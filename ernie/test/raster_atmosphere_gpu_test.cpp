@@ -1251,3 +1251,50 @@ TEST_F(RasterDelegateTest, TheEclipsedMoonGlowsRed) {
     EXPECT_LT(red, 1e-2);
     EXPECT_GT(red, 10.0 * blue);
 }
+
+TEST_F(RasterDelegateTest, EveryDistantLightLightsTheAir) {
+    // The sun up, or set with a second distant light of its own
+    // brightness where it was: the air, the sky and the ground see the
+    // same light either way.
+    const double e = 30.0 * kPi / 180.0;
+    const double set = -40.0 * kPi / 180.0;
+    const auto render = [&](bool second, bool sky) {
+        Scene scene = FlatScene();
+        ernie::Atmosphere::Define(scene, "/World/Air");
+        const glm::dvec3 up(std::cos(e), 0.0, std::sin(e));
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(
+                      second ? glm::dvec3(std::cos(set), 0.0,
+                                          std::sin(set))
+                             : up));
+        if (second) {
+            ernie::DistantLight::Define(scene, "/World/Twin")
+                .SetShadowEnable(false)
+                .SetTransform(ernie::DistantLightTransform(up));
+        }
+        // Down at the ground from 2 km, or up at the sky 20 degrees
+        // above the horizon, towards the light.
+        const double a = 20.0 * kPi / 180.0;
+        scene.Set("/World/Camera", tokens::kTransform,
+                  sky ? ernie::LookAtTransform(
+                            {0.0, 0.0, 2.0},
+                            {std::cos(a), 0.0, 2.0 + std::sin(a)},
+                            {0.0, 0.0, 1.0})
+                      : ernie::LookAtTransform({0.0, 0.0, 2000.0},
+                                               {0.0, 0.0, 0.0},
+                                               {0.0, 1.0, 0.0}));
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
+    };
+    for (const bool sky : {false, true}) {
+        const std::vector<double> sun = render(false, sky);
+        const std::vector<double> twin = render(true, sky);
+        ASSERT_EQ(sun.size(), twin.size());
+        for (std::size_t b = 0; b < sun.size(); ++b) {
+            EXPECT_GT(sun[b], 0.0);
+            EXPECT_NEAR(twin[b] / sun[b], 1.0, 0.03)
+                << (sky ? "sky" : "ground") << ", band " << b;
+        }
+    }
+}

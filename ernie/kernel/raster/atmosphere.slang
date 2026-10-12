@@ -389,11 +389,39 @@ public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float
                          float3 d, float start, float end, float3 sun, float sunSine,
                          Eclipse eclipse, uint group, uint steps, out float4 radiance,
                          out float4 transmittance) {
+    SkyLights lights;
+    lights.count = 1;
+    lights.towards[0] = float4(sun, sunSine);
+    lights.irradiance[0] = float4(1.0);
+    scatterAlongLights(medium, densities, phases, transmittanceTable, multipleTable, linear, p, d,
+                       start, end, lights, eclipse, group, steps, radiance, transmittance);
+}
+
+// Distant lights the air scatters, such as the sun and earthshine: towards each (xyz) and the
+// sine of its angular radius (w), and its irradiance above the atmosphere in a band group.
+public static const uint kSkyLights = 4;
+// Constituents whose phase functions a march keeps per step: as many as the presets have (air,
+// ozone and haze; carbon dioxide and dust) and one spare.
+static const uint kSkyConstituents = 4;
+public struct SkyLights {
+    public float4 towards[kSkyLights];
+    public float4 irradiance[kSkyLights];
+    public uint count;
+}
+
+// `scatterAlong` for `lights`, the light scattered being theirs (W m^-2 sr^-1 nm^-1) rather than
+// per unit irradiance; the air's coefficients are found once per step for them all.
+public void scatterAlongLights(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+                               StructuredBuffer<float> phases,
+                               Texture2DArray<float4> transmittanceTable,
+                               Texture2DArray<float4> multipleTable, SamplerState linear, float3 p,
+                               float3 d, float start, float end, SkyLights lights, Eclipse eclipse,
+                               uint group, uint steps, out float4 radiance,
+                               out float4 transmittance) {
     let bottom = atmosphereBottom(medium);
     let top = atmosphereTop(medium);
     let constituents = uint(medium[0].z);
     let groups = uint(medium[1].x);
-    let nu = dot(d, sun);
     let crowd = start == 0.0;
     radiance = float4(0.0);
     transmittance = float4(1.0);
@@ -409,27 +437,36 @@ public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float
         let altitude = r - bottom;
         float4 extinction = float4(0.0);
         float4 scattering = float4(0.0);
-        float4 phased = float4(0.0);
+        float4 coefficient[kSkyConstituents];
         for (uint c = 0; c < constituents; ++c) {
             let density = densityAt(medium, densities, c, altitude);
             let sc = density * medium[2 + c * 2 * groups + group];
             let ab = density * medium[2 + c * 2 * groups + groups + group];
             extinction += sc + ab;
             scattering += sc;
-            float4 phase;
-            for (uint k = 0; k < 4; ++k) {
-                phase[k] = phaseAt(medium, phases, c, group * 4 + k, nu);
-            }
-            phased += sc * phase;
+            coefficient[min(c, kSkyConstituents - 1)] = sc;
         }
         let up = point / r;
-        let muSun = dot(up, sun);
-        let toSun = sunTransmittance(transmittanceTable, linear, point, sun, sunSine, group, bottom,
-                                     top);
-        let multiple = multipleScattering(multipleTable, linear, r, muSun, group, bottom, top);
-        let source =
-            (phased * toSun + scattering * multiple) * eclipseVisibility(eclipse, point, sun,
-                                                                         sunSine);
+        var source = float4(0.0);
+        for (uint i = 0; i < lights.count; ++i) {
+            let sun = lights.towards[i].xyz;
+            let sunSine = lights.towards[i].w;
+            let nu = dot(d, sun);
+            float4 phased = float4(0.0);
+            for (uint c = 0; c < min(constituents, kSkyConstituents); ++c) {
+                float4 phase;
+                for (uint k = 0; k < 4; ++k) {
+                    phase[k] = phaseAt(medium, phases, c, group * 4 + k, nu);
+                }
+                phased += coefficient[c] * phase;
+            }
+            let toSun = sunTransmittance(transmittanceTable, linear, point, sun, sunSine, group,
+                                         bottom, top);
+            let multiple =
+                multipleScattering(multipleTable, linear, r, dot(up, sun), group, bottom, top);
+            source += lights.irradiance[i] * (phased * toSun + scattering * multiple) *
+                      eclipseVisibility(eclipse, point, sun, sunSine);
+        }
         let sample = exp(-extinction * step);
         let fraction = select(extinction > 0.0, (1.0 - sample) / max(extinction, 1e-20),
                               float4(step));

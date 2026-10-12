@@ -963,6 +963,38 @@ bool anyBodies() {
     return any(float4(sh.bodies[0].w, sh.bodies[1].w, sh.bodies[2].w, sh.bodies[3].w) > 0.0);
 }
 
+// Whether `lights[k]` is a distant light this view sees, not a dome's direction.
+bool isSkyLight(uint k) {
+    let light = lights[k];
+    return ((sh.view.x >> k) & 1u) != 0 && light.position.w == 0.0 && light.shadow.y < 0.5;
+}
+
+// The distant lights the atmosphere carries (`SkyLights`), with their irradiance in band group
+// `group`: the sun, then the scene's other distant lights this view sees, as many as fit. Each
+// scatters in the air, lights the ground, the bodies and the planet's night side, and shows its
+// disc.
+SkyLights skyLights(uint group) {
+    SkyLights sky;
+    sky.count = 0;
+    if (any(sh.irradiance[group] != 0.0)) {
+        sky.towards[0] = float4(sh.sun.xyz, sh.atmosphere[1].z);
+        sky.irradiance[0] = sh.irradiance[group];
+        sky.count = 1;
+    }
+    let count = min(sh.size.w, kMaxLights);
+    for (uint k = 0; k < count && sky.count < kSkyLights; ++k) {
+        if (!isSkyLight(k)) {
+            continue;
+        }
+        let tangent = lights[k].extentY.w;
+        sky.towards[sky.count] =
+            float4(lights[k].position.xyz, tangent * rsqrt(1.0 + tangent * tangent));
+        sky.irradiance[sky.count] = lights[k].spectrum[group] + lights[k].tinted[group];
+        ++sky.count;
+    }
+    return sky;
+}
+
 // The fraction of the sun's light reaching `world` (relative to the frame's origin, metres) past
 // the celestial bodies, per band (`eclipseVisibility`).
 void sunEclipse(float3 world, out float eclipsed[kMaxBands]) {
@@ -1021,10 +1053,11 @@ uint skyBody(float3 eye, float3 d, float pixelRadius, out float3 point, out floa
 }
 
 // The radiance of celestial body `index` at `point` on it (km from the frame's origin) seen along
-// `d`, per unit sun irradiance, in band group `group`: Lommel-Seeliger reflectance scaled to its
-// normal albedo, a radiance factor of A 2 mu0 / (mu0 + mu), which lights a full moon's disc evenly
-// as the Moon's is; dimmed where the other bodies eclipse the sun there, and the planet, whose
-// atmosphere refracts reddened light into its umbra (`planetShadow`).
+// `d` in band group `group`, lit by each of the sky's distant lights (`skyLights`):
+// Lommel-Seeliger reflectance scaled to its normal albedo, a radiance factor of
+// A 2 mu0 / (mu0 + mu), which lights a full moon's disc evenly as the Moon's is; dimmed where the
+// other bodies eclipse the light there, and the planet, whose atmosphere refracts reddened light
+// into its umbra (`planetShadow`, whose table takes the sun's size for every light).
 //
 // References:
 // - B. Hapke, "Theory of Reflectance and Emittance Spectroscopy", 2nd ed., Cambridge University
@@ -1036,19 +1069,29 @@ uint skyBody(float3 eye, float3 d, float pixelRadius, out float3 point, out floa
 float4 bodyRadiance(uint index, float3 point, float3 d, uint group) {
     let body = sh.bodies[index];
     let normal = normalize(point - body.xyz);
-    let mu0 = dot(normal, sh.sun.xyz);
     let mu = max(dot(normal, -d), 0.0);
-    if (mu0 <= 0.0) {
-        return float4(0.0);
+    let sky = skyLights(group);
+    let eclipse = bodiesEclipse(group, float3(0.0), index);
+    var lit = float4(0.0);
+    for (uint i = 0; i < sky.count; ++i) {
+        let towards = sky.towards[i].xyz;
+        let sine = sky.towards[i].w;
+        let mu0 = dot(normal, towards);
+        if (mu0 <= 0.0) {
+            continue;
+        }
+        var visible = eclipseVisibility(eclipse, point, towards, sine);
+        if (sh.atmosphere[1].y != 0.0) {
+            // The planet's shadow follows the transmittance in its table.
+            let groups = (uint(sh.range.z) + 3) / 4;
+            visible *= planetShadow(atmosphereTransmittance, tableSampler,
+                                    sh.atmosphere[0].xyz - point, towards, sine,
+                                    groupWavelengths(group), groups + group, sh.atmosphere[1].x);
+        }
+        lit += sky.irradiance[i] * 2.0 * mu0 / (mu0 + mu) * visible;
     }
-    var visible = eclipseVisibility(bodiesEclipse(group, float3(0.0), index), point, sh.sun.xyz,
-                                    sh.atmosphere[1].z);
-    if (sh.atmosphere[1].y != 0.0) {
-        // The planet's shadow follows the transmittance in its table.
-        let groups = (uint(sh.range.z) + 3) / 4;
-        visible *= planetShadow(atmosphereTransmittance, tableSampler,
-                                sh.atmosphere[0].xyz - point, sh.sun.xyz, sh.atmosphere[1].z,
-                                groupWavelengths(group), groups + group, sh.atmosphere[1].x);
+    if (all(lit == 0.0)) {
+        return float4(0.0);
     }
     let rgb = sh.bodyAlbedo[index].xyz;
     let scale = max(rgb.x, max(rgb.y, rgb.z));
@@ -1058,7 +1101,7 @@ float4 bodyRadiance(uint index, float3 point, float3 d, uint group) {
     for (uint k = 0; k < 4; ++k) {
         albedo[k] = modulationAt(coefficients, scale, wavelengths[k]);
     }
-    return albedo * 2.0 * mu0 / (mu0 + mu) / PI * visible;
+    return albedo / PI * lit;
 }
 
 // Celestial bodies over what lies behind them along `d` from `eye` (relative to the frame's
@@ -1079,8 +1122,7 @@ void bodiesSky(inout float radiance[kMaxBands], float3 eye, float3 d, float pixe
         let light = bodyRadiance(index, point, d, group);
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
             let band = group * 4 + k;
-            radiance[band] = lerp(radiance[band], bandValue(sh.irradiance, band) * light[k],
-                                  coverage);
+            radiance[band] = lerp(radiance[band], light[k], coverage);
         }
     }
 }
@@ -1088,8 +1130,8 @@ void bodiesSky(inout float radiance[kMaxBands], float3 eye, float3 d, float pixe
 // The light of the sky and the ground around a surface at `world` (relative to the frame's
 // origin, metres) facing `normal` (its bent normal where geometry occludes part of the sky), seen
 // over the fraction `visibility` of its surroundings: per band, the radiance of a uniform
-// surround giving the same irradiance, per unit sun irradiance above the atmosphere; 0 without an
-// atmosphere. The sky lights it as isotropically over the part of the sky it faces,
+// surround giving the same irradiance, from each of the sky's distant lights (`skyLights`); 0
+// without an atmosphere. The sky lights it as isotropically over the part of the sky it faces,
 // (1 + cos tilt) / 2, of the sky's irradiance on level ground (the sky irradiance table); the
 // ground, Lambertian with the atmosphere's ground albedo and lit by the sun and the sky, over the
 // rest. Both dim as the celestial bodies eclipse the sun here, as if they eclipsed it for all the
@@ -1114,19 +1156,26 @@ void skyLight(float3 world, float3 normal, float visibility, out float light[kMa
     let p = world * 1e-3 - sh.atmosphere[0].xyz;
     let r = max(length(p), bottom);
     let up = normalize(p);
-    let muSun = dot(up, sh.sun.xyz);
     let facing = 0.5 * (1.0 + dot(normal, up));
     for (uint group = 0; group * 4 < bands; ++group) {
-        let sky = skyIrradiance(atmosphereSkyIrradiance, tableSampler, r, muSun, group, bottom,
-                                top);
-        // The ground below, lit by the sun through the air and by the sky.
-        let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, up * bottom,
-                                     sh.sun.xyz, sh.atmosphere[1].z, group, bottom, top);
-        let ground = groundAlbedo(atmosphereMedium, group) *
-                     (toSun * max(muSun, 0.0) + sky);
-        let eclipsed = eclipseVisibility(bodiesEclipse(group, float3(0.0)), world * 1e-3,
-                                         sh.sun.xyz, sh.atmosphere[1].z);
-        let surround = (sky * facing + ground * (1.0 - facing)) * visibility * eclipsed / PI;
+        let sources = skyLights(group);
+        let eclipse = bodiesEclipse(group, float3(0.0));
+        let albedo = groundAlbedo(atmosphereMedium, group);
+        var surround = float4(0.0);
+        for (uint i = 0; i < sources.count; ++i) {
+            let towards = sources.towards[i].xyz;
+            let sine = sources.towards[i].w;
+            let muSun = dot(up, towards);
+            let sky = skyIrradiance(atmosphereSkyIrradiance, tableSampler, r, muSun, group,
+                                    bottom, top);
+            // The ground below, lit by the light through the air and by the sky.
+            let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, up * bottom,
+                                         towards, sine, group, bottom, top);
+            let ground = albedo * (toSun * max(muSun, 0.0) + sky);
+            surround += sources.irradiance[i] * (sky * facing + ground * (1.0 - facing)) *
+                        eclipseVisibility(eclipse, world * 1e-3, towards, sine);
+        }
+        surround *= visibility / PI;
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
             light[group * 4 + k] = surround[k];
         }
@@ -1140,9 +1189,9 @@ static const uint kAerialSteps = 32;
 
 // Aerial perspective: the atmosphere between the eye and the surface point `world` (relative to
 // the frame's origin, metres) seen through the pixel at `ndc`. Per band, the transmittance across
-// it and the sun's light it scatters towards the eye, per unit irradiance; 1 and 0 without an
-// atmosphere. The eye is the camera's centre, the near plane's point for an orthographic camera,
-// or the row's pose for a pushbroom.
+// it and the light of the sky's distant lights (`skyLights`) it scatters towards the eye; 1 and 0
+// without an atmosphere. The eye is the camera's centre, the near plane's point for an
+// orthographic camera, or the row's pose for a pushbroom.
 void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBands],
                        out float scattered[kMaxBands]) {
     let bands = uint(sh.range.z);
@@ -1177,10 +1226,11 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
     for (uint group = 0; group * 4 < bands; ++group) {
         float4 light;
         float4 through;
-        scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                     atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d, max(start, 0.0),
-                     end, sh.sun.xyz, sh.atmosphere[1].z, bodiesEclipse(group, sh.atmosphere[0].xyz),
-                     group, kAerialSteps, light, through);
+        scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                           atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
+                           max(start, 0.0), end, skyLights(group),
+                           bodiesEclipse(group, sh.atmosphere[0].xyz), group, kAerialSteps, light,
+                           through);
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
             transmittance[group * 4 + k] = through[k];
             scattered[group * 4 + k] = light[k];
@@ -1189,11 +1239,12 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
 }
 
 // The atmosphere between the eye at `origin` (relative to the frame's origin, metres) and the
-// dome and stars along `d`: their light dims by its transmittance and the sun's light it scatters
-// adds; the sun's disc, of `pixelSolidAngle` or larger, shows dimmed through it; and a ray that
-// meets the planet where no geometry is drawn sees its ground, a Lambertian surface of the ground
-// albedo lit by the dimmed sun. Celestial bodies show in front of the sun, the dome and the stars
-// (`bodyRadiance`), and eclipse the sun for the air and the ground (`eclipseVisibility`).
+// dome and stars along `d`: their light dims by its transmittance and the light of the sky's
+// distant lights (`skyLights`) it scatters adds; their discs, of `pixelSolidAngle` or larger,
+// show dimmed through it; and a ray that meets the planet where no geometry is drawn sees its
+// ground, a Lambertian surface of the ground albedo lit by the dimmed lights. Celestial bodies
+// show in front of the lights' discs, the dome and the stars (`bodyRadiance`), and eclipse the
+// lights for the air and the ground (`eclipseVisibility`).
 void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                    float pixelSolidAngle) {
     if ((sh.sky.x & kSkyAtmosphere) == 0 || sh.atmosphere[1].y == 0.0) {
@@ -1202,8 +1253,6 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
     let bands = uint(sh.range.z);
     let bottom = sh.atmosphere[0].w;
     let top = sh.atmosphere[1].x;
-    let sunSine = sh.atmosphere[1].z;
-    let sun = sh.sun.xyz;
     let pixelRadius = sqrt(pixelSolidAngle / PI);
     let p = aboveGround(origin * 1e-3 - sh.atmosphere[0].xyz, bottom);
     float start;
@@ -1221,18 +1270,24 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
         var escapes = bool4(!ground);
         var vertical = float3(0.0, 0.0, 1.0);
         let eclipse = bodiesEclipse(group, sh.atmosphere[0].xyz);
+        let sources = skyLights(group);
         if (inside) {
-            scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                         atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d, start,
-                         end, sun, sunSine, eclipse, group, kSkySteps, scattered, transmittance);
+            scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                               atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
+                               start, end, sources, eclipse, group, kSkySteps, scattered,
+                               transmittance);
             if (ground) {
                 let hit = p + end * d;
                 let up = normalize(hit);
-                let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, hit, sun,
-                                             sunSine, group, bottom, top);
-                groundLight = groundAlbedo(atmosphereMedium, group) / PI * toSun *
-                              saturate(dot(up, sun)) * eclipseVisibility(eclipse, hit, sun,
-                                                                         sunSine);
+                for (uint i = 0; i < sources.count; ++i) {
+                    let towards = sources.towards[i].xyz;
+                    let sine = sources.towards[i].w;
+                    let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, hit,
+                                                 towards, sine, group, bottom, top);
+                    groundLight += sources.irradiance[i] * toSun * saturate(dot(up, towards)) *
+                                   eclipseVisibility(eclipse, hit, towards, sine);
+                }
+                groundLight *= groundAlbedo(atmosphereMedium, group) / PI;
             }
             let first = p + start * d;
             let r = length(first);
@@ -1257,48 +1312,57 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                     !grazingGround) {
                     float4 light;
                     float4 through;
-                    scatterAlong(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                                 atmosphereTransmittance, atmosphereMultiple, tableSampler, p,
-                                 along, grazingStart, grazingEnd, sun, sunSine, eclipse, group,
-                                 kSkySteps, light, through);
+                    scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                       atmosphereTransmittance, atmosphereMultiple, tableSampler,
+                                       p, along, grazingStart, grazingEnd, sources, eclipse, group,
+                                       kSkySteps, light, through);
                     scattered = select(escapes, light, scattered);
                     transmittance = select(escapes, through, transmittance);
                 }
             }
         }
-        // A sun disc smaller than the pixel shows dimmed by the bodies as a whole, from the eye;
-        // a larger one shows where no body covers it.
-        let resolved = pixelSolidAngle <= PI * sunSine * sunSine;
-        let eyeVisible = resolved || !anyBodies() ? float4(1.0)
-                                                  : eclipseVisibility(eclipse, p, sun, sunSine);
+        // A light's disc smaller than the pixel shows dimmed by the bodies as a whole, from the
+        // eye; a larger one shows where no body covers it.
+        bool resolved[kSkyLights];
+        float4 eyeVisible[kSkyLights];
+        for (uint i = 0; i < sources.count; ++i) {
+            let sine = sources.towards[i].w;
+            resolved[i] = pixelSolidAngle <= PI * sine * sine;
+            eyeVisible[i] = resolved[i] || !anyBodies()
+                                ? float4(1.0)
+                                : eclipseVisibility(eclipse, p, sources.towards[i].xyz, sine);
+        }
         for (uint k = 0; k < 4; ++k) {
             let band = group * 4 + k;
             if (band >= bands) {
                 break;
             }
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
-            let irradiance = bandValue(sh.irradiance, band);
             let beyond = turnTowardsZenith(d, vertical, -bending[k]);
-            var behind = irradiance * groundLight[k];
+            var behind = groundLight[k];
             if (escapes[k]) {
                 // A celestial body in front of the stars and the dome, its limb's pixels
-                // partly covering them; and in front of the sun, where the pixel's centre lies on
-                // it: in a total eclipse the Moon is barely larger than the sun, and a partly
-                // covered pixel would let the sun's light through all around its limb.
+                // partly covering them; and in front of a light's disc, where the pixel's centre
+                // lies on it: in a total eclipse the Moon is barely larger than the sun, and a
+                // partly covered pixel would let the sun's light through all around its limb.
                 behind = radiance[band];
-                var sunShows = eyeVisible[k];
+                var covered = false;
                 float3 point;
                 float coverage;
                 let index = skyBody(origin * 1e-3, beyond, pixelRadius, point, coverage);
                 if (index < 4) {
                     let light = bodyRadiance(index, point, beyond, group);
-                    behind = lerp(behind, irradiance * light[k], coverage);
-                    sunShows *= resolved && coverage >= 0.5 ? 0.0 : 1.0;
+                    behind = lerp(behind, light[k], coverage);
+                    covered = coverage >= 0.5;
                 }
-                behind += irradiance * sunShows *
-                          sunDisc(beyond, sun, sunSine, wavelength, pixelSolidAngle);
+                for (uint i = 0; i < sources.count; ++i) {
+                    let shows = resolved[i] && covered ? 0.0 : eyeVisible[i][k];
+                    behind += sources.irradiance[i][k] * shows *
+                              sunDisc(beyond, sources.towards[i].xyz, sources.towards[i].w,
+                                      wavelength, pixelSolidAngle);
+                }
             }
-            radiance[band] = behind * transmittance[k] + irradiance * scattered[k];
+            radiance[band] = behind * transmittance[k] + scattered[k];
         }
     }
 }
@@ -1307,16 +1371,29 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
 // the frame's origin, metres) along `towards`, the sun's apparent direction there
 // (`apparentDirection`), so the ground stays lit while the refracted sun still shows above its
 // horizon; 1 without an atmosphere. The sun's irradiance is then what arrives above the
-// atmosphere.
-float sunAtmosphereTransmittance(float3 world, float3 towards, uint band) {
+// atmosphere. `sine` is the sine of its angular radius; another distant light's likewise.
+float sunAtmosphereTransmittance(float3 world, float3 towards, uint band, float sine) {
     if (sh.atmosphere[1].y == 0.0) {
         return 1.0;
     }
     let p = world * 1e-3 - sh.atmosphere[0].xyz;
-    let groups = sunTransmittance(atmosphereTransmittance, tableSampler, p, towards,
-                                  sh.atmosphere[1].z, band / 4, sh.atmosphere[0].w,
-                                  sh.atmosphere[1].x);
+    let groups = sunTransmittance(atmosphereTransmittance, tableSampler, p, towards, sine,
+                                  band / 4, sh.atmosphere[0].w, sh.atmosphere[1].x);
     return groups[band % 4];
+}
+
+// The fraction of distant light `k`'s light, from its apparent direction `apparent` there, that
+// reaches `world` (relative to the frame's origin, metres) in band `band`, through the air and
+// past the celestial bodies, as the sun's does (`sunAtmosphereTransmittance`, `sunEclipse`).
+float distantLightThrough(uint k, float3 world, float3 apparent, uint band) {
+    let tangent = lights[k].extentY.w;
+    let sine = tangent * rsqrt(1.0 + tangent * tangent);
+    var through = sunAtmosphereTransmittance(world, apparent, band, sine);
+    if (anyBodies()) {
+        through *= eclipseVisibility(bodiesEclipse(band / 4, float3(0.0)), world * 1e-3,
+                                     lights[k].position.xyz, sine)[band % 4];
+    }
+    return through;
 }
 
 static const uint kHorizonLevels = 4;
@@ -1699,6 +1776,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let apparentSun = apparentDirection(world, sh.sun.xyz);
     float eclipsed[kMaxBands];
     sunEclipse(world, eclipsed);
+    // The other distant lights likewise, each dimmed through the air and past the bodies.
+    let throughAir = sh.atmosphere[1].y != 0.0 || anyBodies();
+    float3 apparentLights[kMaxLights];
+    for (uint k = 0; k < lightCount; ++k) {
+        apparentLights[k] = throughAir && lightScales[k] > 0.0 && isSkyLight(k)
+                                ? apparentDirection(world, lights[k].position.xyz)
+                                : float3(0.0);
+    }
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 bandIrradiance = float3(0.0);
@@ -1708,7 +1793,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             bandAlbedo[k] = bandValue(material.reflectance, band) * albedo.x *
                             modulationAt(coefficients, scale, wavelength);
             bandIrradiance[k] = bandValue(sh.irradiance, band) *
-                                sunAtmosphereTransmittance(world, apparentSun, band) *
+                                sunAtmosphereTransmittance(world, apparentSun, band,
+                                                           sh.atmosphere[1].z) *
                                 eclipsed[band];
         }
         // How the model reflects light from all around: the scene's ambient light (from every
@@ -1736,7 +1822,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 radiance[j] += bandValue(material.emission, band);
             }
             // The atmosphere's sky and ground around it, diffusely.
-            radiance[j] += environment.diffuse[j] * bandValue(sh.irradiance, band) * surround[band];
+            radiance[j] += environment.diffuse[j] * surround[band];
             if (domeScale > 0.0) {
                 radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);
@@ -1759,6 +1845,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 let band = min(first + j, bands - 1);
                 lightSpectrum[j] = bandValue(lights[k].spectrum, band) * lightFocus[k] +
                                    bandValue(lights[k].tinted, band);
+                if (any(apparentLights[k] != 0.0)) {
+                    lightSpectrum[j] *= distantLightThrough(k, world, apparentLights[k], band);
+                }
             }
             // A dome's direction stands for its diffuse light alone: the model's diffuse
             // response to surrounding light times cos(i), as a Lambertian radiance factor (the
@@ -1773,8 +1862,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
             let band = first + k;
             spectral[int3(id.xy, id.z * bands + band)] =
-                radiance[k] * aerialTransmittance[band] +
-                bandValue(sh.irradiance, band) * aerialScattered[band];
+                radiance[k] * aerialTransmittance[band] + aerialScattered[band];
         }
     }
 }
