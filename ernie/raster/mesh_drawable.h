@@ -837,6 +837,9 @@ class MeshDrawable : public RasterDrawable {
     mutable std::vector<std::size_t>
         viewCalls_;  ///< Per view, the draw calls it recorded last.
     std::vector<const GraphicsPipeline*> itemPipelines_;
+    /// Per draw, its material as the renderer has it (the default for
+    /// one it lacks), as of `WriteDraws`.
+    std::vector<std::uint32_t> itemMaterials_;
 
     /// Points and instance arrays are double-buffered for motion
     /// blur: two halves of `pointTotal_` points or `instanceTotal_`
