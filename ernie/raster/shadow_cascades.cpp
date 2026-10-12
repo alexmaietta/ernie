@@ -112,10 +112,21 @@ FitCascades(const CameraView& camera, float shadowDistance,
     const float depthPadding = 0.01f * (sceneFar - sceneNear) + 1e-3f;
 
     const float res = static_cast<float>(resolution);
-    const float start = std::max(splitNear, camera.nearPlane);
+    // The span in quarter stops (powers of 2^(1/4)), the start down
+    // and the distance up: a span that drifts as the view turns or
+    // what it sees changes keeps the same cascades, whose snapped
+    // texels then hold still, until it crosses a step.
+    const auto quarterStop = [](float depth, bool up) {
+        const float stops = 4.0f * std::log2(std::max(depth, 1e-6f));
+        return std::exp2((up ? std::ceil(stops) : std::floor(stops)) /
+                         4.0f);
+    };
+    const float start =
+        std::max(quarterStop(splitNear, false), camera.nearPlane);
     const std::vector<float> splits = PracticalSplits(
-        start, std::max(shadowDistance, start * 1.001f), count,
-        lambda);
+        start,
+        std::max(quarterStop(shadowDistance, true), start * 1.001f),
+        count, lambda);
     std::vector<ShadowCascade> cascades;
     for (int c = 0; c < count; ++c) {
         ShadowCascade cascade;

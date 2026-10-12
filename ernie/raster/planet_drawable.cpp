@@ -547,15 +547,19 @@ void PlanetDrawable::Prepare(
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
         const glm::vec3 eye(lodEyes_.front() - Offset());
-        // A view the GPU fits, or one moving across the shutter,
-        // draws every patch: its matrix here is only an estimate, or
-        // one of its sub-frames'.
+        // A view the GPU fits culls by the box holding every one it
+        // may fit, when it has one; without, or moving across the
+        // shutter, it draws every patch: its matrix here is only an
+        // estimate, or one of its sub-frames'.
+        const ShadowCascade& cascade = cascades[c];
         const Frustum light = Shifted(
-            Frustum::FromMatrix(cascades[c].lightViewProjection),
+            Frustum::FromMatrix(cascade.cullViewProjection.value_or(
+                cascade.lightViewProjection)),
             -eye);
-        Select(lodEyes_.front(), ranges,
-               cascades[c].gpuFitted || cascades[c].moving ? nullptr
-                                                           : &light);
+        const bool culls =
+            !cascade.moving &&
+            (!cascade.gpuFitted || cascade.cullViewProjection);
+        Select(lodEyes_.front(), ranges, culls ? &light : nullptr);
         cascadeRanges_[c] = {
             first,
             static_cast<std::uint32_t>(patches_.size()) - first};

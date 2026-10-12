@@ -90,7 +90,9 @@ TEST(FitCascades, CoversEveryFrustumSliceAndTheWholeScene) {
                     0.8f, kResolution);
     ASSERT_EQ(cascades.size(), 4u);
     EXPECT_FLOAT_EQ(cascades.front().splitNear, camera.nearPlane);
-    EXPECT_FLOAT_EQ(cascades.back().splitFar, 1200.0f);
+    // The distance up to the next quarter stop.
+    EXPECT_GE(cascades.back().splitFar, 1200.0f);
+    EXPECT_LT(cascades.back().splitFar, 1200.0f * std::exp2(0.25f));
 
     for (std::size_t c = 0; c < cascades.size(); ++c) {
         const ShadowCascade& cascade = cascades[c];
@@ -292,5 +294,25 @@ TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
                     << "cascade " << c;
             }
         }
+    }
+}
+
+// A shadow distance that drifts within a quarter stop, as the view
+// turns, gives the same cascades: their snapped texels hold still.
+TEST(FitCascades, DriftingDistancesKeepTheCascades) {
+    const CameraView camera = TestCamera();
+    const glm::vec3 toSun =
+        glm::normalize(glm::vec3(0.6f, -0.3f, 0.5f));
+    const auto fit = [&](float distance) {
+        return FitCascades(camera, distance, toSun, kSceneMin,
+                           kSceneMax, 4, 0.8f, kResolution);
+    };
+    const auto a = fit(1030.0f);
+    const auto b = fit(1060.0f);
+    ASSERT_EQ(a.size(), b.size());
+    for (std::size_t c = 0; c < a.size(); ++c) {
+        EXPECT_EQ(a[c].splitFar, b[c].splitFar) << "cascade " << c;
+        EXPECT_EQ(a[c].lightViewProjection, b[c].lightViewProjection)
+            << "cascade " << c;
     }
 }
