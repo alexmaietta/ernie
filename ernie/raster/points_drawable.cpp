@@ -710,7 +710,8 @@ void PointsDrawable::Prepare(
                 glm::mat4(item.below),
                 anchors_->AnchorSlot(item.anchorInstancer,
                                      item.anchorRow),
-                static_cast<std::uint32_t>(i));
+                static_cast<std::uint32_t>(i),
+                anchors_->AnchorOps(item.anchorInstancer));
         }
         std::memcpy(draw.model, glm::value_ptr(model),
                     sizeof(draw.model));

@@ -147,6 +147,12 @@ class RasterDelegate : public RenderDelegate {
                     std::string_view attribute,
                     std::uintptr_t stream = 1) override;
 
+    /// As `RenderDelegate::MapOverlay`: over the overlay pass's batch
+    /// buffer (`OverlayPass::MapBatchArray`).
+    Tensor MapOverlay(Scene& scene, std::string_view overlay,
+                      std::size_t batch, std::string_view array,
+                      std::uintptr_t stream = 1) override;
+
     /// `Info().viewVars`, then the AOVs of the view's chain as
     /// "aov:<name>".
     std::vector<std::string> ViewVars() const override;
@@ -350,6 +356,21 @@ class RasterDelegate : public RenderDelegate {
     /// stack), as `GpuAnchor`.
     std::optional<GpuAnchor> GpuAnchorOf(const Scene& scene,
                                          const Path& path) const;
+
+    /// Where an overlay anchor is this frame (`OverlayAnchorPose`):
+    /// under its GPU anchor, else at its world transform (the world's
+    /// origin for a prim that does not exist), resolved once per
+    /// scene version.
+    OverlayAnchorPose OverlayAnchorOf(const Scene& scene,
+                                      const Path& path) const;
+    struct OverlayAnchor {
+        std::uint64_t scene = 0;
+        std::uint64_t version = 0;
+        std::optional<GpuAnchor> gpu;
+        glm::dmat4 world{1.0};
+    };
+    mutable std::unordered_map<Path, OverlayAnchor> overlayAnchors_;
+    std::uint64_t overlayAnchorsScene_ = 0;  ///< Their scene's id.
     /// `HostArrayReader` of `scene`: GPU arrays the CPU plans with
     /// (worlds), copied to the host once per write (waiting for their
     /// streams) and kept until written again.

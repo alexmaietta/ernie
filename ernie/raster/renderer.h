@@ -473,6 +473,11 @@ class RasterRenderer {
     /// Connects the compute device overlay batches' GPU arrays are
     /// copied from (`OverlayPass::SetComputeInterop`).
     void SetOverlayComputeInterop(ComputeInterop* compute);
+    /// The overlays' pass, to pose their anchors and map their
+    /// batches' arrays.
+    OverlayPass& Overlays() {
+        return *overlays_;
+    }
     /// Connects the compute device volumes' grid arrays are copied
     /// from (`VolumePass::SetComputeInterop`).
     void SetVolumeComputeInterop(ComputeInterop* compute);

@@ -20,9 +20,65 @@ namespace {
 /// never repeats one.
 std::atomic<std::uint64_t> nextVersion{1};
 
-OverlayItem ItemOf(const OverlayStyle& style,
-                   const glm::vec4& color) {
-    return {color, style.depth, style.world};
+/// The font's glyphs, drawn by stb_easy_font into bit rows.
+std::array<OverlayGlyph, 95> MakeGlyphs() {
+    std::array<OverlayGlyph, 95> glyphs{};
+    std::vector<char> buffer(64 * 1024);
+    struct Vertex {
+        float x, y, z;
+        unsigned char color[4];
+    };
+    for (int c = 32; c < 127; ++c) {
+        OverlayGlyph& glyph =
+            glyphs[static_cast<std::size_t>(c - 32)];
+        char text[2] = {static_cast<char>(c), 0};
+        glyph.advance =
+            static_cast<std::uint8_t>(stb_easy_font_width(text));
+        const int quads = stb_easy_font_print(
+            0.0f, 0.0f, text, nullptr, buffer.data(),
+            static_cast<int>(buffer.size()));
+        const auto* vertices =
+            reinterpret_cast<const Vertex*>(buffer.data());
+        int x0 = kOverlayGlyphCell;
+        int y0 = kOverlayGlyphCell;
+        int x1 = 0;
+        int y1 = 0;
+        for (int q = 0; q < quads; ++q) {
+            // Quads on the unit grid, from corner 0 to corner 2.
+            const int qx0 = static_cast<int>(vertices[4 * q].x);
+            const int qy0 = static_cast<int>(vertices[4 * q].y);
+            const int qx1 = static_cast<int>(vertices[4 * q + 2].x);
+            const int qy1 = static_cast<int>(vertices[4 * q + 2].y);
+            for (int y = std::max(qy0, 0);
+                 y < std::min(qy1, kOverlayGlyphCell); ++y) {
+                for (int x = std::max(qx0, 0);
+                     x < std::min(qx1, kOverlayGlyphCell); ++x) {
+                    glyph.rows[static_cast<std::size_t>(y)] |=
+                        static_cast<std::uint16_t>(1u << x);
+                    x0 = std::min(x0, x);
+                    y0 = std::min(y0, y);
+                    x1 = std::max(x1, x + 1);
+                    y1 = std::max(y1, y + 1);
+                }
+            }
+        }
+        if (x1 > x0) {
+            glyph.box = {static_cast<std::uint8_t>(x0),
+                         static_cast<std::uint8_t>(y0),
+                         static_cast<std::uint8_t>(x1),
+                         static_cast<std::uint8_t>(y1)};
+        }
+    }
+    return glyphs;
+}
+
+/// The printable ASCII of `text`, '?' for anything else.
+std::string Ascii(std::string_view text) {
+    std::string ascii;
+    for (const char c : text) {
+        ascii.push_back(c == '\n' || (c >= 32 && c < 127) ? c : '?');
+    }
+    return ascii;
 }
 
 /// Two unit vectors perpendicular to unit `n` and to each other.
@@ -56,8 +112,42 @@ void CheckIndices(std::span<const glm::dvec3> points,
 
 }  // namespace
 
+std::span<const OverlayGlyph> OverlayGlyphs() {
+    static const std::array<OverlayGlyph, 95> glyphs = MakeGlyphs();
+    return glyphs;
+}
+
+glm::vec2 OverlayTextSize(std::string_view text, float size) {
+    std::string ascii = Ascii(text);
+    if (ascii.empty()) {
+        return glm::vec2(0.0f);
+    }
+    const float scale = size / kOverlayLineHeight;
+    // The last line's capitals and descenders, not its spacing.
+    return {static_cast<float>(stb_easy_font_width(ascii.data())) *
+                scale,
+            (static_cast<float>(stb_easy_font_height(ascii.data())) -
+             3.0f) *
+                scale};
+}
+
 Overlay::Overlay() {
     Touch();
+}
+
+OverlayItem Overlay::ItemOf(const OverlayStyle& style,
+                            const glm::vec4& color) {
+    OverlayItem item{color, style.depth, style.world};
+    if (!style.anchor.IsEmpty()) {
+        const auto found =
+            std::find(anchors_.begin(), anchors_.end(), style.anchor);
+        item.anchor =
+            static_cast<std::uint32_t>(found - anchors_.begin()) + 1;
+        if (found == anchors_.end()) {
+            anchors_.push_back(style.anchor);
+        }
+    }
+    return item;
 }
 
 Overlay& Overlay::Touch() {
@@ -70,18 +160,35 @@ Overlay& Overlay::Clear() {
     triangles_.clear();
     sprites_.clear();
     batches_.clear();
+    anchors_.clear();
     Touch();
     return *this;
 }
 
 std::size_t OverlayBatch::Count() const {
-    return points.Empty()
-               ? 0
-               : static_cast<std::size_t>(points.Elements()) / 3;
+    if (points.Empty()) {
+        return kind == OverlayBatchKind::Numbers
+                   ? static_cast<std::size_t>(values.Elements())
+                   : 0;
+    }
+    return static_cast<std::size_t>(points.Elements()) / 3 /
+           TrailLength();
+}
+
+std::size_t OverlayBatch::TrailLength() const {
+    return kind == OverlayBatchKind::Trails && points.Rank() == 3
+               ? std::max<std::size_t>(
+                     static_cast<std::size_t>(points.Shape()[1]), 1)
+               : 1;
 }
 
 Overlay& Overlay::Batch(OverlayBatch batch) {
     using Kind = OverlayBatchKind;
+    const Kind kind = batch.kind;
+    // Screen numbers may go without points, at their placement.
+    const bool placed = kind == Kind::Numbers && batch.screen;
+    const Tensor& lead =
+        placed && batch.points.Empty() ? batch.values : batch.points;
     const auto require = [&](const Tensor& array, const char* what,
                              std::int64_t columns, DType type,
                              bool needed) {
@@ -104,7 +211,7 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
                 std::string("Overlay ") + what + " must have " +
                 std::to_string(columns) + " numbers per item");
         }
-        if (array.Location() != batch.points.Location()) {
+        if (array.Location() != lead.Location()) {
             throw std::invalid_argument(
                 std::string("Overlay ") + what +
                 " must be on the same device as the points");
@@ -116,8 +223,69 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
                 " must have one row per item");
         }
     };
-    const Kind kind = batch.kind;
-    require(batch.points, "points", 3, DType::Float32, true);
+    if (batch.screen && kind != Kind::Numbers) {
+        throw std::invalid_argument(
+            "Only overlay numbers go on the screen");
+    }
+    if (kind == Kind::Trails && batch.points.Rank() != 3) {
+        throw std::invalid_argument(
+            "Overlay trails' points must be (items, length, 3)");
+    }
+    // A trail's arrays have a row per trail (`Count`), its points a
+    // row per point of each.
+    if (kind == Kind::Trails) {
+        if (!batch.points.IsContiguous() ||
+            batch.points.Type() != DType::Float32 ||
+            batch.points.Shape()[2] != 3) {
+            throw std::invalid_argument(
+                "Overlay trails' points must be contiguous float32 "
+                "(items, length, 3)");
+        }
+    } else {
+        require(batch.points, "points", 3, DType::Float32, !placed);
+    }
+    require(batch.heads, "heads", 1, DType::Int32, false);
+    require(batch.halfHeights, "half heights", 1, DType::Float32,
+            kind == Kind::Capsules);
+    require(batch.poseIndices, "pose indices", 1, DType::Int32,
+            false);
+    if (!batch.count.Empty() &&
+        (batch.count.Type() != DType::Int32 ||
+         batch.count.Elements() != 1 ||
+         batch.count.Location() != lead.Location())) {
+        throw std::invalid_argument(
+            "An overlay batch's count must be one int32 on the "
+            "points' device");
+    }
+    if (!batch.poses.Empty()) {
+        if (batch.poses.Type() != DType::Float32 ||
+            !batch.poses.IsContiguous() ||
+            batch.poses.Elements() % 7 != 0 ||
+            batch.poses.Location() != lead.Location()) {
+            throw std::invalid_argument(
+                "Overlay poses must be contiguous float32 (m, 7) "
+                "rows on the points' device: position, then "
+                "quaternion x, y, z, w");
+        }
+        if (batch.poseIndices.Empty() &&
+            static_cast<std::size_t>(batch.poses.Elements() / 7) <
+                batch.Count()) {
+            throw std::invalid_argument(
+                "Overlay poses must be one per item without pose "
+                "indices");
+        }
+        if (!batch.anchors.empty() || !batch.style.anchor.IsEmpty() ||
+            batch.screen) {
+            throw std::invalid_argument(
+                "Overlay items follow poses or prims, not both, and "
+                "not on the screen");
+        }
+    } else if (!batch.poseIndices.Empty()) {
+        throw std::invalid_argument(
+            "Overlay pose indices need poses");
+    }
+    require(batch.values, "values", 1, DType::Float32,
+            kind == Kind::Numbers);
     require(batch.ends, "ends", 3, DType::Float32,
             kind == Kind::Lines || kind == Kind::Arrows);
     require(batch.halfExtents, "half extents", 3, DType::Float32,
@@ -125,7 +293,7 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
     require(batch.orientations, "orientations", 4, DType::Float32,
             false);
     require(batch.radii, "radii", 1, DType::Float32,
-            kind == Kind::Spheres);
+            kind == Kind::Spheres || kind == Kind::Capsules);
     if (!batch.colors.Empty()) {
         const std::int64_t columns =
             batch.colors.Rank() > 1 ? batch.colors.Shape().back() : 3;
@@ -134,11 +302,71 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
     }
     require(batch.sizes, "sizes", 1, DType::Float32, false);
     require(batch.worlds, "worlds", 1, DType::Int32, false);
+    if (batch.anchors.empty() && !batch.style.anchor.IsEmpty()) {
+        batch.anchors = {batch.style.anchor};
+    }
+    if (batch.screen) {
+        batch.anchors.clear();
+    }
+    if (batch.anchors.size() > 1 &&
+        batch.anchors.size() != batch.Count()) {
+        throw std::invalid_argument(
+            "Overlay anchors must be one, or one per item: " +
+            std::to_string(batch.anchors.size()) + " for " +
+            std::to_string(batch.Count()));
+    }
+    if (batch.format.decimals < 0 || batch.format.decimals > 6) {
+        throw std::invalid_argument(
+            "Overlay numbers take 0 to 6 decimals");
+    }
     if (batch.Count() > 0) {
         batches_.push_back(std::move(batch));
     }
     Touch();
     return *this;
+}
+
+void Overlay::ReplaceBatchArray(std::size_t batch,
+                                std::string_view array,
+                                Tensor values) {
+    if (batch >= batches_.size()) {
+        throw std::invalid_argument("The overlay has no batch " +
+                                    std::to_string(batch));
+    }
+    OverlayBatch& b = batches_[batch];
+    const std::pair<std::string_view, Tensor*> arrays[] = {
+        {"points", &b.points},
+        {"ends", &b.ends},
+        {"half_extents", &b.halfExtents},
+        {"orientations", &b.orientations},
+        {"radii", &b.radii},
+        {"values", &b.values},
+        {"colors", &b.colors},
+        {"sizes", &b.sizes},
+        {"worlds", &b.worlds},
+        {"half_heights", &b.halfHeights},
+        {"heads", &b.heads},
+        {"count", &b.count},
+        {"poses", &b.poses},
+        {"pose_indices", &b.poseIndices}};
+    for (const auto& [name, field] : arrays) {
+        if (name != array) {
+            continue;
+        }
+        if (field->Empty()) {
+            break;
+        }
+        if (values.Type() != field->Type() ||
+            values.Elements() != field->Elements()) {
+            throw std::invalid_argument(
+                "Overlay batch array '" + std::string(array) +
+                "' must keep its type and size");
+        }
+        *field = std::move(values);
+        return;
+    }
+    throw std::invalid_argument("The overlay batch has no array '" +
+                                std::string(array) + "'");
 }
 
 Overlay& Overlay::SetVisible(bool visible) {
@@ -152,7 +380,8 @@ Overlay& Overlay::SetVisible(bool visible) {
 void Overlay::AddSegment(const glm::dvec3& a, const glm::dvec3& b,
                          const OverlayStyle& style,
                          const glm::vec4& color) {
-    segments_.push_back({a, b, style.width, ItemOf(style, color)});
+    segments_.push_back(
+        {a, b, style.width, ItemOf(style, color), style.dash});
 }
 
 Overlay& Overlay::Line(const glm::dvec3& a, const glm::dvec3& b,
@@ -275,6 +504,66 @@ Overlay& Overlay::Circle(const glm::dvec3& centre,
     return *this;
 }
 
+Overlay& Overlay::Arc(const glm::dvec3& centre,
+                      const glm::dvec3& normal,
+                      const glm::dvec3& from, double radius,
+                      double angle, const OverlayStyle& style,
+                      bool filled, int segments) {
+    const double length = glm::length(normal);
+    if (!(length > 0.0) || segments < 1) {
+        throw std::invalid_argument(
+            "An overlay arc needs a normal and at least 1 segment");
+    }
+    const glm::dvec3 n = normal / length;
+    // `from` in the plane, and a quarter turn on from it.
+    const glm::dvec3 inPlane = from - glm::dot(from, n) * n;
+    if (!(glm::length(inPlane) > 0.0)) {
+        throw std::invalid_argument(
+            "An overlay arc's start must lie off its normal");
+    }
+    const glm::dvec3 u = glm::normalize(inPlane);
+    const glm::dvec3 v = glm::cross(n, u);
+    const auto at = [&](int i) {
+        const double a = angle * i / segments;
+        return centre + radius * (std::cos(a) * u + std::sin(a) * v);
+    };
+    glm::dvec3 previous = at(0);
+    for (int i = 1; i <= segments; ++i) {
+        const glm::dvec3 next = at(i);
+        if (filled) {
+            triangles_.push_back({{centre, previous, next},
+                                  ItemOf(style, style.color)});
+        } else {
+            AddSegment(previous, next, style, style.color);
+        }
+        previous = next;
+    }
+    Touch();
+    return *this;
+}
+
+Overlay& Overlay::Curve(const glm::dvec3& p0, const glm::dvec3& p1,
+                        const glm::dvec3& p2, const glm::dvec3& p3,
+                        const OverlayStyle& style, int segments) {
+    if (segments < 1) {
+        throw std::invalid_argument(
+            "An overlay curve needs at least 1 segment");
+    }
+    const auto at = [&](double t) {
+        const double s = 1.0 - t;
+        return s * s * s * p0 + 3.0 * s * s * t * p1 +
+               3.0 * s * t * t * p2 + t * t * t * p3;
+    };
+    glm::dvec3 previous = p0;
+    for (int i = 1; i <= segments; ++i) {
+        const glm::dvec3 next = at(static_cast<double>(i) / segments);
+        AddSegment(previous, next, style, style.color);
+        previous = next;
+    }
+    Touch();
+    return *this;
+}
+
 Overlay& Overlay::Sphere(const glm::dvec3& centre, double radius,
                          const OverlayStyle& style) {
     for (const glm::dvec3 axis :
@@ -375,62 +664,103 @@ Overlay& Overlay::Markers(std::span<const glm::dvec3> points,
     return *this;
 }
 
+void Overlay::AddText(const glm::dvec3& anchor,
+                      const glm::vec2& corner, std::string_view text,
+                      const OverlayStyle& style, bool screen) {
+    const std::string ascii = Ascii(text);
+    if (ascii.empty()) {
+        return;
+    }
+    const float scale = style.size / kOverlayLineHeight;
+    if (style.background.a > 0.0f) {
+        const float pad = 0.25f * style.size;
+        const glm::vec2 size = OverlayTextSize(ascii, style.size);
+        sprites_.push_back(
+            {anchor,
+             {corner.x - pad, corner.y - pad, corner.x + size.x + pad,
+              corner.y + size.y + pad},
+             MarkerShape::Square,
+             ItemOf(style, style.background),
+             0,
+             screen});
+    }
+    // A sprite per character over the box its pixels fill.
+    const std::span<const OverlayGlyph> glyphs = OverlayGlyphs();
+    glm::vec2 pen(0.0f);
+    for (const char c : ascii) {
+        if (c == '\n') {
+            pen = {0.0f, pen.y + kOverlayLineHeight};
+            continue;
+        }
+        const OverlayGlyph& glyph =
+            glyphs[static_cast<std::size_t>(c - 32)];
+        if (glyph.box[2] > glyph.box[0]) {
+            const glm::vec2 low =
+                corner +
+                (pen + glm::vec2(glyph.box[0], glyph.box[1])) * scale;
+            const glm::vec2 high =
+                corner +
+                (pen + glm::vec2(glyph.box[2], glyph.box[3])) * scale;
+            sprites_.push_back({anchor,
+                                {low.x, low.y, high.x, high.y},
+                                MarkerShape::Square,
+                                ItemOf(style, style.color),
+                                c,
+                                screen});
+        }
+        pen.x += glyph.advance;
+    }
+}
+
 Overlay& Overlay::Label(const glm::dvec3& point,
                         std::string_view text,
                         const OverlayStyle& style) {
-    // stb_easy_font builds each glyph from quads on a grid whose
-    // capitals are 7 units tall and whose lines are 12 apart; scaled
-    // so a line is `size` pixels.
-    std::string ascii;
-    for (const char c : text) {
-        ascii.push_back(c == '\n' || (c >= 32 && c < 127) ? c : '?');
-    }
-    if (ascii.empty()) {
-        Touch();
-        return *this;
-    }
-    const float scale = style.size / 12.0f;
     // To the right of and above the point, so a marker there stays
     // visible.
-    const float lines =
-        static_cast<float>(stb_easy_font_height(ascii.data()));
-    const float width =
-        static_cast<float>(stb_easy_font_width(ascii.data()));
-    const glm::vec2 offset(0.5f * style.size,
-                           -lines * scale - 0.25f * style.size);
-    if (style.background.a > 0.0f) {
-        const float pad = 0.25f * style.size;
-        OverlayItem item = ItemOf(style, style.background);
-        sprites_.push_back({point,
-                            {offset.x - pad, offset.y - pad,
-                             offset.x + width * scale + pad,
-                             offset.y + (lines - 3.0f) * scale + pad},
-                            MarkerShape::Square,
-                            item});
-    }
-    // About 270 bytes of quads per character, at 4 vertices of 16
-    // bytes per quad.
-    std::vector<char> buffer(ascii.size() * 300 + 1024);
-    const int quads = stb_easy_font_print(
-        0.0f, 0.0f, ascii.data(), nullptr, buffer.data(),
-        static_cast<int>(buffer.size()));
-    struct Vertex {
-        float x, y, z;
-        unsigned char color[4];
-    };
-    const auto* vertices =
-        reinterpret_cast<const Vertex*>(buffer.data());
-    for (int q = 0; q < quads; ++q) {
-        const Vertex& first = vertices[4 * q];
-        const Vertex& opposite = vertices[4 * q + 2];
-        sprites_.push_back(
-            {point,
-             {offset.x + first.x * scale, offset.y + first.y * scale,
-              offset.x + opposite.x * scale,
-              offset.y + opposite.y * scale},
-             MarkerShape::Square,
-             ItemOf(style, style.color)});
-    }
+    const float height = OverlayTextSize(text, style.size).y;
+    AddText(point,
+            {0.5f * style.size,
+             -height - 3.0f * style.size / kOverlayLineHeight -
+                 0.25f * style.size},
+            text, style, false);
+    Touch();
+    return *this;
+}
+
+Overlay& Overlay::Text(const ScreenPlacement& placement,
+                       std::string_view text,
+                       const OverlayStyle& style) {
+    const glm::vec2 size = OverlayTextSize(text, style.size);
+    // The backing box's padding stays inside the image at its edges.
+    const float pad =
+        style.background.a > 0.0f ? 0.25f * style.size : 0.0f;
+    const glm::vec2 corner = placement.offset -
+                             placement.Align() * (size + 2.0f * pad) +
+                             pad;
+    OverlayStyle screen = style;
+    screen.depth = OverlayDepth::Always;
+    screen.anchor = Path();
+    AddText(glm::dvec3(placement.at, 0.0), corner, text, screen,
+            true);
+    Touch();
+    return *this;
+}
+
+Overlay& Overlay::Rect(const ScreenPlacement& placement,
+                       const glm::vec2& size,
+                       const OverlayStyle& style) {
+    const glm::vec2 corner =
+        placement.offset - placement.Align() * size;
+    OverlayStyle screen = style;
+    screen.depth = OverlayDepth::Always;
+    screen.anchor = Path();
+    sprites_.push_back(
+        {glm::dvec3(placement.at, 0.0),
+         {corner.x, corner.y, corner.x + size.x, corner.y + size.y},
+         MarkerShape::Square,
+         ItemOf(screen, screen.color),
+         0,
+         true});
     Touch();
     return *this;
 }

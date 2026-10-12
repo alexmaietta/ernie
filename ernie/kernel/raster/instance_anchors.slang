@@ -11,13 +11,18 @@
 // and the largest scale as `info.w`).
 //
 // Bindings: 0 per record its fields (the frame's rows, then below's rows, then the anchor's slot
-// in the pools or ~0 and the index written: nine float4), 1 to 3 the instance pools, 4 what is
-// written.
+// in the pools or ~0, the index written and which pools its instancer fills, kAnchor*: nine
+// float4), 1 to 3 the instance pools, 4 what is written.
 
 static const uint kNone = 0xFFFFFFFFu;
 static const uint kViewPoses = 0;
 static const uint kPointsDraws = 1;
 static const uint kPointsDrawFloats = 44;
+
+// The pools an anchor's instancer fills (`MeshDrawable::AnchorOps`); the others hold nothing of
+// its own, and stand at the identity.
+static const uint kAnchorOrientations = 1;
+static const uint kAnchorScales = 2;
 
 [[vk::binding(0, 0)]] StructuredBuffer<float4> records;
 [[vk::binding(1, 0)]] StructuredBuffer<float> positions;
@@ -30,12 +35,17 @@ float4x4 rows(uint first) {
     return float4x4(records[first], records[first + 1], records[first + 2], records[first + 3]);
 }
 
-// The matrix of translate, rotate (x, y, z, w), scale at instance pool slot `slot`.
-float4x4 anchorMatrix(uint slot) {
+// The matrix of translate, rotate (x, y, z, w), scale at instance pool slot `slot`, of the pools
+// `ops` says it fills.
+float4x4 anchorMatrix(uint slot, uint ops) {
     let t = float3(positions[3 * slot], positions[3 * slot + 1], positions[3 * slot + 2]);
-    let q = normalize(float4(orientations[4 * slot], orientations[4 * slot + 1],
-                             orientations[4 * slot + 2], orientations[4 * slot + 3]));
-    let s = float3(scales[3 * slot], scales[3 * slot + 1], scales[3 * slot + 2]);
+    let q = (ops & kAnchorOrientations) != 0
+                ? normalize(float4(orientations[4 * slot], orientations[4 * slot + 1],
+                                   orientations[4 * slot + 2], orientations[4 * slot + 3]))
+                : float4(0.0, 0.0, 0.0, 1.0);
+    let s = (ops & kAnchorScales) != 0
+                ? float3(scales[3 * slot], scales[3 * slot + 1], scales[3 * slot + 2])
+                : float3(1.0);
     let x = q.x;
     let y = q.y;
     let z = q.z;
@@ -59,7 +69,7 @@ void anchorsMain(uint3 id : SV_DispatchThreadID) {
     let target = asuint(records[first + 8].y);
     float4x4 pose = rows(first);
     if (slot != kNone) {
-        pose = mul(pose, anchorMatrix(slot));
+        pose = mul(pose, anchorMatrix(slot, asuint(records[first + 8].z)));
     }
     pose = mul(pose, rows(first + 4));
     if (constants.y == kViewPoses) {

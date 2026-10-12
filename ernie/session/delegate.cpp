@@ -84,6 +84,13 @@ Tensor RenderDelegate::MapArray(Scene&, const PrimSet&,
                                 " renderer maps no arrays");
 }
 
+Tensor RenderDelegate::MapOverlay(Scene&, std::string_view,
+                                  std::size_t, std::string_view,
+                                  std::uintptr_t) {
+    throw std::invalid_argument("The " + Info().name +
+                                " renderer maps no arrays");
+}
+
 void RenderDelegate::SetMeshWriter(const Path&, MeshWriter,
                                    std::optional<Bounds3>) {
     throw std::invalid_argument("The " + Info().name +

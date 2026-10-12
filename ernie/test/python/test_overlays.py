@@ -5,6 +5,7 @@ from conftest import make_terrain_scene
 
 import ernie
 import ernie.batch
+from ernie import tokens
 
 
 def test_overlays_build_from_python_values():
@@ -313,3 +314,301 @@ def test_overlay_batches_redraw_arrays_written_in_place(renderer):
     columns = lambda image: np.nonzero(magenta(image).any(0))[0]  # noqa: E731
     assert columns(before).size and columns(after).size
     assert columns(after).mean() > columns(before).mean() + 5
+
+
+def test_overlay_gpu_arrays_redraw_without_a_touch(renderer):
+    # GPU arrays are read every frame: written in place, they draw
+    # anew with no touch.
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    wp = pytest.importorskip("warp")
+    scene = batch_scene()
+    points = wp.array(
+        np.float32([[-20, 0, 0]]), dtype=wp.vec3, device="cuda:0"
+    )
+    scene.overlay("debug").points(
+        points,
+        shape="square",
+        size=8,
+        color=(1, 0, 1),
+        depth="always",
+    )
+    before = np.array(renderer.render(scene))
+    points.assign(np.float32([[20, 0, 0]]))
+    after = np.array(renderer.render(scene))
+    assert differing(before, after) > 20
+
+
+def test_overlay_arrays_map_into_the_renderers_memory(renderer):
+    # A batch's points mapped in place: written there, they draw as
+    # the same points given as a host array.
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    wp = pytest.importorskip("warp")
+    style = dict(
+        shape="square", size=8, color=(0, 1, 1), depth="always"
+    )
+    moved = np.float32([[15, -10, 0], [-15, 10, 0]])
+    reference = batch_scene()
+    reference.overlay("debug").points(moved, **style)
+    expected = np.array(renderer.render(reference))
+
+    scene = batch_scene()
+    overlay = scene.overlay("debug").points(
+        renderer.cuda_upload(np.zeros((2, 3), np.float32)), **style
+    )
+    renderer.render(scene)
+    with pytest.raises(ValueError, match="ends"):
+        renderer.map_overlay(scene, "debug", 0, "ends")
+    mapped = wp.from_dlpack(
+        renderer.map_overlay(
+            scene, "debug", overlay.batch_count - 1, "points"
+        )
+    )
+    mapped.assign(moved)
+    np.testing.assert_array_equal(
+        np.array(renderer.render(scene)), expected
+    )
+
+
+def test_overlays_follow_prims_posed_on_the_gpu(renderer):
+    # Markers and labels posed under links whose translations are CUDA
+    # rows draw where the same items in world coordinates do.
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    places = np.float32([[-20, -10, 0], [5, 15, 0], [25, -20, 0]])
+    style = dict(
+        shape="square", size=8, color=(1, 0.5, 0), depth="always"
+    )
+
+    reference = batch_scene()
+    debug = reference.overlay("debug").points(places, **style)
+    debug.label(places[0].tolist(), "link 0", depth="always")
+    expected = np.array(renderer.render(reference))
+
+    scene = batch_scene()
+    links = []
+    for i in range(len(places)):
+        link = scene.define(f"/World/Env{i}/Link", ernie.Xform).set(
+            tokens.XFORM_OP_ORDER, [tokens.TRANSLATE]
+        )
+        links.append(str(link.path))
+    scene.write(links, tokens.TRANSLATE, renderer.cuda_upload(places))
+    debug = scene.overlay("debug").points(
+        np.zeros((3, 3), np.float32), anchors=links, **style
+    )
+    debug.label((0, 0, 0), "link 0", depth="always", anchor=links[0])
+    np.testing.assert_array_equal(
+        np.array(renderer.render(scene)), expected
+    )
+    # Moved on the GPU alone, the overlay unchanged.
+    version = debug.version
+    scene.write(
+        links, tokens.TRANSLATE, renderer.cuda_upload(places + 5)
+    )
+    assert differing(np.array(renderer.render(scene)), expected) > 20
+    assert debug.version == version
+
+
+def test_hud_numbers_print_cuda_values_as_host_text(renderer):
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    values = np.float32([3.14159, -42.0])
+    style = dict(size=12, color=(1, 1, 1), background=(0, 0, 0, 0.6))
+    host = batch_scene()
+    for i, text in enumerate(["sim 3.142 s", "sim -42.000 s"]):
+        host.overlay("hud").text(
+            text, at=(1, 0), offset=(-4, 4 + 18 * i), **style
+        )
+    expected = np.array(renderer.render(host))
+
+    scene = batch_scene()
+    scene.overlay("hud").numbers(
+        renderer.cuda_upload(values),
+        prefix="sim ",
+        suffix=" s",
+        decimals=3,
+        screen=True,
+        at=(1, 0),
+        offset=(-4, 4),
+        **style,
+    )
+    np.testing.assert_array_equal(
+        np.array(renderer.render(scene)), expected
+    )
+
+
+POINT_STYLE = dict(
+    shape="square", size=8, color=(1, 0, 1), depth="always"
+)
+
+
+def render_overlay(renderer, draw):
+    scene = batch_scene()
+    draw(scene.overlay("debug"))
+    return np.array(renderer.render(scene))
+
+
+def test_overlay_counts_draw_only_rows_in_use(renderer):
+    # A count of 2 draws the first two rows; written on the GPU, a new
+    # count draws anew with no touch.
+    expected = render_overlay(
+        renderer, lambda o: o.points(STARTS[:2], **POINT_STYLE)
+    )
+    counted = render_overlay(
+        renderer,
+        lambda o: o.points(
+            STARTS, count=np.int32([2]), **POINT_STYLE
+        ),
+    )
+    np.testing.assert_array_equal(counted, expected)
+    # Sorted by world, as a batched camera's views draw them.
+    worlds = render_overlay(
+        renderer,
+        lambda o: o.points(
+            STARTS,
+            count=np.int32([2]),
+            worlds=np.full(3, -1, np.int32),
+            **POINT_STYLE,
+        ),
+    )
+    np.testing.assert_array_equal(worlds, expected)
+    if not renderer.cuda_available:
+        return
+    wp = pytest.importorskip("warp")
+    count = wp.array(np.int32([0]), dtype=wp.int32, device="cuda:0")
+    scene = batch_scene()
+    scene.overlay("debug").points(
+        renderer.cuda_upload(STARTS), count=count, **POINT_STYLE
+    )
+    empty = np.array(renderer.render(scene))
+    count.assign(np.int32([2]))
+    np.testing.assert_array_equal(
+        np.array(renderer.render(scene)), expected
+    )
+    assert differing(empty, expected) > 20
+
+
+def test_overlay_items_follow_pose_arrays(renderer):
+    # Boxes at their poses' origins, turned by them, from rows of
+    # position and quaternion x, y, z, w, picked by pose indices.
+    expected = render_overlay(
+        renderer,
+        lambda o: o.boxes(
+            STARTS, np.full((3, 3), 3.0), orientations=TURNS, width=3
+        ),
+    )
+    poses = np.concatenate([STARTS, TURNS], axis=1).astype(np.float32)
+    shuffled = poses[[2, 0, 1]]
+    posed = render_overlay(
+        renderer,
+        lambda o: o.boxes(
+            np.zeros((3, 3), np.float32),
+            np.full((3, 3), 3.0),
+            poses=shuffled,
+            pose_indices=np.int32([1, 2, 0]),
+            width=3,
+        ),
+    )
+    assert differing(posed, expected) == 0
+    # A frame moving every pose.
+    frame = np.eye(4)
+    frame[:3, 3] = (5, 0, 0)
+    moved = render_overlay(
+        renderer,
+        lambda o: o.boxes(
+            np.zeros((3, 3), np.float32),
+            np.full((3, 3), 3.0),
+            poses=poses,
+            pose_frame=frame,
+            width=3,
+        ),
+    )
+    shifted = render_overlay(
+        renderer,
+        lambda o: o.boxes(
+            STARTS + np.float32([5, 0, 0]),
+            np.full((3, 3), 3.0),
+            orientations=TURNS,
+            width=3,
+        ),
+    )
+    assert differing(moved, shifted) == 0
+
+
+def test_overlay_directions_scale_vectors_from_the_starts(renderer):
+    vectors = (ENDS - STARTS) * 0.5
+    expected = render_overlay(
+        renderer, lambda o: o.arrows(STARTS, ENDS, width=3)
+    )
+    directed = render_overlay(
+        renderer,
+        lambda o: o.arrows(
+            STARTS, vectors, directions=True, scale=2.0, width=3
+        ),
+    )
+    assert differing(directed, expected) == 0
+
+
+def test_overlay_trails_draw_their_rings_from_the_head(renderer):
+    # A ring of 5 points whose newest is at index 1: segments 1-0,
+    # 0-4, 4-3, 3-2; a NaN point leaves out the segments meeting it.
+    ring = np.float32(
+        [[[0, 0, 0], [-5, 0, 0], [20, 10, 0], [15, 5, 0], [10, 0, 0]]]
+    )
+    order = [1, 0, 4, 3, 2]
+    path = ring[0][order]
+    expected = render_overlay(
+        renderer, lambda o: o.segments(path[:-1], path[1:], width=3)
+    )
+    trailed = render_overlay(
+        renderer,
+        lambda o: o.trails(
+            ring, heads=np.int32([1]), fade=False, width=3
+        ),
+    )
+    assert differing(trailed, expected) == 0
+    gapped = ring.copy()
+    gapped[0, 4] = np.nan
+    expected = render_overlay(
+        renderer,
+        lambda o: o.segments(path[:1], path[1:2], width=3).segments(
+            path[3:4], path[4:5], width=3
+        ),
+    )
+    trailed = render_overlay(
+        renderer,
+        lambda o: o.trails(
+            gapped, heads=np.int32([1]), fade=False, width=3
+        ),
+    )
+    assert differing(trailed, expected) == 0
+
+
+def test_overlay_capsules_draw_around_their_axes(renderer):
+    plain = render_overlay(renderer, lambda o: None)
+    capsule = dict(
+        radii=np.float32([12.0]),
+        half_heights=np.float32([8.0]),
+        width=2,
+        depth="always",
+    )
+    upright = render_overlay(
+        renderer,
+        lambda o: o.capsules(np.float32([[0, 0, 0]]), **capsule),
+    )
+    assert differing(upright, plain) > 50
+    # Half a turn about x: the same capsule.
+    flipped = render_overlay(
+        renderer,
+        lambda o: o.capsules(
+            np.float32([[0, 0, 0]]),
+            orientations=np.float32([[1, 0, 0, 0]]),
+            **capsule,
+        ),
+    )
+    assert differing(flipped, upright) < 20
+    with pytest.raises(ValueError, match="half heights"):
+        ernie.Scene().overlay("o").capsules(
+            np.zeros((1, 3)), np.ones(1), np.ones(2)
+        )

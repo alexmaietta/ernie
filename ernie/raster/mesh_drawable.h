@@ -415,15 +415,21 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t AnchorSlot(std::uint32_t instancer,
                              std::uint32_t row) const;
 
+    /// Which of the pools instance poses of `instancer` hold, for
+    /// records of `RecordAnchors`: 1 orientations, 2 scales; the
+    /// others stand at the identity.
+    std::uint32_t AnchorOps(std::uint32_t instancer) const;
+
     /// Appends a record of `RecordAnchors` to `records` (nine
     /// float4): `frame` (relative to the frame's origin), the
-    /// instance at `slot` (`AnchorSlot`, ~0 for none), then `below`,
-    /// written at index `target`.
+    /// instance at `slot` (`AnchorSlot`, ~0 for none) of the ops
+    /// `ops` (`AnchorOps`), then `below`, written at index `target`.
     static void AppendAnchorRecord(std::vector<glm::vec4>& records,
                                    const glm::mat4& frame,
                                    const glm::mat4& below,
                                    std::uint32_t slot,
-                                   std::uint32_t target);
+                                   std::uint32_t target,
+                                   std::uint32_t ops);
 
     /// Records the pass posing `count` records (`AppendAnchorRecord`)
     /// under their instances into `target` as `output`, after this

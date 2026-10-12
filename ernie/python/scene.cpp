@@ -227,10 +227,16 @@ OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
             style.world = nb::cast<std::int32_t>(value);
         } else if (name == "background") {
             style.background = ColorFromPython(value);
+        } else if (name == "anchor") {
+            style.anchor =
+                value.is_none() ? Path() : PathFromPython(value);
+        } else if (name == "dash") {
+            style.dash = nb::cast<float>(value);
         } else {
             throw nb::type_error(("unknown overlay style '" + name +
-                                  "'; expected color, width, size, "
-                                  "depth, world or background")
+                                  "'; expected color, width, dash, "
+                                  "size, depth, world, "
+                                  "background or anchor")
                                      .c_str());
         }
     }
@@ -239,11 +245,41 @@ OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
 
 constexpr const char* kStyleDoc =
     " Style keywords: color (RGB or RGBA display colour), width "
-    "(line pixels), size (marker or "
+    "(line pixels), dash (dashes' and gaps' pixels, 0 solid), size "
+    "(marker or "
     "text pixels), depth (\"test\", \"xray\" or \"always\"), world "
-    "(-1 for every view) and "
-    "background (labels' backing colour). Returns the overlay, for "
-    "chaining.";
+    "(-1 for every view), "
+    "background (labels' backing colour) and anchor (a prim the "
+    "coordinates are in the space of, followed as it moves, on the "
+    "GPU too). Returns the overlay, for chaining.";
+
+glm::vec2 Vec2FromPython(nb::handle object) {
+    const auto values = nb::cast<std::vector<float>>(object);
+    if (values.size() != 2) {
+        throw nb::value_error("expected two numbers");
+    }
+    return {values[0], values[1]};
+}
+
+/// A `ScreenPlacement` of `at`, `offset` and `align` (None for `at`).
+ScreenPlacement PlacementFromPython(nb::handle at, nb::handle offset,
+                                    nb::handle align) {
+    ScreenPlacement placement;
+    placement.at = Vec2FromPython(at);
+    placement.offset = Vec2FromPython(offset);
+    if (!align.is_none()) {
+        placement.align = Vec2FromPython(align);
+    }
+    return placement;
+}
+
+constexpr const char* kPlacementDoc =
+    " Placed on the image at `at` (fractions of its width and height "
+    "from its top left), moved `offset` pixels (y down), with its "
+    "own "
+    "point `align` (fractions of its size; `at` when None) there, so "
+    "at=(1, 0) is the top right corner. Drawn over everything, in "
+    "every view (or `world`'s).";
 
 /// An overlay batch's array (`OverlayBatch`): one on a GPU adopted as
 /// it is, without copying; a host one as a contiguous NumPy array of
@@ -284,21 +320,64 @@ Overlay& AddBatch(Overlay& overlay, OverlayBatch batch,
         batch.origin = Vec3FromPython(options.origin);
     }
     batch.stream = StreamOf(options.stream);
-    batch.style = StyleFromPython(style);
+    // Per-item anchors, poses, counts and directions beside the
+    // style's keywords.
+    nb::dict rest;
+    for (const auto& [key, value] : style) {
+        const auto name = nb::cast<std::string_view>(key);
+        if (value.is_none() &&
+            (name == "anchors" || name == "count" ||
+             name == "poses" || name == "pose_indices" ||
+             name == "pose_frame")) {
+            continue;
+        }
+        if (name == "anchors") {
+            for (nb::handle path : value) {
+                batch.anchors.push_back(PathFromPython(path));
+            }
+        } else if (name == "count") {
+            batch.count = BatchArray(value, "int32");
+        } else if (name == "poses") {
+            batch.poses = BatchArray(value, "float32");
+        } else if (name == "pose_indices") {
+            batch.poseIndices = BatchArray(value, "int32");
+        } else if (name == "pose_frame") {
+            batch.poseFrame = TransformFromPython(value);
+        } else if (name == "directions") {
+            batch.directions = nb::cast<bool>(value);
+        } else if (name == "scale") {
+            batch.length = nb::cast<double>(value);
+        } else {
+            rest[key] = value;
+        }
+    }
+    batch.style = StyleFromPython(nb::borrow<nb::kwargs>(rest));
     return overlay.Batch(std::move(batch));
 }
 
 constexpr const char* kBatchDoc =
     " Arrays have a row per item and may live on the host or on the "
     "renderer's CUDA device (NumPy, PyTorch, JAX, CuPy, Warp): GPU "
-    "ones are drawn from as they are, without copies to the host, "
-    "written on `stream`; `touch` the overlay after writing into "
-    "them. "
+    "ones are read as they are every frame, without copies to the "
+    "host, written on `stream` (or written in place in the "
+    "renderer's own memory, `Renderer.map_overlay`); `touch` the "
+    "overlay after writing into host ones. "
     "Optional per-item arrays: `colors` (N, 3) or (N, 4) display "
     "colours, line widths or marker sizes in pixels, and `worlds` "
     "(N,) int32, the world whose views show each (batched cameras). "
     "Coordinates are float32, relative to `origin` (a point far "
-    "from the world's origin keeps them precise).";
+    "from the world's origin keeps them precise), or in the space of "
+    "the style's `anchor`, or of `anchors`, one prim per item (each "
+    "world's robot link, followed on the GPU). "
+    "For physics engines: `count`, a (1,) int32 array of the rows in "
+    "use (a contact count), the GPU drawing only those; `poses`, (M, "
+    "7) float32 rows of position then quaternion x, y, z, w (Warp "
+    "transforms, Newton's body_q) the items are posed under, item i "
+    "under pose `pose_indices[i]` (or i), turned on the GPU every "
+    "frame and placed by the 4 x 4 `pose_frame`; and for segments "
+    "and "
+    "arrows `directions=True`, `ends` then vectors from the starts "
+    "times `scale` (velocities, forces).";
 
 void BindOverlay(nb::module_& m) {
     nb::class_<Overlay>(
@@ -311,12 +390,11 @@ void BindOverlay(nb::module_& m) {
         "until `clear`.")
         .def("clear", &Overlay::Clear,
              nb::rv_policy::reference_internal)
-        .def(
-            "touch", &Overlay::Touch,
-            nb::rv_policy::reference_internal,
-            "Marks the overlay changed, so the renderer reads its "
-            "batches' arrays again: after writing into them in place "
-            "(on the GPU, on their stream).")
+        .def("touch", &Overlay::Touch,
+             nb::rv_policy::reference_internal,
+             "Marks the overlay changed, so the renderer reads its "
+             "batches' host arrays again: after writing into them in "
+             "place. GPU arrays are read every frame.")
         .def_prop_rw("visible", &Overlay::IsVisible,
                      [](Overlay& overlay, bool visible) {
                          overlay.SetVisible(visible);
@@ -419,6 +497,45 @@ void BindOverlay(nb::module_& m) {
             nb::arg("centre"), nb::arg("radius"), nb::arg("style"),
             nb::rv_policy::reference_internal,
             (std::string("Three great circles of a sphere.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "arc",
+            [](Overlay& o, nb::handle centre, nb::handle normal,
+               nb::handle start, double radius, double angle,
+               bool filled, int segments,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Arc(
+                    Vec3FromPython(centre), Vec3FromPython(normal),
+                    Vec3FromPython(start), radius, angle,
+                    StyleFromPython(style), filled, segments);
+            },
+            nb::arg("centre"), nb::arg("normal"), nb::arg("start"),
+            nb::arg("radius"), nb::arg("angle"),
+            nb::arg("filled") = false, nb::arg("segments") = 32,
+            nb::arg("style"), nb::rv_policy::reference_internal,
+            (std::string(
+                 "An arc of the circle of `radius` around `centre` "
+                 "in the plane facing `normal`, from direction "
+                 "`start` turning `angle` radians counter-clockwise "
+                 "about `normal`; with `filled`, the sector it "
+                 "sweeps.") +
+             kStyleDoc)
+                .c_str())
+        .def(
+            "curve",
+            [](Overlay& o, nb::handle p0, nb::handle p1,
+               nb::handle p2, nb::handle p3, int segments,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Curve(Vec3FromPython(p0), Vec3FromPython(p1),
+                               Vec3FromPython(p2), Vec3FromPython(p3),
+                               StyleFromPython(style), segments);
+            },
+            nb::arg("p0"), nb::arg("p1"), nb::arg("p2"),
+            nb::arg("p3"), nb::arg("segments") = 32, nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("The cubic Bezier curve from `p0` to `p3`, "
+                         "pulled toward `p1` and `p2`.") +
              kStyleDoc)
                 .c_str())
         .def(
@@ -679,6 +796,167 @@ void BindOverlay(nb::module_& m) {
                          "`point`.") +
              kStyleDoc)
                 .c_str())
+        .def(
+            "text",
+            [](Overlay& o, std::string_view text, nb::handle at,
+               nb::handle offset, nb::handle align,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Text(PlacementFromPython(at, offset, align),
+                              text, StyleFromPython(style));
+            },
+            nb::arg("text"), nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("ASCII `text` (lines split at newlines) "
+                         "`size` pixels a line on the image itself, "
+                         "a heads-up display, over a `background` "
+                         "box.") +
+             kPlacementDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "rect",
+            [](Overlay& o, nb::handle size, nb::handle at,
+               nb::handle offset, nb::handle align,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Rect(PlacementFromPython(at, offset, align),
+                              Vec2FromPython(size),
+                              StyleFromPython(style));
+            },
+            nb::arg("size"), nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("A filled rectangle `size` (width, height) "
+                         "pixels on the image: a panel or a bar.") +
+             kPlacementDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "numbers",
+            [](Overlay& o, nb::handle values, nb::handle points,
+               std::string prefix, std::string suffix, int decimals,
+               bool screen, nb::handle at, nb::handle offset,
+               nb::handle align, nb::handle colors, nb::handle sizes,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Numbers;
+                batch.values = BatchArray(values, "float32");
+                batch.points = BatchArray(points, "float32");
+                batch.format.prefix = std::move(prefix);
+                batch.format.suffix = std::move(suffix);
+                batch.format.decimals = decimals;
+                batch.screen = screen;
+                batch.placement =
+                    PlacementFromPython(at, offset, align);
+                if (!align.is_none()) {
+                    batch.format.align = Vec2FromPython(align);
+                }
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, sizes, worlds, origin, stream}, style);
+            },
+            nb::arg("values"), nb::arg("points") = nb::none(),
+            nb::arg("prefix") = "", nb::arg("suffix") = "",
+            nb::arg("decimals") = 2, nb::arg("screen") = false,
+            nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(),
+            nb::arg("colors") = nb::none(),
+            nb::arg("sizes") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "(N,) `values` printed as text on the GPU, each "
+                 "`prefix`, the value with `decimals` digits after "
+                 "the point, then `suffix`: beside (N, 3) `points` "
+                 "as labels, or with `screen` on the image, at "
+                 "`points`' x and y (fractions of the image) or, "
+                 "without points, from `at` and `offset` a line "
+                 "apart, its box's point `align` there. A sim's "
+                 "time or each world's reward, read on the GPU "
+                 "every frame with no copy to the host.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "trails",
+            [](Overlay& o, nb::handle points, nb::handle heads,
+               bool fade, nb::handle colors, nb::handle widths,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Trails;
+                batch.points = BatchArray(points, "float32");
+                batch.heads = BatchArray(heads, "int32");
+                batch.fade = fade;
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("points"), nb::arg("heads") = nb::none(),
+            nb::arg("fade") = true, nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "A polyline per item through its row of (N, L, 3) "
+                 "`points`, a ring buffer a simulation writes in "
+                 "place: its newest point at (N,) int32 `heads` (the "
+                 "last without), fading to clear at its oldest with "
+                 "`fade`; a segment with a NaN end is left out, so "
+                 "NaN rows start a trail afresh. Per-item arrays "
+                 "have "
+                 "a row per trail.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "capsules",
+            [](Overlay& o, nb::handle centres, nb::handle radii,
+               nb::handle halfHeights, nb::handle orientations,
+               nb::handle colors, nb::handle widths,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Capsules;
+                batch.points = BatchArray(centres, "float32");
+                batch.radii = BatchArray(radii, "float32");
+                batch.halfHeights =
+                    BatchArray(halfHeights, "float32");
+                batch.orientations =
+                    BatchArray(orientations, "float32");
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("centres"), nb::arg("radii"),
+            nb::arg("half_heights"),
+            nb::arg("orientations") = nb::none(),
+            nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "Wireframe capsules around (N, 3) `centres`, along "
+                 "their local z axis turned by (N, 4) "
+                 "`orientations` (x, y, z, w): cylinders of (N,) "
+                 "`radii` reaching `half_heights` each way, capped "
+                 "by hemispheres.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def_prop_ro(
+            "batch_count",
+            [](const Overlay& o) { return o.Batches().size(); },
+            "Batches added since the last clear: the last one's "
+            "index for `Renderer.map_overlay` is one less.")
         .def("__repr__", [](const Overlay& o) {
             return "Overlay(" + std::to_string(o.Segments().size()) +
                    " segments, " + std::to_string(o.Fills().size()) +

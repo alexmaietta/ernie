@@ -1680,6 +1680,30 @@ RasterDelegate::GpuAnchorOf(const Scene& scene,
     return std::nullopt;
 }
 
+OverlayAnchorPose
+RasterDelegate::OverlayAnchorOf(const Scene& scene,
+                                const Path& path) const {
+    OverlayAnchor& anchor = overlayAnchors_[path];
+    if (anchor.scene != scene.Id() ||
+        anchor.version != scene.Version()) {
+        anchor.scene = scene.Id();
+        anchor.version = scene.Version();
+        const bool exists = scene.Has(path);
+        anchor.gpu = exists ? GpuAnchorOf(scene, path) : std::nullopt;
+        anchor.world = exists && !anchor.gpu
+                           ? scene.WorldTransform(path)
+                           : glm::dmat4(1.0);
+    }
+    if (anchor.gpu) {
+        return {anchor.gpu->frame,
+                meshes_.AnchorSlot(anchor.gpu->instancer,
+                                   anchor.gpu->row),
+                anchor.gpu->below,
+                meshes_.AnchorOps(anchor.gpu->instancer)};
+    }
+    return {anchor.world};
+}
+
 HostArrayReader RasterDelegate::HostArrays(const Scene& scene) const {
     return [this, &scene](const Path& path,
                           std::string_view attribute,
@@ -1975,6 +1999,23 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,
             "a Camera's poses and a LaserLight's pattern image map");
     }
     scene.Write(path, attribute, view, stream);
+    return view;
+}
+
+Tensor RasterDelegate::MapOverlay(Scene& scene,
+                                  std::string_view overlay,
+                                  std::size_t batch,
+                                  std::string_view array,
+                                  std::uintptr_t stream) {
+    RequireCompute();
+    if (scene.FindOverlay(overlay) == nullptr) {
+        throw std::invalid_argument("The scene has no overlay '" +
+                                    std::string(overlay) + "'");
+    }
+    Overlay& layer = scene.GetOverlay(overlay);
+    Tensor view = renderer_.Overlays().MapBatchArray(layer, batch,
+                                                     array, stream);
+    layer.ReplaceBatchArray(batch, array, view);
     return view;
 }
 
@@ -2747,7 +2788,18 @@ void RasterDelegate::UpdatePrims(
     }
     const auto views = static_cast<std::uint32_t>(
         std::max<std::size_t>(frame.poses.size(), 1));
+    // Overlays posed under prims, this frame's poses.
+    if (scene.Id() != overlayAnchorsScene_) {
+        overlayAnchors_.clear();
+        overlayAnchorsScene_ = scene.Id();
+    }
+    renderer_.Overlays().SetAnchorResolver(
+        [this, &scene](const Path& path) {
+            return OverlayAnchorOf(scene, path);
+        },
+        &meshes_);
     renderer_.Update(frame, drawables, drawn);
+    renderer_.Overlays().SetAnchorResolver({}, &meshes_);
     PrepareSensorState(stateKey, extent, views);
 }
 

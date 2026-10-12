@@ -205,6 +205,22 @@ class RenderDelegate {
                             std::string_view attribute,
                             std::uintptr_t stream = 1);
 
+    /// Maps array `array` ("points", "values"...,
+    /// `Overlay::ReplaceBatchArray`'s names) of batch `batch` of
+    /// overlay `overlay` for writing in place on the compute device:
+    /// a tensor over the renderer's own memory for it, holding its
+    /// values, which the batch then holds. Write into it on `stream`
+    /// (which first waits for the frames already submitted); the
+    /// next frames draw it without copying. Map again each step (the
+    /// same memory while the overlay keeps its batches), so the
+    /// stream waits for the frames still reading it.
+    /// @throws std::invalid_argument if the backend maps no arrays,
+    /// has no compute interop, or has not drawn that batch yet.
+    virtual Tensor MapOverlay(Scene& scene, std::string_view overlay,
+                              std::size_t batch,
+                              std::string_view array,
+                              std::uintptr_t stream = 1);
+
     /// Has `writer` write the Mesh at `path` on the GPU every frame,
     /// recorded into the frame before anything reads the mesh: its
     /// points, normals, triangles and the counts of them in use,

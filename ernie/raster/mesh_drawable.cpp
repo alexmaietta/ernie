@@ -2541,7 +2541,8 @@ void MeshDrawable::Prepare(const FrameParams& params,
                                glm::mat4(toOrigin * view.frame),
                                glm::mat4(view.below),
                                AnchorSlot(view.instancer, view.row),
-                               static_cast<std::uint32_t>(v));
+                               static_cast<std::uint32_t>(v),
+                               AnchorOps(view.instancer));
         }
         Reserve(context_, anchorRecords_,
                 records.size() * sizeof(glm::vec4),
@@ -2565,7 +2566,8 @@ void MeshDrawable::Prepare(const FrameParams& params,
                                glm::mat4(toOrigin * light.frame),
                                glm::mat4(light.below),
                                AnchorSlot(light.instancer, light.row),
-                               static_cast<std::uint32_t>(l));
+                               static_cast<std::uint32_t>(l),
+                               AnchorOps(light.instancer));
         }
         Reserve(context_, anchorLightRecords_,
                 records.size() * sizeof(glm::vec4),
@@ -3733,11 +3735,29 @@ std::uint32_t MeshDrawable::AnchorSlot(std::uint32_t instancer,
     return InstanceBase(it->second) + it->second.first + row;
 }
 
+std::uint32_t MeshDrawable::AnchorOps(std::uint32_t instancer) const {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
+        return 0;
+    }
+    // As the draws' kHasOrientations and kHasScales.
+    const Instancer& found = it->second;
+    const bool orientations =
+        found.composed ||
+        (found.onDevice ? !found.device.orientations.Empty()
+                        : !found.data.orientations.empty());
+    const bool scales = found.composed ||
+                        (found.onDevice ? !found.device.scales.Empty()
+                                        : !found.data.scales.empty());
+    return (orientations ? 1u : 0u) | (scales ? 2u : 0u);
+}
+
 void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records,
                                       const glm::mat4& frame,
                                       const glm::mat4& below,
                                       std::uint32_t slot,
-                                      std::uint32_t target) {
+                                      std::uint32_t target,
+                                      std::uint32_t ops) {
     for (const glm::mat4* m : {&frame, &below}) {
         for (int row = 0; row < 4; ++row) {
             records.emplace_back((*m)[0][row], (*m)[1][row],
@@ -3745,7 +3765,8 @@ void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records,
         }
     }
     records.emplace_back(std::bit_cast<float>(slot),
-                         std::bit_cast<float>(target), 0.0f, 0.0f);
+                         std::bit_cast<float>(target),
+                         std::bit_cast<float>(ops), 0.0f);
 }
 
 void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {

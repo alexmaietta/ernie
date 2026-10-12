@@ -3861,6 +3861,8 @@ void RasterRenderer::Update(
     for (RasterDrawable* drawable : drawables) {
         drawable->Prepare(raster, shadowViews_);
     }
+    // Overlays posed under instances, once the meshes placed them.
+    overlays_->PoseAnchors(params.origin);
     updated_ = true;
 }
 
@@ -5717,7 +5719,10 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands,
         commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     if (faces_ > 1) {
         RecordFaceOverlays(commands, targets, firstView, *color);
-        return;
+        // Screen items over the image the lens made.
+        if (!overlays_->HasScreenItems()) {
+            return;
+        }
     }
     color->Transition(commands,
                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -5726,7 +5731,9 @@ void RasterRenderer::RecordOverlays(VkCommandBuffer commands,
             targets, LastSubframeView(firstView + v), v);
         target.color = color->LayerView(v);
         target.format = VK_FORMAT_R8G8B8A8_UNORM;
-        overlays_->Record(commands, target);
+        overlays_->Record(commands, target,
+                          faces_ > 1 ? OverlayPass::Layer::Screen
+                                     : OverlayPass::Layer::All);
     }
     color->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
@@ -5817,7 +5824,8 @@ void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
                 OverlayTarget(targets, first + layer, layer);
             target.color = image->LayerView(layer);
             target.format = VK_FORMAT_R8G8B8A8_UNORM;
-            overlays_->Record(commands, target);
+            overlays_->Record(commands, target,
+                              OverlayPass::Layer::World);
         }
     }
     // Then resampled through the lens onto the sensor's image.
@@ -5906,6 +5914,16 @@ void RasterRenderer::PresentFaceOverlays(
     vkCmdDraw(commands, 3, 1, 0, 0);
     vkCmdEndRendering(commands);
     lensOverlays_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    // Then the screen items, over the image as presented.
+    if (overlays_->HasScreenItems()) {
+        OverlayPass::Target screen =
+            OverlayTarget(targets, LastSubframeView(0), 0);
+        screen.color = present.color;
+        screen.format = presentFormat_;
+        screen.extent = present.extent;
+        overlays_->Record(commands, screen,
+                          OverlayPass::Layer::Screen);
+    }
 }
 
 void RasterRenderer::BeginFrame(std::uint32_t slot) {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/offscreen_target.h"
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/overlay.h"
@@ -8,6 +9,7 @@
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
+#include "ernie/scene/xform.h"
 #include "support/delegate_scenes.h"
 
 #include <gtest/gtest.h>
@@ -250,6 +252,180 @@ TEST_F(RasterDelegateTest,
         }
         EXPECT_GT(lit, 20) << format;
     }
+}
+
+TEST_F(RasterDelegateTest,
+       ScreenItemsSitWhereTheyArePlacedOnTheImage) {
+    // A red square in the top left corner and a blue one in the
+    // bottom right, 10 pixels each, through a frame camera and a
+    // fisheye on cube faces alike: the lens bends the world, not the
+    // screen.
+    for (const bool fisheye : {false, true}) {
+        RasterDelegate delegate(*context_);
+        Scene scene = OverlayScene();
+        if (fisheye) {
+            // As OverlaysFollowACubeCamerasLens: 100 degrees off axis
+            // at the corners.
+            const double aperture = 20.0;
+            const double corner = std::sqrt(2.0) * 0.5 * kSize;
+            ernie::Camera(scene, "/World/Camera")
+                .SetLensProjection(ernie::tokens::kFisheye)
+                .SetVerticalAperture(aperture)
+                .SetHorizontalAperture(aperture)
+                .SetFocalLength(aperture * corner /
+                                (100.0 * M_PI / 180.0) / kSize);
+        }
+        const std::vector<std::uint8_t> plain =
+            Bytes(delegate.Render(scene));
+        OverlayStyle red;
+        red.color = {1.0f, 0.0f, 0.0f, 1.0f};
+        OverlayStyle blue;
+        blue.color = {0.0f, 0.0f, 1.0f, 1.0f};
+        ernie::ScreenPlacement topLeft;
+        ernie::ScreenPlacement bottomRight;
+        bottomRight.at = {1.0f, 1.0f};
+        scene.GetOverlay("hud")
+            .Rect(topLeft, {10.0f, 10.0f}, red)
+            .Rect(bottomRight, {10.0f, 10.0f}, blue);
+        const std::vector<std::uint8_t> image =
+            Bytes(delegate.Render(scene));
+        const auto rgb = [&](std::size_t x, std::size_t y) {
+            const std::size_t at = 4 * (y * kSize + x);
+            return glm::ivec3(image[at], image[at + 1],
+                              image[at + 2]);
+        };
+        EXPECT_EQ(rgb(0, 0), glm::ivec3(255, 0, 0)) << fisheye;
+        EXPECT_EQ(rgb(9, 9), glm::ivec3(255, 0, 0)) << fisheye;
+        EXPECT_EQ(rgb(kSize - 1, kSize - 1), glm::ivec3(0, 0, 255))
+            << fisheye;
+        EXPECT_EQ(rgb(kSize - 10, kSize - 10), glm::ivec3(0, 0, 255))
+            << fisheye;
+        for (const auto& [x, y] :
+             {std::pair<std::size_t, std::size_t>{10, 10},
+              {kSize / 2, kSize / 2},
+              {kSize - 11, kSize - 11}}) {
+            const std::size_t at = 4 * (y * kSize + x);
+            EXPECT_EQ(image[at], plain[at]) << fisheye << " " << x;
+        }
+    }
+}
+
+TEST_F(RasterDelegateTest, DashedLinesLeaveGaps) {
+    // DrawCrossing's line dashed every 4 pixels, from the host and
+    // from a batch: along it, about as many texels lit as not.
+    RasterDelegate delegate(*context_);
+    for (const bool batched : {false, true}) {
+        Scene scene = OverlayScene();
+        OverlayStyle style;
+        style.width = 3.0f;
+        style.dash = 4.0f;
+        if (batched) {
+            ernie::OverlayBatch lines;
+            lines.kind = ernie::OverlayBatchKind::Lines;
+            lines.points = Tensor::Copy<float>(
+                std::vector<float>{-20.0f, -15.0f, 0.0f}, {1, 3});
+            lines.ends = Tensor::Copy<float>(
+                std::vector<float>{20.0f, -15.0f, 0.0f}, {1, 3});
+            lines.style = style;
+            scene.GetOverlay("debug").Batch(lines);
+        } else {
+            scene.GetOverlay("debug").Line({-20.0, -15.0, 0.0},
+                                           {20.0, -15.0, 0.0}, style);
+        }
+        const Tensor image = delegate.Render(scene);
+        int lit = 0;
+        int dark = 0;
+        for (float x = -18.0f; x <= 18.0f; x += 0.25f) {
+            const glm::ivec3 rgb =
+                Rgb(scene, image, {x, -15.0f, 0.0f});
+            lit += rgb == glm::ivec3(255) ? 1 : 0;
+            dark += rgb == glm::ivec3(0) ? 1 : 0;
+        }
+        EXPECT_GT(lit, 30) << batched;
+        EXPECT_GT(dark, 30) << batched;
+    }
+}
+
+TEST_F(RasterDelegateTest, ItemsPosedUnderAPrimFollowIt) {
+    // A line through a tracker prim, in its space: it draws where the
+    // tracker is each frame, though the overlay never changes.
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    ernie::Xform::Define(scene, "/World/Tracker");
+    ernie::SetXform(scene, "/World/Tracker",
+                    {.translate = glm::dvec3(0.0, -15.0, 0.0)});
+    OverlayStyle style;
+    style.width = 3.0f;
+    style.anchor = ernie::Path("/World/Tracker");
+    scene.GetOverlay("tracked").Line({-20.0, 0.0, 0.0},
+                                     {20.0, 0.0, 0.0}, style);
+    style.size = 8.0f;
+    style.color = {0.0f, 0.0f, 1.0f, 1.0f};
+    scene.GetOverlay("tracked").Marker({10.0, 0.0, 0.0}, style,
+                                       MarkerShape::Square);
+    const std::uint64_t version =
+        scene.GetOverlay("tracked").Version();
+    Tensor image = delegate.Render(scene);
+    EXPECT_EQ(Rgb(scene, image, {0.0f, -15.0f, 0.0f}),
+              glm::ivec3(255));
+    EXPECT_EQ(Rgb(scene, image, {10.0f, -15.0f, 0.0f}),
+              glm::ivec3(0, 0, 255));
+    EXPECT_EQ(Rgb(scene, image, {0.0f, 15.0f, 0.0f}), glm::ivec3(0));
+
+    ernie::SetXform(scene, "/World/Tracker",
+                    {.translate = glm::dvec3(0.0, 15.0, 0.0)});
+    image = delegate.Render(scene);
+    EXPECT_EQ(scene.GetOverlay("tracked").Version(), version);
+    EXPECT_EQ(Rgb(scene, image, {0.0f, 15.0f, 0.0f}), glm::ivec3(255))
+        << "moved with the tracker";
+    EXPECT_EQ(Rgb(scene, image, {10.0f, 15.0f, 0.0f}),
+              glm::ivec3(0, 0, 255));
+    EXPECT_EQ(Rgb(scene, image, {0.0f, -15.0f, 0.0f}), glm::ivec3(0));
+}
+
+TEST_F(RasterDelegateTest, NumbersPrintOnTheGpuAsTextDoesOnTheHost) {
+    // Values formatted on the GPU, a line each from the placement,
+    // draw the very pixels of the same text from the host.
+    RasterDelegate delegate(*context_);
+    const std::vector<float> values{12.5f, -3.25f, 0.004f};
+    OverlayStyle style;
+    style.size = 6.0f;
+    style.color = {1.0f, 0.9f, 0.2f, 1.0f};
+    ernie::ScreenPlacement placement;
+    placement.at = {0.0f, 0.0f};
+    placement.offset = {2.0f, 2.0f};
+
+    Scene host = OverlayScene();
+    const char* const lines[] = {"t=12.50 s", "t=-3.25 s",
+                                 "t=0.00 s"};
+    const float line = style.size + 2.0f * 0.25f * style.size;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        ernie::ScreenPlacement at = placement;
+        at.offset.y += static_cast<float>(i) * line;
+        host.GetOverlay("hud").Text(at, lines[i], style);
+    }
+    const std::vector<std::uint8_t> expected =
+        Bytes(delegate.Render(host));
+
+    Scene gpu = OverlayScene();
+    ernie::OverlayBatch numbers;
+    numbers.kind = ernie::OverlayBatchKind::Numbers;
+    numbers.values = Tensor::Copy<float>(
+        values, {static_cast<std::int64_t>(values.size())});
+    numbers.format.prefix = "t=";
+    numbers.format.suffix = " s";
+    numbers.format.decimals = 2;
+    numbers.screen = true;
+    numbers.placement = placement;
+    numbers.style = style;
+    gpu.GetOverlay("hud").Batch(numbers);
+    const std::vector<std::uint8_t> image =
+        Bytes(delegate.Render(gpu));
+    EXPECT_GT(BytesDiffering(expected,
+                             Bytes(delegate.Render(OverlayScene()))),
+              50u)
+        << "the text draws";
+    EXPECT_EQ(BytesDiffering(image, expected), 0u);
 }
 
 TEST_F(RasterDelegateTest, OverlaysDrawMarkersLabelsAndShapes) {

@@ -835,6 +835,31 @@ void BindRender(nb::module_& m) {
             nb::arg("stream").none() = nb::none(),
             "As the map of a PrimSet, for a list of paths.")
         .def(
+            "map_overlay",
+            [](nb::pointer_and_handle<Renderer> self, Scene& scene,
+               std::string_view overlay, std::size_t batch,
+               std::string_view array, nb::handle stream) {
+                return ArrayFromTensor(
+                    KeepingAlive(self.p->Delegate().MapOverlay(
+                                     scene, overlay, batch, array,
+                                     StreamOf(stream)),
+                                 self.h),
+                    true);
+            },
+            nb::arg("scene"), nb::arg("overlay"), nb::arg("batch"),
+            nb::arg("array"), nb::arg("stream").none() = nb::none(),
+            "Maps array `array` (\"points\", \"ends\", \"values\", "
+            "\"colors\", \"sizes\", \"worlds\"...) of batch `batch` "
+            "of "
+            "overlay `overlay` for writing in place on the GPU, "
+            "without copies: a CUDA array over the renderer's own "
+            "memory for it, holding its values, which the batch now "
+            "holds. Write into it on `stream` (which first waits for "
+            "frames already submitted); the next frames draw it. The "
+            "batch must have been drawn once. Map again every step "
+            "(the same memory, no copy), so the stream waits for the "
+            "frames still reading it.")
+        .def(
             "cuda_download",
             [](Renderer& r, const AnyArray& array) {
                 return ArrayFromTensor(

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Overlay pass: debug drawing over a view's display image, after the sensor filters. Segments
-// become quads `width` pixels wide facing the image, sprites (markers and label text) rectangles of
-// fixed pixel size around their anchor's projection, and triangles stay as they are; each is
-// depth-tested by hand against the view's depth, so items can be hidden, faded or always shown.
+// become quads `width` pixels wide facing the image, sprites (markers, text's characters and its
+// backing boxes) rectangles of fixed pixel size around their anchor's projection, and triangles
+// stay as they are; each is depth-tested by hand against the view's depth, so items can be hidden,
+// faded or always shown. Items posed under a prim are in its space, moved by its transform this
+// frame from the anchor table; screen sprites sit at a point of the image, over everything.
 //
 // Bindings: 0 the view's Uniforms (frame.slang; only its view-projection and pushbroom strip are
 // read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites, 5
-// batches' arrays, 6 batches, 7 batches' items in world order (overlay_sort.slang).
+// batches' arrays, 6 batches, 7 batches' items in world order (overlay_sort.slang), 8 the anchor
+// table (four rows of a transform per anchor, relative to the frame's origin), 9 the font.
 //
 // References:
 // - M. Rougier, "Shader-Based Antialiased, Dashed, Stroked Polylines", JCGT 2(2), 2013: lines as
@@ -33,10 +36,12 @@ float4 project(float3 world) {
 }
 
 // Every item: x packed RGBA8 display colour (r in the low byte), y depth mode (kDepth*) in its
-// low byte and marker shape (kShape*) in the next, z the world whose views show it (-1 all).
+// low byte, marker shape (kShape*) in the next, a sprite's character (or 0) in the third and 1 for
+// a screen sprite in the fourth, z the world whose views show it (-1 all), w 1 + its anchor in the
+// anchor table (0 for none).
 struct Segment {
     float4 a;  // xyz relative to the frame's origin, w width in pixels.
-    float4 b;
+    float4 b;  // w the dashes' and gaps' length in pixels, 0 for a solid line.
     uint4 info;
 }
 
@@ -48,7 +53,8 @@ struct Triangle {
 }
 
 struct Sprite {
-    float4 anchor;  // xyz relative to the frame's origin.
+    float4 anchor;  // xyz relative to the frame's origin; a screen sprite's xy fractions of the
+                    // image from its top left.
     float4 rect;    // x0, y0, x1, y1 pixels from the anchor's projection, y down.
     uint4 info;
 }
@@ -59,28 +65,44 @@ struct OverlayConstants {
     int4 view;
     // Image width and height in pixels, near and far planes.
     float4 viewport;
-    // x: the batch the batch shaders draw (`batches`); y: 1 when the draw takes one slot's items
-    // in world order (`sortedItems`): z the slot, w the batch's slots.
+    // x: the batch the batch shaders draw (`batches`), or the first item the segment, triangle and
+    // sprite shaders draw; y: 1 when the draw takes one slot's items in world order
+    // (`sortedItems`): z the slot, w the batch's slots.
     uint4 batch;
 }
 
 // Many items of one kind read from arrays in `batchData` (`OverlayBatch`), expanded here into
 // segments, triangles or sprites: lines and arrow shafts, box edges, sphere circles and frame axes
-// as segments; arrow heads as triangles; markers as sprites.
+// as segments; arrow heads as triangles; markers, and numbers' characters, as sprites.
 struct Batch {
-    // x kind (kBatch*), y items, z segments (or triangles) per item, w kBatchHas* flags.
+    // x kind (kBatch*), y items, z segments (or triangles, or a number's sprites) per item, w
+    // kBatch* flags.
     uint4 shape;
-    // First floats in `batchData` of: x points, y ends, half extents or radii, z orientations,
-    // w colours.
+    // First floats in `batchData` of: x points, y ends, half extents, radii or values, z
+    // orientations, w colours.
     uint4 arrays;
-    // x sizes, y worlds, z its first item in world order in `sortedItems` (overlay_sort.slang).
+    // x sizes, y worlds, z its first item in world order in `sortedItems` (overlay_sort.slang), w
+    // 1 + its anchor in the anchor table (the first of one per item with kBatchItemAnchors), or 0.
     uint4 extras;
-    // The style's: x packed colour, y depth mode and marker shape as `info.y`, z world.
+    // The style's: x packed colour, y depth mode and marker shape as `info.y`, z world, w packed
+    // background colour.
     uint4 style;
-    // xyz the arrays' origin relative to the frame's; w the style's width or marker size (pixels).
+    // xyz the arrays' origin relative to the frame's (or in their anchors' space); w the style's
+    // width, or marker or text size (pixels).
     float4 origin;
-    // x arrows' head length (0 for a fifth of each), y frames' axis length.
+    // x arrows' head length (0 for a fifth of each), y frames' axis length; z lines' dashes in
+    // pixels (0 solid) of kinds but numbers, and of numbers zw where their text
+    // boxes meet their places (fractions of the box from its top left).
     float4 params;
+    // Numbers: x their text's first character in `batchData`, y and z its prefix's and suffix's
+    // lengths, w the decimals.
+    uint4 text;
+    // Screen numbers without points: xy the first's place (fractions of the image), zw its offset
+    // in pixels.
+    float4 place;
+    // x capsules' half heights' or trails' heads' first float, y 1 + pose indices' (0 for none;
+    // read by overlay_sort.slang), z 1 + its count's (0 for none), w points per trail.
+    uint4 more;
 }
 
 static const uint kBatchLines = 0;
@@ -89,12 +111,26 @@ static const uint kBatchMarkers = 2;
 static const uint kBatchBoxes = 3;
 static const uint kBatchSpheres = 4;
 static const uint kBatchFrames = 5;
+static const uint kBatchNumbers = 6;
+static const uint kBatchTrails = 7;
+static const uint kBatchCapsules = 8;
 
 static const uint kBatchHasColors = 1;
 static const uint kBatchHasAlpha = 2;  // colours with opacity, 4 floats each
 static const uint kBatchHasSizes = 4;
 static const uint kBatchHasWorlds = 8;
 static const uint kBatchHasOrientations = 16;
+static const uint kBatchItemAnchors = 32;
+static const uint kBatchScreen = 64;
+static const uint kBatchHasPoints = 128;
+static const uint kBatchHasHeads = 256;
+static const uint kBatchFade = 512;
+static const uint kBatchDirections = 1024;  // ends are vectors from the points, times params.y
+
+// The font (`OverlayGlyphs`): from ' ', per character its sixteen rows of sixteen bits two to a
+// word, its box (x0, y0, x1, y1 a byte each) and its advance, on a grid of which a line is 12.
+static const uint kGlyphWords = 10;
+static const float kLineHeight = 12.0;
 
 // Segments of each of a sphere's circles, and triangles of an arrow head's cone (its side, then its
 // base), as `Overlay::Sphere` and `Overlay::Arrow` draw them.
@@ -126,16 +162,35 @@ static const uint kKindSprite = 2;
 [[vk::binding(5, 0)]] StructuredBuffer<float> batchData;
 [[vk::binding(6, 0)]] StructuredBuffer<Batch> batches;
 [[vk::binding(7, 0)]] StructuredBuffer<uint> sortedItems;
+[[vk::binding(8, 0)]] StructuredBuffer<float4> anchors;
+[[vk::binding(9, 0)]] StructuredBuffer<uint> glyphs;
 [[vk::push_constant]] ConstantBuffer<OverlayConstants> constants;
 
 struct VertexOutput {
     float4 position : SV_Position;
     float4 color : COLOR;
-    // Segments: x pixels across the line from its centre, y half its width. Sprites: xy the
+    // Segments: x pixels across the line from its centre, y half its width, z pixels along it
+    // from its start, w its dashes' length (0 solid). Sprites: xy the
     // position in the rectangle in [-1, 1], zw its half size in pixels.
     noperspective float4 shape : SHAPE;
-    // x kind (kKind*), y depth mode, z marker shape.
+    // x kind (kKind*), y depth mode, z marker shape, w the character drawn (or 0).
     nointerpolation uint4 info : INFO;
+}
+
+// Point `p` of an item with `info`, in its anchor's space if it has one, relative to the frame's
+// origin.
+float3 anchored(uint4 info, float3 p) {
+    if (info.w == 0) {
+        return p;
+    }
+    let first = 4 * (info.w - 1);
+    let m = float4x4(anchors[first], anchors[first + 1], anchors[first + 2], anchors[first + 3]);
+    return mul(m, float4(p, 1.0)).xyz;
+}
+
+// Whether the item is a screen sprite.
+bool onScreen(uint4 info) {
+    return ((info.y >> 24) & 1) != 0;
 }
 
 float4 unpackColor(uint packed) {
@@ -166,7 +221,7 @@ float2 pixelScale() {
 
 [shader("vertex")]
 VertexOutput segmentVertex(uint vertexIndex : SV_VertexID) {
-    return segmentCorner(segments[vertexIndex / 6], vertexIndex);
+    return segmentCorner(segments[constants.batch.x + vertexIndex / 6], vertexIndex);
 }
 
 // Corner `vertexIndex % 6` of a segment's quad.
@@ -178,8 +233,8 @@ VertexOutput segmentCorner(Segment segment, uint vertexIndex) {
     static const uint2 kCorners[6] = { uint2(0, 0), uint2(1, 0), uint2(1, 1),
                                        uint2(0, 0), uint2(1, 1), uint2(0, 1) };
     let corner = kCorners[vertexIndex % 6];
-    var p0 = project(segment.a.xyz);
-    var p1 = project(segment.b.xyz);
+    var p0 = project(anchored(segment.info, segment.a.xyz));
+    var p1 = project(anchored(segment.info, segment.b.xyz));
     // Clipped at the near plane (w is the view depth), so segments passing behind the eye keep
     // their visible part; closer to the eye an end's w, which the clip computes from far-off
     // ends, may round to or past 0.
@@ -211,14 +266,15 @@ VertexOutput segmentCorner(Segment segment, uint vertexIndex) {
     VertexOutput out;
     out.position = float4(p.xy + offset * p.w, p.z, p.w);
     out.color = unpackColor(segment.info.x);
-    out.shape = float4(side * extent, halfWidth, 0.0, 0.0);
+    out.shape = float4(side * extent, halfWidth, corner.x == 0 ? -extent : span + extent,
+                       segment.b.w);
     out.info = uint4(kKindSegment, segment.info.y & 0xff, 0, 0);
     return out;
 }
 
 [shader("vertex")]
 VertexOutput triangleVertex(uint vertexIndex : SV_VertexID) {
-    return triangleCorner(triangles[vertexIndex / 3], vertexIndex);
+    return triangleCorner(triangles[constants.batch.x + vertexIndex / 3], vertexIndex);
 }
 
 // Corner `vertexIndex % 3` of a triangle.
@@ -229,7 +285,7 @@ VertexOutput triangleCorner(Triangle triangle, uint vertexIndex) {
     let corner = vertexIndex % 3;
     let p = corner == 0 ? triangle.p0 : (corner == 1 ? triangle.p1 : triangle.p2);
     VertexOutput out;
-    out.position = project(p.xyz);
+    out.position = project(anchored(triangle.info, p.xyz));
     out.color = unpackColor(triangle.info.x);
     out.shape = float4(0.0);
     out.info = uint4(kKindTriangle, triangle.info.y & 0xff, 0, 0);
@@ -238,12 +294,15 @@ VertexOutput triangleCorner(Triangle triangle, uint vertexIndex) {
 
 [shader("vertex")]
 VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
-    return spriteCorner(sprites[vertexIndex / 6], vertexIndex);
+    return spriteCorner(sprites[constants.batch.x + vertexIndex / 6], vertexIndex);
 }
 
 // Corner `vertexIndex % 6` of a sprite's rectangle.
 VertexOutput spriteCorner(Sprite sprite, uint vertexIndex) {
-    let anchor = project(sprite.anchor.xyz);
+    // A screen sprite's point of the image, y down, in clip coordinates (y up).
+    let anchor = onScreen(sprite.info)
+                     ? float4(sprite.anchor.x * 2.0 - 1.0, 1.0 - sprite.anchor.y * 2.0, 0.5, 1.0)
+                     : project(anchored(sprite.info, sprite.anchor.xyz));
     if (!inWorld(sprite.info) || anchor.w <= 0.0) {
         return culled();
     }
@@ -256,7 +315,8 @@ VertexOutput spriteCorner(Sprite sprite, uint vertexIndex) {
     out.position = float4(anchor.xy + offset * anchor.w, anchor.z, anchor.w);
     out.color = unpackColor(sprite.info.x);
     out.shape = float4(t * 2.0 - 1.0, 0.5 * abs(sprite.rect.zw - sprite.rect.xy));
-    out.info = uint4(kKindSprite, sprite.info.y & 0xff, (sprite.info.y >> 8) & 0xff, 0);
+    out.info = uint4(kKindSprite, sprite.info.y & 0xff, (sprite.info.y >> 8) & 0xff,
+                     (sprite.info.y >> 16) & 0xff);
     return out;
 }
 
@@ -292,8 +352,8 @@ uint packColor(float4 color) {
     return bytes.x | (bytes.y << 8) | (bytes.z << 16) | (bytes.w << 24);
 }
 
-// Item `i`'s `info`: its colour or the style's, the style's depth mode and marker shape, and its
-// world or the style's.
+// Item `i`'s `info`: its colour or the style's, the style's depth mode and marker shape, its
+// world or the style's, and its anchor.
 uint4 batchInfo(Batch b, uint i) {
     var color = b.style.x;
     if ((b.shape.w & kBatchHasColors) != 0) {
@@ -303,7 +363,11 @@ uint4 batchInfo(Batch b, uint i) {
                                  alpha ? batchData[at + 3] : unpackColor(b.style.x).a));
     }
     let world = (b.shape.w & kBatchHasWorlds) != 0 ? asuint(batchData[b.extras.y + i]) : b.style.z;
-    return uint4(color, b.style.y, world, 0);
+    var anchor = b.extras.w;
+    if (anchor != 0 && (b.shape.w & kBatchItemAnchors) != 0) {
+        anchor += i;
+    }
+    return uint4(color, b.style.y, world, anchor);
 }
 
 // The item at position `at` of the draw's items: for a draw of one slot's (overlay_sort.slang),
@@ -319,6 +383,11 @@ uint batchItem(Batch b, uint at) {
     return sortedItems[b.extras.z + first + at];
 }
 
+// Whether item `i` is in use: below the batch's count, if it has one.
+bool batchInUse(Batch b, uint i) {
+    return b.more.z == 0 || int(i) < asint(batchData[b.more.z - 1]);
+}
+
 // Item `i`'s line width or marker size in pixels.
 float batchSize(Batch b, uint i) {
     return (b.shape.w & kBatchHasSizes) != 0 ? batchData[b.extras.x + i] : b.origin.w;
@@ -329,6 +398,46 @@ void perpendiculars(float3 axis, out float3 u, out float3 v) {
     let other = abs(axis.x) < 0.9 ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
     u = normalize(cross(axis, other));
     v = cross(axis, u);
+}
+
+// Item `i`'s end, of a line or an arrow from `start`: its point, or with kBatchDirections its
+// vector from `start`, scaled.
+float3 batchEnd(Batch b, uint i, float3 start) {
+    if ((b.shape.w & kBatchDirections) != 0) {
+        return start + batchVector(b.arrays.y, i) * b.params.y;
+    }
+    return batchPoint(b, b.arrays.y, i);
+}
+
+// Segment `k` of capsule `i` in its own space, along z: a ring around each end of its cylinder
+// (24 segments each), its four sides, then half circles over its caps in the xz and yz planes
+// (12 segments each), as `kCapsuleSegments` in overlay_pass.cpp counts them.
+void capsuleSegment(float radius, float half, uint k, out float3 a, out float3 b) {
+    static const float kPi = 3.14159265;
+    if (k < 48) {
+        let z = k < 24 ? -half : half;
+        let j = k % 24;
+        let a0 = 2.0 * kPi * float(j) / 24.0;
+        let a1 = 2.0 * kPi * float(j + 1) / 24.0;
+        a = float3(radius * cos(a0), radius * sin(a0), z);
+        b = float3(radius * cos(a1), radius * sin(a1), z);
+        return;
+    }
+    if (k < 52) {
+        let angle = 0.5 * kPi * float(k - 48);
+        let side = float2(radius * cos(angle), radius * sin(angle));
+        a = float3(side, -half);
+        b = float3(side, half);
+        return;
+    }
+    let arc = (k - 52) / 12;
+    let j = (k - 52) % 12;
+    let across = arc < 2 ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+    let up = (arc & 1) == 0 ? 1.0 : -1.0;
+    let t0 = kPi * float(j) / 12.0;
+    let t1 = kPi * float(j + 1) / 12.0;
+    a = radius * (cos(t0) * across + float3(0.0, 0.0, up * sin(t0))) + float3(0.0, 0.0, up * half);
+    b = radius * (cos(t1) * across + float3(0.0, 0.0, up * sin(t1))) + float3(0.0, 0.0, up * half);
 }
 
 // Arrow `i`'s head from `end` back to its base, a fifth of the arrow unless the batch sets its
@@ -345,19 +454,54 @@ VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
     let segment = vertexIndex / 6;
     let i = batchItem(b, segment / b.shape.z);
+    if (!batchInUse(b, i)) {
+        return culled();
+    }
     let k = segment % b.shape.z;  // the item's segment
     let p = batchPoint(b, b.arrays.x, i);
     Segment s;
     s.info = batchInfo(b, i);
     s.a = float4(p, batchSize(b, i));
-    s.b = float4(p, 0.0);
+    s.b = float4(p, b.params.z);
     switch (b.shape.x) {
     case kBatchLines:
-        s.b.xyz = batchPoint(b, b.arrays.y, i);
+        s.b.xyz = batchEnd(b, i, p);
         break;
     case kBatchArrows: {
-        let end = batchPoint(b, b.arrays.y, i);
+        let end = batchEnd(b, i, p);
         s.b.xyz = end - arrowHead(b, p, end);
+        break;
+    }
+    case kBatchTrails: {
+        // Segment k from the newest point back, round the ring; one with a NaN end (a point not
+        // yet written) is left out.
+        let length = b.more.w;
+        let head = (b.shape.w & kBatchHasHeads) != 0
+                       ? uint(max(asint(batchData[b.more.x + i]), 0)) % length
+                       : length - 1;
+        let newer = (head + length - k) % length;
+        let older = (head + 2 * length - k - 1) % length;
+        let a = batchVector(b.arrays.x, i * length + newer);
+        let c = batchVector(b.arrays.x, i * length + older);
+        if (any(isnan(a)) || any(isnan(c))) {
+            return culled();
+        }
+        s.a.xyz = a + b.origin.xyz;
+        s.b.xyz = c + b.origin.xyz;
+        if ((b.shape.w & kBatchFade) != 0) {
+            var color = unpackColor(s.info.x);
+            color.a *= 1.0 - float(k) / float(max(length - 1, 1));
+            s.info.x = packColor(color);
+        }
+        break;
+    }
+    case kBatchCapsules: {
+        float3 a;
+        float3 c;
+        capsuleSegment(batchData[b.arrays.y + i], batchData[b.more.x + i], k, a, c);
+        let q = batchOrientation(b, i);
+        s.a.xyz = p + rotate(q, a);
+        s.b.xyz = p + rotate(q, c);
         break;
     }
     case kBatchBoxes: {
@@ -411,9 +555,12 @@ VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
     let triangle = vertexIndex / 3;
     let i = batchItem(b, triangle / (2 * kConeSides));
+    if (!batchInUse(b, i)) {
+        return culled();
+    }
     let k = triangle % (2 * kConeSides);
     let start = batchPoint(b, b.arrays.x, i);
-    let end = batchPoint(b, b.arrays.y, i);
+    let end = batchEnd(b, i, start);
     let head = arrowHead(b, start, end);
     let length = sqrt(dot(head, head));
     if (!(length > 0.0)) {
@@ -448,12 +595,193 @@ VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
 VertexOutput batchSpriteVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
     let i = batchItem(b, vertexIndex / 6);
+    if (!batchInUse(b, i)) {
+        return culled();
+    }
     let half = 0.5 * batchSize(b, i);
     Sprite s;
     s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);
     s.rect = float4(-half, -half, half, half);
     s.info = batchInfo(b, i);
     return spriteCorner(s, vertexIndex);
+}
+
+// The font's words of character `c` (printable ASCII, else '?').
+uint glyphBase(uint c) {
+    return kGlyphWords * ((c >= 32 && c < 127 ? c : 63) - 32);
+}
+
+// How far character `c` moves the pen, in font units.
+float glyphAdvance(uint c) {
+    return float(glyphs[glyphBase(c) + 9]);
+}
+
+// The box character `c`'s pixels fill: x0, y0, x1, y1 in font units from the pen.
+float4 glyphBox(uint c) {
+    let box = glyphs[glyphBase(c) + 8];
+    return float4(float(box & 0xff), float((box >> 8) & 0xff), float((box >> 16) & 0xff),
+                  float(box >> 24));
+}
+
+// Numbers' longest number but its decimals: a sign, ten digits and the point.
+static const uint kNumberChars = 12;
+
+// A value as a number's text prints it (`OverlayNumberFormat`): its prefix, the value with `text.w`
+// decimals (or "nan", or "inf" past 4e9 units of its last decimal), its suffix.
+struct NumberText {
+    uint length;        // characters in all
+    uint first;         // the number's first character
+    uint count;         // the number's characters
+    uint scaled;        // the value's magnitude in units of its last decimal
+    uint digits;        // the number's digits, its integer part's and its decimals
+    uint whole;         // its integer part's digits
+    bool negative;
+    uint special;       // 0 a number, 1 nan, 2 inf
+}
+
+NumberText numberText(Batch b, float value) {
+    NumberText t;
+    let decimals = b.text.w;
+    var unit = 1.0;
+    for (uint d = 0; d < decimals; ++d) {
+        unit *= 10.0;
+    }
+    let magnitude = abs(value) * unit;
+    t.special = isnan(value) ? 1 : (!(magnitude < 4.0e9) ? 2 : 0);
+    t.scaled = t.special == 0 ? uint(round(magnitude)) : 0;
+    t.negative = value < 0.0 && (t.special == 2 || t.scaled != 0);
+    var integer = t.scaled;
+    for (uint d = 0; d < decimals; ++d) {
+        integer /= 10;
+    }
+    t.whole = 1;
+    for (var rest = integer / 10; rest > 0; rest /= 10) {
+        ++t.whole;
+    }
+    t.digits = t.whole + decimals;
+    t.count = (t.negative ? 1 : 0) +
+              (t.special != 0 ? 3 : t.digits + (decimals > 0 ? 1 : 0));
+    t.first = b.text.y;
+    t.length = b.text.y + t.count + b.text.z;
+    return t;
+}
+
+// Character `k` of a number's text.
+uint numberChar(Batch b, NumberText t, uint k) {
+    if (k < t.first) {
+        return uint(batchData[b.text.x + k]);
+    }
+    if (k >= t.first + t.count) {
+        return uint(batchData[b.text.x + b.text.y + k - t.first - t.count]);
+    }
+    var j = k - t.first;
+    if (t.negative) {
+        if (j == 0) {
+            return 45;  // '-'
+        }
+        --j;
+    }
+    if (t.special != 0) {
+        static const uint kNan[3] = { 110, 97, 110 };
+        static const uint kInf[3] = { 105, 110, 102 };
+        return t.special == 1 ? kNan[j] : kInf[j];
+    }
+    if (j == t.whole) {
+        return 46;  // '.'
+    }
+    let q = j < t.whole ? j : j - 1;  // the digit, most significant first
+    var power = 1u;
+    for (uint p = q + 1; p < t.digits; ++p) {
+        power *= 10;
+    }
+    return 48 + (t.scaled / power) % 10;
+}
+
+// Numbers: per item a backing box, then a sprite per character of its text, formatted from its
+// value here, beside its point as `Overlay::Label`'s or placed on the screen as `Overlay::Text`.
+[shader("vertex")]
+VertexOutput batchNumberVertex(uint vertexIndex : SV_VertexID) {
+    let b = batches[constants.batch.x];
+    let sprite = vertexIndex / 6;
+    let i = batchItem(b, sprite / b.shape.z);
+    if (!batchInUse(b, i)) {
+        return culled();
+    }
+    let k = sprite % b.shape.z;
+    let t = numberText(b, batchData[b.arrays.y + i]);
+    let size = batchSize(b, i);
+    let scale = size / kLineHeight;
+    var width = 0.0;
+    var pen = 0.0;
+    for (uint c = 0; c < t.length; ++c) {
+        let advance = glyphAdvance(numberChar(b, t, c));
+        if (c + 1 < k) {
+            pen += advance;
+        }
+        width += advance;
+    }
+    let box = float2(width, kLineHeight - 3.0) * scale;
+    let backing = b.style.w;
+    let pad = unpackColor(backing).a > 0.0 ? 0.25 * size : 0.0;
+    let screen = (b.shape.w & kBatchScreen) != 0;
+    let points = (b.shape.w & kBatchHasPoints) != 0;
+    Sprite s;
+    s.info = batchInfo(b, i);
+    float2 corner;
+    if (screen) {
+        let at = points ? batchPoint(b, b.arrays.x, i).xy : b.place.xy;
+        var offset = points ? float2(0.0) : b.place.zw;
+        offset.y += points ? 0.0 : float(i) * (kLineHeight * scale + 2.0 * pad);
+        corner = offset - b.params.zw * (box + 2.0 * pad) + pad;
+        s.anchor = float4(at, 0.0, 0.0);
+        s.info.y = kDepthAlways | (1u << 24);
+        s.info.w = 0;
+    } else {
+        corner = float2(0.5 * size, -box.y - 3.0 * scale - 0.25 * size);
+        s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);
+        s.info.y &= 0xffff;
+    }
+    if (k == 0) {
+        if (pad == 0.0) {
+            return culled();
+        }
+        s.rect = float4(corner - pad, corner + box + pad);
+        s.info.x = backing;
+        s.info.y = (s.info.y & ~0xff00u) | (kShapeSquare << 8);
+        return spriteCorner(s, vertexIndex);
+    }
+    if (k > t.length) {
+        return culled();
+    }
+    let c = numberChar(b, t, k - 1);
+    let glyph = glyphBox(c);
+    if (!(glyph.z > glyph.x)) {
+        return culled();
+    }
+    s.rect = float4(corner + (float2(pen, 0.0) + glyph.xy) * scale,
+                    corner + (float2(pen, 0.0) + glyph.zw) * scale);
+    s.info.y |= c << 16;
+    return spriteCorner(s, vertexIndex);
+}
+
+// Coverage of character `c` at `p` (in [-1, 1] over the sprite, which spans its box): its pixels'
+// share of four taps across the fragment's footprint on the font's grid.
+float glyphCoverage(uint c, float2 p) {
+    let base = glyphBase(c);
+    let box = glyphBox(c);
+    let g = lerp(box.xy, box.zw, p * 0.5 + 0.5);
+    let footprint = fwidth(g);
+    var covered = 0.0;
+    for (uint tap = 0; tap < 4; ++tap) {
+        let q = g + (float2(float(tap & 1), float(tap >> 1)) - 0.5) * 0.5 * footprint;
+        let cell = int2(floor(q));
+        if (all(cell >= int2(box.xy)) && all(cell < int2(box.zw)) && all(cell < 16)) {
+            let word = glyphs[base + uint(cell.y) / 2];
+            let row = (word >> (16 * (uint(cell.y) & 1))) & 0xffff;
+            covered += float((row >> uint(cell.x)) & 1);
+        }
+    }
+    return 0.25 * covered;
 }
 
 // View depth (distance along the view axis) of a [0, 1] depth: from a perspective projection, or
@@ -503,8 +831,14 @@ float4 overlayFragment(VertexOutput in) : SV_Target {
     var color = in.color;
     if (in.info.x == kKindSegment) {
         color.a *= saturate(in.shape.y + 0.5 - abs(in.shape.x));
+        // Dashes from the segment's start, each as long as the gap after it.
+        if (in.shape.w > 0.0) {
+            let phase = in.shape.z - floor(in.shape.z / (2.0 * in.shape.w)) * 2.0 * in.shape.w;
+            color.a *= saturate(min(phase, in.shape.w - phase) + 0.5);
+        }
     } else if (in.info.x == kKindSprite) {
-        color.a *= markerCoverage(in.info.z, in.shape.xy, in.shape.zw);
+        color.a *= in.info.w != 0 ? glyphCoverage(in.info.w, in.shape.xy)
+                                  : markerCoverage(in.info.z, in.shape.xy, in.shape.zw);
     }
     let mode = in.info.y;
     if (mode != kDepthAlways) {
