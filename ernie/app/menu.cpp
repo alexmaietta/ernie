@@ -76,7 +76,18 @@ bool Action(const char* label, const char* shortcut, bool enabled) {
 }
 
 bool BeginSubmenu(const char* label, bool enabled) {
+    NextMenuWide();
     return ImGui::BeginMenu(Indented(label).c_str(), enabled);
+}
+
+float MinWidth() {
+    return 17.0f * ImGui::GetFontSize();
+}
+
+void NextMenuWide() {
+    // A closed menu consumes the constraint unused, as Begin would.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(MinWidth(), 0.0f),
+                                        ImVec2(FLT_MAX, FLT_MAX));
 }
 
 }  // namespace ernie::app::menu

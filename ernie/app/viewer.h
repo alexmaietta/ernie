@@ -112,6 +112,11 @@ struct ViewportDisplay {
         true;  ///< The camera the viewport looks through.
     bool toolbarLighting =
         true;  ///< How the viewport lights the scene.
+    /// The viewport's own UI: its toolbar and menus, tool strip, axis
+    /// indicator and transform gizmo. Off (the H key toggles it),
+    /// only the image, the scene's overlays and the heads-up display
+    /// show.
+    bool ui = true;
 
     bool operator==(const ViewportDisplay&) const = default;
 };

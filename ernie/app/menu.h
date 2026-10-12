@@ -29,7 +29,16 @@ bool Action(const char* label, const char* shortcut = nullptr,
             bool enabled = true);
 
 /// A submenu's item, aligned with the marked items; when it returns
-/// true, draw the submenu and call `ImGui::EndMenu`.
+/// true, draw the submenu and call `ImGui::EndMenu`. The submenu is
+/// at least `MinWidth` wide.
 bool BeginSubmenu(const char* label, bool enabled = true);
+
+/// The width Kit's menus open to at least, wider for longer items:
+/// about 17 lines of the current font.
+float MinWidth();
+
+/// Makes the next menu, popup or combo's list open at least
+/// `MinWidth` wide; call just before `BeginMenu` or `BeginCombo`.
+void NextMenuWide();
 
 }  // namespace ernie::app::menu

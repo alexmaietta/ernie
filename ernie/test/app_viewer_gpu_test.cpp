@@ -949,6 +949,18 @@ TEST_F(ViewerTest,
     EXPECT_EQ(viewer_->Settings(), Viewer::SessionSettings());
 }
 
+TEST_F(ViewerTest, HidesItsViewportUiButKeepsTheHud) {
+    ViewportDisplay display = viewer_->GetViewportDisplay();
+    EXPECT_TRUE(display.ui);
+    display.ui = false;
+    viewer_->SetViewportDisplay(display);
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_FALSE(viewer_->GetViewportDisplay().ui);
+    display.ui = true;
+    viewer_->SetViewportDisplay(display);
+    EXPECT_TRUE(viewer_->Step());
+}
+
 TEST_F(ViewerTest, RejectsVarsAndSettingsItCannotShowYet) {
     EXPECT_EQ(viewer_->ViewVar(), "LdrColor");
     EXPECT_THROW(viewer_->SetViewVar("NotAVar"),

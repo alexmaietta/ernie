@@ -1238,6 +1238,7 @@ struct Viewer::State {
         }
         menus.push_back("Help");  // last, as in Kit
         for (const std::string& menu : menus) {
+            ernie::app::menu::NextMenuWide();
             if (!ImGui::BeginMenu(menu.c_str())) {
                 continue;
             }
@@ -1453,10 +1454,16 @@ struct Viewer::State {
             }
         }
         HandleNavigation(hovered, active, size.y);
-        DrawGizmo(imageMin, imageSize);
-        DrawToolbar(origin, size);
-        DrawToolStrip(origin);
-        DrawAxisIndicator(origin, size);
+        if (display.ui) {
+            DrawGizmo(imageMin, imageSize);
+            DrawToolbar(origin, size);
+            DrawToolStrip(origin);
+            DrawAxisIndicator(origin, size);
+        } else {
+            // Only the heads-up display, in the top right corner.
+            const float pad = 8.0f * contentScale;
+            DrawHud(ImVec2(origin.x + size.x - pad, origin.y + pad));
+        }
         if (!renderError.empty()) {
             // At the bottom left, beside the axis indicator.
             ImGui::SetCursorScreenPos(ImVec2(
@@ -1956,6 +1963,10 @@ struct Viewer::State {
             }
             if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
                 CycleWireframe();
+            }
+            if (!io.KeyAlt &&
+                ImGui::IsKeyPressed(ImGuiKey_H, false)) {
+                display.ui = !display.ui;
             }
             const std::pair<ImGuiKey, Viewer::Gizmo> gizmoKeys[] = {
                 {ImGuiKey_Q, Viewer::Gizmo::None},
@@ -2822,6 +2833,12 @@ struct Viewer::State {
         constexpr ImGuiComboFlags kPill =
             ImGuiComboFlags_WidthFitPreview |
             ImGuiComboFlags_NoArrowButton;
+        // Their menus open as wide as Kit's and as long as they need,
+        // not a combo's eight items.
+        const auto pill = [](const char* id, const char* label) {
+            menu::NextMenuWide();
+            return ImGui::BeginCombo(id, label, kPill);
+        };
         const float comboWidth = 150.0f * contentScale;
         ImDrawList* draw = ImGui::GetWindowDrawList();
         const ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
@@ -2829,8 +2846,7 @@ struct Viewer::State {
         // The settings menu: a pill drawn with Kit's three bars.
         {
             const ImVec2 corner = ImGui::GetCursorScreenPos();
-            const bool open =
-                ImGui::BeginCombo("##settings", "   ", kPill);
+            const bool open = pill("##settings", "   ");
             if (open) {
                 DrawSettingsMenu();
                 ImGui::EndCombo();
@@ -2860,8 +2876,7 @@ struct Viewer::State {
             const std::string rendererLabel =
                 "      " + DisplayName(renderer) +
                 (MinimalShown() ? " - Minimal" : "");
-            if (ImGui::BeginCombo("##renderer", rendererLabel.c_str(),
-                                  kPill)) {
+            if (pill("##renderer", rendererLabel.c_str())) {
                 DrawRendererMenu();
                 ImGui::EndCombo();
             }
@@ -2879,7 +2894,7 @@ struct Viewer::State {
             ImGui::SameLine();
         }
 
-        if (ImGui::BeginCombo("##show", icons::kEye, kPill)) {
+        if (pill("##show", icons::kEye)) {
             DrawShowMenu();
             ImGui::EndCombo();
         }
@@ -2891,8 +2906,7 @@ struct Viewer::State {
         if (display.toolbarVar) {
             ImGui::SameLine();
         }
-        if (display.toolbarVar &&
-            ImGui::BeginCombo("##var", varLabel.c_str(), kPill)) {
+        if (display.toolbarVar && pill("##var", varLabel.c_str())) {
             DrawVarItems();
             ImGui::EndCombo();
         }
@@ -2908,8 +2922,7 @@ struct Viewer::State {
             const std::string cameraLabel =
                 std::string(icons::kCamera) + "  " +
                 Label(activeCamera);
-            if (ImGui::BeginCombo("##camera", cameraLabel.c_str(),
-                                  kPill)) {
+            if (pill("##camera", cameraLabel.c_str())) {
                 DrawCameraMenu();
                 ImGui::EndCombo();
             }
@@ -2933,8 +2946,7 @@ struct Viewer::State {
                        2.0f * style.FramePadding.x,
                    origin.y + pad));
         if (display.toolbarLighting &&
-            ImGui::BeginCombo("##lighting", lightLabel.c_str(),
-                              kPill)) {
+            pill("##lighting", lightLabel.c_str())) {
             for (const Lighting mode :
                  {Lighting::Camera, Lighting::Stage,
                   Lighting::Default}) {
@@ -2973,6 +2985,8 @@ struct Viewer::State {
                         {"Q W E R", "Select, move, rotate, scale"},
                         {"Z", "Cycle wireframe: off, overlay, hidden "
                               "line"},
+                        {"H", "Hide or show the viewport's toolbar, "
+                              "menus and gizmos"},
                         {"Del", "Delete the selection"},
                         {"Ctrl+D", "Duplicate the selection"},
                         {"F2", "Rename the selected prim (Stage)"},
