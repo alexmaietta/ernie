@@ -172,7 +172,7 @@ class VulkanContext {
     }
 
     /// Whether fragment shaders can write storage buffers and images
-    /// and use atomics there (virtual shadow maps' casters).
+    /// and use atomics there.
     bool SupportsFragmentAtomics() const {
         return fragmentAtomics_;
     }

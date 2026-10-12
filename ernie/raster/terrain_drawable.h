@@ -273,10 +273,6 @@ class TerrainDrawable : public RasterDrawable {
     }
     std::optional<Bounds3> Bounds() const override;
 
-    bool DrawsVirtualShadows() const override {
-        return true;
-    }
-
     /// Writes the terrain uniforms of every view and selects the LOD
     /// patches for every view (each from its own eye and frustum) and
     /// every cascade (from view 0's eye).
@@ -343,8 +339,6 @@ class TerrainDrawable : public RasterDrawable {
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera
                               ///< is a pushbroom.
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
-    /// Made the first time a virtual shadow map's level is drawn.
-    mutable std::unique_ptr<GraphicsPipeline> virtualShadowPipeline_;
     TerrainParams params_;
 
     GpuBuffer uniforms_;

@@ -339,8 +339,6 @@ std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
         {"frame", shaders::kFrameSlang},
         {"gbuffer", shaders::kGBufferSlang},
         {"surface", shaders::kSurfaceSlang},
-        {"virtual_shadow", shaders::kVirtualShadowSlang},
-        {"virtual_shadow_caster", shaders::kVirtualShadowCasterSlang},
         {"mesh", shaders::kMeshSlang}};
 }
 
@@ -687,31 +685,6 @@ void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
     }
 }
 
-const GraphicsPipeline*
-MeshDrawable::VirtualShadowPipeline(bool cutout) const {
-    std::unique_ptr<GraphicsPipeline>& pipeline =
-        virtualShadowPipelines_[cutout ? 1 : 0];
-    if (pipeline == nullptr) {
-        const std::vector<ShaderModuleSource> modules = MeshModules();
-        const std::vector<std::uint32_t> vertex =
-            renderer_.Compiler().CompileSpirv(
-                modules, cutout ? "meshShadowCutoutVertex"
-                                : "meshShadowVertex");
-        const std::vector<std::uint32_t> fragment =
-            renderer_.Compiler().CompileSpirv(
-                modules, cutout ? "meshVirtualShadowCutoutFragment"
-                                : "meshVirtualShadowFragment");
-        GraphicsPipelineDesc desc;
-        desc.vertexSpirv = vertex;
-        desc.fragmentSpirv = fragment;
-        desc.depthFormat = VK_FORMAT_UNDEFINED;
-        desc.depthWrite = false;
-        desc.depthClamp = true;
-        pipeline = std::make_unique<GraphicsPipeline>(context_,
-                                                      layout_, desc);
-    }
-    return pipeline.get();
-}
 
 void MeshDrawable::CreateMinimalPipelines() {
     if (minimalPipelines_[0] != nullptr) {
@@ -4207,10 +4180,8 @@ std::size_t MeshDrawable::Record(
         const bool cut = cutout(item);
         const GraphicsPipeline* pipeline =
             motion != nullptr ? motionPipeline_.get()
-            : shadow && frame.virtualShadow
-                ? VirtualShadowPipeline(cut)
-            : shadow ? (cut ? shadowCutoutPipeline_.get()
-                            : shadowPipeline_.get())
+            : shadow          ? (cut ? shadowCutoutPipeline_.get()
+                                     : shadowPipeline_.get())
             : minimal_ != MinimalMode::Off
                 ? minimalPipelines_[(minimal_ == MinimalMode::None
                                          ? 2

@@ -45,7 +45,6 @@ import brdf;
 import bindless;
 // The planet's atmosphere: the sun's transmittance through it (atmosphere.slang).
 import atmosphere;
-import virtual_shadow;
 import light_pattern;
 import light_patterns;
 import laser_beams;
@@ -286,11 +285,6 @@ struct ShadingResources {
     uint volumeShadowSize;
     // Each view's own uniforms (`ShadingView`), after the shared ones.
     ShadingView* viewBlocks;
-    // The virtual shadow map (virtual_shadow.slang) and the light slot it shadows, ~0 for none.
-    VirtualShadow* virtualShadow;
-    uint virtualLight;
-    // Its debugging: 2 shows its pages, black where none backs a point (`virtualVisibility`).
-    uint virtualDebug;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -608,124 +602,6 @@ LightTap lightTap(LightGpu light, float3 point) {
     let corner = light.map.x / sh.lightShadow.z;
     tap.uv = min(uv * corner, float2(corner - 0.5 / sh.lightShadow.z));
     return tap;
-}
-
-// The level from `index` on, each twice as coarse, in which `texels` of level `index` span at most
-// `kMaxLightFilterTexels`, up to the coarsest the marking backs (`VirtualShadow::filterLevels`).
-uint virtualCoarserFor(VirtualShadow* map, uint index, float texels) {
-    let steps = texels > kMaxLightFilterTexels ? ceil(log2(texels / kMaxLightFilterTexels)) : 0.0;
-    return min(index + min(uint(steps), map.filterLevels), map.levelCount - 1);
-}
-
-// The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
-// towards it): the level that suits the point's distance from the camera (about a texel a pixel),
-// a coarser one where a tap's page is not backed; lit past the last level or off every backed page.
-// As `lightVisibility` for a cascade: the receiver offset along its normal, filtered over the
-// light's Poisson disk, and with the light's angular size percentage-closer soft shadows, whose
-// blockers' mean height over the receiver times the tangent of the light's angular radius widens
-// the filter. The search and the filter wider than `kMaxLightFilterTexels` run in coarser levels,
-// as in a mip chain. A level's reversed-Z depth spans 2000 of its radii, so a depth difference is
-// metres times 0.5 / (1000 R).
-//
-// Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
-// https://doi.org/10.1145/1187112.1187153
-float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
-    let map = resources.virtualShadow;
-    let level = virtualLevelFor(length(world - shv.eye.xyz), map.bias) - map.firstLevel;
-    if (level >= int(map.levelCount)) {
-        return 1.0;
-    }
-    let index = uint(max(level, 0));
-    if (resources.virtualDebug == 2) {
-        float stored;
-        float depth;
-        uint used;
-        return virtualShadowDepth(map, index, world, stored, depth, used) ? 1.0 : 0.0;
-    }
-    // A surface facing away from the light shadows itself.
-    if (nDotL <= 0.0) {
-        return 0.0;
-    }
-    let texelWorld = map.levels[index].info.x;
-    let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
-    let receiver = world + offset;
-    let towards = light.position.xyz;
-    let across = normalize(cross(towards, abs(towards.z) < 0.9 ? float3(0.0, 0.0, 1.0)
-                                                               : float3(1.0, 0.0, 0.0)));
-    let across2 = cross(towards, across);
-    let angle = 6.28318530718 * interleavedGradientNoise(pixel);
-    let rotation = float2(cos(angle), sin(angle));
-    let softness = sh.lightShadow.x;
-    // The receiver's plane across the light: at offset `o` from the receiver it lies
-    // -dot(n, o) / dot(n, L) towards the light, which each tap compares against at the centre of
-    // the texel it reads (`virtualTexelCentreStep`), where its casters were drawn, signed, so the
-    // plane needs no slack for its tilt across a texel, and blockers a little above it shadow it:
-    // a sphere's on the ground about where it rests.
-    let cosine = clamp(nDotL, 0.05, 1.0);
-    // The comparisons' slack, per texel of the level a tap's depth comes from (a coarser one where
-    // its page is not backed): float depth's rounding, about half a texel at any level, twice.
-    let slackTexels = 1.0;
-    var filterIndex = index;
-    var filterTexels = softness;
-    let tanRadius = light.extentY.w;
-    if (tanRadius > 0.0) {
-        // Blockers up to the level's radius above the receiver, searched in a level coarse enough
-        // to span their reach in at most `kMaxLightFilterTexels`.
-        let reach = map.levels[index].info.y * tanRadius;
-        let searchIndex = virtualCoarserFor(map, index, reach / texelWorld);
-        let searchTexel = map.levels[searchIndex].info.x;
-        let searchTexels = clamp(reach / searchTexel, softness, kMaxLightFilterTexels);
-        var blockers = 0.0;
-        var blockerSum = 0.0;
-        for (uint i = 0; i < 16; ++i) {
-            let tap = lightDisk(i, rotation, across, across2, searchTexels * searchTexel);
-            float stored;
-            float depth;
-            uint used;
-            if (!virtualShadowDepth(map, searchIndex, receiver + tap, stored, depth, used)) {
-                continue;
-            }
-            // Metres towards the light above the receiver's plane at the texel's centre.
-            let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-            let step = tap + virtualTexelCentreStep(map, used, receiver + tap);
-            let height = (stored - depth) / perWorld + dot(n, step) / cosine;
-            if (height > slackTexels * map.levels[used].info.x) {
-                blockers += 1.0;
-                blockerSum += height;
-            }
-        }
-        // The penumbra filtered in a level coarse enough to span it likewise. The search only sizes
-        // the filter: where it finds no blockers the filter still runs at its least, so its taps,
-        // not the search's sparser ones, decide what is shadowed.
-        if (blockers > 0.0) {
-            let penumbra = blockerSum / blockers * tanRadius;
-            filterIndex = virtualCoarserFor(map, index, penumbra / texelWorld);
-            filterTexels = clamp(penumbra / map.levels[filterIndex].info.x, softness,
-                                 kMaxLightFilterTexels);
-        }
-    }
-    let filterTexel = map.levels[filterIndex].info.x;
-    // Taps off every backed page count for nothing, rather than as lit, so a filter reaching past
-    // the pages marked about the receivers does not leak light.
-    var lit = 0.0;
-    var taps = 0.0;
-    for (uint i = 0; i < 16; ++i) {
-        let tap = lightDisk(i, rotation, across, across2, filterTexels * filterTexel);
-        float stored;
-        float depth;
-        uint used;
-        if (!virtualShadowDepth(map, filterIndex, receiver + tap, stored, depth, used)) {
-            continue;
-        }
-        // Compared at the receiver's plane at the texel's centre, with the slack.
-        let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-        let step = tap + virtualTexelCentreStep(map, used, receiver + tap);
-        let rise = -dot(n, step) / cosine;
-        let slack = slackTexels * map.levels[used].info.x;
-        lit += stored <= depth + (rise + slack) * perWorld ? 1.0 : 0.0;
-        taps += 1.0;
-    }
-    return taps > 0.0 ? lit / taps : 1.0;
 }
 
 // Fraction of a light reaching `world` past its shadow map: Poisson-disk PCF with normal offset,
@@ -1075,22 +951,6 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
     return float3x2(steps[0].x, steps[1].x, steps[0].y, steps[1].y, steps[0].z, steps[1].z);
 }
 
-// The surface's geometric normal at pixel `pixel` (its point `world`): across its footprint's
-// steps to its neighbours (`pixelFootprint`), the facet the rasterizer drew, without a normal
-// map's bumps or smooth shading's interpolation; turned to the side of the shading normal
-// `shading`, which stands in where the pixel has no neighbours on its surface.
-float3 geometricNormal(int2 pixel, uint layer, float3 world, float3 shading) {
-    let footprint = pixelFootprint(pixel, layer, world);
-    let across = float3(footprint[0][0], footprint[1][0], footprint[2][0]);
-    let down = float3(footprint[0][1], footprint[1][1], footprint[2][1]);
-    let c = cross(across, down);
-    let size = length(c);
-    if (!(size > 1e-30)) {
-        return shading;
-    }
-    let g = c / size;
-    return dot(g, shading) < 0.0 ? -g : g;
-}
 
 // A laser's irradiance at `world` per watt of its power, across the light's ray, m^-2: its pattern
 // (`LightParams::Beam`, an `ILightPattern` in light slot `slot`), averaged over the pixel's
@@ -2492,17 +2352,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
     // row's pose for a pushbroom.
     let v = viewVector(ndc.xy, world);
-    // The normal shading uses, bent to face the viewer, and the one shadows offset and compare
-    // along: the surface's own, as the shadow maps drew it, across the pixel's neighbours' points
-    // (`geometricNormal`), not the bent one, which at grazing views would lift the receiver
-    // sideways, nor a normal map's, whose bumps the maps never saw.
+    // The surface's normal, which shadows compare along, and the one shading uses, bent to face
+    // the viewer: at grazing views the two part, and the bent one would misplace the receiver.
     let packedNormal = gNormal.Load(pixel);
     let surfaceNormal = unpackNormal(packedNormal);
     // Its temperature: the G-buffer's, else its material's (0 for none, or thermal emission off).
     let pixelKelvin = unpackTemperature(packedNormal);
     let kelvin = pixelKelvin > 0.0 ? pixelKelvin : material.surface.y;
     let n = facingNormal(surfaceNormal, v);
-    let shadowNormal = geometricNormal(int2(id.xy), id.z, world, surfaceNormal);
     // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
     // layers on to Q, as many more to U): the image's +x and +y across the light reaching the eye.
     let stokes = kShadePolarization ? pass.model.z : 0u;
@@ -2688,13 +2545,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            let shadowDotL = dot(shadowNormal, toLight);
-            let visibility =
-                k == resources.virtualLight
-                    ? virtualVisibility(light, shadowPoint, shadowNormal, shadowDotL,
-                                        float2(id.xy))
-                    : lightVisibility(light, shadowPoint, shadowNormal, shadowDotL,
-                                      float2(id.xy));
+            let visibility = lightVisibility(light, shadowPoint, surfaceNormal,
+                                             dot(surfaceNormal, toLight), float2(id.xy));
             scale *= visibility * volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;

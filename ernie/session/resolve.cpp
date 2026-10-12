@@ -2912,22 +2912,6 @@ FrameParams FrameParamsOf(const Scene& scene,
     shadows.splitLambda =
         static_cast<float>(options.GetShadowSplitLambda());
     shadows.showCascades = options.GetShadowShowCascades();
-    shadows.virtualMaps = options.GetShadowVirtual();
-    shadows.virtualPages = static_cast<std::uint32_t>(
-        std::clamp(options.GetShadowVirtualPages(), 16, 16384));
-    shadows.virtualBias =
-        static_cast<float>(options.GetShadowVirtualBias());
-    const std::string virtualDebug = options.GetShadowVirtualDebug();
-    if (virtualDebug != kOff && virtualDebug != kLevels &&
-        virtualDebug != kPages) {
-        throw std::invalid_argument(
-            "'" + std::string(kShadowVirtualDebug) + "' of '" +
-            settings.String() +
-            "' must be \"off\", \"levels\" or \"pages\"");
-    }
-    shadows.virtualDebug = virtualDebug == kLevels  ? 1u
-                           : virtualDebug == kPages ? 2u
-                                                    : 0u;
     if (!prims.dome.IsEmpty()) {
         params.dome =
             DomeParamsOf(scene, prims.dome, params.camera.bands);

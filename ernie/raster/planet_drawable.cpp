@@ -192,10 +192,6 @@ PlanetDrawable::PlanetDrawable(RasterRenderer& renderer)
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device) {
     std::vector<ShaderModuleSource> modules = PlanetModules();
-    modules.push_back(
-        {"virtual_shadow", shaders::kVirtualShadowSlang});
-    modules.push_back({"virtual_shadow_caster",
-                       shaders::kVirtualShadowCasterSlang});
     modules.push_back({"planet_shadow", shaders::kPlanetShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
         renderer_.Compiler().CompileSpirv(modules, "shadowVertex");
@@ -415,8 +411,8 @@ PlanetDrawable::ShadowRanges(std::span<const LodRange> ranges,
     // A level-L patch's quads are 2^(L + 1) fine cells across, a fine
     // cell about a quarter of the circumference over `FineCells()`:
     // levels with quads finer than a texel of the view are never
-    // subdivided into, so a level of a virtual shadow map a kilometre
-    // a texel draws kilometre quads, not the eye's metre ones.
+    // subdivided into, so a cascade a kilometre a texel draws
+    // kilometre quads, not the eye's metre ones.
     std::vector<LodRange> out(ranges.begin(), ranges.end());
     const double fineCell = lod_.Radius() * 0.5 * std::numbers::pi /
                             static_cast<double>(lod_.FineCells());
@@ -656,33 +652,8 @@ void PlanetDrawable::RecordShadow(
         !casters.shared || !casters.Casts(params_.linkGroup)) {
         return;
     }
-    if (frame.virtualShadow && virtualShadowPipeline_ == nullptr) {
-        std::vector<ShaderModuleSource> modules = PlanetModules();
-        modules.push_back(
-            {"virtual_shadow", shaders::kVirtualShadowSlang});
-        modules.push_back({"virtual_shadow_caster",
-                           shaders::kVirtualShadowCasterSlang});
-        modules.push_back(
-            {"planet_shadow", shaders::kPlanetShadowSlang});
-        const std::vector<std::uint32_t> vertex =
-            renderer_.Compiler().CompileSpirv(modules,
-                                              "shadowVertex");
-        const std::vector<std::uint32_t> fragment =
-            renderer_.Compiler().CompileSpirv(
-                modules, "virtualShadowFragment");
-        GraphicsPipelineDesc desc;
-        desc.vertexSpirv = vertex;
-        desc.fragmentSpirv = fragment;
-        desc.depthFormat = VK_FORMAT_UNDEFINED;
-        desc.depthWrite = false;
-        desc.depthClamp = true;
-        virtualShadowPipeline_ = std::make_unique<GraphicsPipeline>(
-            renderer_.Context(), layout_, desc);
-    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      frame.virtualShadow
-                          ? virtualShadowPipeline_->Handle()
-                          : shadowPipeline_->Handle());
+                      shadowPipeline_->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                  Resources(frame, 0));
     DrawPatches(commands, cascadeRanges_[cascade],

@@ -116,13 +116,6 @@ class VolumePass {
         return bounds_;
     }
 
-    /// Each of the last `Set`'s volume instances' world boxes,
-    /// relative to its origin, which the virtual shadow map marks its
-    /// pages through.
-    const std::vector<Bounds3>& Boxes() const {
-        return boxes_;
-    }
-
     /// Texels across a light shadow view's volume shadow map, as the
     /// last `Set`'s settings say.
     std::uint32_t ShadowSize() const {
@@ -289,7 +282,6 @@ class VolumePass {
     /// the most of one instance, the buffer they fill, and its
     /// pipeline.
     std::optional<Bounds3> bounds_;
-    std::vector<Bounds3> boxes_;
     /// The grids' distance grids (`PlanDistanceGrids`), their words,
     /// the builds due (`Prepare`), a build's scratch and its
     /// pipelines.

@@ -123,13 +123,6 @@ public struct Shadows {
     public uint4 debug;
     // 16 Poisson disk samples in the unit disk, two per float4.
     public float4 poisson[8];
-    // A virtual shadow map's level being drawn (virtual_shadow.slang): xy its block's address
-    // (low, high), z the level, w 1; in the G-buffer pass with its levels shown (`cascadeTint`), x
-    // the level bias's bits, y the first level's, w 2; else 0.
-    public uint4 virtualMap;
-    // With a level being drawn, xy the address of the levels' rectangles of backed pages
-    // (virtual_shadow.slang's `VirtualShadow::rects`), which its casters clip to.
-    public uint4 virtualRects;
 }
 
 // The frame's resources (renderer's `FrameResources`): every view's Uniforms, so a pass binds them
@@ -169,31 +162,12 @@ public float4x4 shadowViewProj() {
 public struct ShadowPosition {
     public float4 position : SV_Position;
     public uint layer : SV_RenderTargetArrayIndex;
-    public float clip[4] : SV_ClipDistance;
-}
-
-// Distances inside a virtual shadow map's level's rectangle of backed pages (`Shadows::
-// virtualRects`) for clip-space `position`, so casters rasterize only there and not at all in a
-// level with none; 1 for other shadow passes. A level's 128 pages span clip space's 2, x right and
-// y up from its last row.
-public float4 shadowClipDistances(float4 position) {
-    if (s.virtualMap.w != 1) {
-        return float4(1.0);
-    }
-    let rect = bit_cast<uint4*>(s.virtualRects.xy)[s.virtualMap.z];
-    let low = float2(rect.xy) / 64.0;
-    let high = float2(~rect.zw + 1u) / 64.0;
-    let w = position.w;
-    return float4(position.x - (low.x - 1.0) * w, (high.x - 1.0) * w - position.x,
-                  position.y - (1.0 - high.y) * w, (1.0 - low.y) * w - position.y);
 }
 
 public ShadowPosition shadowPosition(float3 world) {
     ShadowPosition out;
     out.position = mul(shadowViewProj(), float4(world, 1.0));
     out.layer = draw.shadowLayer;
-    let clip = shadowClipDistances(out.position);
-    out.clip = { clip.x, clip.y, clip.z, clip.w };
     return out;
 }
 
@@ -217,19 +191,8 @@ public uint cascadeIndex(float depth) {
     return count;
 }
 
-// `color` tinted by shadow cascade when cascade debugging is on, or by the virtual shadow map's
-// clipmap level shadowing it when that debugging shows levels (`Shadows::virtualMap` w 2).
+// `color` tinted by shadow cascade when cascade debugging is on.
 public float3 cascadeTint(float3 color, float3 world) {
-    if (s.virtualMap.w == 2) {
-        // As virtual_shadow.slang's `virtualLevelFor`: x the bias's bits, y the first level's.
-        let level = int(floor(log2(max(length(world - u.eye.xyz), 1e-6)) +
-                              asfloat(s.virtualMap.x))) -
-                    asint(s.virtualMap.y);
-        let tints = float3[6](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
-                              float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5),
-                              float3(1.0, 0.55, 1.0), float3(0.55, 1.0, 1.0));
-        return color * tints[uint(max(level, 0)) % 6];
-    }
     if (s.debug.x == 1 && s.params.w > 0.0) {
         let tints = float3[5](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
                               float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5), float3(1.0, 1.0, 1.0));

@@ -82,8 +82,6 @@ set(ernie_shaders
     raster/terrain_update.slang=kTerrainUpdateSlang
     raster/terrain_horizon.slang=kTerrainHorizonSlang
     raster/views.slang=kViewsSlang
-    raster/virtual_shadow.slang=kVirtualShadowSlang
-    raster/virtual_shadow_caster.slang=kVirtualShadowCasterSlang
     raster/volume.slang=kVolumeSlang
     texture/bc7.slang=kBc7Slang
     bindless.slang=kBindlessSlang

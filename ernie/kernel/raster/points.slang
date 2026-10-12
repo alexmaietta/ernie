@@ -20,7 +20,6 @@
 import frame;
 import gbuffer;
 import surface;
-import virtual_shadow_caster;
 
 static const uint kHasWidths = 1;
 static const uint kHasColors = 2;
@@ -284,7 +283,6 @@ struct ShadowVertexLayered {
     float2 corner : CORNER;
     nointerpolation float4 sphere : SPHERE;
     uint layer : SV_RenderTargetArrayIndex;
-    float clip[4] : SV_ClipDistance;
 }
 
 // The light's view direction away from it, and two directions across it, from its
@@ -315,7 +313,6 @@ ShadowVertexLayered shadowVertex(uint vertexIndex : SV_VertexID, uint instance :
     out.corner = corner;
     out.sphere = sphere;
     out.layer = at.layer;
-    out.clip = at.clip;
     return out;
 }
 
@@ -330,21 +327,6 @@ float shadowFragment(ShadowVertexOutput in) : SV_Depth {
     let front = in.sphere.xyz + in.sphere.w * (across - sqrt(1.0 - rho2) * lightAxis(2));
     let clip = mul(shadowViewProj(), float4(front, 1.0));
     return clip.z / clip.w;
-}
-
-// A virtual shadow map's level (`Shadows::virtualMap`): the sphere's surface facing the light
-// over this texel, written through its pages. Its depth is reversed, growing towards the light,
-// so that surface lies along +`lightAxis(2)`.
-[shader("fragment")]
-void virtualShadowFragment(ShadowVertexOutput in) {
-    let rho2 = dot(in.corner, in.corner);
-    if (rho2 > 1.0) {
-        discard;
-    }
-    let across = in.corner.x * lightAxis(0) + in.corner.y * lightAxis(1);
-    let front = in.sphere.xyz + in.sphere.w * (across + sqrt(1.0 - rho2) * lightAxis(2));
-    let clip = mul(shadowViewProj(), float4(front, 1.0));
-    writeVirtualShadow(float4(in.position.xy, clip.z / clip.w, 1.0));
 }
 
 // Culling: each job's view (x 0 a raster view, its Uniforms in `cullViews`, `draw.records`

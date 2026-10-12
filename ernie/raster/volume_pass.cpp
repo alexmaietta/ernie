@@ -366,7 +366,6 @@ VolumeModules(const LightPatternRegistry& patterns, bool pushbroom,
          {"brdf", shaders::kBrdfSlang},
          {"bindless", shaders::kBindlessSlang},
          {"atmosphere", shaders::kAtmosphereSlang},
-         {"virtual_shadow", shaders::kVirtualShadowSlang},
          {"laser_beams", shaders::kLaserBeamsSlang},
          {"volume", (groups > 0 ? "#define VOLUME_GROUPS " +
                                       std::to_string(groups) + "\n"
@@ -1143,10 +1142,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     }
     active_ = !instances.empty();
     bounds_.reset();
-    boxes_.clear();
     for (const auto& [min, max] : boxes) {
         const Bounds3 box{glm::vec3(min), glm::vec3(max)};
-        boxes_.push_back(box);
         bounds_ = bounds_
                       ? Bounds3{glm::min(bounds_->first, box.first),
                                 glm::max(bounds_->second, box.second)}

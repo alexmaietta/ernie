@@ -9,7 +9,6 @@
 import frame;
 import gbuffer;
 import surface;
-import virtual_shadow_caster;
 
 static const uint kHasNormals = 1;
 // The draw's light link group (`LinkGroups`) in the flags' top bits.
@@ -557,7 +556,6 @@ struct ShadowCutoutLayered {
     float4 position : SV_Position;
     float2 uv : TEXCOORD;
     uint layer : SV_RenderTargetArrayIndex;
-    float clip[4] : SV_ClipDistance;
 }
 
 [shader("vertex")]
@@ -570,7 +568,6 @@ ShadowCutoutLayered meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
     out.position = at.position;
     out.uv = v.uv;
     out.layer = at.layer;
-    out.clip = at.clip;
     return out;
 }
 
@@ -579,21 +576,6 @@ void meshShadowCutoutFragment(ShadowCutoutOutput in) {
     if (surfaceOpacity(in.uv) < surface.opacity.y) {
         discard;
     }
-}
-
-// A virtual shadow map's level (`Shadows::virtualMap`): the fragment written through its pages.
-[shader("fragment")]
-void meshVirtualShadowFragment(float4 position : SV_Position) {
-    writeVirtualShadow(position);
-}
-
-// As `meshVirtualShadowFragment`, but cut out where the surface is transparent.
-[shader("fragment")]
-void meshVirtualShadowCutoutFragment(ShadowCutoutOutput in) {
-    if (surfaceOpacity(in.uv) < surface.opacity.y) {
-        discard;
-    }
-    writeVirtualShadow(in.position);
 }
 
 GBuffer meshGBuffer(VertexOutput in) {

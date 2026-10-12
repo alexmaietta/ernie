@@ -48,11 +48,6 @@ struct ShadowCascade {
     /// `lightViewProjection` is only the frame's pose, so passes cull
     /// nothing by it.
     bool moving = false;
-    /// Whether casters draw into its map: not for the light the
-    /// virtual shadow map shadows, which shading and volumes read
-    /// through the pages, nor for a virtual level no receiver
-    /// reaches.
-    bool drawn = true;
 };
 
 /// View-space split depths from `nearPlane` to `farPlane` with the

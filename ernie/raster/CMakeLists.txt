@@ -18,7 +18,6 @@ ernie_add_library(
     sensor_plan.cpp
     shadow_cascades.cpp
     terrain_drawable.cpp
-    virtual_shadow_map.cpp
     virtual_texture.cpp
     volume_pass.cpp
     PUBLIC
