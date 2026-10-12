@@ -174,7 +174,7 @@ textures (ernie:virtualTexture) need.
             BakeTexture(files[0], files[1], options);
         std::printf("%s: %u x %u, %u mips, %zu bytes\n",
                     files[1].c_str(), texture.width, texture.height,
-                    texture.mips, texture.bytes.size());
+                    texture.mips, texture.Data().size());
     } catch (const std::exception& error) {
         std::fprintf(stderr, "ernie bake-texture: %s\n",
                      error.what());

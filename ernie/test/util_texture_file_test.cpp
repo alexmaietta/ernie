@@ -361,6 +361,28 @@ TEST(TextureFile, LoadsFilesByExtension) {
         LoadTextureFile(write("a.ktx2", Ktx2(37, 1, 1, 0, {Ramp(4)})))
             .format,
         TextureFormat::Rgba8);
+    // Stored texels are read in place from the mapped file; the mips
+    // hold the file's bytes where they lie.
+    const Bytes payload = Ramp(32 + 8 + 8 + 8, 3);
+    const TextureData dds = LoadTextureFile(
+        write("mips.dds",
+              Dds(8, 8, 4, kFourCcFlag, FourCc("DXT1"), payload)));
+    EXPECT_NE(dds.mapping, nullptr);
+    EXPECT_TRUE(dds.bytes.empty()) << "no copy";
+    EXPECT_EQ(Copy(dds.Mip(0, 3)), Slice(payload, 48, 8));
+    const Bytes level0 = Ramp(16, 1);
+    const Bytes level1 = Ramp(4, 100);
+    const TextureData ktx2 = LoadTextureFile(
+        write("levels.ktx2", Ktx2(37, 2, 2, 0, {level0, level1})));
+    EXPECT_NE(ktx2.mapping, nullptr);
+    EXPECT_EQ(Copy(ktx2.Mip(0, 0)), level0);
+    EXPECT_EQ(Copy(ktx2.Mip(0, 1)), level1);
+    // Transcoded Basis Universal texels are decoded into memory.
+    const TextureData basis =
+        LoadTextureFile(std::filesystem::path(ERNIE_TEST_FIXTURES) /
+                        "ktx2" / "quadrants_uastc_zstd.ktx2");
+    EXPECT_EQ(basis.mapping, nullptr);
+    EXPECT_FALSE(basis.bytes.empty());
     // Errors name the file.
     try {
         LoadTextureFile(write("bad.dds", Ramp(10)));

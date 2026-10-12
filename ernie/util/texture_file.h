@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/util/mapped_file.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -68,10 +71,22 @@ struct TextureData {
     std::uint32_t layers = 1;
     std::uint32_t mips = 1;
     bool cube = false;
+    /// The texels, owned; empty when they are read from a mapped file
+    /// in place (`mapping`).
     std::vector<std::byte> bytes;
-    /// Where each mip starts in `bytes`, layer by layer
+    /// A file mapped into memory (`LoadTextureFile`) holding the
+    /// texels, in `mapped`; null when they are in `bytes`.
+    std::shared_ptr<const MappedFile> mapping;
+    std::span<const std::byte> mapped;
+    /// Where each mip starts in `Data()`, layer by layer
     /// (`layer * mips + mip`).
     std::vector<std::size_t> offsets;
+
+    /// The texels: the mapped file's, else `bytes`.
+    std::span<const std::byte> Data() const {
+        return mapping != nullptr ? mapped
+                                  : std::span<const std::byte>(bytes);
+    }
 
     /// The bytes of mip `mip` of layer `layer`.
     /// @throws std::out_of_range for a layer or mip it lacks.
@@ -83,7 +98,11 @@ struct TextureData {
 /// .ktx2, in any case.
 bool IsTextureFile(const std::filesystem::path& path);
 
-/// Reads a DDS or KTX2 file as stored (`TextureData`), by extension.
+/// Reads a DDS or KTX2 file as stored (`TextureData`), by extension:
+/// mapped into memory and read in place (`TextureData::mapping`), so
+/// its texels come from disk only as they are used, a virtual
+/// texture's tiles in view rather than the whole file;
+/// supercompressed KTX2 levels are decoded into memory.
 ///
 /// DDS: the DX10 header's DXGI formats, the legacy DXT1 to DXT5,
 /// ATI1, ATI2, BC4U/S and BC5U/S codes, and 32-bit RGBA or BGRA

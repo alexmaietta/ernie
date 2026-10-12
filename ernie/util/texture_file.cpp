@@ -8,7 +8,6 @@
 #include <array>
 #include <cctype>
 #include <cstring>
-#include <fstream>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -19,8 +18,9 @@ namespace ernie {
 namespace {
 
 // Bounds that keep every size below in range, far past what devices
-// sample.
-constexpr std::uint32_t kMaxSide = 1u << 16;
+// sample whole (virtual textures page larger ones: global mosaics run
+// to 86400 texels across).
+constexpr std::uint32_t kMaxSide = 1u << 20;
 constexpr std::uint32_t kMaxLayers = 2048;
 
 std::uint32_t U32(std::span<const std::byte> file, std::size_t at) {
@@ -63,11 +63,12 @@ std::uint32_t MipCount(std::uint32_t width, std::uint32_t height) {
 }
 
 /// A texture of `format`, `width` x `height` with `layers` layers and
-/// `mips` mips, its bytes still to fill: checks the shape and lays
-/// out `offsets` layer by layer.
+/// `mips` mips, its bytes still to fill (with `allocate`, else left
+/// to a mapped file): checks the shape and lays out `offsets` layer
+/// by layer.
 TextureData Shape(TextureFormat format, std::uint32_t width,
                   std::uint32_t height, std::uint32_t layers,
-                  std::uint32_t mips) {
+                  std::uint32_t mips, bool allocate = true) {
     if (width == 0 || height == 0 || width > kMaxSide ||
         height > kMaxSide) {
         throw std::runtime_error("Texture file has a size of " +
@@ -96,8 +97,20 @@ TextureData Shape(TextureFormat format, std::uint32_t width,
                                 std::max(1u, height >> mip));
         }
     }
-    data.bytes.resize(total);
+    if (allocate) {
+        data.bytes.resize(total);
+    }
     return data;
+}
+
+/// Bytes of every layer's mips of `texture`, as `Shape` laid them
+/// out.
+std::size_t ShapeBytes(const TextureData& texture) {
+    const std::uint32_t last = texture.mips - 1;
+    return texture.offsets.back() +
+           ImageBytes(texture.format,
+                      std::max(1u, texture.width >> last),
+                      std::max(1u, texture.height >> last));
 }
 
 std::optional<TextureFormat> FromDxgi(std::uint32_t dxgi) {
@@ -420,7 +433,7 @@ std::span<const std::byte> TextureData::Mip(std::uint32_t layer,
                                 std::to_string(mip));
     }
     const std::size_t at = offsets[std::size_t{layer} * mips + mip];
-    return std::span(bytes).subspan(
+    return Data().subspan(
         at, ImageBytes(format, std::max(1u, width >> mip),
                        std::max(1u, height >> mip)));
 }
@@ -430,7 +443,11 @@ bool IsTextureFile(const std::filesystem::path& path) {
     return extension == ".dds" || extension == ".ktx2";
 }
 
-TextureData ReadDds(std::span<const std::byte> file) {
+namespace {
+
+/// A DDS file's texture: copied into `bytes` with `copy`, else read
+/// from `file` in place (`mapped`, the offsets into it).
+TextureData ParseDds(std::span<const std::byte> file, bool copy) {
     // "DDS ", then the 124-byte DDS_HEADER, its pixel format at 76.
     constexpr std::size_t kHeader = 4;
     constexpr std::size_t kPixelFormat = kHeader + 72;
@@ -488,20 +505,27 @@ TextureData ReadDds(std::span<const std::byte> file) {
         }
         layers *= 6;
     }
-    TextureData texture = Shape(format, width, height, layers, mips);
+    TextureData texture =
+        Shape(format, width, height, layers, mips, copy);
     texture.cube = cube;
     // Each layer's mips follow the one before, as `TextureData` lays
     // them out.
-    if (file.size() < data ||
-        file.size() - data < texture.bytes.size()) {
+    const std::size_t total = ShapeBytes(texture);
+    if (file.size() < data || file.size() - data < total) {
         throw std::runtime_error("DDS file is truncated");
     }
-    std::memcpy(texture.bytes.data(), file.data() + data,
-                texture.bytes.size());
+    if (copy) {
+        std::memcpy(texture.bytes.data(), file.data() + data, total);
+    } else {
+        texture.mapped = file.subspan(data, total);
+    }
     return texture;
 }
 
-TextureData ReadKtx2(std::span<const std::byte> file) {
+/// A KTX2 file's texture: its levels as `ParseDds` reads, in place
+/// without `copy` unless they are supercompressed (decoded into
+/// `bytes`).
+TextureData ParseKtx2(std::span<const std::byte> file, bool copy) {
     constexpr std::array<std::uint8_t, 12> kIdentifier{
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32,
         0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
@@ -547,9 +571,15 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
     if (arrays > kMaxLayers / faces) {
         throw std::runtime_error("KTX2 file has too many layers");
     }
-    TextureData texture =
-        Shape(*format, width, height, arrays * faces, levels);
+    // Stored levels are read in place: each image is contiguous in
+    // the file, the offsets pointing at it.
+    const bool inPlace = !copy && supercompression == 0;
+    TextureData texture = Shape(*format, width, height,
+                                arrays * faces, levels, !inPlace);
     texture.cube = faces == 6;
+    if (inPlace) {
+        texture.mapped = file;
+    }
     // The level index follows the 80-byte header: each level's
     // offset, stored length and uncompressed length, level 0 the
     // largest. A level holds every layer's faces in turn.
@@ -569,6 +599,15 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
             throw std::runtime_error(
                 "KTX2 file has a malformed level " +
                 std::to_string(level));
+        }
+        if (inPlace) {
+            for (std::uint32_t layer = 0; layer < texture.layers;
+                 ++layer) {
+                texture.offsets[std::size_t{layer} * levels + level] =
+                    static_cast<std::size_t>(offset) +
+                    std::size_t{layer} * image;
+            }
+            continue;
         }
         const std::byte* source = file.data() + offset;
         if (supercompression == kZstd) {
@@ -595,31 +634,36 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
     return texture;
 }
 
+}  // namespace
+
+TextureData ReadDds(std::span<const std::byte> file) {
+    return ParseDds(file, true);
+}
+
+TextureData ReadKtx2(std::span<const std::byte> file) {
+    return ParseKtx2(file, true);
+}
+
 TextureData LoadTextureFile(const std::filesystem::path& path) {
-    std::ifstream stream(path, std::ios::binary);
-    if (!stream) {
-        throw std::runtime_error("Cannot open " + path.string());
-    }
-    std::vector<std::byte> file(
-        static_cast<std::size_t>(std::filesystem::file_size(path)));
-    stream.read(reinterpret_cast<char*>(file.data()),
-                static_cast<std::streamsize>(file.size()));
-    if (!stream) {
-        throw std::runtime_error("Cannot read " + path.string());
-    }
     const std::string extension = LowerExtension(path);
+    if (extension != ".dds" && extension != ".ktx2") {
+        throw std::runtime_error(
+            path.string() + " is neither a .dds nor a .ktx2 file");
+    }
+    // Mapped, so texels are read from disk only as they are used: a
+    // virtual texture's tiles in view, not the whole file.
+    auto mapping = std::make_shared<const MappedFile>(path);
     try {
-        if (extension == ".dds") {
-            return ReadDds(file);
+        TextureData texture =
+            extension == ".dds" ? ParseDds(mapping->Bytes(), false)
+                                : ParseKtx2(mapping->Bytes(), false);
+        if (!texture.mapped.empty()) {
+            texture.mapping = std::move(mapping);
         }
-        if (extension == ".ktx2") {
-            return ReadKtx2(file);
-        }
+        return texture;
     } catch (const std::runtime_error& error) {
         throw std::runtime_error(path.string() + ": " + error.what());
     }
-    throw std::runtime_error(path.string() +
-                             " is neither a .dds nor a .ktx2 file");
 }
 
 }  // namespace ernie

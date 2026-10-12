@@ -254,8 +254,9 @@ void WriteDdsFile(const std::filesystem::path& path,
                sizeof(header));
     // Layer after layer, each layer's mips in turn: `TextureData`'s
     // order.
-    file.write(reinterpret_cast<const char*>(texture.bytes.data()),
-               static_cast<std::streamsize>(texture.bytes.size()));
+    const std::span<const std::byte> data = texture.Data();
+    file.write(reinterpret_cast<const char*>(data.data()),
+               static_cast<std::streamsize>(data.size()));
     if (!file) {
         throw std::runtime_error("Cannot write " + path.string());
     }

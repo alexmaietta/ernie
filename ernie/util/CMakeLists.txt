@@ -6,6 +6,7 @@ ernie_add_library(
     atmosphere.cpp
     ies.cpp
     image.cpp
+    mapped_file.cpp
     nanovdb.cpp
     noise.cpp
     profile_report.cpp

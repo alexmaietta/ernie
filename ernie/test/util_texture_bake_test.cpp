@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <stb_image_write.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <stdexcept>
@@ -81,7 +82,11 @@ TEST_F(TextureBake, ColourBakesToMippedSrgbBc7) {
     const TextureData read = LoadTextureFile(output);
     EXPECT_EQ(read.format, baked.format);
     EXPECT_EQ(read.mips, baked.mips);
-    EXPECT_EQ(read.bytes, baked.bytes) << "the DDS file reads back";
+    ASSERT_EQ(read.Data().size(), baked.Data().size());
+    EXPECT_TRUE(std::equal(read.Data().begin(), read.Data().end(),
+                           baked.Data().begin()))
+        << "the DDS file reads back";
+    EXPECT_NE(read.mapping, nullptr) << "read in place";
 
     BakeOptions linear;
     linear.srgb = false;
