@@ -46,9 +46,9 @@ TEST(PrimSchemasTest, LightPanelsComeFromTheRegistry) {
     const std::vector<PropertySection> lamp =
         SchemaOf(scene, "/Lamp", brdfs, filters);
     EXPECT_EQ(Titles(lamp),
-              (std::vector<std::string>{"Light", "Shape", "Spectrum",
-                                        "Photometric", "Linking",
-                                        "Polarization", "Prim"}));
+              (std::vector<std::string>{
+                  "Light", "Shape", "Spectrum", "Photometric",
+                  "Linking", "Time", "Polarization", "Prim"}));
     // The type's own attributes before its bases' in a section;
     // arrays are not edited.
     EXPECT_EQ(lamp[1].fields.front().attribute, tokens::kRadius);
