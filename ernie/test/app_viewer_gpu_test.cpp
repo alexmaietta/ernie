@@ -107,6 +107,26 @@ TEST_F(ViewerTest, OpensFramingTheScene) {
     EXPECT_GT(glm::dot(toCube, camera.Forward()), 0.999);
 }
 
+TEST_F(ViewerTest, PausesItsSensorClockAndStepsIt) {
+    viewer_->Step();
+    viewer_->Step();
+    const double running = viewer_->Delegate().Time();
+    EXPECT_GT(running, 0.0) << "the clock runs with the frames";
+    viewer_->SetClockPaused(true);
+    EXPECT_TRUE(viewer_->ClockPaused());
+    viewer_->Step();
+    const double paused = viewer_->Delegate().Time();
+    viewer_->Step();
+    viewer_->Step();
+    EXPECT_EQ(viewer_->Delegate().Time(), paused);
+    viewer_->StepClock(0.25);
+    viewer_->Step();
+    EXPECT_DOUBLE_EQ(viewer_->Delegate().Time(), paused + 0.25);
+    viewer_->Step();
+    EXPECT_DOUBLE_EQ(viewer_->Delegate().Time(), paused + 0.25)
+        << "one step only";
+}
+
 TEST_F(ViewerTest, RendersTheSceneIntoTheViewport) {
     for (int i = 0; i < 3; ++i) {
         ASSERT_TRUE(viewer_->Step());

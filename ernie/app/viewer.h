@@ -506,6 +506,17 @@ class Viewer {
     Lighting GetLighting() const;
     void SetLighting(Lighting lighting);
 
+    /// Whether the sensor clock (`RenderDelegate::AdvanceTime`)
+    /// stands still between frames; by default it runs with them, a
+    /// frame's seconds a frame, so pulses and pattern sequences play
+    /// out.
+    bool ClockPaused() const;
+    void SetClockPaused(bool paused);
+
+    /// Advances the sensor clock by `seconds` at the next frame,
+    /// paused or not, as a single step does.
+    void StepClock(double seconds);
+
     /// How the viewport exposes its image: `Auto` keys the scene's
     /// metered average luminance to middle grey (adapting over a
     /// fraction of a second), `Camera` (the default) takes the

@@ -621,6 +621,13 @@ void BindApp(nb::module_& parent) {
             "the viewport's sensor filter chain as 'aov:<name>'.")
         .def_prop_rw("lighting", &Viewer::GetLighting,
                      &Viewer::SetLighting)
+        .def_prop_rw("clock_paused", &Viewer::ClockPaused,
+                     &Viewer::SetClockPaused,
+                     "Whether the sensor clock stands still between "
+                     "frames; by default it runs with them.")
+        .def("step_clock", &Viewer::StepClock, nb::arg("seconds"),
+             "Advances the sensor clock by `seconds` at the next "
+             "frame, paused or not.")
         .def_prop_rw("exposure", &Viewer::GetExposure,
                      &Viewer::SetExposure)
         .def_prop_rw("exposure_compensation",

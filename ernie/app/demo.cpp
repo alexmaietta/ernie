@@ -718,6 +718,14 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                 stepping = true;
                 s.singleStep = false;
             }
+            // A window's sensor clock stands still while paused, but
+            // for a step's worth at each single step.
+            if (viewer != nullptr && o.Windowed()) {
+                viewer->SetClockPaused(s.paused);
+                if (s.paused && stepping) {
+                    viewer->StepClock(demo->frameDt);
+                }
+            }
             if (stepping) {
                 demo->Step();
                 if (o.test) {

@@ -468,6 +468,8 @@ struct Viewer::State {
         return stops + autoStops.value_or(0.0);
     }
     Lighting lighting = Lighting::Stage;
+    bool clockPaused = false;  ///< See `SetClockPaused`.
+    double clockStep = 0.0;    ///< See `StepClock`.
     std::optional<Wireframe> wireframe;
     ViewportDisplay display;
     std::vector<std::string>
@@ -2757,8 +2759,11 @@ struct Viewer::State {
                                      ? capture->var
                                      : viewVar);
             // The sensor clock runs with the viewer, a frame's
-            // seconds a frame.
-            delegate->AdvanceTime(std::max(frameInfo.delta, 0.0));
+            // seconds a frame, unless paused, plus any step asked
+            // for.
+            delegate->AdvanceTime(
+                (clockPaused ? 0.0 : std::max(frameInfo.delta, 0.0)) +
+                std::exchange(clockStep, 0.0));
             delegate->Update(scene, SessionSettingsPath(),
                              viewport->Extent());
             const RenderingTarget target =
@@ -3844,6 +3849,18 @@ Lighting Viewer::GetLighting() const {
 void Viewer::SetLighting(Lighting lighting) {
     state_->lighting = lighting;
     state_->lightingChosen = true;
+}
+
+bool Viewer::ClockPaused() const {
+    return state_->clockPaused;
+}
+
+void Viewer::SetClockPaused(bool paused) {
+    state_->clockPaused = paused;
+}
+
+void Viewer::StepClock(double seconds) {
+    state_->clockStep += std::max(seconds, 0.0);
 }
 
 std::optional<Wireframe> Viewer::GetWireframe() const {
