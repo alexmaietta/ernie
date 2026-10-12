@@ -1881,8 +1881,9 @@ float lampSize(LightGpu light) {
 // it), over the square of the distance, times the air's
 // scattering at the angle between the light and the ray, dimmed through the air from the lamp
 // (`aperture`, km from the planet's centre) and on to the eye (`eye`). The ray, clipped to the
-// cone, is sampled equiangularly from the lamp, which takes the 1/r^2 exactly, at 16 points
-// jittered per pixel; its spectrum (the phase and the air's dimming) once per four.
+// cone, is sampled equiangularly from the lamp, which takes the 1/r^2 exactly, at the middles of
+// 16 equal angles (jittered per pixel, what remains varies smoothly enough that the jitter
+// showed only as grain); its spectrum (the phase and the air's dimming) once per four.
 //
 // Reference: C. Kulla and M. Fajardo, "Importance Sampling Techniques for Path Tracing in
 // Participating Media", Computer Graphics Forum 31(4):1519-1528, 2012 (equiangular sampling).
@@ -1915,6 +1916,19 @@ void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 directio
     let size = lampSize(light);
     // The angles from the lamp's foot on the ray, seen from the lamp, the span covers.
     let along = dot(apex - origin, direction);
+    // No farther than eight of the air's attenuation lengths at the lamp past its foot, where
+    // its light has all but gone: samples beyond, spaced for 1/r^2 alone, would carry nothing
+    // most of the time and the pixels' jitter would show as grain.
+    {
+        float4 scattering;
+        float4 extinction;
+        mediumAt(atmosphereMedium, atmosphereDensities, length(aperture) - bottom, 0,
+                 scattering, extinction);
+        let sigma = 1e-3 * dot(extinction, float4(0.25));
+        if (sigma > 0.0) {
+            end = min(end, max(along, 0.0) + 8.0 / sigma);
+        }
+    }
     let closest = max(length(apex - (origin + direction * along)), max(size, 1e-3));
     let first = atan((start - along) / closest);
     let last = atan((end - along) / closest);
@@ -1930,12 +1944,11 @@ void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 directio
     }
     // Each sample's share of the integral of 1/r^2 along the ray.
     let share = timing * (last - first) / (float(kSamples) * closest);
-    let jitter = interleavedGradientNoise(float2(id.xy));
     for (uint block = 0; block < kSamples / kBlock; ++block) {
         var weight = 0.0;
         var weighted = 0.0;
         for (uint j = 0; j < kBlock; ++j) {
-            let angle = first + (float(block * kBlock + j) + jitter) / float(kSamples) *
+            let angle = first + (float(block * kBlock + j) + 0.5) / float(kSamples) *
                                     (last - first);
             let t = along + closest * tan(angle);
             let fromLamp = origin + direction * t - apex;
