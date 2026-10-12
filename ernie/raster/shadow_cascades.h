@@ -32,6 +32,10 @@ struct ShadowCascade {
     /// `gpuMatrix` of `RasterRenderer::LightViewMatrices`.
     bool gpuFitted = false;
     std::uint32_t gpuMatrix = 0;
+    /// For a view the GPU fits, a light view-projection whose box
+    /// holds every one the GPU may fit, for culling on the host
+    /// (terrain and planet patches); none to cull nothing there.
+    std::optional<glm::mat4> cullViewProjection;
     /// A batch's map fitted to one world (`WorldShadowFit::World`):
     /// the world whose casters it draws besides the shared ones, so
     /// passes consider only theirs; none for every world's.

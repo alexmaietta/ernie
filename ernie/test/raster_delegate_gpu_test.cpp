@@ -1282,18 +1282,18 @@ TEST_F(RasterDelegateTest,
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
     delegate.Render(scene);
-    const float nearPlane =
-        delegate.Renderer().LightShadowViews().front().splitNear;
+    const float sceneSplit = delegate.Renderer().ShadowSplits()[0];
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetShadowFit(tokens::kVisible);
     for (int i = 0; i < 4; ++i) {
         delegate.Render(scene);
     }
-    const float fitted =
-        delegate.Renderer().LightShadowViews().front().splitNear;
+    // The GPU fits them: its first cascade ends a little past where
+    // it starts, near the meshes.
+    const float fitted = delegate.Renderer().ShadowSplits()[0];
     EXPECT_GT(fitted, 50.0f);
-    EXPECT_LT(fitted, 60.0f);
-    EXPECT_GT(fitted, 10.0f * nearPlane);
+    EXPECT_LT(fitted, 70.0f);
+    EXPECT_GT(fitted, 5.0f * sceneSplit);
     // A view far from the one measured falls back to the scene's fit
     // until it measures again.
     scene.Set("/World/Camera", tokens::kTransform,
@@ -1301,9 +1301,8 @@ TEST_F(RasterDelegateTest,
                                      {0.0, 0.0, 0.0},
                                      {0.0, 1.0, 0.0}));
     delegate.Render(scene);
-    EXPECT_EQ(
-        delegate.Renderer().LightShadowViews().front().splitNear,
-        nearPlane);
+    EXPECT_LT(delegate.Renderer().ShadowSplits()[0],
+              2.0f * sceneSplit);
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetShadowFit("nearest");
     EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
@@ -1332,15 +1331,51 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
         delegate.Renderer().LightShadowViews();
     ASSERT_FALSE(cascades.empty())
         << "a cube camera's view has cascades of its own";
-    const float nearPlane = cascades.front().splitNear;
+    const float sceneSplit = delegate.Renderer().ShadowSplits()[0];
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetShadowFit(tokens::kVisible);
     for (int i = 0; i < 4; ++i) {
         delegate.Render(scene);
     }
-    const float fitted =
-        delegate.Renderer().LightShadowViews().front().splitNear;
+    // The GPU fits them: its first cascade ends a little past where
+    // it starts, near the meshes.
+    const float fitted = delegate.Renderer().ShadowSplits()[0];
     EXPECT_GT(fitted, 50.0f);
-    EXPECT_LT(fitted, 60.0f);
-    EXPECT_GT(fitted, 10.0f * nearPlane);
+    EXPECT_LT(fitted, 70.0f);
+    EXPECT_GT(fitted, 5.0f * sceneSplit);
+}
+
+TEST_F(RasterDelegateTest,
+       GpuFittedCascadesMatchTheHostsWithoutSeenDepths) {
+    // A visible fit's view of the sky sees no depths to fit to: the
+    // GPU fits the sun's cascades as the host does (`FitCascades`),
+    // which is their estimate.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetShadowFit(tokens::kVisible);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 30.0},
+                                     {0.0, 0.0, 100.0},
+                                     {0.0, 1.0, 0.0}));
+    for (int i = 0; i < 3; ++i) {
+        delegate.Render(scene);
+    }
+    const auto& views = delegate.Renderer().LightShadowViews();
+    ASSERT_FALSE(views.empty());
+    std::vector<glm::mat4> gpu(views.size());
+    delegate.Renderer().LightViewMatrices().Read(
+        std::as_writable_bytes(std::span(gpu)));
+    for (std::size_t v = 0; v < views.size(); ++v) {
+        EXPECT_TRUE(views[v].gpuFitted);
+        for (int c = 0; c < 4; ++c) {
+            for (int r = 0; r < 4; ++r) {
+                EXPECT_NEAR(gpu[v][c][r],
+                            views[v].lightViewProjection[c][r],
+                            1e-5f * (1.0f + std::abs(gpu[v][c][r])))
+                    << "view " << v << " column " << c << " row "
+                    << r;
+            }
+        }
+    }
 }
