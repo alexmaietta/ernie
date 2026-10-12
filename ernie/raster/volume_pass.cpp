@@ -85,9 +85,16 @@ struct VolumeResources {
     VkDeviceAddress rebuild;
     std::uint32_t materialCount;
     std::uint32_t shadowViewCount;
-    std::uint32_t unused[2];
+    VkDeviceAddress profiles;
+    float originShift[4];
+    VkDeviceAddress timing;
+    std::uint32_t timingWords;
+    std::uint32_t unused;
+    VkDeviceAddress distances;
+    float stepsPerPixel;
+    float thinOpticalDepth;
 };
-static_assert(sizeof(VolumeResources) == 112,
+static_assert(sizeof(VolumeResources) == 160,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -136,7 +143,32 @@ struct VolumeConstants {
     std::uint32_t offsets[4];
     std::uint32_t flags[4];
     std::uint32_t lights[4];
+    VkDeviceAddress historyNow;
+    VkDeviceAddress historyLast;
 };
+static_assert(sizeof(VolumeConstants) == 80,
+              "VolumeConstants must match volume.slang");
+
+// volume.slang's temporal amortisation flags (`VolumeConstants`'s
+// flags.w) and a history's channels besides its bands'.
+constexpr std::uint32_t kTemporal = 1;
+constexpr std::uint32_t kHistoryHeld = 2;
+constexpr std::uint32_t kMarchOnly = 4;
+constexpr std::uint32_t kBlocksOfFour = 8;
+constexpr std::uint32_t kHistoryChannels = 3;
+// Frames whose `volumeChangesMain` verdicts the host keeps, a word
+// each (`VolumePass::changes_`).
+constexpr std::uint32_t kChangeSlots = 8;
+// The pixel of each block that marches in each frame, x and y: in the
+// order of a Bayer matrix, each far from the ones just before.
+//
+// Reference: B. E. Bayer, "An Optimum Method for Two-Level Rendition
+//   of Continuous-Tone Pictures", IEEE International Conference on
+//   Communications, 1973.
+constexpr glm::uvec2 kOrderOfTwo[] = {{0, 0}, {1, 1}, {1, 0}, {0, 1}};
+constexpr glm::uvec2 kOrderOfFour[] = {
+    {0, 0}, {2, 2}, {2, 0}, {0, 2}, {1, 1}, {3, 3}, {3, 1}, {1, 3},
+    {1, 0}, {3, 2}, {3, 0}, {1, 2}, {0, 1}, {2, 3}, {2, 1}, {0, 3}};
 
 // volume.slang's phase functions.
 float PhaseOf(const std::string& phase) {
@@ -329,6 +361,8 @@ VolumePass::VolumePass(const VulkanContext& context,
       shadowLayout_(context, kShadowBindings),
       scatterLayout_(context, kScatterBindings,
                      sizeof(VolumeConstants)),
+      distanceLayout_(context, kCacheBindings,
+                      sizeof(VolumeConstants)),
       cacheLayout_(context, kCacheBindings),
       changeLayout_(context, kChangeBindings,
                     sizeof(VolumeConstants)) {
@@ -337,10 +371,16 @@ VolumePass::VolumePass(const VulkanContext& context,
         context_, sizeof(VolumeResources),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
     rebuild_ = std::make_unique<GpuBuffer>(
-        context_, 6 * sizeof(std::uint32_t),
+        context_, 8 * sizeof(std::uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         BufferMemory::Device);
+    changes_ = std::make_unique<GpuBuffer>(
+        context_, kChangeSlots * sizeof(std::uint32_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT, BufferMemory::Readback);
+    const std::array<std::uint32_t, kChangeSlots> none{};
+    changes_->Write(std::as_bytes(std::span(none)));
 }
 
 const VolumePass::LoadedGrid*
@@ -588,6 +628,7 @@ void VolumePass::CopyDeviceGrid(LoadedGrid& loaded) {
         BytesOf(loaded.device, loaded.deviceOffset, loaded.grid.size),
         *pool_, loaded.offset, loaded.stream);
     loaded.copy = false;
+    loaded.distanceStale = true;
 }
 
 void VolumePass::RebuildPool() {
@@ -626,6 +667,7 @@ void VolumePass::RebuildPool() {
         device ? BufferMemory::Shared : BufferMemory::Device);
     pool_->Write(std::as_bytes(std::span(pool)));
     for (auto& [key, loaded] : grids_) {
+        loaded.distanceStale = true;
         if (loaded.dense && loaded.layout.leafBytes != 0) {
             loaded.scatter = true;
         } else if (!loaded.device.Empty()) {
@@ -698,6 +740,80 @@ void VolumePass::StageDenseGrids(FrameUploads& uploads) {
         at += static_cast<std::uint64_t>(loaded.shape.x) *
               loaded.shape.y * loaded.shape.z;
         loaded.scatter = false;
+        loaded.distanceStale = true;
+    }
+}
+
+void VolumePass::PlanDistanceGrids() {
+    // Each scalar grid's over its active bounds in bricks of 8^3
+    // voxels (volume.slang's `kBrick`), after a header of 8 words:
+    // per brick its distance, largest value and mean, and its
+    // eighths' means (`sampleLevel`), all built again when they move.
+    constexpr int kBrick = 8;
+    constexpr std::uint32_t kHeader = 8;
+    constexpr std::uint64_t kWordsPerBrick = 1 + 1 + 1 + 8;
+    const auto floorDiv = [](glm::ivec3 v) {
+        return glm::ivec3(glm::floor(glm::dvec3(v) / double(kBrick)));
+    };
+    std::uint64_t words = 0;
+    bool moved = false;
+    for (auto& [key, loaded] : grids_) {
+        if (!loaded.grid.Scalar() || loaded.grid.Empty()) {
+            loaded.distances = kNoGrid;
+            continue;
+        }
+        const glm::ivec3 first = floorDiv(loaded.grid.indexMin);
+        const glm::ivec3 bricks =
+            floorDiv(loaded.grid.indexMax) - first + glm::ivec3(1);
+        const auto at = static_cast<std::uint32_t>(words);
+        moved = moved || loaded.distances != at ||
+                loaded.firstBrick != first || loaded.bricks != bricks;
+        loaded.distances = at;
+        loaded.firstBrick = first;
+        loaded.bricks = bricks;
+        words += kHeader + kWordsPerBrick *
+                               static_cast<std::uint64_t>(bricks.x) *
+                               bricks.y * bricks.z;
+    }
+    if (words == 0) {
+        distanceBuilds_.clear();
+        return;
+    }
+    if (distances_ == nullptr || distanceWords_ < words) {
+        if (distances_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        distances_ = std::make_unique<GpuBuffer>(
+            context_, 4 * words, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Device);
+        distanceWords_ = words;
+        moved = true;
+    }
+    distanceBuilds_.clear();
+    std::uint64_t scratch = 0;
+    for (auto& [key, loaded] : grids_) {
+        if (loaded.distances == kNoGrid ||
+            !(loaded.distanceStale || moved)) {
+            continue;
+        }
+        distanceBuilds_.push_back(
+            {static_cast<std::uint32_t>(loaded.offset),
+             static_cast<std::uint32_t>(loaded.grid.type),
+             loaded.distances, loaded.firstBrick, loaded.bricks});
+        scratch = std::max<std::uint64_t>(
+            scratch, static_cast<std::uint64_t>(loaded.bricks.x) *
+                         loaded.bricks.y * loaded.bricks.z);
+        loaded.distanceStale = false;
+    }
+    // Two passes' words, each read by the next.
+    if (scratch > 0 && (distanceScratch_ == nullptr ||
+                        distanceScratch_->Size() < 8 * scratch)) {
+        if (distanceScratch_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        distanceScratch_ = std::make_unique<GpuBuffer>(
+            context_, 8 * scratch, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Device);
     }
 }
 
@@ -721,6 +837,10 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                      std::uint64_t frame, FrameUploads& uploads) {
     ERNIE_ZONE("Volumes");
     seed_ = static_cast<std::uint32_t>(frame * 2654435761u);
+    frame_ = frame;
+    bandCount_ = static_cast<std::uint32_t>(bands.count);
+    originShift_ = glm::vec3(origin - origin_);
+    origin_ = origin;
     bandGroups_ = static_cast<std::uint32_t>(
         std::clamp<std::size_t>((bands.count + 3) / 4, 1, 16));
     if (!(settings == settings_)) {
@@ -779,6 +899,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     if (!scatters_.empty()) {
         hostChanged_ = 3;
     }
+    PlanDistanceGrids();
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -837,6 +958,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                 const auto& [loaded, field] = all[f];
                 FieldGpu& slot = *slots[f];
                 slot.grid[0] = kNoGrid;
+                slot.grid[2] = kNoGrid;
                 if (loaded == nullptr) {
                     continue;
                 }
@@ -847,6 +969,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     static_cast<std::uint32_t>(loaded->offset);
                 slot.grid[1] =
                     static_cast<std::uint32_t>(loaded->grid.type);
+                slot.grid[2] = loaded->distances;
             }
             gpu.params[0] =
                 static_cast<float>(volume.material.density);
@@ -1007,13 +1130,12 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     cacheLargest_ = cacheLargest;
 }
 
-void VolumePass::Prepare(VkCommandBuffer commands,
-                         const GpuBuffer& lights,
-                         const GpuBuffer& lightViews,
-                         std::uint32_t lightCount,
-                         const LightPatternRegistry& patterns,
-                         const GpuBuffer& patternData,
-                         std::uint32_t shadowViews) const {
+void VolumePass::Prepare(
+    VkCommandBuffer commands, const GpuBuffer& lights,
+    const GpuBuffer& profiles, const GpuBuffer& timing,
+    const GpuBuffer& lightViews, std::uint32_t lightCount,
+    const LightPatternRegistry& patterns,
+    const GpuBuffer& patternData, std::uint32_t shadowViews) const {
     if (!active_) {
         return;
     }
@@ -1162,7 +1284,11 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     const VkDeviceSize compared =
         volumeCount_ * sizeof(VolumeGpu) +
         materialCount_ * sizeof(VolumeMaterialGpu) + lights.Size() +
-        shadowViews * (sizeof(glm::mat4) + sizeof(std::int32_t));
+        lightCount * 28 * sizeof(std::uint32_t) +
+        shadowViews * (sizeof(glm::mat4) + sizeof(std::int32_t)) +
+        lightCount * VkDeviceSize{LightParams::kProfileRows} *
+            LightParams::kProfileColumns * sizeof(float) +
+        timing.Size();
     if (previous_ == nullptr || previous_->Size() < compared) {
         if (previous_ != nullptr) {
             vkDeviceWaitIdle(context_.Device());
@@ -1176,6 +1302,19 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     resources.rebuild = rebuild_->Address();
     resources.materialCount = materialCount_;
     resources.shadowViewCount = shadowViews;
+    resources.profiles = profiles.Address();
+    resources.distances =
+        distances_ != nullptr ? distances_->Address() : 0;
+    resources.stepsPerPixel =
+        static_cast<float>(settings_.stepsPerPixel);
+    resources.thinOpticalDepth =
+        static_cast<float>(settings_.thinOpticalDepth);
+    resources.timing = timing.Address();
+    resources.timingWords = static_cast<std::uint32_t>(
+        timing.Size() / sizeof(std::uint32_t));
+    resources.originShift[0] = originShift_.x;
+    resources.originShift[1] = originShift_.y;
+    resources.originShift[2] = originShift_.z;
     // After whatever read the last frame's, before the passes reading
     // these.
     VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -1196,6 +1335,83 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
     dependency.pMemoryBarriers = &after;
     vkCmdPipelineBarrier2(commands, &dependency);
+
+    if (!distanceBuilds_.empty()) {
+        // The changed grids' distance grids, for the march and the
+        // caches to leap through empty space: their bricks'
+        // occupancy, then the distance transform along x, y and z.
+        ERNIE_ZONE("Record volume distance grids");
+        ERNIE_GPU_ZONE(context_, commands, "Volume distance grids");
+        if (occupancyPipeline_ == nullptr ||
+            distancePipelinePatterns_ != patterns.Models().size()) {
+            ERNIE_ZONE("Volume distance pipelines");
+            if (occupancyPipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            const auto modules = VolumeModules(patterns, false);
+            occupancyPipeline_ = std::make_unique<ComputePipeline>(
+                context_, distanceLayout_,
+                compiler_.CompileSpirv(modules,
+                                       "brickOccupancyMain"));
+            distancePipeline_ = std::make_unique<ComputePipeline>(
+                context_, distanceLayout_,
+                compiler_.CompileSpirv(modules, "brickDistanceMain"));
+            distancePipelinePatterns_ = patterns.Models().size();
+        }
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*pool_),
+            DescriptorResource::Of(*resources_)};
+        const VkDeviceAddress scratch[] = {
+            distanceScratch_->Address(),
+            distanceScratch_->Address() +
+                distanceScratch_->Size() / 2};
+        for (const DistanceBuild& build : distanceBuilds_) {
+            const auto bricks = static_cast<std::uint32_t>(
+                build.bricks.x * build.bricks.y * build.bricks.z);
+            VolumeConstants constants{};
+            constants.layout[0] =
+                static_cast<std::uint32_t>(build.bricks.x);
+            constants.layout[1] =
+                static_cast<std::uint32_t>(build.bricks.y);
+            constants.layout[2] =
+                static_cast<std::uint32_t>(build.bricks.z);
+            for (int a = 0; a < 3; ++a) {
+                constants.offsets[a] =
+                    static_cast<std::uint32_t>(build.firstBrick[a]);
+            }
+            constants.offsets[3] = build.grid;
+            constants.flags[0] = build.type;
+            constants.flags[1] = build.distances;
+            // Occupancy into the first scratch, then each axis from
+            // one to the other, the last into the grid's words.
+            constants.historyNow = scratch[0];
+            distanceLayout_.PushConstants(commands, &constants,
+                                          sizeof(constants));
+            occupancyPipeline_->Dispatch(commands, buffers,
+                                         (bricks + 63) / 64);
+            for (std::uint32_t axis = 0; axis < 3; ++axis) {
+                ComputeBarrier(commands);
+                constants.layout[3] = axis;
+                constants.historyLast = scratch[axis % 2];
+                constants.historyNow =
+                    axis == 2
+                        ? distances_->Address() +
+                              4 * (VkDeviceSize{build.distances} + 8)
+                        : scratch[(axis + 1) % 2];
+                vkCmdBindPipeline(commands,
+                                  VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  distancePipeline_->Handle());
+                distanceLayout_.Push(commands,
+                                     VK_PIPELINE_BIND_POINT_COMPUTE,
+                                     buffers);
+                distanceLayout_.PushConstants(commands, &constants,
+                                              sizeof(constants));
+                vkCmdDispatch(commands, (bricks + 63) / 64, 1, 1);
+            }
+            ComputeBarrier(commands);
+        }
+        distanceBuilds_.clear();
+    }
 
     {
         // Whether to build the caches and maps again, on the GPU:
@@ -1248,10 +1464,24 @@ void VolumePass::Prepare(VkCommandBuffer commands,
         VkMemoryBarrier2 sized{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
         sized.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
         sized.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-        sized.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-        sized.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+        // Read as dispatches, and by the march (whether the volumes
+        // changed).
+        sized.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT |
+                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT |
+                             VK_PIPELINE_STAGE_2_COPY_BIT;
+        sized.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT |
+                              VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                              VK_ACCESS_2_TRANSFER_READ_BIT;
         dependency.pMemoryBarriers = &sized;
         vkCmdPipelineBarrier2(commands, &dependency);
+        // Whether what the volumes show changed, for the host to see
+        // a few frames on (`Record`).
+        const VkBufferCopy verdict{6 * sizeof(std::uint32_t),
+                                   (frame_ % kChangeSlots) *
+                                       sizeof(std::uint32_t),
+                                   sizeof(std::uint32_t)};
+        vkCmdCopyBuffer(commands, rebuild_->Handle(),
+                        changes_->Handle(), 1, &verdict);
     }
 
     if (cacheCells_ > 0) {
@@ -1387,9 +1617,95 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.lights[0] = layout.view;
     constants.lights[1] = layout.lightShadow;
     constants.lights[2] = layout.atmosphere;
+    // Temporal amortisation: a history per dispatch, this frame's
+    // written as the last's is read, the last's held when it was the
+    // frame before's for the same images.
+    if (settings_.temporal && !pushbroom) {
+        const std::uint32_t views = targets.RasterLayers();
+        History& history = histories_[firstView];
+        if (history.buffers[0] == nullptr ||
+            history.frame != frame_) {
+            const bool same =
+                history.buffers[0] != nullptr &&
+                history.width == width && history.height == height &&
+                history.views == views && history.bands == bandCount_;
+            if (same) {
+                history.held = history.frame + 1 == frame_;
+                history.now ^= 1;
+            } else {
+                ERNIE_ZONE("Volume histories");
+                if (history.buffers[0] != nullptr) {
+                    vkDeviceWaitIdle(context_.Device());
+                }
+                const VkDeviceSize bytes =
+                    4 * (32 * VkDeviceSize{views} +
+                         VkDeviceSize{kHistoryChannels + bandCount_} *
+                             views * width * height);
+                for (auto& buffer : history.buffers) {
+                    buffer = std::make_unique<GpuBuffer>(
+                        context_, bytes,
+                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        BufferMemory::Device);
+                }
+                history.width = width;
+                history.height = height;
+                history.views = views;
+                history.bands = bandCount_;
+                history.held = false;
+            }
+            history.frame = frame_;
+        }
+        constants.historyNow =
+            history.buffers[history.now]->Address();
+        constants.historyLast =
+            history.buffers[history.now ^ 1]->Address();
+        const bool four = settings_.temporalBlock == 4;
+        const glm::uvec2 marched = four ? kOrderOfFour[frame_ % 16]
+                                        : kOrderOfTwo[frame_ % 4];
+        // Where what the volumes show changed in the frames the host
+        // sees (three and four back, done by now), likely this one's
+        // too: marched in full in one dispatch, writing the history
+        // the frames after reproject.
+        std::array<std::uint32_t, kChangeSlots> changed{};
+        changes_->Read(std::as_writable_bytes(std::span(changed)));
+        const bool changing =
+            frame_ >= 4 &&
+            changed[(frame_ - 3) % kChangeSlots] != 0 &&
+            changed[(frame_ - 4) % kChangeSlots] != 0;
+        constants.flags[3] =
+            kTemporal |
+            (history.held && !changing ? kHistoryHeld : 0u) |
+            (four ? kBlocksOfFour : 0u) | (marched.x << 4) |
+            (marched.y << 6);
+        constants.lights[3] = views;
+        // After the last frame's march wrote its history.
+        ComputeBarrier(commands);
+    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       pipeline->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+    if ((constants.flags[3] & kHistoryHeld) != 0) {
+        // This frame's pixel of each block marched, a thread each, so
+        // no group waits on its others reprojecting; then the others,
+        // which read what those marched where their own history does
+        // not hold.
+        const std::uint32_t block =
+            (constants.flags[3] & kBlocksOfFour) != 0 ? 4 : 2;
+        const std::uint32_t blocksX = (width + block - 1) / block;
+        const std::uint32_t blocksY = (height + block - 1) / block;
+        VolumeConstants marching = constants;
+        marching.flags[3] |= kMarchOnly;
+        layout_.PushConstants(commands, &marching, sizeof(marching));
+        vkCmdDispatch(commands, Groups(blocksX), Groups(blocksY),
+                      targets.RasterLayers());
+        ComputeBarrier(commands);
+        // The blocks' others, a thread each.
+        layout_.PushConstants(commands, &constants,
+                              sizeof(constants));
+        vkCmdDispatch(commands, Groups(blocksX * (block * block - 1)),
+                      Groups(blocksY), targets.RasterLayers());
+        return;
+    }
     layout_.PushConstants(commands, &constants, sizeof(constants));
     vkCmdDispatch(commands, Groups(width), Groups(height),
                   targets.RasterLayers());

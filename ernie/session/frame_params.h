@@ -556,6 +556,20 @@ struct VolumeSettings {
     /// to the lights, the sky and the ground at a cell per two voxels
     /// found once a frame, rather than marching to them every step.
     bool lightCache = true;
+    /// March a pixel of each block a frame and reproject the others'
+    /// last results; in full where the volumes, materials or lights
+    /// changed or a pixel's history does not hold.
+    bool temporal = true;
+    /// Its blocks' pixels across, 2 or 4: a pixel of 4 or of 16
+    /// marched a frame.
+    std::uint32_t temporalBlock = 2;
+    /// Steps per pixel far off, at most: the march's steps grow with
+    /// distance once a pixel spans more than this many of the
+    /// volume's own; 0 keeps them the volume's own everywhere.
+    double stepsPerPixel = 2.0;
+    /// A brick of 8^3 voxels whose largest density holds back less
+    /// than this across it has its steps taken as one; 0, never.
+    double thinOpticalDepth = 0.02;
 
     bool operator==(const VolumeSettings&) const = default;
 };

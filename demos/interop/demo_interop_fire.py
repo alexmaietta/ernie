@@ -18,7 +18,7 @@ References:
 - A. Selle, R. Fedkiw, B. Kim, Y. Liu and J. Rossignac, "An Unconditionally
   Stable MacCormack Method", Journal of Scientific Computing 35, 2008."""
 
-from typing import no_type_check
+from typing import Any, no_type_check
 
 import numpy as np
 import warp as wp
@@ -472,7 +472,7 @@ class Demo(ernie.demo.Demo):
 
     def step(self):
         stream = wp.get_stream(self.device)
-        launch = dict(
+        launch: dict[str, Any] = dict(
             dim=(NX, NY, NZ), device=self.device, stream=stream
         )
         f = self.f

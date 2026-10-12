@@ -246,7 +246,7 @@ class Demo(ernie.demo.Demo):
         with wp.ScopedDevice(self.device):
             self.soot = wp.zeros((NX, NY, NZ), dtype=float)
             self.heat = wp.zeros((NX, NY, NZ), dtype=float)
-            self.perm = wp.array(
+            self.perm: wp.array = wp.array(
                 ernie.noise_permutation(5).astype(np.int32),
                 dtype=wp.int32,
             )

@@ -5075,8 +5075,9 @@ void RasterRenderer::RecordShadows(
     // `RecordViews` the others'.
     RecordShadowMaps(commands, drawables, Frame(0), 0);
     // The volumes' shadow maps, the light views now known.
-    volumes_->Prepare(commands, lightTable_, *lightViewMatrices_,
-                      lightCount_, lightPatterns_, *patternData_,
+    volumes_->Prepare(commands, lightTable_, lightProfiles_,
+                      *lightTiming_, *lightViewMatrices_, lightCount_,
+                      lightPatterns_, *patternData_,
                       static_cast<std::uint32_t>(lightViews_.size()));
     {
         ERNIE_GPU_ZONE(context_, commands, "After shadows");

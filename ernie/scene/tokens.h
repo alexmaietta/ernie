@@ -1249,6 +1249,14 @@ inline constexpr std::string_view kVolumeShadowResolution =
     "ernie:volumes:shadowResolution";
 inline constexpr std::string_view kVolumeLightCache =
     "ernie:volumes:lightCache";
+inline constexpr std::string_view kVolumeTemporal =
+    "ernie:volumes:temporal";
+inline constexpr std::string_view kVolumeTemporalBlock =
+    "ernie:volumes:temporalBlock";
+inline constexpr std::string_view kVolumeStepsPerPixel =
+    "ernie:volumes:stepsPerPixel";
+inline constexpr std::string_view kVolumeThinOpticalDepth =
+    "ernie:volumes:thinOpticalDepth";
 inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =

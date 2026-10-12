@@ -2659,6 +2659,8 @@ void BindScene(nb::module_& m) {
                 std::span(table.data(), table.size()),
                 {static_cast<std::int64_t>(table.size())}));
         },
+        nb::sig("def noise_permutation(seed: int = 0) -> "
+                "NDArray[numpy.uint8]"),
         nb::arg("seed") = 0,
         "The lattice permutation of `fbm_noise`'s noise for `seed`: "
         "256 entries twice over, uint8, for kernels on the GPU to "
@@ -2682,6 +2684,10 @@ void BindScene(nb::module_& m) {
             }
             return ArrayFromTensor(values);
         },
+        nb::sig("def fbm_noise(points: NDArray[numpy.float64], "
+                "octaves: int = 5, lacunarity: float = 2.0, "
+                "gain: float = 0.5, seed: int = 0) -> "
+                "NDArray[numpy.float64]"),
         nb::arg("points"), nb::arg("octaves") = 5,
         nb::arg("lacunarity") = 2.0, nb::arg("gain") = 0.5,
         nb::arg("seed") = 0,
@@ -2705,6 +2711,11 @@ void BindScene(nb::module_& m) {
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 bytes, {static_cast<std::int64_t>(bytes.size())}));
         },
+        nb::sig(
+            "def dense_nanovdb_grid(values: NDArray[numpy.float32], "
+            "voxel_size: float, origin: tuple[float, float, float] = "
+            "(0.0, 0.0, 0.0), name: str = '') -> "
+            "NDArray[numpy.uint8]"),
         nb::arg("values"), nb::arg("voxel_size"),
         nb::arg("origin") = std::array<double, 3>{0.0, 0.0, 0.0},
         nb::arg("name") = "",

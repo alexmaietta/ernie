@@ -346,6 +346,42 @@ TEST_F(RasterDelegateTest,
     asNew("the sun moved");
 }
 
+TEST_F(RasterDelegateTest,
+       TemporalAmortisationShowsWhatEveryPixelMarchedShows) {
+    // A pixel of each 2 x 2 marched a frame, the others reprojected:
+    // over frames of a still view, and as the camera moves, as a
+    // renderer marching every pixel shows.
+    Scene scene = SideScene(1.0);
+    RasterDelegate amortised(*context_);
+    // Every frame of its marched in full.
+    RasterDelegate marched(*context_);
+    const auto asMarched = [&](const char* when) {
+        const std::vector<double> shown =
+            CentreSpectrum(amortised, scene);
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetVolumeTemporal(false);
+        const std::vector<double> full =
+            CentreSpectrum(marched, scene);
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetVolumeTemporal(true);
+        for (std::size_t b = 0; b < full.size(); ++b) {
+            ASSERT_GT(full[b], 0.0) << when << ", band " << b;
+            EXPECT_NEAR(shown[b], full[b], 0.03 * full[b])
+                << when << ", band " << b;
+        }
+    };
+    for (int frame = 0; frame < 5; ++frame) {
+        asMarched("still");
+    }
+    for (int frame = 0; frame < 3; ++frame) {
+        scene.Set(
+            "/World/Camera", tokens::kTransform,
+            ernie::LookAtTransform({0.05 * (frame + 1), -4.0, 1.0},
+                                   {0.0, 0.0, 1.0}, {0.0, 0.0, 1.0}));
+        asMarched("moving");
+    }
+}
+
 TEST_F(RasterDelegateTest, TheAirDimsAndReddensTheSunInAVolume) {
     // The sun 5 degrees up: what the cube scatters, less the sky
     // behind it dimmed through it, against the same without air.

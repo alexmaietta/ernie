@@ -91,6 +91,8 @@ static const uint kIsotropic = 3;
 // space, and the grid: its byte offset in `grids` (kNoGrid for none) and PNANOVDB_GRID_TYPE_*.
 struct FieldGpu {
     float4 toIndex[3];
+    // x: the grid's byte offset in the pool (`kNoGrid` for none); y: its value type; z: its
+    // distance grid's first word in `pass.distances` (`kNoGrid` for none); w unused.
     uint4 grid;
 }
 
@@ -144,14 +146,19 @@ struct VolumeConstants {
     // x: 1 when the background holds radiance (a sky); without one, this pass writes the
     // background's, no radiance but what volumes emit, and the sensor reads it as held. y: the
     // layers from a radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
-    // them). z: the render settings' steps and octaves (`shadowSteps` and on). w unused.
+    // them). z: the render settings' steps and octaves (`shadowSteps` and on). w: temporal
+    // amortisation (`kTemporal` and on).
     uint4 flags;
     // Byte offsets: in a view's block, x `view` (the lights it sees, a bit each; its world's slot
     // in a batch's distant light maps; its first light); from the start (every view's), y
     // `lightShadow` (z the maps' texels across), z `atmosphere` (two float4s: the planet's centre
     // in km relative to the frame's origin and its radius; the atmosphere's top radius and 1 with
-    // one); w unused. The shared `size.w` is the light count.
+    // one); w the views this dispatch shades (`historyAt`). The shared `size.w` is the light count.
     uint4 lights;
+    // Temporal amortisation (`flags.w`): the history this frame writes and the last frame's,
+    // which it reads (`historyAt`).
+    float* historyNow;
+    float* historyLast;
 }
 
 // The shading pass's light (shading.slang's LightGpu, which the renderer checks this against).
@@ -240,8 +247,22 @@ struct VolumeResources {
     uint* rebuild;
     uint materialCount;
     uint shadowViewCount;
-    uint unused0;
-    uint unused1;
+    // The lights' IES profiles (`kProfileRows` x `kProfileColumns` floats each) and their timing
+    // (`timingWords` words), which temporal amortisation compares with the last frame's.
+    float* profiles;
+    // This frame's origin less the last's: added to a point relative to this frame's origin, the
+    // same point relative to the last's (temporal amortisation's reprojection).
+    float4 originShift;
+    uint* timing;
+    uint timingWords;
+    uint unused;
+    // The grids' distance grids (`stepAfterEmptyBricks`), at their fields' `grid.z` words.
+    uint* distances;
+    // The march's steps per pixel far off, at most (`VolumeSettings::stepsPerPixel`; 0, any).
+    float stepsPerPixel;
+    // A brick's optical depth across at most, below which its steps are taken as one
+    // (`stepsInThinBrick`; 0, never).
+    float thinOpticalDepth;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -399,6 +420,271 @@ uint stepAfterEmptyTile(FieldGpu field, float3 index, float3 origin, float3 step
         }
     }
     return uint(max(ceil((exit - start) / dt - jitter), 0.0));
+}
+
+// Distance grids, for empty-space skipping over many leaves at once: per grid, over its active
+// bounds in bricks of `kBrick`^3 voxels (its leaves'), the Chebyshev distance in bricks from each
+// to the nearest holding a value other than 0, at most `kMaxBrickDistance`. In
+// `pass.distances` from a field's `grid.z`: the first brick (index / `kBrick`) and the bricks
+// along x, y and z, two words unused, then a word per brick, x fastest, and its coarser levels
+// (`sampleLevel`). Built on the GPU whenever the grid changes (`brickOccupancyMain`,
+// `brickDistanceMain`).
+//
+// References:
+// - A. Schneider, "Nubis Cubed: Methods (and Madness) to Model and Render Immersive Real-Time
+//   Voxel-Based Clouds", SIGGRAPH Advances in Real-Time Rendering, 2023 (a distance field over a
+//   voxel cloud's empty space, the march leaping through it).
+// - A. Meijster, J. B. T. M. Roerdink and W. H. Hesselink, "A General Algorithm for Computing
+//   Distance Transforms in Linear Time", Mathematical Morphology and its Applications to Image and
+//   Signal Processing, 2002 (the transform a dimension at a time, which holds for Chebyshev
+//   distances).
+static const int kBrick = 8;
+static const uint kMaxBrickDistance = 16;
+static const uint kDistanceHeader = 8;
+
+// Brick `b` (from a distance grid's first) of `dims`'s word, x fastest.
+uint brickIndex(int3 b, int3 dims) {
+    return uint((b.z * dims.y + b.y) * dims.x + b.x);
+}
+
+// Empty-space skipping, exact, as `stepAfterEmptyTile` but over the bricks around `index` that
+// `field`'s distance grid finds empty: where every voxel a trilinear sample there reads is 0, the
+// first step past where the ray leaves them; else 0.
+uint stepAfterEmptyBricks(FieldGpu field, float3 index, float3 origin, float3 step, float start,
+                          float dt, float jitter) {
+    if (field.grid.z == kNoGrid) {
+        return 0;
+    }
+    let header = pass.distances + field.grid.z;
+    let first = int3(asint(header[0]), asint(header[1]), asint(header[2]));
+    let dims = int3(header[3], header[4], header[5]);
+    let brick = int3(floor(index / float(kBrick)));
+    let b = brick - first;
+    if (any(b < int3(0)) || any(b >= dims)) {
+        return 0;
+    }
+    let d = int(header[kDistanceHeader + brickIndex(b, dims)]);
+    if (d == 0) {
+        return 0;
+    }
+    // The bricks within d - 1 of this one are empty; a sample reads the voxels at and past its
+    // own, so up to a voxel short of their far sides.
+    let low = float3((brick - (d - 1)) * kBrick);
+    let high = float3((brick + d) * kBrick) - 1.0;
+    if (any(index >= high) || any(index < low)) {
+        return 0;
+    }
+    float exit = 1e30;
+    for (int a = 0; a < 3; ++a) {
+        if (step[a] > 0.0) {
+            exit = min(exit, (high[a] - origin[a]) / step[a]);
+        } else if (step[a] < 0.0) {
+            exit = min(exit, (low[a] - origin[a]) / step[a]);
+        }
+    }
+    return uint(max(ceil((exit - start) / dt - jitter), 0.0));
+}
+
+// The coarser levels of a field with a distance grid, after its distances (`B` words, a brick
+// each): each brick's largest value (`B`), its mean (level 3, `B`), and its eighths' (level 2, 4^3
+// voxels each, `8 B`, 2 per brick along each axis, x fastest).
+//
+// Reference: L. Williams, "Pyramidal Parametrics", SIGGRAPH 1983 (a prefiltered level for samples
+//   farther apart than the finest's).
+uint bricksOf(uint* header) {
+    return header[3] * header[4] * header[5];
+}
+
+// `field`'s point at local point `local`, in its index space.
+float3 fieldIndex(FieldGpu field, float3 local) {
+    return float3(dot(field.toIndex[0], float4(local, 1.0)), dot(field.toIndex[1], float4(local, 1.0)),
+                  dot(field.toIndex[2], float4(local, 1.0)));
+}
+
+// `field`'s value at index-space point `index` from its level `level` (2 or 3), trilinear between
+// the centres of its blocks of 4^3 or 8^3 voxels; 0 outside its bounds.
+float sampleLevel(FieldGpu field, float3 index, uint level) {
+    let header = pass.distances + field.grid.z;
+    let first = int3(asint(header[0]), asint(header[1]), asint(header[2]));
+    let bricks = int3(header[3], header[4], header[5]);
+    let count = bricksOf(header);
+    let across = level == 3 ? kBrick : kBrick / 2;
+    let dims = level == 3 ? bricks : 2 * bricks;
+    let values = header + kDistanceHeader + (level == 3 ? 2 * count : 3 * count);
+    let at = (index - float3(first * kBrick) - 0.5 * float(across - 1)) / float(across);
+    let cell = int3(floor(at));
+    let f = at - float3(cell);
+    float corners[8];
+    for (int k = 0; k < 8; ++k) {
+        let p = cell + int3(k & 1, (k >> 1) & 1, k >> 2);
+        corners[k] = all(p >= int3(0)) && all(p < dims) ? asfloat(values[brickIndex(p, dims)]) : 0.0;
+    }
+    let x00 = lerp(corners[0], corners[1], f.x);
+    let x10 = lerp(corners[2], corners[3], f.x);
+    let x01 = lerp(corners[4], corners[5], f.x);
+    let x11 = lerp(corners[6], corners[7], f.x);
+    return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
+}
+
+// The level to read `field` at for steps `voxels` of its voxels long: its own (0) up to 4, its
+// blocks of 4^3 (2) up to 8, then of 8^3 (3); its own without a distance grid.
+uint levelFor(FieldGpu field, float voxels) {
+    return field.grid.z == kNoGrid ? 0u : voxels >= 8.0 ? 3u : voxels >= 4.0 ? 2u : 0u;
+}
+
+// `field`'s value at local point `local`, from level `level` (`levelFor`).
+float sampleFieldAt(FieldGpu field, float3 local, uint level,
+                    inout pnanovdb_readaccessor_t accessor) {
+    return level == 0 ? sampleField(field, local, accessor)
+                      : sampleLevel(field, fieldIndex(field, local), level);
+}
+
+// Adaptive steps: where index-space point `index` of `volume`'s density (on the ray `origin` +
+// `step` t, in march steps `dt` from `start` offset by `jitter`, step `i` of `steps`) lies in a
+// brick so thin that the most of it the ray could cross holds back less than
+// `pass.thinOpticalDepth` (its largest value through a brick's width), the steps as far as the ray
+// leaves it, to take as one; else 1.
+//
+// Reference: J. Novák, I. Georgiev, J. Hanika and W. Jarosz, "Monte Carlo Methods for Volumetric
+//   Light Transport Simulation", Eurographics State of the Art Reports, 2018 (bounds on extinction
+//   over a grid's cells, majorants, to take longer steps where it is low).
+uint stepsInThinBrick(VolumeGpu volume, float3 index, float3 origin, float3 step, float start,
+                      float dt, float jitter, uint i, uint steps) {
+    let field = volume.density;
+    if (field.grid.z == kNoGrid || pass.thinOpticalDepth <= 0.0) {
+        return 1;
+    }
+    let header = pass.distances + field.grid.z;
+    let first = int3(asint(header[0]), asint(header[1]), asint(header[2]));
+    let bricks = int3(header[3], header[4], header[5]);
+    let brick = int3(floor(index / float(kBrick)));
+    let b = brick - first;
+    if (any(b < int3(0)) || any(b >= bricks)) {
+        return 1;
+    }
+    let largest = asfloat(header[kDistanceHeader + bricksOf(header) + brickIndex(b, bricks)]);
+    let across = float(kBrick) / max(length(step), 1e-9);
+    if (max(largest, 0.0) * volume.params.x * across >= pass.thinOpticalDepth) {
+        return 1;
+    }
+    let low = float3(brick * kBrick);
+    let high = low + float(kBrick);
+    float exit = 1e30;
+    for (int a = 0; a < 3; ++a) {
+        if (step[a] > 0.0) {
+            exit = min(exit, (high[a] - origin[a]) / step[a]);
+        } else if (step[a] < 0.0) {
+            exit = min(exit, (low[a] - origin[a]) / step[a]);
+        }
+    }
+    let past = uint(max(ceil((exit - start) / dt - jitter), 0.0));
+    return past > i ? min(past - i, steps - i) : 1u;
+}
+
+// A distance grid's build (`constants`): x, y and z its bricks along each axis and w the axis
+// (`brickDistanceMain`); offsets xyz its first brick, w its grid's byte offset in the pool; flags
+// x the grid's value type, y its first word in `pass.distances`. `historyLast` and `historyNow`
+// the words a pass reads and writes.
+
+// A distance grid's bricks, one each: 0 where any voxel holds a value other than 0, else
+// `kMaxBrickDistance`; brick 0's thread writes the grid's header.
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void brickOccupancyMain(uint3 id: SV_DispatchThreadID) {
+    let dims = int3(constants.layout.xyz);
+    if (id.x >= uint(dims.x * dims.y * dims.z)) {
+        return;
+    }
+    let first = asint(constants.offsets.xyz);
+    if (id.x == 0) {
+        let header = pass.distances + constants.flags.y;
+        header[0] = asuint(first.x);
+        header[1] = asuint(first.y);
+        header[2] = asuint(first.z);
+        header[3] = uint(dims.x);
+        header[4] = uint(dims.y);
+        header[5] = uint(dims.z);
+    }
+    let b = int3(int(id.x) % dims.x, (int(id.x) / dims.x) % dims.y, int(id.x) / (dims.x * dims.y));
+    let low = (first + b) * kBrick;
+    FieldGpu field;
+    field.toIndex[0] = float4(0.0);
+    field.toIndex[1] = float4(0.0);
+    field.toIndex[2] = float4(0.0);
+    field.grid = uint4(constants.offsets.w, constants.flags.x, kNoGrid, 0);
+    var accessor = accessorOf(field);
+    let type = constants.flags.x;
+    pnanovdb_coord_t ijk;
+    ijk.x = low.x;
+    ijk.y = low.y;
+    ijk.z = low.z;
+    // Whether any voxel holds a value other than 0, the largest, and the sums of each eighth.
+    bool occupied = false;
+    float largest = -1e30;
+    float eighths[8];
+    for (int e = 0; e < 8; ++e) {
+        eighths[e] = 0.0;
+    }
+    if (pnanovdb_readaccessor_get_dim(type, grids, accessor, ijk) > uint(kBrick)) {
+        // A tile above the leaves holds one value for the whole brick.
+        let value = valueAt(type, ijk, accessor);
+        occupied = value != 0.0;
+        largest = value;
+        for (int e = 0; e < 8; ++e) {
+            eighths[e] = value * float(kBrick * kBrick * kBrick / 8);
+        }
+    } else {
+        for (int v = 0; v < kBrick * kBrick * kBrick; ++v) {
+            let at = int3(v % kBrick, (v / kBrick) % kBrick, v / (kBrick * kBrick));
+            ijk.x = low.x + at.x;
+            ijk.y = low.y + at.y;
+            ijk.z = low.z + at.z;
+            let value = valueAt(type, ijk, accessor);
+            occupied = occupied || value != 0.0;
+            largest = max(largest, value);
+            let octant = at / (kBrick / 2);
+            eighths[octant.x + 2 * octant.y + 4 * octant.z] += value;
+        }
+    }
+    ((uint*)constants.historyNow)[id.x] = occupied ? 0u : kMaxBrickDistance;
+    // Its coarser levels (`sampleLevel`), and the largest value (`stepsInThinBrick`).
+    let count = uint(dims.x * dims.y * dims.z);
+    let values = pass.distances + constants.flags.y + kDistanceHeader;
+    values[count + id.x] = asuint(largest);
+    float sum = 0.0;
+    for (int e = 0; e < 8; ++e) {
+        sum += eighths[e];
+        let cell = 2 * b + int3(e & 1, (e >> 1) & 1, e >> 2);
+        values[3 * count + brickIndex(cell, 2 * dims)] =
+            asuint(eighths[e] / float(kBrick * kBrick * kBrick / 8));
+    }
+    values[2 * count + id.x] = asuint(sum / float(kBrick * kBrick * kBrick));
+}
+
+// A pass of a distance grid's transform along axis `constants.layout.w`: each brick's least, over
+// the bricks along that axis within `kMaxBrickDistance`, of the larger of the distance to it and
+// its value from the pass before. Along x, y then z, from the occupancy, the Chebyshev distance.
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void brickDistanceMain(uint3 id: SV_DispatchThreadID) {
+    let dims = int3(constants.layout.xyz);
+    if (id.x >= uint(dims.x * dims.y * dims.z)) {
+        return;
+    }
+    let axis = constants.layout.w;
+    let input = (uint*)constants.historyLast;
+    let b = int3(int(id.x) % dims.x, (int(id.x) / dims.x) % dims.y, int(id.x) / (dims.x * dims.y));
+    var best = input[id.x];
+    for (uint k = 1; k < best; ++k) {
+        for (int sign = -1; sign <= 1; sign += 2) {
+            var n = b;
+            n[axis] += sign * int(k);
+            if (n[axis] >= 0 && n[axis] < dims[axis]) {
+                best = min(best, max(k, input[brickIndex(n, dims)]));
+            }
+        }
+    }
+    ((uint*)constants.historyNow)[id.x] = best;
 }
 
 pnanovdb_readaccessor_t accessorOf(FieldGpu field) {
@@ -1013,13 +1299,225 @@ SkyLights skyLightsOf(uint4 viewLights, uint lightCount, uint g) {
     return sky;
 }
 
+// Temporal amortisation (`constants.flags.w`): on; whether the last frame's history holds for
+// this dispatch's views; whether this dispatch marches only this frame's pixel of each block, a
+// thread each (the dispatch after reprojects the others, so no group's threads wait on others
+// marching); blocks of 4 x 4 pixels rather than 2 x 2; and bits 4 to 5 and 6 to 7 this frame's
+// pixel's x and y in its block.
+static const uint kTemporal = 1u;
+static const uint kHistoryHeld = 2u;
+static const uint kMarchOnly = 4u;
+static const uint kBlocksOfFour = 8u;
+
+// Temporal amortisation's blocks' pixels across, and this frame's pixel in each.
+uint temporalBlock() {
+    return (constants.flags.w & kBlocksOfFour) != 0 ? 4u : 2u;
+}
+
+uint2 marchedInBlock() {
+    return uint2((constants.flags.w >> 4) & 3u, (constants.flags.w >> 6) & 3u);
+}
+
+// A history's channels per pixel: the volumes' transmittance (-1 where none were in view), the
+// distance along the ray of what they hold back, the geometry's (`kNoSurface` for none), and what
+// they add towards the eye in each band.
+static const uint kHistoryTransmittance = 0;
+static const uint kHistoryFront = 1;
+static const uint kHistorySurface = 2;
+static const uint kHistoryBands = 3;
+static const float kNoSurface = 1e30;
+
+// Where channel `channel` of view `view`'s pixel `xy` is in a history of images `size` across: past
+// each view's inverse view-projection and view-projection (32 floats, by rows), a plane per
+// channel of every view's pixels.
+uint historyAt(uint channel, uint view, uint2 xy, uint2 size) {
+    let views = constants.lights.w;
+    return 32 * views + ((channel * views + view) * size.y + xy.y) * size.x + xy.x;
+}
+
+// Row `row` of matrix `matrix` (0 the inverse view-projection, 1 the view-projection) of view
+// `view` in history `history`.
+float4 historyRow(float* history, uint view, uint matrix, uint row) {
+    let at = 32 * view + 16 * matrix + 4 * row;
+    return float4(history[at], history[at + 1], history[at + 2], history[at + 3]);
+}
+
+bool temporal() {
+    return (constants.flags.w & kTemporal) != 0;
+}
+
+// Whether pixel `id` (its ray from `origin` along unit `direction` to the geometry `tMax` along it)
+// shows the last frame's result, reprojected: the volumes' `transmittance`, `front` and what they
+// add (`added`) where the point they held back last frame was then. Not where that falls outside
+// the image or held no volumes, nor where the geometry behind differs (moved, or uncovered).
+//
+// References:
+// - A. Schneider, "Nubis: Authoring Real-Time Volumetric Cloudscapes with the Decima Engine",
+//   SIGGRAPH Advances in Real-Time Rendering, 2017 (a pixel of each block marched a frame, the
+//   others reprojected).
+bool reproject(uint3 id, uint2 size, float3 origin, float3 direction, float tMax, float middle,
+               uint bands, out float transmittance, out float front,
+               out float4 added[kMaxGroups]) {
+    transmittance = 1.0;
+    front = 0.0;
+    for (uint g = 0; g < kMaxGroups; ++g) {
+        added[g] = float4(0.0);
+    }
+    let last = constants.historyLast;
+    // How far along the ray the volumes were at this pixel last frame; where they held nothing
+    // back, `middle` (the middle of the ray's way through them).
+    let held = last[historyAt(kHistoryTransmittance, id.z, id.xy, size)];
+    if (held < 0.0) {
+        return false;
+    }
+    let guess = held < 1.0 ? last[historyAt(kHistoryFront, id.z, id.xy, size)] : middle;
+    float4x4 lastViewProj;
+    for (uint r = 0; r < 4; ++r) {
+        lastViewProj[r] = historyRow(last, id.z, 1, r);
+    }
+    let clip = mul(lastViewProj, float4(origin + direction * guess + pass.originShift.xyz, 1.0));
+    if (clip.w <= 0.0) {
+        return false;
+    }
+    let at = float2((clip.x / clip.w + 1.0) * 0.5 * float(size.x),
+                    (1.0 - clip.y / clip.w) * 0.5 * float(size.y));
+    if (any(at < float2(0.0)) || at.x >= float(size.x) || at.y >= float(size.y)) {
+        return false;
+    }
+    let then = uint2(at);
+    transmittance = last[historyAt(kHistoryTransmittance, id.z, then, size)];
+    if (transmittance < 0.0) {
+        return false;
+    }
+    let surface = last[historyAt(kHistorySurface, id.z, then, size)];
+    if ((surface >= kNoSurface) != (tMax >= kNoSurface)) {
+        return false;
+    }
+    if (tMax < kNoSurface) {
+        // The geometry there last frame, and here now, the same within 2% of its distance.
+        let ndc = float2((float(then.x) + 0.5) / float(size.x) * 2.0 - 1.0,
+                         1.0 - (float(then.y) + 0.5) / float(size.y) * 2.0);
+        float4x4 lastInverse;
+        for (uint r = 0; r < 4; ++r) {
+            lastInverse[r] = historyRow(last, id.z, 0, r);
+        }
+        float3 lastOrigin;
+        float3 lastToFar;
+        cameraRayThrough(lastInverse, float4(0.0), ndc, lastOrigin, lastToFar);
+        let was = lastOrigin + normalize(lastToFar) * surface - pass.originShift.xyz;
+        if (length(was - (origin + direction * tMax)) > 0.02 * tMax) {
+            return false;
+        }
+    }
+    front = last[historyAt(kHistoryFront, id.z, then, size)];
+    for (uint b = 0; b < bands; ++b) {
+        added[b / 4][b % 4] = last[historyAt(kHistoryBands + b, id.z, then, size)];
+    }
+    return true;
+}
+
+// Whether pixel `id` (the geometry `tMax` along its ray) shows what its block's pixel marched this
+// frame shows: where volumes were in view there and the geometry behind is the same within 2% of
+// its distance (or both have none).
+//
+// Reference: B. Karis, "High-Quality Temporal Supersampling", SIGGRAPH Advances in Real-Time
+//   Rendering, 2014 (and bilateral upsampling of a lower resolution's results by depth).
+bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmittance,
+                 out float front, out float4 added[kMaxGroups]) {
+    transmittance = 1.0;
+    front = 0.0;
+    for (uint g = 0; g < kMaxGroups; ++g) {
+        added[g] = float4(0.0);
+    }
+    let block = temporalBlock();
+    let marched = id.xy / block * block + marchedInBlock();
+    if (any(marched >= size)) {
+        return false;
+    }
+    let now = constants.historyNow;
+    transmittance = now[historyAt(kHistoryTransmittance, id.z, marched, size)];
+    if (transmittance < 0.0) {
+        return false;
+    }
+    let surface = now[historyAt(kHistorySurface, id.z, marched, size)];
+    if ((surface >= kNoSurface) != (tMax >= kNoSurface) ||
+        (tMax < kNoSurface && abs(surface - tMax) > 0.02 * tMax)) {
+        return false;
+    }
+    front = now[historyAt(kHistoryFront, id.z, marched, size)];
+    for (uint b = 0; b < bands; ++b) {
+        added[b / 4][b % 4] = now[historyAt(kHistoryBands + b, id.z, marched, size)];
+    }
+    return true;
+}
+
+// Pixel `id`'s history this frame: the volumes' `transmittance` (-1 for none in view), `front`,
+// the geometry's distance `tMax` and what they add (`added`).
+void writeHistory(uint3 id, uint2 size, float transmittance, float front, float tMax, uint bands,
+                  float4 added[kMaxGroups]) {
+    let now = constants.historyNow;
+    now[historyAt(kHistoryTransmittance, id.z, id.xy, size)] = transmittance;
+    now[historyAt(kHistoryFront, id.z, id.xy, size)] = front;
+    now[historyAt(kHistorySurface, id.z, id.xy, size)] = tMax;
+    for (uint b = 0; b < bands; ++b) {
+        now[historyAt(kHistoryBands + b, id.z, id.xy, size)] = added[b / 4][b % 4];
+    }
+}
+
+// Pixel `id`'s radiance through the volumes: the light behind dimmed by their `transmittance`
+// (its polarization too), and what they add, unpolarized.
+void composite(uint3 id, uint bands, bool unwritten, float transmittance,
+               float4 added[kMaxGroups]) {
+    let stokes = constants.flags.y;
+    for (uint b = 0; b < bands; ++b) {
+        let layer = int3(id.xy, id.z * bands + b);
+        let behind = unwritten ? 0.0 : spectral[layer];
+        spectral[layer] = behind * transmittance + added[b / 4][b % 4];
+        if (stokes != 0) {
+            for (uint plane = 1; plane <= 2; ++plane) {
+                let at = int3(layer.xy, layer.z + int(plane * stokes));
+                spectral[at] = unwritten ? 0.0 : spectral[at] * transmittance;
+            }
+        }
+    }
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void volumeMain(uint3 id : SV_DispatchThreadID) {
+void volumeMain(uint3 thread : SV_DispatchThreadID) {
+    // A thread a pixel. With a history: in one dispatch, this frame's pixel of each block, a
+    // thread each; in the one after, the block's others, a thread each (along x, the blocks'
+    // others in turn), so that no thread idles in either, whether the others reproject or march.
+    let temporalFlags = constants.flags.w;
+    let blockSize = temporalBlock();
+    let marched = marchedInBlock();
+    let marchOnly = (temporalFlags & kMarchOnly) != 0;
+    let held = temporal() && (temporalFlags & kHistoryHeld) != 0;
+    var id = thread;
+    if (marchOnly) {
+        id.xy = blockSize * thread.xy + marched;
+    } else if (held) {
+        let others = blockSize * blockSize - 1;
+        let k = thread.x % others;
+        let skipped = marched.y * blockSize + marched.x;
+        let p = k < skipped ? k : k + 1;
+        id.xy = blockSize * uint2(thread.x / others, thread.y) + uint2(p % blockSize, p / blockSize);
+    }
     // The view's own fields at their offsets in its block; those every view shares (the bands,
     // size, shadow maps and air) at theirs from the start.
     let block = (constants.layout.x + id.z) * constants.layout.y;
     let size = viewLoad(constants.offsets.w);
+    if (temporal() && !marchOnly && all(thread.xy == 0)) {
+        // The view's camera, for the next frame to reproject through.
+        let camera = loadMatrix(block + constants.offsets.x);
+        let viewProj = invert(camera);
+        for (uint r = 0; r < 4; ++r) {
+            for (uint c = 0; c < 4; ++c) {
+                constants.historyNow[32 * id.z + 4 * r + c] = camera[r][c];
+                constants.historyNow[32 * id.z + 16 + 4 * r + c] = viewProj[r][c];
+            }
+        }
+    }
     if (id.x >= size.x || id.y >= size.y) {
         return;
     }
@@ -1035,6 +1533,9 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     let run = runs.xy;
     let shadowRun = runs.zw;
     if (run.y == 0) {
+        if (temporal()) {
+            constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
+        }
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
                 writeNoRadiance(id, id.z * bands + b);
@@ -1093,12 +1594,32 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         ++count;
     }
     if (count == 0) {
+        if (temporal()) {
+            constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
+        }
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
                 writeNoRadiance(id, id.z * bands + b);
             }
         }
         return;
+    }
+    // With temporal amortisation, a pixel of each 2 x 2 marches a frame, and every pixel when the
+    // last frame's history does not hold or what the volumes show changed; the others show the
+    // last frame's where it reprojects.
+    if (held && !marchOnly && pass.rebuild[6] == 0) {
+        float kept;
+        float front;
+        float4 added[kMaxGroups];
+        let middle = 0.5 * (spans[0].x + spans[count - 1].y);
+        // Else, uncovered or come into view, its block's pixel marched this frame where the
+        // geometry behind is as far (an upsampling that keeps to edges).
+        if (reproject(id, size.xy, origin, direction, tMax, middle, bands, kept, front, added) ||
+            fromMarched(id, size.xy, tMax, bands, kept, front, added)) {
+            writeHistory(id, size.xy, kept, front, tMax, bands, added);
+            composite(id, bands, unwritten, kept, added);
+            return;
+        }
     }
 
     // The view's lights: those of its world (a bit each) from its first; its shadow maps' size;
@@ -1119,6 +1640,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     cameraRayThrough(invViewProj, strip, ndc - float2(0.0, 2.0 / float(size.y)), neighbour,
                      toNeighbour);
     let footprintY = normalize(toNeighbour) - direction;
+    // The angle a pixel spans, about, for steps no shorter than a pixel far off.
+    let pixelAngle = max(length(footprintX), length(footprintY));
 
     // Per band, what the volumes add towards the eye, each step's integrated with the
     // transmittance up to it.
@@ -1145,8 +1668,6 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         let d = float3(dot(volume.toLocal[0].xyz, direction), dot(volume.toLocal[1].xyz, direction),
                        dot(volume.toLocal[2].xyz, direction));
         let span = spans[s];
-        let steps = clamp(uint(ceil((span.y - span.x) / volume.params.w)), 1u, constants.layout.z);
-        let dt = (span.y - span.x) / float(steps);
         let hasDensity = volume.density.grid.x != kNoGrid;
         let hasTemperature = volume.temperature.grid.x != kNoGrid;
         let hasEmission = volume.emission.grid.x != kNoGrid;
@@ -1169,24 +1690,76 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
                                dot(volume.density.toIndex[1].xyz, d),
                                dot(volume.density.toIndex[2].xyz, d));
-        for (uint i = 0; i < steps && transmittance > kOpaque; ++i) {
-            let t = span.x + (float(i) + jitter) * dt;
-            let local = o + d * t;
+        // Steps of the volume's own length (`params.w`), or where a pixel spans more than
+        // `stepsPerPixel` of them, farther off, of its span's share: the span in segments, each's
+        // steps as long as that at its start, until where that has doubled.
+        let perPixel = pass.stepsPerPixel > 0.0 ? pixelAngle / pass.stepsPerPixel : 0.0;
+        var budget = constants.layout.z;
+        var start = span.x;
+        var end = span.x;
+        var steps = 0u;
+        var dt = 0.0;
+        for (uint i = 0;; ++i) {
+            if (transmittance <= kOpaque) {
+                break;
+            }
+            if (i >= steps) {
+                // The next segment.
+                start = end;
+                if (start >= span.y || budget == 0) {
+                    break;
+                }
+                let stepLength = max(volume.params.w, perPixel * start);
+                end = perPixel > 0.0
+                          ? min(span.y, max(2.0 * stepLength / perPixel, start + stepLength))
+                          : span.y;
+                steps = clamp(uint(ceil((end - start) / stepLength)), 1u, budget);
+                budget -= steps;
+                dt = (end - start) / float(steps);
+                i = 0;
+            }
+            var t = start + (float(i) + jitter) * dt;
             if (skips) {
-                let next = stepAfterEmptyTile(volume.density, indexOrigin + indexStep * t,
-                                              indexOrigin, indexStep, span.x, dt, jitter,
-                                              densityAccessor);
+                // Over the empty bricks around, else the empty tile.
+                let index = indexOrigin + indexStep * t;
+                var next = stepAfterEmptyBricks(volume.density, index, indexOrigin, indexStep,
+                                                start, dt, jitter);
+                if (next <= i) {
+                    next = stepAfterEmptyTile(volume.density, index, indexOrigin, indexStep,
+                                              start, dt, jitter, densityAccessor);
+                }
                 if (next > i) {
                     i = next - 1;
                     continue;
                 }
             }
-            let rho = hasDensity ? max(sampleField(volume.density, local, densityAccessor), 0.0)
-                                 : 0.0;
+            // A thin brick's steps taken as one, at their middle (`stepsInThinBrick`); its density
+            // read at the level for the step's length (`levelFor`).
+            let firstStep = i;
+            let merged = skips ? stepsInThinBrick(volume, indexOrigin + indexStep * t, indexOrigin,
+                                                  indexStep, start, dt, jitter, i, steps)
+                               : 1u;
+            i += merged - 1;
+            t += 0.5 * float(merged - 1) * dt;
+            let stepDt = float(merged) * dt;
+            let local = o + d * t;
+            float rho = 0.0;
+            if (hasDensity && merged > 1) {
+                // A thin brick's density over its steps, each read as the march reads it: its
+                // depth and what it emits as without merging, its light found once.
+                for (uint k = 0; k < merged; ++k) {
+                    let at = o + d * (start + (float(firstStep + k) + jitter) * dt);
+                    rho += max(sampleField(volume.density, at, densityAccessor), 0.0);
+                }
+                rho /= float(merged);
+            } else if (hasDensity) {
+                let level = levelFor(volume.density, length(indexStep) * dt);
+                rho = max(sampleFieldAt(volume.density, local, level, densityAccessor), 0.0);
+            }
             let sigma = rho * volume.params.x;
-            let opacity = 1.0 - exp(-sigma * dt);
+            let opacity = 1.0 - exp(-sigma * stepDt);
             // The transmittance integrated over the step, from its start.
-            let weight = sigma > 1e-6 ? transmittance * opacity / sigma : transmittance * dt;
+            let weight = sigma > 1e-6 ? transmittance * opacity / sigma : transmittance * stepDt;
             if (emits) {
                 let field = hasEmission
                                 ? max(sampleField(volume.emission, local, emissionAccessor), 0.0)
@@ -1262,8 +1835,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                         emitted[g] += volumeMaterials[materialIndex].albedo[g] * lit * spectrum;
                     }
                 }
-                addBeamCrossings(emitted, nextCrossing, crossings, span.x + float(i) * dt,
-                                 span.x + float(i + 1) * dt, transmittance, sigma, volume,
+                addBeamCrossings(emitted, nextCrossing, crossings, start + float(firstStep) * dt,
+                                 start + float(i + 1) * dt, transmittance, sigma, volume,
                                  materialIndex, origin, direction, o, d, viewLights, shadowRun,
                                  mapTexels, groups);
                 if (skyLit) {
@@ -1315,19 +1888,15 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
 
     // Absorption dims the light behind as it is, its polarization too; what the volumes emit
     // and scatter is unpolarized.
-    let stokes = constants.flags.y;
-    for (uint b = 0; b < bands; ++b) {
-        let layer = int3(id.xy, id.z * bands + b);
-        let behind = unwritten ? 0.0 : spectral[layer];
-        spectral[layer] = behind * transmittance + airThrough[b / 4][b % 4] * emitted[b / 4][b % 4] +
-                          airLight[b / 4][b % 4] * (1.0 - transmittance);
-        if (stokes != 0) {
-            for (uint plane = 1; plane <= 2; ++plane) {
-                let at = int3(layer.xy, layer.z + int(plane * stokes));
-                spectral[at] = unwritten ? 0.0 : spectral[at] * transmittance;
-            }
-        }
+    float4 added[kMaxGroups];
+    for (uint g = 0; g < groups; ++g) {
+        added[g] = airThrough[g] * emitted[g] + airLight[g] * (1.0 - transmittance);
     }
+    if (temporal()) {
+        let front = transmittance < 1.0 ? frontSum / (1.0 - transmittance) : 0.0;
+        writeHistory(id, size.xy, transmittance, front, tMax, bands, added);
+    }
+    composite(id, bands, unwritten, transmittance, added);
 }
 
 // No radiance at layer `layer` of pixel `id`, its Stokes Q and U too with a polarizer.
@@ -1502,7 +2071,8 @@ void denseScatterMain(uint3 id : SV_DispatchThreadID) {
 }
 
 // The parts of the frame `volumeChangesMain` found changed since the last: bit 1 for the lighting
-// caches, bit 2 for the shadow maps.
+// caches, bit 2 for the shadow maps, bit 4 for what else the volumes show (temporal amortisation's
+// history; the caches' changes too).
 groupshared uint changedParts;
 
 // Compares `count` words from `from` with the last frame's at `pass.previous[at]` on, keeping the
@@ -1518,9 +2088,10 @@ void compareWords(uint thread, uint* from, uint count, uint at, uint parts) {
 }
 
 // Whether the volumes' lighting caches and shadow maps need building again, decided on the GPU
-// so a still scene's volumes keep last frame's: the volumes, their materials and the lights are
-// compared with the last frame's (both), the lights' views and their worlds too (the maps', which
-// the GPU fits). Writes the two dispatches `pass.rebuild` holds, `constants.layout.xyz` groups for
+// so a still scene's volumes keep last frame's: the volumes, their materials and where the lights
+// are and what they light are compared with the last frame's (both), the lights' views and their
+// worlds too (the maps', which the GPU fits); and whether what the volumes show changed besides
+// (`pass.rebuild[6]`, temporal amortisation's). Writes the two dispatches `pass.rebuild` holds, `constants.layout.xyz` groups for
 // the caches and `constants.offsets.xyz` for the maps, or none where nothing they read changed.
 // `constants.layout.w` holds the parts the host changed itself (the grids, the settings).
 [shader("compute")]
@@ -1537,13 +2108,54 @@ void volumeChangesMain(uint3 id: SV_DispatchThreadID) {
     let materials = pass.materialCount * uint(sizeof(VolumeMaterialGpu)) / 4;
     compareWords(id.x, (uint*)pass.materials, materials, at, 3u);
     at += materials;
+    // The lights: where they are, their shapes and links, for the caches and maps too; all of
+    // them (their spectra, patterns, time) for what the volumes show.
+    for (uint k = id.x; k < pass.lightCount; k += 256) {
+        let light = pass.shadowLights[k];
+        let placed = uint4[7](asuint(light.position), asuint(light.axis), asuint(light.cone),
+                              asuint(light.shadow), asuint(light.extentX), asuint(light.extentY),
+                              light.links);
+        for (uint w = 0; w < 7; ++w) {
+            for (uint c = 0; c < 4; ++c) {
+                let word = placed[w][c];
+                let last = at + 28 * k + 4 * w + c;
+                if (pass.previous[last] != word) {
+                    pass.previous[last] = word;
+                    InterlockedOr(changedParts, 3u);
+                }
+            }
+        }
+    }
+    at += 28 * pass.lightCount;
     let lights = pass.lightCount * uint(sizeof(LightGpu)) / 4;
-    compareWords(id.x, (uint*)pass.shadowLights, lights, at, 3u);
+    compareWords(id.x, (uint*)pass.shadowLights, lights, at, 4u);
     at += lights;
     if (pass.shadowViewCount > 0) {
         compareWords(id.x, (uint*)pass.shadowViews, 16 * pass.shadowViewCount, at, 2u);
         at += 16 * pass.shadowViewCount;
         compareWords(id.x, (uint*)pass.shadowWorlds, pass.shadowViewCount, at, 2u);
+        at += pass.shadowViewCount;
+    }
+    // What else lights the volumes, for temporal amortisation alone (bit 4): the lights' IES
+    // profiles and their timing (lasers' and strobes'), compared; their pattern images and arrays,
+    // which change unseen, always.
+    let profileWords = kProfileRows * kProfileColumns;
+    bool timed = false;
+    for (uint k = 0; k < pass.lightCount; ++k) {
+        let light = pass.shadowLights[k];
+        let profile = uint(light.shadow.w);
+        if (profile > 0) {
+            compareWords(id.x, (uint*)(pass.profiles + (profile - 1) * profileWords), profileWords,
+                         at, 4u);
+        }
+        at += profileWords;
+        timed = timed || uint(light.position.w) == kLaser || light.links.w != 0;
+        if (light.patternLayout.w != 0 && id.x == 0) {
+            InterlockedOr(changedParts, 4u);
+        }
+    }
+    if (timed) {
+        compareWords(id.x, pass.timing, pass.timingWords, at, 4u);
     }
     GroupMemoryBarrierWithGroupSync();
     if (id.x == 0) {
@@ -1555,6 +2167,8 @@ void volumeChangesMain(uint3 id: SV_DispatchThreadID) {
         pass.rebuild[3] = maps.x;
         pass.rebuild[4] = maps.y;
         pass.rebuild[5] = maps.z;
+        // For temporal amortisation: what the volumes show changed, so every pixel marches.
+        pass.rebuild[6] = (changedParts & 5u) != 0 ? 1u : 0u;
     }
 }
 
@@ -1597,8 +2211,13 @@ float castersDepth(float3 world, float3 towards, float far, int viewWorld, uint 
         float sum = 0.0;
         for (uint i = 0; i < steps; ++i) {
             let t = near + (float(i) + 0.5) * dt;
-            let next = stepAfterEmptyTile(volume.density, indexOrigin + indexStep * t, indexOrigin,
-                                          indexStep, near, dt, 0.5, accessor);
+            let index = indexOrigin + indexStep * t;
+            var next =
+                stepAfterEmptyBricks(volume.density, index, indexOrigin, indexStep, near, dt, 0.5);
+            if (next <= i) {
+                next = stepAfterEmptyTile(volume.density, index, indexOrigin, indexStep, near, dt,
+                                          0.5, accessor);
+            }
             if (next > i) {
                 i = next - 1;
                 continue;

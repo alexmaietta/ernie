@@ -2835,6 +2835,13 @@ FrameParams FrameParamsOf(const Scene& scene,
     volumeSettings.shadowResolution =
         count(options.GetVolumeShadowResolution(), 16, 2048);
     volumeSettings.lightCache = options.GetVolumeLightCache();
+    volumeSettings.temporal = options.GetVolumeTemporal();
+    volumeSettings.temporalBlock =
+        options.GetVolumeTemporalBlock() >= 3 ? 4u : 2u;
+    volumeSettings.stepsPerPixel =
+        std::max(options.GetVolumeStepsPerPixel(), 0.0);
+    volumeSettings.thinOpticalDepth =
+        std::max(options.GetVolumeThinOpticalDepth(), 0.0);
     ShadowSettings& shadows = params.shadows;
     shadows.cascades = options.GetShadowCascades();
     shadows.resolution =

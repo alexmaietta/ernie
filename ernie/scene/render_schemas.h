@@ -227,6 +227,18 @@
                               .doc = "Steps through a volume per voxel of its densest field, "     \
                                      "fewer for speed.",                                           \
                               .group = "Volumes", .min = 0.1, .max = 8.0}))                        \
+    X(double, VolumeStepsPerPixel, ::ernie::tokens::kVolumeStepsPerPixel, 2.0,                    \
+      (::ernie::AttributeMeta{.label = "Steps per pixel",                                          \
+                              .doc = "Far off, where a pixel spans more of a volume's steps, at "  \
+                                     "most this many steps per pixel's width, the steps growing "  \
+                                     "with distance; 0 keeps every step a volume's own.",          \
+                              .group = "Volumes", .max = 16.0}))                                   \
+    X(double, VolumeThinOpticalDepth, ::ernie::tokens::kVolumeThinOpticalDepth, 0.02,              \
+      (::ernie::AttributeMeta{.label = "Thin optical depth",                                       \
+                              .doc = "A brick of 8^3 voxels whose densest holds back less than "   \
+                                     "this across it is stepped through as one step, lit once; "   \
+                                     "0 steps through every brick alike.",                         \
+                              .group = "Volumes", .max = 1.0}))                                    \
     X(int, VolumeMaxSteps, ::ernie::tokens::kVolumeMaxSteps, 256,                                  \
       (::ernie::AttributeMeta{.label = "Most steps", .doc = "Steps through one volume, at most.",  \
                               .group = "Volumes", .min = 1.0, .max = 4096.0}))                     \
@@ -261,6 +273,22 @@
                                      "voxels, rather than marched to at every step; off, for "     \
                                      "reference images.",                                          \
                               .group = "Volumes"}))                                                \
+    X(bool, VolumeTemporal, ::ernie::tokens::kVolumeTemporal, true,                                \
+      (::ernie::AttributeMeta{.label = "Temporal amortisation",                                    \
+                              .doc = "March a pixel of each block a frame and reproject the "      \
+                                     "others' last results, about four times faster; a frame "     \
+                                     "whose volumes, materials or lights changed, and pixels "     \
+                                     "whose history does not hold, march in full. Off, for "       \
+                                     "reference images.",                                          \
+                              .group = "Volumes"}))                                                \
+    X(int, VolumeTemporalBlock, ::ernie::tokens::kVolumeTemporalBlock, 2,                          \
+      (::ernie::AttributeMeta{.label = "Temporal block",                                           \
+                              .doc = "Temporal amortisation's blocks, 2 or 4 pixels across: a "    \
+                                     "pixel of each marched a frame, the others reprojected or, "  \
+                                     "where that fails, the block's marched one's where the "      \
+                                     "geometry behind is as far. 4 is about four times faster "    \
+                                     "again, its history up to 16 frames old.",                    \
+                              .group = "Volumes", .min = 2.0, .max = 4.0}))                        \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, "approximate",                  \
       (::ernie::AttributeMeta{.label = "Mode",                                                     \
                               .doc = "approximate: unoccluded; full: also shadowed; directions: "  \

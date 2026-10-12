@@ -136,8 +136,11 @@ class VolumePass {
     /// of `shadowViews`, from the first `lightCount` lights of
     /// `lights` and their views' view-projections `lightViews` (with
     /// the light patterns its pipeline compiles with, as the
-    /// march's).
+    /// march's). Whether to build them again, and whether the march
+    /// reprojects (temporal amortisation), the GPU decides from
+    /// these, the lights' IES `profiles` and `timing` too.
     void Prepare(VkCommandBuffer commands, const GpuBuffer& lights,
+                 const GpuBuffer& profiles, const GpuBuffer& timing,
                  const GpuBuffer& lightViews,
                  std::uint32_t lightCount,
                  const LightPatternRegistry& patterns,
@@ -202,6 +205,14 @@ class VolumePass {
         glm::uvec3 shape{0};
         std::uint64_t offset = 0;  ///< In the pool, bytes.
         bool used = false;
+        /// Its distance grid (volume.slang's `stepAfterEmptyBricks`):
+        /// its first word in `distances_` (none for a grid without
+        /// one), first brick and bricks along each axis, and whether
+        /// it is due a build since the grid changed.
+        std::uint32_t distances = 0xFFFFFFFFu;
+        glm::ivec3 firstBrick{0};
+        glm::ivec3 bricks{0};
+        bool distanceStale = true;
     };
 
     const LoadedGrid* Load(const VolumeFieldParams& field,
@@ -274,6 +285,25 @@ class VolumePass {
     /// pipeline.
     std::optional<Bounds3> bounds_;
     std::vector<Bounds3> boxes_;
+    /// The grids' distance grids (`PlanDistanceGrids`), their words,
+    /// the builds due (`Prepare`), a build's scratch and its
+    /// pipelines.
+    struct DistanceBuild {
+        std::uint32_t grid = 0;  ///< In the pool, bytes.
+        std::uint32_t type = 0;
+        std::uint32_t distances = 0;
+        glm::ivec3 firstBrick{0};
+        glm::ivec3 bricks{0};
+    };
+    void PlanDistanceGrids();
+    std::unique_ptr<GpuBuffer> distances_;
+    std::uint64_t distanceWords_ = 0;
+    mutable std::vector<DistanceBuild> distanceBuilds_;
+    std::unique_ptr<GpuBuffer> distanceScratch_;
+    PipelineLayout distanceLayout_;
+    mutable std::unique_ptr<ComputePipeline> occupancyPipeline_;
+    mutable std::unique_ptr<ComputePipeline> distancePipeline_;
+    mutable std::size_t distancePipelinePatterns_ = 0;
     std::uint64_t cacheCells_ = 0;
     std::uint64_t cacheLargest_ = 0;
     mutable std::unique_ptr<GpuBuffer> cache_;
@@ -292,9 +322,37 @@ class VolumePass {
     mutable std::size_t changePipelinePatterns_ = 0;
     mutable std::unique_ptr<GpuBuffer> previous_;
     std::unique_ptr<GpuBuffer> rebuild_;
+    /// The last frames' verdicts whether what the volumes show
+    /// changed
+    /// (`pass.rebuild[6]`), a word each by frame, which the host
+    /// reads a few frames on: where they all changed, the march is
+    /// one dispatch, in full, rather than amortised's two.
+    std::unique_ptr<GpuBuffer> changes_;
     mutable std::uint32_t hostChanged_ = 3;
     mutable std::array<std::uint32_t, 4> compared_{};
     std::uint32_t materialCount_ = 0;
+    /// Temporal amortisation's histories (volume.slang's
+    /// `historyAt`), by a dispatch's first view: this frame's and the
+    /// last's, which is current, the images' size, views and bands
+    /// they hold, the frame last written, and whether the last
+    /// frame's holds for this one.
+    struct History {
+        std::unique_ptr<GpuBuffer> buffers[2];
+        std::uint32_t now = 0;
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+        std::uint32_t views = 0;
+        std::uint32_t bands = 0;
+        std::uint64_t frame = 0;
+        bool held = false;
+    };
+    mutable std::map<std::uint32_t, History> histories_;
+    std::uint64_t frame_ = 0;
+    std::uint32_t bandCount_ = 0;
+    /// The frame's origin, and it less the last's as floats
+    /// (`VolumeResources::originShift`).
+    glm::dvec3 origin_{0.0};
+    glm::vec3 originShift_{0.0f};
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
     VolumeSettings settings_;
