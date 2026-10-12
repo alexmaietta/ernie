@@ -1254,19 +1254,19 @@ TEST_F(RasterDelegateTest, TheEclipsedMoonGlowsRed) {
 
 TEST_F(RasterDelegateTest, EveryDistantLightLightsTheAir) {
     // The sun up, or set with a second distant light of its own
-    // brightness where it was: the air, the sky and the ground see the
-    // same light either way.
+    // brightness where it was: the air, the sky and the ground see
+    // the same light either way.
     const double e = 30.0 * kPi / 180.0;
     const double set = -40.0 * kPi / 180.0;
     const auto render = [&](bool second, bool sky) {
         Scene scene = FlatScene();
         ernie::Atmosphere::Define(scene, "/World/Air");
         const glm::dvec3 up(std::cos(e), 0.0, std::sin(e));
-        scene.Set("/World/Sun", tokens::kTransform,
-                  ernie::DistantLightTransform(
-                      second ? glm::dvec3(std::cos(set), 0.0,
-                                          std::sin(set))
-                             : up));
+        scene.Set(
+            "/World/Sun", tokens::kTransform,
+            ernie::DistantLightTransform(
+                second ? glm::dvec3(std::cos(set), 0.0, std::sin(set))
+                       : up));
         if (second) {
             ernie::DistantLight::Define(scene, "/World/Twin")
                 .SetShadowEnable(false)
