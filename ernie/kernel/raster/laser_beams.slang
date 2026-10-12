@@ -88,20 +88,22 @@ BeamCrossing beamletCrossing(Beam beam, float2 centre, float share, float3 origi
                              float3 direction, float3 footprintX, float3 footprintY) {
     let y = cross(beam.x, beam.axis);
     let u = normalize(beam.x * centre.x + y * centre.y + beam.axis);
-    // The closest points of the ray and the beamlet's axis.
-    let w0 = origin - beam.position;
-    let b = dot(direction, u);
-    let denom = 1.0 - b * b;
-    if (denom < 1e-6 || !(share > 0.0)) {
+    // The closest points of the ray and the beamlet's axis, from their common normal's cross
+    // products, which keep their precision for a ray nearly along the beam (a telescope beside a
+    // guide star's laser sees it a third of a milliradian off), where 1 - (d.u)^2 loses it.
+    let c = cross(direction, u);
+    let denom = dot(c, c);
+    if (denom < 1e-14 || !(share > 0.0)) {
         return noCrossing();
     }
-    let s = (b * dot(u, w0) - dot(direction, w0)) / denom;
-    let z = (dot(u, w0) - b * dot(direction, w0)) / denom;
+    let w0 = beam.position - origin;
+    let s = dot(cross(w0, u), c) / denom;
+    let z = dot(cross(w0, direction), c) / denom;
     if (s <= 0.0 || z <= 0.0) {
         return noCrossing();
     }
-    let normal = normalize(cross(direction, u));
-    let offset = dot((origin + direction * s) - (beam.position + u * z), normal);
+    let normal = c * rsqrt(denom);
+    let offset = dot(w0, normal);
     // The beam's radii there, from its waist along the axis.
     let along = z * dot(u, beam.axis) - beam.waistAt;
     let zr = max(beam.beam.zw, float2(1e-12));

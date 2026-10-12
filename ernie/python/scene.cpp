@@ -3110,6 +3110,7 @@ void BindScene(nb::module_& m) {
         {"ATMOSPHERE_HAZE_OPTICAL_DEPTH",
          tokens::kAtmosphereHazeOpticalDepth},
         {"ATMOSPHERE_OZONE_COLUMN", tokens::kAtmosphereOzoneColumn},
+        {"ATMOSPHERE_SODIUM_COLUMN", tokens::kAtmosphereSodiumColumn},
         {"ATMOSPHERE_DUST_OPTICAL_DEPTH",
          tokens::kAtmosphereDustOpticalDepth},
         {"ATMOSPHERE_CLOUD_TOP", tokens::kAtmosphereCloudTop},

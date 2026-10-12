@@ -103,8 +103,8 @@ struct ShadingUniforms {
     float domeLighting[4];
     /// The atmosphere (km): the planet's centre relative to the
     /// frame's origin and the bottom radius; the top radius, 1 with
-    /// an atmosphere, unused, and the sky's greatest degree of
-    /// polarization.
+    /// an atmosphere, the sodium layer's atoms per square metre, and
+    /// the sky's greatest degree of polarization.
     float atmosphere[2][4];
     /// The scene's ambient light's colour, linear RGB over its
     /// luminance (its luminance is `sun[3]`'s); w the scale the
@@ -4390,6 +4390,11 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         shading.atmosphere[1][0] = static_cast<float>(
             (banded.bottomRadius + banded.topAltitude) * 1e-3);
         shading.atmosphere[1][1] = 1.0f;
+        // Earth's mesospheric sodium, for lasers tuned to it.
+        shading.atmosphere[1][2] =
+            atmosphere_->Params().preset == tokens::kEarth
+                ? static_cast<float>(atmosphere_->Params().sodiumColumn)
+                : 0.0f;
         shading.atmosphere[1][3] =
             static_cast<float>(atmosphere_->Params().polarization);
     }

@@ -2614,6 +2614,7 @@ AtmosphereParamsOf(const Scene& scene, const Path& path,
     params.hazeOpticalDepth =
         std::max(prim.GetHazeOpticalDepth(), 0.0);
     params.ozoneColumn = std::max(prim.GetOzoneColumn(), 0.0);
+    params.sodiumColumn = std::max(prim.GetSodiumColumn(), 0.0);
     params.dustOpticalDepth =
         std::max(prim.GetDustOpticalDepth(), 0.0);
     params.cloudTop = std::max(prim.GetCloudTop(), 0.0);

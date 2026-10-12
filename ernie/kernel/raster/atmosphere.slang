@@ -341,23 +341,74 @@ public float4 scatteringAt(float4* medium, float* densities, float* phases, floa
     return phased;
 }
 
-// The transmittance of the air between `a` and `b` (km from the planet's centre) in band group
-// `group`, marched in `steps` midpoint steps: for paths of a few kilometres up to the whole air,
-// as long as the air's density changes smoothly along them.
-public float4 transmittanceBetween(float4* medium, float* densities, float3 a, float3 b,
-                                   uint group, uint steps) {
-    let bottom = atmosphereBottom(medium);
-    let step = (b - a) / float(steps);
-    let span = length(step);
-    var depth = float4(0.0);
-    for (uint s = 0; s < steps; ++s) {
-        float4 scattering;
-        float4 extinction;
-        mediumAt(medium, densities, length(a + (float(s) + 0.5) * step) - bottom, group,
-                 scattering, extinction);
-        depth += extinction * span;
+// The mesospheric sodium layer's resonant scattering coefficient (m^-1) at `altitude` (km) for a
+// laser of `wavelength` and Gaussian `linewidth` (FWHM), nm, of a layer of `column` atoms per
+// square metre: the D2 line's cross-section, its two hyperfine groups (5/8 of its strength from
+// the F = 2 ground level, 3/8 from F = 1, 1.77 GHz apart) Doppler-broadened at 200 K and
+// convolved with the laser's line, times the atoms' Gaussian profile, 92 km up and 4.6 km rms.
+// The light it scatters (fluorescence, isotropic; the layer's saturation and optical pumping
+// left out) keeps the laser's wavelength.
+//
+// References:
+// - D. A. Steck, "Sodium D Line Data" (the D2 line's oscillator strength 0.641 and wavelength
+//   589.158 nm in vacuum, and the ground level's 1.7716 GHz splitting).
+//   https://steck.us/alkalidata/
+// - G. C. Papen, C. S. Gardner and J. Yu, "Characterization of the mesospheric sodium layer",
+//   in Adaptive Optics, OSA Technical Digest 13, 1996 (its column, 2 to 8e13 m^-2, centroid
+//   about 92 km and rms width about 4.6 km).
+public float sodiumScattering(float altitude, float wavelength, float linewidth, float column) {
+    let kD2 = 589.158;  // nm, in vacuum
+    let kC = 2.99792458e8;
+    // pi e^2 / (4 pi epsilon0 m_e c) f, m^2 Hz.
+    let kStrength = 2.6540e-6 * 0.641;
+    // The Doppler width's sigma at 200 K: nu0 sqrt(k T / (m c^2)), Hz.
+    let kDoppler = 4.56e8;
+    let kCentroid = 92.0;
+    let kWidth = 4.6;
+    if (column <= 0.0) {
+        return 0.0;
     }
-    return exp(-depth);
+    let profile = exp(-0.5 * ((altitude - kCentroid) / kWidth) * ((altitude - kCentroid) / kWidth));
+    if (profile < 1e-6) {
+        return 0.0;
+    }
+    // The laser's detuning and line, Hz.
+    let detuning = kC * (kD2 - wavelength) / (kD2 * kD2) * 1e9;
+    let laser = kC * linewidth / (kD2 * kD2) * 1e9 / 2.35482;
+    let sigma = sqrt(kDoppler * kDoppler + laser * laser);
+    let a = (detuning + 6.643e8) / sigma;  // from F = 2, below the centroid
+    let b = (detuning - 1.1073e9) / sigma;  // from F = 1, above it
+    let crossSection = kStrength * (0.625 * exp(-0.5 * a * a) + 0.375 * exp(-0.5 * b * b)) /
+                       (2.50663 * sigma);
+    return crossSection * column * profile / (2.50663 * kWidth * 1e3);
+}
+
+// The transmittance of band group `group` between `a` and `b` (km from the planet's centre), from
+// the transmittance table: `a`'s towards the top along the segment over `b`'s, or, where that ray
+// meets the ground, `b`'s back along it over `a`'s; a few metres long or the whole air.
+//
+// Reference: E. Bruneton and F. Neyret, "Precomputed Atmospheric Scattering", Computer Graphics
+// Forum 27(4):1079-1086, 2008, section 4 (the transmittance between two points from the table).
+public float4 transmittanceBetween(Texture2DArray<float4> table, SamplerState linear, float3 a,
+                                   float3 b, uint group, float bottom, float top) {
+    let span = length(b - a);
+    if (span <= 0.0) {
+        return float4(1.0);
+    }
+    let d = (b - a) / span;
+    let ra = length(a);
+    let rb = length(b);
+    let muA = dot(a, d) / ra;
+    let muB = dot(b, d) / rb;
+    let forwards = !hitsGround(ra, muA, bottom);
+    let start = forwards ? ra : rb;
+    let end = forwards ? rb : ra;
+    let startMu = forwards ? muA : -muB;
+    let endMu = forwards ? muB : -muA;
+    return min(transmittanceToTop(table, linear, start, startMu, group, bottom, top) /
+                   max(transmittanceToTop(table, linear, end, endMu, group, bottom, top),
+                       float4(1e-30)),
+               float4(1.0));
 }
 
 // Where a ray from `p` (km from the planet's centre) along unit `d` crosses the atmosphere: from

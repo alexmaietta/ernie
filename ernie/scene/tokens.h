@@ -816,6 +816,9 @@ inline constexpr std::string_view kAtmosphereHazeOpticalDepth =
 /// float, Dobson units: Earth's total column ozone.
 inline constexpr std::string_view kAtmosphereOzoneColumn =
     "ernie:atmosphere:ozoneColumn";
+/// float, atoms per square metre: Earth's mesospheric sodium column.
+inline constexpr std::string_view kAtmosphereSodiumColumn =
+    "ernie:atmosphere:sodiumColumn";
 /// float: Mars's vertical dust optical depth at 880 nm.
 inline constexpr std::string_view kAtmosphereDustOpticalDepth =
     "ernie:atmosphere:dustOpticalDepth";

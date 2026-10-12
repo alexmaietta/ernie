@@ -120,6 +120,11 @@
     X(double, OzoneColumn, ::ernie::tokens::kAtmosphereOzoneColumn, 300.0,                         \
       (::ernie::AttributeMeta{.doc = "Earth: total column ozone, Dobson units.",                   \
                               .group = "Atmosphere", .max = 1000.0}))                              \
+    X(double, SodiumColumn, ::ernie::tokens::kAtmosphereSodiumColumn, 4e13,                        \
+      (::ernie::AttributeMeta{.doc = "Earth: the mesospheric sodium layer's atoms per square "     \
+                                     "metre (about 2e13 to 8e13), which a laser tuned to the "     \
+                                     "589 nm D2 line lights as a guide star 92 km up.",            \
+                              .group = "Atmosphere", .max = 1e15}))                                \
     X(double, DustOpticalDepth, ::ernie::tokens::kAtmosphereDustOpticalDepth, 0.5,                 \
       (::ernie::AttributeMeta{.doc = "Mars: the dust's vertical optical depth at 880 nm (about "   \
                                      "0.3 to 0.9 in clear seasons, above 1 in dust storms).",      \

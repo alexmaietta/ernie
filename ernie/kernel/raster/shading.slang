@@ -101,7 +101,8 @@ struct ShadingUniforms {
     float4 domeLighting;
     // The atmosphere (atmosphere.slang), in km: xyz the planet's centre relative to the frame's
     // origin and w its radius; then x the atmosphere's top radius, y 1 with an atmosphere, z
-    // unused, w the sky's greatest degree of linear polarization (`skyPolarization`).
+    // the sodium layer's atoms per square metre (`sodiumScattering`), w the sky's greatest degree
+    // of linear polarization (`skyPolarization`).
     float4 atmosphere[2];
     // xyz: the scene's ambient light's colour, linear RGB over its luminance (`sun.w` its
     // radiance); w the scale the raster radiance is stored at (`radianceScale`).
@@ -1735,6 +1736,20 @@ float beamShadow(LightGpu light, float3 point) {
                                               tap.depth);
 }
 
+// The unit direction of the ray through `ndc`, and its `origin`. A perspective camera's is found
+// from a point about 50 km out (a millionth of the near plane's depth) rather than the near
+// plane's: a long lens's neighbouring pixels' points there, metres from the frame's origin,
+// differ by less than a float resolves, which would give whole blocks of pixels one ray.
+float3 airRay(float2 ndc, out float3 origin) {
+    float3 ray;
+    cameraRayThrough(shv.invViewProj, shv.strip, ndc, origin, ray);
+    if (!kPushbroomCamera && sh.range.w == 0.0) {
+        origin = shv.eye.xyz;
+        return normalize(cameraPoint(shv.invViewProj, shv.strip, ndc, 1e-6) - origin);
+    }
+    return normalize(ray);
+}
+
 // Lasers' beams in the air: the light the atmosphere scatters towards the eye where the ray of
 // pixel `id` (through `ndc`) crosses the view's lasers' beams short of its surface at `surface`
 // (with `hit`; else all along), added to its radiance (laser_beams.slang). At each crossing, the light the beam
@@ -1751,19 +1766,12 @@ void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
         return;
     }
     float3 origin;
-    float3 ray;
-    cameraRayThrough(shv.invViewProj, shv.strip, ndc, origin, ray);
-    let direction = normalize(ray);
+    let direction = airRay(ndc, origin);
     let far = hit ? dot(surface - origin, direction) : 1e30;
     // The pixel's extent per unit distance along the ray, to its neighbours' rays.
     float3 neighbour;
-    float3 toNeighbour;
-    cameraRayThrough(shv.invViewProj, shv.strip, ndc + float2(2.0 / float(sh.size.x), 0.0),
-                     neighbour, toNeighbour);
-    let footprintX = normalize(toNeighbour) - direction;
-    cameraRayThrough(shv.invViewProj, shv.strip, ndc - float2(0.0, 2.0 / float(sh.size.y)),
-                     neighbour, toNeighbour);
-    let footprintY = normalize(toNeighbour) - direction;
+    let footprintX = airRay(ndc + float2(2.0 / float(sh.size.x), 0.0), neighbour) - direction;
+    let footprintY = airRay(ndc - float2(0.0, 2.0 / float(sh.size.y)), neighbour) - direction;
     let bands = uint(sh.range.z);
     let centre = sh.atmosphere[0].xyz;
     let bottom = sh.atmosphere[0].w;
@@ -1801,17 +1809,24 @@ void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
                 continue;
             }
             let point = aboveGround(at * 1e-3 - centre, bottom);
+            let altitude = length(point) - bottom;
             let nu = dot(direction, crossing.towards.xyz);
+            // The sodium layer's glow, for a laser tuned to its D2 line (light.pattern.y its
+            // wavelength, map.w its linewidth), isotropic.
+            let sodium = sodiumScattering(altitude, light.pattern.y, light.map.w,
+                                          sh.atmosphere[1].z) /
+                         (4.0 * PI);
             for (uint group = 0; group * 4 < bands; ++group) {
                 // The air's coefficients are per kilometre.
                 let scattered =
-                    1e-3 * lit *
-                    scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                                 length(point) - bottom, group, nu) *
-                    transmittanceBetween(atmosphereMedium, atmosphereDensities, eye, point, group,
-                                         4) *
-                    transmittanceBetween(atmosphereMedium, atmosphereDensities, aperture, point,
-                                         group, 4) *
+                    lit *
+                    (1e-3 * scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                         altitude, group, nu) +
+                     sodium) *
+                    transmittanceBetween(atmosphereTransmittance, tableSampler, eye, point, group,
+                                         bottom, sh.atmosphere[1].x) *
+                    transmittanceBetween(atmosphereTransmittance, tableSampler, aperture, point,
+                                         group, bottom, sh.atmosphere[1].x) *
                     (light.spectrum[group] + light.tinted[group]);
                 for (uint b = 0; b < 4 && group * 4 + b < bands; ++b) {
                     let layer = int3(id.xy, id.z * bands + group * 4 + b);

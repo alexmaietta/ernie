@@ -508,6 +508,7 @@ struct AtmosphereParams {
     double groundAlbedo = 0.3;
     double hazeOpticalDepth = 0.1;  ///< Earth, at 550 nm.
     double ozoneColumn = 300.0;     ///< Earth, Dobson units.
+    double sodiumColumn = 4e13;     ///< Earth, atoms per m^2.
     double dustOpticalDepth = 0.5;  ///< Mars, at 880 nm.
     /// The sky's greatest degree of linear polarization
     /// (`tokens::kPolarizationDegree`), 90 degrees from the sun.
@@ -520,10 +521,13 @@ struct AtmosphereParams {
 
     bool operator==(const AtmosphereParams&) const = default;
 
-    /// Whether the physical model differs, the planet's place aside.
+    /// Whether the physical model differs, the planet's place and the
+    /// sodium layer (which only lasers light, outside the tables)
+    /// aside.
     bool SameModel(const AtmosphereParams& other) const {
         AtmosphereParams placed = other;
         placed.planetCentre = planetCentre;
+        placed.sodiumColumn = sodiumColumn;
         return placed == *this;
     }
 };
