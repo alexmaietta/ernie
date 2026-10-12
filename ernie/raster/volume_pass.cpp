@@ -251,6 +251,40 @@ VolumePass::VolumePass(const VulkanContext& context,
 const VolumePass::LoadedGrid*
 VolumePass::Load(const VolumeFieldParams& field,
                  const std::string& prim) {
+    if (!field.array.empty()) {
+        // A NanoVDBField's array, read again when written again.
+        const GridKey key{field.array, field.gridName, field.gridIndex,
+                          true};
+        auto found = grids_.find(key);
+        if (found == grids_.end() ||
+            found->second.version != field.version) {
+            const Tensor bytes = field.buffer.Contiguous();
+            const std::vector<NanoVdbGrid> grids =
+                NanoVdbGridsOf(std::span(
+                    static_cast<const std::uint8_t*>(bytes.Data()),
+                    static_cast<std::size_t>(bytes.Elements()) *
+                        SizeOf(bytes.Type())));
+            const NanoVdbGrid* grid =
+                FindNanoVdbGrid(grids, field.gridName, field.gridIndex);
+            if (grid == nullptr) {
+                throw std::runtime_error(
+                    "Volume " + prim + ": " + field.array +
+                    " has no grid " +
+                    (field.gridName.empty()
+                         ? std::string("#")
+                         : "'" + field.gridName + "' #") +
+                    std::to_string(field.gridIndex));
+            }
+            LoadedGrid loaded;
+            loaded.grid = *grid;
+            loaded.version = field.version;
+            found =
+                grids_.insert_or_assign(key, std::move(loaded)).first;
+            poolStale_ = true;
+        }
+        found->second.used = true;
+        return &found->second;
+    }
     const std::filesystem::path path(field.file);
     std::error_code error;
     const auto written =

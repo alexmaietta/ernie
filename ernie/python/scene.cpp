@@ -2224,6 +2224,8 @@ void BindScene(nb::module_& m) {
         {"GEOM_POINTS", tokens::kGeomPoints},
         {"VOLUME", tokens::kVolume},
         {"OPENVDB_ASSET", tokens::kOpenVDBAsset},
+        {"NANOVDB_FIELD", tokens::kNanoVDBField},
+        {"NANOVDB_BUFFER", tokens::kNanoVdbBuffer},
         {"FILE_PATH", tokens::kFilePath},
         {"FIELD_NAME", tokens::kFieldName},
         {"FIELD_INDEX", tokens::kFieldIndex},

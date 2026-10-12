@@ -49,12 +49,28 @@
                               .group = "Field",                                                    \
                               .options = {"", "levelSet", "fogVolume", "staggered", "unknown"}}))
 
+#define ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)                                                          \
+    X(::ernie::Tensor, Buffer, ::ernie::tokens::kNanoVdbBuffer, nullptr,                           \
+      (::ernie::AttributeMeta{.doc = "One or more NanoVDB grids back to back as NanoVDB keeps "    \
+                                     "them in memory (Warp's Volume.array()), in an array of any " \
+                                     "type, on the CPU.",                                          \
+                              .group = "Field", .dirty = ::ernie::Dirty::Points}))                 \
+    X(std::string, FieldName, ::ernie::tokens::kFieldName, "",                                     \
+      (::ernie::AttributeMeta{.doc = "The grid's name in the buffer; unset, any grid.",            \
+                              .group = "Field", .dirty = ::ernie::Dirty::Points}))                 \
+    X(int, FieldIndex, ::ernie::tokens::kFieldIndex, 0,                                            \
+      (::ernie::AttributeMeta{.doc = "Which of the buffer's grids of that name (or of all its "    \
+                                     "grids, without a name), 0 the first.",                       \
+                              .group = "Field", .min = 0.0, .max = 1e6,                            \
+                              .dirty = ::ernie::Dirty::Points}))
+
 #define ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ATTRIBUTES(X)
 
 #define ERNIE_FIELD_BASE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_FIELD_ASSET_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_FIELD_ASSET_ATTRIBUTES(X)
 #define ERNIE_OPENVDB_ASSET_ALL(X) ERNIE_FIELD_ASSET_ALL(X) ERNIE_OPENVDB_ASSET_ATTRIBUTES(X)
+#define ERNIE_NANOVDB_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_VOLUME_ATTRIBUTES(X)
 // clang-format on
 
@@ -77,6 +93,14 @@ class OpenVDBAsset : public FieldAsset {
     ERNIE_SCHEMA_BODY(OpenVDBAsset, FieldAsset,
                       ERNIE_OPENVDB_ASSET_ALL)
     ERNIE_SCHEMA_DEFINE(OpenVDBAsset)
+};
+
+/// Ernie's field of NanoVDB grids written as an array instead of a
+/// file, such as a simulation's each step (Warp's `Volume.array()`):
+/// one of its grids, read as an OpenVDBAsset's.
+class NanoVDBField : public FieldBase {
+    ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase, ERNIE_NANOVDB_FIELD_ALL)
+    ERNIE_SCHEMA_DEFINE(NanoVDBField)
 };
 
 /// A participating medium: fields, each named by a relationship

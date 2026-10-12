@@ -36,6 +36,27 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         return std::nullopt;
     }
     const PrimTypeDef* type = PrimTypeOf(scene, target);
+    if (type != nullptr && type->IsA(NanoVDBField::Definition())) {
+        const NanoVDBField grids(scene, target);
+        const Tensor* buffer = grids.GetBuffer();
+        if (buffer == nullptr || buffer->Elements() == 0) {
+            return std::nullopt;
+        }
+        if (buffer->Location().kind != DeviceKind::Cpu) {
+            throw std::invalid_argument(
+                target.String() +
+                ": NanoVDB grids are read from CPU arrays only");
+        }
+        VolumeFieldParams field;
+        field.gridName = grids.GetFieldName();
+        field.gridIndex = grids.GetFieldIndex();
+        field.toVolume = toLocal * scene.WorldTransform(target);
+        field.array = target.String();
+        field.buffer = *buffer;
+        field.version =
+            scene.AttributeVersion(target, tokens::kNanoVdbBuffer);
+        return field;
+    }
     if (type == nullptr || !type->IsA(OpenVDBAsset::Definition())) {
         return std::nullopt;
     }

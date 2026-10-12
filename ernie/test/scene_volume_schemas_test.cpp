@@ -106,7 +106,12 @@ TEST(VolumeSchemas, TypesAreRegistered) {
 
     const std::vector<const PrimTypeDef*> types =
         ernie::VolumeSchemaTypes();
-    ASSERT_EQ(types.size(), 4u);
+    const PrimTypeDef& array =
+        ernie::GetPrimType(tokens::kNanoVDBField);
+    EXPECT_TRUE(array.IsA(ernie::GetPrimType(tokens::kFieldBase)));
+    EXPECT_FALSE(array.IsA(ernie::GetPrimType(tokens::kFieldAsset)));
+    ASSERT_EQ(types.size(), 5u);
     EXPECT_EQ(types[2], &asset);
-    EXPECT_EQ(types[3], &volume);
+    EXPECT_EQ(types[3], &array);
+    EXPECT_EQ(types[4], &volume);
 }

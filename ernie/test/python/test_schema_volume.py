@@ -37,6 +37,24 @@ def test_volume_names_its_fields():
     assert ernie.OpenVDBAsset.file_path.is_asset
 
 
+def test_nanovdb_field_holds_an_array():
+    import numpy as np
+
+    scene = ernie.Scene()
+    grids = scene.define(
+        "/World/Plume/Grids", ernie.NanoVDBField, field_name="density"
+    )
+    assert isinstance(grids, ernie.FieldBase)
+    assert grids.buffer is None
+    scene.write(
+        "/World/Plume/Grids",
+        tokens.NANOVDB_BUFFER,
+        np.zeros(64, dtype=np.uint8),
+    )
+    assert grids.buffer.shape == (64,)
+    assert grids.field_name == "density"
+
+
 def test_material_volume_inputs():
     scene = ernie.Scene()
     smoke = scene.define(

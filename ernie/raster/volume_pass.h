@@ -141,14 +141,16 @@ class VolumePass {
 
   private:
     struct GridKey {
-        std::string file;
+        std::string file;  ///< Or a NanoVDBField's path, `array`.
         std::string name;
         int index = 0;
+        bool array = false;
         auto operator<=>(const GridKey&) const = default;
     };
     struct LoadedGrid {
         NanoVdbGrid grid;
         std::filesystem::file_time_type written;
+        std::uint64_t version = 0;  ///< An array's.
         std::uint64_t offset = 0;  ///< In the pool, bytes.
         bool used = false;
     };

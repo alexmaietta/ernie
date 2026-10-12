@@ -84,6 +84,11 @@ inline constexpr std::string_view kVectorDataRoleHint =
     "vectorDataRoleHint";  ///< token: what a vector grid holds.
 inline constexpr std::string_view kFieldClass =
     "fieldClass";  ///< token: levelSet, fogVolume, staggered.
+/// Ernie's field of NanoVDB grids written as an array, such as Warp's
+/// `Volume.array()`, rather than read from a file.
+inline constexpr std::string_view kNanoVDBField = "NanoVDBField";
+inline constexpr std::string_view kNanoVdbBuffer =
+    "ernie:buffer";  ///< array: the grids, back to back.
 // The volume inputs of a Material. The density field times
 // `inputs:density` is the extinction coefficient in 1/m, of which
 // `inputs:volumeAlbedo` scatters; the rest absorbs, and a temperature

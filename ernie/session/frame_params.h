@@ -314,6 +314,9 @@ struct LightParams {
         std::uintptr_t patternArrayStream = 1;
         std::string patternArrayKey;
         float wavelength = 0.0f;  ///< nm, the line's centre.
+        float linewidth = 0.0f;   ///< nm, its FWHM.
+        /// Whether its light shows speckle (`tokens::kLaserSpeckle`).
+        bool speckle = false;
         /// Its timing on the sensor clock, seconds: pulses
         /// `pulseWidth` long at `pulseRate` per second from
         /// `pulseDelay` (a rate of 0, continuous), and a sequence of
@@ -493,15 +496,26 @@ struct AtmosphereParams {
 };
 
 /// A field a volume shades with (`VolumesOf`): a grid of a NanoVDB
-/// file, an OpenVDBAsset's.
+/// file, an OpenVDBAsset's, or of a NanoVDBField's array (`buffer`).
 struct VolumeFieldParams {
     std::string file;      ///< `filePath`, as authored.
     std::string gridName;  ///< `fieldName`; empty for any grid.
     int gridIndex = 0;     ///< `fieldIndex`.
     /// The field prim's frame to its volume's.
     glm::dmat4 toVolume{1.0};
+    /// A NanoVDBField's: its path, its array of grids on the CPU, and
+    /// the array's version (`Scene::AttributeVersion`), which changes
+    /// when it is written again.
+    std::string array;
+    Tensor buffer;
+    std::uint64_t version = 0;
 
-    bool operator==(const VolumeFieldParams&) const = default;
+    bool operator==(const VolumeFieldParams& other) const {
+        return file == other.file && gridName == other.gridName &&
+               gridIndex == other.gridIndex &&
+               toVolume == other.toVolume && array == other.array &&
+               version == other.version;
+    }
 };
 
 /// How a volume's fields shade: its Material's volume inputs

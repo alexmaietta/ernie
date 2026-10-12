@@ -21,6 +21,11 @@ ERNIE_DEFINE_SCHEMA(OpenVDBAsset, tokens::kOpenVDBAsset,
                     "A grid of a NanoVDB file (.nvdb), which the GPU "
                     "reads in place.",
                     ERNIE_OPENVDB_ASSET_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(NanoVDBField, tokens::kNanoVDBField,
+                    &FieldBase::Definition(), false,
+                    "NanoVDB grids written as an array (Warp's "
+                    "Volume.array()), which the GPU reads in place.",
+                    ERNIE_NANOVDB_FIELD_ATTRIBUTES)
 ERNIE_DEFINE_OPEN_SCHEMA(
     Volume, tokens::kVolume, &Gprim::Definition(), false,
     "A participating medium: fields named by field:<name> "
@@ -65,7 +70,8 @@ std::vector<std::string> Volume::FieldNames() const {
 
 std::vector<const PrimTypeDef*> VolumeSchemaTypes() {
     return {&FieldBase::Definition(), &FieldAsset::Definition(),
-            &OpenVDBAsset::Definition(), &Volume::Definition()};
+            &OpenVDBAsset::Definition(), &NanoVDBField::Definition(),
+            &Volume::Definition()};
 }
 
 }  // namespace ernie

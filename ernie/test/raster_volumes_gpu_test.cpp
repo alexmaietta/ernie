@@ -10,6 +10,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/nanovdb.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
@@ -617,4 +618,36 @@ TEST_F(RasterDelegateTest, APointInstancerPlacesVolumesInTheirWorlds) {
             << "band " << b;
         EXPECT_NEAR(none[b], bare[b], 1e-6 * bare[b]) << "band " << b;
     }
+}
+
+TEST_F(RasterDelegateTest, AVolumeReadsItsGridFromAnArray) {
+    // The cube's grid written as an array (as Warp's Volume.array()
+    // gives it) shades as the file does, and is read again only when
+    // written again.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::vector<double> fromFile =
+        CentreSpectrum(delegate, scene);
+    const std::vector<std::uint8_t> bytes =
+        ernie::ReadNanoVdb(CubeFile()).front().buffer;
+    ernie::NanoVDBField::Define(scene, "/World/Cube/Grids")
+        .SetBuffer(Tensor::Copy<std::uint8_t>(
+            bytes, {static_cast<std::int64_t>(bytes.size())}));
+    ernie::Volume(scene, "/World/Cube")
+        .SetField("density", "/World/Cube/Grids");
+    const std::vector<double> fromArray =
+        CentreSpectrum(delegate, scene);
+    EXPECT_EQ(delegate.Renderer().Volumes().GridCount(), 1u);
+    for (std::size_t b = 0; b < fromFile.size(); ++b) {
+        EXPECT_NEAR(fromArray[b], fromFile[b], 1e-4 * fromFile[b])
+            << "band " << b;
+    }
+    // Only the field's prim names it, so a new array replaces it.
+    scene.Write("/World/Cube/Grids", tokens::kNanoVdbBuffer,
+                Tensor::Copy<std::uint8_t>(
+                    bytes, {static_cast<std::int64_t>(bytes.size())}));
+    const std::vector<double> again = CentreSpectrum(delegate, scene);
+    EXPECT_EQ(delegate.Renderer().Volumes().GridCount(), 1u);
+    EXPECT_NEAR(again[0], fromArray[0], 1e-4 * fromArray[0]);
 }
