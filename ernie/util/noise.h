@@ -36,6 +36,12 @@ class GradientNoise {
     double Fbm(const glm::dvec3& p, int octaves = 5,
                double lacunarity = 2.0, double gain = 0.5) const;
 
+    /// Its lattice's permutation, 256 entries twice over, for shaders
+    /// to evaluate the same noise on the GPU.
+    const std::array<std::uint8_t, 512>& Permutation() const {
+        return permutation_;
+    }
+
   private:
     std::array<std::uint8_t, 512> permutation_{};
 };

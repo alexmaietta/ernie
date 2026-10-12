@@ -2143,6 +2143,18 @@ void BindScene(nb::module_& m) {
         "values decode as sRGB (srgb) or as linear data such as "
         "normal maps; EXR is linear.");
     m.def(
+        "noise_permutation",
+        [](std::uint32_t seed) {
+            const auto& table = GradientNoise(seed).Permutation();
+            return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
+                std::span(table.data(), table.size()),
+                {static_cast<std::int64_t>(table.size())}));
+        },
+        nb::arg("seed") = 0,
+        "The lattice permutation of `fbm_noise`'s noise for `seed`: "
+        "256 entries twice over, uint8, for kernels on the GPU to "
+        "evaluate the same noise.");
+    m.def(
         "fbm_noise",
         [](nb::ndarray<const double, nb::shape<-1, 3>, nb::c_contig,
                        nb::device::cpu>
