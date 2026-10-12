@@ -3261,13 +3261,36 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     const std::size_t count = data.points.size() / 3;
     const Tensor* counts = view.GetFaceVertexCounts();
     const Tensor* indices = view.GetFaceVertexIndices();
-    if ((counts == nullptr) != (indices == nullptr)) {
-        throw std::invalid_argument(
-            "needs both faceVertexCounts and faceVertexIndices");
-    }
     std::vector<std::int64_t> faceCounts;
     std::size_t faceVertexCount = 0;
-    if (counts != nullptr) {
+    const bool gpuIndices =
+        indices != nullptr && IsGpu(indices->Location().kind);
+    if (gpuIndices) {
+        // Triangles written on the GPU: zeros hold their place until
+        // the renderer copies them in, as points. Counts, if any, are
+        // all 3.
+        if (indices->Elements() % 3 != 0) {
+            throw std::invalid_argument(
+                "faceVertexIndices on the GPU must be triangles");
+        }
+        if (counts != nullptr) {
+            const bool triangles =
+                IsGpu(counts->Location().kind)
+                    ? 3 * counts->Elements() == indices->Elements()
+                    : std::ranges::all_of(
+                          IntsOf(*counts, kFaceVertexCounts),
+                          [](std::int64_t n) { return n == 3; });
+            if (!triangles) {
+                throw std::invalid_argument(
+                    "faceVertexIndices on the GPU must be triangles");
+            }
+        }
+        data.indices.assign(
+            static_cast<std::size_t>(indices->Elements()), 0u);
+    } else if ((counts == nullptr) != (indices == nullptr)) {
+        throw std::invalid_argument(
+            "needs both faceVertexCounts and faceVertexIndices");
+    } else if (counts != nullptr) {
         faceCounts = IntsOf(*counts, kFaceVertexCounts);
         const std::vector<std::int64_t> faceIndices =
             IntsOf(*indices, kFaceVertexIndices);
@@ -3300,9 +3323,12 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
                     : FloatsOf(*colors, 3, kDisplayColor);
         }
     }
-    data.uvs = TexCoordsOf(scene, mesh,
-                           UvSetOf(scene, view.GetMaterialBinding()),
-                           data, faceCounts, faceVertexCount);
+    // Without the triangles on the host, no texture coordinates.
+    if (!gpuIndices) {
+        data.uvs = TexCoordsOf(
+            scene, mesh, UvSetOf(scene, view.GetMaterialBinding()),
+            data, faceCounts, faceVertexCount);
+    }
     return data;
 }
 
@@ -3316,6 +3342,8 @@ InstanceData InstanceDataOf(const Scene& scene,
         FloatAttribute(scene, instancer, kOrientations, 4)
             .value_or(std::vector<float>());
     data.scales = FloatAttribute(scene, instancer, kScales, 3)
+                      .value_or(std::vector<float>());
+    data.colors = FloatAttribute(scene, instancer, kDisplayColor, 3)
                       .value_or(std::vector<float>());
     return data;
 }

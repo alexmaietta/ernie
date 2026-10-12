@@ -1026,6 +1026,7 @@ ComputeInterop& RasterDelegate::RequireCompute() {
     if (!meshesOnGpu_) {
         meshes_.SetComputeInterop(compute);
         points_.SetComputeInterop(compute);
+        renderer_.SetOverlayComputeInterop(compute);
         meshesOnGpu_ = true;
     }
     return *compute;
@@ -1044,6 +1045,15 @@ void RasterDelegate::SetMeshPoints(const Scene& scene,
     const std::optional<std::vector<float>> points =
         FloatAttribute(scene, path, tokens::kPoints, 3);
     meshes_.SetPoints(handle, points.value_or(std::vector<float>()));
+}
+
+void RasterDelegate::SetMeshIndices(const Scene& scene,
+                                    const Path& path,
+                                    std::uint32_t handle) {
+    RequireCompute();
+    meshes_.SetIndices(
+        handle, *scene.Read(path, tokens::kFaceVertexIndices),
+        scene.WriteStream(path, tokens::kFaceVertexIndices));
 }
 
 void RasterDelegate::SetMeshAttributes(const Scene& scene,
@@ -1095,11 +1105,21 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         const bool gpuColors = onGpu(kDisplayColor);
         key.second[3] = gpuNormals ? 1 : key.second[3];
         key.second[4] = gpuColors ? 1 : key.second[4];
-        const std::array<std::uint64_t, 3> versions{
+        // Triangles written on the GPU too, while their number holds
+        // (key slot 2).
+        const bool gpuIndices = onGpu(kFaceVertexIndices);
+        if (gpuIndices) {
+            key.second[2] = static_cast<std::uint64_t>(
+                scene.Read(path, kFaceVertexIndices)->Elements());
+        }
+        const std::array<std::uint64_t, 4> versions{
             scene.AttributeVersion(path, kPoints),
             gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
             gpuColors ? scene.AttributeVersion(path, kDisplayColor)
-                      : 0};
+                      : 0,
+            gpuIndices
+                ? scene.AttributeVersion(path, kFaceVertexIndices)
+                : 0};
         const auto it = syncedMeshes_.find(path);
         if (it != syncedMeshes_.end() && it->second.key == key) {
             SyncedMesh& synced = it->second;
@@ -1108,6 +1128,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             }
             if (synced.handle != 0) {
                 try {
+                    if (synced.versions[3] != versions[3]) {
+                        SetMeshIndices(scene, path, synced.handle);
+                    }
                     if (synced.versions[0] != versions[0]) {
                         SetMeshPoints(scene, path, synced.handle);
                     }
@@ -1132,6 +1155,11 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             synced.hasColors = !data.colors.empty();
             synced.tint = ConstantDisplayColor(Gprim(scene, path));
             synced.handle = meshes_.AddMesh(std::move(data));
+            // Before the points, which recompute normals from host
+            // triangles otherwise.
+            if (gpuIndices) {
+                SetMeshIndices(scene, path, synced.handle);
+            }
             if (onGpu(kPoints)) {
                 SetMeshPoints(scene, path, synced.handle);
             }
@@ -1171,8 +1199,9 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
     std::vector<std::string> errors;
     for (const Path& path : scene.Prims(kPointInstancer)) {
         seen.insert(path);
-        const Key key =
-            KeyOf(scene, path, {kPositions, kOrientations, kScales});
+        const Key key = KeyOf(
+            scene, path,
+            {kPositions, kOrientations, kScales, kDisplayColor});
         const std::optional<GpuAnchor> anchor =
             GpuAnchorOf(scene, path);
         auto [it, added] = instancers_.try_emplace(path);
@@ -1247,7 +1276,17 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
                 }
                 meshes_.SetInstances(synced.handle, data);
             } else if (positions != nullptr &&
-                       IsGpu(positions->Location().kind)) {
+                       std::ranges::any_of(
+                           std::array{positions,
+                                      instancer.GetOrientations(),
+                                      instancer.GetScales(),
+                                      instancer.GetDisplayColor()},
+                           [](const Tensor* tensor) {
+                               return tensor != nullptr &&
+                                      IsGpu(tensor->Location().kind);
+                           })) {
+                // Any array on the GPU (such as colours alone) puts
+                // them all there.
                 ComputeInterop& compute = RequireCompute();
                 const auto onDevice = [&](const Tensor* tensor) {
                     if (tensor == nullptr) {
@@ -1258,12 +1297,25 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
                                : compute.Upload(*tensor);
                 };
                 DeviceInstanceData data;
-                data.positions = *positions;
+                data.positions = onDevice(positions);
                 data.orientations =
                     onDevice(instancer.GetOrientations());
                 data.scales = onDevice(instancer.GetScales());
+                data.colors = onDevice(instancer.GetDisplayColor());
                 data.extent = ExtentOf(scene, path);
-                data.stream = scene.WriteStream(path, kPositions);
+                // Copies follow the stream the positions were written
+                // on, or else another array on the GPU.
+                for (const std::string_view attribute :
+                     {kDisplayColor, kScales, kOrientations,
+                      kPositions}) {
+                    const Tensor* tensor =
+                        scene.Read(path, attribute);
+                    if (tensor != nullptr &&
+                        IsGpu(tensor->Location().kind)) {
+                        data.stream =
+                            scene.WriteStream(path, attribute);
+                    }
+                }
                 if (synced.handle == 0) {
                     synced.handle = meshes_.AddInstancer({});
                 }
@@ -1781,14 +1833,16 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,
         view = meshes_.MapPoints(it->second.handle, stream);
     } else if (type == kPointInstancer &&
                (attribute == kPositions ||
-                attribute == kOrientations || attribute == kScales)) {
+                attribute == kOrientations || attribute == kScales ||
+                attribute == kDisplayColor)) {
         const auto it = instancers_.find(path);
         if (it == instancers_.end() || it->second.handle == 0) {
             throw unsynced();
         }
         const std::size_t array = attribute == kPositions      ? 0
                                   : attribute == kOrientations ? 1
-                                                               : 2;
+                                  : attribute == kScales       ? 2
+                                                               : 3;
         view = meshes_.MapInstances(it->second.handle, array, stream);
     } else if (type == kGeomPoints && attribute == kPoints) {
         const auto it = syncedPoints_.find(path);
@@ -2535,6 +2589,17 @@ void RasterDelegate::UpdatePrims(
         for (const std::string& name :
              SelectOverlays(frame.overlays, scene.OverlayNames())) {
             drawn.push_back(scene.FindOverlay(name));
+        }
+    }
+    // Overlay batches with GPU arrays copy from the compute device.
+    for (const Overlay* overlay : drawn) {
+        if (overlay != nullptr &&
+            std::ranges::any_of(
+                overlay->Batches(), [](const OverlayBatch& batch) {
+                    return IsGpu(batch.points.Location().kind);
+                })) {
+            RequireCompute();
+            break;
         }
     }
     const auto views = static_cast<std::uint32_t>(

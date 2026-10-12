@@ -5136,6 +5136,11 @@ void RasterRenderer::SetHighlight(
                    std::as_bytes(std::span(highlightBits_)));
 }
 
+void RasterRenderer::SetOverlayComputeInterop(
+    ComputeInterop* compute) {
+    overlays_->SetComputeInterop(compute);
+}
+
 std::uint64_t RasterRenderer::GpuBytes() const {
     std::uint64_t bytes =
         uniforms_.Size() + shadowUniforms_.Size() +

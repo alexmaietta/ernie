@@ -242,6 +242,60 @@ constexpr const char* kStyleDoc =
     "background (labels' backing colour). Returns the overlay, for "
     "chaining.";
 
+/// An overlay batch's array (`OverlayBatch`): one on a GPU adopted as
+/// it is, without copying; a host one as a contiguous NumPy array of
+/// `dtype` (copied only if it is not one already); none for None.
+Tensor BatchArray(nb::handle object, const char* dtype) {
+    if (object.is_none()) {
+        return Tensor();
+    }
+    try {
+        const auto array = nb::cast<AnyArray>(object);
+        if (array.device_type() != nb::device::cpu::value) {
+            return TensorFromArray(array);
+        }
+    } catch (const nb::cast_error&) {
+        // Lists and the like: through NumPy.
+    }
+    nb::module_ numpy = nb::module_::import_("numpy");
+    return TensorFromArray(nb::cast<AnyArray>(
+        numpy.attr("ascontiguousarray")(object, "dtype"_a = dtype)));
+}
+
+/// The arrays a bulk overlay method takes beside its geometry.
+struct BatchOptions {
+    nb::handle colors;
+    nb::handle sizes;
+    nb::handle worlds;
+    nb::handle origin;
+    nb::handle stream;
+};
+
+Overlay& AddBatch(Overlay& overlay, OverlayBatch batch,
+                  const BatchOptions& options,
+                  const nb::kwargs& style) {
+    batch.colors = BatchArray(options.colors, "float32");
+    batch.sizes = BatchArray(options.sizes, "float32");
+    batch.worlds = BatchArray(options.worlds, "int32");
+    if (!options.origin.is_none()) {
+        batch.origin = Vec3FromPython(options.origin);
+    }
+    batch.stream = StreamOf(options.stream);
+    batch.style = StyleFromPython(style);
+    return overlay.Batch(std::move(batch));
+}
+
+constexpr const char* kBatchDoc =
+    " Arrays have a row per item and may live on the host or on the "
+    "renderer's CUDA device (NumPy, PyTorch, JAX, CuPy, Warp): GPU "
+    "ones are drawn from as they are, without copies to the host, "
+    "written on `stream`; add them again after writing into them. "
+    "Optional per-item arrays: `colors` (N, 3) or (N, 4) display "
+    "colours, line widths or marker sizes in pixels, and `worlds` "
+    "(N,) int32, the world whose views show each (batched cameras). "
+    "Coordinates are float32, relative to `origin` (a point far "
+    "from the world's origin keeps them precise).";
+
 void BindOverlay(nb::module_& m) {
     nb::class_<Overlay>(
         m, "Overlay",
@@ -434,6 +488,173 @@ void BindOverlay(nb::module_& m) {
             (std::string("Markers at (N, 3) `points`, coloured by "
                          "`colors` when given.") +
              kStyleDoc)
+                .c_str())
+        .def(
+            "segments",
+            [](Overlay& o, nb::handle starts, nb::handle ends,
+               nb::handle colors, nb::handle widths,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Lines;
+                batch.points = BatchArray(starts, "float32");
+                batch.ends = BatchArray(ends, "float32");
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("starts"), nb::arg("ends"),
+            nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Segments from (N, 3) `starts` to `ends`.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "arrows",
+            [](Overlay& o, nb::handle starts, nb::handle ends,
+               double head, nb::handle colors, nb::handle widths,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Arrows;
+                batch.points = BatchArray(starts, "float32");
+                batch.ends = BatchArray(ends, "float32");
+                batch.head = head;
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("starts"), nb::arg("ends"), nb::arg("head") = 0.0,
+            nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "Arrows from (N, 3) `starts` to `ends`, with "
+                 "cone heads `head` long (a fifth of each "
+                 "when 0).") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "points",
+            [](Overlay& o, nb::handle points, std::string_view shape,
+               nb::handle colors, nb::handle sizes, nb::handle worlds,
+               nb::handle origin, nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Markers;
+                batch.points = BatchArray(points, "float32");
+                batch.shape = ShapeFromPython(shape);
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, sizes, worlds, origin, stream}, style);
+            },
+            nb::arg("points"), nb::arg("shape") = "circle",
+            nb::arg("colors") = nb::none(),
+            nb::arg("sizes") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Markers of `shape` at (N, 3) `points`, "
+                         "`sizes` pixels across.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "boxes",
+            [](Overlay& o, nb::handle centres, nb::handle halfExtents,
+               nb::handle orientations, nb::handle colors,
+               nb::handle widths, nb::handle worlds,
+               nb::handle origin, nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Boxes;
+                batch.points = BatchArray(centres, "float32");
+                batch.halfExtents =
+                    BatchArray(halfExtents, "float32");
+                batch.orientations =
+                    BatchArray(orientations, "float32");
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("centres"), nb::arg("half_extents"),
+            nb::arg("orientations") = nb::none(),
+            nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "The edges of boxes around (N, 3) `centres`, "
+                 "`half_extents` out along their axes, turned "
+                 "by (N, 4) `orientations` (x, y, z, w).") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "spheres",
+            [](Overlay& o, nb::handle centres, nb::handle radii,
+               nb::handle colors, nb::handle widths,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Spheres;
+                batch.points = BatchArray(centres, "float32");
+                batch.radii = BatchArray(radii, "float32");
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, widths, worlds, origin, stream}, style);
+            },
+            nb::arg("centres"), nb::arg("radii"),
+            nb::arg("colors") = nb::none(),
+            nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string("Spheres around (N, 3) `centres` of (N,) "
+                         "`radii`, as three great circles each.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "frames",
+            [](Overlay& o, nb::handle origins,
+               nb::handle orientations, double length,
+               nb::handle widths, nb::handle worlds,
+               nb::handle origin, nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Frames;
+                batch.points = BatchArray(origins, "float32");
+                batch.orientations =
+                    BatchArray(orientations, "float32");
+                batch.length = length;
+                return AddBatch(
+                    o, std::move(batch),
+                    {nb::none(), widths, worlds, origin, stream},
+                    style);
+            },
+            nb::arg("origins"), nb::arg("orientations") = nb::none(),
+            nb::arg("length") = 1.0, nb::arg("widths") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "The x, y and z axes, `length` long in red, "
+                 "green and blue, at (N, 3) `origins`, turned "
+                 "by (N, 4) `orientations` (x, y, z, w).") +
+             kBatchDoc + kStyleDoc)
                 .c_str())
         .def(
             "label",

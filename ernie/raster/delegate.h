@@ -69,13 +69,16 @@ TerrainParams TerrainParamsOf(const Scene& scene,
 /// changed (`Scene::AttributeVersion`): a deforming mesh rewrites
 /// only its points, and moving instances rewrites only the instance
 /// arrays. Arrays on a GPU compute device (mesh `points`, instance
-/// `positions`, `orientations` and `scales`, contiguous float32) are
-/// copied device to device through `ComputeInterop`, connected on
-/// first use; author `extent` on such prims to spare a copy to the
-/// host for bounds. Meshes that are prototypes of a PointInstancer
-/// are drawn only through it; prototypes must be Mesh prims. A mesh
-/// without a bound material uses the default material tinted by its
-/// `primvars:displayColor` (0.5 grey without one).
+/// `positions`, `orientations`, `scales` and `primvars:displayColor`,
+/// contiguous float32; mesh triangles as `faceVertexIndices`, int32
+/// or uint32, with `faceVertexCounts` all 3 or unset) are copied
+/// device to device through
+/// `ComputeInterop`, connected on first use; author `extent` on such
+/// prims to spare a copy to the host for bounds. Meshes that are
+/// prototypes of a PointInstancer are drawn only through it;
+/// prototypes must be Mesh prims. A mesh without a bound material
+/// uses the default material tinted by its `primvars:displayColor`
+/// (0.5 grey without one), or by its instancer's per instance.
 class RasterDelegate : public RenderDelegate {
   public:
     /// @throws std::runtime_error if the renderer's pipelines cannot
@@ -112,7 +115,8 @@ class RasterDelegate : public RenderDelegate {
                 VkExtent2D extent) override;
 
     /// As `RenderDelegate::MapArray`: a Mesh's `points`, a
-    /// PointInstancer's `positions`, `orientations` or `scales`, a
+    /// PointInstancer's `positions`, `orientations`, `scales` or
+    /// `primvars:displayColor`, a
     /// Points prim's `points`, a Terrain's `heights`, or a Camera's
     /// `ernie:poses` once written on the GPU (as float32, quaternions
     /// w last); or a transform op of a prim posed on the GPU alone in
@@ -237,9 +241,9 @@ class RasterDelegate : public RenderDelegate {
     struct SyncedMesh {
         std::uint32_t handle = 0;
         Key key;
-        /// Versions of its points, and of its normals and colours
-        /// when written on the GPU.
-        std::array<std::uint64_t, 3> versions{};
+        /// Versions of its points, and of its normals, colours and
+        /// triangle indices when written on the GPU.
+        std::array<std::uint64_t, 4> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
     };
@@ -433,6 +437,9 @@ class RasterDelegate : public RenderDelegate {
     /// Hands the mesh its normals and colours written on the GPU.
     void SetMeshAttributes(const Scene& scene, const Path& path,
                            std::uint32_t handle);
+    /// Hands the mesh its triangle indices written on the GPU.
+    void SetMeshIndices(const Scene& scene, const Path& path,
+                        std::uint32_t handle);
 
     const VulkanContext& context_;
     std::unique_ptr<ComputeInterop> compute_;

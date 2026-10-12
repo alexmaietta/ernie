@@ -68,6 +68,74 @@ Overlay& Overlay::Clear() {
     segments_.clear();
     triangles_.clear();
     sprites_.clear();
+    batches_.clear();
+    Touch();
+    return *this;
+}
+
+std::size_t OverlayBatch::Count() const {
+    return points.Empty()
+               ? 0
+               : static_cast<std::size_t>(points.Elements()) / 3;
+}
+
+Overlay& Overlay::Batch(OverlayBatch batch) {
+    using Kind = OverlayBatchKind;
+    const auto require = [&](const Tensor& array, const char* what,
+                             std::int64_t columns, DType type,
+                             bool needed) {
+        if (array.Empty()) {
+            if (needed) {
+                throw std::invalid_argument(std::string("Overlay ") +
+                                            what + " are needed");
+            }
+            return;
+        }
+        if (array.Type() != type || !array.IsContiguous()) {
+            throw std::invalid_argument(
+                std::string("Overlay ") + what +
+                " must be contiguous " +
+                (type == DType::Int32 ? "int32" : "float32"));
+        }
+        if (array.Elements() % columns != 0 ||
+            (array.Rank() > 1 && array.Shape().back() != columns)) {
+            throw std::invalid_argument(
+                std::string("Overlay ") + what + " must have " +
+                std::to_string(columns) + " numbers per item");
+        }
+        if (array.Location() != batch.points.Location()) {
+            throw std::invalid_argument(
+                std::string("Overlay ") + what +
+                " must be on the same device as the points");
+        }
+        if (static_cast<std::size_t>(array.Elements() / columns) !=
+            batch.Count()) {
+            throw std::invalid_argument(
+                std::string("Overlay ") + what +
+                " must have one row per item");
+        }
+    };
+    const Kind kind = batch.kind;
+    require(batch.points, "points", 3, DType::Float32, true);
+    require(batch.ends, "ends", 3, DType::Float32,
+            kind == Kind::Lines || kind == Kind::Arrows);
+    require(batch.halfExtents, "half extents", 3, DType::Float32,
+            kind == Kind::Boxes);
+    require(batch.orientations, "orientations", 4, DType::Float32,
+            false);
+    require(batch.radii, "radii", 1, DType::Float32,
+            kind == Kind::Spheres);
+    if (!batch.colors.Empty()) {
+        const std::int64_t columns =
+            batch.colors.Rank() > 1 ? batch.colors.Shape().back() : 3;
+        require(batch.colors, "colours", columns == 4 ? 4 : 3,
+                DType::Float32, false);
+    }
+    require(batch.sizes, "sizes", 1, DType::Float32, false);
+    require(batch.worlds, "worlds", 1, DType::Int32, false);
+    if (batch.Count() > 0) {
+        batches_.push_back(std::move(batch));
+    }
     Touch();
     return *this;
 }

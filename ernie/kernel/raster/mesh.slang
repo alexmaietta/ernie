@@ -18,6 +18,7 @@ static const uint kInstanced = 4;
 static const uint kHasOrientations = 8;
 static const uint kHasScales = 16;
 static const uint kHasUvs = 32;
+static const uint kHasInstanceColors = 64;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -66,6 +67,9 @@ struct MeshDraw {
 [[vk::binding(25, 0)]] Sampler2D metallicTexture;
 // Opacity, one channel in r, for cutouts (`meshCutoutFragmentMain`, `meshShadowCutoutFragment`).
 [[vk::binding(26, 0)]] Sampler2D opacityTexture;
+// Linear RGB per instance, double-buffered as `scales`, in place of the prototype's colours
+// (`kHasInstanceColors`).
+[[vk::binding(27, 0)]] StructuredBuffer<float> instanceColors;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -181,6 +185,9 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
         v.normal = lerp(before.normal, now.normal, motion);
     }
     v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
+    if ((flags & kHasInstanceColors) != 0) {
+        v.color = load3(instanceColors, d.motion.x + instance);
+    }
     v.uv = float2(0.0);
     if ((flags & kHasUvs) != 0) {
         let at = d.uv.x + call.indexOffset + vertexIndex;

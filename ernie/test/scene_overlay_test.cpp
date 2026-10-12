@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstdint>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -148,4 +150,48 @@ TEST(SelectOverlays, TakesAllOrNamesInOrder) {
     EXPECT_EQ(ernie::SelectOverlays("b missing", available),
               (std::vector<std::string>{"b"}));
     EXPECT_TRUE(ernie::SelectOverlays("", available).empty());
+}
+
+TEST(Overlay, BatchesKeepTheirArraysAndCheckThem) {
+    using ernie::OverlayBatch;
+    using ernie::OverlayBatchKind;
+    using ernie::Tensor;
+    const std::array<float, 6> points{0, 0, 0, 1, 2, 3};
+    const std::array<float, 6> ends{1, 0, 0, 1, 2, 4};
+    Overlay overlay;
+    const std::uint64_t version = overlay.Version();
+    OverlayBatch arrows;
+    arrows.kind = OverlayBatchKind::Arrows;
+    arrows.points = Tensor::Copy<float>(points, {2, 3});
+    arrows.ends = Tensor::Copy<float>(ends, {2, 3});
+    const std::array<std::int32_t, 2> worlds{0, 1};
+    arrows.worlds = Tensor::Copy<std::int32_t>(worlds, {2});
+    overlay.Batch(arrows);
+    ASSERT_EQ(overlay.Batches().size(), 1u);
+    EXPECT_EQ(overlay.Batches()[0].Count(), 2u);
+    EXPECT_EQ(overlay.Batches()[0].points.Data(),
+              arrows.points.Data())
+        << "kept, not copied";
+    EXPECT_TRUE(overlay.Segments().empty());
+    EXPECT_FALSE(overlay.Empty());
+    EXPECT_NE(overlay.Version(), version);
+
+    OverlayBatch missing = arrows;
+    missing.ends = Tensor();
+    EXPECT_THROW(overlay.Batch(missing), std::invalid_argument);
+    OverlayBatch rows = arrows;
+    rows.ends = Tensor::Copy<float>(std::span(ends).first(3), {1, 3});
+    EXPECT_THROW(overlay.Batch(rows), std::invalid_argument);
+    OverlayBatch floats = arrows;
+    const std::array<float, 2> notInts{0, 1};
+    floats.worlds = Tensor::Copy<float>(notInts, {2});
+    EXPECT_THROW(overlay.Batch(floats), std::invalid_argument);
+    OverlayBatch spheres;
+    spheres.kind = OverlayBatchKind::Spheres;
+    spheres.points = arrows.points;
+    EXPECT_THROW(overlay.Batch(spheres), std::invalid_argument)
+        << "spheres need radii";
+
+    overlay.Clear();
+    EXPECT_TRUE(overlay.Empty());
 }

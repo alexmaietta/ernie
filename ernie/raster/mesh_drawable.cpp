@@ -31,6 +31,7 @@ constexpr std::uint32_t kInstanced = 4;
 constexpr std::uint32_t kHasOrientations = 8;
 constexpr std::uint32_t kHasScales = 16;
 constexpr std::uint32_t kHasUvs = 32;
+constexpr std::uint32_t kHasInstanceColors = 64;
 
 /// One draw as `mesh.slang` reads it.
 struct GpuDraw {
@@ -233,7 +234,7 @@ void Reserve(const VulkanContext& context,
         std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 26)
+/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 27)
 /// bindings; see mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
@@ -262,6 +263,7 @@ constexpr DescriptorBinding kBindings[] = {
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's
@@ -293,6 +295,7 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
+    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
@@ -347,6 +350,10 @@ void CheckInstances(const InstanceData& data) {
     if (!data.scales.empty() && data.scales.size() != 3 * count) {
         throw std::invalid_argument(
             "Instance scales must have 3 values per instance");
+    }
+    if (!data.colors.empty() && data.colors.size() != 3 * count) {
+        throw std::invalid_argument(
+            "Instance colours must have 3 values per instance");
     }
 }
 
@@ -767,8 +774,10 @@ void MeshDrawable::SetPoints(
     activeMeshes_.insert(mesh);
     // Normals it has follow the points on the GPU, unless they come
     // from the device too.
+    // Not with device triangles: the host's are placeholders.
     const bool recompute = !target.data.normals.empty() &&
                            target.deviceNormals.Empty() &&
+                           target.deviceIndices.Empty() &&
                            !target.data.indices.empty();
     if (recompute && !target.recomputeNormals) {
         target.recomputeNormals = true;
@@ -830,6 +839,50 @@ void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors,
     target.deviceColors = colors;
     target.colorsStream = stream;
     target.colorsDirty = true;
+    activeMeshes_.insert(mesh);
+}
+
+void MeshDrawable::SetIndices(std::uint32_t mesh,
+                              const Tensor& indices,
+                              std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    if (compute_ == nullptr) {
+        throw std::invalid_argument(
+            "GPU inputs need MeshDrawable::SetComputeInterop");
+    }
+    Mesh& target = it->second;
+    if (indices.Location() != compute_->Location() ||
+        (indices.Type() != DType::Int32 &&
+         indices.Type() != DType::UInt32) ||
+        !indices.IsContiguous()) {
+        throw std::invalid_argument(
+            "Mesh indices must be a contiguous int32 or uint32 "
+            "tensor "
+            "on the compute device " +
+            std::to_string(compute_->Device()));
+    }
+    if (static_cast<std::size_t>(indices.Elements()) !=
+        target.data.indices.size()) {
+        throw std::invalid_argument(
+            "SetIndices must keep the number of triangles");
+    }
+    // Levels simplified from the host's placeholder zeros mean
+    // nothing; nor do triangles around the points from them.
+    if (target.levels.size() > 1 || target.recomputeNormals) {
+        target.levels.resize(1);
+        target.lodIndices.clear();
+        target.lodUvs.clear();
+        target.recomputeNormals = false;
+        target.adjacency.clear();
+        geometryDirty_ = true;
+    }
+    target.deviceIndices = indices;
+    target.indicesStream = stream;
+    target.indicesDirty = true;
     activeMeshes_.insert(mesh);
 }
 
@@ -926,10 +979,10 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer,
         throw std::invalid_argument("Unknown instancer " +
                                     std::to_string(instancer));
     }
-    if (array > 2) {
+    if (array > 3) {
         throw std::invalid_argument(
             "Instance arrays are 0 positions, 1 orientations, 2 "
-            "scales");
+            "scales, 3 colours");
     }
     if (it->second.composed) {
         throw std::invalid_argument(
@@ -937,9 +990,9 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer,
     }
     EnsurePools();
     Instancer& target = it->second;
-    const std::array<const std::shared_ptr<GpuBuffer>*, 3> pools{
-        &positions_, &orientations_, &scales_};
-    const std::array<std::size_t, 3> components{3, 4, 3};
+    const std::array<const std::shared_ptr<GpuBuffer>*, 4> pools{
+        &positions_, &orientations_, &scales_, &instanceColors_};
+    const std::array<std::size_t, 4> components{3, 4, 3, 3};
     const auto count = static_cast<std::int64_t>(target.count);
     const auto view = [&](std::size_t a) {
         return PoolView(
@@ -952,9 +1005,10 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer,
     if (!target.written) {
         // Every array moves to the other half together, as they are
         // now.
-        std::array<Tensor, 3> current{view(0), view(1), view(2)};
+        std::array<Tensor, 4> current{view(0), view(1), view(2),
+                                      view(3)};
         FlipInstancer(target);
-        for (std::size_t a = 0; a < 3; ++a) {
+        for (std::size_t a = 0; a < current.size(); ++a) {
             compute_->Copy(current[a], view(a), stream);
         }
     }
@@ -1021,8 +1075,16 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
         compute_->CopyToBuffer(mesh.deviceColors, *colors_, offset,
                                mesh.colorsStream);
     }
+    // The full mesh's triangles, first of its indices.
+    if (!mesh.deviceIndices.Empty() && (all || mesh.indicesDirty)) {
+        compute_->CopyToBuffer(mesh.deviceIndices, *indices_,
+                               VkDeviceSize{mesh.firstIndex} *
+                                   sizeof(std::uint32_t),
+                               mesh.indicesStream);
+    }
     mesh.normalsDirty = false;
     mesh.colorsDirty = false;
+    mesh.indicesDirty = false;
 }
 
 std::shared_ptr<GpuBuffer>
@@ -1053,6 +1115,14 @@ void MeshDrawable::RemoveMesh(std::uint32_t mesh) {
     geometryDirty_ = true;
 }
 
+bool MeshDrawable::HasInstanceColors(const Instancer& instancer) {
+    if (instancer.composed) {
+        return false;
+    }
+    return instancer.onDevice ? !instancer.device.colors.Empty()
+                              : !instancer.data.colors.empty();
+}
+
 std::uint32_t MeshDrawable::AddInstancer(InstanceData data) {
     CheckInstances(data);
     const std::uint32_t handle = nextHandle_++;
@@ -1078,6 +1148,9 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
     target.composed = false;
     const std::size_t count = data.positions.size() / 3;
     instancesDirty_ = instancesDirty_ || count != target.count;
+    // Draws read instance colours by a flag.
+    drawsDirty_ = drawsDirty_ ||
+                  HasInstanceColors(target) != !data.colors.empty();
     target.count = count;
     target.data = std::move(data);
     target.device = {};
@@ -1144,20 +1217,31 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
                 "Instance scales must have 3 values per instance");
         }
     }
+    if (!data.colors.Empty()) {
+        CheckDeviceTensor(data.colors, 3, "Instance colours");
+        if (static_cast<std::size_t>(data.colors.Elements()) !=
+            3 * count) {
+            throw std::invalid_argument(
+                "Instance colours must have 3 values per instance");
+        }
+    }
     Instancer& target = it->second;
     composeLayoutDirty_ = composeLayoutDirty_ || target.composed;
     target.composed = false;
     instancesDirty_ = instancesDirty_ || count != target.count;
     // Arrays handed back as the views `MapInstances` gave out are
     // written in place.
-    const std::array<const Tensor*, 3> arrays{
-        &data.positions, &data.orientations, &data.scales};
+    const std::array<const Tensor*, 4> arrays{
+        &data.positions, &data.orientations, &data.scales,
+        &data.colors};
     for (std::size_t a = 0; a < arrays.size(); ++a) {
         target.inPlace[a] =
             !arrays[a]->Empty() && !target.mapped[a].Empty() &&
             arrays[a]->Data() == target.mapped[a].Data() &&
             !instancesDirty_;
     }
+    drawsDirty_ = drawsDirty_ ||
+                  HasInstanceColors(target) != !data.colors.Empty();
     target.count = count;
     target.device = data;
     target.onDevice = true;
@@ -1484,7 +1568,8 @@ void MeshDrawable::RebuildGeometry() {
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
-    indices_ = StorageBuffer(context_, indices);
+    // Shared, as triangles may be copied in from the compute device.
+    indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
     adjacency_ = StorageBuffer(context_, adjacency);
     pendingNormals_.clear();
@@ -1509,6 +1594,7 @@ void MeshDrawable::RebuildInstances() {
     std::vector<float> positions;
     std::vector<float> orientations;
     std::vector<float> scales;
+    std::vector<float> colors;
     for (auto& [handle, instancer] : instancers_) {
         instancer.first =
             static_cast<std::uint32_t>(positions.size() / 3);
@@ -1535,18 +1621,25 @@ void MeshDrawable::RebuildInstances() {
         } else {
             scales.resize(scales.size() + 3 * count, 1.0f);
         }
+        if (host && data.colors.size() == 3 * count) {
+            colors.insert(colors.end(), data.colors.begin(),
+                          data.colors.end());
+        } else {
+            colors.resize(colors.size() + 3 * count, 1.0f);
+        }
     }
     vkDeviceWaitIdle(context_.Device());
     // Both halves start with the arrays; each instancer's are in half
     // 0 and stand still.
     instanceTotal_ = static_cast<std::uint32_t>(positions.size() / 3);
     for (std::vector<float>* array :
-         {&positions, &orientations, &scales}) {
+         {&positions, &orientations, &scales, &colors}) {
         array->insert(array->end(), array->begin(), array->end());
     }
     positions_ = Pool(std::as_bytes(std::span(positions)));
     orientations_ = Pool(std::as_bytes(std::span(orientations)));
     scales_ = Pool(std::as_bytes(std::span(scales)));
+    instanceColors_ = Pool(std::as_bytes(std::span(colors)));
     for (auto& [handle, instancer] : instancers_) {
         instancer.set = 0;
         instancer.moving = false;
@@ -1872,6 +1965,11 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
                                    first * 3 * sizeof(float),
                                    device.stream);
         }
+        if (!device.colors.Empty() && !instancer.inPlace[3]) {
+            compute_->CopyToBuffer(device.colors, *instanceColors_,
+                                   first * 3 * sizeof(float),
+                                   device.stream);
+        }
         instancer.inPlace = {};
         return;
     }
@@ -1887,6 +1985,11 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
     }
     if (!data.scales.empty()) {
         uploads.Write(*scales_, std::as_bytes(std::span(data.scales)),
+                      first * 3 * sizeof(float));
+    }
+    if (!data.colors.empty()) {
+        uploads.Write(*instanceColors_,
+                      std::as_bytes(std::span(data.colors)),
                       first * 3 * sizeof(float));
     }
 }
@@ -2099,6 +2202,11 @@ void MeshDrawable::WriteDraws() {
                                     : !instancer.data.scales.empty());
             flags |= orientations ? kHasOrientations : 0u;
             flags |= scales ? kHasScales : 0u;
+            // As a prototype's own colours: not under a bound
+            // material.
+            flags |= item.vertexColors && HasInstanceColors(instancer)
+                         ? kHasInstanceColors
+                         : 0u;
             const std::uint32_t first = instancer.first;
             draw.points[3] = first;
             for (const std::uint32_t instance : item.instances) {
@@ -2252,6 +2360,7 @@ MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
     resources.push_back(DescriptorResource::Of(*uvs_));
     renderer_.MaterialOrDefault(draw.material)
         .AppendTextureResources(resources);
+    resources.push_back(DescriptorResource::Of(*instanceColors_));
     return resources;
 }
 

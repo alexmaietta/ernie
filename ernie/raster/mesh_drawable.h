@@ -28,11 +28,13 @@ namespace ernie {
 
 /// Per-instance arrays on a CUDA device, as contiguous float32
 /// tensors: positions (n, 3), and orientations (n, 4, imaginary part
-/// first) and scales (n, 3), each empty when absent.
+/// first), scales (n, 3) and colours (n, 3, linear RGB in place of
+/// the prototypes'), each empty when absent.
 struct DeviceInstanceData {
     Tensor positions;
     Tensor orientations;
     Tensor scales;
+    Tensor colors;
     /// Bounds of the instances in the instancer's frame, prototypes
     /// included, as USD's `extent`; without them the positions and
     /// scales are copied to the host to compute bounds.
@@ -255,6 +257,19 @@ class MeshDrawable : public RasterDrawable {
     void SetColors(std::uint32_t mesh, const Tensor& colors,
                    std::uintptr_t stream = 1);
 
+    /// Replaces a mesh's triangles with a contiguous int32 or uint32
+    /// tensor on the compute device, three point indices per
+    /// triangle, as many as the mesh was added with (zeros holding
+    /// their place), copied as `SetNormals`. Indices are not checked:
+    /// each must be below the number of points. Such a mesh has no
+    /// coarser levels of detail, and host normals it has are not
+    /// recomputed as its points move (shaded flat without normals).
+    /// @throws std::invalid_argument for an unknown mesh, another
+    /// number of indices, a tensor of another type or device, or
+    /// without `SetComputeInterop`.
+    void SetIndices(std::uint32_t mesh, const Tensor& indices,
+                    std::uintptr_t stream = 1);
+
     /// Maps a mesh's points for writing in place on the compute
     /// device: a float32 (points, 3) tensor over the drawable's own
     /// points pool, the half the next frame draws, holding the points
@@ -269,7 +284,8 @@ class MeshDrawable : public RasterDrawable {
     Tensor MapPoints(std::uint32_t mesh, std::uintptr_t stream = 1);
 
     /// Maps instance array `array` (0 positions, 1 orientations, 2
-    /// scales) of an instancer for writing in place, as `MapPoints`;
+    /// scales, 3 colours) of an instancer for writing in place, as
+    /// `MapPoints`;
     /// the device `SetInstances` takes it back. The instancer's other
     /// arrays move to the same half with it.
     /// @throws std::invalid_argument for an unknown instancer or
@@ -297,8 +313,8 @@ class MeshDrawable : public RasterDrawable {
 
     /// Replaces an instancer's arrays.
     /// @throws std::invalid_argument for an unknown instancer,
-    /// positions whose size is not a multiple of 3, or orientations
-    /// or scales that do not match the positions.
+    /// positions whose size is not a multiple of 3, or orientations,
+    /// scales or colours that do not match the positions.
     void SetInstances(std::uint32_t instancer, InstanceData data);
 
     /// @throws std::invalid_argument for an unknown instancer.
@@ -553,6 +569,10 @@ class MeshDrawable : public RasterDrawable {
                               ///< `data.colors`, if any.
         std::uintptr_t colorsStream = 1;
         bool colorsDirty = false;
+        Tensor deviceIndices;  ///< Device triangle indices replacing
+                               ///< `data.indices` (zeros), if any.
+        std::uintptr_t indicesStream = 1;
+        bool indicesDirty = false;
         /// Whether its normals follow its device points, recomputed
         /// on the GPU when they move: a mesh with normals whose
         /// points, but not normals, come from the device.
@@ -601,8 +621,8 @@ class MeshDrawable : public RasterDrawable {
         bool written = false;
         /// Per array, the view `MapInstances` last gave out this
         /// frame, and whether the array written is already in it.
-        std::array<Tensor, 3> mapped;
-        std::array<bool, 3> inPlace{};
+        std::array<Tensor, 4> mapped;
+        std::array<bool, 4> inPlace{};
         /// Composed on the GPU from transform ops
         /// (`ComposedInstanceData`): the data, its first float in
         /// `composeRaw_`, first op in `composeOps_` and first parent
@@ -615,6 +635,10 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t parentsFirst = 0;
         std::vector<std::uint32_t> levels;
     };
+
+    /// Whether an instancer colours its instances, in place of its
+    /// prototypes' colours; composed ones do not.
+    static bool HasInstanceColors(const Instancer& instancer);
 
     /// The G-buffer pipeline for a frame camera's views, or a
     /// pushbroom's.
@@ -819,7 +843,7 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t instanceTotal_ = 0;
     std::shared_ptr<GpuBuffer> normals_;
     std::shared_ptr<GpuBuffer> colors_;
-    std::unique_ptr<GpuBuffer> indices_;
+    std::shared_ptr<GpuBuffer> indices_;
     std::unique_ptr<GpuBuffer>
         uvs_;  ///< Meshes' texture coordinates per corner
                ///< (`Mesh::firstUv`).
@@ -878,6 +902,9 @@ class MeshDrawable : public RasterDrawable {
     std::shared_ptr<GpuBuffer> positions_;
     std::shared_ptr<GpuBuffer> orientations_;
     std::shared_ptr<GpuBuffer> scales_;
+    /// Linear RGB per instance, laid out as `scales_`; 1 where an
+    /// instancer has none.
+    std::shared_ptr<GpuBuffer> instanceColors_;
     std::unique_ptr<GpuBuffer> instanceIds_;
     /// Per indirect draw of GPU culling: its draw, instance offset
     /// and index offset, read by draw index in batched draws

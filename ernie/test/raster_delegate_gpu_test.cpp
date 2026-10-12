@@ -451,6 +451,117 @@ TEST_F(RasterDelegateTest, CudaArraysAndCudaOutputMatchTheHostPath) {
                  std::invalid_argument);
 }
 
+TEST_F(RasterDelegateTest, InstancesDrawInTheirOwnColours) {
+    Scene scene = MeshScene();
+    const std::array<float, 9> colors{1, 0, 0, 0, 1, 0, 0, 0, 1};
+    ernie::PointInstancer(scene, "/World/Rocks")
+        .SetDisplayColor(Tensor::Copy<float>(colors, {3, 3}));
+    RasterDelegate delegate(*context_);
+    const Tensor image = delegate.Render(scene);
+    // The instances at y = -10, 0 and 10 in red, green and blue, in
+    // place of the prototype's green.
+    const auto expectColours = [&](const Tensor& drawn,
+                                   const char* what) {
+        for (int i = 0; i < 3; ++i) {
+            const std::uint8_t* texel =
+                TexelAt(scene, drawn, {12.0, -10.0 + 10.0 * i, 0.0});
+            for (int c = 0; c < 3; ++c) {
+                if (c == i) {
+                    EXPECT_GT(texel[c], 200) << what << " " << i;
+                } else {
+                    EXPECT_LT(texel[c], 50) << what << " " << i;
+                }
+            }
+        }
+    };
+    expectColours(image, "host colours");
+    // The same instances keep their colours through GPU culling's
+    // compacted ids.
+    for (const std::string_view mode :
+         {tokens::kOff, tokens::kCpu, tokens::kGpu}) {
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetCulling(mode);
+        expectColours(delegate.Render(scene), mode.data());
+    }
+
+    scene.Clear("/World/Rocks", tokens::kDisplayColor);
+    const Tensor plain = delegate.Render(scene);
+    EXPECT_GT(TexelAt(scene, plain, {12, -10, 0})[1], 200)
+        << "without them, the prototype's green again";
+    EXPECT_LT(TexelAt(scene, plain, {12, -10, 0})[0], 50);
+
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // Colours alone on the GPU, positions on the host.
+    scene.Write("/World/Rocks", tokens::kDisplayColor,
+                cuda->Upload(Tensor::Copy<float>(colors, {3, 3})));
+    const Tensor device = delegate.Render(scene);
+    expectColours(device, "CUDA colours");
+    EXPECT_EQ(std::memcmp(device.Data(), image.Data(),
+                          static_cast<std::size_t>(image.Elements())),
+              0)
+        << "CUDA colours draw as host ones";
+
+    // Written in place: blue, red and green.
+    const Tensor mapped = delegate.MapArray(scene, "/World/Rocks",
+                                            tokens::kDisplayColor);
+    EXPECT_EQ(mapped.Shape(), (std::vector<std::int64_t>{3, 3}));
+    const std::array<float, 9> rotated{0, 0, 1, 1, 0, 0, 0, 1, 0};
+    cuda->Copy(cuda->Upload(Tensor::Copy<float>(rotated, {3, 3})),
+               mapped);
+    scene.Unmap("/World/Rocks", tokens::kDisplayColor);
+    const Tensor moved = delegate.Render(scene);
+    EXPECT_GT(TexelAt(scene, moved, {12, -10, 0})[2], 200);
+    EXPECT_GT(TexelAt(scene, moved, {12, 0, 0})[0], 200);
+    EXPECT_GT(TexelAt(scene, moved, {12, 10, 0})[1], 200);
+}
+
+TEST_F(RasterDelegateTest, CudaTrianglesDrawAndChangeInPlace) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene host = MeshScene();
+    RasterDelegate reference(*context_);
+    const Tensor expected = reference.Render(host);
+
+    // The quad's fan as triangles on the GPU, without counts.
+    Scene scene = MeshScene();
+    scene.Clear("/World/Quad", tokens::kFaceVertexCounts);
+    const std::array<std::int32_t, 6> fan{0, 1, 2, 0, 2, 3};
+    scene.Write("/World/Quad", tokens::kFaceVertexIndices,
+                cuda->Upload(Tensor::Copy<std::int32_t>(fan, {6})));
+    const Tensor image = delegate.Render(scene);
+    ASSERT_EQ(image.Elements(), expected.Elements());
+    EXPECT_EQ(std::memcmp(image.Data(), expected.Data(),
+                          static_cast<std::size_t>(image.Elements())),
+              0)
+        << "CUDA triangles draw as the host's";
+
+    // The second triangle over the first: the upper left half goes.
+    const std::size_t meshes = delegate.Meshes().MeshCount();
+    const std::array<std::int32_t, 6> half{0, 1, 2, 0, 1, 2};
+    scene.Write("/World/Quad", tokens::kFaceVertexIndices,
+                cuda->Upload(Tensor::Copy<std::int32_t>(half, {6})));
+    const Tensor halved = delegate.Render(scene);
+    EXPECT_GT(TexelAt(scene, halved, {-11, -1, 0})[0], 200)
+        << "the lower right half stays";
+    EXPECT_EQ(TexelAt(scene, halved, {-13, 1, 0})[0], 0)
+        << "the upper left half went";
+    EXPECT_EQ(delegate.Meshes().MeshCount(), meshes);
+
+    // Counts that are not all 3 cannot go with GPU indices.
+    const std::array<std::int64_t, 1> quad{4};
+    scene.Write("/World/Quad", tokens::kFaceVertexCounts,
+                Tensor::Copy<std::int64_t>(quad, {1}));
+    EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
+}
+
 TEST(ExtentOf, ReadsValuesAndArrays) {
     Scene scene;
     scene.Define("/A", tokens::kMesh)

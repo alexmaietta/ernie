@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/frame_uploads.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
@@ -38,15 +39,25 @@ class OverlayPass {
 
     /// Stages the visible items of `overlays`, relative to the
     /// frame's `origin`, for the next frame's `Record`s; uploads only
-    /// when an overlay or the origin changed. With `pushbroom`, first
-    /// compiles the pipelines for a pushbroom camera's targets,
-    /// unless it has.
+    /// when an overlay or the origin changed. Batches' arrays
+    /// (`OverlayBatch`) are copied as they are into the batch buffer,
+    /// device to device from the compute device, and expanded into
+    /// items as they are drawn. With `pushbroom`, first compiles the
+    /// pipelines for a pushbroom camera's targets, unless it has.
+    /// @throws std::invalid_argument for batch arrays on a GPU
+    /// without `SetComputeInterop`, or on another device.
     void Prepare(std::span<const Overlay* const> overlays,
                  const glm::dvec3& origin, bool pushbroom = false);
 
+    /// Connects the compute device batches' GPU arrays are copied
+    /// from; the frames must wait for its copies
+    /// (`ComputeInterop::VulkanWait`).
+    void SetComputeInterop(ComputeInterop* compute);
+
     /// Whether the last `Prepare` left nothing to draw.
     bool Empty() const {
-        return counts_ == std::array<std::uint32_t, 3>{};
+        return counts_ == std::array<std::uint32_t, 3>{} &&
+               batchDraws_.empty();
     }
 
     /// What one `Record` draws into: a colour attachment of `format`
@@ -87,18 +98,35 @@ class OverlayPass {
     /// camera's or a pushbroom's views.
     void CreatePipelines(bool pushbroom);
 
+    /// Stages the prepared overlays' batches: their arrays into
+    /// `batchData_`, their records and draws.
+    void PrepareBatches(const glm::dvec3& origin);
+
     const VulkanContext& context_;
     const ShaderCompiler& compiler_;
     FrameUploads& uploads_;
     VkFormat presentFormat_;
     PipelineLayout layout_;
     /// Per attachment format and whether for a pushbroom: the
-    /// segment, triangle and sprite pipelines.
+    /// segment, triangle and sprite pipelines, then the batches'.
     std::map<std::pair<VkFormat, bool>,
-             std::array<std::unique_ptr<GraphicsPipeline>, 3>>
+             std::array<std::unique_ptr<GraphicsPipeline>, 6>>
         pipelines_;
     std::array<std::unique_ptr<GpuBuffer>, 3> buffers_;
     std::array<std::uint32_t, 3> counts_{};
+    /// One draw of a batch: the batch, its primitive (0 segments, 1
+    /// triangles, 2 sprites) and vertex count.
+    struct BatchDraw {
+        std::uint32_t batch = 0;
+        std::size_t primitive = 0;
+        std::uint32_t vertices = 0;
+    };
+    std::vector<BatchDraw> batchDraws_;
+    /// The batches' arrays, shared with the compute device when
+    /// connected, and their `Batch` records (overlay.slang).
+    std::shared_ptr<GpuBuffer> batchData_;
+    std::unique_ptr<GpuBuffer> batchInfos_;
+    ComputeInterop* compute_ = nullptr;
     /// What the buffers hold: each overlay and its version, and the
     /// origin.
     std::vector<std::pair<const Overlay*, std::uint64_t>> prepared_;

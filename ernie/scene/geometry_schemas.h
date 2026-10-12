@@ -125,6 +125,10 @@
     X(::ernie::Tensor, Worlds, ::ernie::tokens::kWorlds, nullptr,                                  \
       (::ernie::AttributeMeta{.doc = "int (n,): each instance's world, in place of the "           \
                                      "instancer's world.",                                         \
+                              .group = "Instances"}))                                              \
+    X(::ernie::Tensor, DisplayColor, ::ernie::tokens::kDisplayColor, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = "(n, 3) linear RGB of each instance, in place of its "        \
+                                     "prototype's displayColor (USD's per-instance primvar).",     \
                               .group = "Instances"}))
 
 #define ERNIE_GROUND_PLANE_ATTRIBUTES(X)                                                           \

@@ -460,6 +460,10 @@ class RasterRenderer {
         return uploads_;
     }
 
+    /// Connects the compute device overlay batches' GPU arrays are
+    /// copied from (`OverlayPass::SetComputeInterop`).
+    void SetOverlayComputeInterop(ComputeInterop* compute);
+
     /// The buffer the views' poses of a frame with
     /// `FrameParams::posesOnGpu` are copied into before it records
     /// (`ComputeInterop::CopyToBuffer`), row-major 4x4 float32 per

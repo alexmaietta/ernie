@@ -5,7 +5,8 @@
 // depth-tested by hand against the view's depth, so items can be hidden, faded or always shown.
 //
 // Bindings: 0 the view's Uniforms (frame.slang; only its view-projection and pushbroom strip are
-// read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites.
+// read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites, 5
+// batches' arrays, 6 batches.
 //
 // References:
 // - M. Rougier, "Shader-Based Antialiased, Dashed, Stroked Polylines", JCGT 2(2), 2013: lines as
@@ -58,7 +59,46 @@ struct OverlayConstants {
     int4 view;
     // Image width and height in pixels, near and far planes.
     float4 viewport;
+    // x: the batch the batch shaders draw (`batches`).
+    uint4 batch;
 }
+
+// Many items of one kind read from arrays in `batchData` (`OverlayBatch`), expanded here into
+// segments, triangles or sprites: lines and arrow shafts, box edges, sphere circles and frame axes
+// as segments; arrow heads as triangles; markers as sprites.
+struct Batch {
+    // x kind (kBatch*), y items, z segments (or triangles) per item, w kBatchHas* flags.
+    uint4 shape;
+    // First floats in `batchData` of: x points, y ends, half extents or radii, z orientations,
+    // w colours.
+    uint4 arrays;
+    // x sizes, y worlds.
+    uint4 extras;
+    // The style's: x packed colour, y depth mode and marker shape as `info.y`, z world.
+    uint4 style;
+    // xyz the arrays' origin relative to the frame's; w the style's width or marker size (pixels).
+    float4 origin;
+    // x arrows' head length (0 for a fifth of each), y frames' axis length.
+    float4 params;
+}
+
+static const uint kBatchLines = 0;
+static const uint kBatchArrows = 1;
+static const uint kBatchMarkers = 2;
+static const uint kBatchBoxes = 3;
+static const uint kBatchSpheres = 4;
+static const uint kBatchFrames = 5;
+
+static const uint kBatchHasColors = 1;
+static const uint kBatchHasAlpha = 2;  // colours with opacity, 4 floats each
+static const uint kBatchHasSizes = 4;
+static const uint kBatchHasWorlds = 8;
+static const uint kBatchHasOrientations = 16;
+
+// Segments of each of a sphere's circles, and triangles of an arrow head's cone (its side, then its
+// base), as `Overlay::Sphere` and `Overlay::Arrow` draw them.
+static const uint kCircleSegments = 48;
+static const uint kConeSides = 8;
 
 static const uint kDepthTest = 0;
 static const uint kDepthXRay = 1;
@@ -82,6 +122,8 @@ static const uint kKindSprite = 2;
 [[vk::binding(2, 0)]] StructuredBuffer<Segment> segments;
 [[vk::binding(3, 0)]] StructuredBuffer<Triangle> triangles;
 [[vk::binding(4, 0)]] StructuredBuffer<Sprite> sprites;
+[[vk::binding(5, 0)]] StructuredBuffer<float> batchData;
+[[vk::binding(6, 0)]] StructuredBuffer<Batch> batches;
 [[vk::push_constant]] ConstantBuffer<OverlayConstants> constants;
 
 struct VertexOutput {
@@ -122,7 +164,11 @@ float2 pixelScale() {
 
 [shader("vertex")]
 VertexOutput segmentVertex(uint vertexIndex : SV_VertexID) {
-    let segment = segments[vertexIndex / 6];
+    return segmentCorner(segments[vertexIndex / 6], vertexIndex);
+}
+
+// Corner `vertexIndex % 6` of a segment's quad.
+VertexOutput segmentCorner(Segment segment, uint vertexIndex) {
     if (!inWorld(segment.info)) {
         return culled();
     }
@@ -170,7 +216,11 @@ VertexOutput segmentVertex(uint vertexIndex : SV_VertexID) {
 
 [shader("vertex")]
 VertexOutput triangleVertex(uint vertexIndex : SV_VertexID) {
-    let triangle = triangles[vertexIndex / 3];
+    return triangleCorner(triangles[vertexIndex / 3], vertexIndex);
+}
+
+// Corner `vertexIndex % 3` of a triangle.
+VertexOutput triangleCorner(Triangle triangle, uint vertexIndex) {
     if (!inWorld(triangle.info)) {
         return culled();
     }
@@ -186,7 +236,11 @@ VertexOutput triangleVertex(uint vertexIndex : SV_VertexID) {
 
 [shader("vertex")]
 VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
-    let sprite = sprites[vertexIndex / 6];
+    return spriteCorner(sprites[vertexIndex / 6], vertexIndex);
+}
+
+// Corner `vertexIndex % 6` of a sprite's rectangle.
+VertexOutput spriteCorner(Sprite sprite, uint vertexIndex) {
     let anchor = project(sprite.anchor.xyz);
     if (!inWorld(sprite.info) || anchor.w <= 0.0) {
         return culled();
@@ -204,15 +258,200 @@ VertexOutput spriteVertex(uint vertexIndex : SV_VertexID) {
     return out;
 }
 
+// Batches: each item read from the batch's arrays and expanded into its segments, triangles or
+// sprites, as the overlay's own methods reduce one item on the host.
+
+float3 batchVector(uint first, uint i) {
+    let at = first + 3 * i;
+    return float3(batchData[at], batchData[at + 1], batchData[at + 2]);
+}
+
+// Item `i`'s point of the array at `first`, relative to the frame's origin.
+float3 batchPoint(Batch b, uint first, uint i) {
+    return batchVector(first, i) + b.origin.xyz;
+}
+
+float4 batchOrientation(Batch b, uint i) {
+    if ((b.shape.w & kBatchHasOrientations) == 0) {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
+    let at = b.arrays.z + 4 * i;
+    return float4(batchData[at], batchData[at + 1], batchData[at + 2], batchData[at + 3]);
+}
+
+// `v` turned by unit quaternion `q` (x, y, z, w).
+float3 rotate(float4 q, float3 v) {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+uint packColor(float4 color) {
+    let bytes = uint4(round(saturate(color) * 255.0));
+    return bytes.x | (bytes.y << 8) | (bytes.z << 16) | (bytes.w << 24);
+}
+
+// Item `i`'s `info`: its colour or the style's, the style's depth mode and marker shape, and its
+// world or the style's.
+uint4 batchInfo(Batch b, uint i) {
+    var color = b.style.x;
+    if ((b.shape.w & kBatchHasColors) != 0) {
+        let alpha = (b.shape.w & kBatchHasAlpha) != 0;
+        let at = b.arrays.w + (alpha ? 4 : 3) * i;
+        color = packColor(float4(batchData[at], batchData[at + 1], batchData[at + 2],
+                                 alpha ? batchData[at + 3] : unpackColor(b.style.x).a));
+    }
+    let world = (b.shape.w & kBatchHasWorlds) != 0 ? asuint(batchData[b.extras.y + i]) : b.style.z;
+    return uint4(color, b.style.y, world, 0);
+}
+
+// Item `i`'s line width or marker size in pixels.
+float batchSize(Batch b, uint i) {
+    return (b.shape.w & kBatchHasSizes) != 0 ? batchData[b.extras.x + i] : b.origin.w;
+}
+
+// Two unit vectors perpendicular to unit `axis` and to each other.
+void perpendiculars(float3 axis, out float3 u, out float3 v) {
+    let other = abs(axis.x) < 0.9 ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+    u = normalize(cross(axis, other));
+    v = cross(axis, u);
+}
+
+// Arrow `i`'s head from `end` back to its base, a fifth of the arrow unless the batch sets its
+// length, as `Overlay::Arrow`.
+float3 arrowHead(Batch b, float3 start, float3 end) {
+    let shaft = end - start;
+    let length = sqrt(dot(shaft, shaft));
+    let head = min(b.params.x > 0.0 ? b.params.x : 0.2 * length, length);
+    return length > 0.0 ? shaft / length * head : float3(0.0);
+}
+
+[shader("vertex")]
+VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
+    let b = batches[constants.batch.x];
+    let segment = vertexIndex / 6;
+    let i = segment / b.shape.z;
+    let k = segment % b.shape.z;  // the item's segment
+    let p = batchPoint(b, b.arrays.x, i);
+    Segment s;
+    s.info = batchInfo(b, i);
+    s.a = float4(p, batchSize(b, i));
+    s.b = float4(p, 0.0);
+    switch (b.shape.x) {
+    case kBatchLines:
+        s.b.xyz = batchPoint(b, b.arrays.y, i);
+        break;
+    case kBatchArrows: {
+        let end = batchPoint(b, b.arrays.y, i);
+        s.b.xyz = end - arrowHead(b, p, end);
+        break;
+    }
+    case kBatchBoxes: {
+        // Four edges along each axis, at the corners of the other two.
+        let half = batchVector(b.arrays.y, i);
+        let axis = k / 4;
+        let other = uint2((axis + 1) % 3, (axis + 2) % 3);
+        var low = float3(0.0);
+        low[other.x] = (k & 1) != 0 ? 1.0 : -1.0;
+        low[other.y] = (k & 2) != 0 ? 1.0 : -1.0;
+        var high = low;
+        low[axis] = -1.0;
+        high[axis] = 1.0;
+        let q = batchOrientation(b, i);
+        s.a.xyz = p + rotate(q, low * half);
+        s.b.xyz = p + rotate(q, high * half);
+        break;
+    }
+    case kBatchSpheres: {
+        // A great circle around each axis.
+        let radius = batchData[b.arrays.y + i];
+        let axis = k / kCircleSegments;
+        let j = k % kCircleSegments;
+        let u = axis == 0 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+        let v = axis == 2 ? float3(0.0, 1.0, 0.0) : float3(0.0, 0.0, 1.0);
+        let a0 = 2.0 * 3.14159265 * float(j) / float(kCircleSegments);
+        let a1 = 2.0 * 3.14159265 * float(j + 1) / float(kCircleSegments);
+        s.a.xyz = p + radius * (cos(a0) * u + sin(a0) * v);
+        s.b.xyz = p + radius * (cos(a1) * u + sin(a1) * v);
+        break;
+    }
+    case kBatchFrames: {
+        // Axis k in `Overlay::Axes`' red, green or blue, with the item's opacity.
+        static const float3 kAxisColors[3] = { float3(0.9, 0.2, 0.2), float3(0.3, 0.85, 0.3),
+                                               float3(0.25, 0.45, 1.0) };
+        var unit = float3(0.0);
+        unit[k] = 1.0;
+        s.b.xyz = p + rotate(batchOrientation(b, i), unit) * b.params.y;
+        s.info.x = packColor(float4(kAxisColors[k], unpackColor(s.info.x).a));
+        break;
+    }
+    default:
+        break;
+    }
+    return segmentCorner(s, vertexIndex);
+}
+
+// Arrow heads: cones of kConeSides sides and their bases.
+[shader("vertex")]
+VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
+    let b = batches[constants.batch.x];
+    let triangle = vertexIndex / 3;
+    let i = triangle / (2 * kConeSides);
+    let k = triangle % (2 * kConeSides);
+    let start = batchPoint(b, b.arrays.x, i);
+    let end = batchPoint(b, b.arrays.y, i);
+    let head = arrowHead(b, start, end);
+    let length = sqrt(dot(head, head));
+    if (!(length > 0.0)) {
+        return culled();
+    }
+    let base = end - head;
+    float3 u;
+    float3 v;
+    perpendiculars(head / length, u, v);
+    let radius = 0.35 * length;
+    let side = k % kConeSides;
+    let a0 = 2.0 * 3.14159265 * float(side) / float(kConeSides);
+    let a1 = 2.0 * 3.14159265 * float(side + 1) / float(kConeSides);
+    let p0 = base + radius * (cos(a0) * u + sin(a0) * v);
+    let p1 = base + radius * (cos(a1) * u + sin(a1) * v);
+    Triangle t;
+    t.info = batchInfo(b, i);
+    if (k < kConeSides) {
+        t.p0 = float4(end, 0.0);
+        t.p1 = float4(p0, 0.0);
+        t.p2 = float4(p1, 0.0);
+    } else {
+        t.p0 = float4(base, 0.0);
+        t.p1 = float4(p1, 0.0);
+        t.p2 = float4(p0, 0.0);
+    }
+    return triangleCorner(t, vertexIndex);
+}
+
+// Markers: squares of their size in pixels around their points.
+[shader("vertex")]
+VertexOutput batchSpriteVertex(uint vertexIndex : SV_VertexID) {
+    let b = batches[constants.batch.x];
+    let i = vertexIndex / 6;
+    let half = 0.5 * batchSize(b, i);
+    Sprite s;
+    s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);
+    s.rect = float4(-half, -half, half, half);
+    s.info = batchInfo(b, i);
+    return spriteCorner(s, vertexIndex);
+}
+
 // View depth (distance along the view axis) of a [0, 1] depth: from a perspective projection, or
 // linear in it from an orthographic one.
 float linearDepth(float depth) {
+    // Reverse-Z (`ReversedPerspective`, `ReversedOrthographic`): 1 at the near plane, 0 at the far,
+    // which may be infinite (an orthographic one then 10^12 past the near plane).
     let near = constants.viewport.z;
     let far = constants.viewport.w;
     if (constants.view.w != 0) {
-        return near + depth * (far - near);
+        return lerp(isinf(far) ? near + 1e12 : far, near, depth);
     }
-    return near * far / (far - depth * (far - near));
+    return isinf(far) ? near / depth : near * far / (near + depth * (far - near));
 }
 
 // Coverage of a marker of `shape` at `p` (in [-1, 1] over the sprite), `halfSize` pixels across.

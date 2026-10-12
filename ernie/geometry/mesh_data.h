@@ -53,6 +53,9 @@ struct InstanceData {
         orientations;  ///< Empty, or a quaternion x, y, z, w (real
                        ///< last) per instance.
     std::vector<float> scales;  ///< Empty, or x, y, z per instance.
+    std::vector<float> colors;  ///< Empty, or linear RGB per
+                                ///< instance, in place of the
+                                ///< prototypes' colours.
 };
 
 }  // namespace ernie

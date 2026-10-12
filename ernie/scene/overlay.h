@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/util/tensor.h"
+
 #include <glm/glm.hpp>
 
 #include <array>
@@ -73,6 +75,55 @@ struct OverlaySprite {
     glm::vec4 rect{0.0f};
     MarkerShape shape = MarkerShape::Square;
     OverlayItem item;
+};
+
+/// The kinds of item an `OverlayBatch` holds many of.
+enum class OverlayBatchKind : std::uint8_t {
+    Lines,    ///< Segments from `points` to `ends`.
+    Arrows,   ///< Lines with a cone at `ends`.
+    Markers,  ///< Markers of `shape` at `points`.
+    Boxes,    ///< Box edges around `points`, `halfExtents` out,
+              ///< turned by `orientations`.
+    Spheres,  ///< Three great circles of `radii` around `points`.
+    Frames,   ///< The x, y and z axes at `points`, turned by
+              ///< `orientations`, `length` long, in red, green and
+              ///< blue.
+};
+
+/// Many overlay items of one kind from arrays on the host or a GPU
+/// (`Overlay::Batch`), such as one per world of a batched
+/// simulation: the renderer reads the arrays as they are, without
+/// copies to the host, and draws each item from them on the GPU.
+/// Arrays have one row per item: float32 but `worlds` (int32), and
+/// contiguous; on a GPU, all on the renderer's compute device.
+/// Optional ones are empty when absent, the style's value standing
+/// for them.
+struct OverlayBatch {
+    OverlayBatchKind kind = OverlayBatchKind::Lines;
+    Tensor points;        ///< (n, 3); the number of items.
+    Tensor ends;          ///< (n, 3): lines' and arrows'.
+    Tensor halfExtents;   ///< (n, 3): boxes'.
+    Tensor orientations;  ///< (n, 4) quaternions x, y, z, w: boxes'
+                          ///< and frames', optional.
+    Tensor radii;         ///< (n,): spheres'.
+    /// (n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.
+    Tensor colors;
+    /// (n,) pixels: line widths, or markers' sizes.
+    Tensor sizes;
+    Tensor worlds;  ///< (n,) int32: the world whose views show each.
+    /// Arrows' heads' length; 0 makes each a fifth of its arrow.
+    double head = 0.0;
+    double length = 1.0;  ///< Frames' axis length.
+    MarkerShape shape = MarkerShape::Circle;
+    OverlayStyle style;
+    /// The point the arrays' coordinates are relative to, so items
+    /// far from the world's origin keep float32's precision.
+    glm::dvec3 origin{0.0};
+    /// The CUDA stream GPU arrays are written on; copies follow it.
+    std::uintptr_t stream = 1;
+
+    /// The number of items.
+    std::size_t Count() const;
 };
 
 /// A named layer of debug drawing: lines, shapes, markers and labels
@@ -184,6 +235,14 @@ class Overlay {
     Overlay& Label(const glm::dvec3& point, std::string_view text,
                    const OverlayStyle& style = {});
 
+    /// Many items of one kind from arrays (`OverlayBatch`), kept as
+    /// they are and drawn on the GPU. The overlay holds the arrays:
+    /// add the batch again after writing into them in place.
+    /// @throws std::invalid_argument for arrays of the wrong type or
+    /// shape, rows that differ in number, or ones the kind needs
+    /// missing.
+    Overlay& Batch(OverlayBatch batch);
+
     const std::vector<OverlaySegment>& Segments() const {
         return segments_;
     }
@@ -197,10 +256,14 @@ class Overlay {
         return sprites_;
     }
 
+    const std::vector<OverlayBatch>& Batches() const {
+        return batches_;
+    }
+
     /// Whether the layer has no items.
     bool Empty() const {
         return segments_.empty() && triangles_.empty() &&
-               sprites_.empty();
+               sprites_.empty() && batches_.empty();
     }
 
   private:
@@ -212,6 +275,7 @@ class Overlay {
     std::vector<OverlaySegment> segments_;
     std::vector<OverlayTriangle> triangles_;
     std::vector<OverlaySprite> sprites_;
+    std::vector<OverlayBatch> batches_;
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };
