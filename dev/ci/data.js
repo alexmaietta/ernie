@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791786528654,
+  "lastUpdate": 1791787089442,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -11204,6 +11204,233 @@ window.BENCHMARK_DATA = {
             "name": "test-gcc-4: ccache miss rate",
             "value": 45.45,
             "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "dceedb34bb44749bbdaf1cc67447c86223cf2e3b",
+          "message": "Windows and macOS tests in the test job, Windows in two parts; the build job folded in",
+          "timestamp": "2026-10-12T06:27:57Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/dceedb34bb44749bbdaf1cc67447c86223cf2e3b"
+        },
+        "date": 1791787087659,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 9.78,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.25,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 6.73,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 6.5,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 6.82,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 6.72,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 15.11,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 430,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 25.41,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 24.85,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 430,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 25.41,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 24.3,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 430,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 25.41,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 16.96,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 430,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 25.41,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 14.68,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 640,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 14.87,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 11.36,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 643,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 31.46,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 18.46,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 638,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 30.61,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 12.67,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 640,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 30.83,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-4: compile time",
+            "value": 17.63,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-4: compiles",
+            "value": 644,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-4: ccache miss rate",
+            "value": 31.26,
+            "unit": "%"
+          },
+          {
+            "name": "test-macos: compile time",
+            "value": 16.04,
+            "unit": "min"
+          },
+          {
+            "name": "test-macos: compiles",
+            "value": 555,
+            "unit": "files"
+          },
+          {
+            "name": "test-windows-1: compile time",
+            "value": 25.54,
+            "unit": "min"
+          },
+          {
+            "name": "test-windows-1: compiles",
+            "value": 628,
+            "unit": "files"
+          },
+          {
+            "name": "test-windows-2: compile time",
+            "value": 25.27,
+            "unit": "min"
+          },
+          {
+            "name": "test-windows-2: compiles",
+            "value": 604,
+            "unit": "files"
           }
         ]
       }
