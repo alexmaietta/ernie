@@ -2849,20 +2849,37 @@ void MeshDrawable::Cull(const FrameParams& params,
     // shadow view can see: all of them without culling, else those
     // whose bounds meet the frustum. With GPU culling, every
     // instanced range left becomes a job that tests its instances one
-    // by one (cull.slang). Only when a view or shadow view tests them
-    // on the CPU: with the views' poses on the GPU and shadow views
-    // the GPU fits, none does.
-    const bool tested = culling_ != Culling::Off &&
-                        (!params.posesOnGpu ||
-                         std::any_of(cascades.begin(), cascades.end(),
-                                     [](const ShadowCascade& c) {
-                                         return !c.gpuFitted;
-                                     }));
+    // by one (cull.slang). The CPU tests a range's bounds only with
+    // CPU culling, and only for views whose pose it knows: with the
+    // views' poses on the GPU and shadow views the GPU fits, none.
+    const bool cpuTests = culling_ == Culling::Cpu;
+    const bool tested =
+        cpuTests && (!params.posesOnGpu ||
+                     std::any_of(cascades.begin(), cascades.end(),
+                                 [](const ShadowCascade& c) {
+                                     return !c.gpuFitted;
+                                 }));
+    // With GPU culling every range is a job of the GPU's; under
+    // occlusion culling a plain mesh's is an occluder's, tested
+    // against the frustum alone and drawn before the depth pyramid
+    // is built from it.
+    const auto isJob = [&](std::size_t) {
+        return culling_ == Culling::Gpu;
+    };
+    const auto isOccluder = [&](std::size_t item) {
+        return occlusion_ != Occlusion::Off &&
+               !items_[item].instancer;
+    };
+    // The views' occluder jobs, kept apart until every view's own
+    // jobs are listed: they follow them, frustum-culled with the
+    // shadow views' (`RecordCull`), not against the depth pyramid.
+    std::vector<GpuCullJob> occluderJobs;
+    std::vector<std::uint32_t> occluderDrawCounts;
     std::vector<std::vector<std::optional<Bounds3>>> bounds(
         tested ? items_.size() : 0);
     for (std::size_t i = 0; i < items_.size() && tested; ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
-            bounds[i].push_back(range.count == 0
+            bounds[i].push_back(range.count == 0 || isJob(i)
                                     ? std::nullopt
                                     : RangeBounds(i, range));
         }
@@ -2991,7 +3008,10 @@ void MeshDrawable::Cull(const FrameParams& params,
                 ((linkMask >> group) & 1u) == 0) {
                 continue;
             }
-            if (posed && culling_ != Culling::Off) {
+            // A job's instances are tested on the GPU, each against
+            // the view's planes: nothing to test here.
+            const bool job = isJob(i);
+            if (posed && culling_ != Culling::Off && !job) {
                 const std::optional<Bounds3>& box = bounds[i][r];
                 if (box &&
                     !frustum.Intersects(box->first, box->second)) {
@@ -3000,13 +3020,9 @@ void MeshDrawable::Cull(const FrameParams& params,
             }
             VisibleRange entry{static_cast<std::uint32_t>(i),
                                static_cast<std::uint32_t>(r)};
-            // Draws of their own too, without occlusion culling (with
-            // it they draw directly, as occluders): a job of their
-            // one instance, so every view's draws go out indirectly.
-            if (culling_ == Culling::Gpu &&
-                (items_[i].instancer ||
-                 occlusion_ == Occlusion::Off)) {
-                entry.job = static_cast<std::int32_t>(jobs.size());
+            // Plain meshes too: a job of their one instance, so every
+            // view's draws go out indirectly.
+            if (job) {
                 GpuCullJob job{};
                 job.range[0] = entry.item;
                 job.range[1] = itemIdOffsets_[i] + range.first;
@@ -3017,9 +3033,21 @@ void MeshDrawable::Cull(const FrameParams& params,
                 const std::uint32_t levels = CullLevels(i);
                 job.output[0] = visible;
                 job.output[1] = draws;
-                jobs.push_back(job);
+                // A view's occluder, numbered once the views' own
+                // jobs are all listed (-2 - its index meanwhile).
+                if (pyramid && isOccluder(i)) {
+                    entry.occluder = true;
+                    entry.job = -2 - static_cast<std::int32_t>(
+                                         occluderJobs.size());
+                    occluderJobs.push_back(job);
+                    occluderDrawCounts.push_back(levels);
+                } else {
+                    entry.job =
+                        static_cast<std::int32_t>(jobs.size());
+                    jobs.push_back(job);
+                    cullDrawCounts_.push_back(levels);
+                }
                 addRecords(entry.item, visible, range.count);
-                cullDrawCounts_.push_back(levels);
                 visible += range.count * levels;
                 draws += levels;
             }
@@ -3035,8 +3063,10 @@ void MeshDrawable::Cull(const FrameParams& params,
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds[v] = params.ViewWorld(v);
     }
+    // Host poses too, when no view tests bounds here: then only the
+    // views' cull blocks change from frame to frame.
     const bool cacheable =
-        params.posesOnGpu && !params.camera.pushbroom;
+        (params.posesOnGpu || !cpuTests) && !params.camera.pushbroom;
     const bool reuse = cacheable && viewLayout_.valid &&
                        viewLayout_.layoutVersion == layoutVersion_ &&
                        viewLayout_.idOffsets == itemIdOffsets_ &&
@@ -3050,24 +3080,29 @@ void MeshDrawable::Cull(const FrameParams& params,
         visible = viewLayout_.visible;
         draws = viewLayout_.draws;
         viewJobStarts_ = viewLayout_.jobStarts;
-        // The GPU writes each view's planes and matrix
-        // (`RecordViewPoses`); the rest of a block is the camera's,
-        // the same for every view: the first view's, copied.
-        const glm::mat4 viewProjection =
-            params.View(0).ViewProjection();
-        const float perUnit =
-            glm::length(glm::vec3(viewProjection[0][1],
-                                  viewProjection[1][1],
-                                  viewProjection[2][1])) *
-            0.5f * static_cast<float>(params.camera.height);
-        pushView(Frustum::FromMatrix(viewProjection), viewProjection,
-                 perUnit, occlusion_ != Occlusion::Off);
-        const std::vector<glm::vec4> block(
-            views.end() -
-                static_cast<std::ptrdiff_t>(kCullViewStride),
-            views.end());
-        for (std::size_t v = 1; v < params.Views(); ++v) {
-            views.insert(views.end(), block.begin(), block.end());
+        // With poses on the GPU, it writes each view's planes and
+        // matrix (`RecordViewPoses`); the rest of a block is the
+        // camera's, the same for every view: the first view's,
+        // copied. With host poses each view's own.
+        for (std::size_t v = 0; v < params.Views(); ++v) {
+            if (params.posesOnGpu && v > 0) {
+                const std::vector<glm::vec4> block(
+                    views.begin(),
+                    views.begin() +
+                        static_cast<std::ptrdiff_t>(kCullViewStride));
+                views.insert(views.end(), block.begin(), block.end());
+                continue;
+            }
+            const glm::mat4 viewProjection =
+                params.View(v).ViewProjection();
+            const float perUnit =
+                glm::length(glm::vec3(viewProjection[0][1],
+                                      viewProjection[1][1],
+                                      viewProjection[2][1])) *
+                0.5f * static_cast<float>(params.camera.height);
+            pushView(Frustum::FromMatrix(viewProjection),
+                     viewProjection, perUnit,
+                     occlusion_ != Occlusion::Off);
         }
     }
     if (!reuse) {
@@ -3121,6 +3156,22 @@ void MeshDrawable::Cull(const FrameParams& params,
                 addRecords(job.range[0], visible, job.range[2]);
                 visible += job.range[2] * cullDrawCounts_[j];
                 draws += cullDrawCounts_[j];
+            }
+        }
+        // The views' occluders after their own jobs, which the depth
+        // pyramid's tests run over (`RecordOcclusionCull`).
+        const auto firstOccluder =
+            static_cast<std::int32_t>(jobs.size());
+        jobs.insert(jobs.end(), occluderJobs.begin(),
+                    occluderJobs.end());
+        cullDrawCounts_.insert(cullDrawCounts_.end(),
+                               occluderDrawCounts.begin(),
+                               occluderDrawCounts.end());
+        for (std::vector<VisibleRange>& ranges : viewDraws_) {
+            for (VisibleRange& range : ranges) {
+                if (range.job <= -2) {
+                    range.job = firstOccluder + (-2 - range.job);
+                }
             }
         }
         viewLayout_.valid = cacheable;
@@ -3786,16 +3837,19 @@ std::size_t MeshDrawable::Record(
             continue;
         }
         if (visible.job >= 0) {
-            if (culledSet < 0) {
+            // Occluders draw with the direct draws, their only set;
+            // other jobs in their culled set's phase.
+            if (visible.occluder ? !direct : culledSet < 0) {
                 continue;
             }
+            const int set = visible.occluder ? 0 : culledSet;
             const GpuCullJob& job =
                 cullJobs_[static_cast<std::size_t>(visible.job)];
             const std::uint32_t levels =
                 cullDrawCounts_[static_cast<std::size_t>(
                     visible.job)];
             const std::uint32_t firstDraw =
-                culledSet == 0 ? job.output[1] : job.output[3];
+                set == 0 ? job.output[1] : job.output[3];
             // Shadow batches span materials, except cutout ones,
             // which bind their own to test their opacity.
             const bool sameMaterial =

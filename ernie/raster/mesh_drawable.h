@@ -792,6 +792,10 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t range = 0;
         std::int32_t job = -1;  ///< Its GPU culling job, or -1 to
                                 ///< draw every instance.
+        /// A plain mesh's job under occlusion culling: tested against
+        /// the frustum alone and drawn with the occluders, which the
+        /// depth pyramid is built from.
+        bool occluder = false;
     };
     /// World bounds of draw `item`'s instances in `range`; none to
     /// draw it whatever the view.
