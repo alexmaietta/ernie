@@ -7,6 +7,7 @@
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/profiler.h"
 
@@ -957,6 +958,28 @@ TEST_F(ViewerTest,
     EXPECT_EQ(viewer_->Settings(), Path("/Render/Settings"));
     viewer_->SetSettings(Viewer::SessionSettings());
     EXPECT_EQ(viewer_->Settings(), Viewer::SessionSettings());
+}
+
+TEST_F(ViewerTest, PlaysTheTimelineBeforeTheFrameCallbacks) {
+    Stage(scene_).SetStartTimeCode(0.0).SetEndTimeCode(48.0);
+    Timeline& timeline = viewer_->GetTimeline();
+    timeline.SetPlayEveryFrame(true);
+    std::vector<double> seen;
+    viewer_->OnFrame([&seen](Viewer&, const FrameInfo& info) {
+        seen.push_back(info.timeCode);
+    });
+    EXPECT_TRUE(viewer_->Step());
+    timeline.Play();
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_TRUE(viewer_->Step());
+    ASSERT_EQ(seen.size(), 3u);
+    EXPECT_EQ(seen[0], 0.0) << "held while paused";
+    EXPECT_EQ(seen[1], 1.0) << "a frame a step";
+    EXPECT_EQ(seen[2], 2.0);
+    EXPECT_EQ(Stage(scene_).GetTimeCode(), 2.0);
+    timeline.Stop(scene_);
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_EQ(Stage(scene_).GetTimeCode(), 0.0);
 }
 
 TEST_F(ViewerTest, HidesItsViewportUi) {

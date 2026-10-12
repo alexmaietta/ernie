@@ -328,9 +328,14 @@ void SetBetween(InstanceParent& parent, const glm::dmat4& between) {
     parent.scale = glm::vec3(scale);
 }
 
-/// Whether `change` is to a camera or render prim, which the frame
-/// resolves anew anyway.
+/// Whether `change` is to a camera or render prim, or to the stage's
+/// metadata, which the frame resolves anew anyway.
 bool IsViewChange(const Scene& scene, const Change& change) {
+    // The stage's metadata on the root, such as the time code a
+    // timeline plays every frame: read each frame, or not at all.
+    if (change.path.IsRoot()) {
+        return true;
+    }
     if (Any(change.bits, Dirty::Removed) || !scene.Has(change.path)) {
         return false;
     }

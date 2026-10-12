@@ -4,6 +4,7 @@
 #include "ernie/app/file_dialog.h"
 #include "ernie/app/panel.h"
 #include "ernie/app/theme.h"
+#include "ernie/app/timeline.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/scene/edit_history.h"
 #include "ernie/scene/path.h"
@@ -142,6 +143,12 @@ struct FrameInfo {
     std::uint64_t frame = 0;  ///< Frames drawn before this one.
     double time = 0.0;        ///< Seconds since the viewer opened.
     double delta = 0.0;       ///< Seconds since the previous frame.
+    /// The time code the timeline put the animation at for this frame
+    /// (`Stage::GetTimeCode`).
+    double timeCode = 0.0;
+    /// Seconds of animation the timeline advanced for this frame: 0
+    /// while paused, a frame's while playing every frame.
+    double timeStep = 0.0;
 };
 
 /// An interactive window onto an Ernie `Scene`: a docked viewport
@@ -535,6 +542,14 @@ class Viewer {
     /// Advances the sensor clock by `seconds` at the next frame,
     /// paused or not, as a single step does.
     void StepClock(double seconds);
+
+    /// The animation's timeline (the Timeline panel, Space to play
+    /// and pause), which each frame advances before the frame
+    /// callbacks run (`FrameInfo::timeCode`). While it plays every
+    /// frame, the sensor clock advances a frame's seconds a frame
+    /// too, so sensors keep pace with the animation.
+    Timeline& GetTimeline();
+    const Timeline& GetTimeline() const;
 
     /// How the viewport exposes its image: `Auto` keys the scene's
     /// metered average luminance to middle grey (adapting over a

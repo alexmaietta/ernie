@@ -521,6 +521,7 @@ struct Viewer::State {
     Lighting lighting = Lighting::Stage;
     bool clockPaused = false;  ///< See `SetClockPaused`.
     double clockStep = 0.0;    ///< See `StepClock`.
+    Timeline timeline;         ///< See `GetTimeline`.
     std::optional<Wireframe> wireframe;
     /// The renderer menu's minimal shading over the settings':
     /// texturedDiffuse for "Raster - Minimal", off for "Raster"; none
@@ -1435,7 +1436,23 @@ struct Viewer::State {
             return;
         }
         const ImVec2 origin = ImGui::GetCursorScreenPos();
-        const ImVec2 size = ImGui::GetContentRegionAvail();
+        // The timeline, while shown, takes a strip along the bottom:
+        // inside the viewport's window rather than a dock of its own,
+        // so the docks around keep resizing freely.
+        Panel* timelinePanel = nullptr;
+        for (const auto& panel : panels) {
+            if (panel->GetDock() == Dock::Timeline &&
+                panel->IsVisible() && display.ui) {
+                timelinePanel = panel.get();
+            }
+        }
+        const float strip =
+            timelinePanel != nullptr
+                ? ImGui::GetFrameHeight() +
+                      2.0f * ImGui::GetStyle().WindowPadding.y
+                : 0.0f;
+        ImVec2 size = ImGui::GetContentRegionAvail();
+        size.y = std::max(size.y - strip, 1.0f);
         // The render's size: the panel's or the chosen resolution,
         // scaled.
         const float baseWidth =
@@ -1553,6 +1570,21 @@ struct Viewer::State {
                 origin.y + size.y - 2.0f * ImGui::GetFrameHeight()));
             ImGui::TextColored(ToImVec4(theme.error), "%s",
                                renderError.c_str());
+        }
+        if (timelinePanel != nullptr) {
+            ImGui::SetCursorScreenPos(
+                ImVec2(origin.x, origin.y + size.y));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                                  ToImVec4(theme.panel));
+            if (ImGui::BeginChild(
+                    "##timeline", ImVec2(size.x, strip),
+                    ImGuiChildFlags_AlwaysUseWindowPadding,
+                    ImGuiWindowFlags_NoScrollbar |
+                        ImGuiWindowFlags_NoScrollWithMouse)) {
+                timelinePanel->Draw(self);
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleColor();
         }
         ImGui::End();
     }
@@ -2049,6 +2081,13 @@ struct Viewer::State {
             if (!io.KeyAlt &&
                 ImGui::IsKeyPressed(ImGuiKey_H, false)) {
                 display.ui = !display.ui;
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+                if (timeline.IsPlaying()) {
+                    timeline.Pause();
+                } else {
+                    timeline.Play();
+                }
             }
             const std::pair<ImGuiKey, Viewer::Gizmo> gizmoKeys[] = {
                 {ImGuiKey_Q, Viewer::Gizmo::None},
@@ -3100,6 +3139,7 @@ struct Viewer::State {
                               "line"},
                         {"H", "Hide or show the viewport's toolbar, "
                               "menus, heads-up display and gizmos"},
+                        {"Space", "Play or pause the timeline"},
                         {"Del", "Delete the selection"},
                         {"Ctrl+D", "Duplicate the selection"},
                         {"F2", "Rename the selected prim (Stage)"},
@@ -3140,7 +3180,10 @@ struct Viewer::State {
     void DrawPanels() {
         for (std::size_t i = 0; i < panels.size(); ++i) {
             Panel& panel = *panels[i];
-            if (!panel.IsVisible()) {
+            // The timeline draws in the viewport's window
+            // (`DrawViewport`).
+            if (!panel.IsVisible() ||
+                panel.GetDock() == Dock::Timeline) {
                 continue;
             }
             const auto node = dockNodes.find(panel.GetDock());
@@ -3278,10 +3321,14 @@ struct Viewer::State {
                                      : viewVar);
             // The sensor clock runs with the viewer, a frame's
             // seconds a frame, unless paused, plus any step asked
-            // for.
-            delegate->AdvanceTime(
-                (clockPaused ? 0.0 : std::max(frameInfo.delta, 0.0)) +
-                std::exchange(clockStep, 0.0));
+            // for; with the timeline playing every frame, its frame's
+            // seconds, so sensors keep pace with the animation.
+            const double seconds =
+                timeline.PlaysEveryFrame() && frameInfo.timeStep > 0.0
+                    ? frameInfo.timeStep
+                    : std::max(frameInfo.delta, 0.0);
+            delegate->AdvanceTime((clockPaused ? 0.0 : seconds) +
+                                  std::exchange(clockStep, 0.0));
             delegate->Update(scene, SessionSettingsPath(),
                              viewport->Extent());
             const RenderingTarget target =
@@ -3600,6 +3647,9 @@ bool Viewer::State::Step() {
     info.time = std::chrono::duration<double>(now - start).count();
     info.delta = std::chrono::duration<double>(now - last).count();
     last = now;
+    // The animation moves on before the callbacks see the frame.
+    info.timeStep = timeline.Advance(scene, info.delta);
+    info.timeCode = Timeline::TimeCode(scene);
     frameInfo = info;
     RunCallbacks(Stage::Frame, info);
     if (!open) {
@@ -3716,6 +3766,7 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.panels.push_back(MakeLogPanel());
     s.panels.push_back(std::make_unique<InfoPanel>());
     s.panels.push_back(std::make_unique<OverlaysPanel>());
+    s.panels.push_back(MakeTimelinePanel());
     s.panels.push_back(MakeProfilerPanel());
     s.profilerPanel = s.panels.back().get();
     s.builtInPanels = s.panels.size();
@@ -4469,6 +4520,14 @@ void Viewer::SetClockPaused(bool paused) {
 
 void Viewer::StepClock(double seconds) {
     state_->clockStep += std::max(seconds, 0.0);
+}
+
+Timeline& Viewer::GetTimeline() {
+    return state_->timeline;
+}
+
+const Timeline& Viewer::GetTimeline() const {
+    return state_->timeline;
 }
 
 std::optional<Wireframe> Viewer::GetWireframe() const {

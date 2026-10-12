@@ -39,4 +39,11 @@ std::unique_ptr<Panel> MakeLogPanel();
 /// totals, after Omniverse Kit's profiler window.
 std::unique_ptr<Panel> MakeProfilerPanel();
 
+/// The Timeline panel, a strip under the viewport after Kit's
+/// timeline: the stage's start time code, a ruler to scrub across its
+/// range, its end, the current time code, the transport (first frame,
+/// a frame back, play or pause, stop, a frame on, last frame), loop,
+/// and a menu of the frame rate and playing every frame.
+std::unique_ptr<Panel> MakeTimelinePanel();
+
 }  // namespace ernie::app

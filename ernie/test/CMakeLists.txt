@@ -205,6 +205,7 @@ if(TARGET ernie_app)
         app_prim_schemas_test.cpp
         app_session_test.cpp
         app_theme_test.cpp
+        app_timeline_test.cpp
         LIBRARIES
         ernie_app
         ernie_stb)

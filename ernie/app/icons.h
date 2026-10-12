@@ -41,6 +41,16 @@ inline constexpr const char* kArrowUp = "\xee\x81\x8a";    ///< U+E04A
 inline constexpr const char* kHome = "\xee\x83\xb5";       ///< U+E0F5
 inline constexpr const char* kHardDrive = "\xee\x83\xad";  ///< U+E0ED
 inline constexpr const char* kHistory = "\xee\x87\xb5";    ///< U+E1F5
+inline constexpr const char* kPlay = "\xee\x84\xbc";       ///< U+E13C
+inline constexpr const char* kPause = "\xee\x84\xae";      ///< U+E12E
+inline constexpr const char* kSquare = "\xee\x85\xa7";     ///< U+E167
+inline constexpr const char* kSkipBack = "\xee\x85\x9f";   ///< U+E15F
+inline constexpr const char* kSkipForward =
+    "\xee\x85\xa0";                                       ///< U+E160
+inline constexpr const char* kStepBack = "\xee\x8f\xa9";  ///< U+E3E9
+inline constexpr const char* kStepForward =
+    "\xee\x8f\xaa";                                     ///< U+E3EA
+inline constexpr const char* kRepeat = "\xee\x85\x86";  ///< U+E146
 
 /// First and last codepoints of the icon font, for loading its
 /// glyphs.

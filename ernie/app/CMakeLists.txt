@@ -20,6 +20,8 @@ ernie_add_library(
     settings_panel.cpp
     stage_panel.cpp
     theme.cpp
+    timeline.cpp
+    timeline_panel.cpp
     viewer.cpp
     PUBLIC
     ernie_backends

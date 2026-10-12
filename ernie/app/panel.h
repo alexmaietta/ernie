@@ -21,6 +21,8 @@ enum class Dock {
     Bottom,
     Floating,    ///< Not docked: a free window.
     RightLower,  ///< The right column's lower part, below `Right`.
+    Timeline,    ///< A strip along the bottom of the viewport's own
+                 ///< window, as Kit's timeline; no dock of its own.
 };
 
 /// A dockable window of the viewer. Subclasses draw with Dear ImGui

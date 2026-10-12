@@ -29,6 +29,7 @@ using app::Lighting;
 using app::LogEntry;
 using app::LogLevel;
 using app::Theme;
+using app::Timeline;
 using app::Viewer;
 using app::ViewerOptions;
 using app::WidgetPanel;
@@ -99,6 +100,8 @@ void BindApp(nb::module_& parent) {
         .value("BOTTOM", app::Dock::Bottom)
         .value("RIGHT_LOWER", app::Dock::RightLower,
                "The right column's lower part.")
+        .value("TIMELINE", app::Dock::Timeline,
+               "A strip under the viewport, as the timeline's.")
         .value("FLOATING", app::Dock::Floating,
                "Not docked: a free window.");
 
@@ -180,7 +183,12 @@ void BindApp(nb::module_& parent) {
         .def_ro("time", &FrameInfo::time,
                 "Seconds since the viewer opened.")
         .def_ro("delta", &FrameInfo::delta,
-                "Seconds since the previous frame.");
+                "Seconds since the previous frame.")
+        .def_ro("time_code", &FrameInfo::timeCode,
+                "The time code the timeline put the animation at.")
+        .def_ro("time_step", &FrameInfo::timeStep,
+                "Seconds of animation the timeline advanced: 0 while "
+                "paused, a frame's while playing every frame.");
 
     using app::ViewportDisplay;
     nb::class_<ViewportDisplay>(
@@ -643,6 +651,62 @@ void BindApp(nb::module_& parent) {
         .def("step_clock", &Viewer::StepClock, nb::arg("seconds"),
              "Advances the sensor clock by `seconds` at the next "
              "frame, paused or not.")
+        .def(
+            "play", [](Viewer& v) { v.GetTimeline().Play(); },
+            "Plays the timeline: each frame advances the stage's "
+            "time code, before the on_frame callbacks.")
+        .def(
+            "pause", [](Viewer& v) { v.GetTimeline().Pause(); },
+            "Pauses the timeline where it is.")
+        .def(
+            "stop",
+            [](Viewer& v) { v.GetTimeline().Stop(v.GetScene()); },
+            "Pauses the timeline, back at its range's start.")
+        .def_prop_ro(
+            "playing",
+            [](const Viewer& v) {
+                return v.GetTimeline().IsPlaying();
+            },
+            "Whether the timeline is playing.")
+        .def_prop_rw(
+            "looping",
+            [](const Viewer& v) {
+                return v.GetTimeline().IsLooping();
+            },
+            [](Viewer& v, bool on) {
+                v.GetTimeline().SetLooping(on);
+            },
+            "Whether playing past the range's end starts over at its "
+            "start; otherwise it stops there. On by default.")
+        .def_prop_rw(
+            "play_every_frame",
+            [](const Viewer& v) {
+                return v.GetTimeline().PlaysEveryFrame();
+            },
+            [](Viewer& v, bool on) {
+                v.GetTimeline().SetPlayEveryFrame(on);
+            },
+            "Whether playing advances a frame each step however long "
+            "it took (and the sensor clock a frame's seconds), "
+            "rather than real time.")
+        .def_prop_rw(
+            "time_code",
+            [](Viewer& v) {
+                return Timeline::TimeCode(v.GetScene());
+            },
+            [](Viewer& v, double timeCode) {
+                v.GetTimeline().Seek(v.GetScene(), timeCode);
+            },
+            "The stage's time code, which the timeline plays.")
+        .def(
+            "step_frames",
+            [](Viewer& v, int frames) {
+                v.GetTimeline().StepFrames(v.GetScene(), frames);
+            },
+            nb::arg("frames") = 1,
+            "Pauses the timeline and moves it `frames` frames on "
+            "(back "
+            "for negative), within its range.")
         .def_prop_rw("exposure", &Viewer::GetExposure,
                      &Viewer::SetExposure)
         .def_prop_rw("exposure_compensation",
