@@ -9,6 +9,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/session/resolve.h"
 #include "ernie/util/regolith.h"
 #include "ernie/util/texture_bake.h"
 #include "support/delegate_scenes.h"
@@ -726,8 +727,10 @@ void ExpectVirtualAlbedoLoadsTheTilesInView(
             << "value " << i;
     }
     // At 48 pixels the quad asks for no finer mip than the tail's.
-    // Closer and at 256 pixels it asks for finer ones, whose tiles
-    // load over the next frames.
+    // Closer and at 256 pixels it asks for finer ones, whose tiles a
+    // step's frame (complete, by default) waits for: the first frame
+    // close up has them.
+    const std::uint64_t before = delegate.Stats().gpuBytes;
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetResolution(glm::dvec2(256.0));
     ernie::RenderProduct(scene, "/Render/Out")
@@ -736,11 +739,7 @@ void ExpectVirtualAlbedoLoadsTheTilesInView(
               ernie::LookAtTransform({0.0, 0.0, 20.0},
                                      {0.0, 0.0, 0.0},
                                      {0.0, 1.0, 0.0}));
-    Render(delegate, scene, "HdrColor");
-    const std::uint64_t before = delegate.Stats().gpuBytes;
-    for (int frame = 0; frame < 4; ++frame) {
-        Render(delegate, scene, "HdrColor");
-    }
+    const Tensor close = Render(delegate, scene, "HdrColor");
     // Sparse images grow as tiles bind; pages are allocated up front.
     if (context.SupportsSparseResidency()) {
         EXPECT_GT(delegate.Stats().gpuBytes, before)
@@ -750,7 +749,6 @@ void ExpectVirtualAlbedoLoadsTheTilesInView(
     // Close up the picture is the whole texture's, but for filtering
     // differences at the quadrants' edges (the paged path filters
     // isotropically).
-    const Tensor close = Render(delegate, scene, "HdrColor");
     scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
               std::string("off"));
     const Tensor full = Render(whole, scene, "HdrColor");
@@ -958,6 +956,92 @@ TEST_F(RasterDelegateTest, ImageFilesUploadAsBc7KeptBetweenRuns) {
             std::vector<std::uint8_t>(kSide * kSide * 4, 0),
             {kSide, kSide, 4}));
     const std::vector<float> black = quadrants(twin).first;
+    for (std::size_t i = 0; i < cached.size(); ++i) {
+        EXPECT_NEAR(cached[i], black[i], 1e-3f) << "value " << i;
+    }
+    UnsetEnv("ERNIE_TEXTURE_CACHE");
+    std::filesystem::remove_all(cache);
+}
+
+TEST_F(RasterDelegateTest,
+       LargeImageFilesReadAsVirtualTexturesOfTheirCache) {
+    // An orange 8448 x 64 PNG albedo, wider than kVirtualTextureSide:
+    // prepared in 8 bits, compressed to BC7 into the texture cache
+    // and read from there as a virtual texture, rendering as its
+    // tensor twin does. A second delegate maps the cached file
+    // straight away: replaced there by black, it renders as a black
+    // tensor does.
+    if (!context_->SupportsTextureCompressionBc()) {
+        GTEST_SKIP() << "The device cannot sample BC7";
+    }
+    const std::filesystem::path cache =
+        std::filesystem::path(::testing::TempDir()) / "large_cache";
+    std::filesystem::remove_all(cache);
+    SetEnv("ERNIE_TEXTURE_CACHE", cache.string().c_str());
+    constexpr int kWidth = 8448;
+    constexpr int kHeight = 64;
+    std::vector<std::uint8_t> texels;
+    for (int i = 0; i < kWidth * kHeight; ++i) {
+        texels.insert(texels.end(), {230, 120, 20, 255});
+    }
+    const std::string png = ::testing::TempDir() + "large_orange.png";
+    ASSERT_NE(stbi_write_png(png.c_str(), kWidth, kHeight, 4,
+                             texels.data(), kWidth * 4),
+              0);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    // Three frames each, for the tiles in view to load.
+    const auto render = [&](RasterDelegate& delegate) {
+        std::vector<float> rgb;
+        for (int frame = 0; frame < 3; ++frame) {
+            rgb = Quadrants(delegate, scene);
+        }
+        return rgb;
+    };
+    const auto twin = [&](std::vector<std::uint8_t> bytes) {
+        RasterDelegate delegate(*context_);
+        ernie::Shader(scene, "/Looks/M/Tex")
+            .SetTexture(Tensor::Copy<std::uint8_t>(
+                bytes, {kHeight, kWidth, 4}));
+        std::vector<float> rgb = render(delegate);
+        scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+        return rgb;
+    };
+    const std::vector<float> orange = twin(texels);
+    const std::vector<float> black =
+        twin(std::vector<std::uint8_t>(texels.size(), 0));
+    ASSERT_GT(orange[0], black[0] + 0.1f);
+
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(png);
+    RasterDelegate first(*context_);
+    const std::vector<float> loaded = render(first);
+    for (std::size_t i = 0; i < loaded.size(); ++i) {
+        EXPECT_NEAR(loaded[i], orange[i], 0.03f * orange[i] + 1e-3f)
+            << "value " << i;
+    }
+    std::vector<std::filesystem::path> entries;
+    for (const auto& entry :
+         std::filesystem::directory_iterator(cache)) {
+        entries.push_back(entry.path());
+    }
+    ASSERT_EQ(entries.size(), 1u);
+    const ernie::TextureData stored =
+        ernie::LoadTextureFile(entries[0]);
+    // Plain BC7: the scene reads its textures raw.
+    EXPECT_EQ(stored.format, ernie::TextureFormat::Bc7);
+    EXPECT_EQ(stored.width, static_cast<std::uint32_t>(kWidth));
+
+    ernie::WriteDdsFile(
+        entries[0],
+        ernie::EncodeTexture(
+            ernie::MipChain(
+                ernie::Image(kWidth, kHeight, glm::vec4(0, 0, 0, 1)),
+                ernie::MipFilter::Average),
+            ernie::TextureFormat::Bc7Srgb,
+            ernie::ImageEncoding::Srgb));
+    RasterDelegate second(*context_);
+    const std::vector<float> cached = render(second);
     for (std::size_t i = 0; i < cached.size(); ++i) {
         EXPECT_NEAR(cached[i], black[i], 1e-3f) << "value " << i;
     }
@@ -1202,8 +1286,8 @@ TEST_F(RasterDelegateTest, TemperatureModelsFollowTheSunlight) {
     // The quad lit by the Sun's 1361 W/m^2 (about 1347 of it from 250
     // to 4000 nm): zero-capacitance balance, black, at (E cos i /
     // sigma)^(1/4), 393 K facing it and 330 K at 60 degrees; the grey
-    // material's own absorptivity and emissivity, alike, the same; two
-    // faces radiating, 2^(1/4) colder; the prim's own temperature
+    // material's own absorptivity and emissivity, alike, the same;
+    // two faces radiating, 2^(1/4) colder; the prim's own temperature
     // first. Then the Moon's diurnal table at noon and 3 pm.
     Scene scene = TexturedScene();
     const Path var("/Render/Vars/Temperature");
@@ -1225,8 +1309,9 @@ TEST_F(RasterDelegateTest, TemperatureModelsFollowTheSunlight) {
         return kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2];
     };
     const auto sun = [&](glm::dvec3 towards) {
-        scene.Set("/World/Sun", tokens::kTransform,
-                  ernie::DistantLightTransform(glm::normalize(towards)));
+        scene.Set(
+            "/World/Sun", tokens::kTransform,
+            ernie::DistantLightTransform(glm::normalize(towards)));
     };
     // Nearly overhead (exactly, the light's cascades lose it).
     const glm::dvec3 overhead{0.0, 0.05, 1.0};
@@ -1286,8 +1371,80 @@ public struct Warm : ITemperatureModel {
 )";
     delegate.AddTemperatureModel(warm);
     const Tensor kelvin = Render(delegate, scene, "Temperature");
-    EXPECT_EQ(kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2], 207.0f);
+    EXPECT_EQ(kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2],
+              207.0f);
     warm.id = "broken";
     warm.slang = "import temperature_model;\nstruct Warm { oops }";
-    EXPECT_THROW(delegate.AddTemperatureModel(warm), std::invalid_argument);
+    EXPECT_THROW(delegate.AddTemperatureModel(warm),
+                 std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest,
+       ThermalTerminalsSetTheMaterialsThermalProperties) {
+    // The Material at 250 K of its own, its outputs:ernie:thermal an
+    // ErnieThermal node at 320 K in its place; then the node's
+    // temperature a 1 x 2 texture's red channel of 0.3 and 0.5 scaled
+    // by 1000 and offset by 10: 310 and 510 K at the texels' centres.
+    // Its emissivity and model replace the Material's; another node
+    // type is refused.
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    ernie::Material(scene, "/Looks/M").SetThermalTemperature(250.0);
+    const Path node("/Looks/M/Thermal");
+    ernie::Shader::Define(scene, node)
+        .SetInfoId(std::string(tokens::kErnieThermal))
+        .SetThermalTemperature(320.0)
+        .SetThermalEmissivity(0.5)
+        .SetThermalModel("balance")
+        .SetThermalModelParams({0.2f});
+    ernie::Connect(scene, "/Looks/M", tokens::kThermalOutput, node,
+                   "outputs:out");
+    RasterDelegate delegate(*context_);
+    const auto at = [&](float x) {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        const glm::vec4 clip =
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
+                                  kSize)
+                .RasterView()
+                .ViewProjection() *
+            glm::vec4(x, 0.0f, 0.0f, 1.0f);
+        const auto col = static_cast<std::size_t>(
+            (clip.x / clip.w * 0.5f + 0.5f) * kSize);
+        return kelvin.As<float>()[(kSize / 2) * kSize + col];
+    };
+    const ernie::MaterialSettings settings =
+        ernie::MaterialSettingsOf(
+            scene, "/Looks/M", ernie::BrdfRegistry::WithBuiltins());
+    EXPECT_EQ(settings.temperature, 320.0f);
+    EXPECT_NEAR(settings.emissivity(10000.0), 0.5, 1e-6);
+    EXPECT_EQ(settings.temperatureModel, "balance");
+    EXPECT_EQ(settings.temperatureModelParams,
+              std::vector<float>{0.2f});
+    ernie::Shader(scene, node).SetThermalModel("");
+    EXPECT_EQ(at(0.0f), 320.0f) << "the node's, not the Material's";
+
+    const Path heat("/Looks/M/Heat");
+    ernie::Shader::Define(scene, heat)
+        .SetInfoId(std::string(tokens::kUsdUVTexture))
+        .SetBias(glm::dvec4(10.0));
+    scene.Set(heat, tokens::kShaderScale, glm::dvec4(1000.0));
+    const std::array<float, 2> texels{0.3f, 0.5f};
+    scene.Write(heat, tokens::kShaderTexture,
+                Tensor::Copy<float>(texels, {1, 2, 1}));
+    ernie::Connect(scene, "/Looks/M/Heat", tokens::kSt, "/Looks/M/St",
+                   "outputs:result");
+    ernie::Connect(scene, node, tokens::kThermalTemperatureInput,
+                   heat, "outputs:r");
+    EXPECT_NEAR(at(-6.0f), 310.0f, 0.5f);
+    EXPECT_NEAR(at(6.0f), 510.0f, 0.5f);
+
+    ernie::Shader(scene, node)
+        .SetInfoId(std::string(tokens::kUsdPreviewSurface));
+    EXPECT_THROW(Render(delegate, scene, "Temperature"),
+                 std::invalid_argument);
 }

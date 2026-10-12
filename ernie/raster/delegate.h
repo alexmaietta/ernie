@@ -283,6 +283,9 @@ class RasterDelegate : public RenderDelegate {
         std::optional<Key> detailAlbedo;
         std::optional<Key> detailNormal;
         std::optional<Key> temperatureTexture;
+        /// Its thermal terminal's temperature texture (`TextureKey`),
+        /// empty for none.
+        std::string temperatureReader;
         /// What the albedo texture, normal map, roughness, metallic
         /// and opacity textures were loaded from (`TextureKey`).
         std::array<std::string, 5> textures;
@@ -299,6 +302,10 @@ class RasterDelegate : public RenderDelegate {
     struct LoadedTexture {
         PreparedTexture prepared;
         bool cached = false;
+        /// A large albedo (`IsLargeImageFile`), prepared in 8 bits,
+        /// read with `reader` as a virtual texture.
+        bool large = false;
+        TextureReader reader;
     };
 
     struct SyncedMesh {
@@ -447,10 +454,12 @@ class RasterDelegate : public RenderDelegate {
     BlockEncoder* Encoder();
     /// Uploads an image file's `prepared` texture, uploaded under
     /// `key` (`UploadKey`): compressed to BC7 (`Encoder`) and kept in
-    /// `textureCache_` unless it came from there (`cached`).
+    /// `textureCache_` unless it came from there (`cached`). A large
+    /// albedo (`large`, its reader) reads as a virtual texture of the
+    /// cached file, mapped.
     std::shared_ptr<const MaterialTexture>
     UploadPrepared(PreparedTexture prepared, const std::string& key,
-                   bool cached);
+                   bool cached, const TextureReader* large = nullptr);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -621,6 +630,15 @@ class RasterDelegate : public RenderDelegate {
     bool viewportFrame_ = false;
     /// Inside the frame `StepAsync` meters before exposing.
     bool metering_ = false;
+    /// Inside the frames `StepAsync` renders so that virtual textures
+    /// hold every tile a frame waiting for its textures samples, and
+    /// the scene (id, version) they last did so for.
+    bool settling_ = false;
+    std::pair<std::uint64_t, std::uint64_t> settledVersion_{~0ull,
+                                                            ~0ull};
+    /// Those frames at most: each serves what the last asked for,
+    /// usually finer tiles than the one before.
+    static constexpr int kSettlingPasses = 8;
     /// The span of the sensor clock the frames being prepared cover
     /// (`FrameParams::time`).
     TimeWindow window_;
@@ -711,7 +729,8 @@ class RasterDelegate : public RenderDelegate {
     /// Decodes and mips image files (`loadingTextures_`); after the
     /// cache its jobs read, so it stops first.
     WorkerPool textureLoaders_{
-        std::clamp(std::thread::hardware_concurrency(), 1u, 6u)};
+        std::clamp(std::thread::hardware_concurrency(), 1u, 6u),
+        "Texture loader"};
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;

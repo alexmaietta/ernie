@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <span>
@@ -83,6 +84,19 @@ struct PreparedTexture {
 /// already compressed are left as they are.
 void CompressPreparedTexture(BlockEncoder& encoder,
                              PreparedTexture& prepared);
+
+/// Whether `file` is an 8-bit PNG or JPEG with a side over
+/// `kVirtualTextureSide`, which albedo reads as a virtual texture:
+/// prepared in 8 bits (`PrepareLargeAlbedo`), since as floats a
+/// 21600 x 10800 Earth would be 3.7 GB.
+bool IsLargeImageFile(const std::filesystem::path& file);
+
+/// The albedo of such a file as `PrepareMaterialTexture` would make
+/// it, in 8 bits throughout (`LoadRgba8Mips`): sRGB, or the bytes as
+/// linear values (UNORM) when `reader` reads it raw.
+/// @throws std::runtime_error if it cannot be read.
+PreparedTexture PrepareLargeAlbedo(const std::filesystem::path& file,
+                                   const TextureReader& reader);
 
 /// `prepared` as a DDS file stores it (`TextureCache`).
 TextureData StoredOf(const PreparedTexture& prepared);
@@ -267,6 +281,14 @@ class RasterMaterial {
     /// for (`VirtualTexture::BeginFrame`) and points the uniform at
     /// the slot's request flags. Nothing without virtual textures.
     void BeginFrame(std::uint32_t slot, std::uint64_t frame);
+
+    /// Whether it reads a virtual texture.
+    bool HasVirtualTexture() const;
+
+    /// Serves at once every tile its virtual texture's last frame in
+    /// slot `slot` (finished) asked for (`VirtualTexture::Settle`);
+    /// returns whether that frame was missing any.
+    bool SettleVirtualTexture(std::uint32_t slot);
 
     /// The settings of the last `Update`.
     const MaterialSettings& Settings() const {

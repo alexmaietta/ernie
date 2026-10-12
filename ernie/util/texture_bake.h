@@ -71,6 +71,22 @@ TextureData EncodeTexture(std::span<const Image> mips,
 void WriteDdsFile(const std::filesystem::path& path,
                   const TextureData& texture);
 
+/// The width and height of an 8-bit PNG or JPEG, read from its
+/// header; none for any other file (16-bit, another format,
+/// unreadable).
+std::optional<glm::uvec2>
+Rgba8ImageSize(const std::filesystem::path& file);
+
+/// An 8-bit PNG or JPEG decoded as RGBA8 (rows top to bottom) and its
+/// mips down to 1 x 1, each the 2 x 2 average of the last, with
+/// `srgb` its rgb averaged as linear values: in 8 bits throughout,
+/// for images too large for floats (a 21600 x 10800 Earth is 3.7 GB
+/// of them, its RGBA8 mips 1.2 GB). Full size first.
+/// @throws std::runtime_error if it cannot be read, or is not an
+/// 8-bit PNG or JPEG.
+std::vector<std::vector<std::uint8_t>>
+LoadRgba8Mips(const std::filesystem::path& file, bool srgb);
+
 /// Bakes the PNG, JPEG or EXR image `input` into a DDS file `output`
 /// for Ernie's textures: every mip down to 1 x 1, filtered as its
 /// role says before compression, stored as `options` says; what

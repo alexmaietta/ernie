@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/image.h"
 
+#include "ernie/util/profile.h"
+
 #include <ImfChannelList.h>
 #include <ImfFrameBuffer.h>
 #include <ImfHeader.h>
@@ -189,6 +191,7 @@ void WriteExr(const std::filesystem::path& path,
 
 Image LoadImageFile(const std::filesystem::path& path,
                     ImageEncoding encoding) {
+    ERNIE_ZONE("Decode image");
     const std::string extension =
         Lowercase(path.extension().string());
     if (extension == ".exr") {
@@ -256,6 +259,7 @@ glm::vec4 FilterSlopes(const std::array<glm::vec4, 4>& texels) {
 }  // namespace
 
 std::vector<Image> MipChain(const Image& image, MipFilter filter) {
+    ERNIE_ZONE("Mip chain");
     std::vector<Image> levels{image};
     if (filter == MipFilter::NormalSlopes) {
         for (glm::vec4& texel : levels.back().pixels) {
@@ -302,6 +306,7 @@ std::vector<Image> MipChain(const Image& image, MipFilter filter) {
 
 std::vector<std::uint8_t> ToRgba8(const Image& image,
                                   ImageEncoding encoding) {
+    ERNIE_ZONE("Quantise to RGBA8");
     std::vector<std::uint8_t> bytes(image.pixels.size() * 4);
     auto quantise = [](float value) {
         return static_cast<std::uint8_t>(

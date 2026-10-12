@@ -81,6 +81,14 @@ class VirtualTexture {
     /// frame, whatever its slot.
     void BeginFrame(std::uint32_t slot, std::uint64_t frame);
 
+    /// Serves every request of slot `slot`'s last frame, which has
+    /// finished, at once rather than `kTilesPerFrame` a frame (as far
+    /// as the budget allows), and brings every slot's map up to date:
+    /// so that a frame drawn next finds every tile that one asked for
+    /// (`ernie:textureLoading` complete). Returns whether it loaded
+    /// any tile, i.e. whether that frame was missing some.
+    bool Settle(std::uint32_t slot);
+
     /// Marks `tile` (and its coarser ancestors) wanted, as a shader's
     /// request would; served by the next `BeginFrame`.
     void Request(const SparseTile& tile);
@@ -147,6 +155,13 @@ class VirtualTexture {
     /// edges).
     std::vector<std::byte> TileData(const SparseTile& tile) const;
     void Want(const SparseTile& tile);
+    /// Takes the requests slot `slot`'s last frame flagged into
+    /// `wanted_` and clears its flags.
+    void GatherRequests(std::uint32_t slot);
+    /// Loads up to `limit` wanted tiles, coarsest first, evicting the
+    /// least recently wanted past the budget, as of frame `frame`;
+    /// returns how many it loaded.
+    std::size_t Serve(std::uint64_t frame, std::size_t limit);
     /// Whether `tile` is bound and not on its way out.
     bool Resident(const SparseTile& tile) const;
     /// Rewrites slot `slot`'s min-LOD map, copied ahead of its frame.

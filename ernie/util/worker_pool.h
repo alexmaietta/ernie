@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/util/profile.h"
+
 #include <algorithm>
 #include <condition_variable>
 #include <deque>
@@ -8,6 +10,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -21,10 +24,19 @@ namespace ernie {
 /// running ones finish first.
 class WorkerPool {
   public:
-    /// `threads` threads (at least one).
-    explicit WorkerPool(unsigned threads) {
+    /// `threads` threads (at least one), named `name` 1, 2... in the
+    /// profilers.
+    explicit WorkerPool(unsigned threads,
+                        const std::string& name = "Worker") {
         for (unsigned i = 0; i < std::max(threads, 1u); ++i) {
-            threads_.emplace_back([this] { Run(); });
+            threads_.emplace_back(
+                [this, thread = name + " " + std::to_string(i + 1)] {
+                    profiler::SetThreadName(thread);
+#if ERNIE_TRACY
+                    tracy::SetThreadName(profiler::Intern(thread));
+#endif
+                    Run();
+                });
         }
     }
 

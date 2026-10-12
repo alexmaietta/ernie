@@ -201,10 +201,11 @@ class RasterRenderer {
     }
 
     /// Registers temperature model `model` after checking that its
-    /// Slang module compiles against `ITemperatureModel`, so materials
-    /// can name it in `ernie:thermal:model`; the shading passes
-    /// recompile with it.
-    /// @throws std::invalid_argument if the registry rejects the model
+    /// Slang module compiles against `ITemperatureModel`, so
+    /// materials can name it in `ernie:thermal:model`; the shading
+    /// passes recompile with it.
+    /// @throws std::invalid_argument if the registry rejects the
+    /// model
     /// (`TemperatureModelRegistry::Add`) or its module fails to
     /// compile; the message includes the compiler's diagnostics.
     void AddTemperatureModel(TemperatureModel model);
@@ -479,6 +480,14 @@ class RasterRenderer {
     /// is prepared. Materials' virtual textures serve the tiles the
     /// slot's last frame asked for (`RasterMaterial::BeginFrame`).
     void BeginFrame(std::uint32_t slot);
+    /// Whether any material reads a virtual texture.
+    bool HasVirtualTextures() const;
+
+    /// Serves at once every tile the materials' virtual textures were
+    /// asked for by the last frames of every slot, which must have
+    /// finished (`RasterMaterial::SettleVirtualTexture`); returns
+    /// whether those frames were missing any.
+    bool SettleVirtualTextures();
 
     /// Host data for the renderer's and the drawables' buffers,
     /// copied when the frame records.
@@ -703,7 +712,8 @@ class RasterRenderer {
     /// filters that follow the scene in time. Call after `Update`;
     /// the images must outlive the frame's recording.
     void SetSensorState(std::size_t pass, GpuImage* previous,
-                        GpuImage* next, bool history, double interval) {
+                        GpuImage* next, bool history,
+                        double interval) {
         SensorPass& sensor = sensorPasses_.at(pass);
         sensor.statePrevious = previous;
         sensor.stateNext = next;
@@ -1112,7 +1122,8 @@ class RasterRenderer {
     /// normals to write, its pipeline for frame cameras and
     /// pushbrooms.
     PipelineLayout temperatureLayout_;
-    std::array<std::unique_ptr<ComputePipeline>, 2> temperaturePipelines_;
+    std::array<std::unique_ptr<ComputePipeline>, 2>
+        temperaturePipelines_;
     PipelineLayout filterLayout_;
     /// The fused sensor kernel of each plan used so far, by
     /// `SensorPlan::Key`.

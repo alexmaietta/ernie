@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/texture_bake.h"
 
+#include "ernie/util/profile.h"
+
 #include <bc7enc.h>
 #include <rgbcx.h>
 #include <stb_image.h>
@@ -142,6 +144,7 @@ void EncodeBlocks(TextureFormat format,
                   std::uint32_t width, std::uint32_t height,
                   std::byte* out,
                   const bc7enc_compress_block_params& bc7) {
+    ERNIE_ZONE("Encode blocks on the CPU");
     const TextureFormatInfo info = InfoOf(format);
     const std::uint32_t across = (width + 3) / 4;
     const std::uint32_t down = (height + 3) / 4;
@@ -247,6 +250,7 @@ void EncodeMip(TextureData& texture, std::uint32_t mip,
 std::vector<std::uint8_t>
 HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
            std::uint32_t height, bool srgb) {
+    ERNIE_ZONE("Halve RGBA8");
     static const std::array<float, 256> kLinear = [] {
         std::array<float, 256> table{};
         for (int i = 0; i < 256; ++i) {
@@ -291,6 +295,65 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
 }
 
 }  // namespace
+
+std::optional<glm::uvec2>
+Rgba8ImageSize(const std::filesystem::path& file) {
+    std::string extension = file.extension().string();
+    std::transform(extension.begin(), extension.end(),
+                   extension.begin(), [](unsigned char c) {
+                       return static_cast<char>(std::tolower(c));
+                   });
+    if (extension != ".png" && extension != ".jpg" &&
+        extension != ".jpeg") {
+        return std::nullopt;
+    }
+    const std::string name = file.string();
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    if (stbi_info(name.c_str(), &width, &height, &channels) == 0 ||
+        stbi_is_16_bit(name.c_str()) != 0) {
+        return std::nullopt;
+    }
+    return glm::uvec2(static_cast<std::uint32_t>(width),
+                      static_cast<std::uint32_t>(height));
+}
+
+std::vector<std::vector<std::uint8_t>>
+LoadRgba8Mips(const std::filesystem::path& file, bool srgb) {
+    ERNIE_ZONE("Load RGBA8 mips");
+    const std::string name = file.string();
+    if (!Rgba8ImageSize(file)) {
+        throw std::runtime_error(name +
+                                 " is not an 8-bit PNG or JPEG");
+    }
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_uc* data = [&] {
+        ERNIE_ZONE("Decode image");
+        return stbi_load(name.c_str(), &width, &height, &channels, 4);
+    }();
+    if (data == nullptr) {
+        throw std::runtime_error("Cannot read " + name + ": " +
+                                 stbi_failure_reason());
+    }
+    const std::unique_ptr<stbi_uc, decltype(&stbi_image_free)>
+        decoded(data, &stbi_image_free);
+    auto w = static_cast<std::uint32_t>(width);
+    auto h = static_cast<std::uint32_t>(height);
+    std::vector<std::vector<std::uint8_t>> mips;
+    mips.emplace_back(decoded.get(),
+                      decoded.get() + std::size_t{w} * h * 4);
+    while (w > 1 || h > 1) {
+        std::vector<std::uint8_t> half =
+            HalveRgba8(mips.back(), w, h, srgb);
+        mips.push_back(std::move(half));
+        w = std::max(1u, w / 2);
+        h = std::max(1u, h / 2);
+    }
+    return mips;
+}
 
 TextureData EncodeTexture(std::span<const Image> mips,
                           TextureFormat format,
@@ -359,6 +422,7 @@ void WriteDdsHeader(std::ostream& file, const TextureData& texture) {
 
 void WriteDdsFile(const std::filesystem::path& path,
                   const TextureData& texture) {
+    ERNIE_ZONE("Write DDS");
     std::ofstream file(path, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Cannot write " + path.string());
@@ -377,6 +441,7 @@ void WriteDdsFile(const std::filesystem::path& path,
 TextureData BakeTexture(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         const BakeOptions& options) {
+    ERNIE_ZONE("Bake texture");
     const bool srgb =
         options.role == TextureRole::Colour && options.srgb;
     TextureFormat format = options.role == TextureRole::Normal
@@ -458,6 +523,7 @@ TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
                        std::uint32_t columns,
                        const std::filesystem::path& output,
                        const BakeOptions& options) {
+    ERNIE_ZONE("Bake mosaic");
     if (columns == 0 || tiles.empty() ||
         tiles.size() % columns != 0) {
         throw std::invalid_argument("A mosaic needs whole rows of " +

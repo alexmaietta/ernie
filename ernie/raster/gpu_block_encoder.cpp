@@ -2,6 +2,7 @@
 #include "ernie/raster/gpu_block_encoder.h"
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 
 #include <algorithm>
@@ -51,6 +52,7 @@ void GpuBlockEncoder::Encode(std::span<const std::uint8_t> rgba,
         throw std::invalid_argument(
             "The GPU encoder encodes BC7 alone");
     }
+    ERNIE_ZONE("BC7 encode on the GPU");
     const std::uint32_t across = (width + 3) / 4;
     const std::uint32_t blocks = across * ((height + 3) / 4);
     const std::uint32_t batches = (blocks + kBatch - 1) / kBatch;
@@ -84,6 +86,7 @@ void GpuBlockEncoder::Encode(std::span<const std::uint8_t> rgba,
         const std::uint32_t last =
             std::min(batches, first + kBatchesPerSubmit);
         context_.Submit([&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "BC7 encode");
             for (std::uint32_t batch = first; batch < last; ++batch) {
                 const std::uint32_t count =
                     std::min(kBatch, blocks - batch * kBatch);

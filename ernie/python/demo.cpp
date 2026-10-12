@@ -123,6 +123,9 @@ void BindDemo(nb::module_& m) {
                 "Where to also write them as JSON, or ''.")
         .def_rw("profile_trace", &DemoOptions::profileTrace,
                 "Where to also write a Chrome trace, or ''.")
+        .def_rw("profile_warmup", &DemoOptions::profileWarmup,
+                "The first frames the profile leaves out; 0 keeps "
+                "the scene's loading.")
         .def_rw("test", &DemoOptions::test,
                 "Runs test_post_step and test_final.")
         .def_rw("output", &DemoOptions::output,

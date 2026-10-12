@@ -173,6 +173,15 @@ Image TextureImageOf(const Scene& scene,
 /// GPU's encoder; bumped when its output changes.
 constexpr std::string_view kCompressedKey = "|gpu-bc7-1";
 
+/// How a texture `TextureCache` holds reads back as stored: in its
+/// own format (the reader's colour space already applied), virtual as
+/// `reader` says.
+TextureReader CachedReader(const TextureReader& reader) {
+    TextureReader cached;
+    cached.virtualTexture = reader.virtualTexture;
+    return cached;
+}
+
 /// An image file's texture for `slot` as `RasterDelegate::
 /// UploadPrepared` takes it: from `cache` (when given) under `key`
 /// (`UploadKey`), setting `cached`, else decoded and prepared. Any
@@ -773,13 +782,35 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             throw UploadError(path, attribute, error.what());
         }
     }
+    // Its temperature texture: its thermal terminal's, one channel in
+    // kelvin after the reader's scale and bias, else its own tensor.
     const Key temperatureKey =
         KeyOf(scene, path, {kThermalTemperatureTexture});
-    if (material.temperatureTexture != temperatureKey) {
+    const std::string temperatureReader =
+        settings.temperatureTexture
+            ? TextureKey(scene, *settings.temperatureTexture)
+            : std::string();
+    if (material.temperatureTexture != temperatureKey ||
+        material.temperatureReader != temperatureReader) {
         material.temperatureTexture = temperatureKey;
+        material.temperatureReader = temperatureReader;
         try {
-            if (const Tensor* tensor =
-                    prim.GetThermalTemperatureTexture()) {
+            if (settings.temperatureTexture) {
+                TextureReader reader = *settings.temperatureTexture;
+                reader.colorSpace = TextureColorSpace::Raw;
+                const Image image = TextureImageOf(scene, reader);
+                const auto c =
+                    static_cast<std::size_t>(reader.channel);
+                std::vector<float> kelvin;
+                kelvin.reserve(image.pixels.size());
+                for (const glm::vec4& texel : image.pixels) {
+                    kelvin.push_back(texel[c] * reader.scale[c] +
+                                     reader.bias[c]);
+                }
+                gpu.SetTemperatureTexture(kelvin, image.width,
+                                          image.height);
+            } else if (const Tensor* tensor =
+                           prim.GetThermalTemperatureTexture()) {
                 const Tensor kelvin = tensor->Contiguous();
                 const std::vector<std::int64_t> shape =
                     kelvin.Shape();
@@ -812,6 +843,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
 std::shared_ptr<const MaterialTexture> RasterDelegate::SharedTexture(
     const Scene& scene, MaterialTextureSlot slot,
     const TextureReader& reader, std::string& pending) {
+    ERNIE_ZONE("Shared texture");
     pending.clear();
     const std::string key = UploadKey(scene, slot, reader);
     std::weak_ptr<const MaterialTexture>& shared =
@@ -834,17 +866,38 @@ std::shared_ptr<const MaterialTexture> RasterDelegate::SharedTexture(
             failed != failedTextures_.end()) {
             throw std::invalid_argument(failed->second);
         }
+        // Albedo too large for floats (a planet's) prepares in 8 bits
+        // and reads as a virtual texture of the cached BC7, mapped:
+        // at once when it is cached.
+        const bool large = slot == MaterialTextureSlot::Albedo &&
+                           IsLargeImageFile(reader.file);
+        if (large && Encoder() != nullptr) {
+            if (std::optional<TextureData> stored =
+                    textureCache_.Read(key +
+                                       std::string(kCompressedKey))) {
+                texture = UploadMaterialTexture(context_, slot,
+                                                std::move(*stored),
+                                                CachedReader(reader));
+                shared = texture;
+                return texture;
+            }
+        }
         // Decoded and mipped off the main thread;
         // `FinishTextureLoads` uploads it.
         if (!loadingTextures_.contains(key)) {
             const TextureCache* cache =
                 Encoder() != nullptr ? &textureCache_ : nullptr;
             loadingTextures_.emplace(
-                key,
-                textureLoaders_.Submit([slot, reader, cache, key] {
+                key, textureLoaders_.Submit([slot, reader, cache, key,
+                                             large] {
                     LoadedTexture loaded;
-                    loaded.prepared = LoadPrepared(
-                        slot, reader, cache, key, loaded.cached);
+                    loaded.large = large;
+                    loaded.reader = reader;
+                    loaded.prepared =
+                        large
+                            ? PrepareLargeAlbedo(reader.file, reader)
+                            : LoadPrepared(slot, reader, cache, key,
+                                           loaded.cached);
                     return loaded;
                 }));
         }
@@ -876,8 +929,9 @@ void RasterDelegate::FinishTextureLoads(bool wait) {
         std::string error;
         try {
             LoadedTexture loaded = it->second.get();
-            texture = UploadPrepared(std::move(loaded.prepared), key,
-                                     loaded.cached);
+            texture = UploadPrepared(
+                std::move(loaded.prepared), key, loaded.cached,
+                loaded.large ? &loaded.reader : nullptr);
             sharedTextures_[key] = texture;
         } catch (const std::exception& failure) {
             error = failure.what();
@@ -977,12 +1031,25 @@ BlockEncoder* RasterDelegate::Encoder() {
 
 std::shared_ptr<const MaterialTexture>
 RasterDelegate::UploadPrepared(PreparedTexture prepared,
-                               const std::string& key, bool cached) {
+                               const std::string& key, bool cached,
+                               const TextureReader* large) {
+    ERNIE_ZONE("Upload prepared texture");
+    const std::string cacheKey = key + std::string(kCompressedKey);
     if (!cached) {
         if (BlockEncoder* encoder = Encoder()) {
             CompressPreparedTexture(*encoder, prepared);
-            textureCache_.Write(key + std::string(kCompressedKey),
-                                StoredOf(prepared));
+            textureCache_.Write(cacheKey, StoredOf(prepared));
+        }
+    }
+    // A large albedo reads as a virtual texture of the file just
+    // cached, mapped, rather than whole.
+    if (large != nullptr && Encoder() != nullptr) {
+        if (std::optional<TextureData> stored =
+                textureCache_.Read(cacheKey)) {
+            prepared = {};
+            return UploadMaterialTexture(
+                context_, MaterialTextureSlot::Albedo,
+                std::move(*stored), CachedReader(*large));
         }
     }
     return UploadMaterialTexture(context_, prepared);
@@ -3597,6 +3664,37 @@ RasterDelegate::StepAsync(const Scene& scene,
         metering_ = false;
         context_.WaitForSubmissions();
         renderer_.ReadFinishedMeters();
+    }
+    // A frame that waits for its textures waits for the tiles of the
+    // virtual ones it samples too: frames rendered beforehand, as the
+    // metering one is, each serving every tile the last asked for,
+    // until one asks for none; not again until the scene changes.
+    if (!settling_ && !metering_) {
+        const bool waits = WaitsForTextures(scene, base.settings);
+        if (waits) {
+            Sync(scene);
+            FinishTextureLoads(true);
+        }
+        if (waits && renderer_.HasVirtualTextures() &&
+            settledVersion_ !=
+                std::pair(scene.Id(), scene.Version())) {
+            ERNIE_ZONE("Settle virtual textures");
+            settling_ = true;
+            try {
+                for (int pass = 0; pass < kSettlingPasses; ++pass) {
+                    StepAsync(scene, products, settings).Fetch();
+                    context_.WaitForSubmissions();
+                    if (!renderer_.SettleVirtualTextures()) {
+                        break;
+                    }
+                }
+            } catch (...) {
+                settling_ = false;
+                throw;
+            }
+            settling_ = false;
+            settledVersion_ = std::pair(scene.Id(), scene.Version());
+        }
     }
     window_ = window;
     RenderProductSetOutputs outputs;

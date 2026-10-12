@@ -2,6 +2,7 @@
 #include "ernie/raster/material.h"
 
 #include "ernie/scene/brdf.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/raster_checks.h"
 
 #include <glm/gtc/packing.hpp>
@@ -244,6 +245,7 @@ UploadEncoded(const VulkanContext& context, std::uint32_t width,
               std::uint32_t height,
               const std::vector<std::vector<std::uint8_t>>& mips,
               VkFormat format) {
+    ERNIE_ZONE("Upload texture");
     auto texture = std::make_unique<GpuImage>(
         context, ImageDesc{width, height, 1,
                            static_cast<std::uint32_t>(mips.size()),
@@ -292,6 +294,7 @@ std::unique_ptr<GpuImage>
 UploadStored(const VulkanContext& context, const TextureData& texture,
              const TextureReader& reader,
              VkComponentMapping components) {
+    ERNIE_ZONE("Upload stored texture");
     const VkFormat format = StoredFormat(context, texture, reader);
     const std::uint32_t maxSize =
         context.Limits().maxImageDimension2D;
@@ -383,6 +386,7 @@ UploadMaterialTexture(const VulkanContext& context,
 PreparedTexture PrepareMaterialTexture(MaterialTextureSlot slot,
                                        const Image& image,
                                        const TextureReader& reader) {
+    ERNIE_ZONE("Prepare texture");
     if (image.width == 0 || image.height == 0 ||
         image.pixels.size() !=
             static_cast<std::size_t>(image.width) * image.height) {
@@ -445,6 +449,7 @@ UploadMaterialTexture(const VulkanContext& context,
 
 void CompressPreparedTexture(BlockEncoder& encoder,
                              PreparedTexture& prepared) {
+    ERNIE_ZONE("Compress texture");
     TextureFormat format = TextureFormat::Bc7;
     VkFormat compressed = VK_FORMAT_BC7_UNORM_BLOCK;
     if (prepared.format == VK_FORMAT_R8G8B8A8_SRGB) {
@@ -521,6 +526,26 @@ PreparedOf(const TextureData& texture) {
         out.mips.emplace_back(data, data + bytes.size());
     }
     return out;
+}
+
+bool IsLargeImageFile(const std::filesystem::path& file) {
+    const std::optional<glm::uvec2> size = Rgba8ImageSize(file);
+    return size && std::max(size->x, size->y) > kVirtualTextureSide;
+}
+
+PreparedTexture PrepareLargeAlbedo(const std::filesystem::path& file,
+                                   const TextureReader& reader) {
+    ERNIE_ZONE("Prepare large albedo");
+    const glm::uvec2 size =
+        Rgba8ImageSize(file).value_or(glm::uvec2(0));
+    const bool raw = reader.colorSpace == TextureColorSpace::Raw;
+    PreparedTexture prepared;
+    prepared.width = size.x;
+    prepared.height = size.y;
+    prepared.format =
+        raw ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_R8G8B8A8_SRGB;
+    prepared.mips = LoadRgba8Mips(file, !raw);
+    return prepared;
 }
 
 std::shared_ptr<const MaterialTexture>
@@ -999,6 +1024,17 @@ void RasterMaterial::BeginFrame(std::uint32_t slot,
     albedoTexture->virtualTexture->BeginFrame(slot, frame);
     frameSlot_ = slot;
     WriteUniform();
+}
+
+bool RasterMaterial::HasVirtualTexture() const {
+    const MaterialTexture* albedoTexture = textures_[0].get();
+    return albedoTexture != nullptr &&
+           albedoTexture->virtualTexture != nullptr;
+}
+
+bool RasterMaterial::SettleVirtualTexture(std::uint32_t slot) {
+    return HasVirtualTexture() &&
+           textures_[0]->virtualTexture->Settle(slot);
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {

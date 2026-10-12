@@ -2,6 +2,7 @@
 #include "ernie/device/image.h"
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/gpu_profile.h"
 #include "ernie/device/memory_stats.h"
 #include "ernie/device/pipeline.h"
 
@@ -364,6 +365,7 @@ void GpuImage::Transition(VkCommandBuffer commands,
 
 void GpuImage::Upload(
     std::span<const std::span<const std::byte>> mipData) {
+    ERNIE_ZONE("Image upload");
     const std::uint32_t mips = desc_.mips;
     if (mipData.size() != mips &&
         mipData.size() != std::size_t{mips} * desc_.layers) {
@@ -394,6 +396,7 @@ void GpuImage::Upload(
         staging.Write(mipData[i], regions[i].bufferOffset);
     }
     context_->Submit([&](VkCommandBuffer commands) {
+        ERNIE_GPU_ZONE(*context_, commands, "Image upload");
         Transition(commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         vkCmdCopyBufferToImage(
             commands, staging.Handle(), image_,

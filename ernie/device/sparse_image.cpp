@@ -2,6 +2,7 @@
 #include "ernie/device/sparse_image.h"
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/gpu_profile.h"
 #include "ernie/device/image.h"
 #include "ernie/device/memory_stats.h"
 #include "ernie/device/pipeline.h"
@@ -40,6 +41,7 @@ AllocatePieces(const VulkanContext& context,
 /// Submits `info` on the queue and waits for it.
 void BindAndWait(const VulkanContext& context,
                  const VkBindSparseInfo& info) {
+    ERNIE_ZONE("Sparse bind");
     VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     VkFence fence = VK_NULL_HANDLE;
     CheckVk(
@@ -276,6 +278,7 @@ void SparseImage::BindTiles(std::span<const SparseTile> tiles,
 void SparseImage::Write(
     std::span<const SparseTile> tiles,
     std::span<const std::span<const std::byte>> texels) {
+    ERNIE_ZONE("Sparse tile writes");
     if (tiles.size() != texels.size()) {
         throw std::invalid_argument(
             "SparseImage::Write needs data for every tile");
@@ -343,6 +346,7 @@ void SparseImage::Copy(
     // the texels without the host waiting.
     const std::uint64_t submission =
         context_.SubmitAsync([&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "Sparse tile copies");
             TransitionImage(commands, image_, aspect_, layout_,
                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             vkCmdCopyBufferToImage(

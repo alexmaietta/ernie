@@ -316,3 +316,30 @@ TEST_F(TextureBake, TheTextureCacheKeepsTheRecentlyUsed) {
     none.Write("a", texture);
     EXPECT_FALSE(none.Read("a"));
 }
+
+TEST_F(TextureBake, Rgba8MipsHalveAnImageIn8Bits) {
+    // A 6 x 4 PNG: read as RGBA8, mips 6 x 4, 3 x 2 and 1 x 1, each
+    // the average of the last; its size from its header alone; and no
+    // size for a file that is not an 8-bit PNG or JPEG.
+    std::vector<std::uint8_t> texels;
+    for (int i = 0; i < 6 * 4; ++i) {
+        texels.insert(
+            texels.end(),
+            {static_cast<std::uint8_t>(i * 10), 128, 0, 255});
+    }
+    const std::filesystem::path png = dir_ / "six_by_four.png";
+    ASSERT_NE(stbi_write_png(png.string().c_str(), 6, 4, 4,
+                             texels.data(), 6 * 4),
+              0);
+    EXPECT_EQ(ernie::Rgba8ImageSize(png), glm::uvec2(6, 4));
+    EXPECT_FALSE(ernie::Rgba8ImageSize(dir_ / "missing.png"));
+    const std::vector<std::vector<std::uint8_t>> mips =
+        ernie::LoadRgba8Mips(png, false);
+    ASSERT_EQ(mips.size(), 3u);
+    EXPECT_EQ(mips[0], texels);
+    EXPECT_EQ(mips[1].size(), std::size_t{3 * 2 * 4});
+    EXPECT_EQ(mips[2].size(), std::size_t{4});
+    // The first 2 x 2: red 0, 10, 60 and 70.
+    EXPECT_NEAR(mips[1][0], 35, 1);
+    EXPECT_EQ(mips[1][1], 128);
+}

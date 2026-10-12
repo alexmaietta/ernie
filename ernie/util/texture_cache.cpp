@@ -2,6 +2,7 @@
 #include "ernie/util/texture_cache.h"
 
 #include "ernie/util/disk_cache.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/texture_bake.h"
 
 #include <algorithm>
@@ -41,6 +42,7 @@ TextureCache::Read(std::string_view key) const {
     if (!directory_) {
         return std::nullopt;
     }
+    ERNIE_ZONE("Texture cache read");
     const fs::path path = PathOf(key);
     std::error_code error;
     if (!fs::exists(path, error)) {
@@ -62,6 +64,7 @@ void TextureCache::Write(std::string_view key,
     if (!directory_) {
         return;
     }
+    ERNIE_ZONE("Texture cache write");
     const fs::path path = PathOf(key);
     // Written beside it, then renamed over it, so that no reader (in
     // this process or another) sees a part of it.
@@ -83,6 +86,7 @@ void TextureCache::Write(std::string_view key,
 }
 
 void TextureCache::Prune() const {
+    ERNIE_ZONE("Texture cache prune");
     struct Entry {
         fs::path path;
         fs::file_time_type used;

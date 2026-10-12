@@ -23,19 +23,22 @@ namespace {
 /// Frames a benchmark runs before it starts timing.
 constexpr std::uint64_t kBenchmarkWarmup = 5;
 
-/// Frames a profile keeps (the last of a longer run), and those it
-/// leaves out of its averages at the start, which compile shaders and
-/// upload the scene.
+/// Frames a profile keeps (the last of a longer run); those it leaves
+/// out of its averages at the start, which compile shaders and upload
+/// the scene, are `DemoOptions::profileWarmup`.
 constexpr std::size_t kProfileHistory = 10000;
-constexpr std::size_t kProfileWarmup = 5;
 
 /// Prints the profiler's zones over the frames recorded, after the
 /// warm-up, and writes them where `options` asks.
 void ReportProfile(const DemoOptions& options) {
     profiler::SetEnabled(false);
     std::vector<profiler::Frame> frames = profiler::Frames();
-    if (frames.size() > kProfileWarmup) {
-        frames.erase(frames.begin(), frames.begin() + kProfileWarmup);
+    const auto warmup =
+        static_cast<std::size_t>(options.profileWarmup);
+    if (frames.size() > warmup) {
+        frames.erase(frames.begin(),
+                     frames.begin() +
+                         static_cast<std::ptrdiff_t>(warmup));
     }
     // Nor the newest, which the device may still be running.
     frames.resize(frames.size() -
@@ -77,6 +80,8 @@ constexpr std::string_view kHelp =
   --profile-json PATH    also write them as JSON (implies --profile)
   --profile-trace PATH   also write a Chrome trace for Perfetto or chrome://tracing
                          (implies --profile)
+  --profile-warmup N     first frames the profile leaves out (default 5); 0 keeps the
+                         scene's loading (implies --profile)
   --test                 run the demo's checks (TestPostStep and TestFinal)
   --output PATH          write the last frame here as PNG
   --paused               start paused (the Demos panel resumes)
@@ -195,6 +200,18 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
             options.profile = true;
         } else if (arg == "--profile-trace") {
             options.profileTrace = value();
+            options.profile = true;
+        } else if (arg == "--profile-warmup") {
+            const double frames = ParseNumber(arg, value());
+            if (frames < 0.0 ||
+                frames != static_cast<double>(
+                              static_cast<std::uint64_t>(frames))) {
+                throw std::invalid_argument(
+                    "--profile-warmup needs a whole number of "
+                    "frames");
+            }
+            options.profileWarmup =
+                static_cast<std::uint64_t>(frames);
             options.profile = true;
         } else if (arg == "--output") {
             options.output = value();

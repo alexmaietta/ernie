@@ -48,6 +48,9 @@ struct DemoOptions {
     /// Where to also write the frames as a Chrome trace for Perfetto
     /// or chrome://tracing (`--profile-trace`), or empty.
     std::filesystem::path profileTrace;
+    /// The first frames the profile leaves out (`--profile-warmup`),
+    /// while the scene uploads; 0 keeps them, to profile loading.
+    std::uint64_t profileWarmup = 5;
     /// Runs the demo's checks (`--test`): `Demo::TestPostStep` after
     /// every step and `Demo::TestFinal` at the end.
     bool test = false;

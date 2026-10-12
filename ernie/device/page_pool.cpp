@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/page_pool.h"
 
+#include "ernie/device/gpu_profile.h"
+
 #include <algorithm>
 #include <stdexcept>
 #include <string>
@@ -99,6 +101,7 @@ VkDeviceSize PagePool::Bytes() const {
 void PagePool::Write(
     std::span<const SparseTile> tiles,
     std::span<const std::span<const std::byte>> texels) {
+    ERNIE_ZONE("Page writes");
     if (tiles.size() != texels.size()) {
         throw std::invalid_argument(
             "PagePool::Write needs data for every tile");
@@ -143,6 +146,7 @@ void PagePool::Write(
     const GpuBuffer& source = *staging;
     const std::uint64_t submission =
         context_.SubmitAsync([&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "Page copies");
             pages.Transition(commands,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             vkCmdCopyBufferToImage(

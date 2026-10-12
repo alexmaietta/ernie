@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/virtual_texture.h"
 
+#include "ernie/device/gpu_profile.h"
+
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -28,6 +31,7 @@ VirtualTexture::VirtualTexture(
     std::shared_ptr<const TextureData> source, VkFormat format,
     VkComponentMapping components, VkDeviceSize budget)
     : context_(context), source_(std::move(source)) {
+    ERNIE_ZONE("Make virtual texture");
     if (source_->mips !=
         FullMipCount(source_->width, source_->height)) {
         throw std::invalid_argument(
@@ -195,10 +199,43 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         return;
     }
     frame_ = frame;
+    ERNIE_ZONE("Virtual texture frame");
+    GatherRequests(slot);
+    Serve(frame, kTilesPerFrame);
+    // This slot's map, if it shows an older residency.
+    if (mapVersions_[slot] != version_) {
+        if (pool_ != nullptr) {
+            WritePageTable(slot);
+        } else {
+            WriteMinLod(slot);
+        }
+    }
+}
+
+bool VirtualTexture::Settle(std::uint32_t slot) {
+    ERNIE_ZONE("Settle virtual texture");
+    GatherRequests(slot);
+    const std::size_t loaded =
+        Serve(frame_, std::numeric_limits<std::size_t>::max());
+    for (std::uint32_t each = 0; each < FrameUploads::kSlots;
+         ++each) {
+        if (mapVersions_[each] != version_) {
+            if (pool_ != nullptr) {
+                WritePageTable(each);
+            } else {
+                WriteMinLod(each);
+            }
+        }
+    }
+    return loaded > 0;
+}
+
+void VirtualTexture::GatherRequests(std::uint32_t slot) {
     // The flags this slot's last frame set, which has finished.
     GpuBuffer& requests = *requests_[slot];
     std::vector<std::uint32_t> flags(mipFlags_.back());
     if (!flags.empty()) {
+        ERNIE_ZONE("Read tile requests");
         requests.Read(std::as_writable_bytes(std::span(flags)));
     }
     bool any = false;
@@ -220,7 +257,10 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         const std::vector<std::uint32_t> zeros(flags.size(), 0);
         requests.Write(std::as_bytes(std::span(zeros)));
     }
+}
 
+std::size_t VirtualTexture::Serve(std::uint64_t frame,
+                                  std::size_t limit) {
     // Evicted tiles go once every frame whose map still showed them
     // has finished: the frames before the one they left the maps in,
     // the last of which ran in the other slot.
@@ -252,8 +292,8 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
                      [](const SparseTile& a, const SparseTile& b) {
                          return a.mip > b.mip;
                      });
-    if (load.size() > kTilesPerFrame) {
-        load.resize(kTilesPerFrame);
+    if (load.size() > limit) {
+        load.resize(limit);
     }
     // Past the budget, the least recently wanted resident tiles go,
     // finest first; never those wanted this frame.
@@ -297,10 +337,15 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         changed = true;
     }
     if (!load.empty()) {
+        ERNIE_ZONE("Load tiles");
         std::vector<std::vector<std::byte>> data;
         std::vector<std::span<const std::byte>> spans;
-        for (const SparseTile& tile : load) {
-            data.push_back(TileData(tile));
+        {
+            // From the mapped file: the disk reads, the first time.
+            ERNIE_ZONE("Cut tiles");
+            for (const SparseTile& tile : load) {
+                data.push_back(TileData(tile));
+            }
         }
         for (const auto& bytes : data) {
             spans.push_back(bytes);
@@ -308,20 +353,18 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         store_->Write(load, spans);
         changed = true;
     }
+    ERNIE_PLOT("Virtual texture tiles loaded",
+               static_cast<std::int64_t>(load.size()));
+    ERNIE_PLOT("Virtual texture tiles resident",
+               static_cast<std::int64_t>(store_->BoundTiles()));
     if (changed) {
         ++version_;
     }
-    // This slot's map, if it shows an older residency.
-    if (mapVersions_[slot] != version_) {
-        if (pool_ != nullptr) {
-            WritePageTable(slot);
-        } else {
-            WriteMinLod(slot);
-        }
-    }
+    return load.size();
 }
 
 void VirtualTexture::WritePageTable(std::uint32_t slot) {
+    ERNIE_ZONE("Write page table");
     std::vector<std::uint32_t> table(
         std::max<std::size_t>(mipFlags_.back(), 1), 0);
     for (std::uint32_t mip = 0; mip < store_->TailMip(); ++mip) {
@@ -365,6 +408,7 @@ std::uint32_t VirtualTexture::FinestResident(std::uint32_t x,
 }
 
 void VirtualTexture::WriteMinLod(std::uint32_t slot) {
+    ERNIE_ZONE("Write min-LOD map");
     const VkExtent2D count = store_->TailMip() > 0
                                  ? store_->TileCount(0)
                                  : VkExtent2D{1, 1};
@@ -411,6 +455,7 @@ void VirtualTexture::WriteMinLod(std::uint32_t slot) {
     GpuImage& map = *minLods_[slot];
     mapCopies_[slot] =
         context_.SubmitAsync([&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "Min-LOD map copy");
             map.Transition(commands,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             VkBufferImageCopy region{};

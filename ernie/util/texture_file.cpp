@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/texture_file.h"
 
+#include "ernie/util/profile.h"
+
 #include <basisu_transcoder.h>
 #include <bc7decomp.h>
 #include <rgbcx.h>
@@ -280,6 +282,7 @@ TextureFormat LegacyDdsFormat(std::span<const std::byte> file,
 /// to BC6H, the rest to BC7, sRGB as the file's transfer function
 /// says.
 TextureData TranscodeBasis(std::span<const std::byte> file) {
+    ERNIE_ZONE("Transcode Basis");
     static std::once_flag initialised;
     std::call_once(initialised, basist::basisu_transcoder_init);
     basist::ktx2_transcoder ktx2;
@@ -647,6 +650,7 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
 }
 
 TextureData LoadTextureFile(const std::filesystem::path& path) {
+    ERNIE_ZONE("Load texture file");
     const std::string extension = LowerExtension(path);
     if (extension != ".dds" && extension != ".ktx2") {
         throw std::runtime_error(
@@ -673,6 +677,7 @@ TextureData DecodeBlocks(const TextureData& texture) {
     if (!info.compressed()) {
         return texture;
     }
+    ERNIE_ZONE("Decode BC blocks");
     TextureFormat decoded = TextureFormat::Rgba8;
     switch (texture.format) {
     case TextureFormat::Bc1:
