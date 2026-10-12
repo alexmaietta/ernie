@@ -87,7 +87,7 @@ struct ViewportDisplay {
     bool lights = true;   ///< Every light's gizmo: its shape and the
                           ///< direction it shines.
     bool cameras = true;  ///< Every scene camera's frustum.
-    bool grid = true;     ///< A grid on the ground (z = 0) with the x
+    bool grid = false;    ///< A grid on the ground (z = 0) with the x
                           ///< and y axes.
     bool selection = true;  ///< The selection's outline.
     bool overlays =

@@ -14,6 +14,7 @@
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/nanovdb.h"
+#include "ernie/util/noise.h"
 #include "util.h"
 
 #include <algorithm>
@@ -37,13 +38,19 @@ struct PlumeGrids {
     std::vector<std::uint8_t> temperature;  ///< Over 0 to 1.
 };
 
-/// A rocket engine's plume from a nozzle 1.2 m across at the origin
-/// down -z for 12 m, in 0.1 m voxels: widening as it goes, hottest at
-/// the nozzle with shock diamonds, cooling to soot downstream.
-PlumeGrids MakePlume() {
+/// A rocket engine's plume `time` seconds in, from a nozzle 1.2 m
+/// across at the origin down -z for 12 m, in 0.1 m voxels: widening
+/// as it goes, hottest at the nozzle with shock diamonds, cooling to
+/// soot downstream; turbulence streams down it and the core flickers.
+PlumeGrids MakePlume(double time) {
     constexpr double kVoxel = 0.1;
+    constexpr double kSpeed =
+        20.0;  // m/s the turbulence streams down.
     const glm::ivec3 shape(48, 48, 120);
     const glm::dvec3 low(-2.4, -2.4, -12.0);
+    const GradientNoise noise(5);
+    const double flicker =
+        1.0 + 0.08 * std::sin(2.0 * std::numbers::pi * 12.0 * time);
     const std::size_t count =
         static_cast<std::size_t>(shape.x) * shape.y * shape.z;
     std::vector<float> density(count, 0.0f);
@@ -66,11 +73,18 @@ PlumeGrids MakePlume() {
                 const double fade =
                     std::clamp(s / 0.3, 0.0, 1.0) *
                     std::clamp((12.0 - s) / 2.0, 0.0, 1.0);
+                const double turbulence =
+                    0.5 +
+                    0.5 * noise.Fbm({1.5 * p.x, 1.5 * p.y,
+                                     0.8 * (p.z + kSpeed * time)},
+                                    3);
                 const double hot =
-                    core * diamonds * std::exp(-s / 5.0) * fade;
+                    core * diamonds * std::exp(-s / 5.0) * fade *
+                    flicker * (0.85 + 0.3 * turbulence);
                 const double soot =
                     core * (0.8 + 0.4 * (1.0 - std::exp(-s / 4.0))) *
-                    std::exp(-s / 14.0) * fade;
+                    std::exp(-s / 14.0) * fade *
+                    (0.4 + 1.2 * turbulence);
                 const std::size_t at =
                     (static_cast<std::size_t>(i) * shape.y + j) *
                         shape.z +
@@ -117,7 +131,7 @@ class PlumeDemo : public app::Demo {
   public:
     PlumeDemo(app::Viewer* viewer, const app::DemoOptions& options)
         : Demo(viewer, options) {
-        numFrames = 1;
+        numFrames = 12;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
         // The rocket above its nozzle at the origin, 1.2 m across.
@@ -145,16 +159,14 @@ class PlumeDemo : public app::Demo {
             .SetAlbedo(glm::dvec3(0.25));
 
         // The plume's density and temperature, built here as NanoVDB
-        // grids.
-        const PlumeGrids grids = MakePlume();
+        // grids each step.
         Volume::Define(scene, "/World/Plume")
             .SetField("density", "/World/Plume/Density")
             .SetField("temperature", "/World/Plume/Temperature")
             .SetMaterialBinding("/World/Looks/Exhaust");
-        NanoVDBField::Define(scene, "/World/Plume/Density")
-            .SetBuffer(Bytes(grids.density));
-        NanoVDBField::Define(scene, "/World/Plume/Temperature")
-            .SetBuffer(Bytes(grids.temperature));
+        NanoVDBField::Define(scene, "/World/Plume/Density");
+        NanoVDBField::Define(scene, "/World/Plume/Temperature");
+        Burn();
         // Soot: mostly absorbing, so it glows as a black body where
         // hot (Kirchhoff) and scatters a little sunlight.
         Material::Define(scene, "/World/Looks/Exhaust")
@@ -217,7 +229,23 @@ class PlumeDemo : public app::Demo {
         Check(core.r > core.b, "the glow is warm, as a black body's");
     }
 
+    void Step() override {
+        time_ += frameDt;
+        Burn();
+    }
+
   private:
+    /// The plume's grids at the time.
+    void Burn() {
+        const PlumeGrids grids = MakePlume(time_);
+        NanoVDBField(GetScene(), "/World/Plume/Density")
+            .SetBuffer(Bytes(grids.density));
+        NanoVDBField(GetScene(), "/World/Plume/Temperature")
+            .SetBuffer(Bytes(grids.temperature));
+    }
+
+    double time_ = 0.0;
+
     void SetPeakTemperature(double kelvin) {
         Material(GetScene(), "/World/Looks/Exhaust")
             .SetTemperatureScale(kelvin);

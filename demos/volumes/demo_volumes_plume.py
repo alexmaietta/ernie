@@ -12,12 +12,15 @@ from ernie.demo import srgb_to_linear, write_png
 PEAK_KELVIN = 3000.0
 
 
-def make_plume():
-    """A rocket engine's plume from a nozzle 1.2 m across at the origin
-    down -z for 12 m, in 0.1 m voxels: widening as it goes, hottest at
-    the nozzle with shock diamonds, cooling to soot downstream. Its
+def make_plume(time):
+    """A rocket engine's plume `time` seconds in, from a nozzle 1.2 m
+    across at the origin down -z for 12 m, in 0.1 m voxels: widening as
+    it goes, hottest at the nozzle with shock diamonds, cooling to soot
+    downstream; turbulence streams down it and the core flickers. Its
     density and temperature (over 0 to 1) as NanoVDB grids."""
     voxel = 0.1
+    speed = 20.0  # m/s the turbulence streams down.
+    flicker = 1.0 + 0.08 * np.sin(2.0 * np.pi * 12.0 * time)
     low = np.array([-2.4, -2.4, -12.0])
     shape = (48, 48, 120)
     x, y, z = np.meshgrid(
@@ -36,12 +39,26 @@ def make_plume():
     fade = np.clip(s / 0.3, 0.0, 1.0) * np.clip(
         (12.0 - s) / 2.0, 0.0, 1.0
     )
-    hot = core * diamonds * np.exp(-s / 5.0) * fade
+    points = np.stack(
+        [1.5 * x, 1.5 * y, 0.8 * (z + speed * time)], -1
+    )
+    turbulence = 0.5 + 0.5 * ernie.fbm_noise(
+        points.reshape(-1, 3), octaves=3, seed=5
+    ).reshape(x.shape)
+    hot = (
+        core
+        * diamonds
+        * np.exp(-s / 5.0)
+        * fade
+        * flicker
+        * (0.85 + 0.3 * turbulence)
+    )
     soot = (
         core
         * (0.8 + 0.4 * (1.0 - np.exp(-s / 4.0)))
         * np.exp(-s / 14.0)
         * fade
+        * (0.4 + 1.2 * turbulence)
     )
     origin = tuple(low + 0.5 * voxel)
 
@@ -63,7 +80,7 @@ def mean_in(image, left, right, top, bottom):
 
 
 class Demo(ernie.demo.Demo):
-    num_frames = 1
+    num_frames = 12
 
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
@@ -106,19 +123,20 @@ class Demo(ernie.demo.Demo):
         )
 
         # The plume's density and temperature, built here as NanoVDB
-        # grids.
-        density, temperature = make_plume()
+        # grids each step.
         plume = world.define(
             "Plume",
             ernie.Volume,
             material_binding="/World/Looks/Exhaust",
         )
-        plume.define("Density", ernie.NanoVDBField, buffer=density)
-        plume.define(
-            "Temperature", ernie.NanoVDBField, buffer=temperature
+        self.density = plume.define("Density", ernie.NanoVDBField)
+        self.temperature = plume.define(
+            "Temperature", ernie.NanoVDBField
         )
         plume.set_field("density", "/World/Plume/Density")
         plume.set_field("temperature", "/World/Plume/Temperature")
+        self.time = 0.0
+        self.burn()
         # Soot: mostly absorbing, so it glows as a black body where hot
         # (Kirchhoff) and scatters a little sunlight.
         self.exhaust = self.scene.define(
@@ -172,6 +190,16 @@ class Demo(ernie.demo.Demo):
         )
         if viewer is not None:
             viewer.active_camera = camera.path
+
+    def step(self):
+        self.time += self.frame_dt
+        self.burn()
+
+    def burn(self):
+        """The plume's grids at the time."""
+        density, temperature = make_plume(self.time)
+        self.density.buffer = density
+        self.temperature.buffer = temperature
 
     def set_peak_temperature(self, kelvin):
         self.exhaust.temperature_scale = kelvin

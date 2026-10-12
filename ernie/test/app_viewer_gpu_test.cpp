@@ -788,6 +788,10 @@ TEST_F(ViewerTest, ViewportTogglesShowOverlaysAndHudItemsList) {
         });
     viewer_->AddViewportMenuItem(
         "Pause", [](Viewer&) {}, [](const Viewer&) { return true; });
+    // The grid, off by default.
+    ViewportDisplay withGrid = viewer_->GetViewportDisplay();
+    withGrid.grid = true;
+    viewer_->SetViewportDisplay(withGrid);
     viewer_->Step();
     EXPECT_FALSE(shown().contains("contacts"))
         << "its toggle hides it";
