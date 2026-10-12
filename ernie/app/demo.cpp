@@ -474,17 +474,23 @@ struct DemoRunner::State {
             }
             ImGui::SetNextItemOpen(current >= first && current < end,
                                    ImGuiCond_Appearing);
+            // Ids apart from the labels: a demo may share its
+            // category's name (batched's "cameras").
+            ImGui::PushID(("category/" + category).c_str());
             if (ImGui::CollapsingHeader(category.c_str())) {
                 ImGui::Indent();
                 for (std::size_t i = first; i < end; ++i) {
+                    ImGui::PushID(catalog[i].Id().c_str());
                     if (ImGui::Selectable(catalog[i].name.c_str(),
                                           i == current &&
                                               running != nullptr)) {
                         switchTo = i;
                     }
+                    ImGui::PopID();
                 }
                 ImGui::Unindent();
             }
+            ImGui::PopID();
             first = end;
         }
         ImGui::SeparatorText(running != nullptr &&
