@@ -3705,8 +3705,8 @@ void RasterRenderer::Update(
             }
         }
         // Each light shadow view's volumes cast as its geometry does.
-        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
-                                                  lightCasters_.world);
+        std::vector<std::int32_t> lightViewWorlds(
+            lightViews_.size(), lightCasters_.world);
         for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
             lightViewWorlds[firstLayeredView_ + k] =
                 layeredPasses_[k].casters.world;

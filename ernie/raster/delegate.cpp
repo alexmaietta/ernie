@@ -1847,9 +1847,9 @@ void RasterDelegate::SetMeshWriter(const Path& path,
     }
 }
 
-void RasterDelegate::SetFieldWriter(const Path& path,
-                                    std::array<std::uint32_t, 3> shape,
-                                    FieldWriter writer) {
+void RasterDelegate::SetFieldWriter(
+    const Path& path, std::array<std::uint32_t, 3> shape,
+    FieldWriter writer) {
     renderer_.SetVolumeFieldWriter(path.String(), shape,
                                    std::move(writer));
 }

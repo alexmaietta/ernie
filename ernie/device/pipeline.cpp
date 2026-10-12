@@ -134,7 +134,8 @@ void PipelineLayout::Push(
             break;
         }
     }
-    // None for a layout without bindings, whose shaders take pointers.
+    // None for a layout without bindings, whose shaders take
+    // pointers.
     if (!writes.empty()) {
         context_.PushDescriptorSet()(
             commands, point, layout_, 0,

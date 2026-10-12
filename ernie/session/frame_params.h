@@ -531,8 +531,8 @@ struct VolumeSettings {
     std::uint32_t airSteps = 32;
     std::uint32_t maxOctaves = 8;
     std::uint32_t shadowResolution = 256;
-    /// Light each volume from its lighting cache, its optical depth to
-    /// the lights, the sky and the ground at a cell per two voxels
+    /// Light each volume from its lighting cache, its optical depth
+    /// to the lights, the sky and the ground at a cell per two voxels
     /// found once a frame, rather than marching to them every step.
     bool lightCache = true;
 

@@ -266,8 +266,9 @@ TEST(RenderSchemas, RegistryDescribesTheTypes) {
     EXPECT_FALSE(settings.abstract);
     EXPECT_EQ(settings.base, &base);
     EXPECT_EQ(product.base, &base);
-    ASSERT_EQ(product.attributes.size(), 2u)
-        << "its vars and filters; the rest its base's";
+    ASSERT_EQ(product.attributes.size(), 3u)
+        << "its vars, filters and in-place outputs; the rest its "
+           "base's";
     EXPECT_EQ(product.attributes[0].name, tokens::kOrderedVars);
     EXPECT_EQ(product.attributes[0].pyName, "ordered_vars");
     EXPECT_EQ(product.attributes[1].name, tokens::kFilters);
