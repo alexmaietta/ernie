@@ -123,18 +123,14 @@ class Demo(ernie.demo.Demo):
             -2.0,
             20.0,
             CASES["In sync"][0] * 1e3,
-            on_change=lambda ms: self.flash.set(
-                pulse_delay=ms * 1e-3
-            ),
+            on_change=self.delay,
         )
         self.widgets.slider(
             "Trigger jitter (ms)",
             0.0,
             3.0,
             0.0,
-            on_change=lambda ms: self.flash.set(
-                pulse_jitter=ms * 1e-3
-            ),
+            on_change=self.jitter,
         )
         if viewer is not None:
             viewer.active_camera = self.camera.path
@@ -165,6 +161,12 @@ class Demo(ernie.demo.Demo):
                 shutter_close=0.0,
                 shutter_rolling=0.0,
             )
+
+    def delay(self, ms):
+        self.flash.set(pulse_delay=ms * 1e-3)
+
+    def jitter(self, ms):
+        self.flash.set(pulse_jitter=ms * 1e-3)
 
     def radiance(self, name):
         """Case `name`'s radiance over the bands, rows by columns; each

@@ -39,8 +39,8 @@ def make_dust(drift=(0.0, 0.0, 0.0)):
         indexing="ij",
     )
     points = 0.4 * (np.stack([x, y, z], -1) - drift) + 3.0
-    billows = ernie.fbm_noise(
-        points.reshape(-1, 3), octaves=4, seed=5
+    billows = np.asarray(
+        ernie.fbm_noise(points.reshape(-1, 3), octaves=4, seed=5)
     )
     value = np.clip(0.55 + 0.6 * billows.reshape(shape), 0.0, 1.0)
     value *= np.exp(-z / 2.0)
@@ -176,7 +176,7 @@ class Demo(ernie.demo.Demo):
             0.0,
             1.0,
             DENSITY,
-            on_change=lambda d: self.dust_look.set(density=d),
+            on_change=self.thicken,
         )
         # Wind carrying the dust through the beams, which then flicker.
         self.wind = 0.0
@@ -195,6 +195,9 @@ class Demo(ernie.demo.Demo):
             display.lights = False
             display.grid = False
             viewer.viewport_display = display
+
+    def thicken(self, density):
+        self.dust_look.set(density=density)
 
     def step(self):
         if self.wind > 0.0:
