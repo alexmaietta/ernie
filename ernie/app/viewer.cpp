@@ -435,6 +435,23 @@ struct Viewer::State {
     Panel* plotsPanel = nullptr;
     VkDescriptorSet viewportTexture = VK_NULL_HANDLE;
     VkExtent2D requestedViewport{640, 360};
+    /// Kit's viewport resolution settings: the viewport's own size or
+    /// a chosen one (`custom`, width x height, its aspect kept while
+    /// editing when `lockAspect`), scaled by `scale`; the image fits
+    /// the viewport panel when `fill`, else shows at one texel per
+    /// pixel, centred.
+    struct RenderResolution {
+        bool custom = false;
+        int width = 1920;
+        int height = 1080;
+        bool lockAspect = true;
+        float scale = 1.0f;
+        bool fill = true;
+    } resolution;
+    /// Where the viewport's image shows in the panel, in screen
+    /// pixels: for picking and the gizmo.
+    ImVec2 imageMin{0.0f, 0.0f};
+    ImVec2 imageSize{1.0f, 1.0f};
 
     OrbitController controller;
     /// The active camera's world transform as the controller last
@@ -1350,18 +1367,42 @@ struct Viewer::State {
         }
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         const ImVec2 size = ImGui::GetContentRegionAvail();
+        // The render's size: the panel's or the chosen resolution,
+        // scaled.
+        const float baseWidth =
+            resolution.custom ? static_cast<float>(resolution.width)
+                              : std::max(size.x, 1.0f);
+        const float baseHeight =
+            resolution.custom ? static_cast<float>(resolution.height)
+                              : std::max(size.y, 1.0f);
         requestedViewport = {
-            static_cast<std::uint32_t>(std::max(size.x, 1.0f)),
-            static_cast<std::uint32_t>(std::max(size.y, 1.0f))};
+            static_cast<std::uint32_t>(std::max(
+                std::round(baseWidth * resolution.scale), 1.0f)),
+            static_cast<std::uint32_t>(std::max(
+                std::round(baseHeight * resolution.scale), 1.0f))};
+        // Where it shows: fitted to the panel, letterboxed, or at a
+        // texel per pixel, centred.
+        const ImVec2 extent(
+            static_cast<float>(requestedViewport.width),
+            static_cast<float>(requestedViewport.height));
+        const float fit =
+            resolution.fill
+                ? std::min(std::max(size.x, 1.0f) / extent.x,
+                           std::max(size.y, 1.0f) / extent.y)
+                : 1.0f;
+        imageSize = ImVec2(extent.x * fit, extent.y * fit);
+        imageMin = ImVec2(origin.x + 0.5f * (size.x - imageSize.x),
+                          origin.y + 0.5f * (size.y - imageSize.y));
         ImDrawList* draw = ImGui::GetWindowDrawList();
         draw->AddRectFilled(
             origin, ImVec2(origin.x + size.x, origin.y + size.y),
             ImGui::GetColorU32(ToImVec4(theme.background)));
         if (viewportTexture != VK_NULL_HANDLE) {
-            draw->AddImage(
-                ImTextureRef(
-                    reinterpret_cast<ImTextureID>(viewportTexture)),
-                origin, ImVec2(origin.x + size.x, origin.y + size.y));
+            draw->AddImage(ImTextureRef(reinterpret_cast<ImTextureID>(
+                               viewportTexture)),
+                           imageMin,
+                           ImVec2(imageMin.x + imageSize.x,
+                                  imageMin.y + imageSize.y));
         }
         // The gizmo takes the mouse over its handles and while
         // dragging; elsewhere the viewport navigates, and a click
@@ -1386,12 +1427,19 @@ struct Viewer::State {
                 ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
                 io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <=
                     kClickSlop * kClickSlop) {
-                PickAt(io.MousePos.x - origin.x,
-                       io.MousePos.y - origin.y, io.KeyCtrl);
+                // In the render's pixels; off the image picks none.
+                const float x = (io.MousePos.x - imageMin.x) *
+                                extent.x / imageSize.x;
+                const float y = (io.MousePos.y - imageMin.y) *
+                                extent.y / imageSize.y;
+                if (x >= 0.0f && y >= 0.0f && x < extent.x &&
+                    y < extent.y) {
+                    PickAt(x, y, io.KeyCtrl);
+                }
             }
         }
         HandleNavigation(hovered, active, size.y);
-        DrawGizmo(origin, size);
+        DrawGizmo(imageMin, imageSize);
         DrawToolbar(origin, size);
         DrawToolStrip(origin);
         DrawAxisIndicator(origin, size);
@@ -2042,6 +2090,92 @@ struct Viewer::State {
         }
     }
 
+    /// Kit's viewport resolution settings (Viewport > Render
+    /// Resolution, Render Scale, Fill Viewport): the viewport's own
+    /// size or a preset or custom one, its aspect locked while
+    /// editing, the render scaled, and the image fitted to the panel
+    /// or shown a texel per pixel.
+    void DrawResolutionMenu() {
+        RenderResolution& r = resolution;
+        if (menu::BeginSubmenu("Render Resolution")) {
+            if (menu::Option("Viewport Size", !r.custom)) {
+                r.custom = false;
+            }
+            const std::array<std::pair<int, int>, 6> presets{{
+                {1280, 720},
+                {1920, 1080},
+                {2560, 1440},
+                {3840, 2160},
+                {1024, 1024},
+                {2048, 1080},
+            }};
+            for (const auto& [width, height] : presets) {
+                const std::string label = std::to_string(width) +
+                                          " x " +
+                                          std::to_string(height);
+                if (menu::Option(label.c_str(),
+                                 r.custom && r.width == width &&
+                                     r.height == height)) {
+                    r = {true,         width,   height,
+                         r.lockAspect, r.scale, r.fill};
+                }
+            }
+            menu::Section("Custom");
+            const double aspect =
+                static_cast<double>(r.width) / std::max(r.height, 1);
+            int width = r.width;
+            int height = r.height;
+            ImGui::SetNextItemWidth(70.0f * contentScale);
+            if (ImGui::InputInt("##width", &width, 0, 0)) {
+                r.custom = true;
+                r.width = std::clamp(width, 1, 16384);
+                if (r.lockAspect) {
+                    r.height =
+                        std::clamp(static_cast<int>(
+                                       std::lround(r.width / aspect)),
+                                   1, 16384);
+                }
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted("x");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(70.0f * contentScale);
+            if (ImGui::InputInt("##height", &height, 0, 0)) {
+                r.custom = true;
+                r.height = std::clamp(height, 1, 16384);
+                if (r.lockAspect) {
+                    r.width = std::clamp(static_cast<int>(std::lround(
+                                             r.height * aspect)),
+                                         1, 16384);
+                }
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%.2f:1", aspect);
+            menu::Check("Lock Aspect Ratio", &r.lockAspect);
+            ImGui::EndMenu();
+        }
+        if (menu::BeginSubmenu("Render Scale")) {
+            for (const int percent :
+                 {25, 50, 75, 100, 125, 150, 200}) {
+                const std::string label =
+                    std::to_string(percent) + "%";
+                if (menu::Option(label.c_str(),
+                                 std::abs(r.scale * 100.0f -
+                                          static_cast<float>(
+                                              percent)) < 0.5f)) {
+                    r.scale = static_cast<float>(percent) / 100.0f;
+                }
+            }
+            ImGui::EndMenu();
+        }
+        menu::Check("Fill Viewport", &r.fill);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Fit the image to the viewport; off, show "
+                "it a texel per pixel");
+        }
+    }
+
     /// Kit's viewport settings menu: frame pacing, exposure, the
     /// perspective camera's lens and framing, then applications'
     /// items (`AddViewportMenuItem`).
@@ -2052,6 +2186,7 @@ struct Viewer::State {
             self.SetVsync(vsync);
         }
         menu::Check("Gizmo in Local Axes", &gizmoLocal);
+        DrawResolutionMenu();
         menu::Section("Exposure");
         // On and off in one: automatic, or the camera's own exposure.
         bool automatic = AutoExposing();
@@ -4082,6 +4217,25 @@ void Viewer::SetVsync(bool vsync) {
         ImGui_ImplVulkan_SetMinImageCount(
             state_->swapchain->MinImageCount());
     }
+}
+
+void Viewer::SetRenderResolution(
+    std::optional<std::pair<std::uint32_t, std::uint32_t>> size,
+    float scale, bool fill) {
+    if (!(scale > 0.0f)) {
+        throw std::invalid_argument(
+            "The render scale must be positive");
+    }
+    State::RenderResolution& r = state_->resolution;
+    r.custom = size.has_value();
+    if (size) {
+        r.width =
+            static_cast<int>(std::clamp(size->first, 1u, 16384u));
+        r.height =
+            static_cast<int>(std::clamp(size->second, 1u, 16384u));
+    }
+    r.scale = scale;
+    r.fill = fill;
 }
 
 Lighting Viewer::GetLighting() const {

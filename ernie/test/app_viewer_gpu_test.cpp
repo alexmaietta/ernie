@@ -1039,6 +1039,33 @@ TEST(ViewerLightingTest,
     std::filesystem::remove(path);
 }
 
+TEST_F(ViewerTest, RenderResolutionAndScaleSetTheViewportImage) {
+    const auto captured = [&]() {
+        for (int frame = 0; frame < 3; ++frame) {
+            EXPECT_TRUE(viewer_->Step());
+        }
+        const std::filesystem::path path = TempFile("resolution.png");
+        viewer_->Capture(path);
+        EXPECT_TRUE(viewer_->Step());
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        unsigned char* texels = stbi_load(
+            path.string().c_str(), &width, &height, &channels, 4);
+        stbi_image_free(texels);
+        std::filesystem::remove(path);
+        return std::pair(width, height);
+    };
+    viewer_->SetRenderResolution(std::pair(320u, 200u));
+    EXPECT_EQ(captured(), std::pair(320, 200));
+    viewer_->SetRenderResolution(std::pair(320u, 200u), 0.5f, false);
+    EXPECT_EQ(captured(), std::pair(160, 100));
+    viewer_->SetRenderResolution(std::nullopt);
+    EXPECT_NE(captured(), std::pair(320, 200)) << "the panel's own";
+    EXPECT_THROW(viewer_->SetRenderResolution(std::nullopt, 0.0f),
+                 std::invalid_argument);
+}
+
 TEST_F(ViewerTest, ThemesApplyAtRunTime) {
     Theme theme;
     theme.panel = {0.5f, 0.5f, 0.5f, 1.0f};

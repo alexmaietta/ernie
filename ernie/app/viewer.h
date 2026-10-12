@@ -550,6 +550,15 @@ class Viewer {
     bool GetVsync() const;
     void SetVsync(bool vsync);
 
+    /// The viewport's render resolution, as Kit's Viewport menu sets
+    /// it: `size` (width, height) or none for the viewport panel's
+    /// own, times `scale`; `fill` fits the image to the panel,
+    /// letterboxed, else it shows a texel per pixel, centred. The
+    /// camera's aspect follows the resolution.
+    void SetRenderResolution(
+        std::optional<std::pair<std::uint32_t, std::uint32_t>> size,
+        float scale = 1.0f, bool fill = true);
+
     /// How the viewport draws triangle edges: a mode overriding the
     /// render settings' own (`ernie:wireframe`) in the viewport only,
     /// or none (the default) to follow them. The Z key cycles through
