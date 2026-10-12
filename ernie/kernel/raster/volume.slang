@@ -193,7 +193,9 @@ struct ShadingResources {
 // The pass's own buffers (`VolumePass`): the volumes, their materials, each view's runs of
 // `viewVolumes` (offset and count of those it marches, then of those that shadow them), and the
 // volumes each view sees; for the volumes' shadow maps (`volumeShadowMain`), the lights and their
-// shadow views' view-projections, and how many volumes, texels across a map and lights there are.
+// shadow views' view-projections and the worlds whose volumes cast into them besides the shared
+// ones (`ShadowCasters::world`'s: `kAllWorlds`, `kNoWorld` or one), and how many volumes, texels
+// across a map and lights there are.
 struct VolumeResources {
     VolumeGpu* volumes;
     VolumeMaterialGpu* materials;
@@ -201,6 +203,7 @@ struct VolumeResources {
     uint* lists;
     LightGpu* shadowLights;
     float4x4* shadowViews;
+    int* shadowWorlds;
     uint volumeCount;
     uint shadowSize;
     uint lightCount;
@@ -883,12 +886,26 @@ void writeNoRadiance(uint3 id, uint layer) {
 static const uint kShadowSlices = 8;
 static const uint kShadowSubsteps = 4;
 
-// The extinction coefficient at world point `world` of every volume whose group `casters` holds.
-float extinctionAt(float3 world, uint casters) {
+// `VolumeResources::shadowWorlds`' (drawable.h's ShadowCasters'): every world's volumes, or only
+// the shared.
+static const int kAllWorlds = -1;
+static const int kNoWorld = -2;
+
+// Whether `volume` casts into a shadow view of world `viewWorld` (`VolumeResources::shadowWorlds`)
+// for a light whose shadow group is `casters`.
+bool castsInto(VolumeGpu volume, int viewWorld, uint casters) {
+    let world = int(volume.info.y);
+    return volume.density.grid.x != kNoGrid && ((casters >> volume.info.z) & 1u) != 0 &&
+           (world == -1 || viewWorld == kAllWorlds || world == viewWorld);
+}
+
+// The extinction coefficient at world point `world` of every volume that casts into a shadow view
+// of world `viewWorld` for shadow group `casters`.
+float extinctionAt(float3 world, int viewWorld, uint casters) {
     float sigma = 0.0;
     for (uint i = 0; i < pass.volumeCount; ++i) {
         let volume = volumes[i];
-        if (volume.density.grid.x == kNoGrid || ((casters >> volume.info.z) & 1u) == 0) {
+        if (!castsInto(volume, viewWorld, casters)) {
             continue;
         }
         let local = float3(dot(volume.toLocal[0], float4(world, 1.0)),
@@ -951,11 +968,12 @@ void volumeShadowMain(uint3 id : SV_DispatchThreadID) {
     // below 0.
     let orthographic = all(abs(viewProj[3].xyz) < float3(1e-7));
     let back = orthographic ? -1e6 : 0.0;
+    let viewWorld = pass.shadowWorlds[view];
     float near = 1.0;
     float far = back;
     for (uint i = 0; i < pass.volumeCount; ++i) {
         let volume = volumes[i];
-        if (volume.density.grid.x == kNoGrid || ((casters >> volume.info.z) & 1u) == 0) {
+        if (!castsInto(volume, viewWorld, casters)) {
             continue;
         }
         let o = float3(dot(volume.toLocal[0], float4(start, 1.0)),
@@ -988,7 +1006,8 @@ void volumeShadowMain(uint3 id : SV_DispatchThreadID) {
         let step = (to - from) / float(kShadowSubsteps);
         let length = length(step);
         for (uint j = 0; j < kShadowSubsteps; ++j) {
-            opticalDepth += extinctionAt(from + step * (float(j) + 0.5), casters) * length;
+            opticalDepth +=
+                extinctionAt(from + step * (float(j) + 0.5), viewWorld, casters) * length;
         }
         slices[i] = exp(-opticalDepth);
         from = to;

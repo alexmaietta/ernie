@@ -3,6 +3,7 @@
 
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
+#include "ernie/raster/drawable.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/scene/light_pattern.h"
 #include "ernie/scene/tokens.h"
@@ -53,12 +54,13 @@ struct VolumeResources {
     VkDeviceAddress lists;
     VkDeviceAddress lights;
     VkDeviceAddress lightViews;
+    VkDeviceAddress lightViewWorlds;
     std::uint32_t volumeCount;
     std::uint32_t shadowSize;
     std::uint32_t lightCount;
     std::uint32_t unused;
 };
-static_assert(sizeof(VolumeResources) == 64,
+static_assert(sizeof(VolumeResources) == 72,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -318,6 +320,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                      const SpectralBands& bands,
                      std::span<const std::int32_t> viewWorlds,
                      std::span<const glm::mat4> viewProjections,
+                     std::span<const std::int32_t> lightViewWorlds,
                      std::uint64_t frame, FrameUploads& uploads) {
     ERNIE_ZONE("Volumes");
     seed_ = static_cast<std::uint32_t>(frame * 2654435761u);
@@ -517,9 +520,15 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     upload(materials_, std::as_bytes(std::span(materials)));
     upload(runs_, std::as_bytes(std::span(runs)));
     upload(lists_, std::as_bytes(std::span(lists)));
+    const std::int32_t none = ShadowCasters::kNoWorld;
+    upload(lightViewWorlds_,
+           lightViewWorlds.empty()
+               ? std::as_bytes(std::span(&none, 1))
+               : std::as_bytes(lightViewWorlds));
     // The passes read them by address (VolumeResources, `Prepare`).
     addresses_ = {volumes_->Address(), materials_->Address(),
-                  runs_->Address(), lists_->Address()};
+                  runs_->Address(), lists_->Address(),
+                  lightViewWorlds_->Address()};
     volumeCount_ = static_cast<std::uint32_t>(instances.size());
 }
 
@@ -541,6 +550,7 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     resources.lists = addresses_[3];
     resources.lights = lights.Address();
     resources.lightViews = lightViews.Address();
+    resources.lightViewWorlds = addresses_[4];
     resources.volumeCount = volumeCount_;
     resources.shadowSize = kShadowSize;
     resources.lightCount = lightCount;

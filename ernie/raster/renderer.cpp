@@ -3182,9 +3182,16 @@ void RasterRenderer::Update(
                     raster.View(v).ViewProjection());
             }
         }
+        // Each light shadow view's volumes cast as its geometry does.
+        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
+                                                  lightCasters_.world);
+        for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
+            lightViewWorlds[firstLayeredView_ + k] =
+                layeredPasses_[k].casters.world;
+        }
         volumes_->Set(raster.volumes, raster.origin, bands_,
-                      viewWorlds_, viewProjections, params.frame,
-                      uploads_);
+                      viewWorlds_, viewProjections, lightViewWorlds,
+                      params.frame, uploads_);
     }
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.

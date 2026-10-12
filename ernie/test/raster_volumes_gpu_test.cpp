@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
+#include "ernie/scene/base_schemas.h"
+#include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
@@ -514,4 +517,67 @@ TEST_F(RasterDelegateTest, AVolumeShadowsTheGroundBelowIt) {
         EXPECT_NEAR(shaded[b] / lit[b], expected, 0.05 * expected)
             << "band " << b;
     }
+}
+
+TEST_F(RasterDelegateTest, EachWorldOfABatchShadowsWithItsOwnVolumes) {
+    // Three views from above of a shared floor, of world 0, world 1
+    // and every world, under a sun 45 degrees up towards +x: world 0's
+    // dense cube 10 m up at x = 10 shades the floor's centre only in
+    // the views that see world 0.
+    Scene scene;
+    const glm::dmat4 above = ernie::LookAtTransform(
+        {0.0, 0.0, 60.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+    std::vector<double> poses;
+    for (int view = 0; view < 3; ++view) {
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                poses.push_back(above[col][row]);
+            }
+        }
+    }
+    ernie::Camera::Define(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetPoses(Tensor::Copy<double>(poses, {3, 4, 4}))
+        .SetWorlds(Tensor::Copy<std::int32_t>(
+            std::vector<std::int32_t>{0, 1, -1}, {3}));
+    scene.Define("/World/Sun", tokens::kDistantLight)
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    DefineQuad(scene, "/World/Floor", 20.0f);
+    ernie::Xform::Define(scene, "/Envs/Env0").SetWorld(0);
+    ernie::Volume volume =
+        ernie::Volume::Define(scene, "/Envs/Env0/Smoke");
+    volume.GetPrim().SetXform({.translate = glm::dvec3(10.0, 0.0, 10.0),
+                               .scale = glm::dvec3(3.0)});
+    ernie::OpenVDBAsset::Define(scene, "/Envs/Env0/Smoke/Density")
+        .SetFilePath(CubeFile());
+    volume.SetField("density", "/Envs/Env0/Smoke/Density")
+        .SetMaterialBinding("/Looks/Smoke");
+    ernie::Material::Define(scene, "/Looks/Smoke").SetDensity(3.0);
+    ernie::Xform::Define(scene, "/Envs/Env1").SetWorld(1);
+    ernie::RenderProduct::Define(scene, "/Render/Batch")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize));
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetAmbient(0.1);
+
+    RasterDelegate delegate(*context_);
+    const Path batchOnly[] = {"/Render/Batch"};
+    const Tensor images = delegate.Step(scene, batchOnly)
+                              .at("/Render/Batch")
+                              .vars.at("LdrColor")
+                              .Map(ernie::MapDevice::Cpu)
+                              .tensor;
+    const auto centre = [&](std::size_t view) {
+        const std::uint8_t* texel =
+            images.As<std::uint8_t>() +
+            ((view * kSize + kSize / 2) * kSize + kSize / 2) * 4;
+        return texel[0] + texel[1] + texel[2];
+    };
+    EXPECT_LT(centre(0), centre(1) / 2)
+        << "world 0's smoke shades the floor in its view";
+    EXPECT_LT(centre(2), centre(1) / 2)
+        << "a view of every world sees every world's shadows";
+    EXPECT_GT(centre(1), 100)
+        << "world 1 has no smoke, so its floor is lit";
 }

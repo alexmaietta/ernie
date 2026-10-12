@@ -79,12 +79,15 @@ class VolumePass {
     /// it sees: those of its world (`FrameParams::ViewWorld`) and the
     /// shared ones, and with `viewProjections` (one per view,
     /// relative to `origin`; empty when the poses are on the GPU)
-    /// only those its frustum reaches.
+    /// only those its frustum reaches; and for each light shadow
+    /// view, the world whose volumes it shadows with besides the
+    /// shared ones (`lightViewWorlds`, `ShadowCasters::world`'s).
     /// @throws std::runtime_error if a grid's file cannot be read.
     void Set(std::span<const VolumeParams> volumes,
              const glm::dvec3& origin, const SpectralBands& bands,
              std::span<const std::int32_t> viewWorlds,
              std::span<const glm::mat4> viewProjections,
+             std::span<const std::int32_t> lightViewWorlds,
              std::uint64_t frame, FrameUploads& uploads);
 
     /// Whether any volume is drawn this frame.
@@ -168,11 +171,12 @@ class VolumePass {
     std::unique_ptr<GpuBuffer> materials_;
     std::unique_ptr<GpuBuffer> runs_;
     std::unique_ptr<GpuBuffer> lists_;
+    std::unique_ptr<GpuBuffer> lightViewWorlds_;
     /// volume.slang's VolumeResources: the buffers above by address.
     std::unique_ptr<GpuBuffer> resources_;
     /// What `Set` gives `Prepare` to write into `resources_`: the
     /// buffers' addresses and the volumes' count.
-    std::array<VkDeviceAddress, 4> addresses_{};
+    std::array<VkDeviceAddress, 5> addresses_{};
     std::uint32_t volumeCount_ = 0;
     PipelineLayout shadowLayout_;
     mutable std::unique_ptr<ComputePipeline> shadowPipeline_;
