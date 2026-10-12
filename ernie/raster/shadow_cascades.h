@@ -39,6 +39,11 @@ struct ShadowCascade {
     /// Shadow linking (`LightParams::shadowMask`): the link groups of
     /// the geometry its map draws.
     std::uint32_t shadowMask = ~0u;
+    /// Of a light moving across the shutter, posed again per
+    /// sub-frame (`RasterRenderer::subframeLightViews_`):
+    /// `lightViewProjection` is only the frame's pose, so passes cull
+    /// nothing by it.
+    bool moving = false;
 };
 
 /// View-space split depths from `nearPlane` to `farPlane` with the

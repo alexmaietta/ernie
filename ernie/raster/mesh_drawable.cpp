@@ -2779,8 +2779,15 @@ void MeshDrawable::Cull(const FrameParams& params,
     const auto list = [&](const glm::mat4& viewProjection,
                           float pixelsPerUnit, bool pyramid,
                           const ShadowCasters* seen, bool posed,
-                          std::uint32_t linkMask = ~0u) {
-        const Frustum frustum = Frustum::FromMatrix(viewProjection);
+                          std::uint32_t linkMask = ~0u,
+                          bool cull = true) {
+        // Without culling, planes everything is inside.
+        Frustum frustum;
+        frustum.planes.fill(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        if (cull) {
+            frustum = Frustum::FromMatrix(viewProjection);
+        }
+        posed = posed && cull;
         const auto slot = static_cast<std::uint32_t>(views.size() /
                                                      kCullViewStride);
         pushView(frustum, viewProjection, pixelsPerUnit, pyramid);
@@ -2962,7 +2969,7 @@ void MeshDrawable::Cull(const FrameParams& params,
             list(cascade.lightViewProjection,
                  1.0f / std::max(cascade.texelWorldSize, 1e-30f),
                  false, seen ? &*seen : nullptr, !cascade.gpuFitted,
-                 cascade.shadowMask));
+                 cascade.shadowMask, !cascade.moving));
     }
     if (!gpuShadowSlots_.empty()) {
         Reserve(context_, gpuShadowSlotBuffer_,

@@ -502,7 +502,8 @@ class RasterRenderer {
     };
 
     /// Laser `key`'s region for a `width` x `height` image, made (or
-    /// made again, at another size) as needed. Growing the buffer
+    /// made again, at another size, its old space taken by the next
+    /// regions that fit) as needed. Growing the buffer
     /// waits for the device to idle and moves every region; a view of
     /// the previous buffer keeps it alive, so its values can still be
     /// copied.
@@ -736,12 +737,16 @@ class RasterRenderer {
     void BuildPyramid(VkCommandBuffer commands,
                       GpuImage& image) const;
     /// Records the sun's and the other lights' shadow maps of the
-    /// frame's casters, with `frame`'s uniforms: a sub-frame's, whose
-    /// time (`Uniforms::motion`) places moving casters.
+    /// frame's casters, with `frame`'s uniforms: sub-frame
+    /// `subframe`'s, whose time (`Uniforms::motion`) places moving
+    /// casters, and whose poses place moving lights' views
+    /// (`subframeLightViews_`, written into the views' matrices in
+    /// the command stream, for its shading too).
     void
     RecordShadowMaps(VkCommandBuffer commands,
                      std::span<const RasterDrawable* const> drawables,
-                     const RasterFrame& frame) const;
+                     const RasterFrame& frame,
+                     std::uint32_t subframe) const;
     /// Spectral shading and the sky of `targets`' views into their
     /// raster radiance, with the uniforms of view `firstView` on (a
     /// sub-frame's).
@@ -900,6 +905,10 @@ class RasterRenderer {
     /// sub-frame, each posed at its time (`LightParams::previous`),
     /// which its views read (`ShadingUniforms::view`).
     bool lightSubframes_ = false;
+    /// With `lightSubframes_`, per sub-frame, the moving lights'
+    /// shadow views (index, view-projection) fitted at its time.
+    std::vector<std::vector<std::pair<std::uint32_t, glm::mat4>>>
+        subframeLightViews_;
     std::uint32_t faces_ =
         1;  ///< Raster layers per view: a cube camera's faces.
     /// Whether the last `Update`'s frame holds the MotionVector var,
@@ -1098,6 +1107,10 @@ class RasterRenderer {
     /// applications may write in place; the floats the regions take.
     std::map<std::string, PatternArrayRegion> patternArrayRegions_;
     std::size_t patternArrayFloats_ = 0;
+    /// Space regions left at another size (offset, floats), in order
+    /// and merged, which new regions take before the end grows.
+    std::vector<std::pair<std::size_t, std::size_t>>
+        patternArrayFree_;
     /// The frame's arrays to read into their regions
     /// (`PatternArrayWrites`), and the regions whose mip levels the
     /// frame builds (`RecordPatternMips`).

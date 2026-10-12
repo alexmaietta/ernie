@@ -855,6 +855,31 @@ TEST_F(RasterDelegateTest,
     EXPECT_NEAR(at(swapped, 1.0f), 0.05, 0.0015);
 }
 
+TEST_F(RasterDelegateTest,
+       PatternArrayRegionsReuseTheSpaceTheyLeave) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    if (delegate.Compute(&why) == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    ernie::RasterRenderer& renderer = delegate.Renderer();
+    // 8 x 8 texels and their mips take 85 floats, 4 x 4 take 21.
+    const auto a = renderer.EnsurePatternArray("a", 8, 8);
+    const auto b = renderer.EnsurePatternArray("b", 4, 4);
+    EXPECT_EQ(a.offset, 0u);
+    EXPECT_EQ(b.offset, 85u);
+    const VkDeviceSize size = renderer.PatternArrays()->Size();
+    // Shrunk, "a" takes the start of its own old space; grown, "b"
+    // takes the rest of it and its own, merged.
+    EXPECT_EQ(renderer.EnsurePatternArray("a", 4, 4).offset, 0u);
+    EXPECT_EQ(renderer.EnsurePatternArray("b", 8, 8).offset, 21u);
+    EXPECT_EQ(renderer.EnsurePatternArray("a", 4, 4).offset, 0u)
+        << "the same size keeps its region";
+    // Nothing fits a larger one: it goes at the end.
+    EXPECT_EQ(renderer.EnsurePatternArray("c", 16, 16).offset, 106u);
+    EXPECT_GE(renderer.PatternArrays()->Size(), size);
+}
+
 TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

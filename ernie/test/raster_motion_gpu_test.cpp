@@ -419,6 +419,31 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       MovingLightsShadowEachSubframeFromWhereTheyAre) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    // A lamp sliding over the raised quad, which shadows the ground
+    // under it from wherever the lamp is.
+    scene.Remove("/World/Sun");
+    scene.Remove("/World/Rocks");
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(-6.0);
+    ernie::SphereLight::Define(scene, "/World/Lamp")
+        .SetRadius(0.2)
+        .SetIntensity(2e5)
+        .SetShadowEnable(true);
+    ExpectMotionBlur(
+        delegate, scene,
+        [&](double s) {
+            scene.Set("/World/Lamp", tokens::kTransform,
+                      glm::translate(
+                          glm::dmat4(1.0),
+                          glm::dvec3(-8.0 + 16.0 * s, 0.0, 8.0)));
+        },
+        5);
+}
+
+TEST_F(RasterDelegateTest,
        CameraMotionBlurAveragesTheViewsAcrossTheShutter) {
     RasterDelegate delegate(*context_);
     Scene scene = MotionScene();

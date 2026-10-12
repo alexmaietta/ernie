@@ -109,19 +109,19 @@ class SpeckleDemo : public app::Demo {
             .SetCamera(Path("/World/Camera"))
             .SetResolution(kResolution)
             .SetAmbient(0.0);
-        StopDown(1);
-        std::vector<std::string> names;
-        for (const double n : kFNumbers) {
-            char name[16];
-            std::snprintf(name, sizeof(name), "f/%g", n);
-            names.emplace_back(name);
-        }
-        Widgets().Combo(
-            "f-number", std::move(names), 1,
-            [this](std::size_t index) { StopDown(index); });
+        StopDown(8.0);
+        Widgets().Slider("f-number", 1.4, 22.0, 8.0,
+                         [this](double n) { StopDown(n); });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->SetLighting(app::Lighting::Stage);
+            // The wall alone: no light gizmos or grid over the
+            // speckle.
+            app::ViewportDisplay display =
+                viewer->GetViewportDisplay();
+            display.lights = false;
+            display.grid = false;
+            viewer->SetViewportDisplay(display);
         }
     }
 
@@ -166,10 +166,9 @@ class SpeckleDemo : public app::Demo {
     }
 
   private:
-    /// Sets the lens to kFNumbers[index], the exposure time keeping
-    /// the image as bright.
-    void StopDown(std::size_t index) {
-        const double n = kFNumbers[index];
+    /// Sets the lens to f-number `n`, the exposure time keeping the
+    /// image as bright.
+    void StopDown(double n) {
         Camera(GetScene(), "/World/Camera")
             .SetExposureFStop(n)
             .SetExposureTime(1e-3 * n * n);
@@ -185,9 +184,7 @@ class SpeckleDemo : public app::Demo {
         LaserLight laser(GetScene(), "/World/Laser");
         laser.SetSpeckle(n > 0.0);
         if (n > 0.0) {
-            StopDown(static_cast<std::size_t>(
-                std::find(kFNumbers.begin(), kFNumbers.end(), n) -
-                kFNumbers.begin()));
+            StopDown(n);
         }
         const std::vector<Path> products{Path("/Render/Camera")};
         RenderProductSetOutputs outputs =

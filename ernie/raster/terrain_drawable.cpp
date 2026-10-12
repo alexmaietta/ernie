@@ -1014,13 +1014,16 @@ void TerrainDrawable::Prepare(
         }
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
-        // A view the GPU fits draws every patch: its matrix here is
-        // only an estimate.
+        // A view the GPU fits, or one moving across the shutter,
+        // draws every patch: its matrix here is only an estimate, or
+        // one of its sub-frames'.
         const Frustum light = Shifted(
             Frustum::FromMatrix(cascades[c].lightViewProjection),
             local);
         tree_.Select(lodEyes_.front(), ranges,
-                     cascades[c].gpuFitted ? nullptr : &light,
+                     cascades[c].gpuFitted || cascades[c].moving
+                         ? nullptr
+                         : &light,
                      params_.exaggeration, patches_);
         cascadeRanges_[c] = {
             first,

@@ -115,21 +115,22 @@ class Demo(ernie.demo.Demo):
             ambient=0.0,
         )
         self.images = {}  # per f-number (None: speckle off)
-        self.stop_down(1)
-        self.widgets.combo(
-            "f-number",
-            [f"f/{n:g}" for n in F_NUMBERS],
-            1,
-            on_change=self.stop_down,
+        self.stop_down(8.0)
+        self.widgets.slider(
+            "f-number", 1.4, 22.0, 8.0, on_change=self.stop_down
         )
         if viewer is not None:
             viewer.active_camera = self.camera.path
             viewer.lighting = ernie.app.Lighting.STAGE
+            # The wall alone: no light gizmos or grid over the speckle.
+            display = viewer.viewport_display
+            display.lights = False
+            display.grid = False
+            viewer.viewport_display = display
 
-    def stop_down(self, index):
-        """Sets the lens to F_NUMBERS[index], the exposure time keeping
-        the image as bright."""
-        n = F_NUMBERS[index]
+    def stop_down(self, n):
+        """Sets the lens to f-number `n`, the exposure time keeping the
+        image as bright."""
         self.camera.set(exposure_f_stop=n, exposure_time=1e-3 * n * n)
 
     def radiance(self, f_number):
@@ -139,7 +140,7 @@ class Demo(ernie.demo.Demo):
             return self.images[f_number]
         self.laser.speckle = f_number is not None
         if f_number is not None:
-            self.stop_down(F_NUMBERS.index(f_number))
+            self.stop_down(f_number)
         outputs = self.renderer.step(
             self.scene, render_products=["/Render/Camera"]
         )
