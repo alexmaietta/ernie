@@ -3120,6 +3120,18 @@ struct Viewer::State {
             ImGui::SameLine();
             DrawCameraBar();
         }
+        // A screenshot, at the end of the bar.
+        ImGui::SameLine();
+        if (ImGui::Button((std::string(icons::kCamera) +
+                           "  Capture##barScreenshot")
+                              .c_str())) {
+            self.Screenshot();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Capture a screenshot (F10); the Capture "
+                "panel sets where and what");
+        }
 
         // The lighting in the top right corner, as Kit's "Stage
         // Lights", and the heads-up display below it.

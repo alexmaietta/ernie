@@ -47,7 +47,15 @@ class TimelinePanel final : public Panel {
         const float unit = ImGui::GetFontSize();
         const float field = 4.0f * unit;
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-        const float button = ImGui::GetFrameHeight();
+        // An icon button: the widest icon and the frame's padding.
+        float icon = 0.0f;
+        for (const char* glyph :
+             {icons::kSkipBack, icons::kStepBack, icons::kPlay,
+              icons::kSquare, icons::kRepeat, icons::kSettings}) {
+            icon = std::max(icon, ImGui::CalcTextSize(glyph).x);
+        }
+        const float button =
+            icon + 2.0f * ImGui::GetStyle().FramePadding.x;
 
         // The range's start, the ruler, its end and the current time
         // code, then the transport, as Kit lays its timeline out.
