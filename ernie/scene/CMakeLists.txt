@@ -25,6 +25,7 @@ ernie_add_library(
     sensor_filters.cpp
     stage_schemas.cpp
     terrain_schemas.cpp
+    volume_schemas.cpp
     wide_view.cpp
     xform.cpp
     PUBLIC

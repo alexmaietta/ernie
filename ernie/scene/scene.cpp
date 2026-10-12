@@ -133,6 +133,11 @@ const Tensor* Prim::Read(std::string_view attribute) const {
                              : nullptr;
 }
 
+std::vector<std::string> Prim::Attributes() const {
+    return scene_ != nullptr ? scene_->Attributes(path_)
+                             : std::vector<std::string>{};
+}
+
 Scene::UniqueId::UniqueId() {
     static std::atomic<std::uint64_t> next{1};
     value = next.fetch_add(1, std::memory_order_relaxed);

@@ -44,6 +44,7 @@ nav:
       - Shadows: concepts/shadows.md
       - Terrain and planets: concepts/terrain.md
       - Star fields: concepts/star-fields.md
+      - Volumes: concepts/volumes.md
   - Extending Ernie:
       - Overview: extending/index.md
       - Materials:

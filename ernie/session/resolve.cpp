@@ -13,6 +13,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
+#include "ernie/session/volumes.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/atmosphere.h"
 #include "ernie/util/ies.h"
@@ -2713,6 +2714,7 @@ FrameParams FrameParamsOf(const Scene& scene,
     for (const Path& body : prims.bodies) {
         params.bodies.push_back(BodyParamsOf(scene, body));
     }
+    params.volumes = VolumesOf(scene);
     for (const Path& light : prims.lights) {
         const auto posed = prims.lightTransforms.find(light);
         params.lights.push_back(

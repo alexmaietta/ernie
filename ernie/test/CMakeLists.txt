@@ -36,6 +36,7 @@ ernie_add_test_suite(
     scene_sensor_filters_test.cpp
     scene_stage_test.cpp
     scene_terrain_schemas_test.cpp
+    scene_volume_schemas_test.cpp
     scene_wide_view_test.cpp
     scene_xform_test.cpp
     session_delegate_test.cpp
@@ -47,6 +48,7 @@ ernie_add_test_suite(
     util_image_test.cpp
     util_reflectance_library_test.cpp
     util_ies_test.cpp
+    util_nanovdb_test.cpp
     util_astronomy_test.cpp
     util_atmosphere_test.cpp
     util_scattering_test.cpp
@@ -85,6 +87,7 @@ ernie_add_test_suite(
     raster_standard_filters_gpu_test.cpp
     raster_terrain_drawable_test.cpp
     raster_textures_gpu_test.cpp
+    raster_volumes_gpu_test.cpp
     raster_zero_copy_gpu_test.cpp
     scene_brdf_vulkan_test.cpp
     support/delegate_scenes.cpp

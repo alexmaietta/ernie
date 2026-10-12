@@ -115,7 +115,50 @@
     X(double, DetailHexSharpness, ::ernie::tokens::kDetailHexSharpness, 7.0,                       \
       (::ernie::AttributeMeta{.label = "Hex sharpness",                                            \
                               .doc = "Exponent on the barycentric blend weights.",                 \
-                              .group = "Detail textures", .min = 1.0, .max = 32.0}))
+                              .group = "Detail textures", .min = 1.0, .max = 32.0}))               \
+    X(double, Density, ::ernie::tokens::kVolumeDensity, 1.0,                                       \
+      (::ernie::AttributeMeta{.doc = "Scales the density field into the extinction coefficient, "  \
+                                     "1/m.",                                                       \
+                              .group = "Volume", .max = 1e6}))                                     \
+    X(std::string, DensityField, ::ernie::tokens::kVolumeDensityField, "density",                  \
+      (::ernie::AttributeMeta{.doc = "The Volume's field (field:<name>) of density.",              \
+                              .group = "Volume"}))                                                 \
+    X(glm::dvec3, VolumeAlbedo, ::ernie::tokens::kVolumeAlbedo, glm::dvec3(0.0),                   \
+      (::ernie::AttributeMeta{.label = "Scattering albedo",                                        \
+                              .doc = "Linear RGB share of the extinction that scatters; the rest " \
+                                     "absorbs. 0, smoke that only absorbs.",                       \
+                              .group = "Volume", .color = true}))                                  \
+    X(double, Anisotropy, ::ernie::tokens::kVolumeAnisotropy, 0.0,                                 \
+      (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
+                                     "backwards.",                                                 \
+                              .group = "Volume", .min = -0.99, .max = 0.99}))                      \
+    X(glm::dvec3, EmissionColor, ::ernie::tokens::kVolumeEmissionColor, glm::dvec3(1.0),           \
+      (::ernie::AttributeMeta{.label = "Emission colour", .doc = "Linear RGB.", .group = "Volume", \
+                              .color = true}))                                                     \
+    X(double, EmissionStrength, ::ernie::tokens::kVolumeEmissionStrength, 0.0,                     \
+      (::ernie::AttributeMeta{.doc = "Radiance added per metre, cd/m^2 per m for a white "         \
+                                     "colour, times the emission field.",                          \
+                              .group = "Volume", .max = 1e9}))                                     \
+    X(std::string, EmissionField, ::ernie::tokens::kVolumeEmissionField, "",                       \
+      (::ernie::AttributeMeta{.doc = "The field the emission follows; unset, the density field.",  \
+                              .group = "Volume"}))                                                 \
+    X(double, Blackbody, ::ernie::tokens::kVolumeBlackbody, 1.0,                                   \
+      (::ernie::AttributeMeta{.label = "Black-body emission",                                      \
+                              .doc = "Scales the glow of what absorbs at its temperature, "        \
+                                     "Planck's law times the absorption coefficient (Kirchhoff); " \
+                                     "1 is physical, 0 none.",                                     \
+                              .group = "Volume", .max = 1e3}))                                     \
+    X(double, Temperature, ::ernie::tokens::kVolumeTemperature, 0.0,                               \
+      (::ernie::AttributeMeta{.doc = "Kelvin, of the whole volume when it has no temperature "     \
+                                     "field; 0, no glow.",                                         \
+                              .group = "Volume", .max = 1e5}))                                     \
+    X(std::string, TemperatureField, ::ernie::tokens::kVolumeTemperatureField, "temperature",      \
+      (::ernie::AttributeMeta{.doc = "The Volume's field of temperature in kelvin, times the "     \
+                                     "temperature scale.",                                         \
+                              .group = "Volume"}))                                                 \
+    X(double, TemperatureScale, ::ernie::tokens::kVolumeTemperatureScale, 1.0,                     \
+      (::ernie::AttributeMeta{.doc = "Takes the temperature field's values to kelvin.",            \
+                              .group = "Volume", .max = 1e5}))
 
 #define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
     X(std::string, InfoId, ::ernie::tokens::kInfoId, "",                                           \

@@ -445,6 +445,18 @@ static_assert(
         kSensorStride == sizeof(SensorUniforms),
     "Shading and the filters index the views' uniforms as arrays");
 
+/// Where the volume pass reads a view's block of the shading
+/// uniforms.
+VolumePass::ViewLayout VolumeLayout() {
+    using Offset = std::uint32_t;
+    return {
+        static_cast<Offset>(kShadingStride),
+        static_cast<Offset>(offsetof(ShadingUniforms, invViewProj)),
+        static_cast<Offset>(offsetof(ShadingUniforms, strip)),
+        static_cast<Offset>(offsetof(ShadingUniforms, range)),
+        static_cast<Offset>(offsetof(ShadingUniforms, size))};
+}
+
 /// Samples per axis of the RGB-to-spectrum coefficient table.
 constexpr std::uint32_t kTableResolution = 17;
 
@@ -1282,6 +1294,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     noHeights_->Upload(height);
     atmosphere_ =
         std::make_unique<AtmosphereLuts>(context_, compiler_);
+    volumes_ = std::make_unique<VolumePass>(context_, compiler_);
 
     const std::vector<ShaderModuleSource> hzbModules{
         {"hzb", shaders::kHzbSlang}};
@@ -2967,6 +2980,20 @@ void RasterRenderer::Update(
     WriteLightTiming(frame, params,
                      static_cast<std::uint32_t>(raster.Views()));
     WriteShading(raster);
+    {
+        // Each view's frustum culls its volumes, unless the views'
+        // poses are on the GPU.
+        std::vector<glm::mat4> viewProjections;
+        if (!raster.posesOnGpu && !pushbroom_) {
+            for (std::uint32_t v = 0; v < views_; ++v) {
+                viewProjections.push_back(
+                    raster.View(v).ViewProjection());
+            }
+        }
+        volumes_->Set(raster.volumes, raster.origin, bands_,
+                      viewWorlds_, viewProjections, params.frame,
+                      uploads_);
+    }
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.
     motionVectors_ =
@@ -3378,7 +3405,11 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
     sensor.clear[2] = params.clearColor.b;
     // The background holds the sky's radiance; or with motion blur,
     // every pixel the sub-frames'.
-    sensor.clear[3] = sky_ != 0 ? 1.0f : subframes_ > 1 ? 2.0f : 0.0f;
+    // Volumes write the background's without a sky (`VolumePass`).
+    sensor.clear[3] = sky_ != 0            ? 1.0f
+                      : subframes_ > 1     ? 2.0f
+                      : volumes_->Active() ? 1.0f
+                                           : 0.0f;
     sensor.range[0] = static_cast<float>(bands_.minNm);
     sensor.range[1] = static_cast<float>(bands_.Width());
     // The optics filters read (sensor.slang's PixelContext): the
@@ -4023,6 +4054,12 @@ void RasterRenderer::RecordViews(
             draw(DrawPhase::Occludees, true);
         }
         Shade(commands, targets, first);
+        if (volumes_->Active()) {
+            volumes_->Record(commands, targets, shadingUniforms_,
+                             VolumeLayout(), first, extent_.width,
+                             extent_.height, pushbroom_, sky_ != 0);
+            ShaderBarrier(commands);
+        }
         if (subframes_ > 1) {
             Accumulate(commands, targets, subframe);
         }

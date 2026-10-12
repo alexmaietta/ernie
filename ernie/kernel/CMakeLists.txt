@@ -71,7 +71,10 @@ set(ernie_shaders
     raster/terrain_shadow.slang=kTerrainShadowSlang
     raster/terrain_update.slang=kTerrainUpdateSlang
     raster/terrain_horizon.slang=kTerrainHorizonSlang
-    raster/views.slang=kViewsSlang)
+    raster/views.slang=kViewsSlang
+    raster/volume.slang=kVolumeSlang
+    raster/pnanovdb_prelude.slang=kPNanoVdbPreludeSlang
+    ../../third_party/nanovdb/PNanoVDB.h=kPNanoVdbHeader)
 set(shader_files)
 foreach(entry ${ernie_shaders})
     string(REGEX REPLACE "=.*" "" shader "${entry}")

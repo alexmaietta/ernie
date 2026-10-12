@@ -6,6 +6,7 @@ ernie_add_library(
     frame_params.cpp
     outputs.cpp
     resolve.cpp
+    volumes.cpp
     PUBLIC
     ernie_device
     ernie_geometry

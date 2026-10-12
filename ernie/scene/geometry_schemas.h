@@ -9,8 +9,9 @@
 
 /// Geometry as reflected schemas (`prim_type.h`): UsdGeom's implicit
 /// shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule
-/// and Plane), its point-based Mesh and Points, the PointInstancer
-/// and UsdVol's Volume, and Ernie's GroundPlane. Each declaration's
+/// and Plane), its point-based Mesh and Points, the PointInstancer,
+/// and Ernie's GroundPlane (UsdVol's Volume is in
+/// `volume_schemas.h`). Each declaration's
 /// fallback is the value Ernie draws an unset attribute with
 /// (UsdGeom's own). Bulk arrays (points, topology, instance
 /// transforms) are tensors, written with `Scene::Write`; primvars
@@ -235,12 +236,6 @@ class PointInstancer : public Boundable {
     ERNIE_SCHEMA_BODY(PointInstancer, Boundable,
                       ERNIE_POINT_INSTANCER_ALL)
     ERNIE_SCHEMA_DEFINE(PointInstancer)
-};
-
-/// A volume (UsdVol); Ernie does not draw volumes yet.
-class Volume : public Gprim {
-    ERNIE_SCHEMA_BODY(Volume, Gprim, ERNIE_GPRIM_ALL)
-    ERNIE_SCHEMA_DEFINE(Volume)
 };
 
 /// Ernie: an infinite horizontal floor facing +z at a world height,

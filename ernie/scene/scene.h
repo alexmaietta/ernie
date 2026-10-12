@@ -132,6 +132,9 @@ class Prim {
 
     const Tensor* Read(std::string_view attribute) const;
 
+    /// As `Scene::Attributes`; empty for an empty handle.
+    std::vector<std::string> Attributes() const;
+
   private:
     Scene* scene_ = nullptr;
     Path path_;

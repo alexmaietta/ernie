@@ -13,6 +13,7 @@
 #include "ernie/raster/overlay_pass.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/raster/sensor_plan.h"
+#include "ernie/raster/volume_pass.h"
 #include "ernie/scene/brdf.h"
 #include "ernie/scene/light_pattern.h"
 
@@ -157,6 +158,11 @@ class RasterRenderer {
     /// The atmosphere of the last `Update` and its tables.
     const AtmosphereLuts& AtmosphereTables() const {
         return *atmosphere_;
+    }
+
+    /// The volumes of the last `Update` and their grids.
+    const VolumePass& Volumes() const {
+        return *volumes_;
     }
 
     const BrdfRegistry& Brdfs() const {
@@ -1134,6 +1140,8 @@ class RasterRenderer {
         noHeights_;  ///< Binds in place of a terrain's heights.
     std::unique_ptr<AtmosphereLuts>
         atmosphere_;  ///< The planet's atmosphere and its tables.
+    std::unique_ptr<VolumePass>
+        volumes_;  ///< The Volumes and their grids.
     std::unique_ptr<ComputePipeline> occlusionPipeline_;
     std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
     mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;

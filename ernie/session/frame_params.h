@@ -476,6 +476,51 @@ struct AtmosphereParams {
     }
 };
 
+/// A field a volume shades with (`VolumesOf`): a grid of a NanoVDB
+/// file, an OpenVDBAsset's.
+struct VolumeFieldParams {
+    std::string file;      ///< `filePath`, as authored.
+    std::string gridName;  ///< `fieldName`; empty for any grid.
+    int gridIndex = 0;     ///< `fieldIndex`.
+    /// The field prim's frame to its volume's.
+    glm::dmat4 toVolume{1.0};
+
+    bool operator==(const VolumeFieldParams&) const = default;
+};
+
+/// How a volume's fields shade: its Material's volume inputs
+/// (`material_schemas.h`), the emission colour times its strength.
+struct VolumeMaterialParams {
+    double density = 1.0;
+    glm::dvec3 albedo{0.0};
+    double anisotropy = 0.0;
+    glm::dvec3 emission{0.0};  ///< cd/m^2 per world unit for white.
+    double blackbody = 1.0;
+    double temperature = 0.0;  ///< Kelvin, without a field.
+    double temperatureScale = 1.0;
+
+    bool operator==(const VolumeMaterialParams&) const = default;
+};
+
+/// A Volume (`VolumesOf`): where it is, which world, its material and
+/// its density, temperature and emission fields, each optional.
+/// `instances`, when not empty, places it several times, each with
+/// its own world (`instanceWorlds`, or `world` for all), sharing its
+/// fields and material.
+struct VolumeParams {
+    std::string prim;           ///< Its path, for messages.
+    glm::dmat4 transform{1.0};  ///< Local to world.
+    std::int32_t world = -1;
+    VolumeMaterialParams material;
+    std::optional<VolumeFieldParams> density;
+    std::optional<VolumeFieldParams> temperature;
+    std::optional<VolumeFieldParams> emission;
+    std::vector<glm::dmat4> instances;  ///< Local to world, each.
+    std::vector<std::int32_t> instanceWorlds;
+
+    bool operator==(const VolumeParams&) const = default;
+};
+
 /// A CelestialBody far beyond the scene (`BodyParamsOf`): drawn in
 /// the sky and eclipsing the sun.
 struct BodyParams {
@@ -535,6 +580,8 @@ struct FrameParams {
     /// Bodies such as moons, at most `kMaxBodies`.
     std::vector<BodyParams> bodies;
     static constexpr std::size_t kMaxBodies = 4;
+    /// The visible Volumes (`VolumesOf`).
+    std::vector<VolumeParams> volumes;
     float exposure =
         1.0f;  ///< Extra scale on the photographic output.
     bool meter =

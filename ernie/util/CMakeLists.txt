@@ -6,6 +6,7 @@ ernie_add_library(
     atmosphere.cpp
     ies.cpp
     image.cpp
+    nanovdb.cpp
     profiler.cpp
     reflectance_library.cpp
     scattering.cpp
@@ -18,4 +19,5 @@ ernie_add_library(
     ernie_tracy
     PRIVATE
     ernie_stb
+    ernie_nanovdb
     ernie_openexr)

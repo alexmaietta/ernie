@@ -1051,6 +1051,10 @@ void BindScene(nb::module_& m) {
         .def_prop_ro("path", &Prim::GetPath)
         .def_prop_ro("type", &Prim::Type)
         .def_prop_ro("valid", &Prim::IsValid)
+        .def(
+            "attributes", &Prim::Attributes,
+            "The attribute names set or written on the prim, in name "
+            "order.")
         .def("__bool__", &Prim::IsValid)
         .def("define", &Prim::Define, nb::arg("relative"),
              nb::arg("type"), nb::keep_alive<0, 1>(),
@@ -2212,6 +2216,14 @@ void BindScene(nb::module_& m) {
         {"POINT_INSTANCER", tokens::kPointInstancer},
         {"GEOM_POINTS", tokens::kGeomPoints},
         {"VOLUME", tokens::kVolume},
+        {"OPENVDB_ASSET", tokens::kOpenVDBAsset},
+        {"FILE_PATH", tokens::kFilePath},
+        {"FIELD_NAME", tokens::kFieldName},
+        {"FIELD_INDEX", tokens::kFieldIndex},
+        {"VOLUME_DENSITY", tokens::kVolumeDensity},
+        {"VOLUME_ALBEDO", tokens::kVolumeAlbedo},
+        {"VOLUME_EMISSION_STRENGTH", tokens::kVolumeEmissionStrength},
+        {"VOLUME_TEMPERATURE", tokens::kVolumeTemperature},
         {"CAMERA", tokens::kCamera},
         {"DISTANT_LIGHT", tokens::kDistantLight},
         {"GROUND_PLANE", tokens::kGroundPlane},

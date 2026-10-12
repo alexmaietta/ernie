@@ -124,4 +124,11 @@ extern const char kPlanetSlang[];
 extern const char kPlanetColorSlang[];
 extern const char kPlanetShadowSlang[];
 
+/// The volume march (`VolumePass`), and PNanoVDB's reader
+/// (third_party/nanovdb) with what precedes it, which the march is
+/// compiled after.
+extern const char kVolumeSlang[];
+extern const char kPNanoVdbPreludeSlang[];
+extern const char kPNanoVdbHeader[];
+
 }  // namespace ernie::shaders

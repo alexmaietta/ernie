@@ -17,6 +17,7 @@ ernie_add_library(
     sensor_plan.cpp
     shadow_cascades.cpp
     terrain_drawable.cpp
+    volume_pass.cpp
     PUBLIC
     ernie_session
     PRIVATE

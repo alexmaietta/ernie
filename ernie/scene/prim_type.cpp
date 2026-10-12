@@ -8,6 +8,7 @@
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
+#include "ernie/scene/volume_schemas.h"
 
 #include <algorithm>
 #include <array>
@@ -702,7 +703,7 @@ std::span<const PrimTypeDef* const> PrimTypes() {
              {BaseSchemaTypes(), LightSchemaTypes(),
               GeometrySchemaTypes(), CameraSchemaTypes(),
               MaterialSchemaTypes(), RenderSchemaTypes(),
-              TerrainSchemaTypes()}) {
+              TerrainSchemaTypes(), VolumeSchemaTypes()}) {
             all.insert(all.end(), family.begin(), family.end());
         }
         return all;

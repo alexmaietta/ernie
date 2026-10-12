@@ -3,9 +3,6 @@
 
 namespace ernie {
 
-// For types that declare no attributes of their own.
-#define ERNIE_NO_GEOMETRY_ATTRIBUTES(X)
-
 ERNIE_DEFINE_SCHEMA(
     Cube, tokens::kCube, &Gprim::Definition(), false,
     "A box centred on its origin, size along each axis.",
@@ -53,9 +50,6 @@ ERNIE_DEFINE_SCHEMA(PointInstancer, tokens::kPointInstancer,
                     "relationship's targets) at rows "
                     "of positions, orientations and scales.",
                     ERNIE_POINT_INSTANCER_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Volume, tokens::kVolume, &Gprim::Definition(),
-                    false, "A volume (UsdVol); not drawn yet.",
-                    ERNIE_NO_GEOMETRY_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(GroundPlane, tokens::kGroundPlane,
                     &Imageable::Definition(), false,
                     "Ernie: an infinite horizontal floor facing +z "
@@ -64,13 +58,13 @@ ERNIE_DEFINE_SCHEMA(GroundPlane, tokens::kGroundPlane,
                     ERNIE_GROUND_PLANE_ATTRIBUTES)
 
 std::vector<const PrimTypeDef*> GeometrySchemaTypes() {
-    return {&Cube::Definition(),           &Sphere::Definition(),
-            &AxisShape::Definition(),      &Cylinder::Definition(),
-            &Cone::Definition(),           &Capsule::Definition(),
-            &Plane::Definition(),          &PointBased::Definition(),
-            &Mesh::Definition(),           &Points::Definition(),
-            &PointInstancer::Definition(), &Volume::Definition(),
-            &GroundPlane::Definition()};
+    return {
+        &Cube::Definition(),           &Sphere::Definition(),
+        &AxisShape::Definition(),      &Cylinder::Definition(),
+        &Cone::Definition(),           &Capsule::Definition(),
+        &Plane::Definition(),          &PointBased::Definition(),
+        &Mesh::Definition(),           &Points::Definition(),
+        &PointInstancer::Definition(), &GroundPlane::Definition()};
 }
 
 }  // namespace ernie

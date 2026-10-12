@@ -3,6 +3,7 @@
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/volume_schemas.h"
 #include "ernie/session/resolve.h"
 #include "ernie/util/tensor.h"
 

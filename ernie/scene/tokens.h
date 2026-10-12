@@ -58,6 +58,57 @@ inline constexpr std::string_view kPointInstancer = "PointInstancer";
 /// by their displayColor.
 inline constexpr std::string_view kGeomPoints = "Points";
 inline constexpr std::string_view kVolume = "Volume";
+
+// Volumes (UsdVol). A Volume names its fields with relationships
+// `field:<name>` (`field:density`, `field:temperature`), each to a
+// field prim: an OpenVDBAsset, a grid of a NanoVDB file (.nvdb; .vdb
+// files are converted first). Its bound Material's volume inputs
+// below say how the fields shade.
+//
+// Reference: Pixar, UsdVol,
+// https://openusd.org/release/api/usd_vol_page_front.html
+inline constexpr std::string_view kFieldBase = "FieldBase";
+inline constexpr std::string_view kFieldAsset = "FieldAsset";
+inline constexpr std::string_view kOpenVDBAsset = "OpenVDBAsset";
+/// The namespace of a Volume's field relationships.
+inline constexpr std::string_view kField = "field";
+inline constexpr std::string_view kFilePath =
+    "filePath";  ///< asset: the grid's file.
+inline constexpr std::string_view kFieldName =
+    "fieldName";  ///< token: the grid's name in the file.
+inline constexpr std::string_view kFieldIndex =
+    "fieldIndex";  ///< int: which of the grids of that name.
+inline constexpr std::string_view kFieldDataType =
+    "fieldDataType";  ///< token: the grid's value type.
+inline constexpr std::string_view kVectorDataRoleHint =
+    "vectorDataRoleHint";  ///< token: what a vector grid holds.
+inline constexpr std::string_view kFieldClass =
+    "fieldClass";  ///< token: levelSet, fogVolume, staggered.
+// The volume inputs of a Material. The density field times
+// `inputs:density` is the extinction coefficient in 1/m, of which
+// `inputs:volumeAlbedo` scatters; the rest absorbs, and a temperature
+// field makes what absorbs glow as a black body.
+inline constexpr std::string_view kVolumeDensity = "inputs:density";
+inline constexpr std::string_view kVolumeDensityField =
+    "inputs:densityField";
+inline constexpr std::string_view kVolumeAlbedo =
+    "inputs:volumeAlbedo";
+inline constexpr std::string_view kVolumeAnisotropy =
+    "inputs:anisotropy";
+inline constexpr std::string_view kVolumeEmissionColor =
+    "inputs:emissionColor";
+inline constexpr std::string_view kVolumeEmissionStrength =
+    "inputs:emissionStrength";
+inline constexpr std::string_view kVolumeEmissionField =
+    "inputs:emissionField";
+inline constexpr std::string_view kVolumeBlackbody =
+    "inputs:blackbody";
+inline constexpr std::string_view kVolumeTemperature =
+    "inputs:temperature";
+inline constexpr std::string_view kVolumeTemperatureField =
+    "inputs:temperatureField";
+inline constexpr std::string_view kVolumeTemperatureScale =
+    "inputs:temperatureScale";
 inline constexpr std::string_view kCamera = "Camera";
 inline constexpr std::string_view kDistantLight = "DistantLight";
 inline constexpr std::string_view kSphereLight = "SphereLight";

@@ -150,6 +150,14 @@ def main(output):
             else "Schema"
         )
         lines += _class_lines(prim_type, base)
+        if prim_type.name == "Volume":
+            # The field helpers schema.py adds.
+            lines[-1:] = [
+                "    def set_field(self, name: str, field: Prim | Schema | Path | str) -> Self: ...",
+                "    def get_field(self, name: str) -> Path | None: ...",
+                "    def field_names(self) -> list[str]: ...",
+                "",
+            ]
     # The stage metadata's view, of the root prim (not a prim type).
     lines += _class_lines(ernie.stage_type(), "Schema")[:-1]
     lines += [

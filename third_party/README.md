@@ -9,6 +9,7 @@ implementation. Build glue is in `cmake/third_party/<name>.cmake`.
 | Library | Version | Files | License | Used for |
 | --- | --- | --- | --- | --- |
 | [stb](https://github.com/nothings/stb) | commit `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `stb_image.h`, `stb_image_write.h` | MIT or public domain | Reading PNG (8/16-bit) and JPEG textures |
+| [NanoVDB](https://github.com/AcademySoftwareFoundation/openvdb/tree/master/nanovdb) (OpenVDB) | `v13.0.0` (NanoVDB 32.9) | `PNanoVDB.h` | Apache-2.0 | Reading .nvdb grids, and sampling them in the volume shaders |
 | [DLPack](https://github.com/dmlc/dlpack) | `v1.3` | `include/dlpack/dlpack.h` | Apache-2.0 | Tensor exchange with NumPy, PyTorch, JAX and Warp |
 
 To update one, replace its headers with the files from the new upstream version, update the

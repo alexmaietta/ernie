@@ -436,6 +436,42 @@ globals().update(classes)
 __all__ += list(classes)
 
 
+def _field_relationship(name: str) -> str:
+    return f"field:{name}"
+
+
+def _set_field(self: Schema, name: str, field: Any) -> Schema:
+    """Names ``field`` (a field prim, typed prim or path) as the
+    field ``name`` ("density") of this Volume: its relationship
+    ``field:<name>``; returns the volume."""
+    target = _target(field)
+    self.prim.set(
+        _field_relationship(name),
+        Path(target) if isinstance(target, str) else target,
+    )
+    return self
+
+
+def _get_field(self: Schema, name: str) -> Path | None:
+    """The field prim's path this Volume names ``name``, or None."""
+    return self.prim.get(_field_relationship(name))
+
+
+def _field_names(self: Schema) -> list[str]:
+    """The names of this Volume's fields, sorted."""
+    prefix = _field_relationship("")
+    return sorted(
+        name[len(prefix) :]
+        for name in self.prim.attributes()
+        if name.startswith(prefix) and ":" not in name[len(prefix) :]
+    )
+
+
+classes["Volume"].set_field = _set_field
+classes["Volume"].get_field = _get_field
+classes["Volume"].field_names = _field_names
+
+
 class _StageView(Schema):
     """A scene's stage metadata: a view of its root prim, which stays
     untyped."""
