@@ -315,8 +315,8 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
                      static_cast<double>(
                          std::max(minHeight_ * params_.exaggeration,
                                   maxHeight_ * params_.exaggeration));
-    return Bounds3{glm::vec3(glm::dvec3(-r) - origin_),
-                   glm::vec3(glm::dvec3(r) - origin_)};
+    return Bounds3{glm::vec3(glm::dvec3(-r) - Offset()),
+                   glm::vec3(glm::dvec3(r) - Offset())};
 }
 
 void PlanetDrawable::Select(const glm::dvec3& eye,
@@ -331,7 +331,7 @@ void PlanetDrawable::Select(const glm::dvec3& eye,
             lod_.VertexDirection(patch.face, patch.originX,
                                  patch.originY) *
                 lod_.Radius() -
-            origin_;
+            Offset();
         anchors_.emplace_back(glm::vec3(anchor), 0.0f);
     }
 }
@@ -374,7 +374,7 @@ void PlanetDrawable::Prepare(
         lodFrusta_.clear();
         for (std::size_t v = 0; v < views; ++v) {
             const CameraView view = frame.View(v);
-            lodEyes_.push_back(origin_ + glm::dvec3(view.eye));
+            lodEyes_.push_back(Offset() + glm::dvec3(view.eye));
             lodFrusta_.push_back(
                 Shifted(Frustum::FromMatrix(view.ViewProjection()),
                         -view.eye));
@@ -416,7 +416,7 @@ void PlanetDrawable::Prepare(
                               BufferMemory::Device);
     }
     for (std::size_t v = 0; v < views; ++v) {
-        const glm::vec3 eye(lodEyes_[v] - origin_);
+        const glm::vec3 eye(lodEyes_[v] - Offset());
         uniforms.lodEye[0] = eye.x;
         uniforms.lodEye[1] = eye.y;
         uniforms.lodEye[2] = eye.z;
@@ -440,7 +440,7 @@ void PlanetDrawable::Prepare(
                                              patch.originX,
                                              patch.originY) *
                             lod_.Radius() -
-                        origin_;
+                        Offset();
                     anchors_.emplace_back(glm::vec3(anchor), 0.0f);
                 }
             }
@@ -467,7 +467,7 @@ void PlanetDrawable::Prepare(
         }
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
-        const glm::vec3 eye(lodEyes_.front() - origin_);
+        const glm::vec3 eye(lodEyes_.front() - Offset());
         // A view the GPU fits draws every patch: its matrix here is
         // only an estimate.
         const Frustum light = Shifted(

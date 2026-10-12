@@ -2509,9 +2509,10 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
             "Atmosphere '" + path.String() + "' has no preset '" +
             params.preset + "'; use 'earth' or 'mars'");
     }
-    // Anchored on the ground, a planet Terrain's air, at the world's
-    // origin; anchored at the centre, its own planet's, wherever the
-    // Terrain is (the Earth's air seen from a Terrain Moon).
+    // Anchored on the ground, a planet Terrain's air, about the
+    // Terrain's centre; anchored at the centre, its own planet's,
+    // wherever the Terrain is (the Earth's air seen from a Terrain
+    // Moon).
     const std::string anchor = prim.GetAnchor();
     if (anchor != tokens::kAnchorGround &&
         anchor != tokens::kAnchorCentre) {
@@ -2532,9 +2533,10 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
             ? glm::dvec3(0.0)
             : glm::dvec3(0.0, 0.0, -params.planetRadius);
     params.planetCentre =
-        planetTerrain > 0.0 ? glm::dvec3(0.0)
-                            : glm::dvec3(scene.WorldTransform(path) *
-                                         glm::dvec4(local, 1.0));
+        planetTerrain > 0.0
+            ? glm::dvec3(scene.WorldTransform(terrain)[3])
+            : glm::dvec3(scene.WorldTransform(path) *
+                         glm::dvec4(local, 1.0));
     params.groundAlbedo =
         std::clamp(prim.GetGroundAlbedo(), 0.0, 1.0);
     params.hazeOpticalDepth =

@@ -52,8 +52,9 @@
                               .group = "Terrain"}))                                                \
     X(double, PlanetRadius, ::ernie::tokens::kPlanetRadius, 0.0,                                   \
       (::ernie::AttributeMeta{.doc = "World units. Set, the Terrain is a whole planet of this "    \
-                                     "radius centred at the world's origin, its heights cube "     \
-                                     "faces, and the origin and cell size do not apply.",          \
+                                     "radius centred at its transform's translation (its "         \
+                                     "rotation not yet applied), its heights cube faces, and the " \
+                                     "origin and cell size do not apply.",                         \
                               .group = "Terrain"}))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \

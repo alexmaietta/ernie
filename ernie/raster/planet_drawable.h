@@ -113,6 +113,13 @@ class PlanetDrawable : public RasterDrawable {
         origin_ = origin;
     }
 
+    /// The frame's origin relative to the planet's centre (its
+    /// transform's translation, `TerrainParams::planetCentre`): the
+    /// planet's points less it are the frame's.
+    glm::dvec3 Offset() const {
+        return origin_ - params_.planetCentre;
+    }
+
     /// The bounding box of the body at the current exaggeration,
     /// relative to the origin; none without heights.
     std::optional<Bounds3> Bounds() const override;

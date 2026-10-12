@@ -934,6 +934,13 @@ TEST(AtmosphereParamsOf, PlacesThePlanet) {
                                     prims.terrain);
     EXPECT_DOUBLE_EQ(air.planetRadius, 3396.2e3);
     EXPECT_EQ(air.planetCentre, glm::dvec3(0.0));
+    // A planet Terrain's transform moves it, and its air.
+    scene.Set("/World/Mars", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 0.0, -3396.2e3)));
+    air = ernie::AtmosphereParamsOf(scene, prims.atmosphere,
+                                    prims.terrain);
+    EXPECT_EQ(air.planetCentre, glm::dvec3(0.0, 0.0, -3396.2e3));
     EXPECT_TRUE(air.SameModel(air));
 
     scene.Set("/World/Air", tokens::kAtmospherePreset,

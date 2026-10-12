@@ -70,6 +70,8 @@ struct TerrainParams {
         315.0f;  ///< Hillshade's light, degrees clockwise from north.
     float hillshadeAltitude =
         45.0f;  ///< Hillshade's light, degrees above the horizon.
+    /// A planet's centre, world: its transform's translation.
+    glm::dvec3 planetCentre{0.0};
 };
 
 /// The unit direction towards `params`' hillshade light in a frame of

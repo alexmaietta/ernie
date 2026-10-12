@@ -375,6 +375,8 @@ TerrainParams TerrainParamsOf(const Scene& scene,
             static_cast<float>(terrain.GetHillshadeAzimuth());
         params.hillshadeAltitude =
             static_cast<float>(terrain.GetHillshadeAltitude());
+        params.planetCentre =
+            glm::dvec3(scene.WorldTransform(prims.terrain)[3]);
     }
     const RenderSettings settings =
         RenderSettings::OrFallbacks(scene, prims.settings);
