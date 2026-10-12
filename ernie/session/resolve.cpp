@@ -3360,6 +3360,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
         glm::max(glm::vec3(emission), glm::vec3(0.0f));
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));
+    settings.speckleRoughness =
+        static_cast<float>(std::max(view.GetSpeckleRoughness(), 0.0));
     return settings;
 }
 

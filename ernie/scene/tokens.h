@@ -657,6 +657,12 @@ inline constexpr std::string_view kPolarizationAngle =
 /// its specular reflection polarizes by Fresnel's laws regardless.
 inline constexpr std::string_view kPolarizationRetention =
     "ernie:polarization:retention";
+/// A material's rms surface height in m, which decides how fully
+/// laser speckle develops on it (`ernie:laser:speckle`): optically
+/// rough (well above a quarter wavelength, the default) shows full
+/// contrast, smooth (polished, 0) none.
+inline constexpr std::string_view kSpeckleRoughness =
+    "ernie:speckle:roughness";
 /// A camera's polarizer (Ernie): "none", "linear" (one in front of
 /// the lens, at `ernie:polarizer:angle`) or "mosaic" (a polarization
 /// sensor's 2 x 2 cells of 90, 45 / 135, 0 degree polarizers over its

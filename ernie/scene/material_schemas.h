@@ -61,6 +61,11 @@
                               .doc = "Share of incident polarization diffuse reflection keeps, 0 " \
                                      "to 1; dark, single-scattering surfaces keep more.",          \
                               .group = "Surface", .max = 1.0}))                                    \
+    X(double, SpeckleRoughness, ::ernie::tokens::kSpeckleRoughness, 1e-5,                          \
+      (::ernie::AttributeMeta{.label = "Speckle roughness",                                        \
+                              .doc = "RMS surface height, m: rough (the default) shows laser "     \
+                                     "speckle fully, polished (0) none.",                          \
+                              .group = "Surface", .max = 1e-3}))                                   \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = "Use albedo map", .group = "Surface"}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \

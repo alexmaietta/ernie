@@ -217,7 +217,8 @@ bool HasStageLights(const Scene& scene) {
     for (const std::string_view type :
          {tokens::kDistantLight, tokens::kSphereLight,
           tokens::kRectLight, tokens::kDiskLight,
-          tokens::kCylinderLight, tokens::kDomeLight}) {
+          tokens::kCylinderLight, tokens::kDomeLight,
+          tokens::kLaserLight}) {
         for (const Path& path : scene.Prims(type)) {
             if (!IsSessionPath(path) && scene.IsVisible(path)) {
                 return true;

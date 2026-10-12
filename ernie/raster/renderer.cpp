@@ -154,7 +154,9 @@ struct LightGpu {
     /// x: its pattern's index in the registry, y: the laser's
     /// wavelength (nm), z: the frame's time (s), w: its sequence's
     /// frames (`lightTiming_` says which show); `patternExtent` xy
-    /// its tangent-plane half extents (0 unbounded); `patternLayout`
+    /// its tangent-plane half extents (0 unbounded), z how volumes
+    /// light by its beams (1 a spot's, 2 a grid's, integrated across
+    /// rays; 0 sampled); `patternLayout`
     /// its data and image in `patternData_` (shading.slang's
     /// LightPatternParams); its parameters.
     float pattern[4];
@@ -444,8 +446,10 @@ struct MaterialGpu {
     /// Spectral radiance the surface emits per band (W m^-2 sr^-1
     /// nm^-1).
     float emission[SpectralBands::kMaxBands];
+    /// x: its rms surface height, m, for laser speckle; yzw unused.
+    float surface[4];
 };
-static_assert(sizeof(MaterialGpu) == 592,
+static_assert(sizeof(MaterialGpu) == 608,
               "MaterialGpu must match shading.slang");
 
 /// Reflectance luminance below which a material counts as black; its
@@ -2661,6 +2665,15 @@ void RasterRenderer::WriteLights(
             }
             std::copy(values.begin(), values.end(),
                       entry.patternParams);
+            // Beams volumes integrate across rays (volume.slang's
+            // `BeamCrossings`): a spot's, or a grid's of at most 64
+            // beamlets.
+            const bool smallGrid = beam.pattern == "grid" &&
+                                   values.size() >= 2 &&
+                                   values[0] * values[1] <= 64.0f;
+            entry.patternExtent[2] = beam.IsSpot() ? 1.0f
+                                     : smallGrid   ? 2.0f
+                                                   : 0.0f;
             // Its integral to compute (`patternNormMain`), unless
             // it is 1.
             if (!model->normalized) {
@@ -4017,6 +4030,7 @@ void RasterRenderer::WriteMaterialTable() {
         }
         entry.info[3] = std::bit_cast<std::uint32_t>(
             settings.polarizationRetention);
+        entry.surface[0] = settings.speckleRoughness;
         models.insert(index);
         const std::vector<float>& params = material->Params();
         std::copy_n(params.begin(),

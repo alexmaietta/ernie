@@ -331,6 +331,9 @@ TEST(SessionTest, SessionLightsAreDefinedOnceAndFollowTheCamera) {
     EXPECT_TRUE(HasStageLights(scene));
     sun.SetVisibility(tokens::kInvisible);
     EXPECT_FALSE(HasStageLights(scene));
+    LaserLight::Define(scene, "/World/Laser");
+    EXPECT_TRUE(HasStageLights(scene))
+        << "lasers light the stage too";
 }
 
 TEST(SessionTest, UnionSkipsMissingBounds) {

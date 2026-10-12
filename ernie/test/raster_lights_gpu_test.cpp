@@ -1294,16 +1294,97 @@ TEST_F(RasterDelegateTest,
     const glm::dvec2 fine = measure(1.0);
     EXPECT_NEAR(fine.x, 1.0, 0.05) << "the light's mean kept";
     EXPECT_NEAR(fine.y, contrast(1.0, 1.0), 0.06);
-    // Grains a few pixels across: nearly full contrast.
-    const glm::dvec2 coarse = measure(8.0);
-    EXPECT_NEAR(coarse.y, contrast(8.0, 1.0), 0.15);
-    EXPECT_GT(coarse.y, 1.8 * fine.y);
     // Fixed to the scene: the same frame again.
-    EXPECT_EQ(measure(8.0), coarse);
-    // A floor that depolarizes the light shows two patterns.
+    EXPECT_EQ(measure(8.0), measure(8.0));
+
+    // Grains a few pixels across, about a hundred in the image, so
+    // what follows averages over the patterns of four camera
+    // positions three apertures apart (the field boils as the camera
+    // moves), each the light over the light without speckle.
+    camera.SetExposureFStop(8.0);
+    const double aperture =
+        params.focalLengthMm * shrink * 1e-3 / 8.0;
+    const auto ratios = [&](double dx) {
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform({dx, 0.0, 100.0},
+                                         {dx, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+        const std::vector<float> speckled = Band8(delegate, scene);
+        std::vector<double> values;
+        for (std::size_t i = 0; i < plain.size(); ++i) {
+            if (plain[i] > 0.5f * peak) {
+                values.push_back(speckled[i] / plain[i]);
+            }
+        }
+        return values;
+    };
+    const auto correlation = [](const std::vector<double>& a,
+                                const std::vector<double>& b) {
+        double ma = 0.0;
+        double mb = 0.0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            ma += a[i] / a.size();
+            mb += b[i] / b.size();
+        }
+        double ab = 0.0;
+        double aa = 0.0;
+        double bb = 0.0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            ab += (a[i] - ma) * (b[i] - mb);
+            aa += (a[i] - ma) * (a[i] - ma);
+            bb += (b[i] - mb) * (b[i] - mb);
+        }
+        return ab / std::sqrt(aa * bb);
+    };
+    // The mean contrast over the four positions, and the mean
+    // correlation of each one's pattern with the camera moved `dx`
+    // on.
+    const auto patterns = [&](double dx) {
+        double meanContrast = 0.0;
+        double meanCorrelation = 0.0;
+        for (int k = 0; k < 4; ++k) {
+            const std::vector<double> a = ratios(3.0 * k * aperture);
+            double mean = 0.0;
+            double squares = 0.0;
+            for (const double v : a) {
+                mean += v / a.size();
+                squares += v * v / a.size();
+            }
+            meanContrast +=
+                std::sqrt(squares - mean * mean) / mean / 4.0;
+            if (dx != 0.0) {
+                meanCorrelation +=
+                    correlation(a, ratios(3.0 * k * aperture + dx)) /
+                    4.0;
+            }
+        }
+        return glm::dvec2(meanContrast, meanCorrelation);
+    };
+    // Nearly full contrast; a floor that depolarizes the light shows
+    // two patterns.
+    const double coarse = patterns(0.0).x;
+    EXPECT_NEAR(coarse, contrast(8.0, 1.0), 0.08);
+    EXPECT_GT(coarse, 1.8 * fine.y);
     ernie::Material(scene, "/Looks/Grey")
         .SetPolarizationRetention(0.0);
-    EXPECT_NEAR(measure(8.0).y, contrast(8.0, 2.0), 0.12);
+    EXPECT_NEAR(patterns(0.0).x, contrast(8.0, 2.0), 0.08);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(1.0);
+    // Boiling: the pattern holds while the camera moves a tenth of
+    // its aperture, and is another once it has moved two.
+    EXPECT_GT(patterns(0.1 * aperture).y, 0.8)
+        << "a tenth of an aperture: much the same pattern";
+    EXPECT_LT(std::abs(patterns(2.0 * aperture).y), 0.15)
+        << "two apertures: another";
+    // A polished floor shows none; one of rms height lambda / (4 pi),
+    // a phase deviation of 1 radian, sqrt(1 - e^-1) of the contrast.
+    ernie::Material(scene, "/Looks/Grey").SetSpeckleRoughness(0.0);
+    EXPECT_LT(patterns(0.0).x, 1e-3) << "polished";
+    ernie::Material(scene, "/Looks/Grey")
+        .SetSpeckleRoughness(lambda / (4.0 * M_PI));
+    EXPECT_NEAR(patterns(0.0).x / coarse,
+                std::sqrt(1.0 - std::exp(-1.0)), 0.08)
+        << "partly developed";
 }
 
 TEST_F(RasterDelegateTest,

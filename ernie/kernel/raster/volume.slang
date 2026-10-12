@@ -713,6 +713,170 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
     return irradiance / (along * along);
 }
 
+// Lasers' beams integrated across a pixel's ray exactly (`LightGpu::patternExtent.z`, 1 for a
+// spot, 2 for a grid of beamlets): each beamlet a Gaussian beam from the aperture, of power p and
+// 1/e^2 radius w across the common normal of the ray and its axis there, whose light along the
+// ray, closest d to the axis at angle a, is p sqrt(2 / pi) exp(-2 d^2 / w^2) / (w sin a), averaged
+// over the pixel's width across that normal. A beam millimetres thick then lights the medium
+// once per crossing, at the step holding it, not by the chance of a step landing in it.
+//
+// Reference: A. E. Siegman, Lasers, University Science Books, 1986, ch. 17 (the Gaussian beam).
+static const uint kMaxBeamCrossings = 16;
+static const uint kMaxBeamlets = 64;
+
+struct BeamCrossings {
+    uint count;
+    // Along the ray, by distance: where each crossing is, its light (per unit of its laser's
+    // spectrum), its laser's slot, and towards the laser (xyz) and how far (w).
+    float t[kMaxBeamCrossings];
+    float value[kMaxBeamCrossings];
+    uint slot[kMaxBeamCrossings];
+    float4 towards[kMaxBeamCrossings];
+}
+
+// Whether laser `light`'s beams are integrated across rays (`BeamCrossings`), not sampled.
+bool analyticBeams(LightGpu light) {
+    return uint(light.position.w) == kLaser && light.patternExtent.z > 0.5;
+}
+
+// Adds to `crossings` (sorted by distance) where the ray from `origin` along unit `direction`
+// crosses beamlet `centre` (on the tangent plane) of laser `light` (slot `slot`), carrying
+// `share` of its power, the pixel `footprintX` and `footprintY` across per unit distance.
+void addBeamlet(inout BeamCrossings crossings, LightGpu light, uint slot, float2 centre,
+                float share, float3 origin, float3 direction, float3 footprintX,
+                float3 footprintY) {
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let u = normalize(x * centre.x + y * centre.y + light.axis.xyz);
+    // The closest points of the ray and the beamlet's axis.
+    let w0 = origin - light.position.xyz;
+    let b = dot(direction, u);
+    let denom = 1.0 - b * b;
+    if (denom < 1e-6) {
+        return;
+    }
+    let s = (b * dot(u, w0) - dot(direction, w0)) / denom;
+    let z = (dot(u, w0) - b * dot(direction, w0)) / denom;
+    if (s <= 0.0 || z <= 0.0) {
+        return;
+    }
+    let normal = normalize(cross(direction, u));
+    let offset = dot((origin + direction * s) - (light.position.xyz + u * z), normal);
+    // The beam's radii there, from its waist along the axis.
+    let along = z * dot(u, light.axis.xyz) - light.beamExtra.x;
+    let zr = max(light.beam.zw, float2(1e-12));
+    let w = light.beam.xy * sqrt(1.0 + (along / zr) * (along / zr));
+    let radius = length(float2(w.x * dot(normal, x), w.y * dot(normal, y)));
+    let width = abs(dot(footprintX, normal)) * s + abs(dot(footprintY, normal)) * s;
+    if (abs(offset) > 3.0 * radius + width) {
+        return;
+    }
+    let value = share * beamAverage(offset, radius, width) / sqrt(denom);
+    if (!(value > 0.0) || crossings.count == kMaxBeamCrossings) {
+        return;
+    }
+    // Insertion by distance.
+    var at = crossings.count;
+    while (at > 0 && crossings.t[at - 1] > s) {
+        crossings.t[at] = crossings.t[at - 1];
+        crossings.value[at] = crossings.value[at - 1];
+        crossings.slot[at] = crossings.slot[at - 1];
+        crossings.towards[at] = crossings.towards[at - 1];
+        --at;
+    }
+    crossings.t[at] = s;
+    crossings.value[at] = value;
+    crossings.slot[at] = slot;
+    crossings.towards[at] = float4(-u, z);
+    ++crossings.count;
+}
+
+// The crossings of the pixel's ray with the beams of the view's lasers integrated across rays:
+// a spot's beam, a grid's beamlets (each its share of the efficiency) and their zero order, at
+// the light the laser shows over the view's span of time.
+BeamCrossings beamCrossingsOf(uint4 viewLights, uint lightCount, uint view, float3 origin,
+                              float3 direction, float3 footprintX, float3 footprintY) {
+    BeamCrossings crossings;
+    crossings.count = 0;
+    for (uint k = 0; k < lightCount; ++k) {
+        if ((viewLights.x & (1u << k)) == 0) {
+            continue;
+        }
+        let light = shading.lights[viewLights.z + k];
+        if (!analyticBeams(light)) {
+            continue;
+        }
+        var shown = 0.0;
+        for (uint s = 0; s < kMaxLit; ++s) {
+            shown += lightTiming[(view * kMaxLights + k) * kMaxLit + s].y;
+        }
+        let norm = patternNorms[k];
+        let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
+        if (light.patternExtent.z < 1.5) {
+            addBeamlet(crossings, light, k, float2(0.0), shown * (light.beamExtra.w + efficiency),
+                       origin, direction, footprintX, footprintY);
+            continue;
+        }
+        // A grid: p0 x p1 beamlets p2 and p3 radians apart (light_pattern.cpp's LaserGrid).
+        addBeamlet(crossings, light, k, float2(0.0), shown * light.beamExtra.w, origin, direction,
+                   footprintX, footprintY);
+        let cells = uint2(light.patternParams[0].xy);
+        let pitch = light.patternParams[0].zw;
+        let share = shown * efficiency / float(max(cells.x * cells.y, 1u));
+        for (uint column = 0; column < cells.x; ++column) {
+            for (uint row = 0; row < cells.y; ++row) {
+                let centre =
+                    tan((float2(column, row) - 0.5 * (float2(cells) - 1.0)) * pitch);
+                addBeamlet(crossings, light, k, centre, share, origin, direction, footprintX,
+                           footprintY);
+            }
+        }
+    }
+    return crossings;
+}
+
+// Adds to `emitted` the light the medium scatters towards the eye from the beam crossings of the
+// step from `start` to `end` along the ray (`next` the first not yet passed), where the
+// transmittance is `transmittance` and the extinction `sigma`: per crossing, as a step lights
+// the medium (`octavesOf`, the volumes' depth towards the laser, its geometry's shadow).
+void addBeamCrossings(inout float4 emitted[kMaxGroups], inout uint next,
+                      BeamCrossings crossings, float start, float end, float transmittance,
+                      float sigma, VolumeGpu volume, uint materialIndex, float3 origin,
+                      float3 direction, float3 o, float3 d, uint4 viewLights, uint2 shadowRun,
+                      float mapTexels, uint groups) {
+    while (next < crossings.count && crossings.t[next] < start) {
+        ++next;
+    }
+    let material = volumeMaterials[materialIndex];
+    while (next < crossings.count && crossings.t[next] < end) {
+        let c = next;
+        ++next;
+        let slot = crossings.slot[c];
+        let light = shading.lights[viewLights.z + slot];
+        if (((light.links.x >> volume.info.z) & 1u) == 0) {
+            continue;
+        }
+        let at = origin + direction * crossings.t[c];
+        let local = o + d * crossings.t[c];
+        let towards = crossings.towards[c].xyz;
+        let lightSlot = viewLights.z + slot;
+        let depth = light.links.z == 0 ? 0.0
+                    : hasCache(volume, lightSlot)
+                        ? cachedDepth(volume, lightSlot, local)
+                        : volumesDepth(shadowRun, at, towards, crossings.towards[c].w,
+                                       light.links.y, shadowSteps());
+        let lit = transmittance * sigma * octavesOf(material, dot(towards, -direction), depth) *
+                  crossings.value[c] *
+                  geometryShadow(light, slot, at, origin, viewLights.y, mapTexels);
+        if (lit <= 0.0) {
+            continue;
+        }
+        for (uint g = 0; g < groups; ++g) {
+            emitted[g] += material.albedo[g] * lit * (light.spectrum[g] + light.tinted[g]);
+        }
+    }
+}
+
 // A light's IES profile towards unit `direction` from it, bilinear (shading.slang's
 // `lightProfile`).
 float lightProfile(LightGpu light, float3 direction) {
@@ -1002,10 +1166,14 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     // front of them ends.
     float frontSum = 0.0;
     let jitter = hash(uint3(id.xy, constants.layout.w ^ (id.z * 7919u)));
+    // Lasers' beams the ray crosses, added at the steps holding them (`BeamCrossings`).
+    let crossings =
+        beamCrossingsOf(viewLights, lightCount, view, origin, direction, footprintX, footprintY);
     for (uint s = 0; s < count && transmittance > kOpaque; ++s) {
         let volume = volumes[which[s]];
         let materialIndex = volume.info.x;
         let material = volumeMaterials[materialIndex];
+        uint nextCrossing = 0;
         let o = float3(dot(volume.toLocal[0], float4(origin, 1.0)),
                        dot(volume.toLocal[1], float4(origin, 1.0)),
                        dot(volume.toLocal[2], float4(origin, 1.0)));
@@ -1090,8 +1258,9 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                         continue;
                     }
                     let light = shading.lights[viewLights.z + k];
-                    // Light linking: only the lights whose links hold the volume light it.
-                    if (((light.links.x >> volume.info.z) & 1u) == 0) {
+                    // Light linking: only the lights whose links hold the volume light it; and
+                    // lasers' beams integrated across the ray come after.
+                    if (((light.links.x >> volume.info.z) & 1u) == 0 || analyticBeams(light)) {
                         continue;
                     }
                     let reach = reachOf(light, k, view, world, footprint);
@@ -1128,6 +1297,10 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                         emitted[g] += volumeMaterials[materialIndex].albedo[g] * lit * spectrum;
                     }
                 }
+                addBeamCrossings(emitted, nextCrossing, crossings, span.x + float(i) * dt,
+                                 span.x + float(i + 1) * dt, transmittance, sigma, volume,
+                                 materialIndex, origin, direction, o, d, viewLights, shadowRun,
+                                 mapTexels, groups);
                 if (skyLit) {
                     // How much of the sky above and the ground below the volumes let through:
                     // from the lighting cache's slots past the lights, else marched.

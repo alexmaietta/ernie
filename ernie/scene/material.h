@@ -111,6 +111,8 @@ struct MaterialSettings {
     /// How much of incident polarization its diffuse reflection
     /// keeps (`tokens::kPolarizationRetention`), 0 to 1.
     float polarizationRetention = 0.0f;
+    /// Its rms surface height, m (`tokens::kSpeckleRoughness`).
+    float speckleRoughness = 1e-5f;
     /// UsdPreviewSurface's opacity, a constant or one texture
     /// channel, and its opacityThreshold: above 0, surfaces whose
     /// opacity falls below it are cut out (alpha testing), in shadows

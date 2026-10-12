@@ -164,7 +164,8 @@ struct LightGpu {
     // beamExtra yzw: whether its pattern is the beam itself (0, a spot) or spreads from the
     // aperture (1), the efficiency into it and its zero order. pattern: its pattern's index
     // (`lightPattern`), the laser's wavelength (nm) and the time (s); patternExtent xy: its
-    // tangent-plane half extents (0 unbounded); patternLayout: its data and image
+    // tangent-plane half extents (0 unbounded), z how volumes light by its beams (volume.slang's
+    // `BeamCrossings`); patternLayout: its data and image
     // (LightPatternParams); its parameters.
     float4 pattern;
     float4 patternExtent;
@@ -196,6 +197,8 @@ struct MaterialGpu {
     float4 reflectance[16];
     // Emitted spectral radiance per band (W m^-2 sr^-1 nm^-1), four per float4.
     float4 emission[16];
+    // x: its rms surface height, m (`laserSpeckle`); yzw unused.
+    float4 surface;
 }
 
 struct ShadingConstants {
@@ -1088,14 +1091,15 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
 
 // Speckle's field: layers of smoothed value noise on rotated lattices, each node a complex
 // Gaussian amplitude, summed so the field is close to circular Gaussian and its intensity
-// exponential (fully developed speckle) with mean 1. One lattice cell is `kSpeckleCell` times
-// lambda z / D: the intensity's correlation area is 1.08 cells^2, measured over the field, and
-// Goodman's (lambda z)^2 / A for a pupil of area A = pi D^2 / 4.
+// exponential (fully developed speckle) with mean 1. Each layer is divided by the root of its
+// nodes' squared weights where it is evaluated, so its variance is 1 everywhere: otherwise it
+// dips between nodes alike for every seed, a faint lattice that independent patterns share. One
+// lattice cell is `kSpeckleCell` times lambda z / D: the intensity's correlation area is 0.966
+// cells^2, measured over the field, and Goodman's (lambda z)^2 / A for a pupil of area
+// A = pi D^2 / 4.
 static const uint kSpeckleLayers = 4;
-static const float kSpeckleCell = 1.086;
-static const float kSpeckleCorrelation = 1.08;  // cells^2
-// The mean of a node's squared smoothstep weights over a cell, per axis cubed.
-static const float kSpeckleWeightVariance = 0.409913;
+static const float kSpeckleCell = 1.148;
+static const float kSpeckleCorrelation = 0.966;  // cells^2
 static const float3x3 kSpeckleRotations[kSpeckleLayers] = {
     float3x3(-0.001378, -0.222370, -0.974961, 0.997727, -0.065997, 0.013642, -0.067379, -0.972726,
              0.221956),
@@ -1120,8 +1124,9 @@ uint3 pcg3d(uint3 v) {
     return v;
 }
 
-// The speckle field's intensity at `p` (lattice cells) for seed `seed`, mean 1.
-float speckleIntensity(float3 p, uint seed) {
+// The speckle field's complex amplitude at `p` (lattice cells) for seed `seed`: each part zero
+// mean, variance 1.
+float2 speckleField(float3 p, uint seed) {
     var field = float2(0.0);
     for (uint layer = 0; layer < kSpeckleLayers; ++layer) {
         let q = mul(kSpeckleRotations[layer], p);
@@ -1129,6 +1134,8 @@ float speckleIntensity(float3 p, uint seed) {
         let t = q - cell;
         let s = t * t * (3.0 - 2.0 * t);
         let base = asuint(int3(cell));
+        var sum = float2(0.0);
+        var squares = 0.0;
         for (uint corner = 0; corner < 8; ++corner) {
             let o = uint3(corner & 1u, (corner >> 1) & 1u, corner >> 2);
             let w = (o.x != 0 ? s.x : 1.0 - s.x) * (o.y != 0 ? s.y : 1.0 - s.y) *
@@ -1138,10 +1145,12 @@ float speckleIntensity(float3 p, uint seed) {
             let u1 = (float(h.x >> 8) + 0.5) / 16777216.0;
             let u2 = float(h.y >> 8) / 16777216.0;
             let r = sqrt(-2.0 * log(u1));
-            field += w * r * float2(cos(2.0 * PI * u2), sin(2.0 * PI * u2));
+            sum += w * r * float2(cos(2.0 * PI * u2), sin(2.0 * PI * u2));
+            squares += w * w;
         }
+        field += sum * rsqrt(squares);
     }
-    return dot(field, field) / (2.0 * float(kSpeckleLayers) * kSpeckleWeightVariance);
+    return field * rsqrt(float(kSpeckleLayers));
 }
 
 // The factor laser `light` (slot `slot`) is scaled by at `world` for speckle, 1 without it
@@ -1150,15 +1159,24 @@ float speckleIntensity(float3 p, uint seed) {
 // contrast is 1 / sqrt(M) for M independent patterns summed in the pixel: the pixel's area over
 // the grain's correlation area plus 1, the two polarizations a depolarizing surface (`retention`
 // of the laser's polarization kept) gives, 2 / (1 + P^2), and the laser's linewidth across the
-// paths' spread over the pixel, sqrt(1 + (2 pi sigma_l dlambda / lambda^2)^2). Optically rough
-// surfaces only, the grain isotropic in the scene (foreshortened on surfaces seen obliquely).
+// paths' spread over the pixel, sqrt(1 + (2 pi sigma_l dlambda / lambda^2)^2).
+//
+// The grain is round in the image: on a surface seen at an angle t it is stretched by 1 / cos t
+// along the tilt, the field's coordinates squeezed that way. It boils as the camera moves: each
+// lattice cell of camera positions an aperture across has a field of its own, blended between
+// the eight about the camera (their amplitudes by the square roots of trilinear weights, so the
+// statistics hold), so moving the camera an aperture's width decorrelates the pattern, as moving
+// the pupil over itself does. A surface smoother than the wavelength speckles less: of rms height
+// h, its phase deviation sigma = 2 pi h (cos i + cos o) / lambda leaves contrast
+// sqrt(1 - exp(-sigma^2)). The field is fixed to the scene, so it does not move with objects.
 //
 // References:
 // - J. W. Goodman, "Speckle Phenomena in Optics", Roberts and Company, 2007, ch. 3-5 (statistics,
-//   correlation area, contrast reduction by integration, polarization and wavelength diversity).
+//   correlation area, contrast reduction by integration, polarization and wavelength diversity,
+//   partially developed speckle from smooth surfaces), ch. 6 (decorrelation as the pupil moves).
 // - M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020.
-float laserSpeckle(LightGpu light, uint slot, float3 world, float3 v, float3 toLight,
-                   float3x2 footprint, float retention) {
+float laserSpeckle(LightGpu light, uint slot, float3 world, float3 n, float3 v, float3 toLight,
+                   float3x2 footprint, float retention, float roughness) {
     let aperture = asfloat(shv.view.w);
     if (light.map.z < 0.5 || !(aperture > 0.0)) {
         return 1.0;
@@ -1167,7 +1185,10 @@ float laserSpeckle(LightGpu light, uint slot, float3 world, float3 v, float3 toL
     let cell = kSpeckleCell * lambda * length(world - shv.eye.xyz) / aperture;
     let stepX = float3(footprint[0].x, footprint[1].x, footprint[2].x);
     let stepY = float3(footprint[0].y, footprint[1].y, footprint[2].y);
-    let spatial = 1.0 + length(cross(stepX, stepY)) / (kSpeckleCorrelation * cell * cell);
+    // The grain's area on the surface grows by 1 / cos t, as the pixel's does.
+    let facing = max(abs(dot(n, v)), 0.05);
+    let spatial =
+        1.0 + length(cross(stepX, stepY)) * facing / (kSpeckleCorrelation * cell * cell);
     let polarized = light.polarization.w * retention;
     let polarization = 2.0 / (1.0 + polarized * polarized);
     // The rms spread of the light's path, in and out, over the pixel.
@@ -1175,11 +1196,34 @@ float laserSpeckle(LightGpu light, uint slot, float3 world, float3 v, float3 toL
     let spread = length(float2(dot(stepX, bisector), dot(stepY, bisector))) / sqrt(12.0);
     let diversity = 2.0 * PI * spread * light.map.w * 1e-9 / (lambda * lambda);
     let looks = spatial * polarization * sqrt(1.0 + diversity * diversity);
-    if (looks > 1e4) {
+    let phase = 2.0 * PI * roughness * (abs(dot(n, toLight)) + abs(dot(n, v))) / lambda;
+    let developed = sqrt(1.0 - exp(-phase * phase));
+    if (looks > 1e4 || developed < 1e-3) {
         return 1.0;
     }
-    let intensity = speckleIntensity(world / cell, slot + 1u);
-    return max(0.0, 1.0 + (intensity - 1.0) * rsqrt(looks));
+    // In lattice cells, squeezed along the tilt.
+    var p = world / cell;
+    let tilt = v - n * dot(n, v);
+    if (length(tilt) > 1e-6) {
+        let along = normalize(tilt);
+        p += (facing - 1.0) * dot(p, along) * along;
+    }
+    // The fields of the camera positions about the camera's, an aperture apart.
+    let camera = shv.eye.xyz / aperture;
+    let base = floor(camera);
+    let f = camera - base;
+    var amplitude = float2(0.0);
+    for (uint corner = 0; corner < 8; ++corner) {
+        let o = uint3(corner & 1u, (corner >> 1) & 1u, corner >> 2);
+        let w = (o.x != 0 ? f.x : 1.0 - f.x) * (o.y != 0 ? f.y : 1.0 - f.y) *
+                (o.z != 0 ? f.z : 1.0 - f.z);
+        if (w > 1e-4) {
+            let seed = pcg3d(asuint(int3(base) + int3(o)) + uint3(slot, 0x68E31DA4u, 0u)).x;
+            amplitude += sqrt(w) * speckleField(p, seed);
+        }
+    }
+    let intensity = 0.5 * dot(amplitude, amplitude);
+    return max(0.0, 1.0 + (intensity - 1.0) * developed * rsqrt(looks));
 }
 
 static const uint kOcclusionDirections = 4;
@@ -2178,8 +2222,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 shadowPoint -= light.axis.xyz * reach;
             }
             if (scale > 0.0) {
-                scale *= laserSpeckle(light, k, world, v, toLight, footprint,
-                                      saturate(asfloat(material.info.w)));
+                scale *= laserSpeckle(light, k, world, n, v, toLight, footprint,
+                                      saturate(asfloat(material.info.w)), material.surface.x);
             }
         } else if (type >= 2) {
             let form = areaFormFactor(light, world, n);
