@@ -631,6 +631,42 @@ TEST_F(RasterDelegateTest,
         << "levels of detail from the device's points, not zeros";
 }
 
+TEST_F(RasterDelegateTest,
+       CudaInstancesWithoutExtentAreBoundedOnTheGpu) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // MeshScene's rocks from CUDA without an extent, moved each
+    // frame: their bounds measured on the GPU a frame or two late,
+    // not copied to the host, draw them as host positions do.
+    const std::array<float, 9> moved{12, -10, 0, 6, 4, 0, 12, 10, 0};
+    Scene host = MeshScene();
+    ernie::PointInstancer(host, "/World/Rocks")
+        .SetPositions(Tensor::Copy<float>(moved, {3, 3}));
+    RasterDelegate reference(*context_);
+    const Tensor expected = reference.Render(host);
+
+    Scene device = MeshScene();
+    const Tensor start = cuda->Upload(
+        *device.Read("/World/Rocks", tokens::kPositions));
+    const Tensor end =
+        cuda->Upload(Tensor::Copy<float>(moved, {3, 3}));
+    for (int frame = 0; frame < 4; ++frame) {
+        device.Write("/World/Rocks", tokens::kPositions,
+                     frame < 2 ? start : end);
+        delegate.Render(device);
+    }
+    const Tensor image = delegate.Render(device);
+    EXPECT_EQ(std::memcmp(image.Data(), expected.Data(),
+                          static_cast<std::size_t>(image.Elements())),
+              0);
+    EXPECT_GT(TexelAt(device, image, {6, 4, 0})[1], 200)
+        << "the moved instance";
+}
+
 TEST(ExtentOf, ReadsValuesAndArrays) {
     Scene scene;
     scene.Define("/A", tokens::kMesh)

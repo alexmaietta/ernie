@@ -131,6 +131,13 @@ constexpr DescriptorBinding kComposeBindings[] = {
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+/// instance_bounds.slang's bindings: positions, scales and bounds.
+constexpr DescriptorBinding kBoundsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
 /// instance_anchors.slang's bindings: records, the pools, and what is
 /// written.
 constexpr DescriptorBinding kAnchorBindings[] = {
@@ -513,6 +520,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
                     sizeof(DrawConstants)),
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       composeLayout_(renderer.Context(), kComposeBindings, 32),
+      boundsLayout_(renderer.Context(), kBoundsBindings, 16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       lightCullLayout_(renderer.Context(), kLightCullBindings, 48),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
@@ -526,6 +534,14 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     composePipeline_ = std::make_unique<ComputePipeline>(
         context_, composeLayout_,
         renderer_.Compiler().CompileSpirv(compose, "composeMain"));
+    const std::vector<ShaderModuleSource> bounds{
+        {"instance_bounds", shaders::kInstanceBoundsSlang}};
+    boundsClearPipeline_ = std::make_unique<ComputePipeline>(
+        context_, boundsLayout_,
+        renderer_.Compiler().CompileSpirv(bounds, "boundsClearMain"));
+    boundsPipeline_ = std::make_unique<ComputePipeline>(
+        context_, boundsLayout_,
+        renderer_.Compiler().CompileSpirv(bounds, "boundsMain"));
     const std::vector<ShaderModuleSource> anchors{
         {"instance_anchors", shaders::kInstanceAnchorsSlang}};
     anchorPipeline_ = std::make_unique<ComputePipeline>(
@@ -1288,10 +1304,23 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
     }
     drawsDirty_ = drawsDirty_ ||
                   HasInstanceColors(target) != !data.colors.Empty();
+    // Measurements of other instances, or of host ones, do not bound
+    // these.
+    if (count != target.count || !target.onDevice) {
+        target.gpuPositions.reset();
+        target.lastGpuPositions.reset();
+    }
     target.count = count;
     target.device = data;
     target.onDevice = true;
     target.dirty = true;
+    // Bounds come from the extent, or from the positions measured on
+    // the GPU (`RecordBounds`) once they have been: only before that
+    // are the arrays copied to the host for them.
+    if (data.extent || target.gpuPositions) {
+        target.data = {};
+        return;
+    }
     target.data = {};
     if (!data.extent) {
         const Tensor positions = compute_->Download(data.positions);
@@ -2043,6 +2072,9 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
 void MeshDrawable::Prepare(const FrameParams& params,
                            std::span<const ShadowCascade> cascades) {
     ERNIE_ZONE("Mesh prepare");
+    // Device instancers' bounds measured frames ago, in place of
+    // their positions copied to the host.
+    ReadBounds(renderer_.Uploads().Slot());
     // A pushbroom camera's views draw with the pipeline compiled for
     // it.
     const bool pushbroom = params.camera.pushbroom;
@@ -2295,6 +2327,129 @@ void MeshDrawable::WriteDraws() {
     }
 }
 
+std::optional<std::pair<Bounds3, float>>
+MeshDrawable::MeasuredPositions(const Instancer& instancer) {
+    if (!instancer.gpuPositions) {
+        return std::nullopt;
+    }
+    Bounds3 box = *instancer.gpuPositions;
+    if (instancer.lastGpuPositions) {
+        // Measured frames before this one: ahead by the motion
+        // between the last two measurements.
+        const Bounds3& last = *instancer.lastGpuPositions;
+        box.first =
+            glm::min(box.first, 2.0f * box.first - last.first);
+        box.second =
+            glm::max(box.second, 2.0f * box.second - last.second);
+    }
+    return std::pair(box, instancer.gpuScale);
+}
+
+void MeshDrawable::ReadBounds(std::uint32_t slot) {
+    boundsSlot_ = slot;
+    std::vector<std::pair<std::uint32_t, std::size_t>>& jobs =
+        boundsJobs_[slot];
+    if (!jobs.empty()) {
+        // This slot's last frame has finished (`FrameUploads`).
+        std::vector<std::uint32_t> words(8 * jobs.size());
+        boundsReadback_[slot]->Read(
+            std::as_writable_bytes(std::span(words)));
+        // instance_bounds.slang's `ordered`, undone.
+        const auto value = [](std::uint32_t u) {
+            return std::bit_cast<float>(
+                (u & 0x80000000u) != 0 ? u & 0x7fffffffu : ~u);
+        };
+        for (std::size_t j = 0; j < jobs.size(); ++j) {
+            const auto it = instancers_.find(jobs[j].first);
+            if (it == instancers_.end() || !it->second.onDevice ||
+                it->second.count != jobs[j].second) {
+                continue;
+            }
+            const std::uint32_t* w = &words[8 * j];
+            Instancer& instancer = it->second;
+            instancer.lastGpuPositions = instancer.gpuPositions;
+            instancer.gpuPositions = Bounds3(
+                glm::vec3(value(w[0]), value(w[1]), value(w[2])),
+                glm::vec3(value(w[3]), value(w[4]), value(w[5])));
+            instancer.gpuScale = value(w[6]);
+        }
+        ForgetBounds();
+    }
+    // This frame measures every device instancer without an extent.
+    jobs.clear();
+    for (const auto& [handle, instancer] : instancers_) {
+        if (instancer.onDevice && !instancer.composed &&
+            !instancer.device.extent && instancer.count > 0) {
+            jobs.emplace_back(handle, instancer.count);
+        }
+    }
+    const VkDeviceSize bytes =
+        VkDeviceSize{jobs.size()} * 8 * sizeof(std::uint32_t);
+    if (!jobs.empty() && (boundsReadback_[slot] == nullptr ||
+                          boundsReadback_[slot]->Size() < bytes)) {
+        boundsReadback_[slot] = std::make_unique<GpuBuffer>(
+            context_, std::max<VkDeviceSize>(2 * bytes, 256),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Readback);
+    }
+}
+
+void MeshDrawable::RecordBounds(VkCommandBuffer commands) const {
+    const auto& jobs = boundsJobs_[boundsSlot_];
+    if (jobs.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Instance bounds");
+    const auto barrier = [commands](VkPipelineStageFlags2 dstStage,
+                                    VkAccessFlags2 dstAccess) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = dstStage;
+        memory.dstAccessMask = dstAccess;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*positions_),
+        DescriptorResource::Of(*scales_),
+        DescriptorResource::Of(*boundsReadback_[boundsSlot_])};
+    // Every job's words emptied, then each job's instances measured.
+    for (const ComputePipeline* pipeline :
+         {boundsClearPipeline_.get(), boundsPipeline_.get()}) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          pipeline->Handle());
+        boundsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           resources);
+        for (std::size_t j = 0; j < jobs.size(); ++j) {
+            const Instancer& instancer =
+                instancers_.at(jobs[j].first);
+            const std::uint32_t constants[4] = {
+                InstanceBase(instancer) + instancer.first,
+                static_cast<std::uint32_t>(instancer.count),
+                instancer.device.scales.Empty() ? 0u : 1u,
+                static_cast<std::uint32_t>(8 * j)};
+            boundsLayout_.PushConstants(commands, constants,
+                                        sizeof(constants));
+            vkCmdDispatch(commands,
+                          pipeline == boundsPipeline_.get()
+                              ? (constants[1] + 63) / 64
+                              : 1,
+                          1, 1);
+        }
+        barrier(pipeline == boundsPipeline_.get()
+                    ? VK_PIPELINE_STAGE_2_HOST_BIT
+                    : VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                pipeline == boundsPipeline_.get()
+                    ? VK_ACCESS_2_HOST_READ_BIT
+                    : VK_ACCESS_2_SHADER_READ_BIT |
+                          VK_ACCESS_2_SHADER_WRITE_BIT);
+    }
+}
+
 std::optional<Bounds3> MeshDrawable::Bounds() const {
     if (bounds_) {
         return *bounds_;
@@ -2330,6 +2485,14 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
             TransformBox(item.prototype, mesh.low, mesh.high);
         const float radius =
             glm::length(glm::max(glm::abs(low), glm::abs(high)));
+        if (const auto measured = instancer.onDevice
+                                      ? MeasuredPositions(instancer)
+                                      : std::nullopt) {
+            const glm::vec3 reach(radius * measured->second);
+            add(TransformBox(transform, measured->first.first - reach,
+                             measured->first.second + reach));
+            continue;
+        }
         const InstanceData& data = instancer.data;
         for (const std::uint32_t i : item.instances) {
             float scale = 1.0f;
@@ -2445,17 +2608,25 @@ MeshDrawable::RangeBounds(std::size_t item,
         return transformBox(instancer.device.extent->first,
                             instancer.device.extent->second);
     }
+    // The range's instances, each a sphere around its position
+    // enclosing the posed prototype; for a device instancer, the box
+    // of all its instances measured on the GPU.
+    const auto [low, high] =
+        TransformBox(draw.prototype, mesh.low, mesh.high);
+    const float radius =
+        glm::length(glm::max(glm::abs(low), glm::abs(high)));
+    if (const auto measured = instancer.onDevice
+                                  ? MeasuredPositions(instancer)
+                                  : std::nullopt) {
+        const glm::vec3 reach(radius * measured->second);
+        return transformBox(measured->first.first - reach,
+                            measured->first.second + reach);
+    }
     const InstanceData& data = instancer.data;
     if (data.positions.size() != 3 * instancer.count) {
         return std::nullopt;  // nothing on the host to bound them
                               // with: always drawn
     }
-    // The range's instances, each a sphere around its position
-    // enclosing the posed prototype.
-    const auto [low, high] =
-        TransformBox(draw.prototype, mesh.low, mesh.high);
-    const float radius =
-        glm::length(glm::max(glm::abs(low), glm::abs(high)));
     glm::vec3 boxLow(std::numeric_limits<float>::max());
     glm::vec3 boxHigh(std::numeric_limits<float>::lowest());
     for (std::uint32_t k = range.first; k < range.first + range.count;
@@ -3082,6 +3253,7 @@ void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records,
 
 void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {
     RecordCompose(commands);
+    RecordBounds(commands);
     if (anchorViews_ != 0) {
         ERNIE_GPU_ZONE(context_, commands, "Anchored views");
         RecordAnchors(commands, *anchorRecords_, anchorViews_,

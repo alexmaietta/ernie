@@ -641,11 +641,32 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t opsFirst = 0;
         std::uint32_t parentsFirst = 0;
         std::vector<std::uint32_t> levels;
+        /// Of a device instancer without an extent, bounds of its
+        /// positions and its largest scale measured on the GPU
+        /// (`RecordBounds`) frames ago, and the measurement before,
+        /// in place of positions copied to the host each frame.
+        std::optional<Bounds3> gpuPositions;
+        std::optional<Bounds3> lastGpuPositions;
+        float gpuScale = 1.0f;
     };
 
     /// Whether an instancer colours its instances, in place of its
     /// prototypes' colours; composed ones do not.
     static bool HasInstanceColors(const Instancer& instancer);
+
+    /// The bounds of a device instancer's positions from its GPU
+    /// measurements, widened by its motion between the last two, and
+    /// the largest scale; none until measured.
+    static std::optional<std::pair<Bounds3, float>>
+    MeasuredPositions(const Instancer& instancer);
+
+    /// Reads the bounds the frames of upload slot `slot` measured,
+    /// once they have finished, and chooses the instancers this
+    /// frame measures in it.
+    void ReadBounds(std::uint32_t slot);
+    /// Measures the bounds of the chosen instancers' positions into
+    /// the upload slot's readback buffer (instance_bounds.slang).
+    void RecordBounds(VkCommandBuffer commands) const;
 
     /// The G-buffer pipeline for a frame camera's views, or a
     /// pushbroom's.
@@ -868,6 +889,18 @@ class MeshDrawable : public RasterDrawable {
     PipelineLayout composeLayout_;
     std::unique_ptr<ComputePipeline>
         composePipeline_;  ///< instance_compose.slang.
+    PipelineLayout boundsLayout_;
+    /// instance_bounds.slang's clear and measure.
+    std::unique_ptr<ComputePipeline> boundsClearPipeline_;
+    std::unique_ptr<ComputePipeline> boundsPipeline_;
+    /// Per upload slot: the readback buffer its frames measure into,
+    /// and the instancers it measured (handle and count), in order.
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
+        boundsReadback_;
+    std::array<std::vector<std::pair<std::uint32_t, std::size_t>>,
+               FrameUploads::kSlots>
+        boundsJobs_;
+    std::uint32_t boundsSlot_ = 0;
     /// Composed instancers' raw op arrays (written by the compute
     /// API), their ops (uint4 each), the instance lists of each level
     /// and instancer, and per instance its parent record.

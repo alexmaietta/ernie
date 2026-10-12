@@ -49,6 +49,7 @@ set(ernie_shaders
     raster/depth_range.slang=kDepthRangeSlang
     raster/hzb.slang=kHzbSlang
     raster/instance_compose.slang=kInstanceComposeSlang
+    raster/instance_bounds.slang=kInstanceBoundsSlang
     raster/instance_anchors.slang=kInstanceAnchorsSlang
     raster/light_views.slang=kLightViewsSlang
     raster/minimal_resolve.slang=kMinimalResolveSlang

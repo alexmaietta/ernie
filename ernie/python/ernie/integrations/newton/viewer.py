@@ -165,6 +165,13 @@ class ViewerErnie(ViewerGL):
             to add prims or set Ernie attributes on the model's.
         root: The prim the model goes under, turned so the model's
             up axis is Ernie's +Z.
+        bands: Spectral bands the view renders with: 3 for an
+            interactive view, Ernie's 16 for a sensor's.
+        render_scale: The view's resolution against the window's,
+            which shows it stretched: below 1 for speed.
+        pipelined: Whether each frame shows the last frame's render
+            while rendering its own, so rendering overlaps the next
+            frame's simulation, a frame behind.
         **kwargs: ViewerGL's arguments (width, height, vsync,
             headless, paused, num_frames, ...).
     """
@@ -175,6 +182,9 @@ class ViewerErnie(ViewerGL):
         scene: ernie.Scene | None = None,
         scene_setup: Callable[[ernie.Scene], None] | None = None,
         root: str = "/World/Newton",
+        bands: int = 3,
+        render_scale: float = 1.0,
+        pipelined: bool = True,
         **kwargs: Any,
     ) -> None:
         self._ernie_ready = (
@@ -200,10 +210,16 @@ class ViewerErnie(ViewerGL):
         self._mirrored: set[str] = set()  # batches logged this frame
         # Each wireframe's (vertex data, world matrix), logged apart.
         self._wireframes: dict[str, tuple[Any, np.ndarray]] = {}
-        self._define_view(lit)
+        self.render_scale = render_scale
+        self.pipelined = pipelined
+        # The render under way, and the image last shown, kept until
+        # the next is.
+        self._pending: Any = None
+        self._shown: Any = None
+        self._define_view(lit, bands)
         self._ernie_ready = True
 
-    def _define_view(self, lit: bool) -> None:
+    def _define_view(self, lit: bool, bands: int) -> None:
         """The camera and render settings Ernie renders Newton's view
         with, and Earth's sky and Sun for a new scene."""
         scene = self.ernie_scene
@@ -217,6 +233,7 @@ class ViewerErnie(ViewerGL):
             exposure_f_stop=16.0,
             exposure_time=0.01,
             exposure_iso=100.0,
+            spectral_bands=bands,
         )
         self._settings = scene.define(
             "/NewtonView/Settings",
@@ -260,8 +277,41 @@ class ViewerErnie(ViewerGL):
         super().end_frame()
 
     def _render(self) -> wp.array:
-        width = self.renderer._screen_width
-        height = self.renderer._screen_height
+        """The image to show: with `pipelined`, the last frame's
+        render, once this frame's has started; else this frame's."""
+        self._aim_view()
+        operation = self.ernie_renderer.step_async(
+            self.ernie_scene, settings=self._settings.path
+        )
+        shown = operation
+        if self.pipelined:
+            shown, self._pending = self._pending, operation
+            if shown is None:  # the first frame
+                shown = operation
+        # Kept until the next image is shown: the GL copy of it may
+        # still be queued.
+        self._shown = self._image_of(shown)
+        return self._shown
+
+    def _image_of(self, operation: Any) -> wp.array:
+        """A render's LdrColor in CUDA memory, ready on Warp's
+        stream."""
+        path = str(self._settings.path)
+        frame = operation.outputs()[path].frames[0]
+        image = frame.render_vars[f"{path}/LdrColor"].map(
+            device=ernie.Device.CUDA, sync_stream=self._stream
+        )
+        return wp.from_dlpack(image)
+
+    def _aim_view(self) -> None:
+        """The view's camera on Newton's, at its window's size times
+        `render_scale`, and its wireframe as the GUI asks."""
+        width = max(
+            1, round(self.renderer._screen_width * self.render_scale)
+        )
+        height = max(
+            1, round(self.renderer._screen_height * self.render_scale)
+        )
         camera = self.camera
         eye = self._rotation @ np.asarray(camera.pos, np.float64)
         front = self._rotation @ np.asarray(camera.get_front())
@@ -285,10 +335,6 @@ class ViewerErnie(ViewerGL):
         if wireframe != self._wireframe:
             self._wireframe = wireframe
             self._settings.wireframe = wireframe
-        image = self.ernie_renderer.render(
-            self.ernie_scene, self._settings.path, device="cuda"
-        )
-        return wp.from_dlpack(image)
 
     # The model.
 

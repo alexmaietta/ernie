@@ -103,6 +103,8 @@ extern const char kMeshSlang[];
 extern const char kMeshNormalsSlang[];
 /// Instance poses composed on the GPU from transform ops and parents.
 extern const char kInstanceComposeSlang[];
+/// Bounds of instancers' positions written from the compute device.
+extern const char kInstanceBoundsSlang[];
 /// Views and point clouds posed under prims posed on the GPU.
 extern const char kInstanceAnchorsSlang[];
 /// Lights posed on the GPU: their light table entries, shadow views
