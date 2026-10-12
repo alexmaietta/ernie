@@ -376,19 +376,43 @@ class ProfilerPanel final : public Panel {
         ImGui::EndTable();
     }
 
-    /// One section of the Zones table: its zones, nested as they ran
-    /// (open and close them) or longest first, then its total.
+    /// One section of the Zones table: a row of its total heading its
+    /// zones, nested (open and close them), siblings as they ran or
+    /// longest first.
     void DrawSection(const char* title,
                      const std::vector<ReportNode>& nodes,
                      double totalMs, std::size_t frames,
                      std::uint32_t depth) {
-        ImGui::PushID(title);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(
+                                                 ImGuiCol_TextLink));
+        const bool shown =
+            ImGui::TreeNodeEx(title,
+                              ImGuiTreeNodeFlags_SpanAllColumns |
+                                  ImGuiTreeNodeFlags_DefaultOpen,
+                              "%s", title);
+        ImGui::TableNextColumn();
+        ImGui::Text("%.3f", totalMs);
+        ImGui::TableNextColumn();
+        ImGui::TableNextColumn();
+        if (frames == 0) {
+            ImGui::TextUnformatted(title[0] == 'G' && !gpu_
+                                       ? "(not recording)"
+                                       : "(no frames)");
+        } else {
+            ImGui::Text("%zu frame%s", frames,
+                        frames == 1 ? "" : "s");
+        }
+        ImGui::PopStyleColor();
+        if (!shown) {
+            return;
+        }
         const ReportFilter filter{depth, filter_.minMs,
                                   filter_.byTime};
         std::uint32_t open = 0;  // tree levels pushed
         std::uint32_t closed =
             UINT32_MAX;  // depth of a closed parent
-        int index = 0;
         for (const ReportRow& row : profiler::Rows(nodes, filter)) {
             if (row.depth > closed) {
                 continue;
@@ -399,7 +423,6 @@ class ProfilerPanel final : public Panel {
             }
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::PushID(filter.byTime ? index++ : 0);
             ImGuiTreeNodeFlags flags =
                 ImGuiTreeNodeFlags_SpanAllColumns |
                 ImGuiTreeNodeFlags_DefaultOpen;
@@ -410,7 +433,6 @@ class ProfilerPanel final : public Panel {
             const bool expanded =
                 ImGui::TreeNodeEx(row.node->name.c_str(), flags, "%s",
                                   row.node->name.c_str());
-            ImGui::PopID();
             if (row.parent) {
                 if (expanded) {
                     ++open;
@@ -433,25 +455,7 @@ class ProfilerPanel final : public Panel {
         for (; open > 0; --open) {
             ImGui::TreePop();
         }
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(
-                                                 ImGuiCol_TextLink));
-        ImGui::Text("Total %s time", title);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.3f", totalMs);
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        if (frames == 0) {
-            ImGui::TextUnformatted(title[0] == 'G' && !gpu_
-                                       ? "(not recording)"
-                                       : "(no frames)");
-        } else {
-            ImGui::Text("%zu frame%s", frames,
-                        frames == 1 ? "" : "s");
-        }
-        ImGui::PopStyleColor();
-        ImGui::PopID();
+        ImGui::TreePop();  // the section's
     }
 
     /// The Timeline tab: the frame graph, and the inspected frame's

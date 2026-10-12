@@ -51,8 +51,8 @@ Report Summarize(std::span<const Frame> frames,
                  const std::vector<std::string>& threadNames);
 
 /// What to list of a report: zones nested at most `depth` deep (0:
-/// the outermost alone) and taking at least `minMs`, in a tree as
-/// they ran or, `byTime`, in one list longest first.
+/// the outermost alone) and taking at least `minMs`, in a tree whose
+/// siblings come in the order they ran or, `byTime`, longest first.
 struct ReportFilter {
     std::uint32_t depth = 8;
     double minMs = 0.0;
@@ -62,8 +62,8 @@ struct ReportFilter {
 /// A listed zone and how deep it is shown.
 struct ReportRow {
     const ReportNode* node = nullptr;
-    std::uint32_t depth = 0;  ///< 0 for every row `byTime`.
-    bool parent = false;      ///< Has listed children (not `byTime`).
+    std::uint32_t depth = 0;
+    bool parent = false;  ///< Has listed children.
 };
 
 /// The rows of `nodes` that `filter` lists, parents before their

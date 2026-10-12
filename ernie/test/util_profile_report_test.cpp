@@ -88,8 +88,11 @@ TEST(ProfileReportTest, RowsFilterByDepthAndTimeAndSortByTime) {
         Rows(report.gpu, {8, 0.0, true});
     ASSERT_EQ(byTime.size(), 3u);
     EXPECT_EQ(byTime[0].node->name, "Render");
-    EXPECT_EQ(byTime[1].node->name, "Shading");
-    EXPECT_EQ(byTime[2].depth, 0u);
+    EXPECT_TRUE(byTime[0].parent) << "still nested";
+    EXPECT_EQ(byTime[1].node->name, "Shading")
+        << "siblings longest first";
+    EXPECT_EQ(byTime[1].depth, 1u);
+    EXPECT_EQ(byTime[2].node->name, "Shadows");
 }
 
 TEST(ProfileReportTest, ExportsTextJsonAndAChromeTrace) {
@@ -97,8 +100,9 @@ TEST(ProfileReportTest, ExportsTextJsonAndAChromeTrace) {
                                        MakeFrame(1, 1)};
     const Report report = Summarize(frames, {"Main"});
     const std::string text = ReportText(report, {});
-    EXPECT_NE(text.find("  Shading"), std::string::npos);
-    EXPECT_NE(text.find("Total GPU time"), std::string::npos);
+    EXPECT_NE(text.find("    Shading"), std::string::npos);
+    EXPECT_LT(text.find("GPU total"), text.find("Render"))
+        << "the total heads its section";
 
     const nlohmann::json json =
         nlohmann::json::parse(ReportJson(report));

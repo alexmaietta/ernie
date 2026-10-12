@@ -57,29 +57,29 @@ void Average(std::vector<ReportNode>& nodes, double frames,
 void AddRows(const std::vector<ReportNode>& nodes,
              const ReportFilter& filter, std::uint32_t depth,
              std::vector<ReportRow>& rows) {
+    // Siblings as they ran, or longest first (ties as they ran).
+    std::vector<const ReportNode*> order;
+    order.reserve(nodes.size());
     for (const ReportNode& node : nodes) {
-        if (node.ms < filter.minMs) {
+        order.push_back(&node);
+    }
+    if (filter.byTime) {
+        std::stable_sort(
+            order.begin(), order.end(),
+            [](const ReportNode* a, const ReportNode* b) {
+                return a->ms > b->ms;
+            });
+    }
+    for (const ReportNode* node : order) {
+        if (node->ms < filter.minMs) {
             continue;
         }
         const std::size_t at = rows.size();
-        rows.push_back({&node, depth, false});
+        rows.push_back({node, depth, false});
         if (depth < filter.depth) {
-            AddRows(node.children, filter, depth + 1, rows);
+            AddRows(node->children, filter, depth + 1, rows);
         }
         rows[at].parent = rows.size() > at + 1;
-    }
-}
-
-void Collect(const std::vector<ReportNode>& nodes,
-             const ReportFilter& filter, std::uint32_t depth,
-             std::vector<ReportRow>& rows) {
-    for (const ReportNode& node : nodes) {
-        if (node.ms >= filter.minMs) {
-            rows.push_back({&node, 0, false});
-        }
-        if (depth < filter.depth) {
-            Collect(node.children, filter, depth + 1, rows);
-        }
     }
 }
 
@@ -159,15 +159,7 @@ Report Summarize(std::span<const Frame> frames,
 std::vector<ReportRow> Rows(const std::vector<ReportNode>& nodes,
                             const ReportFilter& filter) {
     std::vector<ReportRow> rows;
-    if (!filter.byTime) {
-        AddRows(nodes, filter, 0, rows);
-        return rows;
-    }
-    Collect(nodes, filter, 0, rows);
-    std::stable_sort(rows.begin(), rows.end(),
-                     [](const ReportRow& a, const ReportRow& b) {
-                         return a.node->ms > b.node->ms;
-                     });
+    AddRows(nodes, filter, 0, rows);
     return rows;
 }
 
@@ -178,22 +170,24 @@ std::string ReportText(const Report& report,
     const auto section = [&](const char* title,
                              const std::vector<ReportNode>& nodes,
                              double totalMs, std::size_t frames) {
-        std::snprintf(line, sizeof(line), "%-56s %12s %10s\n", title,
+        // The section's total heads it; its zones below, indented.
+        std::snprintf(line, sizeof(line), "%-56s %12s %10s\n", "",
                       "Duration (ms)", "Percent");
+        text += line;
+        std::snprintf(
+            line, sizeof(line), "%-56s %12.3f   (%zu frames)\n",
+            (std::string(title) + " total").c_str(), totalMs, frames);
         text += line;
         for (const ReportRow& row : Rows(nodes, filter)) {
             const std::string name =
-                std::string(2 * row.depth, ' ') + row.node->name;
+                std::string(2 * (row.depth + 1), ' ') +
+                row.node->name;
             std::snprintf(line, sizeof(line),
                           "%-56s %12.3f %9.2f%%\n", name.c_str(),
                           row.node->ms, row.node->percent);
             text += line;
         }
-        std::snprintf(
-            line, sizeof(line), "%-56s %12.3f   (%zu frames)\n\n",
-            (std::string("Total ") + title + " time").c_str(),
-            totalMs, frames);
-        text += line;
+        text += "\n";
     };
     section("GPU", report.gpu, report.gpuMs, report.gpuFrames);
     section("CPU", report.cpu, report.cpuMs, report.cpuFrames);
