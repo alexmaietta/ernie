@@ -1053,6 +1053,22 @@ void RasterDelegate::SetMeshIndices(const Scene& scene,
         scene.WriteStream(path, tokens::kFaceVertexIndices));
 }
 
+void RasterDelegate::SetMeshActiveCounts(const Scene& scene,
+                                         const Path& path,
+                                         std::uint32_t handle) {
+    const Tensor* counts = scene.Read(path, tokens::kActiveCounts);
+    if (counts == nullptr) {
+        meshes_.SetActiveCounts(handle, Tensor());
+        return;
+    }
+    if (IsGpu(counts->Location().kind)) {
+        RequireCompute();
+    }
+    meshes_.SetActiveCounts(
+        handle, *counts,
+        scene.WriteStream(path, tokens::kActiveCounts));
+}
+
 void RasterDelegate::SetMeshAttributes(const Scene& scene,
                                        const Path& path,
                                        std::uint32_t handle) {
@@ -1109,14 +1125,16 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             key.second[2] = static_cast<std::uint64_t>(
                 scene.Read(path, kFaceVertexIndices)->Elements());
         }
-        const std::array<std::uint64_t, 4> versions{
+        // The points and triangles in use, read in place (slot 4).
+        const std::array<std::uint64_t, 5> versions{
             scene.AttributeVersion(path, kPoints),
             gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
             gpuColors ? scene.AttributeVersion(path, kDisplayColor)
                       : 0,
             gpuIndices
                 ? scene.AttributeVersion(path, kFaceVertexIndices)
-                : 0};
+                : 0,
+            scene.AttributeVersion(path, kActiveCounts)};
         const auto it = syncedMeshes_.find(path);
         if (it != syncedMeshes_.end() && it->second.key == key) {
             SyncedMesh& synced = it->second;
@@ -1127,6 +1145,10 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
                 try {
                     if (synced.versions[3] != versions[3]) {
                         SetMeshIndices(scene, path, synced.handle);
+                    }
+                    if (synced.versions[4] != versions[4]) {
+                        SetMeshActiveCounts(scene, path,
+                                            synced.handle);
                     }
                     if (synced.versions[0] != versions[0]) {
                         SetMeshPoints(scene, path, synced.handle);
@@ -1156,6 +1178,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             // triangles otherwise.
             if (gpuIndices) {
                 SetMeshIndices(scene, path, synced.handle);
+            }
+            if (scene.Read(path, kActiveCounts) != nullptr) {
+                SetMeshActiveCounts(scene, path, synced.handle);
             }
             if (onGpu(kPoints)) {
                 SetMeshPoints(scene, path, synced.handle);
@@ -1828,6 +1853,12 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,
             throw unsynced();
         }
         view = meshes_.MapPoints(it->second.handle, stream);
+    } else if (type == kMesh && attribute == kFaceVertexIndices) {
+        const auto it = syncedMeshes_.find(path);
+        if (it == syncedMeshes_.end() || it->second.handle == 0) {
+            throw unsynced();
+        }
+        view = meshes_.MapIndices(it->second.handle, stream);
     } else if (type == kPointInstancer &&
                (attribute == kPositions ||
                 attribute == kOrientations || attribute == kScales ||
@@ -1909,7 +1940,8 @@ Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,
         throw std::invalid_argument(
             "Cannot map " + std::string(attribute) + " of '" +
             path.String() +
-            "': only a Mesh's points, a PointInstancer's "
+            "': only a Mesh's points and GPU triangle indices, a "
+            "PointInstancer's "
             "arrays, a Points prim's points, the Terrain's heights, "
             "a Camera's poses and a LaserLight's pattern image map");
     }

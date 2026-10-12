@@ -1,23 +1,27 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Bounds of instancers' positions on the GPU (`MeshDrawable::RecordBounds`), for instancers written
+// Bounds of positions on the GPU (`MeshDrawable::RecordBounds`), for instancers and meshes written
 // from the compute device without an extent: their lowest and highest positions and largest scale,
-// read back on the host frames later, rather than each frame's positions copied to the host.
+// read back on the host frames later, rather than each frame's positions copied to the host. A mesh
+// whose topology changes within a capacity bounds only the points it uses (`activeCounts`).
 //
 // Per job, 8 words of `bounds`: x, y, z of the lowest position, of the highest, the largest scale,
 // as floats ordered as unsigned integers (`ordered`), so atomic min and max compare them.
 //
-// Bindings: 0 instance positions, 1 instance scales, 2 bounds.
+// Bindings: 0 instance positions or mesh points, 1 instance scales, 2 bounds, 3 meshes' points
+// and triangles in use.
 
 struct BoundsJob {
-    uint first;   // the instancer's first instance in the pools
-    uint count;
-    uint scaled;  // 1 when the instancer has scales
-    uint out;     // its first word of `bounds`
+    uint first;      // the first position in the pool
+    uint count;      // positions held
+    uint scaled;     // 1 when there are scales
+    uint out;        // its first word of `bounds`
+    uint countSlot;  // a mesh's slot in `activeCounts` plus 1, 0 for every position
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<float> positions;
 [[vk::binding(1, 0)]] StructuredBuffer<float> scales;
 [[vk::binding(2, 0)]] RWStructuredBuffer<uint> bounds;
+[[vk::binding(3, 0)]] StructuredBuffer<int> activeCounts;
 [[vk::push_constant]] ConstantBuffer<BoundsJob> job;
 
 // `f` as an unsigned integer in the same order as the floats.
@@ -36,8 +40,11 @@ void boundsClearMain(uint3 id : SV_DispatchThreadID) {
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void boundsMain(uint3 id : SV_DispatchThreadID) {
-    let active = id.x < job.count;
-    let i = job.first + min(id.x, max(job.count, 1) - 1);
+    let count = job.countSlot != 0
+                    ? min(job.count, uint(max(activeCounts[2 * (job.countSlot - 1)], 0)))
+                    : job.count;
+    let active = id.x < count;
+    let i = job.first + min(id.x, max(count, 1) - 1);
     let p = float3(positions[3 * i], positions[3 * i + 1], positions[3 * i + 2]);
     var scale = 1.0;
     if (job.scaled != 0) {

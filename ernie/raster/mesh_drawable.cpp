@@ -49,7 +49,8 @@ struct GpuDraw {
     /// double-buffered pools, now and at the last frame.
     std::uint32_t motion[4];
     std::uint32_t uv[4];  ///< The mesh's first corner in the texture
-                          ///< coordinate pool; unused.
+                          ///< coordinate pool, and its slot of active
+                          ///< counts plus 1 (0 for none); unused.
 };
 static_assert(sizeof(GpuDraw) == 272,
               "GpuDraw must match MeshDraw in mesh.slang");
@@ -131,11 +132,13 @@ constexpr DescriptorBinding kComposeBindings[] = {
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
-/// instance_bounds.slang's bindings: positions, scales and bounds.
+/// instance_bounds.slang's bindings: positions, scales, bounds and
+/// the meshes' counts in use.
 constexpr DescriptorBinding kBoundsBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// instance_anchors.slang's bindings: records, the pools, and what is
@@ -274,6 +277,7 @@ constexpr DescriptorBinding kBindings[] = {
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {28, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's
@@ -306,6 +310,7 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {28, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
@@ -520,7 +525,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
                     sizeof(DrawConstants)),
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       composeLayout_(renderer.Context(), kComposeBindings, 32),
-      boundsLayout_(renderer.Context(), kBoundsBindings, 16),
+      boundsLayout_(renderer.Context(), kBoundsBindings, 20),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       lightCullLayout_(renderer.Context(), kLightCullBindings, 48),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
@@ -581,6 +586,8 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     instanceIds_ =
         StorageBuffer(context_, std::span<const std::byte>());
     drawRecords_ =
+        StorageBuffer(context_, std::span<const std::byte>());
+    activeCounts_ =
         StorageBuffer(context_, std::span<const std::byte>());
 }
 
@@ -776,6 +783,8 @@ void MeshDrawable::SetPoints(std::uint32_t mesh,
     std::tie(it->second.low, it->second.high) =
         PointBounds(it->second.data.points);
     it->second.devicePoints = Tensor();
+    it->second.gpuPoints.reset();
+    it->second.lastGpuPoints.reset();
     it->second.pointsDirty = true;
     activeMeshes_.insert(mesh);
     if (it->second.levelsPending &&
@@ -807,14 +816,20 @@ void MeshDrawable::SetPoints(
     // host, once.
     const bool levels =
         target.levelsPending && target.deviceIndices.Empty();
-    if (!bounds || levels) {
+    // Without bounds, the points are downloaded only until the GPU
+    // has measured them (`ReadBounds`).
+    const bool measured = !bounds && target.gpuPoints.has_value();
+    if ((!bounds && !measured) || levels) {
         const Tensor host = compute_->Download(points);
         target.data.points.assign(host.As<float>(),
                                   host.As<float>() + host.Elements());
     }
+    target.pointsBounded = bounds.has_value();
     if (bounds) {
         std::tie(target.low, target.high) = *bounds;
-    } else {
+        target.gpuPoints.reset();
+        target.lastGpuPoints.reset();
+    } else if (!measured) {
         std::tie(target.low, target.high) =
             PointBounds(target.data.points);
     }
@@ -942,10 +957,85 @@ void MeshDrawable::SetIndices(std::uint32_t mesh,
         target.adjacency.clear();
         geometryDirty_ = true;
     }
+    // The view `MapIndices` gave out, handed back: the triangles are
+    // in the pool already.
+    target.indicesInPlace =
+        !target.mappedIndices.Empty() &&
+        indices.Data() == target.mappedIndices.Data() &&
+        !geometryDirty_;
     target.deviceIndices = indices;
     target.indicesStream = stream;
     target.indicesDirty = true;
     activeMeshes_.insert(mesh);
+}
+
+Tensor MeshDrawable::MapIndices(std::uint32_t mesh,
+                                std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    if (it->second.deviceIndices.Empty()) {
+        throw std::invalid_argument(
+            "Only triangle indices written on the GPU can be mapped");
+    }
+    EnsurePools();
+    Mesh& target = it->second;
+    // One copy of the indices: nothing writes them until the frames
+    // that may read them finish. Shaped and typed as written, and
+    // starting as them.
+    compute_->WaitForVulkan(stream);
+    target.mappedIndices = compute_->View(
+        indices_, target.deviceIndices.Type(),
+        target.deviceIndices.Shape(),
+        VkDeviceSize{target.firstIndex} * sizeof(std::uint32_t));
+    if (target.mappedIndices.Data() != target.deviceIndices.Data()) {
+        compute_->Copy(target.deviceIndices, target.mappedIndices,
+                       stream);
+    }
+    return target.mappedIndices;
+}
+
+void MeshDrawable::SetActiveCounts(std::uint32_t mesh,
+                                   const Tensor& counts,
+                                   std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    if (!counts.Empty()) {
+        if (counts.Type() != DType::Int32 || counts.Elements() != 2 ||
+            !counts.IsContiguous()) {
+            throw std::invalid_argument(
+                "Active counts must be a contiguous int32 (2,) "
+                "tensor: points, then triangles");
+        }
+        if (IsGpu(counts.Location().kind) &&
+            (compute_ == nullptr ||
+             counts.Location() != compute_->Location())) {
+            throw std::invalid_argument(
+                "Active counts on a GPU must be on the compute "
+                "device, with MeshDrawable::SetComputeInterop");
+        }
+    }
+    // Gaining or losing them takes or frees a slot.
+    geometryDirty_ = geometryDirty_ ||
+                     counts.Empty() != target.activeCounts.Empty();
+    target.activeCounts = counts;
+    target.countsStream = stream;
+    target.countsDirty = true;
+    activeMeshes_.insert(mesh);
+    if (!geometryDirty_ && !counts.Empty() &&
+        !IsGpu(counts.Location().kind)) {
+        renderer_.Uploads().Write(
+            *activeCounts_,
+            std::as_bytes(std::span(counts.As<std::int32_t>(), 2)),
+            VkDeviceSize{target.countSlot - 1} * 2 *
+                sizeof(std::int32_t));
+    }
 }
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
@@ -1137,16 +1227,32 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
         compute_->CopyToBuffer(mesh.deviceColors, *colors_, offset,
                                mesh.colorsStream);
     }
-    // The full mesh's triangles, first of its indices.
+    // The full mesh's triangles, first of its indices; written in
+    // place (`MapIndices`), they are there already, and the frame
+    // waits for their stream.
     if (!mesh.deviceIndices.Empty() && (all || mesh.indicesDirty)) {
-        compute_->CopyToBuffer(mesh.deviceIndices, *indices_,
-                               VkDeviceSize{mesh.firstIndex} *
-                                   sizeof(std::uint32_t),
-                               mesh.indicesStream);
+        if (mesh.indicesInPlace && !all) {
+            compute_->SignalVulkan(mesh.indicesStream);
+        } else {
+            compute_->CopyToBuffer(mesh.deviceIndices, *indices_,
+                                   VkDeviceSize{mesh.firstIndex} *
+                                       sizeof(std::uint32_t),
+                                   mesh.indicesStream);
+        }
+    }
+    if (mesh.countSlot != 0 && !mesh.activeCounts.Empty() &&
+        IsGpu(mesh.activeCounts.Location().kind) &&
+        (all || mesh.countsDirty)) {
+        compute_->CopyToBuffer(mesh.activeCounts, *activeCounts_,
+                               VkDeviceSize{mesh.countSlot - 1} * 2 *
+                                   sizeof(std::int32_t),
+                               mesh.countsStream);
     }
     mesh.normalsDirty = false;
     mesh.colorsDirty = false;
     mesh.indicesDirty = false;
+    mesh.indicesInPlace = false;
+    mesh.countsDirty = false;
 }
 
 std::shared_ptr<GpuBuffer>
@@ -1594,7 +1700,26 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
     std::vector<float> uvs;
+    // Points and triangles in use, by slot; device ones start as
+    // every one, until copied in.
+    std::vector<std::int32_t> counts;
     for (auto& [handle, mesh] : meshes_) {
+        mesh.countSlot = 0;
+        if (!mesh.activeCounts.Empty()) {
+            mesh.countSlot =
+                static_cast<std::uint32_t>(counts.size() / 2 + 1);
+            if (IsGpu(mesh.activeCounts.Location().kind)) {
+                counts.push_back(static_cast<std::int32_t>(
+                    mesh.data.points.size() / 3));
+                counts.push_back(static_cast<std::int32_t>(
+                    mesh.data.indices.size() / 3));
+            } else {
+                counts.push_back(
+                    mesh.activeCounts.As<std::int32_t>()[0]);
+                counts.push_back(
+                    mesh.activeCounts.As<std::int32_t>()[1]);
+            }
+        }
         mesh.firstUv = static_cast<std::uint32_t>(uvs.size() / 2);
         uvs.insert(uvs.end(), mesh.data.uvs.begin(),
                    mesh.data.uvs.end());
@@ -1639,7 +1764,10 @@ void MeshDrawable::RebuildGeometry() {
         // Points mapped into the old pool copy across from there.
         mesh.pointsInPlace = false;
         mesh.mappedPoints = Tensor();
+        mesh.indicesInPlace = false;
+        mesh.mappedIndices = Tensor();
     }
+    activeCounts_ = Pool(std::as_bytes(std::span(counts)));
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
@@ -2270,6 +2398,7 @@ void MeshDrawable::WriteDraws() {
                      : 0u;
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
         draw.uv[0] = mesh.firstUv;
+        draw.uv[1] = mesh.countSlot;
         if (item.instancer) {
             const Instancer& instancer =
                 instancers_.at(*item.instancer);
@@ -2373,14 +2502,51 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
                 glm::vec3(value(w[3]), value(w[4]), value(w[5])));
             instancer.gpuScale = value(w[6]);
         }
+        // Meshes' measured points (in use) bound them, ahead by their
+        // motion as instancers'.
+        for (std::size_t j = 0; j < jobs.size(); ++j) {
+            const auto it = meshes_.find(jobs[j].first);
+            if (it == meshes_.end() ||
+                it->second.devicePoints.Empty() ||
+                it->second.pointsBounded ||
+                it->second.data.points.size() / 3 != jobs[j].second) {
+                continue;
+            }
+            const std::uint32_t* w = &words[8 * j];
+            Mesh& mesh = it->second;
+            const Bounds3 box(
+                glm::vec3(value(w[0]), value(w[1]), value(w[2])),
+                glm::vec3(value(w[3]), value(w[4]), value(w[5])));
+            if (!(box.first.x <= box.second.x)) {
+                continue;  // no points in use: the lows still empty
+            }
+            mesh.lastGpuPoints = mesh.gpuPoints;
+            mesh.gpuPoints = box;
+            std::tie(mesh.low, mesh.high) = box;
+            if (mesh.lastGpuPoints) {
+                mesh.low =
+                    glm::min(mesh.low, 2.0f * box.first -
+                                           mesh.lastGpuPoints->first);
+                mesh.high = glm::max(mesh.high,
+                                     2.0f * box.second -
+                                         mesh.lastGpuPoints->second);
+            }
+        }
         ForgetBounds();
     }
-    // This frame measures every device instancer without an extent.
+    // This frame measures every device instancer without an extent,
+    // and every mesh's device points without bounds.
     jobs.clear();
     for (const auto& [handle, instancer] : instancers_) {
         if (instancer.onDevice && !instancer.composed &&
             !instancer.device.extent && instancer.count > 0) {
             jobs.emplace_back(handle, instancer.count);
+        }
+    }
+    for (const auto& [handle, mesh] : meshes_) {
+        if (!mesh.devicePoints.Empty() && !mesh.pointsBounded &&
+            !mesh.data.points.empty()) {
+            jobs.emplace_back(handle, mesh.data.points.size() / 3);
         }
     }
     const VkDeviceSize bytes =
@@ -2413,25 +2579,49 @@ void MeshDrawable::RecordBounds(VkCommandBuffer commands) const {
         dependency.pMemoryBarriers = &memory;
         vkCmdPipelineBarrier2(commands, &dependency);
     };
-    const DescriptorResource resources[] = {
+    // Instancers measure their positions, meshes their points.
+    const DescriptorResource instanceResources[] = {
         DescriptorResource::Of(*positions_),
         DescriptorResource::Of(*scales_),
-        DescriptorResource::Of(*boundsReadback_[boundsSlot_])};
-    // Every job's words emptied, then each job's instances measured.
+        DescriptorResource::Of(*boundsReadback_[boundsSlot_]),
+        DescriptorResource::Of(*activeCounts_)};
+    const DescriptorResource meshResources[] = {
+        DescriptorResource::Of(*points_),
+        DescriptorResource::Of(*scales_),
+        DescriptorResource::Of(*boundsReadback_[boundsSlot_]),
+        DescriptorResource::Of(*activeCounts_)};
+    // Every job's words emptied, then each job's positions measured.
     for (const ComputePipeline* pipeline :
          {boundsClearPipeline_.get(), boundsPipeline_.get()}) {
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           pipeline->Handle());
-        boundsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                           resources);
+        std::optional<bool> bound;
         for (std::size_t j = 0; j < jobs.size(); ++j) {
-            const Instancer& instancer =
-                instancers_.at(jobs[j].first);
-            const std::uint32_t constants[4] = {
-                InstanceBase(instancer) + instancer.first,
-                static_cast<std::uint32_t>(instancer.count),
-                instancer.device.scales.Empty() ? 0u : 1u,
-                static_cast<std::uint32_t>(8 * j)};
+            const auto instancer = instancers_.find(jobs[j].first);
+            const bool isInstancer = instancer != instancers_.end();
+            if (bound != isInstancer) {
+                boundsLayout_.Push(
+                    commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                    isInstancer ? std::span(instanceResources)
+                                : std::span(meshResources));
+                bound = isInstancer;
+            }
+            std::uint32_t constants[5] = {
+                0, 0, 0, static_cast<std::uint32_t>(8 * j), 0};
+            if (isInstancer) {
+                constants[0] = InstanceBase(instancer->second) +
+                               instancer->second.first;
+                constants[1] = static_cast<std::uint32_t>(
+                    instancer->second.count);
+                constants[2] =
+                    instancer->second.device.scales.Empty() ? 0u : 1u;
+            } else {
+                const Mesh& mesh = meshes_.at(jobs[j].first);
+                constants[0] = PointBase(mesh) + mesh.firstVertex;
+                constants[1] =
+                    static_cast<std::uint32_t>(jobs[j].second);
+                constants[4] = mesh.countSlot;
+            }
             boundsLayout_.PushConstants(commands, constants,
                                         sizeof(constants));
             vkCmdDispatch(commands,
@@ -2575,6 +2765,7 @@ MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
     renderer_.MaterialOrDefault(draw.material)
         .AppendTextureResources(resources);
     resources.push_back(DescriptorResource::Of(*instanceColors_));
+    resources.push_back(DescriptorResource::Of(*activeCounts_));
     return resources;
 }
 

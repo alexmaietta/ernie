@@ -41,7 +41,7 @@ struct MeshDraw {
     // frame's (equal to the current ones when they stood still).
     uint4 motion;
     // x: the mesh's first corner in `uvs` (its levels of detail's corners follow, as in
-    // `indices`); yzw unused.
+    // `indices`); y: its slot in `activeCounts` plus 1, 0 for all its triangles drawn; zw unused.
     uint4 uv;
 }
 
@@ -72,6 +72,8 @@ struct MeshDraw {
 // Linear RGB per instance, double-buffered as `scales`, in place of the prototype's colours
 // (`kHasInstanceColors`).
 [[vk::binding(27, 0)]] StructuredBuffer<float> instanceColors;
+// Meshes' points and triangles in use, pairs by slot (`MeshDraw.uv.y`).
+[[vk::binding(28, 0)]] StructuredBuffer<int> activeCounts;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -172,7 +174,12 @@ Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint 
 MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float motion = 1.0) {
     let d = draws[call.item];
     let flags = d.offsets.w;
-    let corner = indices[d.offsets.x + call.indexOffset + vertexIndex];
+    // A triangle past the mesh's triangles in use (`activeCounts`, slot d.uv.y - 1) takes its
+    // first point at all three corners: no area, so nothing drawn.
+    let dead = d.uv.y != 0 &&
+               (call.indexOffset + vertexIndex) / 3 >=
+                   uint(max(activeCounts[2 * (d.uv.y - 1) + 1], 0));
+    let corner = dead ? 0u : indices[d.offsets.x + call.indexOffset + vertexIndex];
     let index = d.offsets.y + corner;
     let instance = (flags & kInstanced) != 0
                        ? instanceIds[d.offsets.z + call.instanceOffset + instanceIndex]

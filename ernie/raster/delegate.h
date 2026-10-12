@@ -115,7 +115,8 @@ class RasterDelegate : public RenderDelegate {
     void Update(const Scene& scene, const Path& settings,
                 VkExtent2D extent) override;
 
-    /// As `RenderDelegate::MapArray`: a Mesh's `points`, a
+    /// As `RenderDelegate::MapArray`: a Mesh's `points`, or its
+    /// `faceVertexIndices` once written on the GPU, a
     /// PointInstancer's `positions`, `orientations`, `scales` or
     /// `primvars:displayColor`, a
     /// Points prim's `points`, a Terrain's `heights`, or a Camera's
@@ -255,9 +256,10 @@ class RasterDelegate : public RenderDelegate {
     struct SyncedMesh {
         std::uint32_t handle = 0;
         Key key;
-        /// Versions of its points, and of its normals, colours and
-        /// triangle indices when written on the GPU.
-        std::array<std::uint64_t, 4> versions{};
+        /// Versions of its points, of its normals, colours and
+        /// triangle indices when written on the GPU, and of the
+        /// points and triangles in use.
+        std::array<std::uint64_t, 5> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
     };
@@ -458,6 +460,9 @@ class RasterDelegate : public RenderDelegate {
     /// Hands the mesh its triangle indices written on the GPU.
     void SetMeshIndices(const Scene& scene, const Path& path,
                         std::uint32_t handle);
+    /// Hands the mesh the points and triangles it uses, or none.
+    void SetMeshActiveCounts(const Scene& scene, const Path& path,
+                             std::uint32_t handle);
 
     const VulkanContext& context_;
     std::unique_ptr<ComputeInterop> compute_;

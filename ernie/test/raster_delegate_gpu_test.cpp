@@ -578,6 +578,136 @@ TEST_F(RasterDelegateTest, CudaTrianglesDrawAndChangeInPlace) {
     EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
 }
 
+TEST_F(RasterDelegateTest, ActiveCountsDrawTheTrianglesInUse) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene scene = MeshScene();
+    scene.Clear("/World/Quad", tokens::kFaceVertexCounts);
+    const std::array<std::int32_t, 6> fan{0, 1, 2, 0, 2, 3};
+    scene.Write("/World/Quad", tokens::kFaceVertexIndices,
+                cuda->Upload(Tensor::Copy<std::int32_t>(fan, {6})));
+    const auto expectHalves = [&](bool upper, const char* what) {
+        const Tensor image = delegate.Render(scene);
+        EXPECT_GT(TexelAt(scene, image, {-11, -1, 0})[0], 200)
+            << what;
+        if (upper) {
+            EXPECT_GT(TexelAt(scene, image, {-13, 1, 0})[0], 200)
+                << what;
+        } else {
+            EXPECT_EQ(TexelAt(scene, image, {-13, 1, 0})[0], 0)
+                << what;
+        }
+    };
+    expectHalves(true, "no counts");
+    const std::size_t meshes = delegate.Meshes().MeshCount();
+
+    // One triangle of two in use, from the host, then from the GPU.
+    const std::array<std::int32_t, 2> one{4, 1};
+    const std::array<std::int32_t, 2> both{4, 2};
+    scene.Write("/World/Quad", tokens::kActiveCounts,
+                Tensor::Copy<std::int32_t>(one, {2}));
+    expectHalves(false, "host counts: the first triangle");
+    scene.Write("/World/Quad", tokens::kActiveCounts,
+                Tensor::Copy<std::int32_t>(both, {2}));
+    expectHalves(true, "host counts: both");
+    scene.Write("/World/Quad", tokens::kActiveCounts,
+                cuda->Upload(Tensor::Copy<std::int32_t>(one, {2})));
+    expectHalves(false, "CUDA counts: the first triangle");
+    EXPECT_EQ(delegate.Meshes().MeshCount(), meshes)
+        << "counts change in place";
+
+    // Without them, every triangle again.
+    scene.Clear("/World/Quad", tokens::kActiveCounts);
+    expectHalves(true, "no counts");
+
+    const std::array<std::int32_t, 3> wrong{4, 1, 0};
+    scene.Write("/World/Quad", tokens::kActiveCounts,
+                Tensor::Copy<std::int32_t>(wrong, {3}));
+    EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest, MappedTrianglesAreWrittenInPlace) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene scene = MeshScene();
+    scene.Clear("/World/Quad", tokens::kFaceVertexCounts);
+    const std::array<std::int32_t, 6> fan{0, 1, 2, 0, 2, 3};
+    scene.Write("/World/Quad", tokens::kFaceVertexIndices,
+                cuda->Upload(Tensor::Copy<std::int32_t>(fan, {6})));
+    delegate.Render(scene);
+
+    // The view starts as the triangles written.
+    const Tensor mapped = delegate.MapArray(
+        scene, "/World/Quad", tokens::kFaceVertexIndices);
+    EXPECT_EQ(mapped.Shape(), (std::vector<std::int64_t>{6}));
+    EXPECT_EQ(mapped.Type(), ernie::DType::Int32);
+    const Tensor back = cuda->Download(mapped);
+    EXPECT_TRUE(
+        std::equal(fan.begin(), fan.end(), back.As<std::int32_t>()));
+
+    const std::size_t meshes = delegate.Meshes().MeshCount();
+    const std::array<std::int32_t, 6> half{0, 1, 2, 0, 1, 2};
+    cuda->Copy(cuda->Upload(Tensor::Copy<std::int32_t>(half, {6})),
+               mapped);
+    scene.Unmap("/World/Quad", tokens::kFaceVertexIndices);
+    const Tensor halved = delegate.Render(scene);
+    EXPECT_GT(TexelAt(scene, halved, {-11, -1, 0})[0], 200);
+    EXPECT_EQ(TexelAt(scene, halved, {-13, 1, 0})[0], 0)
+        << "the triangles written in place";
+    EXPECT_EQ(delegate.Meshes().MeshCount(), meshes);
+
+    // Host triangles do not map.
+    EXPECT_THROW(delegate.MapArray(scene, "/World/Rocks/Rock",
+                                   tokens::kFaceVertexIndices),
+                 std::invalid_argument);
+}
+
+TEST_F(RasterDelegateTest,
+       CudaPointsWithoutBoundsAreBoundedOnTheGpu) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // A fifth point far above the quad, out of use.
+    Scene scene = MeshScene();
+    const Tensor* quad = scene.Read("/World/Quad", tokens::kPoints);
+    std::vector<float> points(quad->As<float>(),
+                              quad->As<float>() + quad->Elements());
+    points.insert(points.end(), {0.0f, 0.0f, 500.0f});
+    scene.Write("/World/Quad", tokens::kPoints,
+                cuda->Upload(Tensor::Copy<float>(points, {5, 3})));
+    const std::array<std::int32_t, 2> used{4, 2};
+    scene.Write("/World/Quad", tokens::kActiveCounts,
+                Tensor::Copy<std::int32_t>(used, {2}));
+    delegate.Render(scene);
+    ASSERT_TRUE(delegate.Meshes().Bounds());
+    EXPECT_GT(delegate.Meshes().Bounds()->second.z, 400.0f)
+        << "downloaded at first: every point";
+
+    // Measured on the GPU frames later: the points in use alone.
+    for (int frame = 0; frame < 4; ++frame) {
+        scene.Write(
+            "/World/Quad", tokens::kPoints,
+            cuda->Upload(Tensor::Copy<float>(points, {5, 3})));
+        delegate.Render(scene);
+    }
+    ASSERT_TRUE(delegate.Meshes().Bounds());
+    EXPECT_LT(delegate.Meshes().Bounds()->second.z, 10.0f);
+    const Tensor image = delegate.Render(scene);
+    EXPECT_GT(TexelAt(scene, image, {-12, 0, 0})[0], 200)
+        << "still drawn";
+}
+
 TEST_F(RasterDelegateTest,
        CudaPointsOfDetailedPrototypesDrawAsHostOnes) {
     RasterDelegate delegate(*context_);

@@ -2354,6 +2354,7 @@ void BindScene(nb::module_& m) {
         {"WIDTHS", tokens::kWidths},
         {"FACE_VERTEX_COUNTS", tokens::kFaceVertexCounts},
         {"FACE_VERTEX_INDICES", tokens::kFaceVertexIndices},
+        {"ACTIVE_COUNTS", tokens::kActiveCounts},
         {"DISPLAY_COLOR", tokens::kDisplayColor},
         {"POSITIONS", tokens::kPositions},
         {"ORIENTATIONS", tokens::kOrientations},

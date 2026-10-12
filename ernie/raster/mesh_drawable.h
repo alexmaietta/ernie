@@ -273,6 +273,28 @@ class MeshDrawable : public RasterDrawable {
     void SetIndices(std::uint32_t mesh, const Tensor& indices,
                     std::uintptr_t stream = 1);
 
+    /// Maps a mesh's triangle indices for writing in place on the
+    /// compute device: a uint32 tensor over the drawable's own index
+    /// pool, holding them as they are now. Writes go on `stream`,
+    /// which first waits for the frames already submitted; handing
+    /// the tensor back with `SetIndices` then draws them without
+    /// copying. Map again for each frame.
+    /// @throws std::invalid_argument for an unknown mesh, one whose
+    /// indices are not on the device, or without `SetComputeInterop`.
+    Tensor MapIndices(std::uint32_t mesh, std::uintptr_t stream = 1);
+
+    /// Sets the points and triangles a mesh uses of those it holds
+    /// (its capacity), as a contiguous int32 (2,) tensor on the host
+    /// or the compute device, read on the GPU: the triangles past the
+    /// count are not drawn, and only the points in use bound it. The
+    /// counts are copied each time they are set. An empty tensor
+    /// uses them all.
+    /// @throws std::invalid_argument for an unknown mesh, a tensor of
+    /// another type or shape, or device counts without
+    /// `SetComputeInterop`.
+    void SetActiveCounts(std::uint32_t mesh, const Tensor& counts,
+                         std::uintptr_t stream = 1);
+
     /// Maps a mesh's points for writing in place on the compute
     /// device: a float32 (points, 3) tensor over the drawable's own
     /// points pool, the half the next frame draws, holding the points
@@ -583,6 +605,24 @@ class MeshDrawable : public RasterDrawable {
                                ///< `data.indices` (zeros), if any.
         std::uintptr_t indicesStream = 1;
         bool indicesDirty = false;
+        /// The view `MapIndices` last gave out, and whether the
+        /// indices set are already in it.
+        Tensor mappedIndices;
+        bool indicesInPlace = false;
+        /// Points and triangles in use (`SetActiveCounts`), their
+        /// stream, and its slot in `activeCounts_` (0 for none, else
+        /// the slot plus 1), assigned when the geometry is rebuilt.
+        Tensor activeCounts;
+        std::uintptr_t countsStream = 1;
+        bool countsDirty = false;
+        std::uint32_t countSlot = 0;
+        /// Of device points without bounds, the bounds of the points
+        /// in use measured on the GPU (`RecordBounds`) frames ago,
+        /// and the measurement before.
+        std::optional<Bounds3> gpuPoints;
+        std::optional<Bounds3> lastGpuPoints;
+        bool pointsBounded =
+            false;  ///< Device points set with bounds.
         /// Whether its normals follow its device points, recomputed
         /// on the GPU when they move: a mesh with normals whose
         /// points, but not normals, come from the device.
@@ -897,7 +937,8 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<ComputePipeline> boundsClearPipeline_;
     std::unique_ptr<ComputePipeline> boundsPipeline_;
     /// Per upload slot: the readback buffer its frames measure into,
-    /// and the instancers it measured (handle and count), in order.
+    /// and the instancers and meshes it measured (handle and count),
+    /// in order.
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
         boundsReadback_;
     std::array<std::vector<std::pair<std::uint32_t, std::size_t>>,
@@ -954,6 +995,9 @@ class MeshDrawable : public RasterDrawable {
     /// Linear RGB per instance, laid out as `scales_`; 1 where an
     /// instancer has none.
     std::shared_ptr<GpuBuffer> instanceColors_;
+    /// Meshes' points and triangles in use (int32 pairs), by
+    /// `Mesh::countSlot`; read by the vertex and bounds shaders.
+    std::shared_ptr<GpuBuffer> activeCounts_;
     std::unique_ptr<GpuBuffer> instanceIds_;
     /// Per indirect draw of GPU culling: its draw, instance offset
     /// and index offset, read by draw index in batched draws
