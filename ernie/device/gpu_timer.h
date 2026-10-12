@@ -14,7 +14,8 @@ namespace ernie {
 /// timestamp where it starts and one where it ends in its command
 /// buffer, and `Collect` hands finished zones to the profiler without
 /// waiting for the device, then frees their queries by host reset
-/// (Vulkan 1.2's hostQueryReset). Zones are dropped while the
+/// (Vulkan 1.2's hostQueryReset) some collects later, once their
+/// submission has surely completed. Zones are dropped while the
 /// profiler is not recording, or when the queries in flight run out.
 ///
 /// References:
@@ -47,7 +48,17 @@ class GpuTimer {
         bool ended = false;
     };
 
+    /// A finished zone's queries, reset once `kRetireCollects` more
+    /// collects have passed.
+    struct Retiring {
+        std::uint32_t query;
+        std::uint32_t collects = 0;
+    };
+
     static constexpr std::uint32_t kQueries = 4096;
+    /// Collects (a frame each) before a finished zone's queries are
+    /// reset: more than the frames a renderer keeps in flight.
+    static constexpr std::uint32_t kRetireCollects = 4;
 
     VkDevice device_;
     VkQueryPool pool_ = VK_NULL_HANDLE;
@@ -55,6 +66,7 @@ class GpuTimer {
     double periodNs_ = 1.0;
     std::mutex mutex_;
     std::vector<Pending> pending_;
+    std::vector<Retiring> retiring_;
     std::vector<std::uint32_t>
         free_;  ///< The first queries of the pairs free to hand out.
     std::uint32_t depth_ =

@@ -26,7 +26,9 @@ using ernie::LoadImageFile;
 using ernie::MipChain;
 using ernie::MipFilter;
 using ernie::SrgbToLinear;
+using ernie::Tensor;
 using ernie::ToRgba8;
+using ernie::WriteExr;
 
 namespace {
 
@@ -304,4 +306,32 @@ TEST_F(ImageFiles, ReportsMissingCorruptAndUnsupportedFiles) {
     EXPECT_THROW(
         LoadImageFile(dir_ / "texture.tga", ImageEncoding::Linear),
         std::runtime_error);
+}
+
+TEST_F(ImageFiles, WritesExrThatReadsBack) {
+    // Two rows of three RGBA floats, beyond [0, 1] as HDR is.
+    std::vector<float> values(2 * 3 * 4);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = 0.25f * static_cast<float>(i);
+    }
+    const Tensor image = Tensor::Copy<float>(values, {2, 3, 4});
+    WriteExr(dir_ / "hdr.exr", image);
+    const Image read =
+        LoadImageFile(dir_ / "hdr.exr", ImageEncoding::Linear);
+    ASSERT_EQ(read.width, 3u);
+    ASSERT_EQ(read.height, 2u);
+    // Row 1, column 2: elements 20 to 23.
+    EXPECT_FLOAT_EQ(read.At(2, 1).r, 5.0f);
+    EXPECT_FLOAT_EQ(read.At(2, 1).a, 5.75f);
+}
+
+TEST_F(ImageFiles, WritesExrOfIdsAndRejectsOtherShapes) {
+    const std::vector<std::uint32_t> ids{1, 2, 3, 4};
+    WriteExr(dir_ / "ids.exr",
+             Tensor::Copy<std::uint32_t>(ids, {2, 2}));
+    EXPECT_GT(std::filesystem::file_size(dir_ / "ids.exr"), 0u);
+    const std::vector<float> flat{1.0f, 2.0f};
+    EXPECT_THROW(
+        WriteExr(dir_ / "flat.exr", Tensor::Copy<float>(flat, {2})),
+        std::invalid_argument);
 }

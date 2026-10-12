@@ -104,10 +104,24 @@ void GpuTimer::Collect() {
             static_cast<double>(end) * periodNs_);
         zone.depth = pending.depth;
         profiler::AddGpuZone(pending.frame, zone);
-        vkResetQueryPool(device_, pool_, pending.query, 2);
-        free_.push_back(pending.query);
+        retiring_.push_back({pending.query, 0});
     }
     pending_ = std::move(waiting);
+    // Reset and handed out again only some collects later, once the
+    // fence of the submission that wrote them has surely been waited
+    // on: a host reset must follow the submission's completion, which
+    // its results being available alone does not show (the
+    // validation layer would see the next write as unreset).
+    std::vector<Retiring> kept;
+    for (Retiring& retiring : retiring_) {
+        if (++retiring.collects <= kRetireCollects) {
+            kept.push_back(retiring);
+            continue;
+        }
+        vkResetQueryPool(device_, pool_, retiring.query, 2);
+        free_.push_back(retiring.query);
+    }
+    retiring_ = std::move(kept);
 }
 
 }  // namespace ernie

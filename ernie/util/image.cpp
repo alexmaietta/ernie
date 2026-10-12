@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/image.h"
 
+#include <ImfChannelList.h>
+#include <ImfFrameBuffer.h>
+#include <ImfHeader.h>
+#include <ImfOutputFile.h>
 #include <ImfRgbaFile.h>
 #include <stb_image.h>
 
@@ -115,6 +119,72 @@ glm::vec4 Image::Mean() const {
     return pixels.empty()
                ? glm::vec4(0.0f)
                : glm::vec4(sum / static_cast<double>(pixels.size()));
+}
+
+void WriteExr(const std::filesystem::path& path,
+              const Tensor& image) {
+    if ((image.Rank() != 2 && image.Rank() != 3) ||
+        image.Location().kind != DeviceKind::Cpu) {
+        throw std::invalid_argument(
+            "EXR images are (rows, cols[, channels]) on the CPU");
+    }
+    const auto rows = static_cast<int>(image.Shape()[0]);
+    const auto cols = static_cast<int>(image.Shape()[1]);
+    const int channels =
+        image.Rank() == 3 ? static_cast<int>(image.Shape()[2]) : 1;
+    const DType type = image.Type();
+    if (type != DType::Float32 && type != DType::UInt32 &&
+        type != DType::UInt16 && type != DType::UInt8) {
+        throw std::invalid_argument(
+            "EXR images are float32 or unsigned integers");
+    }
+    const Tensor contiguous =
+        image.IsContiguous() ? image : image.Contiguous();
+    const std::size_t count =
+        static_cast<std::size_t>(rows) * cols * channels;
+    // Floats and uint32 as they are; narrower integers as floats.
+    const bool uints = type == DType::UInt32;
+    std::vector<float> floats;
+    if (type == DType::UInt16 || type == DType::UInt8) {
+        floats.resize(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            floats[i] = type == DType::UInt16
+                            ? contiguous.As<std::uint16_t>()[i]
+                            : contiguous.As<std::uint8_t>()[i];
+        }
+    }
+    char* base =
+        floats.empty()
+            ? static_cast<char*>(const_cast<void*>(contiguous.Data()))
+            : reinterpret_cast<char*>(floats.data());
+    static constexpr std::array<const char*, 4> kRgba{"R", "G", "B",
+                                                      "A"};
+    const auto name = [&](int c) -> std::string {
+        if (channels == 1) {
+            return "Y";
+        }
+        return channels <= 4 ? kRgba[static_cast<std::size_t>(c)]
+                             : std::to_string(c);
+    };
+    try {
+        Imf::Header header(cols, rows);
+        header.compression() = Imf::ZIP_COMPRESSION;
+        const Imf::PixelType pixel = uints ? Imf::UINT : Imf::FLOAT;
+        Imf::FrameBuffer frame;
+        const std::size_t texel = channels * sizeof(float);
+        for (int c = 0; c < channels; ++c) {
+            header.channels().insert(name(c), Imf::Channel(pixel));
+            frame.insert(name(c),
+                         Imf::Slice(pixel, base + c * sizeof(float),
+                                    texel, texel * cols));
+        }
+        Imf::OutputFile file(path.string().c_str(), header);
+        file.setFrameBuffer(frame);
+        file.writePixels(rows);
+    } catch (const std::exception& error) {
+        throw std::runtime_error("Cannot write " + path.string() +
+                                 ": " + error.what());
+    }
 }
 
 Image LoadImageFile(const std::filesystem::path& path,

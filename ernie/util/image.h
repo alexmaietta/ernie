@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/util/tensor.h"
+
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -79,6 +81,16 @@ struct Image {
 /// or its extension is not .png, .jpg, .jpeg or .exr.
 Image LoadImageFile(const std::filesystem::path& path,
                     ImageEncoding encoding);
+
+/// Writes `image`, (rows, cols) or (rows, cols, channels) on the CPU,
+/// rows top to bottom, as an OpenEXR file with ZIP compression:
+/// 32-bit float channels, or 32-bit unsigned for uint32 (ids,
+/// exactly). One channel is named Y, two R and G, three R, G and B,
+/// four R, G, B and A, more their indices (0, 1, ...). Integer types
+/// narrower than 32 bits are written as floats, exactly.
+/// @throws std::invalid_argument for another rank or type, or
+/// std::runtime_error if the file cannot be written.
+void WriteExr(const std::filesystem::path& path, const Tensor& image);
 
 /// IEC 61966-2-1 sRGB transfer function for one channel in [0, 1]:
 /// decode to linear and encode.

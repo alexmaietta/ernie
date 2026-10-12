@@ -7,6 +7,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -35,11 +36,10 @@ TEST(CaptureName, MakesFileNamesSafe) {
 }
 
 TEST(UniquePath, NeverOverwrites) {
+    // Its own: ctest runs tests side by side, with seeds alike.
     const std::filesystem::path dir =
         std::filesystem::temp_directory_path() /
-        ("ernie_capture_" +
-         std::to_string(
-             ::testing::UnitTest::GetInstance()->random_seed()));
+        ("ernie_capture_" + std::to_string(std::random_device{}()));
     std::filesystem::create_directories(dir);
     const std::filesystem::path shot = dir / "shot.png";
     std::filesystem::remove(shot);

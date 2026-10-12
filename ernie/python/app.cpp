@@ -735,6 +735,25 @@ void BindApp(nb::module_& parent) {
             },
             "Capture file names without extension: {scene}, "
             "{camera}, {date} and {time} fill in.")
+        .def_prop_rw(
+            "capture_vars",
+            [](Viewer& v) { return v.GetCaptureOptions().vars; },
+            [](Viewer& v, std::vector<std::string> vars) {
+                v.GetCaptureOptions().vars = std::move(vars);
+            },
+            "The render vars a capture writes, rendered anew through "
+            "the active camera: LdrColor as PNG, the others as EXR "
+            "named _<var>. Empty writes the viewport's image as "
+            "shown.")
+        .def_prop_rw(
+            "capture_scale",
+            [](Viewer& v) { return v.GetCaptureOptions().scale; },
+            [](Viewer& v, double scale) {
+                v.GetCaptureOptions().scale = scale;
+            },
+            "The rendered size over the viewport's render "
+            "resolution, such as 2 or 4 for stills larger than the "
+            "screen.")
         .def("screenshot", &Viewer::Screenshot,
              "Saves the next viewport frame as PNG in the capture "
              "folder (as F10 does): the image with the scene's "

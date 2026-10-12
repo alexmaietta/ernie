@@ -28,6 +28,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/image.h"
 #include "ernie/util/profile.h"
 
 #define GLFW_INCLUDE_NONE
@@ -765,6 +766,9 @@ struct Viewer::State {
         bool rendered = false;
         bool screenshot =
             false;  ///< Listed and announced once written.
+        /// Renders the capture options' vars (`RenderCapture`) rather
+        /// than reading the viewport.
+        bool render = false;
     };
     std::optional<CaptureRequest> capture;
 
@@ -3503,36 +3507,129 @@ struct Viewer::State {
 
     void WriteCapture() {
         frame->Wait();
-        const std::vector<std::uint8_t> texels =
-            viewport->ReadColor();
-        const VkExtent2D extent = viewport->Extent();
         const std::filesystem::path path = capture->path;
         const bool screenshot = capture->screenshot;
+        const bool rendered = capture->render;
         capture.reset();
         if (path.has_parent_path()) {
             std::error_code error;
             std::filesystem::create_directories(path.parent_path(),
                                                 error);
         }
-        if (stbi_write_png(
-                path.string().c_str(), static_cast<int>(extent.width),
-                static_cast<int>(extent.height), 4, texels.data(),
-                static_cast<int>(extent.width * 4)) == 0) {
-            if (screenshot || recording) {
-                // From the GUI: said in the log rather than thrown.
-                recording.reset();
-                self.Log(LogLevel::Error,
-                         "Cannot write " + path.string());
-                Toast("Cannot write " + path.filename().string());
-                return;
+        std::vector<std::filesystem::path> written;
+        try {
+            if (rendered) {
+                written = RenderCapture(path);
+            } else {
+                const std::vector<std::uint8_t> texels =
+                    viewport->ReadColor();
+                const VkExtent2D extent = viewport->Extent();
+                if (stbi_write_png(
+                        path.string().c_str(),
+                        static_cast<int>(extent.width),
+                        static_cast<int>(extent.height), 4,
+                        texels.data(),
+                        static_cast<int>(extent.width * 4)) == 0) {
+                    throw std::runtime_error("Cannot write " +
+                                             path.string());
+                }
+                written.push_back(path);
             }
-            throw std::runtime_error("Cannot write " + path.string());
+        } catch (const std::exception& error) {
+            if (!screenshot && !recording) {
+                throw;
+            }
+            // From the GUI: said in the log rather than thrown.
+            recording.reset();
+            self.Log(LogLevel::Error, error.what());
+            Toast("Capture failed: see the Log");
+            return;
         }
-        if (screenshot) {
-            recentCaptures.push_back(path);
-            self.Log(LogLevel::Info, "Saved " + path.string());
-            Toast("Saved " + path.filename().string());
+        if (screenshot && !written.empty()) {
+            recentCaptures.insert(recentCaptures.end(),
+                                  written.begin(), written.end());
+            self.Log(LogLevel::Info,
+                     "Saved " + written.front().string());
+            Toast("Saved " + written.front().filename().string() +
+                  (written.size() > 1
+                       ? " and " +
+                             std::to_string(written.size() - 1) +
+                             " more"
+                       : std::string()));
         }
+    }
+
+    /// Whether captures render their vars anew rather than read the
+    /// viewport's image.
+    bool CaptureRenders() const {
+        return !captureOptions.vars.empty() ||
+               captureOptions.scale != 1.0;
+    }
+
+    /// Renders the capture's vars (LdrColor without any) through a
+    /// session render product of the active camera at the viewport's
+    /// render resolution times the capture's scale, with the
+    /// viewport's settings, and writes them by `path`: LdrColor as
+    /// PNG at `path`, the others as EXR at its stem and `_<var>`.
+    /// Returns the files written.
+    std::vector<std::filesystem::path>
+    RenderCapture(const std::filesystem::path& path) {
+        std::vector<std::string> vars = captureOptions.vars;
+        if (vars.empty()) {
+            vars.push_back(std::string(render_vars::kLdrColor));
+        }
+        const Path product = SessionRootPath().Child("Capture");
+        std::vector<Path> varPaths;
+        for (const std::string& name : vars) {
+            const Path var =
+                SessionRootPath().Child("CaptureVars").Child(name);
+            RenderVar::Define(scene, var).SetSourceName(name);
+            varPaths.push_back(var);
+        }
+        // The size the viewport rendered at, scaled.
+        const double scale =
+            std::clamp(captureOptions.scale, 0.1, 16.0);
+        const VkExtent2D shown = viewport->Extent();
+        RenderProduct::Define(scene, product)
+            .SetCamera(activeCamera)
+            .SetResolution(glm::dvec2(
+                std::max(std::round(shown.width * scale), 1.0),
+                std::max(std::round(shown.height * scale), 1.0)));
+        scene.Set(product, tokens::kOrderedVars, varPaths);
+        const Path products[] = {product};
+        RenderProductSetOutputs outputs =
+            delegate->Step(scene, products, SessionSettingsPath());
+        std::vector<std::filesystem::path> written;
+        std::filesystem::path stem = path;
+        stem.replace_extension();
+        // In the order chosen.
+        auto& rendered = outputs.at(product).vars;
+        for (const std::string& name : vars) {
+            const auto found = rendered.find(name);
+            if (found == rendered.end()) {
+                continue;
+            }
+            const Tensor image =
+                found->second.Map(MapDevice::Cpu).tensor;
+            if (name == render_vars::kLdrColor) {
+                const Tensor rgba = image.Contiguous();
+                const auto rows = static_cast<int>(rgba.Shape()[0]);
+                const auto cols = static_cast<int>(rgba.Shape()[1]);
+                if (stbi_write_png(path.string().c_str(), cols, rows,
+                                   4, rgba.As<std::uint8_t>(),
+                                   cols * 4) == 0) {
+                    throw std::runtime_error("Cannot write " +
+                                             path.string());
+                }
+                written.push_back(path);
+                continue;
+            }
+            std::filesystem::path file = stem;
+            file += "_" + name + ".exr";
+            WriteExr(file, image);
+            written.push_back(file);
+        }
+        return written;
     }
 
     /// The toast, or a recording's progress, centred at the bottom of
@@ -3597,7 +3694,7 @@ struct Viewer::State {
                 (r.stem + "_" +
                  ExpandCaptureName("{frame}", {.frame = r.index}) +
                  ".png"),
-            "", false, false};
+            "", false, false, CaptureRenders()};
         return r.index == 0 ? 0.0 : r.options.every / r.fps;
     }
 
@@ -4782,7 +4879,8 @@ std::filesystem::path Viewer::Screenshot() {
         s.captureOptions.folder /
         (ExpandCaptureName(s.captureOptions.name, s.CaptureFields()) +
          ".png"));
-    s.capture = State::CaptureRequest{path, "", false, true};
+    s.capture = State::CaptureRequest{path, "", false, true,
+                                      s.CaptureRenders()};
     return path;
 }
 
@@ -4802,6 +4900,13 @@ void Viewer::RecordSequence(const SequenceOptions& options) {
     if (options.video != VideoFormat::None && FindFfmpeg().empty()) {
         throw std::invalid_argument(
             "Encoding a video needs ffmpeg on the PATH");
+    }
+    const std::vector<std::string>& vars = s.captureOptions.vars;
+    if (options.video != VideoFormat::None && !vars.empty() &&
+        std::find(vars.begin(), vars.end(), render_vars::kLdrColor) ==
+            vars.end()) {
+        throw std::invalid_argument(
+            "A video is made of LdrColor: capture it too");
     }
     State::SequenceRecording r;
     r.options = options;

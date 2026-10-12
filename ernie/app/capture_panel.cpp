@@ -2,8 +2,12 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/capture.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/menu.h"
 #include "ernie/app/viewer.h"
+#include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/stage_schemas.h"
+
+#include <imgui_internal.h>
 
 #include <imgui.h>
 
@@ -32,6 +36,7 @@ class CapturePanel final : public Panel {
         ImGui::TableSetupColumn("value",
                                 ImGuiTableColumnFlags_WidthStretch);
         Output(options);
+        Image(options);
         Screenshot(viewer);
         Sequence(viewer);
         ImGui::EndTable();
@@ -73,9 +78,58 @@ class CapturePanel final : public Panel {
                     .c_str())) {
             viewer.Screenshot();
         }
-        ImGui::SameLine();
-        ImGui::TextDisabled(
-            "PNG at the viewport's render resolution");
+    }
+
+    /// Which render vars a capture writes, and at what size.
+    static void Image(CaptureOptions& options) {
+        Row("Render vars");
+        std::vector<std::string>& vars = options.vars;
+        std::string shown;
+        for (const std::string& var : vars) {
+            shown += (shown.empty() ? "" : ", ") + var;
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        menu::NextMenuWide();
+        if (ImGui::BeginCombo("##vars", shown.empty()
+                                            ? "The viewport as shown"
+                                            : shown.c_str())) {
+            // Toggles stay open, so several change at once.
+            ImGui::PushItemFlag(ImGuiItemFlags_AutoClosePopups,
+                                false);
+            for (const std::string_view name : kRenderVarNames) {
+                const auto found =
+                    std::find(vars.begin(), vars.end(), name);
+                bool on = found != vars.end();
+                if (menu::Check(std::string(name).c_str(), &on)) {
+                    if (on) {
+                        vars.emplace_back(name);
+                    } else {
+                        vars.erase(found);
+                    }
+                }
+            }
+            ImGui::PopItemFlag();
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "LdrColor as PNG, the others as EXR (_<var>), "
+                "rendered anew through the active camera; none "
+                "writes the viewport's image as shown");
+        }
+        Row("Scale");
+        const std::pair<double, const char*> scales[] = {
+            {0.5, "50%"},
+            {1.0, "100%"},
+            {2.0, "200%"},
+            {4.0, "400%"}};
+        for (const auto& [scale, label] : scales) {
+            if (ImGui::RadioButton(label, options.scale == scale)) {
+                options.scale = scale;
+            }
+            ImGui::SameLine();
+        }
+        ImGui::TextDisabled("of the viewport's render resolution");
     }
 
     void Sequence(Viewer& viewer) {

@@ -136,6 +136,15 @@ struct CaptureOptions {
     /// File names without extension (`ExpandCaptureName`); a
     /// sequence's frames add `_{frame}` in a folder of this name.
     std::string name = "{scene}_{date}_{time}";
+    /// The render vars a capture writes, rendered anew through the
+    /// active camera: LdrColor as PNG under the name itself, the
+    /// others as EXR (`WriteExr`) under the name and `_<var>`. Empty
+    /// writes the viewport's image as shown, unless `scale` asks for
+    /// another size, which renders LdrColor.
+    std::vector<std::string> vars;
+    /// The rendered size over the viewport's render resolution, such
+    /// as 2 or 4 for stills larger than the screen.
+    double scale = 1.0;
 };
 
 /// A sequence to record (`Viewer::RecordSequence`).

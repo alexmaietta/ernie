@@ -1072,6 +1072,47 @@ TEST_F(ViewerTest, ScreenshotsAndSequencesLandInTheCaptureFolder) {
     std::filesystem::remove_all(dir);
 }
 
+TEST_F(ViewerTest, CapturesRenderVarsAnewAtAScaleOfTheViewport) {
+    const std::filesystem::path dir = TempFile("var_captures");
+    std::filesystem::remove_all(dir);
+    CaptureOptions& options = viewer_->GetCaptureOptions();
+    options.folder = dir;
+    options.name = "vars";
+    // The layout settles over the first frames.
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_TRUE(viewer_->Step());
+    }
+    // The viewport as shown, for its size.
+    const std::filesystem::path shown = viewer_->Screenshot();
+    EXPECT_TRUE(viewer_->Step());
+    const auto size = [](const std::filesystem::path& path) {
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        EXPECT_TRUE(stbi_info(path.string().c_str(), &width, &height,
+                              &channels));
+        return std::pair{width, height};
+    };
+    const auto [width, height] = size(shown);
+
+    options.name = "rendered";
+    options.vars = {"LdrColor", "DistanceToCamera"};
+    options.scale = 2.0;
+    viewer_->Screenshot();
+    EXPECT_TRUE(viewer_->Step());
+    const std::vector<std::filesystem::path>& written =
+        viewer_->RecentCaptures();
+    ASSERT_EQ(written.size(), 3u);
+    EXPECT_EQ(written[1], dir / "rendered.png");
+    EXPECT_EQ(written[2], dir / "rendered_DistanceToCamera.exr");
+    EXPECT_EQ(size(dir / "rendered.png"),
+              std::pair(2 * width, 2 * height))
+        << "twice the viewport's render resolution";
+    EXPECT_TRUE(std::filesystem::exists(
+        dir / "rendered_DistanceToCamera.exr"));
+    std::filesystem::remove_all(dir);
+}
+
 TEST_F(ViewerTest, HidesItsViewportUi) {
     ViewportDisplay display = viewer_->GetViewportDisplay();
     EXPECT_TRUE(display.ui);
