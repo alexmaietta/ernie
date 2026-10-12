@@ -103,8 +103,12 @@ class MarsDemo : public app::Demo {
         numFrames = 1;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
-        // Carbon dioxide and dust (feldspar with hematite) around a
-        // planet whose surface is the world's z = 0.
+        // Mars's surface at the world's z = 0 (reddish soil, albedo
+        // about its mean 0.25), and its carbon dioxide and dust
+        // (feldspar with hematite).
+        demos::DefinePlanetSurface(scene, "/World/Mars", 3389.5e3,
+                                   glm::dvec3(0.33, 0.22, 0.14),
+                                   "/World/Looks/Soil");
         Atmosphere::Define(scene, "/World/Air")
             .SetPreset(std::string(tokens::kMars))
             .SetDustOpticalDepth(0.5)

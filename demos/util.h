@@ -4,6 +4,8 @@
 // Small helpers the C++ demos share, as ernie.demo's helpers do the
 // Python demos'.
 
+#include "ernie/scene/path.h"
+#include "ernie/scene/scene.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/vec3.hpp>
@@ -28,6 +30,15 @@ Tensor SideBySide(std::span<const Tensor> images, int gap = 4);
 /// image, as Python's `ernie.demo.heatmap`.
 Tensor Heatmap(std::span<const double> values, std::int64_t rows,
                std::int64_t cols, double low, double high);
+
+/// A smooth planet of `radius` metres at `path`: a planet Terrain of
+/// flat cube faces, its surface at the world's z = 0 (its centre
+/// `radius` below the origin), drawn with a Material of normal albedo
+/// `albedo` (linear RGB) at `material`. The ground under an
+/// atmosphere, which is the air alone.
+void DefinePlanetSurface(Scene& scene, const Path& path,
+                         double radius, const glm::dvec3& albedo,
+                         const Path& material);
 
 /// An sRGB-encoded colour in [0, 1] to linear.
 glm::dvec3 SrgbToLinear(glm::dvec3 srgb);

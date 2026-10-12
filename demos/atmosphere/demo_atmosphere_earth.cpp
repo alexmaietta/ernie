@@ -76,9 +76,11 @@ class EarthDemo : public app::Demo {
         numFrames = 1;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
-        // Earth's air, ozone and haze around a planet whose surface
-        // is the world's z = 0, the ground beyond any geometry its
-        // own.
+        // The Earth's surface at the world's z = 0 (albedo 0.3), and
+        // its air, ozone and haze.
+        demos::DefinePlanetSurface(scene, "/World/Earth", 6371.0088e3,
+                                   glm::dvec3(0.3),
+                                   "/World/Looks/Ground");
         Atmosphere::Define(scene, "/World/Air")
             .SetPreset(std::string(tokens::kEarth));
         // The Sun above the atmosphere: its measured spectrum.

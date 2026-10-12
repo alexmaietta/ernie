@@ -48,8 +48,15 @@ class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
         world = self.scene.define("/World", ernie.Xform)
-        # Earth's air, ozone and haze around a planet whose surface is
-        # the world's z = 0, the ground beyond any geometry its own.
+        # The Earth's surface at the world's z = 0 (albedo 0.3), and its
+        # air, ozone and haze.
+        ernie.demo.define_planet_surface(
+            self.scene,
+            "/World/Earth",
+            6371.0088e3,
+            (0.3, 0.3, 0.3),
+            "/World/Looks/Ground",
+        )
         world.define("Air", ernie.Atmosphere, preset=tokens.EARTH)
         # The Sun above the atmosphere: its measured spectrum.
         self.sun = world.define(

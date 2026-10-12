@@ -498,7 +498,10 @@ TEST_F(RasterDelegateTest, TheSkyMatchesTheReferenceAtTheZenith) {
               2.0 * sky.back() / static_cast<double>(sun.back()));
 }
 
-TEST_F(RasterDelegateTest, FromOrbitSpaceIsBlackAndTheGroundLit) {
+// From orbit, space is black, and the air over the planet glows with
+// the light it scatters up (no geometry stands for the planet's
+// ground here: the atmosphere is the air alone).
+TEST_F(RasterDelegateTest, FromOrbitSpaceIsBlackAndTheAirGlows) {
     constexpr double kElevation = 30.0;
     const double altitude = 1000e3;
     // Straight down at the planet, and up into space.
@@ -525,18 +528,11 @@ TEST_F(RasterDelegateTest, FromOrbitSpaceIsBlackAndTheGroundLit) {
     const double e = kElevation * kPi / 180.0;
     for (std::size_t b = 0; b < down.size(); ++b) {
         EXPECT_EQ(space[b], 0.0) << "band " << b;
-        // The ground's light (albedo 0.3, the sun dimmed on its way
-        // down) through the air, and the light the air scatters up.
         const int band = static_cast<int>(b);
-        const double ground =
-            0.3 / kPi * std::sin(e) *
-            air.TransmittanceToTop(air.bottomRadius, std::sin(e),
-                                   band) *
-            air.TransmittanceToTop(air.bottomRadius, 1.0, band);
         const double scattered =
             VerticalReference(air, multiple, band, e, true);
-        EXPECT_NEAR(down[b] / (static_cast<double>(sun[b]) *
-                               (ground + scattered)),
+        EXPECT_NEAR(down[b] /
+                        (static_cast<double>(sun[b]) * scattered),
                     1.0, 0.03)
             << "band " << b;
     }

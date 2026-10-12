@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "util.h"
 
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/terrain_schemas.h"
+#include "ernie/scene/xform.h"
+
 #ifdef ERNIE_DEMO_DOWNLOADS
 #include <curl/curl.h>
 #endif
@@ -170,6 +174,21 @@ Tensor SideBySide(std::span<const Tensor> images, int gap) {
         left += width + gap;
     }
     return result;
+}
+
+void DefinePlanetSurface(Scene& scene, const Path& path,
+                         double radius, const glm::dvec3& albedo,
+                         const Path& material) {
+    constexpr std::int64_t kSide = 65;
+    Terrain::Define(scene, path)
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(6 * kSide * kSide, 0.0f),
+            {6, kSide, kSide}))
+        .SetPlanetRadius(radius)
+        .SetMaterialBinding(material);
+    SetXform(scene, path,
+             {.translate = glm::dvec3(0.0, 0.0, -radius)});
+    Material::Define(scene, material).SetAlbedo(albedo);
 }
 
 glm::dvec3 SrgbToLinear(glm::dvec3 srgb) {

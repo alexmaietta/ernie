@@ -1502,8 +1502,9 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
 // The atmosphere between the eye at `origin` (relative to the frame's origin, metres) and the
 // dome and stars along `d`: their light dims by its transmittance and the light of the sky's
 // distant lights (`skyLights`) it scatters adds; their discs, of `pixelSolidAngle` or larger,
-// show dimmed through it; and a ray that meets the planet where no geometry is drawn sees its
-// ground, a Lambertian surface of the ground albedo lit by the dimmed lights. Celestial bodies
+// show dimmed through it; a ray that meets the planet where no geometry is drawn sees the air in
+// front of it over black (the atmosphere is the air alone: its planet's surface is the scene's own
+// geometry, a planet Terrain or a sphere, shown whether the air is or not). Celestial bodies
 // show in front of the lights' discs, the dome and the stars (`bodyRadiance`), and eclipse the
 // lights for the air and the ground (`eclipseVisibility`).
 void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
@@ -1526,7 +1527,6 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
     for (uint group = 0; group * 4 < bands; ++group) {
         var scattered = float4(0.0);
         var transmittance = float4(1.0);
-        var groundLight = float4(0.0);
         // Refraction: rays that the air bends back up clear the ground just below the
         // horizon, and what lies beyond the atmosphere shows from further down, where the bent
         // ray came from (judged where the ray is in the atmosphere first).
@@ -1540,19 +1540,6 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                                atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
                                start, end, sources, eclipse, group, kSkySteps, scattered,
                                transmittance);
-            if (ground) {
-                let hit = p + end * d;
-                let up = normalize(hit);
-                for (uint i = 0; i < sources.count; ++i) {
-                    let towards = sources.towards[i].xyz;
-                    let sine = sources.towards[i].w;
-                    let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, hit,
-                                                 towards, sine, group, bottom, top);
-                    groundLight += sources.irradiance[i] * toSun * saturate(dot(up, towards)) *
-                                   eclipseVisibility(eclipse, hit, towards, sine);
-                }
-                groundLight *= groundAlbedo(atmosphereMedium, group) / PI;
-            }
             let first = p + start * d;
             let r = length(first);
             vertical = first / r;
@@ -1603,7 +1590,7 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
             }
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             let beyond = turnTowardsZenith(d, vertical, -bending[k]);
-            var behind = groundLight[k];
+            var behind = 0.0;
             if (escapes[k]) {
                 // A celestial body in front of the stars and the dome, its limb's pixels
                 // partly covering them; and in front of a light's disc, where the pixel's centre

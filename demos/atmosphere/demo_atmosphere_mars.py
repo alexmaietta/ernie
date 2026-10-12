@@ -72,8 +72,16 @@ class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
         world = self.scene.define("/World", ernie.Xform)
-        # Carbon dioxide and dust (feldspar with hematite) around a
-        # planet whose surface is the world's z = 0.
+        # Mars's surface at the world's z = 0 (reddish soil, albedo about
+        # its mean 0.25), and its carbon dioxide and dust (feldspar with
+        # hematite).
+        ernie.demo.define_planet_surface(
+            self.scene,
+            "/World/Mars",
+            3389.5e3,
+            (0.33, 0.22, 0.14),
+            "/World/Looks/Soil",
+        )
         self.air = world.define(
             "Air",
             ernie.Atmosphere,

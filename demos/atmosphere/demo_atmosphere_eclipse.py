@@ -92,6 +92,13 @@ class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
         world = self.scene.define("/World", ernie.Xform)
+        ernie.demo.define_planet_surface(
+            self.scene,
+            "/World/Earth",
+            6371.0088e3,
+            (0.3, 0.3, 0.3),
+            "/World/Looks/Ground",
+        )
         world.define("Air", ernie.Atmosphere, preset=tokens.EARTH)
         e = math.radians(SUN_ELEVATION)
         sun = world.define(

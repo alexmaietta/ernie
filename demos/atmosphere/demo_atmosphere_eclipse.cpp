@@ -133,6 +133,9 @@ class EclipseDemo : public app::Demo {
         numFrames = 1;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
+        demos::DefinePlanetSurface(scene, "/World/Earth", 6371.0088e3,
+                                   glm::dvec3(0.3),
+                                   "/World/Looks/Ground");
         Atmosphere::Define(scene, "/World/Air")
             .SetPreset(std::string(tokens::kEarth));
         DistantLight::Define(scene, "/World/Sun")

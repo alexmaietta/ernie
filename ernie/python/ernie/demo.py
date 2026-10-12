@@ -551,6 +551,25 @@ def srgb_to_linear(rgb):
     )
 
 
+def define_planet_surface(scene, path, radius, albedo, material):
+    """A smooth planet of `radius` metres at `path`: a planet Terrain of
+    flat cube faces, its surface at the world's z = 0 (its centre
+    `radius` below the origin), drawn with a Material of normal albedo
+    `albedo` (linear RGB) at `material`. The ground under an atmosphere,
+    which is the air alone (as the C++ demos' `DefinePlanetSurface`)."""
+    from . import Material, Terrain
+
+    scene.define(
+        path,
+        Terrain,
+        heights=np.zeros((6, 65, 65), dtype=np.float32),
+        planet_radius=radius,
+        material_binding=material,
+        translate=(0.0, 0.0, -radius),
+    )
+    scene.define(material, Material, albedo=tuple(albedo))
+
+
 def mean_linear_rgb(image):
     """The mean colour of a uint8 (rows, cols, 3 or 4) image, decoded
     from sRGB to linear."""
