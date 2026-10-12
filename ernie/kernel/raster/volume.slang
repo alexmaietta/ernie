@@ -1029,6 +1029,7 @@ Beam beamOf(LightGpu light) {
     beam.waistAt = light.beamExtra.x;
     beam.kind = light.patternExtent.z;
     beam.params = light.patternParams[0];
+    beam.more = light.patternParams[1];
     return beam;
 }
 

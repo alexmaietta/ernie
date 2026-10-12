@@ -1726,12 +1726,13 @@ Beam beamOf(LightGpu light) {
     beam.waistAt = light.beamExtra.x;
     beam.kind = light.patternExtent.z;
     beam.params = light.patternParams[0];
+    beam.more = light.patternParams[1];
     return beam;
 }
 
-// The fraction of laser `light`'s beam reaching `point` in the air past its shadow map: one
-// comparison, the point lying on the beam rather than on a surface.
-float beamShadow(LightGpu light, float3 point) {
+// The fraction of `light` reaching `point` in the air past its shadow map: one comparison, the
+// point lying in the air rather than on a surface.
+float airShadow(LightGpu light, float3 point) {
     if (light.cone.w <= 0.0) {
         return 1.0;
     }
@@ -1757,19 +1758,158 @@ float3 airRay(float2 ndc, out float3 origin) {
     return normalize(ray);
 }
 
-// Lasers' beams in the air: the light the atmosphere scatters towards the eye where the ray of
-// pixel `id` (through `ndc`) crosses the view's lasers' beams short of its surface at `surface`
-// (with `hit`; else all along), added to its radiance (laser_beams.slang). At each crossing, the light the beam
-// gathers there times the air's scattering at the angle between the beam and the ray (each
-// constituent's coefficient and phase function: Rayleigh's for the gas, the haze's or dust's
-// forward peak), dimmed through the air from the laser and on to the eye, and by the laser's
-// shadow map. The air's light is unpolarized here, as Stokes Q and U are left as they are. Only
-// in variants with air and lasers.
+// Where the ray from `origin` along unit `d` lies inside the cone from `apex` around unit `axis`
+// whose half angle has cosine `cosine` (0 to 1: a convex cone), narrowing [`start`, `end`] to it;
+// false if it misses it there.
+bool coneSpan(float3 apex, float3 axis, float cosine, float3 origin, float3 d, inout float start,
+              inout float end) {
+    let co = origin - apex;
+    let dv = dot(d, axis);
+    let cv = dot(co, axis);
+    let c2 = cosine * cosine;
+    // Where the ray meets the cone's surface (or its mirror image behind the apex).
+    let a = dv * dv - c2;
+    let b = 2.0 * (dv * cv - dot(d, co) * c2);
+    let c = cv * cv - dot(co, co) * c2;
+    float cuts[4] = {start, start, end, end};
+    let discriminant = b * b - 4.0 * a * c;
+    if (abs(a) > 1e-12 && discriminant > 0.0) {
+        let root = sqrt(discriminant);
+        let q = -0.5 * (b + (b < 0.0 ? -root : root));
+        let t0 = q / a;
+        let t1 = abs(q) > 0.0 ? c / q : t0;
+        cuts[1] = clamp(min(t0, t1), start, end);
+        cuts[2] = clamp(max(t0, t1), start, end);
+    } else if (abs(a) <= 1e-12 && abs(b) > 0.0) {
+        cuts[1] = clamp(-c / b, start, end);
+        cuts[2] = cuts[1];
+    }
+    // The one span of the three inside it.
+    for (uint i = 0; i < 3; ++i) {
+        let lo = cuts[i];
+        let hi = cuts[i + 1];
+        if (hi <= lo) {
+            continue;
+        }
+        let q = co + d * (0.5 * (lo + hi));
+        if (dot(q, axis) >= cosine * length(q)) {
+            start = lo;
+            end = hi;
+            return true;
+        }
+    }
+    return false;
+}
+
+// The farthest along a ray the air is lit by a lamp, metres.
+static const float kAirLampReach = 1e5;
+
+// The light a point, sphere or spot light scatters towards the eye from the air along the ray
+// from `origin` along unit `direction` short of `far`, added to pixel `id`'s radiance: the
+// lamp's intensity as surfaces take it (its cone, focus and IES profile, its pulses, its shadow
+// map, which cuts shafts through it), over the square of the distance, times the air's
+// scattering at the angle between the light and the ray, dimmed through the air from the lamp
+// (`aperture`, km from the planet's centre) and on to the eye (`eye`). The ray, clipped to the
+// cone, is sampled equiangularly from the lamp, which takes the 1/r^2 exactly, at 16 points
+// jittered per pixel; its spectrum (the phase and the air's dimming) once per four.
+//
+// Reference: C. Kulla and M. Fajardo, "Importance Sampling Techniques for Path Tracing in
+// Participating Media", Computer Graphics Forum 31(4):1519-1528, 2012 (equiangular sampling).
+void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 direction, float far,
+                float3 eye, float3 aperture, uint bands, float3 centre, float bottom) {
+    static const uint kSamples = 16;
+    static const uint kBlock = 4;
+    float start = 0.0;
+    float end = min(far, kAirLampReach);
+    let apex = light.position.xyz;
+    if (light.cone.x > 0.0 &&
+        !coneSpan(apex, light.axis.xyz, light.cone.x, origin, direction, start, end)) {
+        return;
+    }
+    // The angles from the lamp's foot on the ray, seen from the lamp, the span covers.
+    let along = dot(apex - origin, direction);
+    let closest = max(length(apex - (origin + direction * along)), max(light.axis.w, 1e-3));
+    let first = atan((start - along) / closest);
+    let last = atan((end - along) / closest);
+    if (!(last > first)) {
+        return;
+    }
+    var timing = 1.0;
+    if (light.links.w != 0) {
+        timing = 0.0;
+        for (uint s = 0; s < kMaxLit; ++s) {
+            timing += lightTiming[(shadedView * kMaxLights + k) * kMaxLit + s].y;
+        }
+    }
+    // Each sample's share of the integral of 1/r^2 along the ray.
+    let share = timing * (last - first) / (float(kSamples) * closest);
+    let jitter = interleavedGradientNoise(float2(id.xy));
+    for (uint block = 0; block < kSamples / kBlock; ++block) {
+        var weight = 0.0;
+        var weighted = 0.0;
+        for (uint j = 0; j < kBlock; ++j) {
+            let angle = first + (float(block * kBlock + j) + jitter) / float(kSamples) *
+                                    (last - first);
+            let t = along + closest * tan(angle);
+            let fromLamp = origin + direction * t - apex;
+            let distance2 = max(dot(fromLamp, fromLamp), 1e-12);
+            let outwards = fromLamp * rsqrt(distance2);
+            // Its intensity there, the 1/r^2 aside (within its radius, no brighter).
+            var intensity = distance2 / max(distance2, light.axis.w * light.axis.w);
+            if (light.cone.x > -1.5) {
+                intensity *= smoothstep(light.cone.x, max(light.cone.y, light.cone.x + 1e-6),
+                                        dot(outwards, light.axis.xyz));
+            }
+            if (light.shadow.z > 0.0) {
+                intensity *= pow(abs(dot(outwards, light.axis.xyz)), light.shadow.z);
+            }
+            if (light.shadow.w > 0.0) {
+                intensity *= lightProfile(light, outwards);
+            }
+            if (intensity > 0.0) {
+                intensity *= airShadow(light, apex + fromLamp);
+            }
+            weight += intensity;
+            weighted += intensity * t;
+        }
+        if (!(weight > 0.0)) {
+            continue;
+        }
+        // The block's spectrum where its light lies.
+        let at = origin + direction * (weighted / weight);
+        let point = aboveGround(at * 1e-3 - centre, bottom);
+        let nu = dot(direction, normalize(apex - at));
+        for (uint group = 0; group * 4 < bands; ++group) {
+            let scattered =
+                share * weight * 1e-3 *
+                scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                             length(point) - bottom, group, nu) *
+                transmittanceBetween(atmosphereTransmittance, tableSampler, eye, point, group,
+                                     bottom, sh.atmosphere[1].x) *
+                transmittanceBetween(atmosphereTransmittance, tableSampler, aperture, point,
+                                     group, bottom, sh.atmosphere[1].x) *
+                (light.spectrum[group] + light.tinted[group]);
+            for (uint b = 0; b < 4 && group * 4 + b < bands; ++b) {
+                let layer = int3(id.xy, id.z * bands + group * 4 + b);
+                spectral[layer] = spectral[layer] + scattered[b] * radianceScale();
+            }
+        }
+    }
+}
+
+// The light the air scatters towards the eye from the view's lamps and lasers (`addAirLamp`;
+// lasers' beams by laser_beams.slang's crossings) along the ray of pixel `id` (through `ndc`),
+// short of its surface at `surface` (with `hit`; else all along), added to its radiance. At each
+// of a laser's crossings, the light its beam gathers there times the air's scattering at the
+// angle between the beam and the ray (each constituent's coefficient and phase function:
+// Rayleigh's for the gas, the haze's or dust's forward peak), dimmed through the air from the
+// laser and on to the eye, and by the laser's shadow map. The air's light is unpolarized here, as
+// Stokes Q and U are left as they are. Only in variants with air; lasers' in those with lasers.
 //
 // Reference: C. F. Bohren and D. R. Huffman, "Absorption and Scattering of Light by Small
 // Particles", Wiley, 1983 (a beam seen side-on by the light its path scatters).
-void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
-    if (!(kShadeAir && kShadeLasers) || sh.atmosphere[1].y == 0.0) {
+void addAirLight(uint3 id, float2 ndc, float3 surface, bool hit) {
+    if (!kShadeAir || sh.atmosphere[1].y == 0.0) {
         return;
     }
     float3 origin;
@@ -1789,7 +1929,13 @@ void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
             continue;
         }
         let light = lights[shv.view.z + k];
-        if (uint(light.position.w) != 5 || light.patternExtent.z < 0.5) {
+        let aperture = aboveGround(light.position.xyz * 1e-3 - centre, bottom);
+        if (uint(light.position.w) == 1) {
+            addAirLamp(id, k, light, origin, direction, far, eye, aperture, bands, centre,
+                       bottom);
+            continue;
+        }
+        if (!kShadeLasers || uint(light.position.w) != 5 || light.patternExtent.z < 0.5) {
             continue;
         }
         var shown = 0.0;
@@ -1799,7 +1945,6 @@ void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
         let norm = patternNorms[k];
         let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
         let beam = beamOf(light);
-        let aperture = aboveGround(light.position.xyz * 1e-3 - centre, bottom);
         let pieces = beamPieces(beam);
         for (uint i = 0; i < pieces; ++i) {
             let crossing = beamPiece(beam, i, shown * light.beamExtra.w, shown * efficiency,
@@ -1810,7 +1955,7 @@ void addAirBeams(uint3 id, float2 ndc, float3 surface, bool hit) {
             let at = origin + direction * crossing.t;
             // Its shadow on the beam's own axis there, which its map, as narrow, sees.
             let lit = crossing.value *
-                      beamShadow(light, light.position.xyz -
+                      airShadow(light, light.position.xyz -
                                             crossing.towards.xyz * crossing.towards.w);
             if (lit <= 0.0) {
                 continue;
@@ -2598,7 +2743,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
         }
     }
-    addAirBeams(id, ndc.xy, world, true);
+    addAirLight(id, ndc.xy, world, true);
 }
 
 static const uint kMaxBands = 64;
@@ -2854,7 +2999,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
         writeSky(id, radiance, ndc, d);
         if (part == kSkyPartAtmosphere) {
-            addAirBeams(id, ndc, float3(0.0), false);
+            addAirLight(id, ndc, float3(0.0), false);
         }
         return;
     }
@@ -2879,7 +3024,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
         writeSky(id, radiance, ndc, d);
         if (part == kSkyPartAtmosphere) {
-            addAirBeams(id, ndc, float3(0.0), false);
+            addAirLight(id, ndc, float3(0.0), false);
         }
         return;
     }
@@ -2922,7 +3067,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     }
     writeSky(id, radiance, ndc, d);
     if (part == kSkyPartAtmosphere) {
-        addAirBeams(id, ndc, float3(0.0), false);
+        addAirLight(id, ndc, float3(0.0), false);
     }
 }
 

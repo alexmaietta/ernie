@@ -308,11 +308,61 @@ public struct LaserImage : ILightPattern {
 }
 )";
 
+constexpr const char* kScanSlang = R"(
+import light_pattern;
+
+// The scan's strokes, straight on the tangent plane (laser_beams.slang's scan sheets, as many).
+static const uint kScanStrokes = 64;
+
+// Where the scan is at `s` of its period: (p0 sin(2 pi p2 s + p4), p1 sin(2 pi p3 s)).
+float2 scanPoint(float s, LightPatternParams p) {
+    let turn = 6.28318530718 * s;
+    return float2(p.get(0) * sin(turn * p.get(2) + p.get(4)), p.get(1) * sin(turn * p.get(3)));
+}
+
+// A straight stroke from `a` to `b` of power 1 spread evenly along it, at input.t: across it the
+// beam's Gaussian averaged over the pixel's footprint; along it, its ends softened as much.
+float scanStroke(LightPatternInput input, float2 a, float2 b) {
+    let radius = 0.5 * (input.beam.x + input.beam.y);
+    let width = 0.5 * (input.footprint.x + input.footprint.y);
+    let along = b - a;
+    let length2 = dot(along, along);
+    let offset = input.t - a;
+    if (length2 < 1e-16) {
+        return beamAverage(offset.x, radius, width) * beamAverage(offset.y, radius, width);
+    }
+    let span = sqrt(length2);
+    let unit = along / span;
+    let u = dot(offset, unit);
+    let across = offset.x * unit.y - offset.y * unit.x;
+    let spread = sqrt(max(0.25 * radius * radius + width * width / 12.0, 1e-20));
+    return beamAverage(across, radius, width) *
+           (normalBelow(u / spread) - normalBelow((u - span) / spread)) / span;
+}
+
+// A figure scanned faster than the camera sees it, as a laser show's galvanometers draw it: the
+// beam's Lissajous curve over a period, p0 and p1 the tangents of its half widths along x and y,
+// p2 and p3 its frequencies, p4 its phase along x (radians). Its light lies along the curve by
+// the time the beam spends there, so brighter where it slows to turn; in 64 straight strokes.
+public struct LaserScan : ILightPattern {
+    public float emission(LightPatternInput input, LightPatternParams p) {
+        var total = 0.0;
+        var a = scanPoint(0.0, p);
+        for (uint k = 0; k < kScanStrokes; ++k) {
+            let b = scanPoint(float(k + 1) / float(kScanStrokes), p);
+            total += scanStroke(input, a, b);
+            a = b;
+        }
+        return total / float(kScanStrokes);
+    }
+}
+)";
+
 /// The ids built-in patterns hold, which `Add` refuses.
 bool IsBuiltinId(std::string_view id) {
     return id == tokens::kSpot || id == tokens::kLine ||
            id == tokens::kGrid || id == tokens::kImage ||
-           id == tokens::kDots;
+           id == tokens::kDots || id == tokens::kScan;
 }
 
 }  // namespace
@@ -364,6 +414,13 @@ LightPatternRegistry LightPatternRegistry::WithBuiltins() {
          {"halfX", 0.364f, "tan of half the field of view along x"},
          {"halfY", 0.268f, "tan of half the field of view along y"},
          {"seed", 1.0f, "The seed the dots derive from"}},
+        true);
+    add(tokens::kScan, "Scan", "LaserScan", kScanSlang,
+        {{"halfX", 0.364f, "tan of half the figure's width along x"},
+         {"halfY", 0.268f, "tan of half the figure's height along y"},
+         {"frequencyX", 3.0f, "Turns along x a period"},
+         {"frequencyY", 2.0f, "Turns along y a period"},
+         {"phase", 1.5708f, "Phase along x, radians"}},
         true);
     return registry;
 }

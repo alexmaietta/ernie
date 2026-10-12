@@ -1697,6 +1697,27 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
                               static_cast<float>(seed)};
         extent = std::atan(glm::length(half)) +
                  std::max(spread.x, spread.y);
+    } else if (beam.pattern == tokens::kScan) {
+        const glm::dvec2 fov =
+            glm::radians(laser.GetPatternFieldOfView());
+        const glm::dvec2 frequencies = laser.GetScanFrequencies();
+        if (!(fov.x >= 0.0) || !(fov.y >= 0.0) ||
+            !(fov.x < glm::radians(170.0)) ||
+            !(fov.y < glm::radians(170.0)) || !(frequencies.x >= 0.0) ||
+            !(frequencies.y >= 0.0)) {
+            throw std::invalid_argument(
+                "LaserLight '" + path.String() +
+                "' needs a scan's field of view of 0 or more and below "
+                "170 degrees and frequencies of 0 or more");
+        }
+        const glm::dvec2 half = glm::tan(0.5 * fov);
+        beam.patternParams = {
+            static_cast<float>(half.x), static_cast<float>(half.y),
+            static_cast<float>(frequencies.x),
+            static_cast<float>(frequencies.y),
+            static_cast<float>(glm::radians(laser.GetScanPhase()))};
+        extent = std::atan(glm::length(half)) +
+                 std::max(spread.x, spread.y);
     } else if (beam.pattern == tokens::kImage) {
         const glm::dvec2 fov =
             glm::radians(laser.GetPatternFieldOfView());

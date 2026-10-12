@@ -513,6 +513,12 @@ inline constexpr std::string_view kLaserDotJitter =
     "ernie:laser:dotJitter";
 inline constexpr std::string_view kLaserDotSeed =
     "ernie:laser:dotSeed";
+/// double2: a scan's Lissajous frequencies along x and y, turns a
+/// period; double: its phase along x, degrees.
+inline constexpr std::string_view kLaserScanFrequencies =
+    "ernie:laser:scanFrequencies";
+inline constexpr std::string_view kLaserScanPhase =
+    "ernie:laser:scanPhase";
 /// A pulsed laser (0 rate: continuous): pulses `pulse:width` seconds
 /// long at `pulse:rate` per second, the first starting
 /// `pulse:delay` seconds into the sensor clock
@@ -588,6 +594,7 @@ inline constexpr std::string_view kLine = "line";
 inline constexpr std::string_view kGrid = "grid";
 inline constexpr std::string_view kImage = "image";
 inline constexpr std::string_view kDots = "dots";
+inline constexpr std::string_view kScan = "scan";
 inline constexpr std::string_view kFlat = "flat";
 inline constexpr std::string_view kGaussian = "gaussian";
 /// Degrees off the axis that a light reaches, and the fraction of
