@@ -64,7 +64,7 @@ jobs:
 
   # Ernie built from source and tested on lavapipe under the Vulkan validation layer. GCC, on the
   # oldest supported Python, runs every test (C++, GPU, Python, the install test and the README's
-  # examples) in three parts of every third test each (ctest -I part,,3), so the slow GPU tests run
+  # examples) in four parts of every fourth test each (ctest -I part,,4), so the slow GPU tests run
   # side by side; Clang, on the newest Python, runs the unit and Python tests. Tests fail on any
   # validation message, and on a missing driver or layer rather than skipping
   # (ERNIE_TEST_REQUIRE_VALIDATION).
@@ -75,24 +75,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: gcc, part 1 of 3
+          - name: gcc, part 1 of 4
             key: gcc-1
             cc: gcc
             cxx: g++
             python: "3.12"
-            tests: -I 1,,3
-          - name: gcc, part 2 of 3
+            tests: -I 1,,4
+          - name: gcc, part 2 of 4
             key: gcc-2
             cc: gcc
             cxx: g++
             python: "3.12"
-            tests: -I 2,,3
-          - name: gcc, part 3 of 3
+            tests: -I 2,,4
+          - name: gcc, part 3 of 4
             key: gcc-3
             cc: gcc
             cxx: g++
             python: "3.12"
-            tests: -I 3,,3
+            tests: -I 3,,4
+          - name: gcc, part 4 of 4
+            key: gcc-4
+            cc: gcc
+            cxx: g++
+            python: "3.12"
+            tests: -I 4,,4
           - name: clang, Python 3.14, unit and Python tests
             key: clang
             cc: clang
