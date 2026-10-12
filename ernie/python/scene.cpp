@@ -2179,8 +2179,8 @@ void BindScene(nb::module_& m) {
                 glm::ivec3(static_cast<int>(values.shape(0)),
                            static_cast<int>(values.shape(1)),
                            static_cast<int>(values.shape(2))),
-                voxelSize,
-                glm::dvec3(origin[0], origin[1], origin[2]), name);
+                voxelSize, glm::dvec3(origin[0], origin[1], origin[2]),
+                name);
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 bytes, {static_cast<std::int64_t>(bytes.size())}));
         },
@@ -2277,6 +2277,9 @@ void BindScene(nb::module_& m) {
         {"OPENVDB_ASSET", tokens::kOpenVDBAsset},
         {"NANOVDB_FIELD", tokens::kNanoVDBField},
         {"NANOVDB_BUFFER", tokens::kNanoVdbBuffer},
+        {"DENSE_FIELD", tokens::kDenseField},
+        {"DENSE_VALUES", tokens::kDenseValues},
+        {"VOXEL_SIZE", tokens::kVoxelSize},
         {"HENYEY_GREENSTEIN", tokens::kHenyeyGreenstein},
         {"DOUBLE_HENYEY_GREENSTEIN", tokens::kDoubleHenyeyGreenstein},
         {"PHASE_B", tokens::kPhaseB},

@@ -412,14 +412,21 @@ const NanoVdbGrid* FindNanoVdbGrid(std::span<const NanoVdbGrid> grids,
     return nullptr;
 }
 
+namespace {
+
+// `DenseNanoVdbGrid`, or with `everyVoxel` `DenseNanoVdbTopology` (no
+// `values`, every voxel of the shape active), filling `layout` when
+// given.
 std::vector<std::uint8_t>
-DenseNanoVdbGrid(std::span<const float> values,
-                 const glm::ivec3& shape, double voxelSize,
-                 const glm::dvec3& origin, std::string_view name) {
+BuildDense(std::span<const float> values, const glm::ivec3& shape,
+           double voxelSize, const glm::dvec3& origin,
+           std::string_view name, bool everyVoxel,
+           DenseNanoVdbLayout* layout) {
     if (glm::any(glm::lessThan(shape, glm::ivec3(0))) ||
-        values.size() != static_cast<std::size_t>(shape.x) *
-                             static_cast<std::size_t>(shape.y) *
-                             static_cast<std::size_t>(shape.z)) {
+        (!everyVoxel &&
+         values.size() != static_cast<std::size_t>(shape.x) *
+                              static_cast<std::size_t>(shape.y) *
+                              static_cast<std::size_t>(shape.z))) {
         throw std::invalid_argument(
             "DenseNanoVdbGrid: values do not fill the shape");
     }
@@ -433,9 +440,12 @@ DenseNanoVdbGrid(std::span<const float> values,
     };
     using Constants = pnanovdb_grid_type_constants_t;
     const auto at = [&](int i, int j, int k) {
-        return values[(static_cast<std::size_t>(i) * shape.y + j) *
-                          shape.z +
-                      k];
+        return values.empty()
+                   ? 0.0f
+                   : values[(static_cast<std::size_t>(i) * shape.y +
+                             j) *
+                                shape.z +
+                            k];
     };
     // The leaves (8^3) holding active values, then the lower (128^3)
     // and upper (4096^3) nodes above them, each keyed by its origin.
@@ -450,7 +460,7 @@ DenseNanoVdbGrid(std::span<const float> values,
     for (int x = 0; x < shape.x; x += 8) {
         for (int y = 0; y < shape.y; y += 8) {
             for (int z = 0; z < shape.z; z += 8) {
-                bool active = false;
+                bool active = everyVoxel;
                 for (int i = x;
                      i < std::min(x + 8, shape.x) && !active; ++i) {
                     for (int j = y;
@@ -545,7 +555,7 @@ DenseNanoVdbGrid(std::span<const float> values,
                         continue;
                     }
                     const float value = at(ijk.x, ijk.y, ijk.z);
-                    if (value == 0.0f) {
+                    if (value == 0.0f && !everyVoxel) {
                         continue;
                     }
                     const auto bit = static_cast<std::uint32_t>(
@@ -699,10 +709,12 @@ DenseNanoVdbGrid(std::span<const float> values,
         pnanovdb_make_version(PNANOVDB_MAJOR_VERSION_NUMBER,
                               PNANOVDB_MINOR_VERSION_NUMBER,
                               PNANOVDB_PATCH_VERSION_NUMBER));
-    pnanovdb_grid_set_flags(buf, grid,
-                            PNANOVDB_GRID_FLAGS_HAS_BBOX |
-                                PNANOVDB_GRID_FLAGS_HAS_MIN_MAX |
-                                PNANOVDB_GRID_FLAGS_IS_BREADTH_FIRST);
+    // A topology's values come later: no min and max for them.
+    pnanovdb_grid_set_flags(
+        buf, grid,
+        PNANOVDB_GRID_FLAGS_HAS_BBOX |
+            PNANOVDB_GRID_FLAGS_IS_BREADTH_FIRST |
+            (values.empty() ? 0u : PNANOVDB_GRID_FLAGS_HAS_MIN_MAX));
     pnanovdb_grid_set_grid_index(buf, grid, 0);
     pnanovdb_grid_set_grid_count(buf, grid, 1);
     pnanovdb_grid_set_grid_size(buf, grid, size);
@@ -751,9 +763,33 @@ DenseNanoVdbGrid(std::span<const float> values,
                                  PNANOVDB_GRID_CLASS_FOG_VOLUME);
     pnanovdb_grid_set_grid_type(buf, grid, kType);
 
+    if (layout != nullptr) {
+        layout->firstLeaf = firstLeaf;
+        layout->leafBytes = constant(&Constants::leaf_size);
+        layout->valuesOffset = constant(&Constants::leaf_off_table);
+        layout->leaves = (shape + 7) / 8;
+    }
     std::vector<std::uint8_t> bytes(size);
     std::memcpy(bytes.data(), words.data(), size);
     return bytes;
+}
+
+}  // namespace
+
+std::vector<std::uint8_t>
+DenseNanoVdbGrid(std::span<const float> values,
+                 const glm::ivec3& shape, double voxelSize,
+                 const glm::dvec3& origin, std::string_view name) {
+    return BuildDense(values, shape, voxelSize, origin, name, false,
+                      nullptr);
+}
+
+std::vector<std::uint8_t>
+DenseNanoVdbTopology(const glm::ivec3& shape, double voxelSize,
+                     const glm::dvec3& origin, std::string_view name,
+                     DenseNanoVdbLayout& layout) {
+    return BuildDense({}, shape, voxelSize, origin, name, true,
+                      &layout);
 }
 
 }  // namespace ernie

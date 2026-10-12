@@ -53,7 +53,9 @@
     X(::ernie::Tensor, Buffer, ::ernie::tokens::kNanoVdbBuffer, nullptr,                           \
       (::ernie::AttributeMeta{.doc = "One or more NanoVDB grids back to back as NanoVDB keeps "    \
                                      "them in memory (Warp's Volume.array()), in an array of any " \
-                                     "type, on the CPU or a CUDA device.",                         \
+                                     "type, on the CPU or a CUDA device. Written again in the "    \
+                                     "same device memory, as a simulation steps its grids, "       \
+                                     "their layout is taken as kept; a new array is read anew.",   \
                               .group = "Field", .dirty = ::ernie::Dirty::Points}))                 \
     X(std::string, FieldName, ::ernie::tokens::kFieldName, "",                                     \
       (::ernie::AttributeMeta{.doc = "The grid's name in the buffer; unset, any grid.",            \
@@ -64,6 +66,19 @@
                               .group = "Field", .min = 0.0, .max = 1e6,                            \
                               .dirty = ::ernie::Dirty::Points}))
 
+#define ERNIE_DENSE_FIELD_ATTRIBUTES(X)                                                            \
+    X(::ernie::Tensor, Values, ::ernie::tokens::kDenseValues, nullptr,                             \
+      (::ernie::AttributeMeta{.doc = "float32 (x, y, z) values, z fastest, on the CPU or a CUDA "  \
+                                     "device; 0 is empty. Written again on the device at its "     \
+                                     "shape, as a solver steps, it is copied into place on the "   \
+                                     "GPU with no work on the CPU.",                               \
+                              .group = "Field", .dirty = ::ernie::Dirty::Points}))                 \
+    X(double, VoxelSize, ::ernie::tokens::kVoxelSize, 1.0,                                         \
+      (::ernie::AttributeMeta{.doc = "World units between values: value (i, j, k) is at the "      \
+                                     "voxel size times (i, j, k) in the field's frame.",           \
+                              .group = "Field", .min = 1e-9, .max = 1e9,                           \
+                              .dirty = ::ernie::Dirty::Points}))
+
 #define ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ATTRIBUTES(X)
 
@@ -71,6 +86,7 @@
 #define ERNIE_FIELD_ASSET_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_FIELD_ASSET_ATTRIBUTES(X)
 #define ERNIE_OPENVDB_ASSET_ALL(X) ERNIE_FIELD_ASSET_ALL(X) ERNIE_OPENVDB_ASSET_ATTRIBUTES(X)
 #define ERNIE_NANOVDB_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)
+#define ERNIE_DENSE_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_DENSE_FIELD_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_VOLUME_ATTRIBUTES(X)
 // clang-format on
 
@@ -101,6 +117,14 @@ class OpenVDBAsset : public FieldAsset {
 class NanoVDBField : public FieldBase {
     ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase, ERNIE_NANOVDB_FIELD_ALL)
     ERNIE_SCHEMA_DEFINE(NanoVDBField)
+};
+
+/// Ernie's field of a dense array of values, such as a grid solver's
+/// smoke or dust each step (Warp's arrays): sampled as a NanoVDB grid
+/// of every voxel, which a device array fills in place on the GPU.
+class DenseField : public FieldBase {
+    ERNIE_SCHEMA_BODY(DenseField, FieldBase, ERNIE_DENSE_FIELD_ALL)
+    ERNIE_SCHEMA_DEFINE(DenseField)
 };
 
 /// A participating medium: fields, each named by a relationship

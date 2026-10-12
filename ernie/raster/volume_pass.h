@@ -166,6 +166,13 @@ class VolumePass {
         std::uint64_t deviceOffset = 0;
         std::uintptr_t stream = 1;
         bool copy = false;
+        /// A DenseField's on a device: `device` its values, the grid
+        /// every voxel of their shape (`layout`), which a scatter on
+        /// the GPU fills when `scatter` (`Prepare`).
+        bool dense = false;
+        double voxelSize = 1.0;
+        DenseNanoVdbLayout layout;
+        bool scatter = false;
         std::uint64_t offset = 0;  ///< In the pool, bytes.
         bool used = false;
     };
@@ -174,6 +181,22 @@ class VolumePass {
                            const std::string& prim);
     void RebuildPool();
     void CopyDeviceGrid(LoadedGrid& loaded);
+    /// Queues the dense grids due a scatter: their values copied on
+    /// the device into `staging_`, for `Prepare` to scatter.
+    void StageDenseGrids();
+
+    /// A dense grid's scatter from `staging_` into the pool, in
+    /// 4-byte words: where its values start in `staging_`, its first
+    /// leaf in the pool, the words of a leaf and of a leaf's values,
+    /// its shape and its leaves along each axis.
+    struct Scatter {
+        std::uint32_t values = 0;
+        std::uint32_t firstLeaf = 0;
+        std::uint32_t leafWords = 0;
+        std::uint32_t valuesWord = 0;
+        glm::uvec3 shape{0};
+        glm::uvec3 leaves{0};
+    };
 
     const VulkanContext& context_;
     const ShaderCompiler& compiler_;
@@ -200,6 +223,13 @@ class VolumePass {
     PipelineLayout shadowLayout_;
     mutable std::unique_ptr<ComputePipeline> shadowPipeline_;
     mutable std::size_t shadowPipelinePatterns_ = 0;
+    /// Dense grids' values on their way to the pool, and the scatters
+    /// due (`denseScatterMain`).
+    std::unique_ptr<GpuBuffer> staging_;
+    mutable std::vector<Scatter> scatters_;
+    PipelineLayout scatterLayout_;
+    mutable std::unique_ptr<ComputePipeline> scatterPipeline_;
+    mutable std::size_t scatterPipelinePatterns_ = 0;
     mutable std::unique_ptr<GpuImage> shadowMap_;
     mutable std::uint32_t shadowViews_ = 0;
     std::uint32_t views_ = 0;

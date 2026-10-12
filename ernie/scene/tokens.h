@@ -89,6 +89,12 @@ inline constexpr std::string_view kFieldClass =
 inline constexpr std::string_view kNanoVDBField = "NanoVDBField";
 inline constexpr std::string_view kNanoVdbBuffer =
     "ernie:buffer";  ///< array: the grids, back to back.
+/// Ernie's field of a dense array of values, such as a grid solver's.
+inline constexpr std::string_view kDenseField = "DenseField";
+inline constexpr std::string_view kDenseValues =
+    "ernie:values";  ///< array: (x, y, z) float32.
+inline constexpr std::string_view kVoxelSize =
+    "ernie:voxelSize";  ///< double: world units between values.
 // The volume inputs of a Material. The density field times
 // `inputs:density` is the extinction coefficient in 1/m, of which
 // `inputs:volumeAlbedo` scatters; the rest absorbs, and a temperature

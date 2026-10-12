@@ -220,6 +220,10 @@ struct VolumeResources {
 [[vk::binding(5, 0)]] ConstantBuffer<VolumeResources> pass;
 // The volumes' shadow maps (`volumeShadowMain`'s output, its own pipeline's).
 [[vk::image_format("rgba32f")]] [[vk::binding(6, 0)]] RWTexture2DArray<float4> volumeShadowsOut;
+// The dense grids' scatter (`denseScatterMain`, its own pipeline's): the grids' pool it writes and
+// the values it reads.
+[[vk::binding(7, 0)]] RWStructuredBuffer<uint> gridsOut;
+[[vk::binding(8, 0)]] StructuredBuffer<float> denseValues;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 #define volumes (pass.volumes)
@@ -1172,4 +1176,24 @@ void volumeShadowMain(uint3 id : SV_DispatchThreadID) {
         float4(slices[0], slices[1], slices[2], slices[3]);
     volumeShadowsOut[int3(id.xy, 3 * view + 2)] =
         float4(slices[4], slices[5], slices[6], slices[7]);
+}
+
+// A dense grid's values (a DenseField's on a device, `VolumePass::StageDenseGrids`) scattered into
+// its grid of every voxel in the pool (`DenseNanoVdbTopology`): value (i, j, k) of the (x, y, z)
+// array goes to its leaf's value table. In 4-byte words, `constants` hold the shape
+// (`layout.xyz`) and where its values start (`layout.w`); its first leaf in the pool, the words
+// of a leaf, and where a leaf's values start in it (`offsets.xyz`); and its leaves along y and z
+// (`offsets.w`, `flags.x`).
+[shader("compute")]
+[numthreads(4, 4, 4)]
+void denseScatterMain(uint3 id : SV_DispatchThreadID) {
+    let shape = constants.layout.xyz;
+    if (any(id >= shape)) {
+        return;
+    }
+    let value = denseValues[constants.layout.w + (id.x * shape.y + id.y) * shape.z + id.z];
+    let leaf = ((id.x >> 3) * constants.offsets.w + (id.y >> 3)) * constants.flags.x + (id.z >> 3);
+    let inLeaf = ((id.x & 7u) << 6) | ((id.y & 7u) << 3) | (id.z & 7u);
+    gridsOut[constants.offsets.x + leaf * constants.offsets.y + constants.offsets.z + inLeaf] =
+        asuint(value);
 }

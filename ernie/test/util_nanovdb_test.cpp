@@ -154,6 +154,23 @@ TEST(NanoVdb, BuildsAGridFromDenseValues) {
         std::invalid_argument);
 }
 
+TEST(NanoVdb, ADenseTopologyHoldsEveryVoxelOfItsShape) {
+    // Every voxel of a 20 x 10 x 12 box active (and 0), in 3 x 2 x 2
+    // leaves after the grid's nodes; the GPU tests write and sample
+    // its values.
+    const glm::ivec3 shape(20, 10, 12);
+    DenseNanoVdbLayout layout;
+    const std::vector<std::uint8_t> bytes = DenseNanoVdbTopology(
+        shape, 0.5, glm::dvec3(0.0), "density", layout);
+    EXPECT_EQ(layout.leaves, glm::ivec3(3, 2, 2));
+    EXPECT_EQ(bytes.size(), layout.firstLeaf +
+                                12 * std::uint64_t{layout.leafBytes});
+    const NanoVdbGrid topology = NanoVdbGridsOf(bytes).front();
+    EXPECT_EQ(topology.indexMin, glm::ivec3(0));
+    EXPECT_EQ(topology.indexMax, shape - 1);
+    EXPECT_FALSE(topology.hasStatistics);
+}
+
 TEST(NanoVdb, FindsGridsByNameAndIndex) {
     std::vector<NanoVdbGrid> grids(3);
     grids[0].name = "density";

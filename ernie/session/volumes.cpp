@@ -37,6 +37,32 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         return std::nullopt;
     }
     const PrimTypeDef* type = PrimTypeOf(scene, target);
+    if (type != nullptr && type->IsA(DenseField::Definition())) {
+        const DenseField dense(scene, target);
+        const Tensor* values = dense.GetValues();
+        if (values == nullptr || values->Elements() == 0) {
+            return std::nullopt;
+        }
+        if (values->Type() != DType::Float32 || values->Rank() != 3 ||
+            (values->Location().kind != DeviceKind::Cpu &&
+             !values->IsContiguous())) {
+            throw std::invalid_argument(
+                target.String() +
+                ": a DenseField's values must be a float32 (x, y, z) "
+                "array, contiguous on a device");
+        }
+        VolumeFieldParams field;
+        field.toVolume = toLocal * scene.WorldTransform(target);
+        field.array = target.String();
+        field.buffer = *values;
+        field.version =
+            scene.AttributeVersion(target, tokens::kDenseValues);
+        field.stream =
+            scene.WriteStream(target, tokens::kDenseValues);
+        field.dense = true;
+        field.voxelSize = dense.GetVoxelSize();
+        return field;
+    }
     if (type != nullptr && type->IsA(NanoVDBField::Definition())) {
         const NanoVDBField grids(scene, target);
         const Tensor* buffer = grids.GetBuffer();

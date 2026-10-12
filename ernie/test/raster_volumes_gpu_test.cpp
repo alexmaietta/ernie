@@ -837,3 +837,59 @@ TEST_F(RasterDelegateTest, VolumeSettingsTradeQualityForSpeed) {
         EXPECT_NEAR(ratio[band], 1.0, 0.05) << "band " << band;
     }
 }
+
+TEST_F(RasterDelegateTest,
+       ADenseFieldShadesAsTheGridFromTheCpuOrTheGpu) {
+    // The cube's 16^3 ones as a DenseField, its first value at
+    // -0.75 m (the field's transform) and 0.1 m apart: as the file's
+    // grid, from a CPU array or a CUDA one, the latter written again
+    // in place each step and scattered into the pool on the GPU.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::vector<double> fromFile =
+        CentreSpectrum(delegate, scene);
+    const Tensor ones = Tensor::Copy<float>(
+        std::vector<float>(16 * 16 * 16, 1.0f), {16, 16, 16});
+    ernie::DenseField::Define(scene, "/World/Cube/Dense")
+        .SetValues(ones)
+        .SetVoxelSize(0.1);
+    scene.GetPrim("/World/Cube/Dense")
+        .SetXform({.translate = glm::dvec3(-0.75)});
+    ernie::Volume(scene, "/World/Cube")
+        .SetField("density", "/World/Cube/Dense");
+    const auto expectFile = [&](const std::vector<double>& spectrum,
+                                const char* what) {
+        for (std::size_t b = 0; b < fromFile.size(); ++b) {
+            EXPECT_NEAR(spectrum[b], fromFile[b], 1e-4 * fromFile[b])
+                << what << ", band " << b;
+        }
+    };
+    expectFile(CentreSpectrum(delegate, scene), "CPU");
+
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    const Tensor onDevice = cuda->Upload(ones);
+    scene.Write("/World/Cube/Dense", tokens::kDenseValues, onDevice);
+    expectFile(CentreSpectrum(delegate, scene), "CUDA");
+    const std::size_t poolBytes =
+        delegate.Renderer().Volumes().PoolBytes();
+    // Half the values: the medium half as dense, the grid kept.
+    const Tensor halves = cuda->Upload(Tensor::Copy<float>(
+        std::vector<float>(16 * 16 * 16, 0.5f), {16, 16, 16}));
+    cuda->Copy(halves, onDevice);
+    scene.Write("/World/Cube/Dense", tokens::kDenseValues, onDevice);
+    const std::vector<double> half = CentreSpectrum(delegate, scene);
+    EXPECT_EQ(delegate.Renderer().Volumes().PoolBytes(), poolBytes);
+    Scene halfScene = VolumeScene(kSigma / 2.0, 0.0);
+    RasterDelegate reference(*context_);
+    const std::vector<double> expected =
+        CentreSpectrum(reference, halfScene);
+    for (std::size_t b = 0; b < expected.size(); ++b) {
+        EXPECT_NEAR(half[b], expected[b], 1e-3 * expected[b])
+            << "half, band " << b;
+    }
+}

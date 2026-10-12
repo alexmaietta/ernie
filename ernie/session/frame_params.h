@@ -551,12 +551,17 @@ struct VolumeFieldParams {
     Tensor buffer;
     std::uint64_t version = 0;
     std::uintptr_t stream = 1;
+    /// A DenseField's: `buffer` holds its (x, y, z) float32 values,
+    /// `voxelSize` apart, rather than NanoVDB grids.
+    bool dense = false;
+    double voxelSize = 1.0;
 
     bool operator==(const VolumeFieldParams& other) const {
         return file == other.file && gridName == other.gridName &&
                gridIndex == other.gridIndex &&
                toVolume == other.toVolume && array == other.array &&
-               version == other.version;
+               version == other.version && dense == other.dense &&
+               voxelSize == other.voxelSize;
     }
 };
 

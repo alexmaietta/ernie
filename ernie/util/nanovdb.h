@@ -143,4 +143,27 @@ DenseNanoVdbGrid(std::span<const float> values,
                  const glm::dvec3& origin,
                  std::string_view name = "");
 
+/// Where a `DenseNanoVdbTopology`'s values go: leaf (a, b, c) of
+/// `leaves` (the shape's 8^3 blocks) starts `firstLeaf` +
+/// ((a leaves.y + b) leaves.z + c) `leafBytes` into the grid, and
+/// voxel (i, j, k)'s float is `valuesOffset` + 4 ((i & 7) 64 +
+/// (j & 7) 8 + (k & 7)) bytes into its leaf.
+struct DenseNanoVdbLayout {
+    std::uint64_t firstLeaf = 0;
+    std::uint32_t leafBytes = 0;
+    std::uint32_t valuesOffset = 0;
+    glm::ivec3 leaves{0};
+};
+
+/// As `DenseNanoVdbGrid`, with every voxel of `shape` active and 0,
+/// for values written into it in place later, such as by the GPU each
+/// step of a simulation (a DenseField on a device); `layout` says
+/// where they go. No min and max.
+/// @throws std::invalid_argument for a negative shape or a voxel size
+/// that is not positive.
+std::vector<std::uint8_t>
+DenseNanoVdbTopology(const glm::ivec3& shape, double voxelSize,
+                     const glm::dvec3& origin, std::string_view name,
+                     DenseNanoVdbLayout& layout);
+
 }  // namespace ernie

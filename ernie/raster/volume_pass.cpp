@@ -47,6 +47,13 @@ constexpr DescriptorBinding kShadowBindings[] = {
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+// The dense grids' scatter (volume.slang's `denseScatterMain`): the
+// pool it writes and the values it reads.
+constexpr DescriptorBinding kScatterBindings[] = {
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
 // volume.slang's VolumeResources.
 struct VolumeResources {
     VkDeviceAddress volumes;
@@ -250,6 +257,26 @@ std::unique_ptr<GpuBuffer> Grow(const VulkanContext& context,
     return buffer;
 }
 
+// volume.slang's modules, with the light patterns as shading takes
+// them (`lightPattern`), for lasers' beams in the medium, for a
+// pinhole or a pushbroom camera.
+std::vector<ShaderModuleSource>
+VolumeModules(const LightPatternRegistry& patterns, bool pushbroom) {
+    std::vector<ShaderModuleSource> modules =
+        LightPatternModules(patterns);
+    modules.insert(
+        modules.end(),
+        {{"projection", pushbroom ? shaders::kProjectionPushbroomSlang
+                                  : shaders::kProjectionPinholeSlang},
+         {"brdf", shaders::kBrdfSlang},
+         {"bindless", shaders::kBindlessSlang},
+         {"atmosphere", shaders::kAtmosphereSlang},
+         {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
+                        shaders::kPNanoVdbHeader + "\n" +
+                        shaders::kVolumeSlang}});
+    return modules;
+}
+
 // `count` bytes of contiguous `tensor` from byte `offset`, a view on
 // its device.
 Tensor BytesOf(const Tensor& tensor, std::uint64_t offset,
@@ -265,7 +292,9 @@ VolumePass::VolumePass(const VulkanContext& context,
                        const ShaderCompiler& compiler)
     : context_(context), compiler_(compiler),
       layout_(context, kBindings, sizeof(VolumeConstants)),
-      shadowLayout_(context, kShadowBindings) {
+      shadowLayout_(context, kShadowBindings),
+      scatterLayout_(context, kScatterBindings,
+                     sizeof(VolumeConstants)) {
     pool_ = Grow(context_, nullptr, kGridAlignment);
     resources_ = std::make_unique<GpuBuffer>(
         context_, sizeof(VolumeResources),
@@ -275,6 +304,73 @@ VolumePass::VolumePass(const VulkanContext& context,
 const VolumePass::LoadedGrid*
 VolumePass::Load(const VolumeFieldParams& field,
                  const std::string& prim) {
+    if (field.dense) {
+        // A DenseField's values: on the CPU, a sparse grid of them,
+        // built again when written again; on a device, a grid of
+        // every voxel of their shape, built once, which the GPU fills
+        // from them each time they are written (`StageDenseGrids`,
+        // `Prepare`).
+        const GridKey key{field.array, "", 0, true};
+        auto found = grids_.find(key);
+        if (found == grids_.end() ||
+            found->second.version != field.version ||
+            found->second.voxelSize != field.voxelSize) {
+            ERNIE_ZONE("Volume dense grid");
+            const std::vector<std::int64_t>& dims =
+                field.buffer.Shape();
+            const glm::ivec3 shape(static_cast<int>(dims[0]),
+                                   static_cast<int>(dims[1]),
+                                   static_cast<int>(dims[2]));
+            LoadedGrid loaded;
+            loaded.version = field.version;
+            loaded.dense = true;
+            loaded.voxelSize = field.voxelSize;
+            if (field.buffer.Location().kind == DeviceKind::Cpu) {
+                const Tensor values = field.buffer.Contiguous();
+                loaded.grid =
+                    NanoVdbGridsOf(
+                        DenseNanoVdbGrid(
+                            std::span(values.As<float>(),
+                                      static_cast<std::size_t>(
+                                          values.Elements())),
+                            shape, field.voxelSize, glm::dvec3(0.0)))
+                        .front();
+                poolStale_ = true;
+            } else {
+                if (compute_ == nullptr) {
+                    throw std::runtime_error("Volume " + prim + ": " +
+                                             field.array +
+                                             " is on a device, which "
+                                             "needs compute interop");
+                }
+                const bool same =
+                    found != grids_.end() &&
+                    !found->second.device.Empty() &&
+                    found->second.device.Shape() == dims &&
+                    found->second.voxelSize == field.voxelSize;
+                if (same) {
+                    loaded.grid = std::move(found->second.grid);
+                    loaded.layout = found->second.layout;
+                    loaded.offset = found->second.offset;
+                } else {
+                    loaded.grid =
+                        NanoVdbGridsOf(DenseNanoVdbTopology(
+                                           shape, field.voxelSize,
+                                           glm::dvec3(0.0), "",
+                                           loaded.layout))
+                            .front();
+                    poolStale_ = true;
+                }
+                loaded.device = field.buffer;
+                loaded.stream = field.stream;
+                loaded.scatter = true;
+            }
+            found =
+                grids_.insert_or_assign(key, std::move(loaded)).first;
+        }
+        found->second.used = true;
+        return &found->second;
+    }
     if (!field.array.empty()) {
         // A NanoVDBField's array, read again when written again.
         const GridKey key{field.array, field.gridName, field.gridIndex,
@@ -325,6 +421,25 @@ VolumePass::Load(const VolumeFieldParams& field,
                 std::uint64_t offset = 0;
                 int matched = 0;
                 bool held = false;
+                // The same array written again in place (its memory
+                // and size the same), as a simulation steps its
+                // grids: their layout kept, its heads are not read
+                // again, so the step is one copy on the device with
+                // no wait.
+                if (found != grids_.end() &&
+                    !found->second.device.Empty() &&
+                    found->second.device.Data() ==
+                        field.buffer.Data() &&
+                    found->second.device.Elements() ==
+                        field.buffer.Elements() &&
+                    found->second.device.Type() ==
+                        field.buffer.Type()) {
+                    loaded.grid = found->second.grid;
+                    loaded.device = field.buffer;
+                    loaded.deviceOffset = found->second.deviceOffset;
+                    loaded.stream = field.stream;
+                    held = true;
+                }
                 while (!held && offset < total) {
                     const Tensor head = compute_->Download(
                         BytesOf(
@@ -422,12 +537,14 @@ void VolumePass::RebuildPool() {
     bool device = false;
     for (auto& [key, loaded] : grids_) {
         loaded.offset = bytes;
-        const std::uint64_t size = loaded.device.Empty()
-                                       ? loaded.grid.buffer.size()
-                                       : loaded.grid.size;
+        // A device NanoVDBField's grid comes from the device; a dense
+        // grid's topology from the host, its values scattered in.
+        const std::uint64_t size = loaded.grid.buffer.empty()
+                                       ? loaded.grid.size
+                                       : loaded.grid.buffer.size();
         bytes += (size + kGridAlignment - 1) / kGridAlignment *
                  kGridAlignment;
-        device = device || !loaded.device.Empty();
+        device = device || (!loaded.device.Empty() && !loaded.dense);
     }
     // PNanoVDB's 32-bit addresses on the GPU.
     if (bytes >= (std::uint64_t{1} << 32)) {
@@ -450,12 +567,59 @@ void VolumePass::RebuildPool() {
         device ? BufferMemory::Shared : BufferMemory::Device);
     pool_->Write(std::as_bytes(std::span(pool)));
     for (auto& [key, loaded] : grids_) {
-        if (!loaded.device.Empty()) {
+        if (loaded.dense && !loaded.device.Empty()) {
+            loaded.scatter = true;
+        } else if (!loaded.device.Empty()) {
             CopyDeviceGrid(loaded);
         }
     }
     poolBytes_ = bytes;
     poolStale_ = false;
+}
+
+void VolumePass::StageDenseGrids() {
+    scatters_.clear();
+    std::uint64_t floats = 0;
+    for (const auto& [key, loaded] : grids_) {
+        if (loaded.scatter) {
+            floats +=
+                static_cast<std::uint64_t>(loaded.device.Elements());
+        }
+    }
+    if (floats == 0) {
+        return;
+    }
+    ERNIE_ZONE("Volume dense grids");
+    if (staging_ == nullptr || staging_->Size() < 4 * floats) {
+        if (staging_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        staging_ = std::make_unique<GpuBuffer>(
+            context_, 4 * floats,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            BufferMemory::Shared);
+    }
+    std::uint64_t at = 0;
+    for (auto& [key, loaded] : grids_) {
+        if (!loaded.scatter) {
+            continue;
+        }
+        compute_->CopyToBuffer(loaded.device, *staging_, 4 * at,
+                               loaded.stream);
+        const std::vector<std::int64_t>& dims = loaded.device.Shape();
+        Scatter scatter;
+        scatter.values = static_cast<std::uint32_t>(at);
+        scatter.firstLeaf = static_cast<std::uint32_t>(
+            (loaded.offset + loaded.layout.firstLeaf) / 4);
+        scatter.leafWords = loaded.layout.leafBytes / 4;
+        scatter.valuesWord = loaded.layout.valuesOffset / 4;
+        scatter.shape = glm::uvec3(dims[0], dims[1], dims[2]);
+        scatter.leaves = glm::uvec3(loaded.layout.leaves);
+        scatters_.push_back(scatter);
+        at += static_cast<std::uint64_t>(loaded.device.Elements());
+        loaded.scatter = false;
+    }
 }
 
 void VolumePass::Set(std::span<const VolumeParams> volumes,
@@ -515,6 +679,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             CopyDeviceGrid(loaded);
         }
     }
+    StageDenseGrids();
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -712,6 +877,59 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     if (!active_) {
         return;
     }
+    if (!scatters_.empty()) {
+        // The dense grids' values written on the device, scattered
+        // into their leaves in the pool before anything samples it.
+        ERNIE_ZONE("Record dense grids");
+        ERNIE_GPU_ZONE(context_, commands, "Volume dense grids");
+        if (scatterPipeline_ == nullptr ||
+            scatterPipelinePatterns_ != patterns.Models().size()) {
+            ERNIE_ZONE("Volume scatter pipeline");
+            if (scatterPipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            scatterPipeline_ = std::make_unique<ComputePipeline>(
+                context_, scatterLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "denseScatterMain"));
+            scatterPipelinePatterns_ = patterns.Models().size();
+        }
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          scatterPipeline_->Handle());
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*pool_),
+            DescriptorResource::Of(*staging_)};
+        scatterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            buffers);
+        for (const Scatter& scatter : scatters_) {
+            VolumeConstants constants{};
+            constants.layout[0] = scatter.shape.x;
+            constants.layout[1] = scatter.shape.y;
+            constants.layout[2] = scatter.shape.z;
+            constants.layout[3] = scatter.values;
+            constants.offsets[0] = scatter.firstLeaf;
+            constants.offsets[1] = scatter.leafWords;
+            constants.offsets[2] = scatter.valuesWord;
+            constants.offsets[3] = scatter.leaves.y;
+            constants.flags[0] = scatter.leaves.z;
+            scatterLayout_.PushConstants(commands, &constants,
+                                         sizeof(constants));
+            vkCmdDispatch(commands, (scatter.shape.x + 3) / 4,
+                          (scatter.shape.y + 3) / 4,
+                          (scatter.shape.z + 3) / 4);
+        }
+        scatters_.clear();
+        VkMemoryBarrier2 written{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        written.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        written.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        written.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        written.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &written;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
     ERNIE_ZONE("Record volume shadows");
     ERNIE_GPU_ZONE(context_, commands, "Volume shadows");
     VolumeResources resources{};
@@ -767,23 +985,13 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     if (shadowPipeline_ == nullptr ||
         shadowPipelinePatterns_ != patterns.Models().size()) {
         ERNIE_ZONE("Volume shadow pipeline");
-        std::vector<ShaderModuleSource> modules =
-            LightPatternModules(patterns);
-        modules.insert(
-            modules.end(),
-            {{"projection", shaders::kProjectionPinholeSlang},
-             {"brdf", shaders::kBrdfSlang},
-             {"bindless", shaders::kBindlessSlang},
-             {"atmosphere", shaders::kAtmosphereSlang},
-             {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
-                            shaders::kPNanoVdbHeader + "\n" +
-                            shaders::kVolumeSlang}});
         if (shadowPipeline_ != nullptr) {
             vkDeviceWaitIdle(context_.Device());
         }
         shadowPipeline_ = std::make_unique<ComputePipeline>(
             context_, shadowLayout_,
-            compiler_.CompileSpirv(modules, "volumeShadowMain"));
+            compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                   "volumeShadowMain"));
         shadowPipelinePatterns_ = patterns.Models().size();
     }
     shadowMap_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);

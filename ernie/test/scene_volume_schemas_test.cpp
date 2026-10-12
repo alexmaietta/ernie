@@ -110,8 +110,13 @@ TEST(VolumeSchemas, TypesAreRegistered) {
         ernie::GetPrimType(tokens::kNanoVDBField);
     EXPECT_TRUE(array.IsA(ernie::GetPrimType(tokens::kFieldBase)));
     EXPECT_FALSE(array.IsA(ernie::GetPrimType(tokens::kFieldAsset)));
-    ASSERT_EQ(types.size(), 5u);
+    const PrimTypeDef& dense =
+        ernie::GetPrimType(tokens::kDenseField);
+    EXPECT_TRUE(dense.IsA(ernie::GetPrimType(tokens::kFieldBase)));
+    EXPECT_EQ(dense.Find(tokens::kVoxelSize)->meta.min, 1e-9);
+    ASSERT_EQ(types.size(), 6u);
     EXPECT_EQ(types[2], &asset);
     EXPECT_EQ(types[3], &array);
-    EXPECT_EQ(types[4], &volume);
+    EXPECT_EQ(types[4], &dense);
+    EXPECT_EQ(types[5], &volume);
 }
