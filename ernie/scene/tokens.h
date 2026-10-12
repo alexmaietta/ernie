@@ -729,6 +729,14 @@ inline constexpr std::string_view kAtmosphereCloudTop =
     "ernie:atmosphere:cloudTop";
 inline constexpr std::string_view kAtmosphereCloudCover =
     "ernie:atmosphere:cloudCover";
+/// token: where the Atmosphere's origin is on its planet: "ground"
+/// (on the surface, the planet's centre a radius below along its -z;
+/// the default) or "centre" (at the planet's centre), its world
+/// transform then placing the planet.
+inline constexpr std::string_view kAtmosphereAnchor =
+    "ernie:atmosphere:anchor";
+inline constexpr std::string_view kAnchorGround = "ground";
+inline constexpr std::string_view kAnchorCentre = "centre";
 
 // CelestialBody (Ernie): a sphere far beyond the scene, such as a
 // moon, at its transform's origin, drawn in the sky and casting

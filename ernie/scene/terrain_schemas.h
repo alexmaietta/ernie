@@ -119,7 +119,15 @@
                               .group = "Atmosphere", .max = 20e3}))                                \
     X(double, CloudCover, ::ernie::tokens::kAtmosphereCloudCover, 0.5,                             \
       (::ernie::AttributeMeta{.doc = "The fraction of the planet's limb the clouds cover.",        \
-                              .group = "Atmosphere", .max = 1.0}))
+                              .group = "Atmosphere", .max = 1.0}))                                 \
+    X(std::string, Anchor, ::ernie::tokens::kAtmosphereAnchor, ::ernie::tokens::kAnchorGround,     \
+      (::ernie::AttributeMeta{.doc = "ground: its origin is on the planet's surface, the centre "  \
+                                     "a radius below along its -z; centre: its origin is the "     \
+                                     "planet's centre. Its transform places it; a planet "         \
+                                     "Terrain's atmosphere is centred on the Terrain.",            \
+                              .group = "Atmosphere",                                               \
+                              .options = {::ernie::tokens::kAnchorGround,                          \
+                                          ::ernie::tokens::kAnchorCentre}}))
 
 #define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
     X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \

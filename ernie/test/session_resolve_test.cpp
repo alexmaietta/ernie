@@ -943,6 +943,31 @@ TEST(AtmosphereParamsOf, PlacesThePlanet) {
                  std::invalid_argument);
 }
 
+// Without a planet Terrain an Atmosphere's transform places its
+// planet: its origin on the ground, or at the centre.
+TEST(AtmosphereParamsOf, ItsTransformPlacesItsPlanet) {
+    Scene scene;
+    ernie::Xform::Define(scene, "/World");
+    ernie::Xform::Define(scene, "/World/Earth");
+    scene.Set("/World/Earth", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 384400e3, 0.0)));
+    ernie::Atmosphere::Define(scene, "/World/Earth/Air")
+        .SetAnchor(std::string(tokens::kAnchorCentre));
+    ernie::AtmosphereParams air =
+        ernie::AtmosphereParamsOf(scene, "/World/Earth/Air", {});
+    EXPECT_EQ(air.planetCentre, glm::dvec3(0.0, 384400e3, 0.0));
+    ernie::Atmosphere(scene, "/World/Earth/Air")
+        .SetAnchor(std::string(tokens::kAnchorGround));
+    air = ernie::AtmosphereParamsOf(scene, "/World/Earth/Air", {});
+    EXPECT_DOUBLE_EQ(air.planetCentre.y, 384400e3);
+    EXPECT_DOUBLE_EQ(air.planetCentre.z, -air.planetRadius);
+    ernie::Atmosphere(scene, "/World/Earth/Air").SetAnchor("pole");
+    EXPECT_THROW(
+        ernie::AtmosphereParamsOf(scene, "/World/Earth/Air", {}),
+        std::invalid_argument);
+}
+
 TEST(AtmosphereParamsOf, BoundsThePlanetToTheTopOfItsAir) {
     Scene scene;
     EXPECT_FALSE(ernie::PlanetOf(scene).has_value());
@@ -954,8 +979,8 @@ TEST(AtmosphereParamsOf, BoundsThePlanetToTheTopOfItsAir) {
     EXPECT_DOUBLE_EQ(planet->top, 6371.0088e3 + 100e3);
     EXPECT_DOUBLE_EQ(planet->centre.z, -6371.0088e3);
 
-    // Its bounds are the planet's, where it lies in the world
-    // whatever the prim's transform: framing it frames the planet.
+    // Its bounds are the planet's, which its transform carries:
+    // framing it frames the planet.
     scene.Set(
         "/World/Air", tokens::kTransform,
         glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)));
@@ -963,7 +988,7 @@ TEST(AtmosphereParamsOf, BoundsThePlanetToTheTopOfItsAir) {
         ernie::LocalBoundsOf(scene, Path("/World/Air"));
     ASSERT_TRUE(bounds.has_value());
     const glm::vec3 centre = 0.5f * (bounds->first + bounds->second);
-    EXPECT_NEAR(centre.x, -5.0f, 1.0f);
+    EXPECT_NEAR(centre.x, 0.0f, 1.0f);
     EXPECT_NEAR(centre.z, -6371.0088e3f, 1.0f);
     EXPECT_NEAR(bounds->second.z - centre.z, 6471.0088e3f, 1.0f);
 

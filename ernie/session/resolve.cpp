@@ -2482,10 +2482,23 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
     params.planetRadius = radius > 0.0          ? radius
                           : planetTerrain > 0.0 ? planetTerrain
                                                 : presetRadius;
-    params.planetCentre =
-        planetTerrain > 0.0
+    // A planet Terrain's at the world's origin; else where the
+    // Atmosphere's transform puts its anchor.
+    const std::string anchor = prim.GetAnchor();
+    if (anchor != tokens::kAnchorGround &&
+        anchor != tokens::kAnchorCentre) {
+        throw std::invalid_argument("Atmosphere '" + path.String() +
+                                    "' has no anchor '" + anchor +
+                                    "'; use 'ground' or 'centre'");
+    }
+    const glm::dvec3 local =
+        anchor == tokens::kAnchorCentre
             ? glm::dvec3(0.0)
             : glm::dvec3(0.0, 0.0, -params.planetRadius);
+    params.planetCentre =
+        planetTerrain > 0.0 ? glm::dvec3(0.0)
+                            : glm::dvec3(scene.WorldTransform(path) *
+                                         glm::dvec4(local, 1.0));
     params.groundAlbedo =
         std::clamp(prim.GetGroundAlbedo(), 0.0, 1.0);
     params.hazeOpticalDepth =
