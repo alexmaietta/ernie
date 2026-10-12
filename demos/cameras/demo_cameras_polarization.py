@@ -165,8 +165,19 @@ class Demo(ernie.demo.Demo):
             resolution=RESOLUTION,
         )
         self.measured = None
+        # The polarizers on or off, to see what they take away.
+        self.widgets.checkbox(
+            "Polarizer", True, on_change=self.polarize
+        )
         if viewer is not None:
             viewer.active_camera = self.camera.path
+
+    def polarize(self, on):
+        """The mosaic on or off; without it, Sunny 16, as it no longer
+        takes about half the light."""
+        self.camera.polarizer_type = "mosaic" if on else "none"
+        self.camera.exposure_f_stop = 11.0 if on else 16.0
+        self.measured = None
 
     def measure(self):
         """Per mosaic cell: its intensity S0, degree and angle (degrees,

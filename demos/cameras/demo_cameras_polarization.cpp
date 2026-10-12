@@ -151,9 +151,22 @@ class PolarizationDemo : public app::Demo {
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(Path("/World/Camera"))
             .SetResolution(kResolution);
+        // The polarizers on or off, to see what they take away.
+        Widgets().Checkbox("Polarizer", true,
+                           [this](bool on) { Polarize(on); });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
         }
+    }
+
+    /// The mosaic on or off; without it, Sunny 16, as it no longer
+    /// takes about half the light.
+    void Polarize(bool on) {
+        Camera(GetScene(), "/World/Camera")
+            .SetPolarizerType(
+                std::string(on ? tokens::kMosaic : tokens::kNone))
+            .SetExposureFStop(on ? 11.0 : 16.0);
+        measured_.reset();
     }
 
     /// Its intensity (a square root of S0 over the median's 4 times),
