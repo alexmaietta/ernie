@@ -50,6 +50,7 @@ ernie_add_test_suite(
     util_reflectance_library_test.cpp
     util_ies_test.cpp
     util_nanovdb_test.cpp
+    util_profile_report_test.cpp
     util_astronomy_test.cpp
     util_atmosphere_test.cpp
     util_scattering_test.cpp
@@ -58,6 +59,7 @@ ernie_add_test_suite(
     util_tensor_test.cpp
     LIBRARIES
     ernie
+    ernie_json
     ernie_stb
     ernie_openexr
     DEFINITIONS

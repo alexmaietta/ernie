@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/buffer.h"
+#include "ernie/device/image.h"
+#include "ernie/device/memory_stats.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/vulkan_context.h"
@@ -14,6 +16,7 @@
 #include <numeric>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 using ernie::BufferMemory;
@@ -106,6 +109,45 @@ TEST_F(VulkanContextTest, BuffersMoveWithoutDoubleFreeing) {
     third = std::move(second);
     EXPECT_EQ(third.Handle(), handle);
     EXPECT_EQ(third.Size(), 64u);
+}
+
+TEST_F(VulkanContextTest,
+       MemoryStatsTrackLiveBuffersAndImagesByKind) {
+    const auto count = [](const char* category) {
+        std::size_t n = 0;
+        for (const ernie::memory::Allocation& allocation :
+             ernie::memory::Live()) {
+            n += std::string_view(allocation.category) == category;
+        }
+        return n;
+    };
+    const std::size_t uploads = count("Upload buffers");
+    const std::size_t targets = count("Render targets");
+    {
+        GpuBuffer upload(*context_, 256, 0, BufferMemory::Upload);
+        ernie::ImageDesc desc;
+        desc.width = 32;
+        desc.height = 16;
+        desc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        const ernie::GpuImage target(*context_, desc);
+        EXPECT_EQ(count("Upload buffers"), uploads + 1);
+        EXPECT_EQ(count("Render targets"), targets + 1);
+        // Moving keeps one entry.
+        GpuBuffer moved(std::move(upload));
+        EXPECT_EQ(count("Upload buffers"), uploads + 1);
+        bool found = false;
+        for (const ernie::memory::Allocation& allocation :
+             ernie::memory::Live()) {
+            if (allocation.detail == "32 x 16") {
+                found = true;
+                EXPECT_GE(allocation.bytes, 32u * 16u * 4u);
+                EXPECT_FALSE(allocation.host);
+            }
+        }
+        EXPECT_TRUE(found);
+    }
+    EXPECT_EQ(count("Upload buffers"), uploads);
+    EXPECT_EQ(count("Render targets"), targets);
 }
 
 TEST_F(VulkanContextTest, ComputePipelinesRunSlangShaders) {

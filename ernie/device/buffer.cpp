@@ -1,11 +1,43 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/buffer.h"
 
+#include "ernie/device/memory_stats.h"
+
+#include <bit>
 #include <cstring>
 #include <stdexcept>
 #include <utility>
 
 namespace ernie {
+
+namespace {
+
+/// Registers `buffer`'s `bytes` with the memory statistics under a
+/// category from its use.
+void TrackBuffer(VkBuffer buffer, VkDeviceSize bytes,
+                 VkBufferUsageFlags usage, BufferMemory memory) {
+    const char* category = "Storage buffers";
+    if (memory == BufferMemory::Shared) {
+        category = "Shared with CUDA";
+    } else if (memory == BufferMemory::Upload) {
+        category = "Upload buffers";
+    } else if (memory == BufferMemory::Readback) {
+        category = "Readback buffers";
+    } else if ((usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT) != 0) {
+        category = "Indirect arguments";
+    } else if ((usage & (VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT)) != 0) {
+        category = "Vertices and indices";
+    } else if ((usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) != 0) {
+        category = "Uniform buffers";
+    }
+    memory::Track(std::bit_cast<std::uint64_t>(buffer),
+                  {category, std::to_string(bytes) + " bytes", bytes,
+                   memory == BufferMemory::Upload ||
+                       memory == BufferMemory::Readback});
+}
+
+}  // namespace
 
 GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
                      VkBufferUsageFlags usage, BufferMemory memory)
@@ -59,6 +91,7 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
         exported_->buffer = buffer_;
         exported_->memory = sharedMemory_;
         context.TrackExported(exported_);
+        TrackBuffer(buffer_, allocationSize_, usage, memory);
         return;
     }
     VmaAllocationCreateInfo allocation{};
@@ -77,6 +110,7 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
                             &buffer_, &allocation_, &result),
             "vmaCreateBuffer");
     mapped_ = result.pMappedData;
+    TrackBuffer(buffer_, result.size, usage, memory);
 }
 
 GpuBuffer::~GpuBuffer() {
@@ -120,6 +154,9 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
 void GpuBuffer::Release() {
     attached_.reset();
     lifetime_.reset();
+    if (buffer_ != VK_NULL_HANDLE) {
+        memory::Untrack(std::bit_cast<std::uint64_t>(buffer_));
+    }
     if (exported_ != nullptr) {
         // Unless the context went first and destroyed them with its
         // device, as when a scene held an array over the buffer after

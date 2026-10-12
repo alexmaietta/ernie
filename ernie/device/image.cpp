@@ -2,10 +2,13 @@
 #include "ernie/device/image.h"
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/memory_stats.h"
 #include "ernie/device/pipeline.h"
 
 #include <algorithm>
+#include <bit>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace ernie {
@@ -128,6 +131,28 @@ GpuImage::GpuImage(const VulkanContext& context,
         rowPitch_ = layout.rowPitch;
         texelOffset_ = layout.offset;
     }
+    const char* category = "Textures";
+    if (desc.shared) {
+        category = "Shared with CUDA";
+    } else if ((AspectOf(desc.format) & VK_IMAGE_ASPECT_DEPTH_BIT) !=
+               0) {
+        category = "Depth targets";
+    } else if ((desc.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) !=
+               0) {
+        category = "Render targets";
+    } else if ((desc.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0) {
+        category = "Storage images";
+    }
+    std::string detail = std::to_string(desc.width) + " x " +
+                         std::to_string(desc.height);
+    if (desc.layers > 1) {
+        detail += ", " + std::to_string(desc.layers) + " layers";
+    }
+    if (desc.mips > 1) {
+        detail += ", " + std::to_string(desc.mips) + " mips";
+    }
+    memory::Track(std::bit_cast<std::uint64_t>(image_),
+                  {category, std::move(detail), bytes_, false});
 
     VkImageViewCreateInfo view{
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -228,6 +253,7 @@ void GpuImage::Release() {
     if (image_ == VK_NULL_HANDLE) {
         return;
     }
+    memory::Untrack(std::bit_cast<std::uint64_t>(image_));
     for (VkImageView view : layerViews_) {
         vkDestroyImageView(context_->Device(), view, nullptr);
     }

@@ -43,10 +43,17 @@ struct Frame {
     std::vector<Zone> gpu;
 };
 
-/// Starts or stops recording; stopping keeps the frames recorded so
-/// far.
+/// Starts or stops recording CPU and GPU zones both; stopping keeps
+/// the frames recorded so far. `Enabled` is whether either records.
 void SetEnabled(bool enabled);
 bool Enabled();
+
+/// Starts or stops recording CPU zones (`ERNIE_ZONE`) alone, or GPU
+/// zones (`ERNIE_GPU_ZONE`) alone.
+void SetCpuEnabled(bool enabled);
+bool CpuEnabled();
+void SetGpuEnabled(bool enabled);
+bool GpuEnabled();
 
 /// Nanoseconds on the steady clock.
 std::uint64_t Now();

@@ -8,6 +8,7 @@ ernie_add_library(
     frame_uploads.cpp
     gpu_timer.cpp
     image.cpp
+    memory_stats.cpp
     offscreen_target.cpp
     pipeline.cpp
     shader_compiler.cpp

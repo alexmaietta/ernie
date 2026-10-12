@@ -38,7 +38,7 @@ GpuTimer::~GpuTimer() {
 
 std::int64_t GpuTimer::Begin(VkCommandBuffer commands,
                              const char* name) {
-    if (pool_ == VK_NULL_HANDLE || !profiler::Enabled()) {
+    if (pool_ == VK_NULL_HANDLE || !profiler::GpuEnabled()) {
         return -1;
     }
     std::lock_guard lock(mutex_);

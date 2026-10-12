@@ -11,7 +11,8 @@ namespace ernie::profiler {
 
 namespace {
 
-std::atomic<bool> enabled{false};
+std::atomic<bool> cpuEnabled{false};
+std::atomic<bool> gpuEnabled{false};
 
 struct State {
     std::mutex mutex;
@@ -31,11 +32,28 @@ thread_local std::uint32_t depth = 0;
 }  // namespace
 
 void SetEnabled(bool on) {
-    enabled.store(on, std::memory_order_relaxed);
+    SetCpuEnabled(on);
+    SetGpuEnabled(on);
 }
 
 bool Enabled() {
-    return enabled.load(std::memory_order_relaxed);
+    return CpuEnabled() || GpuEnabled();
+}
+
+void SetCpuEnabled(bool on) {
+    cpuEnabled.store(on, std::memory_order_relaxed);
+}
+
+bool CpuEnabled() {
+    return cpuEnabled.load(std::memory_order_relaxed);
+}
+
+void SetGpuEnabled(bool on) {
+    gpuEnabled.store(on, std::memory_order_relaxed);
+}
+
+bool GpuEnabled() {
+    return gpuEnabled.load(std::memory_order_relaxed);
 }
 
 std::uint64_t Now() {
@@ -138,7 +156,7 @@ void AddGpuZone(std::uint64_t frame, const Zone& zone) {
 }
 
 ScopedZone::ScopedZone(const char* name) : name_(name) {
-    if (Enabled()) {
+    if (CpuEnabled()) {
         active_ = true;
         start_ = Now();
         ++depth;

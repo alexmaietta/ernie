@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/app.h"
+#include "ernie/device/memory_stats.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
@@ -7,6 +8,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/profiler.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
@@ -1040,6 +1042,30 @@ TEST_F(ViewerTest, ThemesApplyAtRunTime) {
     viewer_->SetTheme(theme);
     EXPECT_EQ(viewer_->GetTheme().panel, theme.panel);
     EXPECT_TRUE(viewer_->Step());
+}
+
+TEST_F(ViewerTest, TheProfilerPanelRecordsGpuZonesWhileShown) {
+    profiler::Clear();
+    viewer_->FindPanel("Profiler")->SetVisible(true);
+    for (int i = 0; i < 6; ++i) {
+        ASSERT_TRUE(viewer_->Step());
+    }
+    std::set<std::string> gpu;
+    std::size_t cpu = 0;
+    for (const profiler::Frame& frame : profiler::Frames()) {
+        for (const profiler::Zone& zone : frame.gpu) {
+            gpu.insert(zone.name);
+        }
+        cpu += frame.cpu.size();
+    }
+    EXPECT_TRUE(gpu.count("Shading") == 1 || gpu.count("UI") == 1);
+    EXPECT_GT(cpu, 0u);
+    EXPECT_FALSE(memory::Live().empty())
+        << "the renderer's targets are tracked";
+
+    viewer_->FindPanel("Profiler")->SetVisible(false);
+    ASSERT_TRUE(viewer_->Step());
+    EXPECT_FALSE(profiler::Enabled());
 }
 
 TEST(ViewerOptionsTest, RejectsAnEmptyWindowAndUnknownSettings) {

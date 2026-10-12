@@ -7,6 +7,7 @@ ernie_add_library(
     ies.cpp
     image.cpp
     nanovdb.cpp
+    profile_report.cpp
     profiler.cpp
     reflectance_library.cpp
     scattering.cpp
@@ -18,6 +19,7 @@ ernie_add_library(
     ernie_dlpack
     ernie_tracy
     PRIVATE
+    ernie_json
     ernie_stb
     ernie_nanovdb
     ernie_openexr)
