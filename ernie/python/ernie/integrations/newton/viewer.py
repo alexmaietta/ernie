@@ -38,6 +38,32 @@ from ernie import tokens
 # (newton/_src/viewer/gl/shaders.py).
 _CHECKER_DARKEN = 0.7
 
+# Newton's sky as a dome's linear RGB, from its horizon to its zenith
+# (newton/_src/viewer/gl/opengl.py's sRGB), and the illuminance
+# setting the dome's brightness behind the scene at the view's
+# exposure. Newton's ambient light, neutral as the sky's colour is
+# not, and its luminance (cd/m^2) beside the Sun's.
+_SKY_LOWER = tuple((c / 255.0) ** 2.2 for c in (40.0, 44.0, 55.0))
+_SKY_UPPER = tuple((c / 255.0) ** 2.2 for c in (68.0, 161.0, 255.0))
+_SKY_LUX = 28000.0
+_AMBIENT = (0.8, 0.8, 0.85)
+_AMBIENT_LUMINANCE = 1500.0
+
+
+def _sky_gradient(rows: int = 64, columns: int = 8) -> np.ndarray:
+    """Newton's sky as a dome's latitude-longitude texture, linear
+    RGB: its lower colour at and below the horizon, blending to its
+    upper by the sine of the elevation, as Newton's sky shader."""
+    elevation = np.pi / 2 - np.pi * (np.arange(rows) + 0.5) / rows
+    height = np.maximum(np.sin(elevation), 0.0)[:, None]
+    rgb = (
+        (1.0 - height) * np.asarray(_SKY_LOWER)
+        + height * np.asarray(_SKY_UPPER)
+    ).astype(np.float32)
+    return np.ascontiguousarray(
+        np.broadcast_to(rgb[:, None, :], (rows, columns, 3))
+    )
+
 
 @wp.kernel(enable_backward=False)
 def _split_transforms(
@@ -165,6 +191,9 @@ class ViewerErnie(ViewerGL):
             to add prims or set Ernie attributes on the model's.
         root: The prim the model goes under, turned so the model's
             up axis is Ernie's +Z.
+        sky: For a new scene, "gradient", Newton's sky as a dome
+            lighting the scene, or "atmosphere", Earth's, physical and
+            slower.
         bands: Spectral bands the view renders with: 3 for an
             interactive view, Ernie's 16 for a sensor's.
         render_scale: The view's resolution against the window's,
@@ -182,7 +211,8 @@ class ViewerErnie(ViewerGL):
         scene: ernie.Scene | None = None,
         scene_setup: Callable[[ernie.Scene], None] | None = None,
         root: str = "/World/Newton",
-        bands: int = 3,
+        bands: int = 16,
+        sky: str = "gradient",
         render_scale: float = 1.0,
         pipelined: bool = True,
         **kwargs: Any,
@@ -216,12 +246,13 @@ class ViewerErnie(ViewerGL):
         # the next is.
         self._pending: Any = None
         self._shown: Any = None
-        self._define_view(lit, bands)
+        self._define_view(lit, bands, sky)
         self._ernie_ready = True
 
-    def _define_view(self, lit: bool, bands: int) -> None:
+    def _define_view(self, lit: bool, bands: int, sky: str) -> None:
         """The camera and render settings Ernie renders Newton's view
-        with, and Earth's sky and Sun for a new scene."""
+        with, and for a new scene the Sun and a sky: Newton's gradient
+        or Earth's atmosphere."""
         scene = self.ernie_scene
         # Exposed for sunlight (sunny 16: f/16, 1/100 s, ISO 100); a
         # metered exposure keys to Newton's dark ground and burns out
@@ -244,11 +275,27 @@ class ViewerErnie(ViewerGL):
         self._wireframe = ""  # the settings' wireframe mode, once set
         if lit:
             return
-        # Earth's sky: its air, ozone and haze lit by the Sun above
-        # them, with its measured spectrum and width.
-        scene.define(
-            "/World/Air", ernie.Atmosphere, preset=tokens.EARTH
-        )
+        if sky == "atmosphere":
+            # Earth's sky: its air, ozone and haze lit by the Sun
+            # above them, with its measured spectrum and width.
+            scene.define(
+                "/World/Air", ernie.Atmosphere, preset=tokens.EARTH
+            )
+        else:
+            # Newton's sky: a dome of its gradient behind the scene,
+            # lighting none of it, and as Newton a neutral ambient
+            # light filling the shadows.
+            dome = scene.define(
+                "/World/Sky",
+                ernie.DomeLight,
+                photometric_illuminance=_SKY_LUX,
+                shadow_enable=False,
+            )
+            dome.set("collection:lightLink:includeRoot", False)
+            scene.write(dome.path, "ernie:texture", _sky_gradient())
+            self._settings.dome_light_mode = "approximate"
+            self._settings.ambient = _AMBIENT_LUMINANCE
+            self._settings.ambient_color = _AMBIENT
         scene.define(
             "/World/Sun",
             ernie.DistantLight,
