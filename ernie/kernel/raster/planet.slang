@@ -9,22 +9,27 @@ import brdf;
 public struct PlanetUniforms {
     // Radius, vertical exaggeration, min height, max height.
     public float4 body;
-    // Grid quads along a face, colour mode, tint patches by LOD level, grid quads along a patch.
+    // Data grid quads along a face, colour mode, tint patches by LOD level, grid quads along a
+    // patch.
     public uint4 dims;
     // xyz: eye position that drives LOD morphing, relative to the frame's origin; w: unused.
     public float4 lodEye;
     // Morph start distance and 1 / (morph end - morph start) per LOD level, two levels per float4.
-    public float4 morph[8];
+    public float4 morph[16];
     // Material, prim id.
     public uint4 ids;
     // xyz: towards the hillshade's light in each point's frame (east, north, up), north towards +z.
     public float4 hillshade;
+    // x: refinement levels k (`CubeSphereLod::SetRefinement`); patches are on the fine grid of
+    // 2^k quads per data quad.
+    public uint4 refine;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<PlanetUniforms> p;
 // One layer per cube face (`CubeSphereLod`) of (faces cells + 1) squared vertex heights.
 [[vk::binding(11, 0)]] public Texture2DArray<float> heights;
-// Per patch: origin column, origin row, LOD level (vertex spacing 2^level cells), face.
+// Per patch: origin column, origin row (fine grid), LOD level (vertex spacing 2^level fine
+// cells), face.
 [[vk::binding(12, 0)]] public StructuredBuffer<uint4> patches;
 // Per vertex and face, the height's slope along the directions of increasing column and row,
 // before exaggeration; filterable, unlike `heights`.
@@ -54,9 +59,20 @@ public FaceFrame faceFrame(uint face) {
     return f;
 }
 
-// Face coordinate (-1 to 1) of grid line `index`.
+// Face coordinate (-1 to 1) of data grid line `index`.
 public float2 faceCoords(float2 index) {
     return index * (2.0 / float(p.dims.x)) - 1.0;
+}
+
+// Fine quads along a face.
+float fineCells() {
+    return float(p.dims.x << p.refine.x);
+}
+
+// Data grid point of fine grid point `g`, exact in its fraction.
+float2 dataGrid(int2 g) {
+    let k = p.refine.x;
+    return float2(g >> k) + float2(g & int((1u << k) - 1u)) / float(1u << k);
 }
 
 // Unit direction of face point `st`, the equiangular cube-sphere mapping.
@@ -66,20 +82,29 @@ public float3 faceDirection(uint face, float2 st) {
     return normalize(f.normal + ab.x * f.u + ab.y * f.v);
 }
 
-// The unit direction at grid point `g` of `face` less that at grid point `origin`, accurate when
+// sin(x) to float precision relative to x for small x, where GPU sin is accurate only in
+// absolute terms (a part in ten million of the radius is metres on a planet).
+float2 sinSmall(float2 x) {
+    let x2 = x * x;
+    let series = x * (1.0 - x2 / 6.0 * (1.0 - x2 / 20.0 * (1.0 - x2 / 42.0)));
+    return select(abs(x) < 0.25, series, sin(x));
+}
+
+// The unit direction at fine grid point `g` of `face` less that at `origin`, accurate when
 // the two are close although both directions are near unit length: tangent and length
 // differences come from the small difference of their angles rather than from subtraction.
 float3 directionOffset(uint face, int2 g, int2 origin, out float3 direction) {
     let f = faceFrame(face);
-    let st = faceCoords(float2(g));
-    let sta = faceCoords(float2(origin));
-    let delta = float2(g - origin) * (2.0 / float(p.dims.x));
+    let scale = 2.0 / fineCells();
+    let st = float2(g) * scale - 1.0;
+    let sta = float2(origin) * scale - 1.0;
+    let delta = float2(g - origin) * scale;
     let angle = 0.25 * PI * st;
     let angleA = 0.25 * PI * sta;
     let ab = tan(angle);
     let abA = tan(angleA);
     // tan x - tan y = sin(x - y) / (cos x cos y)
-    let dab = sin(0.25 * PI * delta) / (cos(angle) * cos(angleA));
+    let dab = sinSmall(0.25 * PI * delta) / (cos(angle) * cos(angleA));
     let point = f.normal + ab.x * f.u + ab.y * f.v;
     let pointA = f.normal + abA.x * f.u + abA.y * f.v;
     let length0 = length(point);
@@ -90,8 +115,18 @@ float3 directionOffset(uint face, int2 g, int2 origin, out float3 direction) {
     return (dab.x * f.u + dab.y * f.v) / length0 + pointA * inverse;
 }
 
+// The height at fine grid point `g`: the data's, bilinear between its vertices.
 public float heightAt(uint face, int2 g) {
-    return heights.Load(int4(g, int(face), 0));
+    let k = p.refine.x;
+    let cell = g >> k;
+    let last = int(p.dims.x);
+    let next = min(cell + 1, int2(last, last));
+    let t = float2(g & int((1u << k) - 1u)) / float(1u << k);
+    let h00 = heights.Load(int4(cell, int(face), 0));
+    let h10 = heights.Load(int4(next.x, cell.y, int(face), 0));
+    let h01 = heights.Load(int4(cell.x, next.y, int(face), 0));
+    let h11 = heights.Load(int4(next, int(face), 0));
+    return lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y);
 }
 
 float2 morphRange(uint level) {
@@ -111,7 +146,7 @@ float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, out float h) 
 public struct PlanetVertex {
     public float3 world;
     public float height;
-    public float2 grid;  // the vertex's grid point on its face
+    public float2 grid;  // the vertex's data grid point on its face
     public uint face;
     public uint corner;
     public uint level;
@@ -155,7 +190,7 @@ public PlanetVertex planetVertex(uint vertexIndex, uint instanceIndex) {
     PlanetVertex v;
     v.world = lerp(world, target, k);
     v.height = lerp(h, hTarget, k);
-    v.grid = float2(g);
+    v.grid = dataGrid(g);
     v.face = tile.w;
     v.corner = corner;
     v.level = tile.z;

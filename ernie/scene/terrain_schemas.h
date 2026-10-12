@@ -55,7 +55,12 @@
                                      "radius centred at its transform's translation (its "         \
                                      "rotation not yet applied), its heights cube faces, and the " \
                                      "origin and cell size do not apply.",                         \
-                              .group = "Terrain"}))
+                              .group = "Terrain"}))                                                \
+    X(double, FinestCell, ::ernie::tokens::kFinestCell, 1.0,                                       \
+      (::ernie::AttributeMeta{.label = "Finest cell", .doc = "World units. A planet's LOD "        \
+                                     "refines below its heights' quads, bilinear between them, "   \
+                                     "down to quads about this size; 0 stops at the heights'.",   \
+                              .group = "Terrain", .max = 1e6}))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \
     X(double, MagnitudeLimit, ::ernie::tokens::kStarsMagnitudeLimit, 99.0,                         \

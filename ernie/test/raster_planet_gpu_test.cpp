@@ -153,6 +153,45 @@ TEST_F(RasterDelegateTest,
         << "the far side is culled";
 }
 
+// An Earth of 156 km quads from 2 m up: refined below its data, the
+// ground is whole to the horizon, without facets sagging under the
+// eye or cracks along the face's centre lines.
+TEST_F(RasterDelegateTest, APlanetRefinesBelowItsDataUnderTheEye) {
+    constexpr double kEarth = 6371008.8;
+    Scene scene;
+    ernie::Terrain::Define(scene, "/World/Earth")
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(6 * 65 * 65, 0.0f), {6, 65, 65}))
+        .SetPlanetRadius(kEarth)
+        .SetMaterialBinding("/Looks/Ground");
+    ernie::Material::Define(scene, "/Looks/Ground")
+        .SetAlbedo(glm::dvec3(0.5));
+    scene.Define("/World/Sun", tokens::kDistantLight)
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({0.5, 0.0, 0.866}));
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize))
+        .SetClearColor(glm::dvec3(0.0, 0.0, 1.0));
+    // Over face 4's centre, looking along its centre line.
+    const glm::dvec3 eye(0.0, 0.0, kEarth + 2.0);
+    PlaceCamera(scene, eye, eye + glm::dvec3(-1000.0, 0.0, -400.0),
+                {0.0, 0.0, 1.0}, {0.1, 1e8});
+    RasterDelegate delegate(*context_);
+    delegate.Sync(scene);
+    const Tensor image = delegate.Render(scene);
+    const auto* pixels = image.As<std::uint8_t>();
+    std::size_t clear = 0;
+    for (std::uint32_t row = kSize / 2; row < kSize; ++row) {
+        for (std::uint32_t col = 0; col < kSize; ++col) {
+            clear +=
+                IsClear(pixels + (row * kSize + col) * 4) ? 1u : 0u;
+        }
+    }
+    EXPECT_EQ(clear, 0u) << "holes in the ground below the horizon";
+    EXPECT_GT(delegate.Planet().Lod().Refinement(), 0u);
+}
+
 TEST_F(RasterDelegateTest,
        APlanetStaysStillUnderCentimetreCameraMoves) {
     Scene scene = PlanetScene(256);

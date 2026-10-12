@@ -794,6 +794,9 @@ inline constexpr std::string_view kExaggeration =
 /// rather than a raster, so `ernie:origin` and `ernie:cellSize` do
 /// not apply.
 inline constexpr std::string_view kPlanetRadius = "ernie:radius";
+/// double, world units: a planet's finest LOD quad
+/// (`TerrainParams::finestCell`).
+inline constexpr std::string_view kFinestCell = "ernie:finestCell";
 /// int4 (first column, first row, columns, rows): the cells that
 /// changed with the last write of heights on a GPU, so only their
 /// gradients and LOD bounds are rebuilt; absent for all.

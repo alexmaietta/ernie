@@ -65,13 +65,32 @@ CubeSphereLod Build(const Faces& faces, std::uint32_t leafCells) {
     return CubeSphereLod(kRadius, views, leafCells);
 }
 
+/// Reference for planet.slang's `heightAt`: the height at fine grid
+/// point `c`, bilinear between the data's vertices.
+double FineHeight(const CubeSphereLod& lod, const Faces& faces,
+                  std::uint32_t face, glm::ivec2 c) {
+    const int k = static_cast<int>(lod.Refinement());
+    const int last = static_cast<int>(lod.FaceCells());
+    const glm::ivec2 cell = c >> k;
+    const glm::ivec2 next = glm::min(cell + 1, glm::ivec2(last));
+    const glm::dvec2 t =
+        glm::dvec2(c & ((1 << k) - 1)) / std::ldexp(1.0, k);
+    auto at = [&](int x, int y) {
+        return static_cast<double>(
+            faces[face](static_cast<std::size_t>(x),
+                        static_cast<std::size_t>(y)));
+    };
+    return glm::mix(
+        glm::mix(at(cell.x, cell.y), at(next.x, cell.y), t.x),
+        glm::mix(at(cell.x, next.y), at(next.x, next.y), t.x), t.y);
+}
+
 glm::dvec3 Vertex(const CubeSphereLod& lod, const Faces& faces,
                   std::uint32_t face, glm::ivec2 c,
                   float exaggeration) {
-    const double h = faces[face](static_cast<std::size_t>(c.x),
-                                 static_cast<std::size_t>(c.y));
-    return lod.VertexDirection(face, static_cast<std::uint32_t>(c.x),
-                               static_cast<std::uint32_t>(c.y)) *
+    const double h = FineHeight(lod, faces, face, c);
+    return lod.FineDirection(face, static_cast<std::uint32_t>(c.x),
+                             static_cast<std::uint32_t>(c.y)) *
            (lod.Radius() + h * static_cast<double>(exaggeration));
 }
 
@@ -147,7 +166,7 @@ Edges(const CubeSphereLod& lod, const Faces& faces,
                     : side == 2 ? glm::uvec2(0, along)
                                 : glm::uvec2(n, along);
                 const glm::ivec2 g = GridIndex(patches[i], local);
-                edge.keys.push_back(DirectionKey(lod.VertexDirection(
+                edge.keys.push_back(DirectionKey(lod.FineDirection(
                     patches[i].face, static_cast<std::uint32_t>(g.x),
                     static_cast<std::uint32_t>(g.y))));
                 edge.points.push_back(
@@ -271,11 +290,11 @@ SeamReport CheckSeams(const CubeSphereLod& lod, const Faces& faces,
     return report;
 }
 
-/// Times each quad of each face is covered by `patches`, face by face
-/// and row-major.
+/// Times each fine quad of each face is covered by `patches`, face by
+/// face and row-major.
 std::vector<int> Coverage(const CubeSphereLod& lod,
                           std::span<const LodPatch> patches) {
-    const std::size_t n = lod.FaceCells();
+    const std::size_t n = lod.FineCells();
     std::vector<int> covered(CubeSphereLod::kFaces * n * n, 0);
     for (const LodPatch& patch : patches) {
         const std::size_t extent =
@@ -635,6 +654,73 @@ TEST(CubeSphereLod,
         EXPECT_GT(faceEdges, 0)
             << "no edges between faces were checked";
     }
+}
+
+TEST(CubeSphereLod, RefinedLevelsTileWithoutGapsOrCracks) {
+    const Faces faces = Relief(32);
+    CubeSphereLod lod = Build(faces, 8);
+    lod.SetRefinement(3);
+    EXPECT_EQ(lod.FineCells(), 256u);
+    EXPECT_EQ(lod.Levels(), 6u);
+    const auto ranges =
+        lod.Ranges(lod.MinFirstRange(1.0f, kMorphStart), kMorphStart);
+    int refined = 0;
+    for (const glm::dvec3& eye : TestEyes()) {
+        std::vector<LodPatch> patches;
+        lod.Select(eye, ranges, nullptr, 1.0f, false, patches);
+        for (const int count : Coverage(lod, patches)) {
+            ASSERT_EQ(count, 1);
+        }
+        const SeamReport report =
+            CheckSeams(lod, faces, patches, eye, ranges, 1.0f);
+        EXPECT_EQ(report.levelJumps, 0);
+        EXPECT_EQ(report.cracks, 0);
+        refined += static_cast<int>(std::count_if(
+            patches.begin(), patches.end(),
+            [](const LodPatch& p) { return p.level < 3; }));
+    }
+    EXPECT_GT(refined, 0) << "no refined patches were checked";
+}
+
+TEST(CubeSphereLod, RefinementReachesTheFinestLevelUnderTheEye) {
+    const Faces faces = Relief(32);
+    CubeSphereLod lod = Build(faces, 8);
+    lod.SetRefinement(4);
+    const auto ranges =
+        lod.Ranges(lod.MinFirstRange(1.0f, kMorphStart), kMorphStart);
+    const glm::dvec3 eye =
+        CubeSphereLod::FaceDirection(1, 0.3, -0.6) * (kRadius + 4.0);
+    std::vector<LodPatch> patches;
+    lod.Select(eye, ranges, nullptr, 1.0f, false, patches);
+    const glm::dvec2 st = CubeSphereLod::FacePoint(eye).second;
+    const glm::uvec2 cell((st + 1.0) * (0.5 * lod.FineCells()));
+    const auto under = std::find_if(
+        patches.begin(), patches.end(), [&](const LodPatch& p) {
+            const std::uint32_t extent = lod.PatchCells() << p.level;
+            return p.face == 1 && p.originX <= cell.x &&
+                   cell.x < p.originX + extent &&
+                   p.originY <= cell.y && cell.y < p.originY + extent;
+        });
+    ASSERT_NE(under, patches.end());
+    EXPECT_EQ(under->level, 0u);
+
+    // Every patch at the data's resolution, on the fine grid.
+    std::vector<LodPatch> all;
+    lod.SelectAll(all);
+    for (const LodPatch& patch : all) {
+        EXPECT_EQ(patch.level, 4u);
+    }
+    for (const int count : Coverage(lod, all)) {
+        EXPECT_EQ(count, 1);
+    }
+}
+
+TEST(CubeSphereLod, RejectsRefinementPastTheFineGrid) {
+    CubeSphereLod lod(kRadius, 1u << 15, 64);
+    EXPECT_NO_THROW(lod.SetRefinement(15));
+    EXPECT_EQ(lod.FineCells(), 1u << 30);
+    EXPECT_THROW(lod.SetRefinement(16), std::invalid_argument);
+    EXPECT_EQ(lod.Refinement(), 15u);
 }
 
 TEST(CubeSphereLod, RangesBelowTheMinimumCanCrack) {

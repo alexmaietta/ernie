@@ -80,6 +80,16 @@ struct CubeSphereRegion {
 /// face's grid runs, so edges between faces match, and a fully
 /// morphed patch is exactly the coarser mesh.
 ///
+/// Refinement (`SetRefinement`) adds levels finer than the data:
+/// with k extra levels each face is a grid of `FineCells()` = 2^k
+/// `FaceCells()` quads, the data's vertices every 2^k of its lines
+/// and heights between them interpolated, so the surface keeps its
+/// shape (the sphere's curvature and the data's heights) down to
+/// cells 2^k times smaller than the data's near the eye. Levels then
+/// count from the finest, a data level l being level l + k, and
+/// patches' origins are on the fine grid. A refined node's heights
+/// are its data leaf's.
+///
 /// Positions on a planet need more precision than single floats.
 /// Selection works in doubles, and its frustum is relative to the
 /// eye: build it from a view-projection matrix whose view has the eye
@@ -136,9 +146,33 @@ class CubeSphereLod {
     static std::pair<std::uint32_t, glm::dvec2>
     FacePoint(const glm::dvec3& direction);
 
-    /// Unit direction of vertex (`col`, `row`) of face `face`.
+    /// Unit direction of vertex (`col`, `row`) of face `face`'s data
+    /// grid.
     glm::dvec3 VertexDirection(std::uint32_t face, std::uint32_t col,
                                std::uint32_t row) const;
+
+    /// Unit direction of vertex (`col`, `row`) of face `face`'s fine
+    /// grid (`FineCells()`), where patches lie.
+    glm::dvec3 FineDirection(std::uint32_t face, std::uint32_t col,
+                             std::uint32_t row) const;
+
+    /// Adds `levels` levels finer than the data's.
+    /// @throws std::invalid_argument when the fine grid would exceed
+    /// 2^30 quads along a face or the levels `kMaxLevels`.
+    void SetRefinement(std::uint32_t levels);
+
+    std::uint32_t Refinement() const {
+        return refinement_;
+    }
+
+    /// Quads along each side of a face's fine grid: `FaceCells()`
+    /// times 2^`Refinement()`.
+    std::uint32_t FineCells() const {
+        return faceCells_ << refinement_;
+    }
+
+    /// The most levels, the data's and the refinement's together.
+    static constexpr std::uint32_t kMaxLevels = 30;
 
     bool Empty() const {
         return faceCells_ == 0;
@@ -162,8 +196,9 @@ class CubeSphereLod {
         return trees_[0].PatchCells();
     }
 
+    /// Levels in all: the data's and the refinement's.
     std::uint32_t Levels() const {
-        return trees_[0].Levels();
+        return trees_[0].Levels() + refinement_;
     }
 
     /// Level-0 nodes along each side of a face: `SetLeaves` takes
@@ -184,8 +219,9 @@ class CubeSphereLod {
     /// valid samples.
     glm::vec2 HeightRange() const;
 
-    /// Region of the node at (`x`, `y`) on `level` of face `face`;
-    /// empty for nodes without valid samples.
+    /// Region of the node at (`x`, `y`) on `level` of face `face`
+    /// (`LeafCells()` 2^`level` fine quads across); empty for nodes
+    /// without valid samples.
     CubeSphereRegion NodeRegion(std::uint32_t face,
                                 std::uint32_t level, std::uint32_t x,
                                 std::uint32_t y,
@@ -256,8 +292,15 @@ class CubeSphereLod {
                        float exaggeration, double occluder,
                        std::vector<LodPatch>& out) const;
 
+    /// The (min, max) height of node (`x`, `y`) on `level`: a
+    /// refined node's, its data leaf's.
+    const glm::vec2& NodeHeights(std::uint32_t face,
+                                 std::uint32_t level, std::uint32_t x,
+                                 std::uint32_t y) const;
+
     double radius_ = 0.0;
     std::uint32_t faceCells_ = 0;
+    std::uint32_t refinement_ = 0;
     std::array<LodQuadtree, kFaces> trees_;
 };
 

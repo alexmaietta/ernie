@@ -22,18 +22,23 @@ namespace {
 
 constexpr std::size_t kInitialPatchCapacity = 256;
 
+/// LOD levels the uniforms carry morph ranges for.
+constexpr std::uint32_t kMorphLevels = 32;
+static_assert(kMorphLevels >= CubeSphereLod::kMaxLevels);
+
 struct PlanetUniforms {
     float body[4];
     std::uint32_t dims[4];
     float lodEye[4];
-    float morph[LodQuadtree::kMaxLevels * 2];
+    float morph[kMorphLevels * 2];
     std::uint32_t ids[4];
     float hillshade[4];
+    std::uint32_t refine[4];
 };
-static_assert(sizeof(PlanetUniforms) == 208,
+static_assert(sizeof(PlanetUniforms) == 352,
               "PlanetUniforms must match planet.slang");
 
-constexpr VkDeviceSize kUniformsStride = 256;
+constexpr VkDeviceSize kUniformsStride = 512;
 
 struct DrawConstants {
     float lightViewProj[16];
@@ -159,6 +164,28 @@ PackedFaceGradients(const CubeSphereLod& lod, std::uint32_t face,
         w = nw;
         h = nh;
     }
+}
+
+/// The refinement levels that bring `lod`'s quads (at the face
+/// centres, where they are largest) down to `finestCell` world units,
+/// as deep as `CubeSphereLod::SetRefinement` allows; none for 0.
+std::uint32_t RefinementFor(const CubeSphereLod& lod,
+                            double finestCell) {
+    if (!(finestCell > 0.0) || lod.Empty()) {
+        return 0;
+    }
+    const double dataCell = lod.Radius() * 0.5 * std::numbers::pi /
+                            static_cast<double>(lod.FaceCells());
+    const double wanted = std::ceil(std::log2(dataCell / finestCell));
+    std::uint32_t deepest =
+        CubeSphereLod::kMaxLevels - (lod.Levels() - lod.Refinement());
+    while (deepest > 0 && (static_cast<std::uint64_t>(lod.FaceCells())
+                           << deepest) > (std::uint64_t{1} << 30)) {
+        --deepest;
+    }
+    return wanted <= 0.0 ? 0u
+                         : static_cast<std::uint32_t>(std::min(
+                               wanted, static_cast<double>(deepest)));
 }
 
 }  // namespace
@@ -328,8 +355,8 @@ void PlanetDrawable::Select(const glm::dvec3& eye,
     for (std::size_t i = first; i < patches_.size(); ++i) {
         const LodPatch& patch = patches_[i];
         const glm::dvec3 anchor =
-            lod_.VertexDirection(patch.face, patch.originX,
-                                 patch.originY) *
+            lod_.FineDirection(patch.face, patch.originX,
+                               patch.originY) *
                 lod_.Radius() -
             Offset();
         anchors_.emplace_back(glm::vec3(anchor), 0.0f);
@@ -352,7 +379,9 @@ void PlanetDrawable::Prepare(
         renderer_.HasMaterial(params_.material)
             ? params_.material
             : RasterRenderer::kDefaultMaterial;
+    lod_.SetRefinement(RefinementFor(lod_, params_.finestCell));
     PlanetUniforms uniforms{};
+    uniforms.refine[0] = lod_.Refinement();
     uniforms.body[0] = static_cast<float>(lod_.Radius());
     uniforms.body[1] = params_.exaggeration;
     uniforms.body[2] = minHeight_;
@@ -386,16 +415,15 @@ void PlanetDrawable::Prepare(
     if (lod.enabled) {
         const float morphStart =
             std::clamp(lod.morphStart, 0.05f, 0.95f);
-        const double leafWidth = lod_.Radius() * 0.5 *
-                                 std::numbers::pi * kLodLeafCells /
-                                 lod_.FaceCells();
+        const double leafWidth =
+            lod_.Radius() * 0.5 * std::numbers::pi * kLodLeafCells /
+            static_cast<double>(lod_.FineCells());
         firstRange_ = std::max(
             static_cast<double>(lod.detail) * leafWidth,
             lod_.MinFirstRange(params_.exaggeration, morphStart));
         ranges = lod_.Ranges(firstRange_, morphStart);
     }
-    for (std::uint32_t level = 0; level < LodQuadtree::kMaxLevels;
-         ++level) {
+    for (std::uint32_t level = 0; level < kMorphLevels; ++level) {
         float start = std::numeric_limits<float>::max();
         float slope = 0.0f;
         if (level < ranges.size() &&
@@ -436,9 +464,8 @@ void PlanetDrawable::Prepare(
                 lod_.SelectAll(patches_);
                 for (const LodPatch& patch : patches_) {
                     const glm::dvec3 anchor =
-                        lod_.VertexDirection(patch.face,
-                                             patch.originX,
-                                             patch.originY) *
+                        lod_.FineDirection(patch.face, patch.originX,
+                                           patch.originY) *
                             lod_.Radius() -
                         Offset();
                     anchors_.emplace_back(glm::vec3(anchor), 0.0f);

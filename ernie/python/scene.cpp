@@ -2385,6 +2385,7 @@ void BindScene(nb::module_& m) {
         {"ORIGIN", tokens::kOrigin},
         {"CELL_SIZE", tokens::kCellSize},
         {"PLANET_RADIUS", tokens::kPlanetRadius},
+        {"FINEST_CELL", tokens::kFinestCell},
         {"NO_DATA", tokens::kNoData},
         {"EXAGGERATION", tokens::kExaggeration},
         {"HEIGHTS_DIRTY", tokens::kHeightsDirty},

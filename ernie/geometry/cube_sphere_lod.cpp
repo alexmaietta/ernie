@@ -7,6 +7,7 @@
 #include <limits>
 #include <numbers>
 #include <stdexcept>
+#include <string>
 
 namespace ernie {
 
@@ -152,6 +153,38 @@ glm::dvec3 CubeSphereLod::VertexDirection(std::uint32_t face,
                          static_cast<double>(row) * scale - 1.0);
 }
 
+glm::dvec3 CubeSphereLod::FineDirection(std::uint32_t face,
+                                        std::uint32_t col,
+                                        std::uint32_t row) const {
+    const double scale = 2.0 / static_cast<double>(FineCells());
+    return FaceDirection(face, static_cast<double>(col) * scale - 1.0,
+                         static_cast<double>(row) * scale - 1.0);
+}
+
+void CubeSphereLod::SetRefinement(std::uint32_t levels) {
+    if ((static_cast<std::uint64_t>(faceCells_) << levels) >
+            (std::uint64_t{1} << 30) ||
+        trees_[0].Levels() + levels > kMaxLevels) {
+        throw std::invalid_argument("Cube sphere refinement too "
+                                    "deep: at most 2^30 quads along "
+                                    "a face and " +
+                                    std::to_string(kMaxLevels) +
+                                    " levels");
+    }
+    refinement_ = levels;
+}
+
+const glm::vec2& CubeSphereLod::NodeHeights(std::uint32_t face,
+                                            std::uint32_t level,
+                                            std::uint32_t x,
+                                            std::uint32_t y) const {
+    if (level >= refinement_) {
+        return trees_.at(face).NodeHeights(level - refinement_, x, y);
+    }
+    const std::uint32_t up = refinement_ - level;
+    return trees_.at(face).NodeHeights(0, x >> up, y >> up);
+}
+
 void CubeSphereLod::SetLeaves(std::uint32_t face,
                               std::span<const glm::vec2> leaves) {
     if (face >= kFaces) {
@@ -179,7 +212,7 @@ CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face,
                                            std::uint32_t x,
                                            std::uint32_t y,
                                            float exaggeration) const {
-    const glm::vec2& h = trees_.at(face).NodeHeights(level, x, y);
+    const glm::vec2& h = NodeHeights(face, level, x, y);
     CubeSphereRegion region;
     if (h.x > h.y) {
         region.inner = 1.0;
@@ -190,11 +223,11 @@ CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face,
     const std::uint32_t col0 = x * cells;
     const std::uint32_t row0 = y * cells;
     region.axis =
-        VertexDirection(face, col0 + cells / 2, row0 + cells / 2);
+        FineDirection(face, col0 + cells / 2, row0 + cells / 2);
     for (const std::uint32_t corner : {0u, 1u, 2u, 3u}) {
         const glm::dvec3 d =
-            VertexDirection(face, col0 + (corner & 1u) * cells,
-                            row0 + (corner >> 1) * cells);
+            FineDirection(face, col0 + (corner & 1u) * cells,
+                          row0 + (corner >> 1) * cells);
         region.angle = std::max(region.angle, Angle(region.axis, d));
     }
     region.angle *= 1.0 + 1e-12;
@@ -229,9 +262,34 @@ double CubeSphereLod::OccluderRadius(float exaggeration) const {
 double CubeSphereLod::MinFirstRange(float exaggeration,
                                     float morphStart) const {
     double range = 0.0;
-    for (std::uint32_t level = 0; level + 1 < Levels(); ++level) {
+    // Refined levels: each node's sideways extent halves with its
+    // level, as the range does, so its data leaf's (a refined node
+    // spans 2^-(k - level) of it) sets every refined level's bound.
+    if (refinement_ > 0) {
+        const std::uint32_t leaves = trees_[0].LeavesPerSide();
+        double widest = 0.0;
+        for (std::uint32_t face = 0; face < kFaces; ++face) {
+            for (std::uint32_t y = 0; y < leaves; ++y) {
+                for (std::uint32_t x = 0; x < leaves; ++x) {
+                    const CubeSphereRegion r = NodeRegion(
+                        face, refinement_, x, y, exaggeration);
+                    if (!r.Empty()) {
+                        widest = std::max(
+                            widest, 2.0 * r.outer *
+                                        std::sin(std::min(
+                                            r.angle, 0.5 * kPi)));
+                    }
+                }
+            }
+        }
+        range =
+            widest / (static_cast<double>(morphStart) *
+                      std::ldexp(1.0, static_cast<int>(refinement_)));
+    }
+    for (std::uint32_t level = refinement_; level + 1 < Levels();
+         ++level) {
         const std::uint32_t side =
-            faceCells_ / (LeafCells() << level);
+            FineCells() / (LeafCells() << level);
         for (std::uint32_t face = 0; face < kFaces; ++face) {
             for (std::uint32_t y = 0; y < side; ++y) {
                 for (std::uint32_t x = 0; x < side; ++x) {
@@ -261,8 +319,24 @@ double CubeSphereLod::MinFirstRange(float exaggeration,
 
 std::vector<LodRange> CubeSphereLod::Ranges(double firstRange,
                                             float morphStart) const {
-    return trees_[0].Ranges(static_cast<float>(firstRange),
-                            morphStart);
+    // As `LodQuadtree::Ranges`, over the refined levels too.
+    std::vector<LodRange> ranges(Levels());
+    double previous = 0.0;
+    for (std::uint32_t level = 0; level < Levels(); ++level) {
+        if (level + 1 == Levels()) {
+            ranges[level] = {std::numeric_limits<float>::infinity(),
+                             std::numeric_limits<float>::infinity()};
+            break;
+        }
+        const double end =
+            firstRange * std::ldexp(1.0, static_cast<int>(level));
+        ranges[level] = {
+            static_cast<float>(previous +
+                               morphStart * (end - previous)),
+            static_cast<float>(end)};
+        previous = end;
+    }
+    return ranges;
 }
 
 // A point at radius r is hidden behind a sphere of radius a from an
@@ -318,6 +392,7 @@ void CubeSphereLod::SelectAll(std::vector<LodPatch>& out) const {
     if (Empty()) {
         return;
     }
+    // The data's leaves at the data's resolution: four patches each.
     const std::uint32_t leaves = LeavesPerSide();
     for (std::uint32_t face = 0; face < kFaces; ++face) {
         for (std::uint32_t y = 0; y < leaves; ++y) {
@@ -325,8 +400,9 @@ void CubeSphereLod::SelectAll(std::vector<LodPatch>& out) const {
                 const glm::vec2& h =
                     trees_[face].NodeHeights(0, x, y);
                 if (h.x <= h.y) {
-                    EmitQuarters(face, 0, x, y, glm::dvec3(0.0),
-                                 nullptr, 1.0f, 0.0, out);
+                    EmitQuarters(face, refinement_, x, y,
+                                 glm::dvec3(0.0), nullptr, 1.0f, 0.0,
+                                 out);
                 }
             }
         }
