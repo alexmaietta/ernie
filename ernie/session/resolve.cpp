@@ -840,9 +840,7 @@ RenderPrims ResolveRenderPrims(const Scene& scene,
         candidates.end());
     for (const Path& path : candidates) {
         const std::string& type = scene.TypeOf(path);
-        if (type == tokens::kDistantLight && prims.light.IsEmpty()) {
-            prims.light = path;
-        } else if (type == tokens::kDomeLight) {
+        if (type == tokens::kDomeLight) {
             if (prims.dome.IsEmpty()) {
                 prims.dome = path;
             }
@@ -2700,17 +2698,6 @@ FrameParams FrameParamsOf(const Scene& scene,
     shadows.splitLambda =
         static_cast<float>(options.GetShadowSplitLambda());
     shadows.showCascades = options.GetShadowShowCascades();
-    if (!prims.light.IsEmpty()) {
-        params.sunDirection =
-            glm::vec3(TowardsLight(scene, prims.light));
-        params.sunIrradiance =
-            SunIrradianceOf(scene, prims.light, params.camera.bands);
-        const DistantLight sun(scene, prims.light);
-        params.sunAngle =
-            std::max(static_cast<float>(sun.GetAngle()), 0.0f);
-        shadows.enabled = sun.GetShadowEnable();
-    }
-    params.sun = !prims.light.IsEmpty();
     if (!prims.dome.IsEmpty()) {
         params.dome =
             DomeParamsOf(scene, prims.dome, params.camera.bands);

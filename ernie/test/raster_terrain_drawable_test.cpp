@@ -317,8 +317,7 @@ TEST_F(TerrainRendererTest, RidgeShadowsTheGroundAwayFromTheSun) {
               unshadowed[east].Luminance() * 9 / 10);
 }
 
-TEST_F(TerrainRendererTest,
-       FitsTheRequestedCascadesOnlyWhenTheSunIsUp) {
+TEST_F(TerrainRendererTest, FitsTheRequestedCascadesWhenTheSunIsUp) {
     TerrainRenderer renderer(*context_, kColorFormat);
     TerrainDrawParams params;
     renderer.Update(params);
@@ -336,9 +335,11 @@ TEST_F(TerrainRendererTest,
     renderer.Update(params);
     EXPECT_GT(renderer.GpuBytes(), bytes1024);
 
+    // Below the horizon: one map over the scene rather than cascades
+    // over the view, as on a planet, whose up is not +z.
     params.sunDirection = glm::vec3(0.0f, 0.6f, -0.8f);
     renderer.Update(params);
-    EXPECT_TRUE(renderer.Cascades().empty());
+    EXPECT_EQ(renderer.Cascades().size(), 1u);
 
     params.sunDirection = glm::vec3(0.0f, 0.0f, 1.0f);
     params.shadows.enabled = false;

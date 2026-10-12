@@ -2,6 +2,7 @@
 #include "ernie/session/frame_params.h"
 
 #include "ernie/scene/wide_view.h"
+#include "ernie/util/spectrum.h"
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -10,6 +11,38 @@
 #include <stdexcept>
 
 namespace ernie {
+
+LightParams RelativeDistantLight(const glm::vec3& towards,
+                                 const SpectralBands& bands) {
+    // A white Lambertian surface facing it shows E / pi of radiance,
+    // whose luminance is K E / pi times the integral of ybar.
+    static const double perBand = [] {
+        double integral = 0.0;
+        for (double w = 360.5; w < 830.0; w += 1.0) {
+            integral += CieXyz(w).y;
+        }
+        return M_PI / (kLuminousEfficacy * integral);
+    }();
+    LightParams light;
+    light.type = LightType::Distant;
+    light.direction = glm::normalize(towards);
+    light.angle = 0.53f;
+    light.spectrum.assign(static_cast<std::size_t>(bands.count),
+                          static_cast<float>(perBand));
+    return light;
+}
+
+glm::dmat4 LightParams::Pose::Matrix() const {
+    const glm::dvec3 z = -glm::normalize(glm::dvec3(direction));
+    const glm::dvec3 x = glm::normalize(
+        glm::dvec3(tangent) - glm::dot(glm::dvec3(tangent), z) * z);
+    glm::dmat4 matrix(1.0);
+    matrix[0] = glm::dvec4(x, 0.0);
+    matrix[1] = glm::dvec4(glm::cross(z, x), 0.0);
+    matrix[2] = glm::dvec4(z, 0.0);
+    matrix[3] = glm::dvec4(position, 1.0);
+    return matrix;
+}
 
 glm::dmat4 InterpolatePose(const glm::dmat4& from,
                            const glm::dmat4& to, double s) {

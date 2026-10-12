@@ -504,8 +504,7 @@ GBuffer meshGBuffer(VertexOutput in) {
     let modulation = cascadeTint(in.color * textured.albedo * detail.albedo, in.world);
     let unlit = hiddenLine();
     GBuffer out;
-    out.normal =
-        float4(shadingNormal, unlit ? 1.0 : sunVisibility(in.world, normal, in.position.xy));
+    out.normal = float4(shadingNormal, 1.0);
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),
                         wireframe(modulation, in.barycentric));
     out.ids = uint4(d.points.y, d.points.z, in.instance,

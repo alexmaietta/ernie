@@ -178,8 +178,8 @@ enum class Occlusion : std::uint32_t {
 /// Minimal shading (`ernie:minimal:mode`), after RTX Minimal: for
 /// throughput, a product draws in one forward pass straight into its
 /// outputs, without the spectral shading, sensor filters, sky or
-/// dome; lit by the sun (the first distant light) and the scene's
-/// ambient light.
+/// dome; lit by the first four distant lights, unshadowed, and the
+/// scene's ambient light.
 ///
 /// Reference: NVIDIA, "RTX - Minimal Mode", Omniverse Materials and
 /// Rendering documentation.
@@ -214,9 +214,9 @@ enum class LightType : std::uint32_t {
     Laser = 5,
 };
 
-/// A light besides the sun, resolved for a frame from its prim
-/// (`LightParamsOf`). In the rasterizer, distant lights get one
-/// orthographic shadow map over the scene; sphere lights a
+/// A light, resolved for a frame from its prim (`LightParamsOf`). In
+/// the rasterizer, distant lights get cascades over a single view, or
+/// orthographic maps over the scene in a batch; sphere lights a
 /// perspective map when their cone is at most `kMaxSpotConeDegrees`,
 /// else six (a cube); rect and disk lights a cube at their centre.
 ///
@@ -469,10 +469,17 @@ struct BodyParams {
     bool operator==(const BodyParams&) const = default;
 };
 
+/// A distant light towards unit vector `towards` in relative units: a
+/// flat spectrum over `bands` under which a white Lambertian surface
+/// facing it has a luminance of 1 cd/m^2, the sun's angular diameter,
+/// and shadows.
+LightParams RelativeDistantLight(const glm::vec3& towards,
+                                 const SpectralBands& bands);
+
 /// Per-frame parameters of a render, whatever the backend: the
-/// camera, the sun, the other lights, the sensor filters and the
-/// frame's place in the random streams. `shadows` tunes the
-/// rasterizer's shadow maps; tracers ignore it.
+/// camera, the lights, the sensor filters and the frame's place in
+/// the random streams. `shadows` tunes the rasterizer's shadow maps;
+/// tracers ignore it.
 struct FrameParams {
     /// The camera: pose, projection, spectral bands, exposure, lens
     /// and sensor. Its `width` and `height` are the image size, which
@@ -482,19 +489,6 @@ struct FrameParams {
     /// view is, so that with lens distortion it covers the
     /// undistorted rays of every sensor pixel (`OverscanOf`).
     double overscan = 1.0;
-    bool sun = true;  ///< Off lights the scene with `lights` alone
-                      ///< (no sun or cascades).
-    glm::vec3 sunDirection{
-        0.0f, 0.0f, 1.0f};  ///< Unit vector pointing towards the sun.
-    /// Angular diameter of the sun's disk in degrees, which widens
-    /// shadow penumbrae with the distance from the occluder
-    /// (percentage-closer soft shadows); 0 keeps `shadows.softness`.
-    float sunAngle = 0.53f;
-    /// The sun's spectral irradiance at normal incidence per band of
-    /// `camera.bands`, in W m^-2 nm^-1. Empty means a flat spectrum
-    /// scaled so a white Lambertian surface facing the sun has a
-    /// luminance of 1 cd/m^2 (relative units).
-    std::vector<float> sunIrradiance;
     /// Luminance (cd/m^2) of light arriving at every surface
     /// uniformly from all around, besides the lights
     /// (`ernie:ambient`); 0 none.
@@ -502,7 +496,8 @@ struct FrameParams {
     /// Its linear RGB colour, whatever its brightness
     /// (`ernie:ambientColor`).
     glm::vec3 ambientColor{1.0f};
-    /// Other lights; the rasterizer takes
+    /// The lights, distant ones such as the sun and earthshine among
+    /// them, all alike; the rasterizer takes
     /// `RasterRenderer::kMaxLights`.
     std::vector<LightParams> lights;
     std::optional<DomeParams> dome;

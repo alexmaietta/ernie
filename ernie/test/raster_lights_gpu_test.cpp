@@ -1230,7 +1230,7 @@ TEST_F(RasterDelegateTest, LargerLightsCastWiderPenumbrae) {
 }
 
 TEST_F(RasterDelegateTest, WiderDistantLightsCastWiderPenumbrae) {
-    // A distant light besides the sun, from 45 degrees towards +x,
+    // A distant light from 45 degrees towards +x,
     // past a blocker 20 up over x in [4, 20] whose edge throws its
     // shadow's edge onto x = 0: sharp from a point in the sky, and
     // from one 10 degrees across spread over about 3.5 to each side
@@ -1239,9 +1239,7 @@ TEST_F(RasterDelegateTest, WiderDistantLightsCastWiderPenumbrae) {
     const auto fractions = [&](double angle) {
         RasterDelegate delegate(*context_);
         Scene scene = FlatScene();
-        // The first distant light by path is the sun, which this one
-        // follows.
-        ernie::DistantLight(scene, "/World/Sun").SetIntensity(0.0);
+        scene.Remove("/World/Sun");
         ernie::DistantLight::Define(scene, "/World/Tilted")
             .SetShadowEnable(true)
             .SetAngle(angle);
@@ -1259,7 +1257,7 @@ TEST_F(RasterDelegateTest, WiderDistantLightsCastWiderPenumbrae) {
                   static_cast<std::size_t>(
                       ernie::RenderSettings(scene, "/Render/Settings")
                           .GetShadowCascades()))
-            << "cascades of its own, not the sun's";
+            << "cascades over the view";
         return std::pair{in / inLit, out / outLit};
     };
     const auto [pointIn, pointOut] = fractions(0.0);

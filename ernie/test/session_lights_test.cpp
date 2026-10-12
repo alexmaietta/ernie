@@ -131,35 +131,30 @@ TEST(LightParamsOf, DistantLightsShineFromTheirAxis) {
               ernie::SunIrradianceOf(scene, "/Earth", bands));
 }
 
-TEST(FrameParamsOf, ResolvesEveryLightAndTheSunsDisk) {
+TEST(FrameParamsOf, ResolvesEveryLightAndTheirDiscs) {
     Scene scene;
     ernie::Camera::Define(scene, "/World/Camera");
     ernie::SphereLight::Define(scene, "/World/Lamp");
     ernie::SphereLight::Define(scene, "/World/Off")
         .SetVisibility(tokens::kInvisible);
     ernie::RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_EQ(prims.light, Path());
     EXPECT_EQ(prims.lights, std::vector<Path>{"/World/Lamp"});
     ernie::FrameParams frame =
         ernie::FrameParamsOf(scene, prims, 8, 8);
-    EXPECT_FALSE(frame.sun) << "lamps alone light the scene";
-    ASSERT_EQ(frame.lights.size(), 1u);
+    ASSERT_EQ(frame.lights.size(), 1u) << "lamps alone light it";
 
     ernie::DistantLight::Define(scene, "/World/Sun").SetAngle(2.0);
-    ernie::DistantLight earth =
-        ernie::DistantLight::Define(scene, "/World/Earth");
+    ernie::DistantLight::Define(scene, "/World/Earth");
     prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_EQ(prims.light, Path("/World/Earth"))
-        << "the first distant light is the sun";
     EXPECT_EQ(prims.lights,
-              (std::vector<Path>{"/World/Lamp", "/World/Sun"}));
+              (std::vector<Path>{"/World/Earth", "/World/Lamp",
+                                 "/World/Sun"}))
+        << "distant lights among the rest, none the sun";
     frame = ernie::FrameParamsOf(scene, prims, 8, 8);
-    EXPECT_TRUE(frame.sun);
-    EXPECT_EQ(frame.sunAngle, 0.53f) << "UsdLux's default angle";
-    EXPECT_EQ(frame.lights.size(), 2u);
-    earth.SetAngle(2.0);
-    EXPECT_EQ(ernie::FrameParamsOf(scene, prims, 8, 8).sunAngle,
-              2.0f);
+    ASSERT_EQ(frame.lights.size(), 3u);
+    EXPECT_EQ(frame.lights[0].angle, 0.53f)
+        << "UsdLux's default angle";
+    EXPECT_EQ(frame.lights[2].angle, 2.0f);
 }
 
 TEST(LightParamsOf, RectAndDiskLightsTakeTheirSizeAndRadiance) {
@@ -270,7 +265,7 @@ TEST(DomeIrradianceSh, ProjectsUniformAndHemisphericalMaps) {
                  std::invalid_argument);
 }
 
-TEST(DomeParamsOf, ResolvesTheDomeAndTurnsOffTheDefaultSun) {
+TEST(DomeParamsOf, ResolvesTheDomeAlone) {
     Scene scene;
     ernie::Camera::Define(scene, "/World/Camera");
     ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(2.0);
@@ -279,7 +274,7 @@ TEST(DomeParamsOf, ResolvesTheDomeAndTurnsOffTheDefaultSun) {
     EXPECT_EQ(prims.dome, Path("/World/Sky"));
     const ernie::FrameParams frame =
         ernie::FrameParamsOf(scene, prims, 8, 8);
-    EXPECT_FALSE(frame.sun);
+    EXPECT_TRUE(frame.lights.empty());
     ASSERT_TRUE(frame.dome.has_value());
     EXPECT_NEAR(
         frame.dome->radiance[8],

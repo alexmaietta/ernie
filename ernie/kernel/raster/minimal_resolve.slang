@@ -37,9 +37,9 @@ static const uint kHoldsPrimId = 1u << 4;
 static const uint kHoldsInstanceId = 1u << 5;
 
 // Byte offsets: Uniforms' forward, eye and flags; ShadingUniforms' inverse view-projection.
-static const uint kForward = 80;
-static const uint kEye = 96;
-static const uint kFlags = 112;
+static const uint kForward = 64;
+static const uint kEye = 80;
+static const uint kFlags = 96;
 
 float3 load3(ByteAddressBuffer buffer, uint at) {
     return asfloat(buffer.Load3(at));

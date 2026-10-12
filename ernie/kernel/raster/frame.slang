@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Per-frame resources every raster pass shares, at fixed bindings of its push-descriptor set:
-//   0 every view's Uniforms (view and light; `u` is the drawn view's), 1 Shadows, 2 cascaded
-//   shadow maps, 3 shadow comparison sampler, 4 clamping linear sampler;
-// the per-draw push constants; and sun visibility and reflectance helpers. Materials take
+//   0 every view's Uniforms (view and light; `u` is the drawn view's), 1 Shadows (a shadow pass's
+//   light view, the cascades' splits), 2 the light shadow maps, 3 shadow comparison sampler, 4
+//   clamping linear sampler;
+// the per-draw push constants; and reflectance helpers. Materials take
 // bindings 5 to 9 (surface.slang) and each drawable's own resources start at 10.
 //
 // Passes place world points in the image with `projectWorld`, from module `projection`: a frame
@@ -13,30 +14,28 @@ import projection;
 public struct Uniforms {
     // The view-projection; a pushbroom's strip in its place (`PushbroomStrip::Packed`).
     public float4x4 viewProj;
-    // xyz: unit direction towards the sun; w unused.
-    public float4 sun;
     // xyz: camera forward, w: dot(eye, forward); view depth = dot(world, forward) - w.
     public float4 forward;
     // xyz: camera position, w: unused.
     public float4 eye;
-    // x: wireframe (0 off, 1 overlay, 2 hidden line), y: the view's first layer of the sun's
-    // shadow map (a batch's views each read their world's), z: the view's layer of the render
+    // x: wireframe (0 off, 1 overlay, 2 hidden line), y unused, z: the view's layer of the render
     // targets, which G-buffer vertex shaders draw into (SV_RenderTargetArrayIndex), w: 1 when the
     // projection is orthographic, every ray along `forward` (`towardsViewer`).
     public uint4 flags;
-    // A batch view's own sun shadow map, fitted to its world, in place of cascade 0's when
-    // `sunShadow.z` is 1: its view-projection, then its texel size and depth span in world units.
-    public float4x4 sunViewProj;
-    public float4 sunShadow;
+    // Minimal shading's distant lights (`minimalShade`), the first four this view sees: xyz each
+    // unit direction towards it, w its share of what the brightest gives a white surface facing it
+    // (0 past the last).
+    public float4 minimalLights[4];
     // x: the view's sub-frame time as the share of the way from the last frame's transforms (0)
     // to this one's (1), which moving meshes interpolate for motion blur; 1 without. yzw: minimal
-    // shading's ambient light per RGB channel, as a share of what the sun gives a white surface
-    // facing it.
+    // shading's ambient light per RGB channel, as a share of what the brightest distant light
+    // gives a white surface facing it.
     public float4 motion;
     // A pushbroom's intrinsics (`PushbroomStrip::Intrinsics`); unused by frame cameras.
     public float4 strip;
     // Minimal shading (`minimalShade`): rgb the constant colour, w the mode (kMinimal*).
     public float4 minimal;
+    float4 padding[2];
 }
 
 // Clip coordinates of world point `world` in the view.
@@ -149,16 +148,6 @@ public ShadowPosition shadowPosition(float3 world) {
     return out;
 }
 
-// Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced Warfare".
-float interleavedGradientNoise(float2 pixel) {
-    return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
-}
-
-float2 poissonSample(uint i) {
-    let pair = s.poisson[i / 2];
-    return i % 2 == 0 ? pair.xy : pair.zw;
-}
-
 public float viewDepth(float3 world) {
     return dot(world, u.forward.xyz) - u.forward.w;
 }
@@ -179,100 +168,6 @@ public uint cascadeIndex(float depth) {
     return count;
 }
 
-// Largest PCF radius in texels, which bounds the penumbra of the sun's disk.
-static const float kMaxFilterTexels = 24.0;
-
-// Poisson-disk PCF over a cascaded shadow map. Each tap is a hardware 2x2 comparison; the disk is
-// rotated per pixel so undersampling shows as fine noise rather than banding. Normal offset
-// (Holbert 2011) pushes the lookup off the surface to avoid self-shadowing acne.
-//
-// Percentage-closer soft shadows (Fernando 2005) size the filter to the sun's disk: a blocker
-// search averages the depth of occluders within the disk's footprint, and the penumbra is the
-// receiver-to-blocker distance times the tangent of the sun's angular radius, never below the
-// configured softness. Taps beyond that softness compare against the receiver's plane, lowered by
-// their distance times the tangent of the angle between the normal and the sun, so tilted
-// surfaces do not shadow themselves through the wider filter.
-float shadowVisibility(float3 world, float3 normal, float nDotL, float depth, float2 pixel) {
-    let cascade = cascadeIndex(depth);
-    if (cascade >= uint(s.params.z)) {
-        return 1.0;
-    }
-    // A view's own fitted map replaces the cascade's.
-    let own = u.sunShadow.z > 0.5;
-    let texelWorld = own ? u.sunShadow.x : s.texelWorld[cascade];
-    let layer = cascade + u.flags.y;
-    // A floor on the offset keeps surfaces facing the light head-on, which get no slope-scaled
-    // bias, from comparing equal to their own depth.
-    let offset = normal * s.params.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
-    let clip = mul(own ? u.sunViewProj : s.lightViewProj[cascade], float4(world + offset, 1.0));
-    // Receivers beyond the map's far plane are behind every caster, so they compare at it: any
-    // caster above them still shadows them.
-    let ndc = float3(clip.xy / clip.w, min(clip.z / clip.w, 0.99999994));
-    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
-    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
-        return 1.0;
-    }
-
-    let angle = 6.28318530718 * interleavedGradientNoise(pixel);
-    let c = cos(angle);
-    let sn = sin(angle);
-    uint width;
-    uint height;
-    uint layers;
-    shadowMap.GetDimensions(width, height, layers);
-    var filterTexels = s.params.x;
-    let tanRadius = s.sun.x;
-    let depthWorld = own ? u.sunShadow.y : s.depthWorld[cascade];
-    let cosine = clamp(nDotL, 0.05, 1.0);
-    let planeSlope = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0) * texelWorld /
-                     max(depthWorld, 1e-6);
-    if (tanRadius > 0.0) {
-        let searchTexels = clamp(ndc.z * depthWorld * tanRadius / texelWorld, s.params.x,
-                                 kMaxFilterTexels);
-        var blockers = 0.0;
-        var blockerDepth = 0.0;
-        for (uint i = 0; i < 16; ++i) {
-            let p = poissonSample(i);
-            let tap = uv + float2(c * p.x - sn * p.y, sn * p.x + c * p.y) * searchTexels /
-                               float(width);
-            let texel = int2(clamp(tap, float2(0.0), float2(1.0)) * float2(width, height));
-            let stored = shadowMap.Load(int4(min(texel, int2(width, height) - 1), layer, 0));
-            if (stored < ndc.z - length(p) * max(searchTexels - s.params.x, 0.0) * planeSlope) {
-                blockers += 1.0;
-                blockerDepth += stored;
-            }
-        }
-        if (blockers == 0.0) {
-            return 1.0;
-        }
-        let gap = (ndc.z - blockerDepth / blockers) * depthWorld;
-        filterTexels = clamp(gap * tanRadius / texelWorld, s.params.x, kMaxFilterTexels);
-    }
-    let radius = filterTexels / float(width);
-    let extra = max(filterTexels - s.params.x, 0.0) * planeSlope;
-    var lit = 0.0;
-    for (uint i = 0; i < 16; ++i) {
-        let p = poissonSample(i);
-        let tap = uv + float2(c * p.x - sn * p.y, sn * p.x + c * p.y) * radius;
-        lit += shadowMap.SampleCmpLevelZero(shadowSampler, float3(tap, float(layer)),
-                                            ndc.z - length(p) * extra);
-    }
-    return lit / 16.0;
-}
-
-// Fraction of the sun reaching a surface point with unit geometric normal `normal`, at pixel
-// `pixel`: 0 facing away from the sun, shadow-mapped otherwise when shadows are on.
-public float sunVisibility(float3 world, float3 normal, float2 pixel) {
-    if (s.params.w <= 0.0) {
-        return 1.0;
-    }
-    let nDotL = dot(normal, u.sun.xyz);
-    if (nDotL <= 0.0) {
-        return 0.0;
-    }
-    return shadowVisibility(world, normal, nDotL, viewDepth(world), pixel);
-}
-
 // `color` tinted by shadow cascade when cascade debugging is on.
 public float3 cascadeTint(float3 color, float3 world) {
     if (s.debug.x == 1 && s.params.w > 0.0) {
@@ -284,7 +179,7 @@ public float3 cascadeTint(float3 color, float3 world) {
 }
 
 // What raster passes write for the spectral shading pass (see `RenderTargets`):
-//   normal: unit shading normal, w sun visibility (0 shadowed to 1 lit);
+//   normal: unit shading normal, w 1 (the lights' shadows are the shading pass's);
 //   albedo: x scale on the material's reflectance (albedo map over its luminance), yzw linear RGB
 //           modulation of it (detail albedo, tints, vertex colours, debug overlays);
 //   ids: material, prim id, instance id, flags (kUnlit: light without shading or shadows).

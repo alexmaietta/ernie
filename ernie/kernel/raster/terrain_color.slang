@@ -80,9 +80,7 @@ GBuffer fragmentMain(VertexOutput in) {
         modulation = modulation * levelTints[in.level % 6];
     }
     GBuffer out;
-    out.normal = float4(shadingNormal, flags == kUnlit ? 1.0
-                                                       : sunVisibility(in.world, normal,
-                                                                       in.position.xy));
+    out.normal = float4(shadingNormal, 1.0);
     let scale = flags == kUnlit ? 1.0 : surfaceAlbedoScale(in.world);
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
     out.ids = uint4(t.ids.x, t.ids.y, 0, packSurfaceFlags(flags, detail.slopeVariance));

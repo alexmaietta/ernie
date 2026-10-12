@@ -39,21 +39,19 @@ Scene MinimalScene() {
 
 }  // namespace
 
-TEST(FrameParamsOf, DefaultsMatchTheRendererAndAnUnlitSceneHasNoSun) {
+TEST(FrameParamsOf,
+     DefaultsMatchTheRendererAndAnUnlitSceneHasNoLights) {
     const Scene scene = MinimalScene();
     const RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
     const ernie::FrameParams params =
         ernie::FrameParamsOf(scene, prims, 64, 32);
     const ernie::FrameParams defaults;
-    EXPECT_FALSE(params.sun)
+    EXPECT_TRUE(params.lights.empty())
         << "a scene without lights renders black";
-    EXPECT_TRUE(params.lights.empty());
-    EXPECT_EQ(params.sunDirection, defaults.sunDirection);
     EXPECT_EQ(params.ambient, defaults.ambient);
     EXPECT_EQ(params.exposure, 1.0f);
     EXPECT_TRUE(params.shadows.enabled);
     EXPECT_EQ(params.View().aspect, 2.0f);
-    EXPECT_TRUE(params.sunIrradiance.empty());
     EXPECT_EQ(params.camera.width, 64u);
     EXPECT_DOUBLE_EQ(params.overscan, 1.0);
     EXPECT_DOUBLE_EQ(params.camera.LinearExposureScale(), 1.0);
@@ -107,20 +105,23 @@ TEST(FrameParamsOf, ReadsLightMaterialTerrainAndSettings) {
     const ernie::FrameParams frame =
         ernie::FrameParamsOf(scene, prims, 32, 32);
     const float diagonal = std::sqrt(0.5f);
-    EXPECT_NEAR(frame.sunDirection.x, diagonal, 1e-6f);
-    EXPECT_NEAR(frame.sunDirection.z, diagonal, 1e-6f);
+    ASSERT_EQ(frame.lights.size(), 1u);
+    const ernie::LightParams& sun = frame.lights.front();
+    EXPECT_EQ(sun.type, ernie::LightType::Distant);
+    EXPECT_NEAR(sun.direction.x, diagonal, 1e-6f);
+    EXPECT_NEAR(sun.direction.z, diagonal, 1e-6f);
     EXPECT_DOUBLE_EQ(frame.camera.LinearExposureScale(), 2.0)
         << "camera exposure 1 stop";
-    ASSERT_EQ(frame.sunIrradiance.size(), 16u);
+    ASSERT_EQ(sun.spectrum.size(), 16u);
     double luminanceIntegral = 0.0;
     for (double w = 360.5; w < 830.0; w += 1.0) {
         luminanceIntegral += ernie::CieXyz(w).y;
     }
-    EXPECT_NEAR(frame.sunIrradiance[5],
+    EXPECT_NEAR(sun.spectrum[5],
                 M_PI * 4.0 / (683.002 * luminanceIntegral), 1e-6)
         << "a flat sun whose white Lambertian luminance is 2 x 2^1 "
            "cd/m^2";
-    EXPECT_FALSE(frame.shadows.enabled);
+    EXPECT_FALSE(sun.shadows);
     EXPECT_EQ(frame.ambient, 0.3f);
     EXPECT_EQ(frame.wireframe, ernie::Wireframe::Overlay);
     EXPECT_EQ(frame.shadows.cascades, 2);

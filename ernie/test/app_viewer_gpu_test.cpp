@@ -992,8 +992,7 @@ TEST_F(ViewerTest, HeadlessRendersOfTheSceneIgnoreTheSessionPrims) {
     viewer_->Step();
     const RenderPrims prims = ResolveRenderPrims(scene_, {});
     EXPECT_EQ(prims.settings, Path("/Render/Settings"));
-    EXPECT_EQ(prims.light, Path("/World/Sun"));
-    EXPECT_TRUE(prims.lights.empty());
+    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/World/Sun")});
 }
 
 TEST(ViewerLightingTest,

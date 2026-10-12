@@ -250,11 +250,10 @@ public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 
 
 // Minimal shading (`Uniforms::minimal`), RTX Minimal's modes for throughput: the w mode's low
 // bits are no colour (black, for the other outputs alone), one constant colour, or the surface's
-// diffuse colour; kMinimalNoSun set means no sun lights the frame, only the scene's ambient.
+// diffuse colour.
 public static const uint kMinimalNone = 0;
 public static const uint kMinimalConstant = 1;
 public static const uint kMinimalTextured = 2;
-public static const uint kMinimalNoSun = 4;
 
 // What minimal passes write (`MinimalTargets`): sRGB colour, and the prim id, instance id, unit
 // normal (octahedral, two 16-bit snorm) and surface flags.
@@ -281,9 +280,9 @@ float srgbEncode(float c) {
     return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 
-// Minimal shading of what a G-buffer pass wrote: Lambert under the sun (its visibility in
-// `g.normal.w`) plus the scene's ambient light (`u.motion.yzw`, per channel as a share of what
-// the sun gives a white surface facing it), of the constant colour or of the material's linear
+// Minimal shading of what a G-buffer pass wrote: Lambert under the distant lights, unshadowed
+// (`u.minimalLights`), plus the scene's ambient light (`u.motion.yzw`), each as a share of what
+// the brightest gives a white surface facing it, of the constant colour or of the material's linear
 // colour scaled to the albedo (an albedo map's) and modulated (textures, vertex colours, tints);
 // unlit surfaces show that colour as it is. Exposed, clamped and encoded as sRGB.
 public Minimal minimalShade(GBuffer g) {
@@ -299,10 +298,12 @@ public Minimal minimalShade(GBuffer g) {
         if ((g.ids.w & kUnlit) != 0) {
             color = base;
         } else {
-            let sun = (mode & kMinimalNoSun) != 0
-                          ? 0.0
-                          : max(dot(g.normal.xyz, u.sun.xyz), 0.0) * g.normal.w;
-            color = base * (sun + u.motion.yzw);
+            var lit = 0.0;
+            for (uint i = 0; i < 4; ++i) {
+                let light = u.minimalLights[i];
+                lit += light.w * max(dot(g.normal.xyz, light.xyz), 0.0);
+            }
+            color = base * (lit + u.motion.yzw);
         }
         color = saturate(color * u.eye.w);
     }

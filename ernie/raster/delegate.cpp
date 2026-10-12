@@ -913,17 +913,10 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
     }
     const glm::vec3 towards(
         glm::normalize(rotation * domeSun_->direction));
-    if (!frame.sun) {
-        frame.sun = true;
-        frame.sunDirection = towards;
-        frame.sunAngle = static_cast<float>(domeSun_->angle);
-        frame.sunIrradiance = std::move(spectrum);
-        frame.shadows.enabled = true;
-        return;
-    }
     LightParams sun;
     sun.type = LightType::Distant;
     sun.direction = towards;
+    sun.angle = static_cast<float>(domeSun_->angle);
     sun.spectrum = std::move(spectrum);
     sun.shadows = true;
     frame.lights.push_back(std::move(sun));

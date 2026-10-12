@@ -55,41 +55,42 @@ std::vector<ShadowCascade> FitLightShadowViews(
 /// Ernie's rasterizer: owns what the drawables of a frame share, and
 /// draws them, spectrally.
 ///
-/// Shared are the frame uniforms (camera, sun, ambient), the lights,
-/// the shadow maps, a table of materials, the reflectance models and
-/// the shader compiler. Drawables (`TerrainDrawable`, `MeshDrawable`,
+/// Shared are the frame uniforms (camera, ambient), the lights, the
+/// shadow maps, a table of materials, the reflectance models and the
+/// shader compiler. Drawables (`TerrainDrawable`, `MeshDrawable`,
 /// ...) are created against a renderer and passed to `Update` and
-/// `Record` each frame: the renderer fits the shadow cascades around
-/// all their bounds, so every drawable casts shadows on every other.
+/// `Record` each frame: the renderer fits the lights' shadow maps
+/// around all their bounds, so every drawable casts shadows on every
+/// other.
 ///
 /// A frame is deferred and spectral. The drawables rasterize a
-/// G-buffer (shading normals, shadow visibility, albedo scale and
-/// modulation, material and prim ids, depth); a compute pass per
-/// reflectance model in use turns it into spectral radiance in the
-/// camera's bands, lit by the sun's spectral irradiance and the other
-/// lights (`Light`); then the camera's sensor filters
-/// (`SensorFilter`) turn that into the render vars, and a present
-/// pass can draw LdrColor into a colour attachment.
+/// G-buffer (shading normals, albedo scale and modulation, material
+/// and prim ids, depth); a compute pass per reflectance model in use
+/// turns it into spectral radiance in the camera's bands, lit by the
+/// lights (`Light`), distant ones such as the sun among them, all
+/// alike; then the camera's sensor filters (`SensorFilter`) turn that
+/// into the render vars, and a present pass can draw LdrColor into a
+/// colour attachment.
 ///
 /// A frame can render a batch of views of one camera at different
 /// poses (`FrameParams::poses`), such as one per environment in
 /// reinforcement learning, into layered targets in one command
 /// buffer: every view has uniforms of its own, and drawables prepare
-/// and draw each view (`RasterDrawable::RecordColor`). A batch's sun
-/// shadows use one map fitted to the whole scene rather than cascades
-/// fitted to each view: a base layer of what every world shares,
-/// copied into one layer per world of the batch's views
+/// and draw each view (`RasterDrawable::RecordColor`). A batch's
+/// distant lights' shadows use maps fitted to the whole scene rather
+/// than cascades fitted to each view: a map of what every world
+/// shares, copied into one per world of the batch's views
 /// (`FrameParams::worlds`) on which that world's casters draw, so
 /// worlds overlapping in space shadow only themselves. Other lights'
 /// maps hold what every world shares.
 ///
-/// The sun's shadows use cascaded shadow maps (`FitCascades`)
-/// filtered with rotated Poisson-disk PCF, with slope-scaled depth
-/// bias and normal offset against acne, and penumbrae that widen with
-/// the distance to the occluder for the sun's angular size
-/// (percentage-closer soft shadows). Other lights' shadow maps
-/// (`FitLightShadowViews`) are sampled with the same filter in the
-/// shading pass.
+/// A single view's distant lights use cascaded shadow maps
+/// (`FitViewCascades`), other lights maps of their own
+/// (`FitLightShadowViews`), all in one array of layers, each at its
+/// own resolution, and filtered in the shading pass with rotated
+/// Poisson-disk PCF, with normal offset against acne, and penumbrae
+/// that widen with the distance to the occluder for the light's size
+/// (percentage-closer soft shadows).
 ///
 /// References:
 /// - L. Williams, "Casting Curved Shadows on Curved Surfaces",
@@ -116,8 +117,9 @@ class RasterRenderer {
   public:
     static constexpr int kMaxCascades = 4;
 
-    /// Lights besides the sun per frame, and shadow map views among
-    /// them; lights past the views draw without shadows.
+    /// Lights per frame, and shadow map views among them besides a
+    /// batch's per-world maps; lights past the views draw without
+    /// shadows.
     static constexpr std::size_t kMaxLights = 16;
     static constexpr std::size_t kMaxLightShadowViews = 24;
 
@@ -648,13 +650,9 @@ class RasterRenderer {
     /// uniforms, the shadows and samplers (bindings 0 to 4).
     RasterFrame Frame(std::uint32_t view = 0) const;
 
-    /// Cascades fitted by the last `Update`; empty with shadows off.
-    const std::vector<ShadowCascade>& Cascades() const {
-        return cascades_;
-    }
-
-    /// Shadow views of the other lights fitted by the last `Update`,
-    /// in light order.
+    /// Shadow views of the lights fitted by the last `Update`: in
+    /// light order, a single view's distant lights' cascades among
+    /// them, then a batch's per-world maps.
     const std::vector<ShadowCascade>& LightShadowViews() const {
         return lightViews_;
     }
@@ -664,13 +662,6 @@ class RasterRenderer {
     std::uint64_t GpuBytes() const;
 
   private:
-    void CreateShadowMaps(std::uint32_t resolution,
-                          std::uint32_t layers);
-    /// Plans a batch's sun shadow maps: the passes, each view's layer
-    /// and own fitted map.
-    void PlanBatchShadows(const FrameParams& params,
-                          const Bounds3& scene,
-                          std::span<RasterDrawable* const> drawables);
     void CreateLightShadowMaps(std::uint32_t resolution,
                                std::uint32_t layers);
     /// Records the per-world light maps' passes
@@ -844,9 +835,9 @@ class RasterRenderer {
     GpuBuffer shadowUniforms_;
     Sampler clampSampler_;
     Sampler shadowSampler_;
+    /// A texel at the G-buffer passes' shadow map binding, which none
+    /// reads.
     std::unique_ptr<GpuImage> shadowMaps_;
-    std::uint32_t shadowResolution_ = 0;
-    std::vector<ShadowCascade> cascades_;
     /// What a single view's cascades fit to this frame: its view, a
     /// cube camera's face extent (0 for others), the casters' box
     /// down to any floor they shadow, the split count and weight, and
@@ -870,7 +861,6 @@ class RasterRenderer {
     mutable bool castersChanged_ = true;
     std::uint32_t lightResolution_ = 0;
     std::vector<glm::vec2> poisson_;
-    bool shadowsEnabled_ = false;
     bool updated_ = false;
     /// Internal views: a view per sub-frame, output view and face
     /// (`FrameParams::Subframes`, then `FrameParams::Faces`),
@@ -912,25 +902,9 @@ class RasterRenderer {
     std::array<std::uint32_t, FrameUploads::kSlots>
         poseHistoryViews_{};
     std::array<glm::dvec3, FrameUploads::kSlots>
-        poseHistoryOrigins_{};  ///< Their frames' origins.
-    /// One pass rendering the sun's casters `casters` for cascade
-    /// `cascade` into shadow map layer `layer`, starting from a copy
-    /// of layer 0 with `fromBase`.
-    struct ShadowPass {
-        std::uint32_t layer = 0;
-        std::uint32_t cascade = 0;
-        ShadowCasters casters;
-        bool fromBase = false;
-    };
-    std::vector<ShadowPass> shadowPasses_;
-    std::vector<std::uint32_t>
-        viewShadowLayers_;  ///< Per view, its sun map's first layer.
-    std::vector<std::int32_t>
-        viewSunCascades_;  ///< Per view, its own fitted map, or -1.
-    std::uint32_t shadowLayers_ =
-        1;  ///< Layers the frame's sun maps take.
-    ShadowCasters
-        lightCasters_;  ///< Casters of the other lights' maps.
+        poseHistoryOrigins_{};    ///< Their frames' origins.
+    ShadowCasters lightCasters_;  ///< Casters of the lights' maps
+                                  ///< drawn one by one.
     /// A batch's per-world maps of its distant lights
     /// (`WorldShadows::Separate`): the worlds of its views, by slot
     /// past the shared map's (0); the bounds of those fitted to their

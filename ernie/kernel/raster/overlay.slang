@@ -18,12 +18,10 @@ import projection;
 // frame.slang's Uniforms, as far as this pass reads.
 struct ViewUniforms {
     float4x4 viewProj;
-    float4 sun;
     float4 forward;
     float4 eye;
     uint4 flags;
-    float4x4 sunViewProj;
-    float4 sunShadow;
+    float4 minimalLights[4];
     float4 motion;
     float4 strip;
 }

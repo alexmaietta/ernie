@@ -218,20 +218,19 @@ TEST(RenderSchemas, TypedRelationshipsChooseWhatRenders) {
     ernie::RenderPrims prims =
         ernie::ResolveRenderPrims(scene, "/Render/Settings");
     EXPECT_EQ(prims.camera, Path("/Cams/B"));
-    EXPECT_EQ(prims.light, Path("/Sun"))
+    EXPECT_EQ(prims.lights,
+              (std::vector<Path>{Path("/Lamp"), Path("/Sun")}))
         << "every visible light while ernie:lights is unset";
-    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/Lamp")});
     settings.SetLights({});
     prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
-    EXPECT_TRUE(prims.light.IsEmpty()) << "an empty list names none";
-    EXPECT_TRUE(prims.lights.empty());
+    EXPECT_TRUE(prims.lights.empty()) << "an empty list names none";
     settings.SetLights("/Lamp");
     prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
-    EXPECT_TRUE(prims.light.IsEmpty());
     EXPECT_EQ(prims.lights, std::vector<Path>{Path("/Lamp")});
     settings.ClearLights().SetCamera({"/Cams/A", "/Cams/B"});
     prims = ernie::ResolveRenderPrims(scene, "/Render/Settings");
-    EXPECT_EQ(prims.light, Path("/Sun"));
+    EXPECT_EQ(prims.lights,
+              (std::vector<Path>{Path("/Lamp"), Path("/Sun")}));
     EXPECT_EQ(prims.camera, Path("/Cams/A")) << "the first of a list";
 
     std::vector<ernie::RenderProductSpec> specs =

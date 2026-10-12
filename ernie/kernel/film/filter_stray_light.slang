@@ -8,11 +8,11 @@
 // power of it, about theta^-2 to theta^-3 for scatter off the optics), and zero once the
 // aperture no longer sees the source (`cutoff`, 90 degrees past which the sun is behind the
 // entrance plane; baffles bring it in). The veiling irradiance E_sun PST(theta) reads as the
-// radiance PST(theta) times `PixelContext.sunFocalRadiance` (the camera equation inverted), added
-// to each band across the image: its mean, times a linear ramp towards the side of the image
-// nearest the sun, 1 at the centre and 1 + `gradient` half a diagonal away towards the sun (1 -
-// `gradient` away from it). Every other distant light (Earthshine, a second star) adds a veil of
-// its own the same way, by its own angle and irradiance.
+// radiance PST(theta) times `PixelContext.sourceFocalRadiance` (the camera equation inverted),
+// added to each band across the image: its mean, times a linear ramp towards the side of the
+// image nearest the sun, 1 at the centre and 1 + `gradient` half a diagonal away towards the sun
+// (1 - `gradient` away from it). Every distant light (the sun, Earthshine, a second star) adds a
+// veil of its own the same way, by its own angle and irradiance.
 //
 // PST(theta) = strength (theta / angle)^-slope, held below `angle`; or, when `angles` (degrees)
 // increase, strength times 10^`logValues` at theta, linear in log PST between them and held
@@ -99,14 +99,13 @@ struct StrayLight : IBandFilter {
         return pst(theta, params) * profile * focal;
     }
 
-    // The sun's veil and every other distant light's (`PixelContext.sourceInCamera`), each by
-    // its own angle off the axis.
+    // Every distant light's veil (`PixelContext.sourceInCamera`), each by its own angle off the
+    // axis.
     static float apply(float radiance, uint band, PixelContext pixel, Params params) {
         if (params.strength == 0.0) {
             return radiance;
         }
-        var veiled = radiance +
-                     veil(pixel.sunInCamera(), pixel.sunFocalRadiance(band), pixel, params);
+        var veiled = radiance;
         for (uint s = 0; s < kStraySources; ++s) {
             veiled += veil(pixel.sourceInCamera(s), pixel.sourceFocalRadiance(s, band), pixel,
                            params);

@@ -118,7 +118,7 @@ TEST(RenderPrims, ResolveFollowsSettingsBindingsAndVisibility) {
     EXPECT_EQ(prims.camera, Path("/World/Camera"));
     EXPECT_EQ(prims.terrain, Path("/World/Terrain"));
     EXPECT_EQ(prims.material, Path("/Looks/Rock"));
-    EXPECT_EQ(prims.light, Path("/World/Sun"));
+    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/World/Sun")});
 
     ernie::RenderSettings::Define(scene, "/Render/Settings")
         .SetCamera("/World/Other");
@@ -127,7 +127,7 @@ TEST(RenderPrims, ResolveFollowsSettingsBindingsAndVisibility) {
     prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_EQ(prims.settings, Path("/Render/Settings"));
     EXPECT_EQ(prims.camera, Path("/World/Other"));
-    EXPECT_TRUE(prims.light.IsEmpty());
+    EXPECT_TRUE(prims.lights.empty());
     EXPECT_TRUE(prims.material.IsEmpty());
 
     scene.Set("/World", tokens::kVisibility, tokens::kInvisible);
@@ -148,7 +148,7 @@ TEST(RenderPrims, FallbacksSkipTheSessionRoot) {
     RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
     EXPECT_TRUE(prims.settings.IsEmpty());
     EXPECT_TRUE(prims.camera.IsEmpty());
-    EXPECT_TRUE(prims.light.IsEmpty());
+    EXPECT_TRUE(prims.lights.empty());
     EXPECT_TRUE(prims.dome.IsEmpty());
 
     ernie::Camera::Define(scene, "/z/Camera");
@@ -177,29 +177,27 @@ TEST(RenderPrims, LightsRelationshipChoosesTheLights) {
                     "/__session/Lights/Fill", "/Missing",
                     "/World/Terrain"});
     RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_EQ(prims.light, Path("/__session/Lights/Fill"));
     EXPECT_EQ(prims.lights,
-              std::vector<Path>{Path("/__session/Lights/Head")});
+              (std::vector<Path>{Path("/__session/Lights/Fill"),
+                                 Path("/__session/Lights/Head")}));
     EXPECT_TRUE(prims.dome.IsEmpty());
 
     scene.Set("/Render/Settings", tokens::kLightsRel,
               Path("/World/Sky"));
     prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_TRUE(prims.light.IsEmpty());
     EXPECT_TRUE(prims.lights.empty());
     EXPECT_EQ(prims.dome, Path("/World/Sky"));
 
     scene.Set("/Render/Settings", tokens::kLightsRel,
               std::vector<Path>{});
     prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_TRUE(prims.light.IsEmpty());
     EXPECT_TRUE(prims.lights.empty());
     EXPECT_TRUE(prims.dome.IsEmpty());
 
     scene.Clear("/Render/Settings", tokens::kLightsRel);
     prims = ernie::ResolveRenderPrims(scene, {});
-    EXPECT_EQ(prims.light, Path("/World/Sun"));
-    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/World/Lamp")});
+    EXPECT_EQ(prims.lights, (std::vector<Path>{Path("/World/Lamp"),
+                                               Path("/World/Sun")}));
     EXPECT_EQ(prims.dome, Path("/World/Sky"));
 
     // Another type is refused when set (`Validate`).

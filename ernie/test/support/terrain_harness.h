@@ -77,7 +77,8 @@ class TerrainRenderer {
         frame.camera = params.camera;
         frame.camera.width = params.extent.width;
         frame.camera.height = params.extent.height;
-        frame.sunDirection = params.sunDirection;
+        frame.lights = {ernie::RelativeDistantLight(
+            params.sunDirection, frame.camera.bands)};
         frame.ambient = params.ambient;
         frame.exposure = params.surface.exposure;
         frame.wireframe = params.wireframe;
@@ -137,8 +138,9 @@ class TerrainRenderer {
         return terrain_.Lod();
     }
 
+    /// The sun's cascades: its light's shadow views.
     const std::vector<ShadowCascade>& Cascades() const {
-        return renderer_.Cascades();
+        return renderer_.LightShadowViews();
     }
 
     std::uint64_t GpuBytes() const {

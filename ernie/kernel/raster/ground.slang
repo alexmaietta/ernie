@@ -103,10 +103,8 @@ GroundOutput shadeGround(VertexOutput in) {
     }
 
     let clip = projectWorld(world);
-    let normal = float3(0.0, 0.0, 1.0);
     GroundOutput out;
-    out.normal = float4(normalize(float3(-detail.slope, 1.0)), sunVisibility(world, normal,
-                                                                             in.position.xy));
+    out.normal = float4(normalize(float3(-detail.slope, 1.0)), 1.0);
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
     out.ids = uint4(g.ids.x, g.ids.y, 0, packSurfaceFlags(0u, detail.slopeVariance));
     out.depth = min(clip.z / clip.w, 0.99999994);

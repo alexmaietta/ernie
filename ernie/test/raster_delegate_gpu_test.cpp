@@ -341,7 +341,7 @@ TEST_F(RasterDelegateTest,
     const std::uint8_t* prototype = TexelAt(scene, image, {0, 0, 0});
     EXPECT_EQ(prototype[0] + prototype[1] + prototype[2], 0)
         << "prototypes draw only as instances";
-    EXPECT_TRUE(delegate.Renderer().Cascades().size() > 0)
+    EXPECT_TRUE(delegate.Renderer().LightShadowViews().size() > 0)
         << "meshes alone enable shadows";
 }
 
@@ -816,14 +816,14 @@ TEST_F(RasterDelegateTest,
     Scene scene = MeshScene();
     delegate.Render(scene);
     const float nearPlane =
-        delegate.Renderer().Cascades().front().splitNear;
+        delegate.Renderer().LightShadowViews().front().splitNear;
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetShadowFit(tokens::kVisible);
     for (int i = 0; i < 4; ++i) {
         delegate.Render(scene);
     }
     const float fitted =
-        delegate.Renderer().Cascades().front().splitNear;
+        delegate.Renderer().LightShadowViews().front().splitNear;
     EXPECT_GT(fitted, 50.0f);
     EXPECT_LT(fitted, 60.0f);
     EXPECT_GT(fitted, 10.0f * nearPlane);
@@ -834,8 +834,9 @@ TEST_F(RasterDelegateTest,
                                      {0.0, 0.0, 0.0},
                                      {0.0, 1.0, 0.0}));
     delegate.Render(scene);
-    EXPECT_EQ(delegate.Renderer().Cascades().front().splitNear,
-              nearPlane);
+    EXPECT_EQ(
+        delegate.Renderer().LightShadowViews().front().splitNear,
+        nearPlane);
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetShadowFit("nearest");
     EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
@@ -861,7 +862,7 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
               ernie::kCubeFaces);
     delegate.Render(scene);
     const std::vector<ernie::ShadowCascade> cascades =
-        delegate.Renderer().Cascades();
+        delegate.Renderer().LightShadowViews();
     ASSERT_FALSE(cascades.empty())
         << "a cube camera's view has cascades of its own";
     const float nearPlane = cascades.front().splitNear;
@@ -871,7 +872,7 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
         delegate.Render(scene);
     }
     const float fitted =
-        delegate.Renderer().Cascades().front().splitNear;
+        delegate.Renderer().LightShadowViews().front().splitNear;
     EXPECT_GT(fitted, 50.0f);
     EXPECT_LT(fitted, 60.0f);
     EXPECT_GT(fitted, 10.0f * nearPlane);

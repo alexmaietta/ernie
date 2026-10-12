@@ -400,7 +400,12 @@ TEST_F(RasterDelegateTest,
         .SetHeight(-6.0);
     scene.Set("/World/Sun", tokens::kTransform,
               ernie::DistantLightTransform({0.6, 0.2, 0.8}));
-    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
+    // A point in the sky: soft shadows' blocker search follows the
+    // cascades' fit, which each sharp reference refits around the
+    // moved quad and the blurred frame fits once.
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetShadowEnable(true)
+        .SetAngle(0.0);
     scene.Remove("/World/Rocks");
     ExpectMotionBlur(
         delegate, scene,

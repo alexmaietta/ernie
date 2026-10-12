@@ -46,10 +46,10 @@ namespace ernie {
 ///   Material.
 /// - the lights, from the settings' `ernie:lights` relationship when
 ///   it is set (its visible light prims), or else from every visible
-///   light outside the session root: `light` is the first
-///   DistantLight by path, the sun, with cascaded shadows; `lights`
-///   every other DistantLight, SphereLight, RectLight, DiskLight,
-///   CylinderLight and LaserLight, sorted by path; `dome` the first
+///   light outside the session root: `lights` every DistantLight,
+///   SphereLight, RectLight, DiskLight, CylinderLight and
+///   LaserLight, sorted by path, no light above another; `dome` the
+///   first
 ///   DomeLight. A scene without
 ///   lights renders black.
 /// - `ground`: the first visible GroundPlane.
@@ -58,7 +58,6 @@ struct RenderPrims {
     Path camera;
     Path terrain;
     Path material;
-    Path light;
     std::vector<Path> lights;
     Path dome;
     Path ground;

@@ -137,7 +137,7 @@ PointsOutput fragmentMain(VertexOutput in) {
     // close for spheres small beside the strip's distance to them.
     let clip = projectWorld(hit);
     PointsOutput out;
-    out.normal = float4(normal, sunVisibility(hit, normal, in.position.xy));
+    out.normal = float4(normal, 1.0);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, 0u);
     out.depth = clip.z / clip.w;

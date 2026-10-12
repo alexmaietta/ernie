@@ -173,7 +173,7 @@ TEST(LoadScene, LoadsAFileThatResolvesForRendering) {
     const ernie::RenderPrims prims =
         ernie::ResolveRenderPrims(scene, "/Render/Settings");
     EXPECT_EQ(prims.camera, Path("/World/Camera"));
-    EXPECT_EQ(prims.light, Path("/World/Sun"));
+    EXPECT_EQ(prims.lights, std::vector<Path>{Path("/World/Sun")});
     EXPECT_EQ(prims.ground, Path("/World/Ground"));
     EXPECT_TRUE(
         ernie::GroundPlane(scene, "/World/Ground").GetChecker());
@@ -186,7 +186,8 @@ TEST(LoadScene, LoadsAFileThatResolvesForRendering) {
                                       {0.0, 0.0, 1.0}));
     EXPECT_EQ(frame.camera.focalLengthMm, 35.0);
     EXPECT_NEAR(frame.camera.nearPlane, 0.1, 1e-12);
-    EXPECT_GT(frame.sunDirection.z, 0.0f);
+    ASSERT_EQ(frame.lights.size(), 1u);
+    EXPECT_GT(frame.lights.front().direction.z, 0.0f);
     EXPECT_FLOAT_EQ(frame.ambient, 0.2f);
 }
 

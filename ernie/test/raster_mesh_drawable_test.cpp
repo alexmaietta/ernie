@@ -101,7 +101,8 @@ class MeshDrawableTest : public ernie::testing::VulkanTest {
                               glm::vec3 sun = {0.0f, 0.0f, 1.0f},
                               bool shadows = true) {
         FrameParams params = View(distance);
-        params.sunDirection = glm::normalize(sun);
+        params.lights = {
+            ernie::RelativeDistantLight(sun, params.camera.bands)};
         params.ambient = 0.0f;
         params.shadows.enabled = shadows;
         RasterDrawable* drawables[] = {&frame.terrain, &frame.meshes};

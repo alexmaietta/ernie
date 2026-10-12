@@ -28,23 +28,26 @@ namespace {
 
 struct Uniforms {
     float viewProjection[16];
-    float sun[4];
     float forward[4];
     float eye[4];
     std::uint32_t flags[4];
-    float sunViewProjection[16];  ///< A batch view's own fitted sun
-                                  ///< map, with `sunShadow[2]` 1.
-    float sunShadow[4];  ///< Its texel size and depth span in world
-                         ///< units, and the flag.
+    /// Minimal shading's distant lights: towards each, and its share
+    /// of the brightest's light.
+    float minimalLights[4][4];
     float motion[4];  ///< The sub-frame's share from the last frame's
                       ///< transforms.
     float strip[4];   ///< A pushbroom's intrinsics
                       ///< (`PushbroomStrip::Intrinsics`).
     float
         minimal[4];  ///< Minimal shading's constant colour and mode.
+    float padding[8];
 };
 static_assert(sizeof(Uniforms) == 256,
               "Uniforms must match frame.slang");
+static_assert(offsetof(Uniforms, forward) == 64 &&
+                  offsetof(Uniforms, eye) == 80 &&
+                  offsetof(Uniforms, flags) == 96,
+              "minimal_resolve.slang reads these offsets");
 
 struct ShadowUniforms {
     float lightViewProjection[4][16];
@@ -295,9 +298,9 @@ static_assert(sizeof(MaterialGpu) == 592,
 /// spectrum's shape is flat.
 constexpr float kBlackLuminance = 1e-6f;
 
-/// Distant lights besides the sun whose stray light the sensor adds
+/// Distant lights whose stray light the sensor adds, such as the sun
 /// (sensor.slang's `kStraySources`).
-constexpr std::size_t kStraySources = 3;
+constexpr std::size_t kStraySources = 4;
 
 struct SensorUniforms {
     float invViewProj[16];
@@ -327,26 +330,21 @@ struct SensorUniforms {
     /// Faces (1 without), the faces' focal length in raster pixels,
     /// their principal point.
     float faces[4];
-    /// The unit direction towards the sun in the view's camera frame;
-    /// 1 when the sun lights the frame.
-    float sun[4];
     /// A pushbroom's lens: Brown-Conrady p1 and p2 (its k1 to k3 and
     /// line in `distortion`).
     float pushbroom[4];
-    /// Other distant lights for stray light, as `sun`: the unit
-    /// direction towards each in the view's camera frame; w 1 when it
-    /// lights the frame.
+    /// Distant lights for stray light: the unit direction towards
+    /// each in the view's camera frame; w 1 for a light, 0 past the
+    /// last.
     float sources[kStraySources][4];
     float facesPadding[24];
     /// Per band, two to a float4: the lens's image scale (lateral
     /// colour) and focal length shift in millimetres (axial colour);
     /// 1 and 0 without chromatic aberration.
     float chromatic[SpectralBands::kMaxBands / 2][4];
-    /// Per band: the radiance whose image puts the sun's irradiance
-    /// at normal incidence on the focal plane, E_sun 4 N^2 / (pi T),
-    /// for stray light; 0 without the sun.
-    float sunRadiance[SpectralBands::kMaxBands];
-    /// Per band, the other distant lights' as `sunRadiance`.
+    /// Per light of `sources` and band: the radiance whose image puts
+    /// its irradiance at normal incidence on the focal plane,
+    /// E 4 N^2 / (pi T), for stray light.
     float sourceRadiance[kStraySources][SpectralBands::kMaxBands];
 };
 static_assert(sizeof(SensorUniforms) == 4352,
@@ -847,31 +845,61 @@ glm::vec3 UnitLuminanceColor(const glm::vec3& rgb) {
     return luminance > 0.0f ? rgb / luminance : glm::vec3(0.0f);
 }
 
-/// The scene's ambient light for minimal shading, which is lit in
-/// units of the sun, per RGB channel: its colour of unit luminance
-/// times its luminance over a white surface's facing the sun (the
-/// sun's illuminance over pi), or without a sun, of 1 when there is
-/// any.
+/// The luminance (cd/m^2) of a white Lambertian surface facing
+/// distant light `light`: its illuminance over pi.
+double WhiteLuminance(const LightParams& light,
+                      const SpectralBands& bands) {
+    double white = 0.0;
+    for (int b = 0; b < bands.count &&
+                    b < static_cast<int>(light.spectrum.size());
+         ++b) {
+        white += light.spectrum[static_cast<std::size_t>(b)] *
+                 CieXyz(bands.Centre(b)).y * bands.Width();
+    }
+    return white * kLuminousEfficacy / M_PI;
+}
+
+/// The frame's brightest distant light (`WhiteLuminance`), not a
+/// dome's direction, of the shared ones or world `world`'s (all for
+/// -1); none without one. Unlit surfaces and minimal shading show
+/// their colours as a white surface facing it.
+const LightParams* BrightestDistant(const FrameParams& params,
+                                    const SpectralBands& bands,
+                                    std::int32_t world = -1) {
+    const LightParams* brightest = nullptr;
+    double most = 0.0;
+    for (const LightParams& light : params.lights) {
+        if (light.type != LightType::Distant || light.domeDiffuse ||
+            !(light.world == -1 || world == -1 ||
+              light.world == world)) {
+            continue;
+        }
+        const double white = WhiteLuminance(light, bands);
+        if (brightest == nullptr || white > most) {
+            brightest = &light;
+            most = white;
+        }
+    }
+    return brightest;
+}
+
+/// The scene's ambient light for minimal shading of view world
+/// `world`, which is lit in units of its brightest distant light, per
+/// RGB channel: its colour of unit luminance times its luminance over
+/// a white surface's facing that light, or without one, of 1 when
+/// there is any.
 glm::vec3 MinimalAmbient(const FrameParams& params,
-                         const SpectralBands& bands) {
+                         const SpectralBands& bands,
+                         std::int32_t world) {
     if (!(params.ambient > 0.0f)) {
         return glm::vec3(0.0f);
     }
     const glm::vec3 colour = UnitLuminanceColor(params.ambientColor);
-    double white = 0.0;
-    if (params.sun && params.sunIrradiance.empty()) {
-        white = 1.0;  // relative units: 1 cd/m^2 on white
-    } else if (params.sun) {
-        for (int b = 0;
-             b < bands.count &&
-             b < static_cast<int>(params.sunIrradiance.size());
-             ++b) {
-            white +=
-                params.sunIrradiance[static_cast<std::size_t>(b)] *
-                CieXyz(bands.Centre(b)).y * bands.Width();
-        }
-        white *= kLuminousEfficacy / M_PI;
-    }
+    const LightParams* brightest =
+        BrightestDistant(params, bands, world);
+    const double white = brightest != nullptr
+                             ? WhiteLuminance(*brightest, bands)
+                             : 0.0;
     return colour * (white > 0.0
                          ? static_cast<float>(params.ambient / white)
                          : 1.0f);
@@ -1103,7 +1131,17 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
         kDefaultMaterial,
         std::make_unique<RasterMaterial>(context_, uploads_));
     SetMaterial(kDefaultMaterial, defaults);
-    CreateShadowMaps(1, kMaxCascades);
+    // A texel for the G-buffer passes' shadow map binding, which none
+    // reads: the lights' shadows are the shading pass's.
+    shadowMaps_ = std::make_unique<GpuImage>(
+        context_,
+        ImageDesc{1, 1, 1, 1, VK_FORMAT_D32_SFLOAT,
+                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                      VK_IMAGE_USAGE_SAMPLED_BIT});
+    context_.Submit([this](VkCommandBuffer commands) {
+        shadowMaps_->Transition(
+            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
     CreateLightShadowMaps(1, 1);
 
     const std::vector<float>& table = SigmoidTable();
@@ -1659,34 +1697,19 @@ void RasterRenderer::SetStars(std::span<const Star> stars) {
     starCount_ = stars.size();
 }
 
-void RasterRenderer::CreateShadowMaps(std::uint32_t resolution,
-                                      std::uint32_t layers) {
-    vkDeviceWaitIdle(context_.Device());
-    shadowMaps_ = std::make_unique<GpuImage>(
-        context_,
-        ImageDesc{resolution, resolution,
-                  std::max<std::uint32_t>(layers, kMaxCascades), 1,
-                  VK_FORMAT_D32_SFLOAT,
-                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                      VK_IMAGE_USAGE_SAMPLED_BIT |
-                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                      VK_IMAGE_USAGE_TRANSFER_DST_BIT});
-    context_.Submit([this](VkCommandBuffer commands) {
-        shadowMaps_->Transition(
-            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    });
-    shadowResolution_ = resolution;
-}
-
 void RasterRenderer::CreateLightShadowMaps(std::uint32_t resolution,
                                            std::uint32_t layers) {
     vkDeviceWaitIdle(context_.Device());
+    // Copied within: a batch's world maps start as their light's
+    // shared one.
     lightShadowMaps_ = std::make_unique<GpuImage>(
         context_,
         ImageDesc{resolution, resolution, layers, 1,
                   VK_FORMAT_D32_SFLOAT,
                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                      VK_IMAGE_USAGE_SAMPLED_BIT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                   false, true});
     context_.Submit([this](VkCommandBuffer commands) {
         lightShadowMaps_->Transition(
@@ -1821,8 +1844,9 @@ void RasterRenderer::WriteLights(
         if (worldMaps_ && bounds && distant && light.shadows &&
             !light.domeDiffuse && !light.posedOnGpu) {
             perWorld.push_back(i);
-        } else if (bounds && !(laser && light.posedOnGpu &&
-                               light.beam.IsSpot())) {
+        } else if (bounds && params.shadows.enabled &&
+                   !(laser && light.posedOnGpu &&
+                     light.beam.IsSpot())) {
             // A laser's spot posed on the GPU has no shadows yet: the
             // light pass fits perspective views only.
             // A distant light over a single view casts cascades over
@@ -2070,7 +2094,7 @@ void RasterRenderer::WriteLights(
         casters_.valid = true;
         casters_.layer =
             static_cast<std::uint32_t>(lightViews_.size());
-        casters_.shadowView = cascades_.size() + lightViews_.size();
+        casters_.shadowView = lightViews_.size();
         casters_.resolution = resolution;
         casters_.top = top;
         casters_.span = span;
@@ -2264,118 +2288,6 @@ void RasterRenderer::RecordLights(
     ShaderBarrier(commands);
 }
 
-void RasterRenderer::PlanBatchShadows(
-    const FrameParams& params, const Bounds3& scene,
-    std::span<RasterDrawable* const> drawables) {
-    ERNIE_ZONE("Plan batch shadows");
-    const ShadowSettings& shadows = params.shadows;
-    LightParams sun;
-    sun.type = LightType::Distant;
-    sun.direction = params.sunDirection;
-    // A fit of the sun's map around `low` to `high`, one cascade
-    // covering every view depth. It reaches receivers below the
-    // casters, such as a ground plane, without a floor
-    // (`ShadowFloor`): they lie in the casters' shadow along the
-    // light, and the one cascade has no far split.
-    const auto fit = [&](const glm::vec3& low,
-                         const glm::vec3& high) {
-        std::vector<ShadowCascade> views = FitLightShadowViews(
-            sun, glm::vec3(0.0f), low, high, shadowResolution_);
-        ShadowCascade cascade = views.front();
-        cascade.splitFar = std::numeric_limits<float>::max();
-        return cascade;
-    };
-    cascades_ = {fit(scene.first, scene.second)};
-    std::vector<std::int32_t> worlds;
-    for (std::uint32_t v = 0; v < views_; ++v) {
-        worlds.push_back(params.ViewWorld(v));
-    }
-    std::sort(worlds.begin(), worlds.end());
-    worlds.erase(std::unique(worlds.begin(), worlds.end()),
-                 worlds.end());
-    // One map for all: every view of every world, the worlds' shared
-    // casters only, or every world's casters.
-    if (worlds == std::vector<std::int32_t>{-1} ||
-        shadows.worlds != WorldShadows::Separate) {
-        const std::int32_t casting =
-            shadows.worlds == WorldShadows::Shared
-                ? ShadowCasters::kNoWorld
-                : ShadowCasters::kAllWorlds;
-        shadowPasses_.push_back(
-            {0, 0, ShadowCasters{true, casting}, false});
-        return;
-    }
-    // A map per world: layer 0 holds the shared casters. Fitted to
-    // the scene, each world's layer is a copy of it with the world's
-    // casters drawn on top; fitted to the world, it draws the shared
-    // casters again with its own light view. Views of every world
-    // (-1) get every caster.
-    shadowPasses_.push_back(
-        {0, 0, ShadowCasters{true, ShadowCasters::kNoWorld}, false});
-    const std::uint32_t maxLayers =
-        context_.Limits().maxImageArrayLayers;
-    std::map<std::int32_t, std::uint32_t> layerOf;
-    std::map<std::int32_t, std::uint32_t> cascadeOf;
-    // Every world's bounds at once, over the drawables' geometry.
-    std::map<std::int32_t, Bounds3> worldBounds;
-    if (shadows.worldFit == WorldShadowFit::World) {
-        for (const RasterDrawable* drawable : drawables) {
-            for (const auto& [world, box] :
-                 drawable->WorldsBounds()) {
-                const auto [it, added] =
-                    worldBounds.try_emplace(world, box);
-                if (!added) {
-                    it->second = Bounds3(
-                        glm::min(it->second.first, box.first),
-                        glm::max(it->second.second, box.second));
-                }
-            }
-        }
-    }
-    for (const std::int32_t world : worlds) {
-        if (shadowPasses_.size() == maxLayers) {
-            break;  // Further worlds get the shared casters' shadows
-                    // only.
-        }
-        const auto layer =
-            static_cast<std::uint32_t>(shadowPasses_.size());
-        layerOf[world] = layer;
-        std::optional<Bounds3> own;
-        if (shadows.worldFit == WorldShadowFit::World &&
-            world != -1) {
-            if (const auto found = worldBounds.find(world);
-                found != worldBounds.end()) {
-                own = found->second;
-            }
-        }
-        if (!own) {
-            shadowPasses_.push_back(
-                {layer, 0, ShadowCasters{false, world}, true});
-            continue;
-        }
-        const glm::vec3 margin(shadows.worldMargin);
-        const auto cascade =
-            static_cast<std::uint32_t>(cascades_.size());
-        cascades_.push_back(
-            fit(own->first - margin, own->second + margin));
-        cascades_.back().world = world;
-        cascadeOf[world] = cascade;
-        shadowPasses_.push_back(
-            {layer, cascade, ShadowCasters{true, world}, false});
-    }
-    for (std::uint32_t v = 0; v < views_; ++v) {
-        const auto layer = layerOf.find(params.ViewWorld(v));
-        viewShadowLayers_[v] =
-            layer != layerOf.end() ? layer->second : 0;
-        const auto cascade = cascadeOf.find(params.ViewWorld(v));
-        viewSunCascades_[v] =
-            cascade != cascadeOf.end()
-                ? static_cast<std::int32_t>(cascade->second)
-                : -1;
-    }
-    shadowLayers_ = static_cast<std::uint32_t>(shadowPasses_.size());
-}
-
 void RasterRenderer::Update(
     const FrameParams& frame,
     std::span<RasterDrawable* const> drawables,
@@ -2425,7 +2337,7 @@ void RasterRenderer::Update(
     if (params.lights.size() > kMaxLights) {
         throw std::invalid_argument("A frame has at most " +
                                     std::to_string(kMaxLights) +
-                                    " lights besides the sun");
+                                    " lights");
     }
     for (const LightParams& light : params.lights) {
         if (light.spectrum.size() !=
@@ -2531,50 +2443,24 @@ void RasterRenderer::Update(
         }
     }
     const ShadowSettings& shadows = params.shadows;
-    shadowsEnabled_ = params.sun && shadows.enabled &&
-                      bounds.has_value() &&
-                      params.sunDirection.z > 0.0f;
-    cascades_.clear();
-    shadowPasses_.clear();
-    viewShadowLayers_.assign(views_, 0);
-    viewSunCascades_.assign(views_, -1);
-    shadowLayers_ = 1;
-    // Other lights' maps hold what a single view sees, or in a batch
-    // what every world shares (every world's casters when merged).
+    // The lights' maps hold what a single view sees, or in a batch
+    // what every world shares (every world's casters when merged; a
+    // batch's distant lights add a map per world when separate).
     lightCasters_ =
         !batch ? ShadowCasters{true, params.ViewWorld(0)}
                : ShadowCasters{true,
                                shadows.worlds == WorldShadows::Merged
                                    ? ShadowCasters::kAllWorlds
                                    : ShadowCasters::kNoWorld};
-    if (shadowsEnabled_ && batch) {
-        // A batch's per-world maps use their own, smaller resolution.
-        const std::uint32_t worldResolution =
-            shadows.worldResolution > 0
-                ? shadows.worldResolution
-                : ShadowSettings::AutoWorldResolution(
-                      params.camera.width, params.camera.height);
-        const std::uint32_t resolution =
-            shadows.worlds == WorldShadows::Separate
-                ? worldResolution
-                : shadows.resolution;
-        if (resolution != shadowResolution_) {
-            CreateShadowMaps(resolution, kMaxCascades);
-        }
-        PlanBatchShadows(raster, *bounds, drawables);
-        if (shadowLayers_ > shadowMaps_->Desc().layers) {
-            CreateShadowMaps(resolution, shadowLayers_);
-        }
-    }
-    // What a single view's cascades fit to, the sun's and other
-    // distant lights' alike (`FitViewCascades`).
+    // What a single view's distant lights' cascades fit to
+    // (`FitViewCascades`).
     const bool distantCascades = std::any_of(
         params.lights.begin(), params.lights.end(),
         [](const LightParams& light) {
             return light.type == LightType::Distant && light.shadows;
         });
     cascadeFit_.reset();
-    if (!batch && bounds && (shadowsEnabled_ || distantCascades)) {
+    if (!batch && bounds && shadows.enabled && distantCascades) {
         CascadeFit fit;
         fit.view = view;
         fit.around = around;
@@ -2595,21 +2481,6 @@ void RasterRenderer::Update(
             fit.seen = VisibleDepths(params);
         }
         cascadeFit_ = fit;
-    }
-    if (shadowsEnabled_ && !batch) {
-        if (shadows.resolution != shadowResolution_) {
-            CreateShadowMaps(shadows.resolution, kMaxCascades);
-        }
-        cascades_ =
-            FitViewCascades(params.sunDirection, shadowResolution_);
-        // A single view's cascades hold what it sees: the shared
-        // casters and its world's.
-        for (std::uint32_t c = 0; c < cascades_.size(); ++c) {
-            shadowPasses_.push_back(
-                {c, c, ShadowCasters{true, params.ViewWorld(0)},
-                 false});
-        }
-        shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
     }
     // A batch's per-world maps of its distant lights, at the
     // resolution of its worlds' maps: the worlds of its views, and
@@ -2695,10 +2566,6 @@ void RasterRenderer::Update(
                 CopyMatrix(uniforms.viewProjection,
                            viewOf.ViewProjection());
             }
-            uniforms.sun[0] = params.sunDirection.x;
-            uniforms.sun[1] = params.sunDirection.y;
-            uniforms.sun[2] = params.sunDirection.z;
-            uniforms.sun[3] = 0.0f;
             uniforms.forward[0] = viewOf.forward.x;
             uniforms.forward[1] = viewOf.forward.y;
             uniforms.forward[2] = viewOf.forward.z;
@@ -2710,7 +2577,6 @@ void RasterRenderer::Update(
             uniforms.eye[3] = params.exposure;
             uniforms.flags[0] =
                 static_cast<std::uint32_t>(params.wireframe);
-            uniforms.flags[1] = viewShadowLayers_[v];
             // Its layer of the render targets it draws into: a frame
             // of more views renders them in chunks of
             // `RenderTargets::MaxViews`, and each sub-frame into the
@@ -2728,24 +2594,43 @@ void RasterRenderer::Update(
                           frame.camera.SubframeTime(static_cast<int>(
                               v / (outputViews_ * faces_))))
                     : 1.0f;
-            // Minimal shading's ambient light, per channel.
-            const glm::vec3 ambient = MinimalAmbient(params, bands_);
+            // Minimal shading's light: the first distant lights the
+            // view's world sees, each as a share of the brightest's,
+            // and the ambient light, per channel.
+            const std::int32_t world = raster.ViewWorld(v);
+            const glm::vec3 ambient =
+                MinimalAmbient(params, bands_, world);
             uniforms.motion[1] = ambient.r;
             uniforms.motion[2] = ambient.g;
             uniforms.motion[3] = ambient.b;
-            if (viewSunCascades_[v] >= 0) {
-                // A view of a world with its own fitted map samples
-                // it in place of cascade 0.
-                const ShadowCascade& own =
-                    cascades_[static_cast<std::size_t>(
-                        viewSunCascades_[v])];
-                std::memcpy(uniforms.sunViewProjection,
-                            glm::value_ptr(own.lightViewProjection),
-                            sizeof(uniforms.sunViewProjection));
-                uniforms.sunShadow[0] = own.texelWorldSize;
-                uniforms.sunShadow[1] =
-                    OrthographicDepth(own.lightViewProjection);
-                uniforms.sunShadow[2] = 1.0f;
+            if (const LightParams* brightest =
+                    BrightestDistant(params, bands_, world)) {
+                const double unit =
+                    WhiteLuminance(*brightest, bands_);
+                std::size_t count = 0;
+                for (const LightParams& light : params.lights) {
+                    if (count == 4) {
+                        break;
+                    }
+                    if (light.type != LightType::Distant ||
+                        light.domeDiffuse ||
+                        !(light.world == -1 || world == -1 ||
+                          light.world == world)) {
+                        continue;
+                    }
+                    const glm::vec3 towards =
+                        glm::normalize(light.direction);
+                    float* entry = uniforms.minimalLights[count++];
+                    entry[0] = towards.x;
+                    entry[1] = towards.y;
+                    entry[2] = towards.z;
+                    entry[3] =
+                        unit > 0.0
+                            ? static_cast<float>(
+                                  WhiteLuminance(light, bands_) /
+                                  unit)
+                            : 0.0f;
+                }
             }
             // Minimal shading's colour and mode (surface.slang's
             // kMinimal*).
@@ -2756,33 +2641,29 @@ void RasterRenderer::Update(
                 params.minimal == MinimalMode::Constant   ? 1u
                 : params.minimal == MinimalMode::Textured ? 2u
                                                           : 0u;
-            uniforms.minimal[3] =
-                static_cast<float>(mode | (params.sun ? 0u : 4u));
+            uniforms.minimal[3] = static_cast<float>(mode);
         }
         uploads_.Write(uniforms_,
                        std::as_bytes(std::span(viewUniforms)));
     }
 
+    // The G-buffer passes' Shadows block: the view's cascade splits,
+    // which every distant light's cascades share, for tinting by
+    // cascade (`ShadowSettings::showCascades`).
     ShadowUniforms shadowUniforms{};
-    // A batch's views all sample cascade 0 (or their own fitted map).
-    const std::size_t sampled =
-        batch ? std::min<std::size_t>(cascades_.size(), 1)
-              : cascades_.size();
-    for (std::size_t c = 0; c < sampled; ++c) {
-        std::memcpy(shadowUniforms.lightViewProjection[c],
-                    glm::value_ptr(cascades_[c].lightViewProjection),
-                    64);
-        shadowUniforms.splits[c] = cascades_[c].splitFar;
-        shadowUniforms.texelWorld[c] = cascades_[c].texelWorldSize;
-        shadowUniforms.depthWorld[c] =
-            OrthographicDepth(cascades_[c].lightViewProjection);
+    std::size_t splits = 0;
+    if (cascadeFit_) {
+        const std::vector<ShadowCascade> cascades =
+            FitViewCascades(glm::vec3(0.0f, 0.0f, 1.0f), 1);
+        splits = std::min<std::size_t>(cascades.size(), kMaxCascades);
+        for (std::size_t c = 0; c < splits; ++c) {
+            shadowUniforms.splits[c] = cascades[c].splitFar;
+        }
     }
-    shadowUniforms.sun[0] = std::tan(
-        0.5f * glm::radians(std::max(params.sunAngle, 0.0f)));
     shadowUniforms.params[0] = shadows.softness;
     shadowUniforms.params[1] = shadows.normalOffset;
-    shadowUniforms.params[2] = static_cast<float>(sampled);
-    shadowUniforms.params[3] = shadowsEnabled_ ? 1.0f : 0.0f;
+    shadowUniforms.params[2] = static_cast<float>(splits);
+    shadowUniforms.params[3] = splits > 0 ? 1.0f : 0.0f;
     shadowUniforms.debug[0] = shadows.showCascades ? 1u : 0u;
     for (std::size_t i = 0; i < poisson_.size(); ++i) {
         shadowUniforms.poisson[2 * i] = poisson_[i].x;
@@ -2795,12 +2676,6 @@ void RasterRenderer::Update(
     if (params.camera.sensor.channels.size() > 4) {
         throw std::invalid_argument(
             "A sensor has at most four channels");
-    }
-    if (!params.sunIrradiance.empty() &&
-        params.sunIrradiance.size() !=
-            static_cast<std::size_t>(params.camera.bands.count)) {
-        throw std::invalid_argument(
-            "The sun's irradiance needs one value per camera band");
     }
     // Only the filters producing the wanted vars run, fused into one
     // kernel that writes only them, per chain: the frame's own, or
@@ -2933,7 +2808,11 @@ void RasterRenderer::Update(
     if (!params.bodies.empty()) {
         sky_ |= kSkyBodies;
     }
-    atmosphere_->Set(params.atmosphere, bands_, params.sunAngle);
+    // The planet's shadow table takes the size of the brightest
+    // distant light, the sun's for Earth, for every light.
+    const LightParams* brightest = BrightestDistant(params, bands_);
+    atmosphere_->Set(params.atmosphere, bands_,
+                     brightest != nullptr ? brightest->angle : 0.53f);
     // The lights first: shading reads the size of the light shadow
     // maps they make.
     WriteLights(params, bounds);
@@ -2952,9 +2831,7 @@ void RasterRenderer::Update(
     }
     WriteSensor(params, raster);
 
-    shadowViews_ = cascades_;
-    shadowViews_.insert(shadowViews_.end(), lightViews_.begin(),
-                        lightViews_.end());
+    shadowViews_ = lightViews_;
     for (RasterDrawable* drawable : drawables) {
         drawable->Prepare(raster, shadowViews_);
     }
@@ -3095,9 +2972,6 @@ void RasterRenderer::WriteMaterialTable() {
 void RasterRenderer::WriteShading(const FrameParams& params) {
     ERNIE_ZONE("Shading uniforms");
     ShadingUniforms shading{};
-    shading.sun[0] = params.sunDirection.x;
-    shading.sun[1] = params.sunDirection.y;
-    shading.sun[2] = params.sunDirection.z;
     // The scene's ambient light: white of its luminance, the same
     // spectral radiance in every band, which its colour of unit
     // luminance shapes.
@@ -3120,12 +2994,16 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.size[2] = kTableResolution;
     shading.size[3] =
         static_cast<std::uint32_t>(params.lights.size());
-    for (int i = 0; i < bands_.count && params.sun; ++i) {
+    // Unlit surfaces show their colour as a white one facing the
+    // brightest distant light, or in relative units without one.
+    const LightParams* brightest = BrightestDistant(params, bands_);
+    for (int i = 0; i < bands_.count; ++i) {
         shading.irradiance[i] =
-            params.sunIrradiance.empty()
-                ? static_cast<float>(M_PI / (kLuminousEfficacy *
-                                             LuminanceIntegral()))
-                : params.sunIrradiance[static_cast<std::size_t>(i)];
+            brightest != nullptr &&
+                    i < static_cast<int>(brightest->spectrum.size())
+                ? brightest->spectrum[static_cast<std::size_t>(i)]
+                : static_cast<float>(M_PI / (kLuminousEfficacy *
+                                             LuminanceIntegral()));
     }
     if (params.dome) {
         for (std::size_t k = 0; k < params.dome->sh.size(); ++k) {
@@ -3197,8 +3075,6 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
             (banded.bottomRadius + banded.topAltitude) * 1e-3);
         shading.atmosphere[1][1] = 1.0f;
     }
-    shading.atmosphere[1][2] = std::max(
-        std::sin(glm::radians(0.5f * params.sunAngle)), 1e-5f);
     // Bodies in kilometres likewise, the Moon's 384,000 km away.
     for (std::size_t i = 0;
          i < std::min(params.bodies.size(), FrameParams::kMaxBodies);
@@ -3455,25 +3331,12 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         sensor.chromatic[i / 2][(i % 2) * 2 + 1] =
             static_cast<float>(shift);
     }
-    // The sun for stray light: its irradiance as the radiance whose
-    // image puts it on the focal plane, through the camera equation
-    // (`CameraParams::IrradiancePerRadiance` on axis).
+    // Distant lights for stray light, such as the sun: the first few,
+    // not a dome's directions (its diffuse light); each irradiance as
+    // the radiance whose image puts it on the focal plane, through
+    // the camera equation (`CameraParams::IrradiancePerRadiance` on
+    // axis).
     const double focal = camera.IrradiancePerRadiance({0.0, 0.0});
-    for (int i = 0; i < bands_.count && params.sun && focal > 0.0 &&
-                    std::isfinite(focal);
-         ++i) {
-        const double irradiance =
-            params.sunIrradiance.empty()
-                ? M_PI / (kLuminousEfficacy * LuminanceIntegral())
-                : static_cast<double>(
-                      params.sunIrradiance[static_cast<std::size_t>(
-                          i)]);
-        sensor.sunRadiance[i] =
-            static_cast<float>(irradiance / focal);
-    }
-    sensor.sun[3] = params.sun ? 1.0f : 0.0f;
-    // Other distant lights' stray light, as the sun's: the first few,
-    // not a dome's directions (its diffuse light).
     std::vector<const LightParams*> sources;
     for (const LightParams& light : params.lights) {
         if (light.type == LightType::Distant && !light.domeDiffuse &&
@@ -3534,13 +3397,6 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         sensor.forward[0] = view.forward.x;
         sensor.forward[1] = view.forward.y;
         sensor.forward[2] = view.forward.z;
-        const glm::vec3 sun =
-            glm::mat3(view.view) * params.sunDirection;
-        const glm::vec3 towards =
-            glm::length(sun) > 0.0f ? glm::normalize(sun) : sun;
-        sensor.sun[0] = towards.x;
-        sensor.sun[1] = towards.y;
-        sensor.sun[2] = towards.z;
         for (std::size_t s = 0; s < sources.size(); ++s) {
             const glm::vec3 source =
                 glm::mat3(view.view) * sources[s]->direction;
@@ -3807,67 +3663,6 @@ void RasterRenderer::RecordShadowMaps(
     VkCommandBuffer commands,
     std::span<const RasterDrawable* const> drawables,
     const RasterFrame& frame) const {
-    if (shadowsEnabled_) {
-        ERNIE_GPU_ZONE(context_, commands, "Sun shadows");
-        shadowMaps_->Transition(
-            commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-        // One layered pass for the passes of a kind, each drawing
-        // into its layer (`RasterFrame::shadowLayer`), rather than a
-        // pass per layer: a batch has a layer per world.
-        const auto record = [&](bool fromBase) {
-            RenderingTarget shadow;
-            shadow.depth = shadowMaps_->View();
-            shadow.extent = {shadowResolution_, shadowResolution_};
-            shadow.layers = shadowMaps_->Desc().layers;
-            shadow.loadDepth = fromBase;
-            BeginRendering(commands, shadow);
-            for (const ShadowPass& pass : shadowPasses_) {
-                if (pass.fromBase != fromBase) {
-                    continue;
-                }
-                RasterFrame layered = frame;
-                layered.shadowLayer = pass.layer;
-                for (const RasterDrawable* drawable : drawables) {
-                    drawable->RecordShadow(
-                        commands, layered, pass.cascade,
-                        cascades_[pass.cascade].lightViewProjection,
-                        pass.casters);
-                }
-            }
-            vkCmdEndRendering(commands);
-        };
-        record(false);
-        // Each world's layer starts as a copy of the shared casters'
-        // layer 0.
-        std::vector<VkImageCopy> copies;
-        for (const ShadowPass& pass : shadowPasses_) {
-            if (pass.fromBase) {
-                VkImageCopy copy{};
-                copy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0,
-                                       0, 1};
-                copy.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0,
-                                       pass.layer, 1};
-                copy.extent = {shadowResolution_, shadowResolution_,
-                               1};
-                copies.push_back(copy);
-            }
-        }
-        if (!copies.empty()) {
-            shadowMaps_->Transition(commands,
-                                    VK_IMAGE_LAYOUT_GENERAL);
-            vkCmdCopyImage(commands, shadowMaps_->Handle(),
-                           VK_IMAGE_LAYOUT_GENERAL,
-                           shadowMaps_->Handle(),
-                           VK_IMAGE_LAYOUT_GENERAL,
-                           static_cast<std::uint32_t>(copies.size()),
-                           copies.data());
-            shadowMaps_->Transition(
-                commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-            record(true);
-        }
-        shadowMaps_->Transition(
-            commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
     if (!lightViews_.empty()) {
         ERNIE_GPU_ZONE(context_, commands, "Light shadows");
         lightShadowMaps_->Transition(
@@ -3892,7 +3687,7 @@ void RasterRenderer::RecordShadowMaps(
             own.shadowFromFrame = true;
             for (const RasterDrawable* drawable : drawables) {
                 drawable->RecordShadow(
-                    commands, own, cascades_.size() + v,
+                    commands, own, v,
                     lightViews_[v].lightViewProjection,
                     lightCasters_);
             }
@@ -3932,7 +3727,7 @@ void RasterRenderer::RecordLayeredLightShadows(
             layered.shadowLayer = static_cast<std::uint32_t>(v);
             for (const RasterDrawable* drawable : drawables) {
                 drawable->RecordShadow(
-                    commands, layered, cascades_.size() + v,
+                    commands, layered, v,
                     lightViews_[v].lightViewProjection, pass.casters);
             }
         }
