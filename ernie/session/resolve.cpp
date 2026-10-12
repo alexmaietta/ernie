@@ -2529,6 +2529,31 @@ std::optional<PlanetSphere> PlanetOf(const Scene& scene,
                             AtmosphereModel{}.topAltitude};
 }
 
+Path NearestAtmosphere(const Scene& scene, const glm::dvec3& point) {
+    Path nearest;
+    double best = 0.0;
+    double bestRadius = 0.0;
+    for (const Path& path : scene.Prims(tokens::kAtmosphere)) {
+        if (!scene.IsVisible(path)) {
+            continue;
+        }
+        const std::optional<PlanetSphere> planet =
+            PlanetOf(scene, path);
+        if (!planet) {
+            continue;
+        }
+        const double distance = std::max(
+            glm::length(point - planet->centre) - planet->top, 0.0);
+        if (nearest.IsEmpty() || distance < best ||
+            (distance == best && planet->radius < bestRadius)) {
+            nearest = path;
+            best = distance;
+            bestRadius = planet->radius;
+        }
+    }
+    return nearest;
+}
+
 std::optional<PlanetSphere> PlanetOf(const Scene& scene) {
     const Path atmosphere = FirstVisible(scene, tokens::kAtmosphere);
     if (atmosphere.IsEmpty()) {
@@ -2720,9 +2745,13 @@ FrameParams FrameParamsOf(const Scene& scene,
     if (!prims.stars.IsEmpty()) {
         params.stars = StarFieldParamsOf(scene, prims.stars);
     }
+    // Of several Atmospheres, the one nearest the camera.
     if (!prims.atmosphere.IsEmpty()) {
+        const Path nearest = NearestAtmosphere(
+            scene, glm::dvec3(params.camera.transform[3]));
         params.atmosphere = AtmosphereParamsOf(
-            scene, prims.atmosphere, prims.terrain);
+            scene, nearest.IsEmpty() ? prims.atmosphere : nearest,
+            prims.terrain);
     }
     for (const Path& body : prims.bodies) {
         params.bodies.push_back(BodyParamsOf(scene, body));

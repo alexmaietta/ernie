@@ -1797,7 +1797,11 @@ struct Viewer::State {
     /// (`OrbitAboutPlanet`); returns false within the air or without
     /// a planet, for the usual orbit.
     bool OrbitPlanet(float deltaYaw, float deltaPitch) {
-        const std::optional<PlanetSphere> planet = PlanetOf(scene);
+        const Path nearest =
+            NearestAtmosphere(scene, controller.Eye());
+        const std::optional<PlanetSphere> planet =
+            nearest.IsEmpty() ? std::nullopt
+                              : PlanetOf(scene, nearest);
         if (!planet) {
             return false;
         }

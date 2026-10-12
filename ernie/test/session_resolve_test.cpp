@@ -943,6 +943,33 @@ TEST(AtmosphereParamsOf, PlacesThePlanet) {
                  std::invalid_argument);
 }
 
+// Of several Atmospheres, a frame renders the one nearest the camera:
+// the one it is in, else the nearest top of air.
+TEST(AtmosphereParamsOf, TheNearestAtmosphereRenders) {
+    Scene scene;
+    ernie::Atmosphere::Define(scene, "/World/EarthAir");
+    ernie::Xform::Define(scene, "/World/Mars");
+    scene.Set(
+        "/World/Mars", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(78e9, 0.0, 0.0)));
+    ernie::Atmosphere::Define(scene, "/World/Mars/Air")
+        .SetPreset(std::string(tokens::kMars))
+        .SetAnchor(std::string(tokens::kAnchorCentre));
+    EXPECT_EQ(
+        ernie::NearestAtmosphere(scene, glm::dvec3(0.0, 0.0, 2.0)),
+        Path("/World/EarthAir"));
+    EXPECT_EQ(ernie::NearestAtmosphere(
+                  scene, glm::dvec3(78e9, 0.0, 3389.5e3 + 400e3)),
+              Path("/World/Mars/Air"));
+    EXPECT_EQ(
+        ernie::NearestAtmosphere(scene, glm::dvec3(30e9, 0.0, 0.0)),
+        Path("/World/EarthAir"));
+    ernie::Atmosphere(scene, "/World/EarthAir")
+        .SetVisibility(std::string(tokens::kInvisible));
+    EXPECT_EQ(ernie::NearestAtmosphere(scene, glm::dvec3(0.0)),
+              Path("/World/Mars/Air"));
+}
+
 // Without a planet Terrain an Atmosphere's transform places its
 // planet: its origin on the ground, or at the centre.
 TEST(AtmosphereParamsOf, ItsTransformPlacesItsPlanet) {

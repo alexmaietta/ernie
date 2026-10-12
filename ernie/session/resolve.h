@@ -441,6 +441,12 @@ std::optional<PlanetSphere> PlanetOf(const Scene& scene,
 /// or none.
 std::optional<PlanetSphere> PlanetOf(const Scene& scene);
 
+/// Of the scene's visible Atmospheres, the one whose air is nearest
+/// `point` (world; inside it, distance 0, the smallest planet's
+/// first): the one a frame renders, as a camera flies between
+/// planets. Empty without one.
+Path NearestAtmosphere(const Scene& scene, const glm::dvec3& point);
+
 /// A CelestialBody's centre (its transform's origin), radius and
 /// albedo.
 /// @throws std::invalid_argument for another prim type.
