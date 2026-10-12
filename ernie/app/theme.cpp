@@ -22,57 +22,6 @@ glm::vec4 WithAlpha(const glm::vec4& colour, float alpha) {
 
 }  // namespace
 
-Theme DarkTheme() {
-    return {};
-}
-
-Theme LightTheme() {
-    Theme theme;
-    theme.background = {0.851f, 0.855f, 0.863f, 1.0f};
-    theme.panel = {0.922f, 0.925f, 0.929f, 1.0f};
-    theme.header = {0.863f, 0.867f, 0.875f, 1.0f};
-    theme.field = {0.980f, 0.980f, 0.984f, 1.0f};
-    theme.fieldHovered = {1.0f, 1.0f, 1.0f, 1.0f};
-    theme.button = {0.890f, 0.894f, 0.902f, 1.0f};
-    theme.buttonLit = {0.667f, 0.675f, 0.690f, 1.0f};
-    theme.overlayBorder = {0.769f, 0.773f, 0.784f, 1.0f};
-    theme.separator = {0.769f, 0.773f, 0.784f, 1.0f};
-    theme.border = theme.separator;
-    theme.text = {0.133f, 0.141f, 0.153f, 1.0f};
-    theme.textMuted = {0.427f, 0.439f, 0.459f, 1.0f};
-    theme.selection = {0.776f, 0.843f, 0.894f, 1.0f};
-    theme.overlay = {0.922f, 0.925f, 0.929f, 0.80f};
-    theme.checkBox = theme.textMuted;
-    theme.checkMark = theme.field;
-    return theme;
-}
-
-Theme ClassicTheme() {
-    Theme theme;
-    // Colours read from PANGU v7's renderer GUI (Qt on Linux).
-    theme.background = {0.788f, 0.800f, 0.773f, 1.0f};
-    theme.panel = {0.831f, 0.843f, 0.816f, 1.0f};  // #D4D7D0
-    theme.header = {0.776f, 0.788f, 0.761f, 1.0f};
-    theme.field = {1.0f, 1.0f, 1.0f, 1.0f};
-    theme.fieldHovered = {0.957f, 0.965f, 0.945f, 1.0f};
-    theme.button = {0.863f, 0.875f, 0.847f, 1.0f};
-    theme.buttonLit = {0.698f, 0.761f, 0.835f, 1.0f};
-    theme.separator = {0.667f, 0.678f, 0.651f, 1.0f};  // #AAADA6
-    theme.border = {0.553f, 0.565f, 0.537f, 1.0f};
-    theme.text = {0.0f, 0.0f, 0.0f, 1.0f};
-    theme.textMuted = {0.333f, 0.345f, 0.325f, 1.0f};
-    theme.selection = {0.627f, 0.741f, 0.863f, 1.0f};
-    theme.accent = {0.122f, 0.290f, 0.541f, 1.0f};
-    theme.overlay = {0.831f, 0.843f, 0.816f, 0.92f};
-    theme.overlayBorder = theme.border;
-    theme.checkBox = theme.field;
-    theme.checkMark = theme.text;
-    theme.rounding = 0.0f;
-    theme.pillRounding = 0.0f;
-    theme.frameBorder = 1.0f;
-    return theme;
-}
-
 void ApplyTheme(const Theme& theme, float contentScale,
                 ImGuiStyle& style) {
     style = ImGuiStyle();
@@ -95,10 +44,9 @@ void ApplyTheme(const Theme& theme, float contentScale,
     style.ChildBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
     style.FrameBorderSize = theme.frameBorder;
-    // Framed tabs in a framed theme; else Kit's, with an accent line
-    // over the shown one.
+    // Framed tabs, without a line over the shown one.
     style.TabBorderSize = theme.frameBorder;
-    style.TabBarOverlineSize = theme.frameBorder > 0.0f ? 0.0f : 2.0f;
+    style.TabBarOverlineSize = 0.0f;
     style.DockingSeparatorSize = 1.0f;
     style.WindowMenuButtonPosition = ImGuiDir_None;
     style.WindowTitleAlign = {0.0f, 0.5f};
@@ -114,7 +62,7 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_TextDisabled, theme.textMuted);
     set(ImGuiCol_WindowBg, theme.panel);
     set(ImGuiCol_ChildBg, WithAlpha(theme.panel, 0.0f));
-    // Menus and combos' lists as Kit's, a shade off the panels.
+    // Menus and combos' lists, opaque.
     set(ImGuiCol_PopupBg, WithAlpha(theme.overlay, 1.0f));
     set(ImGuiCol_Border, theme.border);
     set(ImGuiCol_BorderShadow, glm::vec4(0.0f));
@@ -129,12 +77,10 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_ScrollbarGrab, theme.fieldHovered);
     set(ImGuiCol_ScrollbarGrabHovered, theme.textMuted);
     set(ImGuiCol_ScrollbarGrabActive, theme.accent);
-    // Checked boxes in their own colours (Kit's grey with a dark
-    // check, a classic white box with a black one); menus mark their
-    // items in the accent instead (menu.h, TextLink).
+    // A white box with a black check; menus mark their items in the
+    // accent instead (menu.h, TextLink).
     set(ImGuiCol_CheckMark, theme.checkMark);
     set(ImGuiCol_CheckboxSelectedBg, theme.checkBox);
-    // Kit's sliders fill in grey rather than showing a grab.
     set(ImGuiCol_SliderGrab, theme.buttonLit);
     set(ImGuiCol_SliderGrabActive, theme.text);
     set(ImGuiCol_Button, theme.button);
@@ -142,7 +88,7 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_ButtonActive, theme.buttonLit);
     // Headers: section bars (drawn with `header` by the panels), and
     // selected and hovered rows of trees, lists and menus, which take
-    // Kit's blue-teal.
+    // the selection's pale blue.
     set(ImGuiCol_Header, theme.selection);
     set(ImGuiCol_HeaderHovered, WithAlpha(theme.selection, 0.85f));
     set(ImGuiCol_HeaderActive, theme.selection);
@@ -153,8 +99,7 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_ResizeGripHovered, accentDim);
     set(ImGuiCol_ResizeGripActive, theme.accent);
     set(ImGuiCol_InputTextCursor, theme.text);
-    // Tabs as Kit draws them: dim on the dark bar, the shown one in
-    // the panel's colour.
+    // Tabs: on the darker bar, the shown one in the panel's colour.
     set(ImGuiCol_Tab, theme.background);
     set(ImGuiCol_TabHovered, theme.fieldHovered);
     set(ImGuiCol_TabSelected, theme.panel);

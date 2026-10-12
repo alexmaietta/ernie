@@ -179,7 +179,7 @@ def test_layouts_and_themes(viewer, tmp_path):
     viewer.save_layout(layout)
     assert "[Docking]" in layout.read_text()
     viewer.load_layout(layout)
-    theme = app.light_theme()
+    theme = app.Theme()
     theme.accent = (0.9, 0.3, 0.1, 1.0)
     viewer.theme = theme
     assert viewer.theme.accent == pytest.approx((0.9, 0.3, 0.1, 1.0))

@@ -167,18 +167,6 @@ class SettingsPanel final : public Panel {
         if (ImGui::Checkbox("Local##gizmoLocal", &local)) {
             viewer.SetGizmoLocal(local);
         }
-        row("Theme");
-        if (ImGui::Button("Classic")) {
-            viewer.SetTheme(ClassicTheme());
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Dark")) {
-            viewer.SetTheme(DarkTheme());
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Light")) {
-            viewer.SetTheme(LightTheme());
-        }
         ImGui::EndTable();
     }
 

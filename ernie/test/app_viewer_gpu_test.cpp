@@ -1035,8 +1035,10 @@ TEST(ViewerLightingTest,
 }
 
 TEST_F(ViewerTest, ThemesApplyAtRunTime) {
-    viewer_->SetTheme(LightTheme());
-    EXPECT_EQ(viewer_->GetTheme().panel, LightTheme().panel);
+    Theme theme;
+    theme.panel = {0.5f, 0.5f, 0.5f, 1.0f};
+    viewer_->SetTheme(theme);
+    EXPECT_EQ(viewer_->GetTheme().panel, theme.panel);
     EXPECT_TRUE(viewer_->Step());
 }
 
