@@ -2382,6 +2382,32 @@ TEST_F(RasterDelegateTest, LightLinksChooseWhatALampLights) {
     EXPECT_EQ(RadianceAt(delegate, scene, 5.0f, 0.0f), 0.0f);
 }
 
+TEST_F(RasterDelegateTest, LightLinksChooseWhatALaserLights) {
+    // A beam 20 m across over two cubes, then linked to the left one.
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(20.0, &bandWidth);
+    for (const auto& [name, x] : {std::pair{"/World/Left", -10.0},
+                                  std::pair{"/World/Right", 10.0}}) {
+        ernie::Cube::Define(scene, name).SetSize(4.0);
+        scene.Set(
+            name, tokens::kTransform,
+            glm::translate(glm::dmat4(1.0), glm::dvec3(x, 0.0, 2.0)));
+    }
+    RasterDelegate delegate(*context_);
+    const auto at = [&](float x) {
+        const auto [row, col] = PixelOf(scene, x, 0.0f);
+        return Band8(delegate, scene)[row * kVarSize + col];
+    };
+    const float left = at(-10.0f);
+    ASSERT_GT(left, 0.0f);
+    ASSERT_GT(at(10.0f), 0.0f);
+    ernie::LaserLight(scene, "/World/Laser")
+        .SetLightLinkIncludeRoot(false)
+        .SetLightLinkIncludes({ernie::Path("/World/Left")});
+    EXPECT_NEAR(at(-10.0f), left, 1e-3f * left);
+    EXPECT_EQ(at(10.0f), 0.0f);
+}
+
 // Shadow linking: a blocker shadows the ground under a lamp until the
 // lamp's shadow link leaves it out (as
 // LampsCastShadowsFromSpotAndCubeMaps sets it up).

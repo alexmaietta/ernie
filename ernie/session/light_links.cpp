@@ -31,26 +31,36 @@ bool LinkCollection::Contains(const Path& path) const {
     return includeRoot;
 }
 
-LinkCollection LightLinkOf(const Scene& scene, const Path& path) {
-    // A LaserLight (Ernie's own schema) has no link collections: it
-    // lights everything, as USD's default does.
-    if (scene.TypeOf(path) == tokens::kLaserLight) {
-        return {true, {}, {}};
-    }
-    const Light light(scene, path);
+namespace {
+
+/// A light's link collections through its view: a UsdLux light's
+/// (`Light`) or a LaserLight's, both `ERNIE_LIGHT_LINK_ATTRIBUTES`.
+template <typename View>
+LinkCollection LightLinkOfView(const View& light) {
     return {light.GetLightLinkIncludeRoot(),
             light.GetLightLinkIncludes(),
             light.GetLightLinkExcludes()};
 }
 
-LinkCollection ShadowLinkOf(const Scene& scene, const Path& path) {
-    if (scene.TypeOf(path) == tokens::kLaserLight) {
-        return {true, {}, {}};
-    }
-    const Light light(scene, path);
+template <typename View>
+LinkCollection ShadowLinkOfView(const View& light) {
     return {light.GetShadowLinkIncludeRoot(),
             light.GetShadowLinkIncludes(),
             light.GetShadowLinkExcludes()};
+}
+
+}  // namespace
+
+LinkCollection LightLinkOf(const Scene& scene, const Path& path) {
+    return scene.TypeOf(path) == tokens::kLaserLight
+               ? LightLinkOfView(LaserLight(scene, path))
+               : LightLinkOfView(Light(scene, path));
+}
+
+LinkCollection ShadowLinkOf(const Scene& scene, const Path& path) {
+    return scene.TypeOf(path) == tokens::kLaserLight
+               ? ShadowLinkOfView(LaserLight(scene, path))
+               : ShadowLinkOfView(Light(scene, path));
 }
 
 std::uint32_t LinkGroups::GroupOf(const Path& path) const {

@@ -27,22 +27,9 @@
     " Setting any photometric value puts the light in photometric units: they alone then set its " \
     "brightness."
 
-#define ERNIE_LIGHT_ATTRIBUTES(X)                                                                  \
-    X(double, Intensity, ::ernie::tokens::kIntensity, 1.0,                                         \
-      (::ernie::AttributeMeta{.group = "Light", .max = 1e6}))                                      \
-    X(double, Exposure, ::ernie::tokens::kExposure, 0.0,                                           \
-      (::ernie::AttributeMeta{.doc = "Stops; scales the intensity by 2^exposure.",                 \
-                              .group = "Light", .min = -16.0, .max = 16.0}))                       \
-    X(glm::dvec3, Color, ::ernie::tokens::kColor, glm::dvec3(1.0),                                 \
-      (::ernie::AttributeMeta{.label = "Colour", .doc = "Linear RGB tint.", .group = "Light",      \
-                              .color = true}))                                                     \
-    X(bool, EnableColorTemperature, ::ernie::tokens::kEnableColorTemperature, false,               \
-      (::ernie::AttributeMeta{.label = "Use temperature", .group = "Light"}))                      \
-    X(double, ColorTemperature, ::ernie::tokens::kColorTemperature, 6500.0,                        \
-      (::ernie::AttributeMeta{.label = "Temperature", .doc = "Kelvin.", .group = "Light",          \
-                              .min = 1000.0, .max = 20000.0}))                                     \
-    X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
-      (::ernie::AttributeMeta{.label = "Shadows", .group = "Light"}))                              \
+// USD's light and shadow link collections (`light_links.h`), on UsdLux's lights and Ernie's
+// LaserLight alike.
+#define ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                             \
     X(bool, LightLinkIncludeRoot, ::ernie::tokens::kLightLinkIncludeRoot, true,                    \
       (::ernie::AttributeMeta{.label = "Lights everything", .doc = "Lights the whole scene "       \
                                      "unless excluded; off, only what it includes.",               \
@@ -70,7 +57,25 @@
       std::vector<::ernie::Path>{},                                                                \
       (::ernie::AttributeMeta{.label = "Not casters", .doc = "Prims that cast none of its "        \
                                      "shadows, with their descendants.",                           \
-                              .group = "Linking"}))                                                \
+                              .group = "Linking"}))
+
+#define ERNIE_LIGHT_ATTRIBUTES(X)                                                                  \
+    X(double, Intensity, ::ernie::tokens::kIntensity, 1.0,                                         \
+      (::ernie::AttributeMeta{.group = "Light", .max = 1e6}))                                      \
+    X(double, Exposure, ::ernie::tokens::kExposure, 0.0,                                           \
+      (::ernie::AttributeMeta{.doc = "Stops; scales the intensity by 2^exposure.",                 \
+                              .group = "Light", .min = -16.0, .max = 16.0}))                       \
+    X(glm::dvec3, Color, ::ernie::tokens::kColor, glm::dvec3(1.0),                                 \
+      (::ernie::AttributeMeta{.label = "Colour", .doc = "Linear RGB tint.", .group = "Light",      \
+                              .color = true}))                                                     \
+    X(bool, EnableColorTemperature, ::ernie::tokens::kEnableColorTemperature, false,               \
+      (::ernie::AttributeMeta{.label = "Use temperature", .group = "Light"}))                      \
+    X(double, ColorTemperature, ::ernie::tokens::kColorTemperature, 6500.0,                        \
+      (::ernie::AttributeMeta{.label = "Temperature", .doc = "Kelvin.", .group = "Light",          \
+                              .min = 1000.0, .max = 20000.0}))                                     \
+    X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
+      (::ernie::AttributeMeta{.label = "Shadows", .group = "Light"}))                              \
+    ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                                 \
     X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
       (::ernie::AttributeMeta{.doc = "Divides the intensity by the light's size (its area, or a "  \
                                      "distant light's projected solid angle), so resizing it "     \
@@ -347,6 +352,7 @@
                               .group = "Time", .min = -10.0, .max = 10.0}))                        \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))                              \
+    ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                                 \
     X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.98,                      \
       (::ernie::AttributeMeta{.label = "Polarized",                                                \
                               .doc = "Fraction of the beam linearly polarized, 0 to 1: a laser "   \
