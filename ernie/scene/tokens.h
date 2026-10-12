@@ -1267,6 +1267,8 @@ inline constexpr std::string_view kVolumeTemporal =
     "ernie:volumes:temporal";
 inline constexpr std::string_view kVolumeTemporalBlock =
     "ernie:volumes:temporalBlock";
+inline constexpr std::string_view kVolumeTemporalAnimated =
+    "ernie:volumes:temporalAnimated";
 inline constexpr std::string_view kVolumeStepsPerPixel =
     "ernie:volumes:stepsPerPixel";
 inline constexpr std::string_view kVolumeThinOpticalDepth =

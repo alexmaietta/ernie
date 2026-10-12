@@ -159,6 +159,12 @@ constexpr std::uint32_t kHistoryChannels = 3;
 // Frames whose `volumeChangesMain` verdicts the host keeps, a word
 // each (`VolumePass::changes_`).
 constexpr std::uint32_t kChangeSlots = 8;
+// volume.slang's host changes (`VolumeConstants::layout.w` to
+// `volumeChangesMain`): grids written again, and changes at a stroke.
+constexpr std::uint32_t kHostGrids = 8;
+constexpr std::uint32_t kHostDiscrete = 16;
+// Its temporal flag for volumes whose grids changed to reproject too.
+constexpr std::uint32_t kAnimated = 256;
 // The pixel of each block that marches in each frame, x and y: in the
 // order of a Bayer matrix, each far from the ones just before.
 //
@@ -377,9 +383,9 @@ VolumePass::VolumePass(const VulkanContext& context,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         BufferMemory::Device);
     changes_ = std::make_unique<GpuBuffer>(
-        context_, kChangeSlots * sizeof(std::uint32_t),
+        context_, 2 * kChangeSlots * sizeof(std::uint32_t),
         VK_BUFFER_USAGE_TRANSFER_DST_BIT, BufferMemory::Readback);
-    const std::array<std::uint32_t, kChangeSlots> none{};
+    const std::array<std::uint32_t, 2 * kChangeSlots> none{};
     changes_->Write(std::as_bytes(std::span(none)));
 }
 
@@ -844,7 +850,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     bandGroups_ = static_cast<std::uint32_t>(
         std::clamp<std::size_t>((bands.count + 3) / 4, 1, 16));
     if (!(settings == settings_)) {
-        hostChanged_ = 3;
+        hostChanged_ |= 3 | kHostDiscrete;
     }
     settings_ = settings;
     views_ = static_cast<std::uint32_t>(viewWorlds.size());
@@ -887,17 +893,17 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     }
     if (poolStale_) {
         RebuildPool();
-        hostChanged_ = 3;
+        hostChanged_ |= 3 | kHostDiscrete;
     }
     for (auto& [key, loaded] : grids_) {
         if (loaded.copy) {
             CopyDeviceGrid(loaded);
-            hostChanged_ = 3;
+            hostChanged_ |= 3 | kHostGrids;
         }
     }
     StageDenseGrids(uploads);
     if (!scatters_.empty()) {
-        hostChanged_ = 3;
+        hostChanged_ |= 3 | kHostGrids;
     }
     PlanDistanceGrids();
 
@@ -1279,7 +1285,7 @@ void VolumePass::Prepare(
         volumeCount_, materialCount_, lightCount, shadowViews};
     if (counts != compared_) {
         compared_ = counts;
-        hostChanged_ = 3;
+        hostChanged_ |= 3 | kHostDiscrete;
     }
     const VkDeviceSize compared =
         volumeCount_ * sizeof(VolumeGpu) +
@@ -1296,7 +1302,7 @@ void VolumePass::Prepare(
         previous_ = std::make_unique<GpuBuffer>(
             context_, std::max<VkDeviceSize>(compared, 16),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        hostChanged_ = 3;
+        hostChanged_ |= 3 | kHostDiscrete;
     }
     resources.previous = previous_->Address();
     resources.rebuild = rebuild_->Address();
@@ -1447,6 +1453,14 @@ void VolumePass::Prepare(
             constants.layout[1] = slots;
             constants.layout[2] = volumeCount_;
         }
+        // Grids written again count as animated where the three
+        // frames before wrote them too; a write or a few change them
+        // at a stroke.
+        const bool grids = (hostChanged_ & kHostGrids) != 0;
+        gridsWritten_ = grids ? gridsWritten_ + 1 : 0;
+        if (grids && gridsWritten_ <= 3) {
+            hostChanged_ |= kHostDiscrete;
+        }
         constants.layout[3] = hostChanged_;
         constants.offsets[0] = Groups(size);
         constants.offsets[1] = Groups(size);
@@ -1477,9 +1491,9 @@ void VolumePass::Prepare(
         // Whether what the volumes show changed, for the host to see
         // a few frames on (`Record`).
         const VkBufferCopy verdict{6 * sizeof(std::uint32_t),
-                                   (frame_ % kChangeSlots) *
+                                   2 * (frame_ % kChangeSlots) *
                                        sizeof(std::uint32_t),
-                                   sizeof(std::uint32_t)};
+                                   2 * sizeof(std::uint32_t)};
         vkCmdCopyBuffer(commands, rebuild_->Handle(),
                         changes_->Handle(), 1, &verdict);
     }
@@ -1666,17 +1680,25 @@ void VolumePass::Record(VkCommandBuffer commands,
         // sees (three and four back, done by now), likely this one's
         // too: marched in full in one dispatch, writing the history
         // the frames after reproject.
-        std::array<std::uint32_t, kChangeSlots> changed{};
+        std::array<std::uint32_t, 2 * kChangeSlots> changed{};
         changes_->Read(std::as_writable_bytes(std::span(changed)));
+        // A frame marched in full: changed at a stroke, or its grids
+        // written again without reprojecting animated volumes.
+        const auto full = [&](std::uint64_t frame) {
+            const std::size_t at = 2 * (frame % kChangeSlots);
+            return changed[at] != 0 || (changed[at + 1] != 0 &&
+                                        !settings_.temporalAnimated);
+        };
         const bool changing =
-            frame_ >= 4 &&
-            changed[(frame_ - 3) % kChangeSlots] != 0 &&
-            changed[(frame_ - 4) % kChangeSlots] != 0;
+            frame_ >= 4 && full(frame_ - 3) && full(frame_ - 4);
         constants.flags[3] =
             kTemporal |
             (history.held && !changing ? kHistoryHeld : 0u) |
             (four ? kBlocksOfFour : 0u) | (marched.x << 4) |
             (marched.y << 6);
+        if (settings_.temporalAnimated) {
+            constants.flags[3] |= kAnimated;
+        }
         constants.lights[3] = views;
         // After the last frame's march wrote its history.
         ComputeBarrier(commands);

@@ -2858,6 +2858,8 @@ FrameParams FrameParamsOf(const Scene& scene,
         count(options.GetVolumeShadowResolution(), 16, 2048);
     volumeSettings.lightCache = options.GetVolumeLightCache();
     volumeSettings.temporal = options.GetVolumeTemporal();
+    volumeSettings.temporalAnimated =
+        options.GetVolumeTemporalAnimated();
     volumeSettings.temporalBlock =
         options.GetVolumeTemporalBlock() >= 3 ? 4u : 2u;
     volumeSettings.stepsPerPixel =

@@ -323,12 +323,16 @@ class VolumePass {
     mutable std::unique_ptr<GpuBuffer> previous_;
     std::unique_ptr<GpuBuffer> rebuild_;
     /// The last frames' verdicts whether what the volumes show
-    /// changed
-    /// (`pass.rebuild[6]`), a word each by frame, which the host
-    /// reads a few frames on: where they all changed, the march is
-    /// one dispatch, in full, rather than amortised's two.
+    /// changed at a stroke and whether their grids were written again
+    /// (`pass.rebuild[6]` and `[7]`), two words each by frame, which
+    /// the host reads a few frames on: where they all would march in
+    /// full, the march is one dispatch rather than amortised's two.
     std::unique_ptr<GpuBuffer> changes_;
-    mutable std::uint32_t hostChanged_ = 3;
+    /// Starts discrete (volume.slang's `kHostDiscrete`).
+    mutable std::uint32_t hostChanged_ = 3 | 16;
+    /// The frames in a row, this one's included, that wrote grids
+    /// again.
+    mutable std::uint32_t gridsWritten_ = 0;
     mutable std::array<std::uint32_t, 4> compared_{};
     std::uint32_t materialCount_ = 0;
     /// Temporal amortisation's histories (volume.slang's

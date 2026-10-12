@@ -812,6 +812,11 @@ uint maxOctaves() {
     return constants.flags.z >> 24;
 }
 
+// The most octaves any render settings allow (`VolumeSettings::maxOctaves`), and no distant light
+// for a span's march to treat as its sun.
+static const uint kMaxOctaves = 8;
+static const uint kNoSun = 0xFFFFFFFFu;
+
 // The inverse of `matrix` by cofactors, 0 for a singular one (views.slang's `invert`).
 //
 // Reference: MESA GLU, `__gluInvertMatrixd` (cofactor inverse of a 4x4 matrix).
@@ -1302,12 +1307,14 @@ SkyLights skyLightsOf(uint4 viewLights, uint lightCount, uint g) {
 // Temporal amortisation (`constants.flags.w`): on; whether the last frame's history holds for
 // this dispatch's views; whether this dispatch marches only this frame's pixel of each block, a
 // thread each (the dispatch after reprojects the others, so no group's threads wait on others
-// marching); blocks of 4 x 4 pixels rather than 2 x 2; and bits 4 to 5 and 6 to 7 this frame's
-// pixel's x and y in its block.
+// marching); blocks of 4 x 4 pixels rather than 2 x 2; bits 4 to 5 and 6 to 7 this frame's
+// pixel's x and y in its block; and whether volumes that changed reproject too, clamped to what
+// this frame marched about them (`clampToMarched`).
 static const uint kTemporal = 1u;
 static const uint kHistoryHeld = 2u;
 static const uint kMarchOnly = 4u;
 static const uint kBlocksOfFour = 8u;
+static const uint kAnimated = 256u;
 
 // Temporal amortisation's blocks' pixels across, and this frame's pixel in each.
 uint temporalBlock() {
@@ -1449,6 +1456,53 @@ bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmi
         added[b / 4][b % 4] = now[historyAt(kHistoryBands + b, id.z, marched, size)];
     }
     return true;
+}
+
+// Where what the volumes show changed, pixel `id`'s reprojected `transmittance` and `added`
+// clamped, band by band, to the range of what this frame marched at the pixels of its block and
+// the blocks about it: what moved on leaves no trail.
+//
+// Reference: B. Karis, "High-Quality Temporal Supersampling", SIGGRAPH Advances in Real-Time
+//   Rendering, 2014 (history clamped to the current frame's neighbourhood).
+void clampToMarched(uint3 id, uint2 size, uint bands, inout float transmittance,
+                    inout float4 added[kMaxGroups]) {
+    let block = temporalBlock();
+    let now = constants.historyNow;
+    let centre = int2(id.xy / block);
+    float lowT = 1e30;
+    float highT = -1e30;
+    float4 low[kMaxGroups];
+    float4 high[kMaxGroups];
+    for (uint g = 0; g < kMaxGroups; ++g) {
+        low[g] = float4(1e30);
+        high[g] = float4(-1e30);
+    }
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            let at = (centre + int2(dx, dy)) * int(block) + int2(marchedInBlock());
+            if (any(at < int2(0)) || any(at >= int2(size))) {
+                continue;
+            }
+            let marched = uint2(at);
+            let t = now[historyAt(kHistoryTransmittance, id.z, marched, size)];
+            // Volumes not in view there: no light added, all let through.
+            let seen = t >= 0.0;
+            lowT = min(lowT, seen ? t : 1.0);
+            highT = max(highT, seen ? t : 1.0);
+            for (uint b = 0; b < bands; ++b) {
+                let value = seen ? now[historyAt(kHistoryBands + b, id.z, marched, size)] : 0.0;
+                low[b / 4][b % 4] = min(low[b / 4][b % 4], value);
+                high[b / 4][b % 4] = max(high[b / 4][b % 4], value);
+            }
+        }
+    }
+    if (lowT > highT) {
+        return;
+    }
+    transmittance = clamp(transmittance, lowT, highT);
+    for (uint b = 0; b < bands; ++b) {
+        added[b / 4][b % 4] = clamp(added[b / 4][b % 4], low[b / 4][b % 4], high[b / 4][b % 4]);
+    }
 }
 
 // Pixel `id`'s history this frame: the volumes' `transmittance` (-1 for none in view), `front`,
@@ -1607,7 +1661,11 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     // With temporal amortisation, a pixel of each 2 x 2 marches a frame, and every pixel when the
     // last frame's history does not hold or what the volumes show changed; the others show the
     // last frame's where it reprojects.
-    if (held && !marchOnly && pass.rebuild[6] == 0) {
+    // Changed at a stroke, every pixel marches; their grids written again, the others reproject
+    // clamped to what this frame marched, where animated volumes may.
+    let changed = pass.rebuild[7] != 0;
+    if (held && !marchOnly && pass.rebuild[6] == 0 &&
+        (!changed || (temporalFlags & kAnimated) != 0)) {
         float kept;
         float front;
         float4 added[kMaxGroups];
@@ -1616,6 +1674,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         // geometry behind is as far (an upsampling that keeps to edges).
         if (reproject(id, size.xy, origin, direction, tMax, middle, bands, kept, front, added) ||
             fromMarched(id, size.xy, tMax, bands, kept, front, added)) {
+            if (changed) {
+                clampToMarched(id, size.xy, bands, kept, added);
+            }
             writeHistory(id, size.xy, kept, front, tMax, bands, added);
             composite(id, bands, unwritten, kept, added);
             return;
@@ -1693,6 +1754,42 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         // Steps of the volume's own length (`params.w`), or where a pixel spans more than
         // `stepsPerPixel` of them, farther off, of its span's share: the span in segments, each's
         // steps as long as that at its start, until where that has doubled.
+        // The first distant light lighting the volume, which every step sees alike: its phase for
+        // each octave towards the eye and its spectrum through the material's albedo, found once
+        // here rather than at each step.
+        uint sun = kNoSun;
+        float sunPhases[kMaxOctaves];
+        float4 sunTints[kMaxGroups];
+        uint3 sunLinks = uint3(0);
+        float3 sunTowards = float3(0.0);
+        float sunSine = 0.0;
+        let sunOctaves = min(uint(material.scattering.x), maxOctaves());
+        for (uint k = 0; k < lightCount && sun == kNoSun && scatters; ++k) {
+            if ((viewLights.x & (1u << k)) == 0) {
+                continue;
+            }
+            let light = shading.lights[viewLights.z + k];
+            if (uint(light.position.w) != kDistantLight || light.shadow.y >= 0.5 ||
+                light.links.w != 0 || ((light.links.x >> volume.info.z) & 1u) == 0 ||
+                analyticBeams(light)) {
+                continue;
+            }
+            sun = k;
+            sunLinks = light.links.xyz;
+            sunTowards = light.position.xyz;
+            let tangent = light.extentY.w;
+            sunSine = tangent * rsqrt(1.0 + tangent * tangent);
+            let cosG = dot(sunTowards, -direction);
+            float spread = 1.0;
+            for (uint n = 0; n < kMaxOctaves; ++n) {
+                sunPhases[n] = n < sunOctaves ? phaseOf(material, cosG, spread) : 0.0;
+                spread *= material.scattering.w;
+            }
+            for (uint g = 0; g < groups; ++g) {
+                sunTints[g] = volumeMaterials[materialIndex].albedo[g] *
+                              (light.spectrum[g] + light.tinted[g]);
+            }
+        }
         let perPixel = pass.stepsPerPixel > 0.0 ? pixelAngle / pass.stepsPerPixel : 0.0;
         var budget = constants.layout.z;
         var start = span.x;
@@ -1793,6 +1890,41 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                          float2(footprintX.z, footprintY.z) * t);
                 for (uint k = 0; k < lightCount; ++k) {
                     if ((viewLights.x & (1u << k)) == 0) {
+                        continue;
+                    }
+                    if (k == sun) {
+                        // The span's sun: its phases and tints found for the span.
+                        let slot = viewLights.z + k;
+                        let depth = sunLinks.z == 0 ? 0.0
+                                    : hasCache(volume, slot)
+                                        ? cachedDepth(volume, slot, local)
+                                        : volumesDepth(shadowRun, world, sunTowards, 1e30,
+                                                       sunLinks.y, shadowSteps());
+                        float octaves = 0.0;
+                        float a = 1.0;
+                        float b = 1.0;
+                        for (uint n = 0; n < sunOctaves; ++n) {
+                            octaves += a * exp(-b * depth) * sunPhases[n];
+                            a *= material.scattering.y;
+                            b *= material.scattering.z;
+                        }
+                        let lit = weight * sigma * octaves *
+                                  geometryShadow(shading.lights[slot], k, world, origin,
+                                                 viewLights.y, mapTexels);
+                        if (lit > 0.0) {
+                            let throughAir = air[1].y != 0.0;
+                            for (uint g = 0; g < groups; ++g) {
+                                var tint = sunTints[g];
+                                if (throughAir) {
+                                    tint *= sunTransmittance(atmosphereTransmittance,
+                                                             tableSampler,
+                                                             world * 1e-3 - air[0].xyz,
+                                                             sunTowards, sunSine, g, air[0].w,
+                                                             air[1].x);
+                                }
+                                emitted[g] += lit * tint;
+                            }
+                        }
                         continue;
                     }
                     let light = shading.lights[viewLights.z + k];
@@ -2075,6 +2207,12 @@ void denseScatterMain(uint3 id : SV_DispatchThreadID) {
 // history; the caches' changes too).
 groupshared uint changedParts;
 
+// The parts the host changed itself (`constants.layout.w`): bits 1 and 2 as `changedParts`'s, and
+// whether its volumes changed at a stroke (their grids loaded, the settings) or only their grids
+// were written again (fields written each frame).
+static const uint kHostGrids = 8u;
+static const uint kHostDiscrete = 16u;
+
 // Compares `count` words from `from` with the last frame's at `pass.previous[at]` on, keeping the
 // new ones and marking `parts` changed where any differs.
 void compareWords(uint thread, uint* from, uint count, uint at, uint parts) {
@@ -2098,7 +2236,7 @@ void compareWords(uint thread, uint* from, uint count, uint at, uint parts) {
 [numthreads(256, 1, 1)]
 void volumeChangesMain(uint3 id: SV_DispatchThreadID) {
     if (id.x == 0) {
-        changedParts = constants.layout.w;
+        changedParts = 0;
     }
     GroupMemoryBarrierWithGroupSync();
     var at = 0u;
@@ -2159,16 +2297,23 @@ void volumeChangesMain(uint3 id: SV_DispatchThreadID) {
     }
     GroupMemoryBarrierWithGroupSync();
     if (id.x == 0) {
-        let caches = (changedParts & 1u) != 0 ? constants.layout.xyz : uint3(0);
-        let maps = (changedParts & 2u) != 0 ? constants.offsets.xyz : uint3(0);
+        // With the parts the host changed itself.
+        let host = constants.layout.w;
+        let parts = changedParts | (host & 3u);
+        let caches = (parts & 1u) != 0 ? constants.layout.xyz : uint3(0);
+        let maps = (parts & 2u) != 0 ? constants.offsets.xyz : uint3(0);
         pass.rebuild[0] = caches.x;
         pass.rebuild[1] = caches.y;
         pass.rebuild[2] = caches.z;
         pass.rebuild[3] = maps.x;
         pass.rebuild[4] = maps.y;
         pass.rebuild[5] = maps.z;
-        // For temporal amortisation: what the volumes show changed, so every pixel marches.
-        pass.rebuild[6] = (changedParts & 5u) != 0 ? 1u : 0u;
+        // For temporal amortisation: whether what the volumes show changed at a stroke (their
+        // volumes, materials, lights or settings), so every pixel marches; and whether only
+        // their grids were written again (`kHostGrids`), which pixels may still reproject,
+        // clamped (`clampToMarched`).
+        pass.rebuild[6] = (changedParts & 5u) != 0 || (host & kHostDiscrete) != 0 ? 1u : 0u;
+        pass.rebuild[7] = (host & kHostGrids) != 0 ? 1u : 0u;
     }
 }
 

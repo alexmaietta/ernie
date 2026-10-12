@@ -281,14 +281,21 @@
                                      "whose history does not hold, march in full. Off, for "       \
                                      "reference images.",                                          \
                               .group = "Volumes"}))                                                \
-    X(int, VolumeTemporalBlock, ::ernie::tokens::kVolumeTemporalBlock, 2,                          \
+    X(int, VolumeTemporalBlock, ::ernie::tokens::kVolumeTemporalBlock, 4,                          \
       (::ernie::AttributeMeta{.label = "Temporal block",                                           \
                               .doc = "Temporal amortisation's blocks, 2 or 4 pixels across: a "    \
                                      "pixel of each marched a frame, the others reprojected or, "  \
                                      "where that fails, the block's marched one's where the "      \
-                                     "geometry behind is as far. 4 is about four times faster "    \
-                                     "again, its history up to 16 frames old.",                    \
+                                     "geometry behind is as far. 2 is about half as fast, its "    \
+                                     "history up to 4 frames old rather than 16.",                 \
                               .group = "Volumes", .min = 2.0, .max = 4.0}))                        \
+    X(bool, VolumeTemporalAnimated, ::ernie::tokens::kVolumeTemporalAnimated, true,                \
+      (::ernie::AttributeMeta{.label = "Amortise animated volumes",                                \
+                              .doc = "Volumes whose grids are written again each frame (field "    \
+                                     "writers, simulations) reproject too, each pixel clamped "    \
+                                     "to what the frame marched about it; off, they march in "     \
+                                     "full each frame.",                                           \
+                              .group = "Volumes"}))                                                \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, "approximate",                  \
       (::ernie::AttributeMeta{.label = "Mode",                                                     \
                               .doc = "approximate: unoccluded; full: also shadowed; directions: "  \

@@ -566,7 +566,11 @@ struct VolumeSettings {
     bool temporal = true;
     /// Its blocks' pixels across, 2 or 4: a pixel of 4 or of 16
     /// marched a frame.
-    std::uint32_t temporalBlock = 2;
+    std::uint32_t temporalBlock = 4;
+    /// Volumes whose grids are written again each frame reproject
+    /// too, clamped to what the frame marched about each pixel; off,
+    /// they march in full.
+    bool temporalAnimated = true;
     /// Steps per pixel far off, at most: the march's steps grow with
     /// distance once a pixel spans more than this many of the
     /// volume's own; 0 keeps them the volume's own everywhere.
