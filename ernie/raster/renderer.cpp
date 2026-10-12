@@ -3183,8 +3183,8 @@ void RasterRenderer::Update(
             }
         }
         // Each light shadow view's volumes cast as its geometry does.
-        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
-                                                  lightCasters_.world);
+        std::vector<std::int32_t> lightViewWorlds(
+            lightViews_.size(), lightCasters_.world);
         for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
             lightViewWorlds[firstLayeredView_ + k] =
                 layeredPasses_[k].casters.world;
@@ -5287,10 +5287,34 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                 skyPipelines_[pushbroom_ ? 1 : 0]->Handle());
             shadingLayout_.Push(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
-            const ShadingConstants constants = constantsFor(0);
-            shadingLayout_.PushConstants(commands, &constants,
-                                         sizeof(constants));
-            vkCmdDispatch(commands, groupsX, groupsY, views);
+            // Its parts in turn (shading.slang's kSkyPart*), each
+            // adding to what the one before stored: the dome, which
+            // clears the pixels too, so it always runs.
+            const auto part = [&](std::uint32_t index) {
+                ShadingConstants constants = constantsFor(0);
+                constants.model[3] = index;
+                shadingLayout_.PushConstants(commands, &constants,
+                                             sizeof(constants));
+                vkCmdDispatch(commands, groupsX, groupsY, views);
+                ShaderBarrier(commands);
+            };
+            {
+                ERNIE_GPU_ZONE(context_, commands, "Dome");
+                part(0);
+            }
+            if ((sky_ & kSkyStars) != 0) {
+                ERNIE_GPU_ZONE(context_, commands, "Stars");
+                part(1);
+            }
+            if ((sky_ & kSkyBodies) != 0) {
+                ERNIE_GPU_ZONE(context_, commands,
+                               "Celestial bodies");
+                part(2);
+            }
+            if ((sky_ & kSkyAtmosphere) != 0) {
+                ERNIE_GPU_ZONE(context_, commands, "Atmosphere");
+                part(3);
+            }
         }
         ShaderBarrier(commands);
     }

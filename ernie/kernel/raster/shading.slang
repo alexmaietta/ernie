@@ -188,7 +188,7 @@ struct MaterialGpu {
 struct ShadingConstants {
     // x: index of the model this dispatch shades, y: the first view's uniforms, z: the layers
     // from a raster radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
-    // them); w unused.
+    // them); w: the sky's part (`kSkyPart*`) a sky dispatch draws.
     uint4 model;
     // The terrain's horizon map (`terrainOcclusion`): its north-west corner's x and y relative
     // to the frame's origin, its texel size and the terrain's vertical exaggeration; and its
@@ -2312,6 +2312,15 @@ void addStars(inout float radiance[kMaxBands], float3 eye, float3 d, StarFrame f
     }
 }
 
+// The sky's parts, one dispatch each in this order (`pass.model.w`), so each has its own GPU zone:
+// the dome (which also clears the pixel), the stars, the celestial bodies, then the atmosphere,
+// which dims what the others left and adds the light it scatters. Each part after the first
+// adds to the radiance the one before stored.
+static const uint kSkyPartDome = 0;
+static const uint kSkyPartStars = 1;
+static const uint kSkyPartBodies = 2;
+static const uint kSkyPartAtmosphere = 3;
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void skyMain(uint3 id : SV_DispatchThreadID) {
@@ -2322,6 +2331,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     if (gIds.Load(int4(id.xyz, 0)).x != kBackground) {
         return;
     }
+    let part = pass.model.w;
     let size = float2(sh.size.xy);
     let pixel = float2(id.xy) + 0.5;
     let ndc = float2(pixel.x / size.x * 2.0 - 1.0, 1.0 - pixel.y / size.y * 2.0);
@@ -2331,7 +2341,10 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     let bands = uint(sh.range.z);
     float radiance[kMaxBands];
     for (uint band = 0; band < kMaxBands; ++band) {
-        radiance[band] = 0.0;
+        radiance[band] =
+            part == kSkyPartDome || band >= bands ? 0.0 : spectral[int3(id.xy, id.z * bands + band)];
+        // Only the atmosphere's part scatters light into the pixel (`writeSky`).
+        skyScattered[band] = 0.0;
     }
     if (kPushbroomCamera) {
         // Its pixels look along their rows' rays, each row from its own pose: the row's camera
@@ -2353,7 +2366,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         frame.point = float2(x, line);
         frame.focal = 0.5 * sh.strip.x * size.x;
         let d = normalize(ray);
-        if ((sh.sky.x & kSkyDome) != 0) {
+        if (part == kSkyPartDome && (sh.sky.x & kSkyDome) != 0) {
             let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
                                                  : float3(1.0);
             let scale = max(rgb.x, max(rgb.y, rgb.z));
@@ -2364,7 +2377,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
                     bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
             }
         }
-        if ((sh.sky.x & kSkyStars) != 0) {
+        if (part == kSkyPartStars && (sh.sky.x & kSkyStars) != 0) {
             // A detector pixel's solid angle: square, a focal length's pixel on a side, seen
             // off the axis.
             let pixelAngle = 1.0 / frame.focal;
@@ -2374,9 +2387,13 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
         let detector = 1.0 / frame.focal;
         let offAxis = 1.0 / length(float3(x, line, 1.0));
-        bodiesSky(radiance, origin, d, 0.5 * detector);
-        atmosphereSky(radiance, origin, d,
-                      detector * detector * offAxis * offAxis * offAxis);
+        if (part == kSkyPartBodies) {
+            bodiesSky(radiance, origin, d, 0.5 * detector);
+        }
+        if (part == kSkyPartAtmosphere) {
+            atmosphereSky(radiance, origin, d,
+                          detector * detector * offAxis * offAxis * offAxis);
+        }
         writeSky(id, radiance, ndc, d);
         return;
     }
@@ -2384,7 +2401,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         // Orthographic: every pixel sees the dome along the view direction, with no solid angle
         // for stars to fill.
         let d = normalize(c);
-        if ((sh.sky.x & kSkyDome) != 0) {
+        if (part == kSkyPartDome && (sh.sky.x & kSkyDome) != 0) {
             let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, 0.0), float3(0.0))
                                                  : float3(1.0);
             let scale = max(rgb.x, max(rgb.y, rgb.z));
@@ -2396,7 +2413,9 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
             }
         }
         // Each pixel's ray starts on the near plane.
-        atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
+        if (part == kSkyPartAtmosphere) {
+            atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
+        }
         writeSky(id, radiance, ndc, d);
         return;
     }
@@ -2412,7 +2431,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     let solidAngle = pixelArea / (distance * distance) * cosine * cosine * cosine;
     let pixelAngle = 2.0 * length(b) / size.y / distance;
 
-    if ((sh.sky.x & kSkyDome) != 0) {
+    if (part == kSkyPartDome && (sh.sky.x & kSkyDome) != 0) {
         let rgb = (sh.sky.x & kSkyMap) != 0 ? max(domeMapAt(d, pixelAngle), float3(0.0))
                                              : float3(1.0);
         let scale = max(rgb.x, max(rgb.y, rgb.z));
@@ -2423,7 +2442,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
                 bandValue(sh.dome, band) * modulationAt(coefficients, scale, wavelength);
         }
     }
-    if ((sh.sky.x & kSkyStars) != 0) {
+    if (part == kSkyPartStars && (sh.sky.x & kSkyStars) != 0) {
         StarFrame frame;
         frame.a = a;
         frame.b = b;
@@ -2431,8 +2450,12 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         frame.pixel = pixel;
         addStars(radiance, sh.eye.xyz, d, frame, pixelAngle, solidAngle);
     }
-    bodiesSky(radiance, sh.eye.xyz, d, 0.5 * pixelAngle);
-    atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
+    if (part == kSkyPartBodies) {
+        bodiesSky(radiance, sh.eye.xyz, d, 0.5 * pixelAngle);
+    }
+    if (part == kSkyPartAtmosphere) {
+        atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
+    }
     writeSky(id, radiance, ndc, d);
 }
 
