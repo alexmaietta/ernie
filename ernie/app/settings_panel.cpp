@@ -180,27 +180,25 @@ class SettingsPanel final : public Panel {
             }
         }
         DrawRendererRow(viewer);
+        // The viewer's own settings are always there besides the
+        // scene's: what the viewport renders with while it has none.
+        choices.push_back(Viewer::SessionSettings());
         const Path& settings = viewer.Settings();
-        if (choices.empty() || settings.IsEmpty()) {
-            ImGui::TextWrapped("The scene has no RenderSettings: the "
-                               "viewport uses Ernie's "
-                               "fallbacks.");
-            if (ImGui::Button("Create /Render/Settings")) {
-                const Path path("/Render/Settings");
-                if (!scene.Has(path)) {
-                    scene.Define(path, tokens::kRenderSettings);
-                }
-                viewer.SetSettings(path);
-            }
+        if (settings.IsEmpty() || !scene.Has(settings)) {
             return;
         }
-        // Which RenderSettings prim, when the scene has several.
+        const auto name = [](const Path& path) {
+            return path == Viewer::SessionSettings()
+                       ? std::string("Session")
+                       : path.String();
+        };
+        // Which RenderSettings prim, when the scene has any.
         if (choices.size() > 1) {
             ImGui::SetNextItemWidth(-1.0f);
             if (ImGui::BeginCombo("##settings",
-                                  settings.String().c_str())) {
+                                  name(settings).c_str())) {
                 for (const Path& path : choices) {
-                    if (ImGui::Selectable(path.String().c_str(),
+                    if (ImGui::Selectable(name(path).c_str(),
                                           path == settings)) {
                         viewer.SetSettings(path);
                     }

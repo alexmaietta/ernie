@@ -384,6 +384,12 @@ class Viewer {
     /// framing the scene's bounds when the viewer opens.
     static const Path& PerspectiveCamera();
 
+    /// The viewer's own RenderSettings, `/__session/Settings`: what
+    /// the viewport renders with while the scene has none, edited in
+    /// the Settings panel as a scene's are, and always on hand to
+    /// choose besides the scene's.
+    static const Path& SessionSettings();
+
     const std::vector<Path>& Selection() const;
     void SetSelection(std::vector<Path> paths);
 
@@ -629,11 +635,12 @@ class Viewer {
     /// menu item with id `id`; unknown ids are ignored.
     void RemoveViewportItem(std::uint64_t id);
 
-    /// The RenderSettings prim the viewport renders with.
+    /// The RenderSettings prim the viewport renders with: the scene's
+    /// first unless chosen, else `SessionSettings()`.
     const Path& Settings() const;
 
-    /// @throws std::invalid_argument if `settings` is not a
-    /// RenderSettings prim.
+    /// @throws std::invalid_argument if `settings` is not one of the
+    /// scene's RenderSettings prims or `SessionSettings()`.
     void SetSettings(Path settings);
 
     /// Writes the next viewport frame to `path` as PNG, showing `var`

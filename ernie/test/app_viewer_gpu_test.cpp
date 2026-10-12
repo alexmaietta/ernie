@@ -923,6 +923,32 @@ TEST_F(ViewerTest, ShowsRenderErrorsWithoutThrowing) {
     EXPECT_TRUE(viewer_->Step());
 }
 
+TEST_F(ViewerTest,
+       RendersWithItsSessionSettingsWhileTheSceneHasNone) {
+    // Without the scene's, the viewer's own.
+    scene_.Remove(Path("/Render"));
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_EQ(viewer_->Settings(), Viewer::SessionSettings());
+    EXPECT_EQ(scene_.TypeOf(Viewer::SessionSettings()),
+              tokens::kRenderSettings);
+    // Edited as a scene's are, and rendered with.
+    viewer_->Edit(Viewer::SessionSettings(), tokens::kWireframe,
+                  std::string(tokens::kOverlay));
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_EQ(*scene_.Get(Path("/__session/RenderSettings"),
+                          tokens::kWireframe),
+              Value(std::string(tokens::kOverlay)))
+        << "mirrored into what the viewport renders with";
+
+    // Settings the scene gains take over; the session's stay to
+    // choose again.
+    RenderSettings::Define(scene_, "/Render/Settings");
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_EQ(viewer_->Settings(), Path("/Render/Settings"));
+    viewer_->SetSettings(Viewer::SessionSettings());
+    EXPECT_EQ(viewer_->Settings(), Viewer::SessionSettings());
+}
+
 TEST_F(ViewerTest, RejectsVarsAndSettingsItCannotShowYet) {
     EXPECT_EQ(viewer_->ViewVar(), "LdrColor");
     EXPECT_THROW(viewer_->SetViewVar("NotAVar"),

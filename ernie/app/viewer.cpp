@@ -920,6 +920,9 @@ struct Viewer::State {
                                          : Lighting::Default;
         delegate->Sync(scene);
         FrameBounds(SceneBounds());
+        viewportDefaults = {
+            resolution, exposure,     compensation,     gizmo,
+            gizmoLocal, display.grid, display.selection};
     }
 
     /// Starts over on the scene's present content, as on opening: no
@@ -963,14 +966,20 @@ struct Viewer::State {
         }
     }
 
-    Path FirstUserSettings() const {
+    /// The scene's first RenderSettings, else the viewer's own
+    /// (`Viewer::SessionSettings`), defined if need be.
+    Path FirstUserSettings() {
         for (const Path& path :
              scene.Prims(tokens::kRenderSettings)) {
             if (!IsSessionPath(path)) {
                 return path;
             }
         }
-        return {};
+        const Path& own = Viewer::SessionSettings();
+        if (!scene.Has(own)) {
+            scene.Define(own, tokens::kRenderSettings);
+        }
+        return own;
     }
 
     std::optional<Bounds3> SceneBounds() const {
@@ -1094,7 +1103,9 @@ struct Viewer::State {
         }
         // Settings the scene gained since it had none, such as a
         // demo's after `ClearScene`, unless the application chose.
-        if (settingsSource.IsEmpty() && !settingsChosen) {
+        if ((settingsSource.IsEmpty() ||
+             settingsSource == Viewer::SessionSettings()) &&
+            !settingsChosen) {
             settingsSource = FirstUserSettings();
         }
     }
@@ -2179,77 +2190,139 @@ struct Viewer::State {
         }
     }
 
-    /// Kit's viewport settings menu: frame pacing, exposure, the
-    /// perspective camera's lens and framing, then applications'
-    /// items (`AddViewportMenuItem`).
+    /// What the viewport menu's Reset To Defaults goes back to: as
+    /// the viewer opened.
+    struct ViewportDefaults {
+        RenderResolution resolution;
+        Viewer::Exposure exposure = Viewer::Exposure::Camera;
+        double compensation = 0.0;
+        Viewer::Gizmo gizmo = Viewer::Gizmo::Translate;
+        bool gizmoLocal = false;
+        bool grid = false;
+        bool selection = true;
+    } viewportDefaults;
+
+    /// Shows the panel titled `title` and focuses it.
+    void ShowPanel(const std::string& title) {
+        for (const auto& panel : panels) {
+            if (panel->Title() == title) {
+                panel->SetVisible(true);
+                ImGui::SetWindowFocus(title.c_str());
+            }
+        }
+    }
+
+    void ResetViewportSettings() {
+        const ViewportDefaults& d = viewportDefaults;
+        resolution = d.resolution;
+        exposure = d.exposure;
+        compensation = d.compensation;
+        gizmo = d.gizmo;
+        gizmoLocal = d.gizmoLocal;
+        display.grid = d.grid;
+        display.selection = d.selection;
+    }
+
+    /// Kit's viewport settings (hamburger) menu: a submenu each for
+    /// navigation, selection, the grid, gizmos, the viewport's image
+    /// and exposure, then applications' items
+    /// (`AddViewportMenuItem`), Reset To Defaults and Preferences.
     void DrawSettingsMenu() {
-        menu::Section("Viewport");
-        bool vsync = self.GetVsync();
-        if (menu::Check("Vsync", &vsync)) {
-            self.SetVsync(vsync);
-        }
-        menu::Check("Gizmo in Local Axes", &gizmoLocal);
-        DrawResolutionMenu();
-        menu::Section("Exposure");
-        // On and off in one: automatic, or the camera's own exposure.
-        bool automatic = AutoExposing();
-        if (menu::Check("Auto Exposure", &automatic)) {
-            exposure = automatic ? Viewer::Exposure::Auto
-                                 : Viewer::Exposure::Camera;
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Key the scene's metered luminance to middle grey; "
-                "off, the camera's "
-                "own exposure (ISO, shutter, f-stop) applies");
-        }
-        const std::pair<Viewer::Exposure, const char*> modes[] = {
-            {Viewer::Exposure::Default, "Default"},
-            {Viewer::Exposure::Auto, "Automatic"},
-            {Viewer::Exposure::Camera, "Camera's Own"}};
-        for (const auto& [mode, name] : modes) {
-            if (menu::Option(name, exposure == mode)) {
-                exposure = mode;
+        if (menu::BeginSubmenu("Navigation")) {
+            if (menu::Action("Frame Selection", "F",
+                             !selection.empty())) {
+                self.Frame(selection);
             }
+            if (menu::Action("Frame All")) {
+                self.Frame();
+            }
+            // The perspective camera's lens; a scene camera's is its
+            // own, in the Camera panel.
+            const bool perspective =
+                activeCamera == PerspectiveCamera();
+            ImGui::BeginDisabled(!perspective ||
+                                 !scene.Has(activeCamera));
+            if (scene.Has(activeCamera)) {
+                CameraParams lens =
+                    CameraParamsOf(scene, activeCamera,
+                                   ViewportWidth(), ViewportHeight());
+                float fov = static_cast<float>(
+                    glm::degrees(lens.VerticalFov()));
+                ImGui::SetNextItemWidth(160.0f * contentScale);
+                if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f,
+                                       120.0f, "%.0f deg")) {
+                    // Through the focal length, as the Camera panel
+                    // shows it.
+                    lens.focalLengthMm =
+                        lens.verticalApertureMm /
+                        (2.0 * std::tan(0.5 * glm::radians(
+                                                  static_cast<double>(
+                                                      fov))));
+                    self.Edit(activeCamera, tokens::kFocalLength,
+                              lens.focalLengthMm, true);
+                    WriteActiveCamera();
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
         }
-        float stops = static_cast<float>(compensation);
-        ImGui::SetNextItemWidth(160.0f * contentScale);
-        if (ImGui::SliderFloat("Compensation", &stops, -6.0f, 6.0f,
-                               "%+.1f EV")) {
-            compensation = stops;
+        if (menu::BeginSubmenu("Selection")) {
+            menu::Check("Outline", &display.selection);
+            ImGui::ColorEdit3("Outline Color",
+                              glm::value_ptr(theme.outline),
+                              ImGuiColorEditFlags_NoInputs);
+            ImGui::EndMenu();
         }
-        menu::Section("Camera");
-        const bool perspective = activeCamera == PerspectiveCamera();
-        ImGui::BeginDisabled(!perspective ||
-                             !scene.Has(activeCamera));
-        if (scene.Has(activeCamera)) {
-            CameraParams lens =
-                CameraParamsOf(scene, activeCamera, ViewportWidth(),
-                               ViewportHeight());
-            float fov =
-                static_cast<float>(glm::degrees(lens.VerticalFov()));
+        if (menu::BeginSubmenu("Grid")) {
+            menu::Check("Show Grid", &display.grid);
+            ImGui::EndMenu();
+        }
+        if (menu::BeginSubmenu("Gizmos")) {
+            const std::pair<const char*, Viewer::Gizmo> modes[] = {
+                {"None", Viewer::Gizmo::None},
+                {"Translate", Viewer::Gizmo::Translate},
+                {"Rotate", Viewer::Gizmo::Rotate},
+                {"Scale", Viewer::Gizmo::Scale}};
+            for (const auto& [name, mode] : modes) {
+                if (menu::Option(name, gizmo == mode)) {
+                    gizmo = mode;
+                }
+            }
+            ImGui::Separator();
+            menu::Check("Local Axes", &gizmoLocal);
+            ImGui::EndMenu();
+        }
+        if (menu::BeginSubmenu("Viewport")) {
+            DrawResolutionMenu();
+            bool vsync = self.GetVsync();
+            if (menu::Check("Vsync", &vsync)) {
+                self.SetVsync(vsync);
+            }
+            ImGui::EndMenu();
+        }
+        if (menu::BeginSubmenu("Exposure")) {
+            const std::pair<Viewer::Exposure, const char*>
+                exposures[] = {
+                    {Viewer::Exposure::Default, "Default"},
+                    {Viewer::Exposure::Auto, "Automatic"},
+                    {Viewer::Exposure::Camera, "Camera's Own"}};
+            for (const auto& [mode, name] : exposures) {
+                if (menu::Option(name, exposure == mode)) {
+                    exposure = mode;
+                }
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("The camera's ISO, shutter and "
+                                  "f-stop; Automatic keys the "
+                                  "metered luminance to middle grey");
+            }
+            float stops = static_cast<float>(compensation);
             ImGui::SetNextItemWidth(160.0f * contentScale);
-            if (ImGui::SliderFloat("Vertical FOV", &fov, 5.0f, 120.0f,
-                                   "%.0f deg")) {
-                // Through the focal length, as the Camera panel shows
-                // it.
-                lens.focalLengthMm =
-                    lens.verticalApertureMm /
-                    (2.0 *
-                     std::tan(0.5 * glm::radians(
-                                        static_cast<double>(fov))));
-                self.Edit(activeCamera, tokens::kFocalLength,
-                          lens.focalLengthMm, true);
-                WriteActiveCamera();
+            if (ImGui::SliderFloat("Compensation", &stops, -6.0f,
+                                   6.0f, "%+.1f EV")) {
+                compensation = stops;
             }
-        }
-        ImGui::EndDisabled();
-        if (menu::Action("Frame Selection", "F",
-                         !selection.empty())) {
-            self.Frame(selection);
-        }
-        if (menu::Action("Frame All")) {
-            self.Frame();
+            ImGui::EndMenu();
         }
         if (!viewportMenuItems.empty()) {
             ImGui::Separator();
@@ -2266,6 +2339,13 @@ struct Viewer::State {
                     item.action(self);
                 }
             }
+        }
+        ImGui::Separator();
+        if (menu::Action("Reset To Defaults")) {
+            ResetViewportSettings();
+        }
+        if (menu::Action("Preferences...")) {
+            ShowPanel("Settings");
         }
     }
 
@@ -2407,12 +2487,7 @@ struct Viewer::State {
         }
         menu::Section("Rendering Settings");
         if (menu::Action("Render Settings...")) {
-            for (const auto& panel : panels) {
-                if (panel->Title() == "Settings") {
-                    panel->SetVisible(true);
-                    ImGui::SetWindowFocus(panel->Title().c_str());
-                }
-            }
+            ShowPanel("Settings");
         }
         if (menu::Action("Reset to Render Settings", nullptr,
                          minimal || wireframe)) {
@@ -3813,6 +3888,11 @@ const Path& Viewer::PerspectiveCamera() {
     return path;
 }
 
+const Path& Viewer::SessionSettings() {
+    static const Path path = SessionRootPath().Child("Settings");
+    return path;
+}
+
 const std::vector<Path>& Viewer::Selection() const {
     return state_->selection;
 }
@@ -4294,10 +4374,13 @@ const Path& Viewer::Settings() const {
 }
 
 void Viewer::SetSettings(Path settings) {
-    const Scene& scene = state_->scene;
+    Scene& scene = state_->scene;
+    if (settings == SessionSettings() && !scene.Has(settings)) {
+        scene.Define(settings, tokens::kRenderSettings);
+    }
     if (!scene.Has(settings) ||
         scene.TypeOf(settings) != tokens::kRenderSettings ||
-        IsSessionPath(settings)) {
+        (IsSessionPath(settings) && settings != SessionSettings())) {
         throw std::invalid_argument("'" + settings.String() +
                                     "' is not a RenderSettings prim");
     }
