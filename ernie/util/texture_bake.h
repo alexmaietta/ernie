@@ -70,4 +70,22 @@ TextureData BakeTexture(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         const BakeOptions& options = {});
 
+/// As `BakeTexture`, for an image too large to hold whole: a mosaic
+/// of `tiles`, 8-bit PNG or JPEG images of one size, `columns` to a
+/// row, rows top to bottom (a global mosaic's tiles, such as Blue
+/// Marble's eight 21600 x 21600 ones). Each tile is read and its top
+/// mips encoded into the file in turn, as far as they halve exactly
+/// and split into whole blocks at the tiles' edges; the smaller mips
+/// come from those tiles' last mips joined. So at most two tiles'
+/// texels (one decoding as the other encodes) and the joined mips are
+/// held. Normal maps are not baked as mosaics. Returns the stored
+/// texture's layout, its texels in the file only.
+/// @throws std::invalid_argument for tiles that are not whole rows or
+/// not of one size, or normal maps; std::runtime_error if a tile
+/// cannot be read or the output written.
+TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
+                       std::uint32_t columns,
+                       const std::filesystem::path& output,
+                       const BakeOptions& options = {});
+
 }  // namespace ernie

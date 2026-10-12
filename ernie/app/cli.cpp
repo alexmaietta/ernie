@@ -10,6 +10,7 @@
 #include "ernie/util/texture_bake.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -93,6 +94,7 @@ void DefineDefaultScene(Scene& scene) {
 int BakeTextureMain(std::span<const std::string> args) {
     constexpr std::string_view kBakeUsage =
         R"(Usage: ernie bake-texture input output.dds [options]
+       ernie bake-texture --mosaic 4x2 tile1.png ... tile8.png output.dds [options]
 
 Bakes a PNG, JPEG or EXR image into a DDS file for Ernie's textures: every mip, filtered as its
 role says, then block-compressed (BC7 for colour and data, BC5 for normal maps), as virtual
@@ -103,9 +105,13 @@ textures (ernie:virtualTexture) need.
                                the stored format, in place of the role's
   --linear                     colour stored linear rather than sRGB
   --quality 0-4                BC7's effort (default 1)
+  --mosaic COLUMNSxROWS        the inputs are one image's tiles of one size, row by row from the
+                               top left (a global mosaic's), baked a tile at a time
 )";
     std::vector<std::string> files;
     BakeOptions options;
+    std::uint32_t columns = 0;
+    std::uint32_t rows = 0;
     try {
         for (std::size_t i = 0; i < args.size(); ++i) {
             const std::string& arg = args[i];
@@ -154,15 +160,30 @@ textures (ernie:virtualTexture) need.
                 options.srgb = false;
             } else if (arg == "--quality") {
                 options.quality = std::stoi(value());
+            } else if (arg == "--mosaic") {
+                const std::string& grid = value();
+                const std::size_t x = grid.find('x');
+                if (x == std::string::npos) {
+                    throw std::invalid_argument(
+                        "--mosaic takes COLUMNSxROWS, not " + grid);
+                }
+                columns = static_cast<std::uint32_t>(
+                    std::stoul(grid.substr(0, x)));
+                rows = static_cast<std::uint32_t>(
+                    std::stoul(grid.substr(x + 1)));
             } else if (arg.starts_with("--")) {
                 throw std::invalid_argument("unknown option " + arg);
             } else {
                 files.push_back(arg);
             }
         }
-        if (files.size() != 2) {
+        const std::size_t inputs =
+            columns > 0 ? std::size_t{columns} * rows : 1;
+        if (files.size() != inputs + 1) {
             throw std::invalid_argument(
-                "needs an input and an output file");
+                "needs " + std::to_string(inputs) +
+                (inputs == 1 ? " input" : " inputs") +
+                " and an output file");
         }
     } catch (const std::exception& error) {
         std::fprintf(stderr, "ernie bake-texture: %s\n\n%s",
@@ -170,11 +191,19 @@ textures (ernie:virtualTexture) need.
         return 2;
     }
     try {
+        const std::filesystem::path output = files.back();
+        files.pop_back();
         const TextureData texture =
-            BakeTexture(files[0], files[1], options);
-        std::printf("%s: %u x %u, %u mips, %zu bytes\n",
-                    files[1].c_str(), texture.width, texture.height,
-                    texture.mips, texture.Data().size());
+            columns > 0
+                ? BakeMosaic(std::vector<std::filesystem::path>(
+                                 files.begin(), files.end()),
+                             columns, output, options)
+                : BakeTexture(files[0], output, options);
+        std::printf("%s: %u x %u, %u mips, %llu bytes\n",
+                    output.string().c_str(), texture.width,
+                    texture.height, texture.mips,
+                    static_cast<unsigned long long>(
+                        std::filesystem::file_size(output)));
     } catch (const std::exception& error) {
         std::fprintf(stderr, "ernie bake-texture: %s\n",
                      error.what());

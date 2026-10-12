@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -112,46 +113,18 @@ void EncodeBlock(TextureFormat format, const std::uint8_t* pixels,
 /// `mip`, stored as 8-bit RGBA in `bytes` (`width` x `height`),
 /// encoded into BC `format` blocks at `out`, rows of blocks shared
 /// among threads.
-void EncodeBlocks(TextureFormat format,
-                  std::span<const std::uint8_t> rgba,
-                  std::uint32_t width, std::uint32_t height,
-                  std::byte* out,
-                  const bc7enc_compress_block_params& bc7) {
-    const TextureFormatInfo info = InfoOf(format);
-    const std::uint32_t across = (width + 3) / 4;
-    const std::uint32_t down = (height + 3) / 4;
-    std::atomic<std::uint32_t> nextRow{0};
+/// Runs `body(row)` for every row below `rows`, the rows shared among
+/// the hardware's threads.
+template <typename Body>
+void ForEachRow(std::uint32_t rows, const Body& body) {
+    std::atomic<std::uint32_t> next{0};
     const auto work = [&] {
-        std::array<std::uint8_t, 64> pixels{};
-        for (std::uint32_t row = nextRow++; row < down;
-             row = nextRow++) {
-            for (std::uint32_t column = 0; column < across;
-                 ++column) {
-                // Texels past the edge repeat the last row and
-                // column.
-                for (std::uint32_t y = 0; y < 4; ++y) {
-                    const std::uint32_t sy =
-                        std::min(row * 4 + y, height - 1);
-                    for (std::uint32_t x = 0; x < 4; ++x) {
-                        const std::uint32_t sx =
-                            std::min(column * 4 + x, width - 1);
-                        std::memcpy(
-                            pixels.data() + 4 * (y * 4 + x),
-                            rgba.data() +
-                                4 * (std::size_t{sy} * width + sx),
-                            4);
-                    }
-                }
-                EncodeBlock(format, pixels.data(),
-                            out +
-                                (std::size_t{row} * across + column) *
-                                    info.blockBytes,
-                            bc7);
-            }
+        for (std::uint32_t row = next++; row < rows; row = next++) {
+            body(row);
         }
     };
     const unsigned threads = std::max(
-        1u, std::min(std::thread::hardware_concurrency(), down));
+        1u, std::min(std::thread::hardware_concurrency(), rows));
     std::vector<std::thread> pool;
     for (unsigned t = 1; t < threads; ++t) {
         pool.emplace_back(work);
@@ -162,11 +135,47 @@ void EncodeBlocks(TextureFormat format,
     }
 }
 
+/// `rgba` (`width` x `height` RGBA8) encoded into BC `format` blocks
+/// at `out`, rows of blocks on every thread.
+void EncodeBlocks(TextureFormat format,
+                  std::span<const std::uint8_t> rgba,
+                  std::uint32_t width, std::uint32_t height,
+                  std::byte* out,
+                  const bc7enc_compress_block_params& bc7) {
+    const TextureFormatInfo info = InfoOf(format);
+    const std::uint32_t across = (width + 3) / 4;
+    const std::uint32_t down = (height + 3) / 4;
+    ForEachRow(down, [&](std::uint32_t row) {
+        std::array<std::uint8_t, 64> pixels{};
+        for (std::uint32_t column = 0; column < across; ++column) {
+            // Texels past the edge repeat the last row and column.
+            for (std::uint32_t y = 0; y < 4; ++y) {
+                const std::uint32_t sy =
+                    std::min(row * 4 + y, height - 1);
+                for (std::uint32_t x = 0; x < 4; ++x) {
+                    const std::uint32_t sx =
+                        std::min(column * 4 + x, width - 1);
+                    std::memcpy(
+                        pixels.data() + 4 * (y * 4 + x),
+                        rgba.data() +
+                            4 * (std::size_t{sy} * width + sx),
+                        4);
+                }
+            }
+            EncodeBlock(format, pixels.data(),
+                        out + (std::size_t{row} * across + column) *
+                                  info.blockBytes,
+                        bc7);
+        }
+    });
+}
+
 /// A texture of `format`, `width` x `height` with `mips` mips, its
-/// blocks still to encode.
+/// blocks still to encode (with `allocate`; else only laid out).
 /// @throws std::invalid_argument for a format it does not write.
 TextureData Allocate(TextureFormat format, std::uint32_t width,
-                     std::uint32_t height, std::uint32_t mips) {
+                     std::uint32_t height, std::uint32_t mips,
+                     bool allocate = true) {
     using F = TextureFormat;
     constexpr std::array<F, 10> kWritten{
         F::Rgba8,   F::Rgba8Srgb, F::Bc1, F::Bc1Srgb, F::Bc3,
@@ -181,12 +190,14 @@ TextureData Allocate(TextureFormat format, std::uint32_t width,
     texture.width = width;
     texture.height = height;
     texture.mips = mips;
+    std::size_t total = 0;
     for (std::uint32_t mip = 0; mip < mips; ++mip) {
-        texture.offsets.push_back(texture.bytes.size());
-        texture.bytes.resize(texture.bytes.size() +
-                             ImageBytes(format,
-                                        std::max(1u, width >> mip),
-                                        std::max(1u, height >> mip)));
+        texture.offsets.push_back(total);
+        total += ImageBytes(format, std::max(1u, width >> mip),
+                            std::max(1u, height >> mip));
+    }
+    if (allocate) {
+        texture.bytes.resize(total);
     }
     return texture;
 }
@@ -242,7 +253,7 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
     const std::uint32_t w = std::max(1u, width / 2);
     const std::uint32_t h = std::max(1u, height / 2);
     std::vector<std::uint8_t> half(std::size_t{w} * h * 4);
-    for (std::uint32_t y = 0; y < h; ++y) {
+    ForEachRow(h, [&](std::uint32_t y) {
         for (std::uint32_t x = 0; x < w; ++x) {
             for (std::uint32_t c = 0; c < 4; ++c) {
                 float sum = 0.0f;
@@ -270,7 +281,7 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
                         std::clamp(mean, 0.0f, 1.0f) * 255.0f));
             }
         }
-    }
+    });
     return half;
 }
 
@@ -301,8 +312,14 @@ TextureData EncodeTexture(std::span<const Image> mips,
     return texture;
 }
 
-void WriteDdsFile(const std::filesystem::path& path,
-                  const TextureData& texture) {
+namespace {
+
+/// Bytes before a DDS file's texels as `WriteDdsHeader` writes them.
+constexpr std::size_t kDdsHeaderBytes = (32 + 5) * 4;
+
+/// Writes the header of a DDS file of `texture`, with the DX10
+/// header.
+void WriteDdsHeader(std::ostream& file, const TextureData& texture) {
     // "DDS ", DDS_HEADER (31 words after the magic),
     // DDS_HEADER_DXT10.
     std::array<std::uint32_t, 32 + 5> header{};
@@ -326,12 +343,20 @@ void WriteDdsFile(const std::filesystem::path& path,
     header[33] = 3;  // A 2D texture.
     header[34] = texture.cube ? 0x4u : 0u;
     header[35] = texture.cube ? texture.layers / 6 : texture.layers;
+    static_assert(sizeof(header) == kDdsHeaderBytes);
+    file.write(reinterpret_cast<const char*>(header.data()),
+               sizeof(header));
+}
+
+}  // namespace
+
+void WriteDdsFile(const std::filesystem::path& path,
+                  const TextureData& texture) {
     std::ofstream file(path, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Cannot write " + path.string());
     }
-    file.write(reinterpret_cast<const char*>(header.data()),
-               sizeof(header));
+    WriteDdsHeader(file, texture);
     // Layer after layer, each layer's mips in turn: `TextureData`'s
     // order.
     const std::span<const std::byte> data = texture.Data();
@@ -420,6 +445,184 @@ TextureData BakeTexture(const std::filesystem::path& input,
         EncodeTexture(mips, format, encoding, options.quality);
     WriteDdsFile(output, texture);
     return texture;
+}
+
+TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
+                       std::uint32_t columns,
+                       const std::filesystem::path& output,
+                       const BakeOptions& options) {
+    if (columns == 0 || tiles.empty() ||
+        tiles.size() % columns != 0) {
+        throw std::invalid_argument("A mosaic needs whole rows of " +
+                                    std::to_string(columns) +
+                                    " tiles");
+    }
+    if (options.role == TextureRole::Normal) {
+        throw std::invalid_argument(
+            "Normal maps are not baked as mosaics");
+    }
+    const auto rows =
+        static_cast<std::uint32_t>(tiles.size() / columns);
+    // Every tile an 8-bit PNG or JPEG of one size.
+    std::uint32_t tileWidth = 0;
+    std::uint32_t tileHeight = 0;
+    for (const std::filesystem::path& tile : tiles) {
+        const std::string name = tile.string();
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        if (stbi_info(name.c_str(), &width, &height, &channels) ==
+                0 ||
+            stbi_is_16_bit(name.c_str()) != 0) {
+            throw std::runtime_error("Cannot read " + name +
+                                     " as an 8-bit PNG or JPEG");
+        }
+        if (tileWidth == 0) {
+            tileWidth = static_cast<std::uint32_t>(width);
+            tileHeight = static_cast<std::uint32_t>(height);
+        } else if (static_cast<std::uint32_t>(width) != tileWidth ||
+                   static_cast<std::uint32_t>(height) != tileHeight) {
+            throw std::invalid_argument(
+                "A mosaic's tiles are all one size: " + name +
+                " is not " + std::to_string(tileWidth) + " x " +
+                std::to_string(tileHeight));
+        }
+    }
+    const bool srgb =
+        options.role == TextureRole::Colour && options.srgb;
+    const TextureFormat format =
+        WithSrgb(options.format.value_or(TextureFormat::Bc7), srgb);
+    const std::uint32_t width = columns * tileWidth;
+    const std::uint32_t height = rows * tileHeight;
+    std::uint32_t mips = 1;
+    for (std::uint32_t side = std::max(width, height); side > 1;
+         side >>= 1) {
+        ++mips;
+    }
+    const TextureData layout =
+        Allocate(format, width, height, mips, false);
+    const TextureFormatInfo info = InfoOf(format);
+    // Mips stay per tile while they halve exactly and split into
+    // whole blocks at the tiles' edges (21600 texels: mips 0 to 3);
+    // the rest are made from those tiles' last mips joined.
+    std::uint32_t perTile = 0;
+    while (perTile + 1 < mips && tileWidth % (4u << perTile) == 0 &&
+           tileHeight % (4u << perTile) == 0) {
+        ++perTile;
+    }
+    std::ofstream file(output, std::ios::binary | std::ios::trunc);
+    if (!file) {
+        throw std::runtime_error("Cannot write " + output.string());
+    }
+    WriteDdsHeader(file, layout);
+    // Writes `blocks` (`across` x `down` blocks of mip `mip`) at
+    // block
+    // (`column`, `row`) of the mip.
+    const auto write = [&](std::uint32_t mip, std::uint32_t column,
+                           std::uint32_t row, std::uint32_t across,
+                           std::uint32_t down,
+                           const std::vector<std::byte>& blocks) {
+        const std::uint32_t mipWidth = std::max(1u, width >> mip);
+        const std::size_t mipAcross =
+            (mipWidth + info.blockSize - 1) / info.blockSize;
+        for (std::uint32_t y = 0; y < down; ++y) {
+            file.seekp(static_cast<std::streamoff>(
+                kDdsHeaderBytes + layout.offsets[mip] +
+                ((row + y) * mipAcross + column) * info.blockBytes));
+            file.write(reinterpret_cast<const char*>(
+                           blocks.data() +
+                           std::size_t{y} * across * info.blockBytes),
+                       static_cast<std::streamsize>(across *
+                                                    info.blockBytes));
+        }
+    };
+    const bc7enc_compress_block_params bc7 =
+        Bc7Params(format, options.quality);
+    const auto encode = [&](std::span<const std::uint8_t> rgba,
+                            std::uint32_t w, std::uint32_t h) {
+        std::vector<std::byte> blocks(ImageBytes(format, w, h));
+        if (info.compressed()) {
+            EncodeBlocks(format, rgba, w, h, blocks.data(), bc7);
+        } else {
+            std::memcpy(blocks.data(), rgba.data(), rgba.size());
+        }
+        return blocks;
+    };
+
+    // The tiles' last per-tile mips, joined.
+    const std::uint32_t joinedWidth = width >> perTile;
+    const std::uint32_t joinedHeight = height >> perTile;
+    std::vector<std::uint8_t> joined(std::size_t{joinedWidth} *
+                                     joinedHeight * 4);
+    // The next tile decodes on its own thread while this one encodes.
+    using Decoded =
+        std::unique_ptr<stbi_uc, decltype(&stbi_image_free)>;
+    const auto decode = [&](std::size_t index) {
+        const std::string name = tiles[index].string();
+        int w = 0;
+        int h = 0;
+        int channels = 0;
+        stbi_uc* data = stbi_load(name.c_str(), &w, &h, &channels, 4);
+        if (data == nullptr) {
+            throw std::runtime_error("Cannot read " + name + ": " +
+                                     stbi_failure_reason());
+        }
+        return Decoded(data, &stbi_image_free);
+    };
+    std::future<Decoded> next =
+        std::async(std::launch::async, decode, 0);
+    for (std::size_t index = 0; index < tiles.size(); ++index) {
+        Decoded decoded = next.get();
+        if (index + 1 < tiles.size()) {
+            next = std::async(std::launch::async, decode, index + 1);
+        }
+        const auto column =
+            static_cast<std::uint32_t>(index % columns);
+        const auto row = static_cast<std::uint32_t>(index / columns);
+        std::uint32_t w = tileWidth;
+        std::uint32_t h = tileHeight;
+        std::vector<std::uint8_t> halved;
+        std::span<const std::uint8_t> rgba(decoded.get(),
+                                           std::size_t{w} * h * 4);
+        for (std::uint32_t mip = 0; mip < perTile; ++mip) {
+            const std::uint32_t across =
+                (w + info.blockSize - 1) / info.blockSize;
+            const std::uint32_t down =
+                (h + info.blockSize - 1) / info.blockSize;
+            write(mip, column * across, row * down, across, down,
+                  encode(rgba, w, h));
+            halved = HalveRgba8(rgba, w, h, srgb);
+            rgba = halved;
+            decoded.reset();
+            w /= 2;
+            h /= 2;
+        }
+        for (std::uint32_t y = 0; y < h; ++y) {
+            std::memcpy(joined.data() + ((std::size_t{row} * h + y) *
+                                             joinedWidth +
+                                         std::size_t{column} * w) *
+                                            4,
+                        rgba.data() + std::size_t{y} * w * 4,
+                        std::size_t{w} * 4);
+        }
+    }
+    // The joined mips, down to 1 x 1.
+    std::uint32_t w = joinedWidth;
+    std::uint32_t h = joinedHeight;
+    for (std::uint32_t mip = perTile; mip < mips; ++mip) {
+        write(mip, 0, 0, (w + info.blockSize - 1) / info.blockSize,
+              (h + info.blockSize - 1) / info.blockSize,
+              encode(joined, w, h));
+        if (mip + 1 < mips) {
+            joined = HalveRgba8(joined, w, h, srgb);
+            w = std::max(1u, w / 2);
+            h = std::max(1u, h / 2);
+        }
+    }
+    if (!file) {
+        throw std::runtime_error("Cannot write " + output.string());
+    }
+    return layout;
 }
 
 }  // namespace ernie

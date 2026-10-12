@@ -10,8 +10,10 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
+using ernie::BakeMosaic;
 using ernie::BakeOptions;
 using ernie::BakeTexture;
 using ernie::EncodeTexture;
@@ -166,4 +168,64 @@ TEST_F(TextureBake, EightBitBakesMatchFloatOnes) {
         }
         EXPECT_LE(worst, 2) << "mip " << mip;
     }
+}
+
+TEST_F(TextureBake, MosaicsBakeAsTheirJoinedImage) {
+    // A 2 x 2 mosaic bakes byte for byte as the image its tiles make:
+    // 64 x 48 tiles keep mips 0 to 2 per tile, 30 x 30 ones none.
+    const auto colour = [](int x, int y) {
+        return glm::u8vec4(x * 3, y * 5, (x ^ y) & 0xff, 255);
+    };
+    for (const auto& [tileWidth, tileHeight] :
+         {std::pair{64, 48}, std::pair{30, 30}}) {
+        const std::string size = std::to_string(tileWidth) + "_" +
+                                 std::to_string(tileHeight);
+        const auto whole = Png("whole" + size + ".png", 2 * tileWidth,
+                               2 * tileHeight, colour);
+        std::vector<std::filesystem::path> tiles;
+        for (int row = 0; row < 2; ++row) {
+            for (int column = 0; column < 2; ++column) {
+                tiles.push_back(
+                    Png("tile" + size + std::to_string(row) +
+                            std::to_string(column) + ".png",
+                        tileWidth, tileHeight, [&](int x, int y) {
+                            return colour(column * tileWidth + x,
+                                          row * tileHeight + y);
+                        }));
+            }
+        }
+        for (const TextureFormat format :
+             {TextureFormat::Rgba8, TextureFormat::Bc7}) {
+            BakeOptions options;
+            options.format = format;
+            BakeTexture(whole, dir_ / "whole.dds", options);
+            const TextureData layout =
+                BakeMosaic(tiles, 2, dir_ / "mosaic.dds", options);
+            EXPECT_EQ(layout.width,
+                      static_cast<std::uint32_t>(2 * tileWidth));
+            const TextureData a = LoadTextureFile(dir_ / "whole.dds");
+            const TextureData b =
+                LoadTextureFile(dir_ / "mosaic.dds");
+            ASSERT_EQ(a.mips, b.mips);
+            ASSERT_EQ(a.Data().size(), b.Data().size());
+            EXPECT_TRUE(std::equal(a.Data().begin(), a.Data().end(),
+                                   b.Data().begin()))
+                << size << ", format " << static_cast<int>(format);
+        }
+    }
+
+    const std::vector<std::filesystem::path> three(
+        3, dir_ / "tile64_4800.png");
+    EXPECT_THROW(BakeMosaic(three, 2, dir_ / "bad.dds"),
+                 std::invalid_argument)
+        << "not whole rows";
+    const std::vector<std::filesystem::path> mixed{
+        dir_ / "tile64_4800.png", dir_ / "tile30_3000.png"};
+    EXPECT_THROW(BakeMosaic(mixed, 2, dir_ / "bad.dds"),
+                 std::invalid_argument)
+        << "two sizes";
+    BakeOptions normal;
+    normal.role = TextureRole::Normal;
+    EXPECT_THROW(BakeMosaic(mixed, 2, dir_ / "bad.dds", normal),
+                 std::invalid_argument);
 }
