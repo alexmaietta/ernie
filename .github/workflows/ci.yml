@@ -21,6 +21,7 @@ jobs:
   # or pull requests. After a release, main must move to the next version before its dev builds.
   version:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       suffix: ${{ steps.version.outputs.suffix }}
     steps:
@@ -52,6 +53,7 @@ jobs:
 
   format:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -71,6 +73,7 @@ jobs:
   test:
     name: test (${{ matrix.name }})
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -181,6 +184,7 @@ jobs:
     name: sanitize (part ${{ matrix.part }} of 4)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     # Every fourth test each, side by side, as the GCC tests run.
     strategy:
       fail-fast: false
@@ -241,8 +245,9 @@ jobs:
   # run: the CPU tests, as those runners have no Vulkan driver of their own (the wheel-test job
   # renders on Windows through Mesa's lavapipe).
   build:
-    name: build (${{ matrix.os }})
+    name: build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -292,7 +297,7 @@ jobs:
         run: .github/scripts/install-lavapipe-windows.sh
       - name: GPU tests on lavapipe
         if: runner.os == 'Windows'
-        run: ctest --test-dir build --output-on-failure -j4 --timeout 1800 -L gpu
+        run: ctest --test-dir build --output-on-failure -j4 --timeout 600 -L gpu
       # ctest names a test "ernie_<suite>.<gtest name>", from the program
       # ernie_tests_<suite>.
       - name: Debug the first failing test
@@ -320,6 +325,7 @@ jobs:
     name: wheel (${{ matrix.platform }})
     needs: version
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -358,6 +364,7 @@ jobs:
   wheel-test:
     name: wheel-test (${{ matrix.platform }})
     needs: wheel
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -427,6 +434,7 @@ jobs:
   sdist:
     needs: version
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Version
@@ -449,6 +457,7 @@ jobs:
   docs:
     needs: wheel
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
@@ -485,6 +494,7 @@ jobs:
   packages:
     needs: version
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     container: quay.io/pypa/manylinux_2_34_x86_64
     steps:
       - uses: actions/checkout@v7
@@ -537,6 +547,7 @@ jobs:
     name: package-test (${{ matrix.image }})
     needs: packages
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     container: ${{ matrix.image }}
     # The clean systems have Make, not the workflow's Ninja.
     env:
@@ -595,6 +606,7 @@ jobs:
   # trusts ci.yml's jobs in the pypi environment (main and v* tags only), so no token is stored.
   publish:
     needs: [test, build, wheel, wheel-test, sdist]
+    timeout-minutes: 10
     if: >
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
