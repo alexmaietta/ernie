@@ -373,8 +373,8 @@ VolumePass::Load(const VolumeFieldParams& field,
     }
     if (!field.array.empty()) {
         // A NanoVDBField's array, read again when written again.
-        const GridKey key{field.array, field.gridName, field.gridIndex,
-                          true};
+        const GridKey key{field.array, field.gridName,
+                          field.gridIndex, true};
         auto found = grids_.find(key);
         if (found == grids_.end() ||
             found->second.version != field.version) {
@@ -856,10 +856,9 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     upload(runs_, std::as_bytes(std::span(runs)));
     upload(lists_, std::as_bytes(std::span(lists)));
     const std::int32_t none = ShadowCasters::kNoWorld;
-    upload(lightViewWorlds_,
-           lightViewWorlds.empty()
-               ? std::as_bytes(std::span(&none, 1))
-               : std::as_bytes(lightViewWorlds));
+    upload(lightViewWorlds_, lightViewWorlds.empty()
+                                 ? std::as_bytes(std::span(&none, 1))
+                                 : std::as_bytes(lightViewWorlds));
     // The passes read them by address (VolumeResources, `Prepare`).
     addresses_ = {volumes_->Address(), materials_->Address(),
                   runs_->Address(), lists_->Address(),

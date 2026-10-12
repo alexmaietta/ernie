@@ -159,7 +159,8 @@ VolumeParams VolumeOf(const Scene& scene, const Path& path) {
 
 // Instance `i`'s transform of `data`: translate, then orient, then
 // scale, as a PointInstancer's.
-glm::dmat4 InstanceTransform(const InstanceData& data, std::size_t i) {
+glm::dmat4 InstanceTransform(const InstanceData& data,
+                             std::size_t i) {
     glm::dmat4 transform = glm::translate(
         glm::dmat4(1.0),
         glm::dvec3(data.positions[3 * i], data.positions[3 * i + 1],
@@ -167,13 +168,14 @@ glm::dmat4 InstanceTransform(const InstanceData& data, std::size_t i) {
     if (4 * i + 3 < data.orientations.size()) {
         transform *= glm::mat4_cast(glm::dquat(
             data.orientations[4 * i + 3], data.orientations[4 * i],
-            data.orientations[4 * i + 1], data.orientations[4 * i + 2]));
+            data.orientations[4 * i + 1],
+            data.orientations[4 * i + 2]));
     }
     if (3 * i + 2 < data.scales.size()) {
-        transform = glm::scale(
-            transform,
-            glm::dvec3(data.scales[3 * i], data.scales[3 * i + 1],
-                       data.scales[3 * i + 2]));
+        transform =
+            glm::scale(transform, glm::dvec3(data.scales[3 * i],
+                                             data.scales[3 * i + 1],
+                                             data.scales[3 * i + 2]));
     }
     return transform;
 }
@@ -182,7 +184,8 @@ glm::dmat4 InstanceTransform(const InstanceData& data, std::size_t i) {
 
 std::vector<VolumeParams> VolumesOf(const Scene& scene) {
     ERNIE_ZONE("Resolve volumes");
-    // PointInstancers' prototypes, which show only as their instances.
+    // PointInstancers' prototypes, which show only as their
+    // instances.
     const std::vector<Path> instancers =
         scene.Prims(tokens::kPointInstancer);
     std::vector<Path> prototypes;

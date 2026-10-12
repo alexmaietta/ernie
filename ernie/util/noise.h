@@ -12,7 +12,8 @@ namespace ernie {
 /// shuffled by a seed, for procedural fields such as volumes'
 /// density: smooth, zero at every integer point, and within about
 /// [-1, 1]. The same seed gives the same noise everywhere, from C++
-/// or Python (`ernie.fbm_noise`), so demo twins build the same fields.
+/// or Python (`ernie.fbm_noise`), so demo twins build the same
+/// fields.
 ///
 /// References:
 /// - K. Perlin, "Improving Noise", ACM Transactions on Graphics 21(3)

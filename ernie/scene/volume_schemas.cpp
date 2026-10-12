@@ -26,11 +26,11 @@ ERNIE_DEFINE_SCHEMA(NanoVDBField, tokens::kNanoVDBField,
                     "NanoVDB grids written as an array (Warp's "
                     "Volume.array()), which the GPU reads in place.",
                     ERNIE_NANOVDB_FIELD_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(DenseField, tokens::kDenseField,
-                    &FieldBase::Definition(), false,
-                    "A dense array of values (a grid solver's), which a "
-                    "device array fills in place on the GPU.",
-                    ERNIE_DENSE_FIELD_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(
+    DenseField, tokens::kDenseField, &FieldBase::Definition(), false,
+    "A dense array of values (a grid solver's), which a "
+    "device array fills in place on the GPU.",
+    ERNIE_DENSE_FIELD_ATTRIBUTES)
 ERNIE_DEFINE_OPEN_SCHEMA(
     Volume, tokens::kVolume, &Gprim::Definition(), false,
     "A participating medium: fields named by field:<name> "
@@ -74,9 +74,9 @@ std::vector<std::string> Volume::FieldNames() const {
 }
 
 std::vector<const PrimTypeDef*> VolumeSchemaTypes() {
-    return {&FieldBase::Definition(), &FieldAsset::Definition(),
+    return {&FieldBase::Definition(),    &FieldAsset::Definition(),
             &OpenVDBAsset::Definition(), &NanoVDBField::Definition(),
-            &DenseField::Definition(), &Volume::Definition()};
+            &DenseField::Definition(),   &Volume::Definition()};
 }
 
 }  // namespace ernie

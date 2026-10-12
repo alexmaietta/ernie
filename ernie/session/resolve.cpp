@@ -2806,15 +2806,19 @@ FrameParams FrameParamsOf(const Scene& scene,
     volumeSettings.stepsPerVoxel =
         std::clamp(options.GetVolumeStepsPerVoxel(), 0.1, 8.0);
     const auto count = [](int value, int low, int high) {
-        return static_cast<std::uint32_t>(std::clamp(value, low, high));
+        return static_cast<std::uint32_t>(
+            std::clamp(value, low, high));
     };
-    volumeSettings.maxSteps = count(options.GetVolumeMaxSteps(), 1, 4096);
+    volumeSettings.maxSteps =
+        count(options.GetVolumeMaxSteps(), 1, 4096);
     volumeSettings.shadowSteps =
         count(options.GetVolumeShadowSteps(), 1, 64);
     volumeSettings.skyLightSteps =
         count(options.GetVolumeSkyLightSteps(), 0, 64);
-    volumeSettings.airSteps = count(options.GetVolumeAirSteps(), 0, 128);
-    volumeSettings.maxOctaves = count(options.GetVolumeMaxOctaves(), 1, 8);
+    volumeSettings.airSteps =
+        count(options.GetVolumeAirSteps(), 0, 128);
+    volumeSettings.maxOctaves =
+        count(options.GetVolumeMaxOctaves(), 1, 8);
     volumeSettings.shadowResolution =
         count(options.GetVolumeShadowResolution(), 16, 2048);
     ShadowSettings& shadows = params.shadows;

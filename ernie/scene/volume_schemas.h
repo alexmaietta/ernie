@@ -115,7 +115,8 @@ class OpenVDBAsset : public FieldAsset {
 /// file, such as a simulation's each step (Warp's `Volume.array()`):
 /// one of its grids, read as an OpenVDBAsset's.
 class NanoVDBField : public FieldBase {
-    ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase, ERNIE_NANOVDB_FIELD_ALL)
+    ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase,
+                      ERNIE_NANOVDB_FIELD_ALL)
     ERNIE_SCHEMA_DEFINE(NanoVDBField)
 };
 

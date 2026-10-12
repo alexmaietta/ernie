@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A lander hovering over the Moon, its exhaust blowing a sheet of dust
 outward: a low sun lights the dust, which shades the ground under it."""
 

@@ -12,7 +12,8 @@
 //     ERNIE_GPU_ZONE(context, commands, "Shadow passes");
 //     // A name chosen at run time, which must outlive the profile
 //     // (a string literal, such as a drawable's `ProfileName`).
-//     ERNIE_GPU_ZONE_NAMED(context, commands, drawable.ProfileName());
+//     ERNIE_GPU_ZONE_NAMED(context, commands,
+//     drawable.ProfileName());
 //
 // Finished zones reach the profilers when later command buffers
 // collect them (`VulkanContext::CollectGpuProfile`, which `Submit`

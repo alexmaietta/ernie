@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """A rocket engine's plume in sunlight: hot gas glowing as a black body
 at the nozzle, cooling to soot that shadows and dims what is behind."""
 

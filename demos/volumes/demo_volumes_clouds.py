@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 """Cumulus clouds over the Earth under its atmosphere, after
 three-geospatial's clouds: a Volume whose grid is built here from a
 coverage map, a height profile and eroding noise, scattering many times

@@ -520,9 +520,9 @@ struct AtmosphereParams {
 
 /// How finely volumes render (RenderSettings' `ernie:volumes:*`):
 /// steps through each volume, towards each light, up and down for the
-/// sky's light (0, unoccluded) and through the air in front (0, none),
-/// the most orders of multiple scattering, and the texels across the
-/// volumes' shadow maps.
+/// sky's light (0, unoccluded) and through the air in front (0,
+/// none), the most orders of multiple scattering, and the texels
+/// across the volumes' shadow maps.
 struct VolumeSettings {
     double stepsPerVoxel = 2.0;
     std::uint32_t maxSteps = 256;
@@ -576,9 +576,9 @@ struct VolumeMaterialParams {
     std::string phase = "henyeyGreenstein";
     double b = 0.25;
     double c = 0.5;
-    /// Orders of scattering approximated, and each order's scattering,
-    /// extinction and anisotropy of the one before's (Wrenninge's a,
-    /// b and c).
+    /// Orders of scattering approximated, and each order's
+    /// scattering, extinction and anisotropy of the one before's
+    /// (Wrenninge's a, b and c).
     int octaves = 1;
     double octaveAttenuation = 0.5;
     double octaveExtinction = 0.5;
