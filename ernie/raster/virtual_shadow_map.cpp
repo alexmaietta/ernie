@@ -130,6 +130,9 @@ VirtualShadowMap::VirtualShadowMap(const VulkanContext& context,
     noDepth_ = std::make_unique<GpuImage>(
         context, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
                            VK_IMAGE_USAGE_SAMPLED_BIT});
+    volumeBoxes_ = std::make_unique<GpuBuffer>(
+        context, kMaxVolumeBoxes * 2 * sizeof(glm::vec4), kStorage,
+        BufferMemory::Upload);
     SetLevels(FitLevels(glm::dvec3(0.0, 0.0, 1.0), glm::dvec3(0.0),
                         glm::dvec3(0.0), firstLevel, lastLevel),
               0.0f);
@@ -226,6 +229,34 @@ void VirtualShadowMap::SetLevels(
     write(*block_, std::as_bytes(std::span(&block, 1)));
 }
 
+void VirtualShadowMap::SetVolumes(
+    std::span<const std::pair<glm::vec3, glm::vec3>> boxes,
+    FrameUploads* uploads) {
+    std::vector<glm::vec4> corners;
+    for (std::size_t i = 0; i < boxes.size(); ++i) {
+        const auto& [low, high] = boxes[i];
+        if (i < kMaxVolumeBoxes) {
+            corners.emplace_back(low, 0.0f);
+            corners.emplace_back(high, 0.0f);
+        } else {
+            glm::vec4& last = corners[corners.size() - 2];
+            last = glm::min(last, glm::vec4(low, 0.0f));
+            corners.back() =
+                glm::max(corners.back(), glm::vec4(high, 0.0f));
+        }
+    }
+    volumeBoxCount_ = static_cast<std::uint32_t>(corners.size() / 2);
+    if (corners.empty()) {
+        return;
+    }
+    if (uploads != nullptr) {
+        uploads->Write(*volumeBoxes_,
+                       std::as_bytes(std::span(corners)));
+    } else {
+        volumeBoxes_->Write(std::as_bytes(std::span(corners)));
+    }
+}
+
 void VirtualShadowMap::CreatePipelines() const {
     if (markPipeline_ != nullptr) {
         return;
@@ -235,6 +266,9 @@ void VirtualShadowMap::CreatePipelines() const {
     markPipeline_ = std::make_unique<ComputePipeline>(
         context_, layout_,
         compiler_.CompileSpirv(modules, "markMain"));
+    markVolumesPipeline_ = std::make_unique<ComputePipeline>(
+        context_, layout_,
+        compiler_.CompileSpirv(modules, "markVolumesMain"));
     allocatePipeline_ = std::make_unique<ComputePipeline>(
         context_, layout_,
         compiler_.CompileSpirv(modules, "allocateMain"));
@@ -271,7 +305,7 @@ VirtualShadowMap::ConstantsOf(std::uint32_t width,
                               std::uint32_t height,
                               const glm::mat4& inverseViewProjection,
                               const glm::vec3& eye) const {
-    static_assert(sizeof(Constants) == 96,
+    static_assert(sizeof(Constants) == 112,
                   "Constants must match virtual_shadow.slang");
     Constants constants{};
     std::memcpy(constants.inverseViewProjection,
@@ -282,6 +316,10 @@ VirtualShadowMap::ConstantsOf(std::uint32_t width,
     constants.eye[2] = eye.z;
     constants.sizes[0] = width;
     constants.sizes[1] = height;
+    const VkDeviceAddress boxes = volumeBoxes_->Address();
+    constants.volumes[0] = static_cast<std::uint32_t>(boxes);
+    constants.volumes[1] = static_cast<std::uint32_t>(boxes >> 32);
+    constants.volumes[2] = volumeBoxCount_;
     return constants;
 }
 
@@ -297,6 +335,13 @@ void VirtualShadowMap::RecordMark(
          ConstantsOf(width, height, inverseViewProjection, eye));
     vkCmdDispatch(commands, Groups((width + 1) / 2),
                   Groups((height + 1) / 2), 1);
+    if (volumeBoxCount_ > 0) {
+        // Writing the same flags, in any order.
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          markVolumesPipeline_->Handle());
+        vkCmdDispatch(commands, Groups((width + 7) / 8),
+                      Groups((height + 7) / 8), 1);
+    }
     ComputeBarrier(commands);
 }
 

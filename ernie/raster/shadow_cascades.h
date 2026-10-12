@@ -49,8 +49,8 @@ struct ShadowCascade {
     /// nothing by it.
     bool moving = false;
     /// Whether casters draw into its map: not for the light the
-    /// virtual shadow map shadows in a frame without volumes, which
-    /// shading reads through the pages.
+    /// virtual shadow map shadows, which shading and volumes read
+    /// through the pages.
     bool drawn = true;
 };
 

@@ -9,9 +9,10 @@
 // level after level. A page table entry is the physical page's index in bits 0-19 and bit 31 set
 // when backed.
 //
-// `markMain` flags the pages the depth buffer's points fall in, `allocateMain` backs them from
-// the pool in order and clears the flags, `clearMain` clears the backed pages; casters then write
-// through `virtualShadowWrite`, and shading reads through `virtualShadowDepth`.
+// `markMain` flags the pages the depth buffer's points fall in and `markVolumesMain` those along
+// the camera's rays through volumes, `allocateMain` backs them from the pool in order and clears
+// the flags, `clearMain` clears the backed pages; casters then write through `virtualShadowWrite`,
+// and shading and volumes read through `virtualShadowDepth`.
 //
 // References:
 // - Epic Games, "Virtual Shadow Maps in Unreal Engine" (documentation).
@@ -126,6 +127,9 @@ struct VirtualConstants {
     float4 eye;
     // x, y: the depth buffer's size.
     uint4 sizes;
+    // x, y: the address of the volumes' boxes (`markVolumesMain`), each its origin-relative low
+    // then high corner; z: their count.
+    uint4 volumes;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<VirtualShadow> map;
@@ -181,6 +185,58 @@ void markMain(uint3 id: SV_DispatchThreadID) {
         let clip = mul(map.levels[index].viewProjection, float4(world, 1.0));
         if (all(abs(clip.xy) <= 1.0)) {
             markAround(index, virtualTexelAt(clip.xy));
+        }
+    }
+}
+
+// Pixels apart of the rays `markVolumesMain` marks along, and the most steps along each.
+static const uint kVolumeMarkStride = 8;
+static const uint kVolumeMarkSteps = 1024;
+
+// The pages volumes read their shadow from (volume.slang's `geometryShadow`) along the camera's
+// rays through them, which the depth buffer's points do not mark: every eighth pixel's ray in x
+// and y, through each volume's box (`constants.volumes`) up to the surface it meets, in steps of
+// half a page of the level for each distance, so its points mark each page they cross; as
+// Unreal's marking from the volumetric fog's froxels.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void markVolumesMain(uint3 id: SV_DispatchThreadID) {
+    let pixel = id.xy * kVolumeMarkStride;
+    if (any(pixel >= constants.sizes.xy)) {
+        return;
+    }
+    let ndc = (float2(pixel) + 0.5) / float2(constants.sizes.xy) * 2.0 - 1.0;
+    let eye = constants.eye.xyz;
+    let near = mul(constants.inverseViewProjection, float4(ndc, 1.0, 1.0));
+    let direction = normalize(near.xyz / near.w - eye);
+    // Unbounded past the sky.
+    let d = depth.Load(int3(int2(pixel), 0));
+    var surface = 3.0e38;
+    if (d > 0.0) {
+        let h = mul(constants.inverseViewProjection, float4(ndc, d, 1.0));
+        surface = length(h.xyz / h.w - eye);
+    }
+    let inverse = 1.0 / select(abs(direction) > 1e-12, direction, float3(1e-12));
+    let boxes = bit_cast<float4*>(constants.volumes.xy);
+    for (uint b = 0; b < constants.volumes.z; ++b) {
+        let t0 = (boxes[2 * b].xyz - eye) * inverse;
+        let t1 = (boxes[2 * b + 1].xyz - eye) * inverse;
+        let enter = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
+        let end = min(min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z)), surface);
+        var t = max(enter, 0.0);
+        for (uint step = 0; step < kVolumeMarkSteps && t <= end; ++step) {
+            let level = virtualLevelFor(t, map.bias) - map.firstLevel;
+            if (level >= int(map.levelCount)) {
+                break;  // past the last level: lit
+            }
+            let index = uint(max(level, 0));
+            let clip = mul(map.levels[index].viewProjection, float4(eye + direction * t, 1.0));
+            if (all(abs(clip.xy) <= 1.0)) {
+                markAround(index, virtualTexelAt(clip.xy));
+            }
+            // The last step lands on the end.
+            let next = t + 0.5 * float(kVirtualPageTexels) * map.levels[index].info.x;
+            t = t < end && next > end ? end : next;
         }
     }
 }

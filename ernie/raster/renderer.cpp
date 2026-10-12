@@ -2950,19 +2950,14 @@ void RasterRenderer::WriteLights(
                     .shadowMask;
             lightViews_.push_back(cascade);
         }
-        // Its own cascades then hold no casters, as shading reads the
-        // pages instead, unless volumes march through them: the pages
-        // back only what the G-buffer saw, not the air in front of
-        // it.
-        if (params.volumes.empty()) {
-            const auto first =
-                static_cast<std::size_t>(entry.cone[2]);
-            const auto count =
-                static_cast<std::size_t>(entry.cone[3]);
-            for (std::size_t v = first;
-                 v < first + count && v < firstVirtualView_; ++v) {
-                lightViews_[v].drawn = false;
-            }
+        // Its own cascades then hold no casters, as shading and the
+        // volumes read the pages instead; their views only place the
+        // volumes' shadow maps.
+        const auto first = static_cast<std::size_t>(entry.cone[2]);
+        const auto count = static_cast<std::size_t>(entry.cone[3]);
+        for (std::size_t v = first;
+             v < first + count && v < firstVirtualView_; ++v) {
+            lightViews_[v].drawn = false;
         }
     }
     // Shadow linking: each light's views draw only the geometry its
@@ -3942,6 +3937,10 @@ void RasterRenderer::Update(
         volumes_->Set(raster.volumes, raster.origin, bands_,
                       viewWorlds_, viewProjections, lightViewWorlds,
                       volumeSettings, params.frame, uploads_);
+    }
+    // The volumes' pages are marked along the rays through them.
+    if (virtualLight_ >= 0) {
+        virtualShadow_->SetVolumes(volumes_->Boxes(), &uploads_);
     }
     WriteCascadeJobs();
     // A cube camera's motion is its faces', which the sensor maps

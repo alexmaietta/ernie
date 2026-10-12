@@ -109,10 +109,22 @@ class VirtualShadowMap {
     void SetLevels(std::span<const VirtualShadowLevel> levels,
                    float bias, FrameUploads* uploads = nullptr);
 
+    /// The volumes' boxes (origin-relative low and high corners),
+    /// whose points along the camera's rays `RecordMark` marks too,
+    /// as volumes read the map there; past `kMaxVolumeBoxes`, the
+    /// rest as one box around them. Through `uploads` as `SetLevels`.
+    void
+    SetVolumes(std::span<const std::pair<glm::vec3, glm::vec3>> boxes,
+               FrameUploads* uploads = nullptr);
+
+    static constexpr std::uint32_t kMaxVolumeBoxes = 256;
+
     /// Flags the pages of every second pixel's point in `depth`
     /// (reversed-Z, 0 far; sampled as `VK_IMAGE_LAYOUT_SHADER_READ_
     /// ONLY_OPTIMAL`), `inverseViewProjection` taking clip space to
-    /// origin-relative world, the camera at `eye` (origin-relative).
+    /// origin-relative world, the camera at `eye` (origin-relative);
+    /// and those along every eighth pixel's ray through the volumes'
+    /// boxes (`SetVolumes`), up to its point.
     void RecordMark(VkCommandBuffer commands, VkImageView depth,
                     std::uint32_t width, std::uint32_t height,
                     const glm::mat4& inverseViewProjection,
@@ -153,6 +165,7 @@ class VirtualShadowMap {
         float inverseViewProjection[16];
         float eye[4];
         std::uint32_t sizes[4];
+        std::uint32_t volumes[4];
     };
 
     const VulkanContext& context_;
@@ -168,8 +181,11 @@ class VirtualShadowMap {
     std::unique_ptr<GpuBuffer> counter_;
     std::unique_ptr<GpuBuffer> block_;
     std::unique_ptr<GpuImage> noDepth_;
+    std::unique_ptr<GpuBuffer> volumeBoxes_;
+    std::uint32_t volumeBoxCount_ = 0;
     mutable bool cleared_ = false;
     mutable std::unique_ptr<ComputePipeline> markPipeline_;
+    mutable std::unique_ptr<ComputePipeline> markVolumesPipeline_;
     mutable std::unique_ptr<ComputePipeline> allocatePipeline_;
     mutable std::unique_ptr<ComputePipeline> clearPipeline_;
 
