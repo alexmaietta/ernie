@@ -24,6 +24,8 @@ void DefineDefaultScene(Scene& scene);
 ///     ernie scene.json --output x.png     renders it, no window
 ///     ernie --demo demo_lighting_illuminants   that demo running
 ///     ernie --list                the demos' names
+///     ernie bake-texture in.png out.dds    a texture baked
+///                                 (`BakeTextureMain`)
 ///
 /// It takes the options every demo takes (`ParseDemoOptions`), so a
 /// scene file renders headless or without a viewer as a demo does,
@@ -33,5 +35,11 @@ void DefineDefaultScene(Scene& scene);
 /// status, printing any error.
 int ErnieMain(std::span<const std::string> args,
               std::string_view version);
+
+/// `ernie bake-texture input output.dds [options]` (`args` after
+/// `bake-texture`): bakes an image into a mipped, block-compressed
+/// DDS file (`BakeTexture`). Returns the exit status, printing any
+/// error.
+int BakeTextureMain(std::span<const std::string> args);
 
 }  // namespace ernie::app

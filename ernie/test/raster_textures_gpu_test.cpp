@@ -8,6 +8,7 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/texture_bake.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
@@ -723,4 +724,81 @@ TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
     }
     EXPECT_GT(delegate.Stats().gpuBytes, before)
         << "tiles were loaded";
+}
+
+TEST_F(RasterDelegateTest, BakedTexturesRenderAsTheirSources) {
+    // The quadrants (64 x 64) mipped and baked to BC7 render as the
+    // image uploaded whole; a tilted normal map baked to BC5 tilts
+    // the surface as the plain one does.
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp");
+    const glm::vec4 kQuadrants[2][2] = {
+        {glm::vec4(1, 0, 0, 1), glm::vec4(0, 1, 0, 1)},
+        {glm::vec4(0, 0, 1, 1), glm::vec4(1, 1, 1, 1)}};
+    ernie::Image quadrants(64, 64);
+    std::vector<std::uint8_t> texels;
+    for (std::uint32_t y = 0; y < 64; ++y) {
+        for (std::uint32_t x = 0; x < 64; ++x) {
+            const glm::vec4 c = kQuadrants[y / 32][x / 32];
+            quadrants.At(x, y) = c;
+            for (int i = 0; i < 4; ++i) {
+                texels.push_back(
+                    static_cast<std::uint8_t>(c[i] * 255.0f));
+            }
+        }
+    }
+    RasterDelegate delegate(*context_);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(texels, {64, 64, 4}));
+    const std::vector<float> decoded = Quadrants(delegate, scene);
+    scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+    const std::string colour =
+        ::testing::TempDir() + "baked_quadrants.dds";
+    ernie::WriteDdsFile(
+        colour,
+        ernie::EncodeTexture(
+            ernie::MipChain(quadrants, ernie::MipFilter::Average),
+            ernie::TextureFormat::Bc7, ernie::ImageEncoding::Linear));
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(colour);
+    const std::vector<float> baked = Quadrants(delegate, scene);
+    for (std::size_t i = 0; i < baked.size(); ++i) {
+        EXPECT_NEAR(baked[i], decoded[i], 0.03f * decoded[i] + 1e-3f)
+            << "value " << i;
+    }
+
+    ernie::Material(scene, "/Looks/M").SetBrdf("lambert");
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    scene.Set("/Looks/M/Tex", tokens::kShaderScale,
+              glm::vec4(2.0f, 2.0f, 2.0f, 1.0f));
+    scene.Set("/Looks/M/Tex", tokens::kShaderBias,
+              glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f));
+    scene.Clear("/Looks/M/Surface",
+                std::string(tokens::kDiffuseColor) +
+                    std::string(tokens::kConnectSuffix));
+    const float flat = CentreGreen(delegate, scene);
+    ASSERT_GT(flat, 0.0f);
+    const float tilt = glm::radians(30.0f);
+    const ernie::Image normals(
+        16, 16,
+        glm::vec4(0.5f * std::sin(tilt) + 0.5f, 0.5f,
+                  0.5f * std::cos(tilt) + 0.5f, 1.0f));
+    const std::string normal =
+        ::testing::TempDir() + "baked_normal.dds";
+    ernie::WriteDdsFile(
+        normal,
+        ernie::EncodeTexture(
+            ernie::MipChain(normals, ernie::MipFilter::NormalSlopes),
+            ernie::TextureFormat::Bc5, ernie::ImageEncoding::Linear));
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(normal);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput,
+                   "/Looks/M/Tex", "outputs:rgb");
+    EXPECT_NEAR(CentreGreen(delegate, scene) / flat,
+                std::cos(glm::radians(15.0f)) /
+                    std::cos(glm::radians(45.0f)),
+                0.03f);
 }

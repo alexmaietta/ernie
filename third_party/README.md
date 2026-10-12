@@ -40,6 +40,7 @@ Everything else is fetched at configure time (`cmake/third_party/<name>.cmake`, 
 | [Imath](https://github.com/AcademySoftwareFoundation/Imath) | with OpenEXR | BSD-3-Clause | OpenEXR's math |
 | [libdeflate](https://github.com/ebiggers/libdeflate), [zstd](https://github.com/facebook/zstd), [OpenJPH](https://github.com/aous72/OpenJPH) | vendored by OpenEXR | MIT, BSD-3-Clause, BSD-2-Clause | OpenEXR's compression; zstd also KTX2 supercompression |
 | [Basis Universal](https://github.com/BinomialLLC/basis_universal) | `v2_50` (transcoder only) | Apache-2.0 | Transcoding Basis (ETC1S) and UASTC KTX2 textures to BC; their zstd from OpenEXR's |
+| [bc7enc_rdo](https://github.com/richgel999/bc7enc_rdo) | commit `b9438627eef73a1157e84201b6fa6eb2ffd6d9f0` (bc7enc and rgbcx only) | MIT or public domain | Baking textures to BC1, BC3, BC4, BC5 and BC7 (`ernie bake-texture`) |
 | [meshoptimizer](https://github.com/zeux/meshoptimizer) | `v1.3` | MIT | Simplified levels of detail |
 | [nlohmann/json](https://github.com/nlohmann/json) | `v3.12.0` | MIT | Reading JSON |
 | [Dear ImGui](https://github.com/ocornut/imgui) | `v1.92.9b-docking` | MIT | The viewer's UI (app only) |

@@ -15,6 +15,7 @@ ernie_add_library(
     solar.cpp
     spectrum.cpp
     tensor.cpp
+    texture_bake.cpp
     texture_file.cpp
     PUBLIC
     ernie_glm
@@ -26,4 +27,5 @@ ernie_add_library(
     ernie_nanovdb
     ernie_openexr
     ernie_basisu
-    ernie_zstd)
+    ernie_zstd
+    ernie_bc7enc)

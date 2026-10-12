@@ -42,6 +42,7 @@ function(ernie_install_licenses destination component)
         openexr
         imath
         basisu
+        bc7enc
         meshoptimizer
         nlohmann_json
         tracy
@@ -80,6 +81,7 @@ function(ernie_install_licenses destination component)
     license(zstd "${openexr_SOURCE_DIR}/external/zstd/LICENSE")
     license(openjph "${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE")
     license(basis-universal "${basisu_SOURCE_DIR}/LICENSE")
+    license(bc7enc-rdo "${bc7enc_SOURCE_DIR}/LICENSE")
     license(meshoptimizer "${meshoptimizer_SOURCE_DIR}/LICENSE.md")
     license(nlohmann-json "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT")
     if(APPLE)

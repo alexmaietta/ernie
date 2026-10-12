@@ -7,7 +7,9 @@
 #include "ernie/scene/scene_json.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/texture_bake.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -32,6 +34,7 @@ any of Ernie's demos. With --viewer null or --output, renders without a window.
   ernie --demo demo_lighting_illuminants
                                       the viewer with a demo running
   ernie --list                        the demos' names
+  ernie bake-texture in.png out.dds   bakes a texture (ernie bake-texture --help)
 
 Options:
 )";
@@ -87,8 +90,104 @@ void DefineDefaultScene(Scene& scene) {
             {0.0, -12.0, 5.0}, {0.0, 0.0, 0.8}, {0.0, 0.0, 1.0}));
 }
 
+int BakeTextureMain(std::span<const std::string> args) {
+    constexpr std::string_view kBakeUsage =
+        R"(Usage: ernie bake-texture input output.dds [options]
+
+Bakes a PNG, JPEG or EXR image into a DDS file for Ernie's textures: every mip, filtered as its
+role says, then block-compressed (BC7 for colour and data, BC5 for normal maps), as virtual
+textures (ernie:virtualTexture) need.
+
+  --role colour|normal|data    what the image holds (default colour: sRGB colour)
+  --format bc1|bc3|bc4|bc5|bc7|rgba8
+                               the stored format, in place of the role's
+  --linear                     colour stored linear rather than sRGB
+  --quality 0-4                BC7's effort (default 1)
+)";
+    std::vector<std::string> files;
+    BakeOptions options;
+    try {
+        for (std::size_t i = 0; i < args.size(); ++i) {
+            const std::string& arg = args[i];
+            const auto value = [&]() -> const std::string& {
+                if (i + 1 >= args.size()) {
+                    throw std::invalid_argument(arg +
+                                                " needs a value");
+                }
+                return args[++i];
+            };
+            if (arg == "--help" || arg == "-h") {
+                std::printf("%s", std::string(kBakeUsage).c_str());
+                return 0;
+            } else if (arg == "--role") {
+                const std::string& role = value();
+                if (role == "colour" || role == "color") {
+                    options.role = TextureRole::Colour;
+                } else if (role == "normal") {
+                    options.role = TextureRole::Normal;
+                } else if (role == "data") {
+                    options.role = TextureRole::Data;
+                } else {
+                    throw std::invalid_argument("unknown role " +
+                                                role);
+                }
+            } else if (arg == "--format") {
+                const std::string& format = value();
+                const std::pair<const char*, TextureFormat>
+                    kFormats[] = {{"bc1", TextureFormat::Bc1},
+                                  {"bc3", TextureFormat::Bc3},
+                                  {"bc4", TextureFormat::Bc4},
+                                  {"bc5", TextureFormat::Bc5},
+                                  {"bc7", TextureFormat::Bc7},
+                                  {"rgba8", TextureFormat::Rgba8}};
+                const auto it = std::find_if(
+                    std::begin(kFormats), std::end(kFormats),
+                    [&](const auto& entry) {
+                        return format == entry.first;
+                    });
+                if (it == std::end(kFormats)) {
+                    throw std::invalid_argument("unknown format " +
+                                                format);
+                }
+                options.format = it->second;
+            } else if (arg == "--linear") {
+                options.srgb = false;
+            } else if (arg == "--quality") {
+                options.quality = std::stoi(value());
+            } else if (arg.starts_with("--")) {
+                throw std::invalid_argument("unknown option " + arg);
+            } else {
+                files.push_back(arg);
+            }
+        }
+        if (files.size() != 2) {
+            throw std::invalid_argument(
+                "needs an input and an output file");
+        }
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "ernie bake-texture: %s\n\n%s",
+                     error.what(), std::string(kBakeUsage).c_str());
+        return 2;
+    }
+    try {
+        const TextureData texture =
+            BakeTexture(files[0], files[1], options);
+        std::printf("%s: %u x %u, %u mips, %zu bytes\n",
+                    files[1].c_str(), texture.width, texture.height,
+                    texture.mips, texture.bytes.size());
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "ernie bake-texture: %s\n",
+                     error.what());
+        return 1;
+    }
+    return 0;
+}
+
 int ErnieMain(std::span<const std::string> args,
               std::string_view version) {
+    if (!args.empty() && args.front() == "bake-texture") {
+        return BakeTextureMain(args.subspan(1));
+    }
     for (const std::string& arg : args) {
         if (arg == "--version") {
             std::printf("ernie %.*s\n",
