@@ -5,6 +5,7 @@
 import bindless;
 import brdf;
 import frame;
+import gbuffer;
 
 public struct Surface {
     // rgb: albedo where no albedo map applies (shading uses the material's spectrum instead),
@@ -53,7 +54,8 @@ public struct Surface {
     // Slots in the bindless heap (`surfaceSlot`): 0 the albedo map, 1 the detail albedo and 2
     // the detail normal textures (`heapTextures`), 3 the detail sampler (`heapSamplers`); 4 to 8
     // the mesh textures' images and 9 to 13 their samplers, by `MaterialTextureSlot`; 14 a virtual
-    // albedo texture's min-LOD map, or its pages (`heapTextureArrays`, slot 4 then its tail).
+    // albedo texture's min-LOD map, or its pages (`heapTextureArrays`, slot 4 then its tail); 15
+    // the temperature texture.
     public uint4 heap[4];
     // A virtual albedo texture (`VirtualTexture`, `virtualTexture`): its first tail mip, mips (0
     // for none), width and height; texels across and down a tile; this frame slot's request
@@ -61,9 +63,29 @@ public struct Surface {
     public uint4 virtualAlbedo;
     public uint2 virtualTile;
     public uint* virtualRequests;
+    // x: 1 with a temperature texture, kelvin in red (heap slot 15, `temperatureTexture`); yzw
+    // unused.
+    public float4 temperature;
 }
 
 [[vk::binding(5, 0)]] public ConstantBuffer<Surface> surface;
+
+// The temperature texture at image coordinates `uv` (origin top left), bilinear from four loads
+// since float formats need not filter, clamped at its edges.
+public float temperatureTexture(float2 uv) {
+    let image = heapTextures[surfaceSlot(15)];
+    uint width;
+    uint height;
+    image.GetDimensions(width, height);
+    let p = uv * float2(width, height) - 0.5;
+    let f = p - floor(p);
+    let last = int2(width, height) - 1;
+    let a = clamp(int2(floor(p)), int2(0), last);
+    let b = clamp(int2(floor(p)) + 1, int2(0), last);
+    let top = lerp(image.Load(int3(a.x, a.y, 0)).r, image.Load(int3(b.x, a.y, 0)).r, f.x);
+    let bottom = lerp(image.Load(int3(a.x, b.y, 0)).r, image.Load(int3(b.x, b.y, 0)).r, f.x);
+    return lerp(top, bottom, f.y);
+}
 
 // The material's heap slot `i` (`Surface::heap`).
 public uint surfaceSlot(uint i) {
@@ -412,17 +434,10 @@ public struct Minimal {
     public uint4 ids : SV_Target1;
 }
 
-// Unit vector `n` as two 16-bit snorm octahedral coordinates.
-//
-// Reference: Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A Survey
-// of Efficient Representations for Independent Unit Vectors", JCGT 3(2), 2014.
-// http://jcgt.org/published/0003/02/01/
+// Unit vector `n` as two 16-bit snorm octahedral coordinates (gbuffer.slang's
+// `octahedralEncode`).
 public uint packOctahedral(float3 n) {
-    var p = n.xy / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-12);
-    if (n.z < 0.0) {
-        p = (1.0 - abs(p.yx)) * select(p >= 0.0, float2(1.0), float2(-1.0));
-    }
-    let q = int2(round(clamp(p, -1.0, 1.0) * 32767.0));
+    let q = int2(round(clamp(octahedralEncode(n), -1.0, 1.0) * 32767.0));
     return (uint(q.x) & 0xFFFFu) | (uint(q.y) << 16);
 }
 
@@ -447,7 +462,7 @@ float srgbEncode(float c) {
 //   and the Smith term's k = alpha / 2).
 public Minimal minimalShade(GBuffer g, float3 world) {
     Minimal out;
-    out.ids = uint4(g.ids.y, g.ids.z, packOctahedral(normalize(g.normal.xyz)), g.ids.w);
+    out.ids = uint4(g.ids.y, g.ids.z, packOctahedral(unpackNormal(g.normal)), g.ids.w);
     let mode = uint(u.minimal.w) & 3u;
     float3 color = float3(0.0);
     if (mode != kMinimalNone) {
@@ -459,7 +474,7 @@ public Minimal minimalShade(GBuffer g, float3 world) {
         if ((g.ids.w & kUnlit) != 0) {
             color = base;
         } else {
-            let n = normalize(g.normal.xyz);
+            let n = unpackNormal(g.normal);
             let v = normalize(u.eye.xyz - world);
             let alpha = max(surface.gloss.x * surface.gloss.x, 1e-3);
             let metallic = glossy ? saturate(surface.gloss.y) : 0.0;

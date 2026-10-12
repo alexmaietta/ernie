@@ -18,7 +18,8 @@ public struct PlanetUniforms {
     public float4 lodEye;
     // Morph start distance and 1 / (morph end - morph start) per LOD level, two levels per float4.
     public float4 morph[16];
-    // Material, prim id, light link group.
+    // Material, prim id, light link group, the float bits of its own temperature in kelvin (0 for
+    // its material's, or with thermal emission off).
     public uint4 ids;
     // xyz: towards the hillshade's light in each point's frame (east, north, up), north towards +z.
     public float4 hillshade;

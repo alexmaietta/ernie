@@ -49,6 +49,7 @@ import virtual_shadow;
 import light_pattern;
 import light_patterns;
 import laser_beams;
+import gbuffer;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
 // (projection_pinhole.slang, projection_pushbroom.slang).
 import projection;
@@ -197,9 +198,13 @@ struct MaterialGpu {
     // Reflectance per band normalised to luminance 1 (G-buffer albedo.x scales it), four per
     // float4.
     float4 reflectance[16];
-    // Emitted spectral radiance per band (W m^-2 sr^-1 nm^-1), four per float4.
+    // Emitted spectral radiance per band (W m^-2 sr^-1 nm^-1), four per float4: its colour's, in
+    // the visible; thermal emission is `thermalBand`'s.
     float4 emission[16];
-    // x: its rms surface height, m (`laserSpeckle`); yzw unused.
+    // Thermal emissivity per band, four per float4.
+    float4 emissivity[16];
+    // x: its rms surface height, m (`laserSpeckle`); y: its temperature in kelvin, 0 for none or
+    // with thermal emission off; zw unused.
     float4 surface;
 }
 
@@ -374,6 +379,9 @@ float reflectanceBand(uint id, uint band) {
 }
 float emissionBand(uint id, uint band) {
     return materials[id].emission[band / 4][band % 4];
+}
+float emissivityBand(uint id, uint band) {
+    return materials[id].emissivity[band / 4][band % 4];
 }
 float spectrumBand(uint k, uint band) {
     return lights[k].spectrum[band / 4][band % 4];
@@ -2372,7 +2380,7 @@ void occlusionMain(uint3 id : SV_DispatchThreadID) {
                      1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
     let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
     let v = viewVector(ndc.xy, world);
-    let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
+    let n = facingNormal(unpackNormal(gNormal.Load(pixel)), v);
     var occlusion = domeOcclusion(int2(id.xy), id.z, world, ndc.z, n, v);
     // Over terrain, and on what stands over it, the horizon map's occlusion too, which sees the
     // whole terrain: the less visible of the two (as Unreal combines distance field and
@@ -2407,7 +2415,7 @@ void occlusionFilterMain(uint3 id : SV_DispatchThreadID) {
         occlusionFiltered[id] = float4(0.0, 0.0, 1.0, 1.0);
         return;
     }
-    let n = normalize(gNormal.Load(int4(id.xyz, 0)).xyz);
+    let n = unpackNormal(gNormal.Load(int4(id.xyz, 0)));
     let scale = max(0.01 * length(world - shv.eye.xyz), 1e-4);
     var sum = float4(0.0);
     var weights = 0.0;
@@ -2418,7 +2426,7 @@ void occlusionFilterMain(uint3 id : SV_DispatchThreadID) {
             if (!gbufferPoint(at, id.z, other)) {
                 continue;
             }
-            let otherNormal = normalize(gNormal.Load(int4(at, id.z, 0)).xyz);
+            let otherNormal = unpackNormal(gNormal.Load(int4(at, id.z, 0)));
             let offPlane = abs(dot(n, other - world)) / scale;
             let weight = exp(-offPlane * offPlane) * pow(saturate(dot(n, otherNormal)), 8.0);
             let value = occlusionRaw[uint3(at, id.z)];
@@ -2475,7 +2483,11 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // along: the surface's own, as the shadow maps drew it, across the pixel's neighbours' points
     // (`geometricNormal`), not the bent one, which at grazing views would lift the receiver
     // sideways, nor a normal map's, whose bumps the maps never saw.
-    let surfaceNormal = normalize(gNormal.Load(pixel).xyz);
+    let packedNormal = gNormal.Load(pixel);
+    let surfaceNormal = unpackNormal(packedNormal);
+    // Its temperature: the G-buffer's, else its material's (0 for none, or thermal emission off).
+    let pixelKelvin = unpackTemperature(packedNormal);
+    let kelvin = pixelKelvin > 0.0 ? pixelKelvin : material.surface.y;
     let n = facingNormal(surfaceNormal, v);
     let shadowNormal = geometricNormal(int2(id.xy), id.z, world, surfaceNormal);
     // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
@@ -2738,6 +2750,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             if (material.info.z != 0 && !unlit) {
                 radiance[j] += emissionBand(ids.x, band);
             }
+            if (kelvin > 0.0 && !unlit) {
+                radiance[j] += thermalBand(ids.x, band, kelvin);
+            }
             // The atmosphere's sky and ground around it, diffusely.
             radiance[j] += environment.diffuse[j] * (kShadeAir ? surround[band] : 0.0);
             if (domeScale > 0.0) {
@@ -2831,6 +2846,27 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
 static const uint kMaxBands = ERNIE_MAX_BANDS;
 // Planck's second radiation constant, hc/k, in nm K.
 static const float kPlanckC2 = 1.4387769e7;
+
+// A black body's spectral radiance at `wavelength` (nm) and `kelvin`, W m^-2 sr^-1 nm^-1: 2hc^2
+// (1.191043e20 W nm^4 m^-2 sr^-1) / lambda^5 / (exp(hc / (lambda k T)) - 1).
+float planck(float wavelength, float kelvin) {
+    let r = 1.0 / wavelength;
+    return 1.1910430e20 * r * r * r * r * r / (exp(kPlanckC2 * r / kelvin) - 1.0);
+}
+
+// Material `id`'s thermal emission in band `band` at `kelvin`: its emissivity times Planck's
+// radiance averaged over the band by four-point Gauss-Legendre quadrature (RGB mode's bands as
+// spans of the visible, where only glowing surfaces emit).
+float thermalBand(uint id, uint band, float kelvin) {
+    static const float2 kNodes[2] = { float2(0.3399810, 0.6521452), float2(0.8611363, 0.3478548) };
+    let centre = sh.range.x + (float(band) + 0.5) * sh.range.y;
+    var sum = 0.0;
+    for (uint k = 0; k < 2; ++k) {
+        let offset = 0.5 * sh.range.y * kNodes[k].x;
+        sum += kNodes[k].y * (planck(centre - offset, kelvin) + planck(centre + offset, kelvin));
+    }
+    return emissivityBand(id, band) * 0.5 * sum;
+}
 
 // A black body's spectral radiance at `wavelength` (nm) over its value at 555 nm.
 float planckRatio(float wavelength, float kelvin) {

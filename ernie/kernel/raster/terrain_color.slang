@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Terrain G-buffer pass: the terrain's normals, shadows, albedo and ids for spectral shading.
 import terrain;
+import gbuffer;
 import surface;
 
 struct VertexOutput {
@@ -80,7 +81,7 @@ GBuffer fragmentMain(VertexOutput in) {
         modulation = modulation * levelTints[in.level % 6];
     }
     GBuffer out;
-    out.normal = float4(shadingNormal, 1.0);
+    out.normal = packNormal(shadingNormal, asfloat(t.ids.w));
     let scale = flags == kUnlit ? 1.0 : surfaceAlbedoScale(in.world);
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
     out.ids = uint4(t.ids.x, t.ids.y, 0,

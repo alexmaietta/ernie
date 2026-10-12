@@ -281,7 +281,8 @@ public float minimalShadow(float3 world, float3 normal) {
 }
 
 // What raster passes write for the spectral shading pass (see `RenderTargets`):
-//   normal: unit shading normal, w 1 (the lights' shadows are the shading pass's);
+//   normal: unit shading normal and the surface's temperature, as gbuffer.slang's `packNormal`
+//           (the lights' shadows are the shading pass's);
 //   albedo: x scale on the material's reflectance (albedo map over its luminance), yzw linear RGB
 //           modulation of it (detail albedo, tints, vertex colours, debug overlays);
 //   ids: material, prim id, instance id, flags (kUnlit: light without shading or shadows).

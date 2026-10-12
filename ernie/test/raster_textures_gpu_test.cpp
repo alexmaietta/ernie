@@ -850,3 +850,47 @@ TEST_F(RasterDelegateTest, BakedTexturesRenderAsTheirSources) {
                     std::cos(glm::radians(45.0f)),
                 0.03f);
 }
+
+TEST_F(RasterDelegateTest,
+       TemperatureTexturesSetTheTemperatureAcrossAMesh) {
+    // The quad's material at 250 K with a 2 x 1 temperature texture
+    // of 0 (the material's) and 400 K: the Temperature var reads the
+    // texels' centres, bilinear between them; the prim's own
+    // temperature replaces both, and thermal emission off reads none.
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    const std::array<float, 2> texels{0.0f, 400.0f};
+    ernie::Material(scene, "/Looks/M")
+        .SetThermalTemperature(250.0)
+        .SetThermalTemperatureTexture(
+            Tensor::Copy<float>(texels, {1, 2}));
+    RasterDelegate delegate(*context_);
+    const auto at = [&](float x) {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        const glm::vec4 clip =
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
+                                  kSize)
+                .RasterView()
+                .ViewProjection() *
+            glm::vec4(x, 0.0f, 0.0f, 1.0f);
+        const auto col = static_cast<std::size_t>(
+            (clip.x / clip.w * 0.5f + 0.5f) * kSize);
+        return kelvin.As<float>()[(kSize / 2) * kSize + col];
+    };
+    // Outside the texels' centres (u 0.25 and 0.75) the edges clamp.
+    EXPECT_NEAR(at(-6.0f), 250.0f, 0.01f) << "0 is the material's";
+    EXPECT_NEAR(at(6.0f), 400.0f, 0.01f);
+    // Within a pixel of u 0.5, where it climbs 50 K a metre.
+    EXPECT_NEAR(at(0.0f), 200.0f, 40.0f)
+        << "bilinear between 0 and 400";
+    ernie::Mesh(scene, "/World/Quad").SetThermalTemperature(500.0);
+    EXPECT_NEAR(at(6.0f), 500.0f, 0.01f);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(false);
+    EXPECT_EQ(at(6.0f), 0.0f);
+}

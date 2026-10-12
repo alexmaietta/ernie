@@ -7,6 +7,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
@@ -75,6 +76,7 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
         ProjectionModule(pushbroom),
         {"bindless", shaders::kBindlessSlang},
         {"frame", shaders::kFrameSlang},
+        {"gbuffer", shaders::kGBufferSlang},
         {"surface", shaders::kSurfaceSlang},
         {"ground", shaders::kGroundSlang}};
     const std::vector<std::uint32_t> vertex =
@@ -167,6 +169,8 @@ void GroundDrawable::Prepare(const FrameParams& params,
                           : RasterRenderer::kDefaultMaterial;
     uniforms.ids[1] = params_.primId;
     uniforms.ids[2] = params_.linkGroup;
+    uniforms.ids[3] = std::bit_cast<std::uint32_t>(
+        params.thermal.enable ? params_.temperature : 0.0f);
     const VkDeviceSize bytes = params.Views() * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());

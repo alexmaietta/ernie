@@ -71,6 +71,7 @@ set(ernie_shaders
     raster/present.slang=kPresentSlang
     raster/projection_pinhole.slang=kProjectionPinholeSlang
     raster/projection_pushbroom.slang=kProjectionPushbroomSlang
+    raster/gbuffer.slang=kGBufferSlang
     raster/shading.slang=kShadingSlang
     raster/surface.slang=kSurfaceSlang
     raster/terrain.slang=kTerrainSlang
@@ -82,6 +83,7 @@ set(ernie_shaders
     raster/virtual_shadow.slang=kVirtualShadowSlang
     raster/virtual_shadow_caster.slang=kVirtualShadowCasterSlang
     raster/volume.slang=kVolumeSlang
+    texture/bc7_encode.slang=kBc7EncodeSlang
     bindless.slang=kBindlessSlang
     raster/pnanovdb_prelude.slang=kPNanoVdbPreludeSlang
     ../../third_party/nanovdb/PNanoVDB.h=kPNanoVdbHeader)

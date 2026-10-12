@@ -34,6 +34,8 @@ constexpr DescriptorBinding kBindings[] = {
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     // The pass's own buffers (VolumeResources).
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    // The volumes' temperature (`RenderTargets::MediaTemperature`).
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // light_pattern's pattern data.
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
@@ -166,6 +168,9 @@ constexpr std::uint32_t kHostGrids = 8;
 constexpr std::uint32_t kHostDiscrete = 16;
 // Its temporal flag for volumes whose grids changed to reproject too.
 constexpr std::uint32_t kAnimated = 256;
+// volume.slang's flag for writing the volumes' temperature
+// (`RenderTargets::MediaTemperature`), every pixel marched.
+constexpr std::uint32_t kMediaTemperature = 512;
 // The pixel of each block that marches in each frame, x and y: in the
 // order of a Bayer matrix, each far from the ones just before.
 //
@@ -1619,7 +1624,11 @@ void VolumePass::Record(VkCommandBuffer commands,
                                VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(*pool_),
         DescriptorResource::Of(*resources_),
+        DescriptorResource::Of(targets.MediaTemperature().View(),
+                               VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(*shading.patternData)};
+    targets.MediaTemperature().Transition(commands,
+                                          VK_IMAGE_LAYOUT_GENERAL);
     VolumeConstants constants{};
     constants.layout[0] = firstView;
     constants.layout[1] = layout.stride;
@@ -1720,6 +1729,10 @@ void VolumePass::Record(VkCommandBuffer commands,
         constants.lights[3] = views;
         // After the last frame's march wrote its history.
         ComputeBarrier(commands);
+    }
+    // The Temperature var: every pixel marches, none reprojects.
+    if (targets.HoldsMediaTemperature()) {
+        constants.flags[3] |= kMediaTemperature;
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       pipeline->Handle());

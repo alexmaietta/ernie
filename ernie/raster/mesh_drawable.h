@@ -154,6 +154,10 @@ struct MeshItem {
                                            ///< table.
     glm::vec3 tint{1.0f};  ///< Multiplies the material's albedo where
                            ///< colours are not used.
+    /// Its own temperature in kelvin, in place of its material's
+    /// (`tokens::kThermalTemperature` on the prim); 0 for the
+    /// material's. Drawn only with thermal emission on.
+    float temperature = 0.0f;
     std::uint32_t primId =
         1;  ///< Written to the PrimId render var; 0 means background.
     /// Its light link group (`LinkGroups`): which lights light it and
@@ -1080,6 +1084,9 @@ class MeshDrawable : public RasterDrawable {
     Culling culling_ = Culling::Gpu;
     bool drawsDirty_ =
         true;  ///< Whether the draws changed since `WriteDraws`.
+    /// Whether the frame has thermal emission on, which the items'
+    /// own temperatures are drawn with.
+    bool thermal_ = false;
     /// Each item's transform relative to `origin_` (`SetOrigin`), in
     /// float for the GPU and the bounds; rebuilt when the items or
     /// the origin change.

@@ -70,6 +70,9 @@ struct TerrainParams {
     /// Its light link group (`LinkGroups`), which lights light it and
     /// whose shadows it casts.
     std::uint32_t linkGroup = 0;
+    /// Its own temperature in kelvin, in place of its material's; 0
+    /// for the material's. Drawn only with thermal emission on.
+    float temperature = 0.0f;
     float hillshadeAzimuth =
         315.0f;  ///< Hillshade's light, degrees clockwise from north.
     float hillshadeAltitude =

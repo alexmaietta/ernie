@@ -98,6 +98,13 @@
                                      "nearest value outside them. Unset, 1 minus the "             \
                                      "reflectance (Kirchhoff).",                                   \
                               .group = "Thermal"}))                                                \
+    X(::ernie::Tensor, ThermalTemperatureTexture, ::ernie::tokens::kThermalTemperatureTexture,     \
+      nullptr,                                                                                     \
+      (::ernie::AttributeMeta{.label = "Temperature texture",                                      \
+                              .doc = "float32 (rows, cols) or (rows, cols, 1) kelvin through "     \
+                                     "mesh texture coordinates, row 0 at the top, in place of "    \
+                                     "the temperature; 0 or below there for the temperature.",     \
+                              .group = "Thermal"}))                                                \
     X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo " \
                                      "tiled over the surface.",                                    \

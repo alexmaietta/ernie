@@ -90,6 +90,14 @@ RenderTargets::RenderTargets(const VulkanContext& context,
                   VK_FORMAT_R32_SFLOAT, kStorage, false, true,
                   bandLayers});
     held_ = RequiredVars(vars);
+    holdsMediaTemperature_ =
+        std::find(held_.begin(), held_.end(),
+                  render_vars::kTemperature) != held_.end();
+    mediaTemperature_ = std::make_unique<GpuImage>(
+        context,
+        ImageDesc{holdsMediaTemperature_ ? extent.width : 1,
+                  holdsMediaTemperature_ ? extent.height : 1, layers, 1,
+                  VK_FORMAT_R32G32_SFLOAT, kStorage, false, true});
     for (std::size_t i = 0; i < kVarNames.size(); ++i) {
         const bool spectral =
             kVarNames[i] == render_vars::kSpectralRadiance;

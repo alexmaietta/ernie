@@ -165,6 +165,19 @@ class RasterMaterial {
     /// @throws std::invalid_argument as `SetDetailTextures`.
     void SetDetailNormal(const Image* normal);
 
+    /// Replaces the temperature texture: `kelvin`, `width` x `height`
+    /// row by row from the top, read through mesh texture coordinates
+    /// with thermal emission on (bilinear, clamped at its edges);
+    /// empty removes it.
+    /// @throws std::invalid_argument if the size does not match or
+    /// exceeds the device's maximum texture size.
+    void SetTemperatureTexture(std::span<const float> kelvin,
+                               std::uint32_t width, std::uint32_t height);
+
+    bool HasTemperatureTexture() const {
+        return temperatureTexture_ != nullptr;
+    }
+
     /// Reads `texture` (from `UploadMaterialTexture`, and shareable
     /// with other materials) for `slot` through mesh texture
     /// coordinates, wrapping as `reader` says; nullptr removes it.
@@ -256,6 +269,7 @@ class RasterMaterial {
     std::unique_ptr<GpuImage> albedoMap_;
     std::unique_ptr<GpuImage> detailAlbedo_;
     std::unique_ptr<GpuImage> detailNormal_;
+    std::unique_ptr<GpuImage> temperatureTexture_;  ///< R32F kelvin.
     /// By `MaterialTextureSlot`: the texture of `SetTexture`, null
     /// for none; the 1 x 1 one bound in its place (white albedo, a
     /// flat normal, zero); and the sampler.

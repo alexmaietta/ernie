@@ -149,6 +149,19 @@ class RenderTargets : public FrameImages {
         return *rasterRadiance_;
     }
 
+    /// The volumes' temperature for the Temperature var, which the
+    /// volume march writes and the sensor reads (sensor.slang's
+    /// `volumeTemperatureSlot`): RG32F, a layer per raster layer, x
+    /// the sum of each step's absorbed share reaching the eye times
+    /// its kelvin and y the sum of the shares; a texel per layer
+    /// unless the frame holds Temperature (`HoldsMediaTemperature`).
+    GpuImage& MediaTemperature() {
+        return *mediaTemperature_;
+    }
+    bool HoldsMediaTemperature() const {
+        return holdsMediaTemperature_;
+    }
+
     /// Whether the raster radiance holds Stokes Q and U beside its
     /// intensity, for a camera with a polarizer; changing it waits
     /// for the device and makes the radiance images anew.
@@ -277,6 +290,8 @@ class RenderTargets : public FrameImages {
     std::array<std::unique_ptr<GpuImage>, 3> gbuffer_;
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
+    std::unique_ptr<GpuImage> mediaTemperature_;
+    bool holdsMediaTemperature_ = false;
     std::unique_ptr<GpuImage> radianceSum_;
     bool stokes_ = false;        ///< See `SetStokes`.
     bool halfRadiance_ = false;  ///< See `SetHalfRadiance`.

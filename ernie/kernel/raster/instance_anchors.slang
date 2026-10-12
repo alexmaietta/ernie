@@ -17,7 +17,7 @@
 static const uint kNone = 0xFFFFFFFFu;
 static const uint kViewPoses = 0;
 static const uint kPointsDraws = 1;
-static const uint kPointsDrawFloats = 44;
+static const uint kPointsDrawFloats = 48;
 
 // The pools an anchor's instancer fills (`MeshDrawable::AnchorOps`); the others hold nothing of
 // its own, and stand at the identity.

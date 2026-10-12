@@ -269,6 +269,7 @@ class RasterDelegate : public RenderDelegate {
         std::optional<Key> albedoMap;
         std::optional<Key> detailAlbedo;
         std::optional<Key> detailNormal;
+        std::optional<Key> temperatureTexture;
         /// What the albedo texture, normal map, roughness, metallic
         /// and opacity textures were loaded from (`TextureKey`).
         std::array<std::string, 5> textures;

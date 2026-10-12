@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Planet G-buffer pass: the planet's normals, shadows, albedo and ids for spectral shading.
 import planet;
+import gbuffer;
 import surface;
 
 struct VertexOutput {
@@ -108,7 +109,7 @@ GBuffer fragmentMain(VertexOutput in) {
         modulation = modulation * levelTints[in.level % 6];
     }
     GBuffer out;
-    out.normal = float4(shadingNormal, 1.0);
+    out.normal = packNormal(shadingNormal, asfloat(p.ids.w));
     let scale = flags == kUnlit ? 1.0 : surface.albedo.a;
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
     out.ids = uint4(p.ids.x, p.ids.y, 0,

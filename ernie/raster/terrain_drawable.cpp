@@ -10,6 +10,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -89,6 +90,7 @@ TerrainModules(bool pushbroom = false) {
             {"bindless", shaders::kBindlessSlang},
             {"frame", shaders::kFrameSlang},
             {"terrain", shaders::kTerrainSlang},
+            {"gbuffer", shaders::kGBufferSlang},
             {"surface", shaders::kSurfaceSlang}};
 }
 
@@ -960,6 +962,8 @@ void TerrainDrawable::Prepare(
     uniforms.ids[0] = material;
     uniforms.ids[1] = params_.primId;
     uniforms.ids[2] = params_.linkGroup;
+    uniforms.ids[3] = std::bit_cast<std::uint32_t>(
+        frame.thermal.enable ? params_.temperature : 0.0f);
     // The heights and gradients in the bindless heap, in fresh slots:
     // the last ones retire once no frame in flight reads them.
     BindlessHeap& heap = renderer_.Context().Bindless();

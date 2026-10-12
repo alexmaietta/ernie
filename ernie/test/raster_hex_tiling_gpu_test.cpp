@@ -86,6 +86,7 @@ class HexTilingGpuTest : public ernie::testing::VulkanTest {
             {"projection", ShaderSource("raster/projection_pinhole")},
             {"bindless", ShaderSource("bindless")},
             {"frame", ShaderSource("raster/frame")},
+            {"gbuffer", ShaderSource("raster/gbuffer")},
             {"surface", ShaderSource("raster/surface")},
             {"harness", kHarness}};
         constexpr VkShaderStageFlags kCompute =

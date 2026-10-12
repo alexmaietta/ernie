@@ -31,6 +31,19 @@ namespace ernie {
 
 namespace {
 
+/// Prim `path`'s own temperature (`tokens::kThermalTemperature`),
+/// `kelvin`, for its drawable.
+/// @throws std::invalid_argument below 0 K.
+float CheckedTemperature(const Path& path, double kelvin) {
+    if (!(kelvin >= 0.0)) {
+        throw std::invalid_argument(
+            "Prim '" + path.String() + "' has '" +
+            std::string(tokens::kThermalTemperature) +
+            "' below 0 K: " + std::to_string(kelvin));
+    }
+    return static_cast<float>(kelvin);
+}
+
 /// The vars the view holds for a chain writing `aovs` AOVs, with
 /// opt-in var `optIn` (it is shown) unless empty: every var (empty)
 /// without either, else every var and the first `aovs` AOV slots.
@@ -714,6 +727,35 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             }
         } catch (const std::invalid_argument& error) {
             throw UploadError(path, attribute, error.what());
+        }
+    }
+    const Key temperatureKey =
+        KeyOf(scene, path, {kThermalTemperatureTexture});
+    if (material.temperatureTexture != temperatureKey) {
+        material.temperatureTexture = temperatureKey;
+        try {
+            if (const Tensor* tensor = prim.GetThermalTemperatureTexture()) {
+                const Tensor kelvin = tensor->Contiguous();
+                const std::vector<std::int64_t> shape = kelvin.Shape();
+                if (kelvin.Type() != DType::Float32 ||
+                    (shape.size() != 2 &&
+                     !(shape.size() == 3 && shape[2] == 1)) ||
+                    shape[0] < 1 || shape[1] < 1) {
+                    throw std::invalid_argument(
+                        "needs float32 (rows, cols) or (rows, cols, 1)");
+                }
+                const auto rows = static_cast<std::uint32_t>(shape[0]);
+                const auto cols = static_cast<std::uint32_t>(shape[1]);
+                gpu.SetTemperatureTexture(
+                    std::span(kelvin.As<float>(),
+                              static_cast<std::size_t>(rows) * cols),
+                    cols, rows);
+            } else if (gpu.HasTemperatureTexture()) {
+                gpu.SetTemperatureTexture({}, 0, 0);
+            }
+        } catch (const std::invalid_argument& error) {
+            throw UploadError(path, kThermalTemperatureTexture,
+                              error.what());
         }
     }
 }
@@ -2313,6 +2355,8 @@ RasterDelegate::PointsItems(const Scene& scene) const {
         }
         item.material = MaterialOf(scene, path);
         item.tint = ConstantDisplayColor(Gprim(scene, path));
+        item.temperature = CheckedTemperature(
+            path, Gprim(scene, path).GetThermalTemperature());
         item.primId = PrimIdOf(path);
         item.linkGroup = links_.GroupOf(path);
         item.world = WorldOf(scene, path);
@@ -2444,6 +2488,8 @@ RasterDelegate::Items(const Scene& scene) const {
             item.material != RasterRenderer::kDefaultMaterial;
         item.tint = bound ? glm::vec3(1.0f) : synced.tint;
         item.vertexColors = !bound;
+        item.temperature = CheckedTemperature(
+            mesh, Gprim(scene, mesh).GetThermalTemperature());
     };
 
     std::vector<MeshItem> items;
@@ -2830,6 +2876,12 @@ void RasterDelegate::UpdatePrims(
     terrain.linkGroup = prims_.terrain.IsEmpty()
                             ? 0u
                             : links_.GroupOf(prims_.terrain);
+    terrain.temperature =
+        prims_.terrain.IsEmpty()
+            ? 0.0f
+            : CheckedTemperature(
+                  prims_.terrain,
+                  Gprim(scene, prims_.terrain).GetThermalTemperature());
     terrain_.SetParams(terrain);
     planet_.SetParams(terrain);
     ground_.SetEnabled(!prims_.ground.IsEmpty());
@@ -2838,6 +2890,9 @@ void RasterDelegate::UpdatePrims(
         ground.material = MaterialOf(scene, prims_.ground);
         ground.primId = PrimIdOf(prims_.ground);
         ground.linkGroup = links_.GroupOf(prims_.ground);
+        ground.temperature = CheckedTemperature(
+            prims_.ground,
+            GroundPlane(scene, prims_.ground).GetThermalTemperature());
         ground_.SetParams(ground);
     }
     // The highlighted prims and everything under them, as the prim

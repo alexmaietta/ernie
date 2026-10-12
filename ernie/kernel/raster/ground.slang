@@ -10,6 +10,7 @@
 //
 // Bindings: frame 0 and 1 (frame.slang), material 5 (surface.slang), 10 GroundUniforms.
 import frame;
+import gbuffer;
 import projection;
 import surface;
 
@@ -25,7 +26,8 @@ struct GroundUniforms {
     float4 colour1;
     // Image width and height in pixels.
     float4 viewport;
-    // Material, prim id, light link group.
+    // Material, prim id, light link group, the float bits of its own temperature in kelvin (0 for
+    // its material's, or with thermal emission off).
     uint4 ids;
     float4 padding[6];  // to 256 bytes, the views' stride
 }
@@ -110,7 +112,7 @@ GroundOutput shadeGround(VertexOutput in) {
 
     let clip = projectWorld(world);
     GroundOutput out;
-    out.normal = float4(normalize(float3(-detail.slope, 1.0)), 1.0);
+    out.normal = packNormal(normalize(float3(-detail.slope, 1.0)), asfloat(g.ids.w));
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
     out.ids = uint4(g.ids.x, g.ids.y, 0,
                     packSurfaceFlags(linkGroupFlags(g.ids.z), detail.slopeVariance));

@@ -450,10 +450,14 @@ struct MaterialGpu {
     /// Spectral radiance the surface emits per band (W m^-2 sr^-1
     /// nm^-1).
     float emission[SpectralBands::kMaxBands];
-    /// x: its rms surface height, m, for laser speckle; yzw unused.
+    /// Thermal emissivity per band.
+    float emissivity[SpectralBands::kMaxBands];
+    /// x: its rms surface height, m, for laser speckle; y: its
+    /// temperature in kelvin (0 for none, or thermal emission off);
+    /// zw unused.
     float surface[4];
 };
-static_assert(sizeof(MaterialGpu) == 608,
+static_assert(sizeof(MaterialGpu) == 864,
               "MaterialGpu must match shading.slang");
 
 /// Reflectance luminance below which a material counts as black; its
@@ -722,7 +726,9 @@ struct SensorConstants {
     std::uint32_t spectrumSlot;
     std::uint32_t channelsSlot;
     std::uint32_t channelsSampler;
-    std::uint32_t padding;
+    /// The volumes' temperature's heap slot
+    /// (`RenderTargets::MediaTemperature`), 0 for none.
+    std::uint32_t volumeTemperatureSlot;
     /// Each material's temperature, for the Temperature var
     /// (`materialTemperatures_`).
     VkDeviceAddress temperatures;
@@ -947,6 +953,7 @@ ShadingModules(const BrdfModel& brdf,
                     {"atmosphere", shaders::kAtmosphereSlang},
                     {"virtual_shadow", shaders::kVirtualShadowSlang},
                     {"laser_beams", shaders::kLaserBeamsSlang},
+                    {"gbuffer", shaders::kGBufferSlang},
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
                                     brdf.typeName + ";\n" +
@@ -965,6 +972,7 @@ std::vector<ShaderModuleSource> SensorModules(const SensorPlan& plan,
         {"cube_faces", shaders::kCubeFacesSlang},
         {"lensProjection", plan.LensSource()},
         {"bindless", shaders::kBindlessSlang},
+        {"gbuffer", shaders::kGBufferSlang},
         {"sensor", shaders::kSensorSlang}};
     for (auto& [name, source] : plan.Modules()) {
         modules.push_back({name, source});
@@ -4194,6 +4202,7 @@ RasterRenderer::LensPipeline(const std::string& lens,
         {"cube_faces", shaders::kCubeFacesSlang},
         {"lensProjection", lens},
         {"bindless", shaders::kBindlessSlang},
+        {"gbuffer", shaders::kGBufferSlang},
         {"sensor", shaders::kSensorSlang}};
     auto pipeline = std::make_unique<ComputePipeline>(
         context_, layout, compiler_.CompileSpirv(modules, entry));
@@ -4323,27 +4332,38 @@ void RasterRenderer::WriteMaterialTable() {
                     visible * static_cast<double>(peak) * perNit);
             }
         }
-        // Thermal emission, when the frame has it on: its emissivity,
-        // or 1 minus its reflectance (Kirchhoff), times Planck's
-        // radiance at its temperature or else the frame's default.
+        // Thermal emission, when the frame has it on, which shading
+        // computes (shading.slang's `thermalBand`) at its temperature,
+        // else the frame's default, or a pixel's own: its emissivity,
+        // or 1 minus its reflectance (Kirchhoff), per band, weighted
+        // by Planck's radiance at that temperature (300 K without
+        // one).
         const float temperature = settings.temperature > 0.0f
                                       ? settings.temperature
                                       : thermal_.defaultTemperature;
         if (thermal_.enable) {
             temperatures[id] = temperature;
-        }
-        if (thermal_.enable && temperature > 0.0f) {
-            entry.info[2] = 1;
+            entry.surface[1] = temperature;
             const Spectrum& reflectance = material->Reflectance();
-            const std::vector<float> thermal =
-                ThermalEmission(bands_, temperature, [&](double nm) {
-                    return settings.emissivity.Empty()
-                               ? std::clamp(1.0 - reflectance(nm),
-                                            0.0, 1.0)
-                               : settings.emissivity(nm);
-                });
-            for (std::size_t b = 0; b < thermal.size(); ++b) {
-                entry.emission[b] += thermal[b];
+            const auto emissivity = [&](double nm) {
+                return settings.emissivity.Empty()
+                           ? std::clamp(1.0 - reflectance(nm), 0.0, 1.0)
+                           : settings.emissivity(nm);
+            };
+            const double weight = temperature > 0.0f
+                                      ? static_cast<double>(temperature)
+                                      : 300.0;
+            const std::vector<float> emitted =
+                ThermalEmission(bands_, weight, emissivity);
+            const std::vector<float> black =
+                ThermalEmission(bands_, weight, [](double) { return 1.0; });
+            for (int b = 0; b < bands_.count; ++b) {
+                const auto i = static_cast<std::size_t>(b);
+                entry.emissivity[i] =
+                    black[i] > 0.0f
+                        ? emitted[i] / black[i]
+                        : static_cast<float>(emissivity(
+                              bands_.Lower(b) + 0.5 * bands_.Width()));
             }
         }
     }
@@ -6924,6 +6944,14 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
     const std::uint32_t radianceSlot =
         slot(Kind::Texture2DArray, targets.RasterRadiance(),
              VK_IMAGE_LAYOUT_GENERAL);
+    // The volumes' temperature, which their march wrote this frame;
+    // none with thermal emission off, as surfaces have none then.
+    const std::uint32_t volumeTemperatureSlot =
+        thermal_.enable && targets.HoldsMediaTemperature() &&
+                volumes_->Active()
+            ? slot(Kind::Texture2DArray, targets.MediaTemperature(),
+                   VK_IMAGE_LAYOUT_GENERAL)
+            : 0u;
     // Each chain's kernels in turn over the one raster image, each
     // writing its own vars.
     for (const SensorPass& pass : sensorPasses_) {
@@ -6987,7 +7015,7 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             0u,
             0u,
             clampSamplerSlot_.Index(),
-            0u,
+            volumeTemperatureSlot,
             materialTemperatures_->Address()};
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {

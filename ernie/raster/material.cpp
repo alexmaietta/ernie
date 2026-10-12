@@ -54,8 +54,10 @@ struct SurfaceUniforms {
     std::uint32_t virtualAlbedo[4];
     std::uint32_t virtualTile[2];
     std::uint64_t virtualRequests;
+    /// x: 1 with a temperature texture (heap slot 15); yzw unused.
+    float temperature[4];
 };
-static_assert(sizeof(SurfaceUniforms) == 560,
+static_assert(sizeof(SurfaceUniforms) == 576,
               "SurfaceUniforms must match Surface in surface.slang");
 
 /// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate
@@ -543,6 +545,39 @@ void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
     WriteUniform();
 }
 
+void RasterMaterial::SetTemperatureTexture(
+    std::span<const float> kelvin, std::uint32_t width,
+    std::uint32_t height) {
+    std::unique_ptr<GpuImage> image;
+    if (!kelvin.empty()) {
+        if (kelvin.size() !=
+            static_cast<std::size_t>(width) * height) {
+            throw std::invalid_argument(
+                "Temperature texture holds " +
+                std::to_string(kelvin.size()) + " values, not " +
+                std::to_string(width) + " x " +
+                std::to_string(height));
+        }
+        const std::uint32_t maxSize =
+            context_.Limits().maxImageDimension2D;
+        if (width > maxSize || height > maxSize) {
+            throw std::invalid_argument(
+                "Temperature texture exceeds the device's maximum "
+                "texture size");
+        }
+        image = std::make_unique<GpuImage>(
+            context_,
+            ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT});
+        const std::span<const std::byte> mips[] = {
+            std::as_bytes(kelvin)};
+        image->Upload(mips);
+    }
+    vkDeviceWaitIdle(context_.Device());
+    temperatureTexture_ = std::move(image);
+    WriteUniform();
+}
+
 void RasterMaterial::SetDetailNormal(const Image* normal) {
     CheckImage(context_, normal);
     const Image flat(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
@@ -712,6 +747,8 @@ void RasterMaterial::WriteUniform() {
     u.heap[1] = image(detailAlbedo_.get());
     u.heap[2] = image(detailNormal_.get());
     u.heap[3] = sampler(&sampler_);
+    u.heap[15] = image(temperatureTexture_.get());
+    u.temperature[0] = temperatureTexture_ != nullptr ? 1.0f : 0.0f;
     for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
         u.heap[4 + slot] = image(textures_[slot] != nullptr
                                      ? textures_[slot]->image.get()
@@ -771,6 +808,9 @@ std::uint64_t RasterMaterial::GpuBytes() const {
                           detailNormal_->Bytes();
     for (const auto& fallback : fallbacks_) {
         bytes += fallback->Bytes();
+    }
+    if (temperatureTexture_ != nullptr) {
+        bytes += temperatureTexture_->Bytes();
     }
     return bytes;
 }

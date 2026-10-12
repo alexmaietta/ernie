@@ -18,6 +18,7 @@
 // Reference: C. Sigg, T. Weyrich, M. Botsch and M. Gross, "GPU-Based Ray-Casting of Quadratic
 // Surfaces", Eurographics Symposium on Point-Based Graphics, 59-65, 2006.
 import frame;
+import gbuffer;
 import surface;
 import virtual_shadow_caster;
 
@@ -35,6 +36,9 @@ struct PointsDraw {
     uint4 info;
     // Material, prim id, light link group, points.
     uint4 ids;
+    // x: its own temperature in kelvin (0 for its material's, or with thermal emission off); yzw
+    // unused.
+    float4 thermal;
 }
 
 static const uint kChunk = 64;
@@ -188,7 +192,7 @@ PointsOutput shadePoint(VertexOutput in, out float3 hit) {
     // close for spheres small beside the strip's distance to them.
     let clip = projectWorld(hit);
     PointsOutput out;
-    out.normal = float4(normal, 1.0);
+    out.normal = packNormal(normal, d.thermal.x);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, packSurfaceFlags(linkGroupFlags(d.ids.z), 0.0));
     out.depth = saturate(clip.z / clip.w);

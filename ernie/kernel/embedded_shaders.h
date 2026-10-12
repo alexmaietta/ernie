@@ -138,11 +138,20 @@ extern const char kPlanetShadowSlang[];
 /// The bindless heap's arrays (`BindlessHeap`), module `bindless`.
 extern const char kBindlessSlang[];
 
+/// The G-buffer's normal and temperature encoding, module `gbuffer`.
+extern const char kGBufferSlang[];
+
 /// The volume march (`VolumePass`), and PNanoVDB's reader
 /// (third_party/nanovdb) with what precedes it, which the march is
 /// compiled after.
 extern const char kVolumeSlang[];
 extern const char kPNanoVdbPreludeSlang[];
 extern const char kPNanoVdbHeader[];
+/// BC7 encoding on the GPU (`GpuBlockEncoder`), derived from
+/// DirectXTex's compute shader (third_party/directxtex).
+extern const char kBc7EncodeSlang[];
+/// Lasers' beams crossed by a pixel's ray, in closed form, for the
+/// media that scatter them (volume.slang, shading.slang).
+extern const char kLaserBeamsSlang[];
 
 }  // namespace ernie::shaders

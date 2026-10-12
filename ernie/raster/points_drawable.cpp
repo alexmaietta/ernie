@@ -31,8 +31,11 @@ struct GpuPointsDraw {
     float tint[4];
     std::uint32_t info[4];
     std::uint32_t ids[4];
+    /// x: its own temperature in kelvin, 0 for its material's or with
+    /// thermal emission off; yzw unused.
+    float thermal[4];
 };
-static_assert(sizeof(GpuPointsDraw) == 176,
+static_assert(sizeof(GpuPointsDraw) == 192,
               "GpuPointsDraw must match PointsDraw in points.slang");
 
 /// frame.slang's per-draw push constants.
@@ -154,6 +157,7 @@ PointsModules(bool pushbroom = false) {
         ProjectionModule(pushbroom),
         {"bindless", shaders::kBindlessSlang},
         {"frame", shaders::kFrameSlang},
+        {"gbuffer", shaders::kGBufferSlang},
         {"surface", shaders::kSurfaceSlang},
         {"virtual_shadow", shaders::kVirtualShadowSlang},
         {"virtual_shadow_caster", shaders::kVirtualShadowCasterSlang},
@@ -728,6 +732,7 @@ void PointsDrawable::Prepare(
         draw.ids[1] = item.primId;
         draw.ids[2] = item.linkGroup;
         draw.ids[3] = count;
+        draw.thermal[0] = params.thermal.enable ? item.temperature : 0.0f;
     }
     const VkDeviceSize bytes = std::max<VkDeviceSize>(
         draws.size() * sizeof(GpuPointsDraw), 16);

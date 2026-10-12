@@ -279,6 +279,10 @@ struct VolumeResources {
 // the values it reads.
 [[vk::binding(7, 0)]] RWStructuredBuffer<uint> gridsOut;
 [[vk::binding(8, 0)]] StructuredBuffer<float> denseValues;
+// The volumes' temperature for the Temperature var (`kMediaTemperature`, renderer's
+// `RenderTargets::MediaTemperature`): per pixel, x the sum over the march of each step's extinction
+// reaching the eye where it has a temperature times its kelvin, y the sum of those shares.
+[[vk::image_format("rg32f")]] [[vk::binding(9, 0)]] RWTexture2DArray<float2> mediaTemperatureOut;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 #define volumes (pass.volumes)
@@ -1318,6 +1322,15 @@ static const uint kHistoryHeld = 2u;
 static const uint kMarchOnly = 4u;
 static const uint kBlocksOfFour = 8u;
 static const uint kAnimated = 256u;
+// The frame holds the Temperature var: every pixel marches (none reprojects) and writes
+// `mediaTemperatureOut`.
+static const uint kMediaTemperature = 512u;
+
+void writeMediaTemperature(uint3 id, float2 media) {
+    if ((constants.flags.w & kMediaTemperature) != 0) {
+        mediaTemperatureOut[id] = media;
+    }
+}
 
 // Temporal amortisation's blocks' pixels across, and this frame's pixel in each.
 uint temporalBlock() {
@@ -1621,6 +1634,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     let run = runs.xy;
     let shadowRun = runs.zw;
     if (run.y == 0) {
+        writeMediaTemperature(id, float2(0.0));
         if (temporal()) {
             constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
         }
@@ -1682,6 +1696,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         ++count;
     }
     if (count == 0) {
+        writeMediaTemperature(id, float2(0.0));
         if (temporal()) {
             constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
         }
@@ -1696,9 +1711,11 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     // last frame's history does not hold or what the volumes show changed; the others show the
     // last frame's where it reprojects.
     // Changed at a stroke, every pixel marches; their grids written again, the others reproject
-    // clamped to what this frame marched, where animated volumes may.
+    // clamped to what this frame marched, where animated volumes may. With the Temperature var,
+    // which has no history, every pixel marches.
     let changed = pass.rebuild[7] != 0;
     if (held && !marchOnly && pass.rebuild[6] == 0 &&
+        (temporalFlags & kMediaTemperature) == 0 &&
         (!changed || (temporalFlags & kAnimated) != 0)) {
         float kept;
         float front;
@@ -1748,6 +1765,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     // The distance along the ray of what the volumes hold back, weighted by it: where the air in
     // front of them ends.
     float frontSum = 0.0;
+    // The Temperature var's sums (`mediaTemperatureOut`).
+    float2 media = float2(0.0);
     let jitter = hash(uint3(id.xy, constants.layout.w ^ (id.z * 7919u)));
     // Lasers' beams the ray crosses, added at the steps holding them (`BeamCrossings`).
     let crossings =
@@ -1918,6 +1937,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                            volume.params.z
                         : kelvinBase;
                 if (kelvin > 0.0) {
+                    // Its share of what reaches the eye, transmittance times opacity.
+                    media += float2(kelvin, 1.0) * (weight * sigma);
                     let scale = weight * sigma * material.params.y;
                     let inverse = 1.0 / kelvin;
                     for (uint g = 0; g < groups; ++g) {
@@ -2071,6 +2092,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         let front = transmittance < 1.0 ? frontSum / (1.0 - transmittance) : 0.0;
         writeHistory(id, size.xy, transmittance, front, tMax, bands, added);
     }
+    writeMediaTemperature(id, media);
     composite(id, bands, unwritten, transmittance, added);
 }
 

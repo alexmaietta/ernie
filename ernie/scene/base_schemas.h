@@ -51,7 +51,12 @@
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \
                               .group = "Geometry", .options = {::ernie::tokens::kMaterial},        \
-                              .dirty = ::ernie::Dirty::Material}))
+                              .dirty = ::ernie::Dirty::Material}))                                 \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
+      (::ernie::AttributeMeta{.label = "Temperature",                                              \
+                              .doc = "Kelvin, in place of its material's; 0 for the "              \
+                                     "material's own.",                                            \
+                              .group = "Thermal", .max = 5000.0}))
 
 #define ERNIE_BOUNDABLE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_BOUNDABLE_ATTRIBUTES(X)
 #define ERNIE_GPRIM_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_GPRIM_ATTRIBUTES(X)

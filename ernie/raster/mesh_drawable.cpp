@@ -32,6 +32,8 @@ constexpr std::uint32_t kHasOrientations = 8;
 constexpr std::uint32_t kHasScales = 16;
 constexpr std::uint32_t kHasUvs = 32;
 constexpr std::uint32_t kHasInstanceColors = 64;
+/// The frame has thermal emission on (`MeshDrawable::thermal_`).
+constexpr std::uint32_t kThermal = 128;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -324,6 +326,7 @@ std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
         ProjectionModule(pushbroom),
         {"bindless", shaders::kBindlessSlang},
         {"frame", shaders::kFrameSlang},
+        {"gbuffer", shaders::kGBufferSlang},
         {"surface", shaders::kSurfaceSlang},
         {"virtual_shadow", shaders::kVirtualShadowSlang},
         {"virtual_shadow_caster", shaders::kVirtualShadowCasterSlang},
@@ -2447,6 +2450,10 @@ void MeshDrawable::Prepare(const FrameParams& params,
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
     }
+    if (params.thermal.enable != thermal_) {
+        thermal_ = params.thermal.enable;
+        drawsDirty_ = true;
+    }
     // The per-draw data changes only with the draws, meshes or
     // instancers, not every frame.
     bool drawsChanged =
@@ -2606,6 +2613,7 @@ void MeshDrawable::WriteDraws() {
         draw.tint[0] = item.tint.r;
         draw.tint[1] = item.tint.g;
         draw.tint[2] = item.tint.b;
+        draw.tint[3] = thermal_ ? item.temperature : 0.0f;
         draw.offsets[0] = mesh.firstIndex;
         draw.offsets[1] = mesh.firstVertex;
         draw.offsets[2] =
@@ -2620,6 +2628,7 @@ void MeshDrawable::WriteDraws() {
                      ? kHasColors
                      : 0u;
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
+        flags |= thermal_ ? kThermal : 0u;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
         draw.uv[2] =

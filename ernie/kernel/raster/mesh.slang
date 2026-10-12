@@ -7,6 +7,7 @@
 //   10 the buffers' addresses (`MeshResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
+import gbuffer;
 import surface;
 import virtual_shadow_caster;
 
@@ -19,13 +20,16 @@ static const uint kHasOrientations = 8;
 static const uint kHasScales = 16;
 static const uint kHasUvs = 32;
 static const uint kHasInstanceColors = 64;
+// The frame has thermal emission on: the material's temperature texture applies.
+static const uint kThermal = 128;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
     float4x4 model;
     // Instanced draws: the prototype's own transform, applied before the instance's.
     float4x4 prototype;
-    // rgb: tint on the material's albedo where the mesh has no vertex colours, a: unused.
+    // rgb: tint on the material's albedo where the mesh has no vertex colours, a: its own
+    // temperature in kelvin (0 for its material's, or with thermal emission off).
     float4 tint;
     // First index, first vertex, first instance id, flags.
     uint4 offsets;
@@ -582,7 +586,13 @@ GBuffer meshGBuffer(VertexOutput in) {
     let modulation = cascadeTint(in.color * textured.albedo * detail.albedo, in.world);
     let unlit = hiddenLine();
     GBuffer out;
-    out.normal = float4(shadingNormal, 1.0);
+    // Its temperature: its own, else its material's texture's, else 0 for the material's.
+    var kelvin = d.tint.a;
+    if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs) &&
+        surface.temperature.x > 0.0) {
+        kelvin = max(temperatureTexture(imageUv(in.uv)), 0.0);
+    }
+    out.normal = packNormal(shadingNormal, kelvin);
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),
                         wireframe(modulation, in.barycentric));
     out.ids = uint4(d.points.y, d.points.z, in.instance,

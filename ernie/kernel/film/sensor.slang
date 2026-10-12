@@ -46,6 +46,7 @@ module sensor;
 
 import bindless;
 import cube_faces;
+import gbuffer;
 import lens;
 import lensProjection;
 import projection;
@@ -194,7 +195,10 @@ public struct SensorConstants {
     public uint spectrumSlot;
     public uint channelsSlot;
     public uint channelsSampler;
-    uint padding;
+    // The volumes' temperature in `heapTextureArrays` (the volume pass's: x the sum over the march
+    // of each step's absorbed share reaching the eye times its kelvin, y the sum of the shares, per
+    // raster texel), 0 for none.
+    public uint volumeTemperatureSlot;
     // Each material's temperature in kelvin, by G-buffer material id, for the Temperature var
     // (0 for none, or with thermal emission off).
     public float* temperatures;
@@ -920,6 +924,7 @@ public struct Lens : ISpatialSource {
     uint prim;
     uint instance;
     uint material;  // the G-buffer's material id, for Temperature
+    float surfaceKelvin;  // the G-buffer's temperature, or 0 for the material's
 
     public static Lens at(PixelContext pixel) {
         let cam = pixel.uniforms();
@@ -957,6 +962,7 @@ public struct Lens : ISpatialSource {
         lens.prim = 0;
         lens.instance = 0;
         lens.material = 0;
+        lens.surfaceKelvin = 0.0;
         if (lens.dark) {
             return lens;
         }
@@ -987,10 +993,12 @@ public struct Lens : ISpatialSource {
             return lens;  // the sky's radiance, at infinity with no prim
         }
         distancesOf(cam, tap, nearest, lens.imagePlane, lens.camera);
-        lens.normal = float4(normalize(gNormalAt(nearest, layer).xyz), 0.0);
+        let packed = gNormalAt(nearest, layer);
+        lens.normal = float4(unpackNormal(packed), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;
         lens.material = ids.x;
+        lens.surfaceKelvin = unpackTemperature(packed);
         return lens;
     }
 
@@ -1126,7 +1134,19 @@ public struct Lens : ISpatialSource {
             storeLinear(firstbitlow(kHoldsInstanceId), texel, uint4(instance), 1);
         }
         if ((holds & kHoldsTemperature) != 0) {
-            let kelvin = background ? 0.0 : pass.temperatures[material];
+            var kelvin = background ? 0.0
+                                    : (surfaceKelvin > 0.0 ? surfaceKelvin
+                                                           : pass.temperatures[material]);
+            // Volumes before it: their absorption-weighted mean over their opacity, then what
+            // lies behind through the rest (none for the sky or a surface without one).
+            if (pass.volumeTemperatureSlot != 0 && !dark) {
+                let media =
+                    heapTextureArrays[pass.volumeTemperatureSlot].Load(int4(nearest, 0)).xy;
+                if (media.y > 0.0) {
+                    let behind = kelvin > 0.0 ? saturate(1.0 - media.y) : 0.0;
+                    kelvin = (media.x + behind * kelvin) / (media.y + behind);
+                }
+            }
             temperatureOut[id] = kelvin;
             storeLinear(firstbitlow(kHoldsTemperature), texel, uint4(asuint(kelvin)), 1);
         }
