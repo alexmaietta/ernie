@@ -403,13 +403,26 @@ StarFieldParams StarFieldParamsOf(const Scene& scene,
 double AtmospherePresetRadius(std::string_view preset);
 
 /// The Atmosphere at `path` around the planet Terrain `terrain`
-/// (empty for none): with a planet Terrain the planet is at the
-/// world's origin and has its radius unless
+/// (empty for none): with a planet Terrain anchored on the ground the
+/// planet is at the Terrain's translation and has its radius unless
 /// `ernie:atmosphere:planetRadius` sets one; without, it is that
 /// radius, else the preset planet's mean radius, centred that far
-/// below the origin.
+/// below the Atmosphere's origin.
+///
+/// The air is a spherical shell. On an ellipsoid Terrain
+/// (`ernie:radii`) its sphere, of the Atmosphere's radius or else the
+/// preset's, touches the ellipsoid at the foot of the normal through
+/// `eye` (world), sharing its tangent plane there, so the ground and
+/// the air's bottom agree under the viewer and the altitude is right
+/// (three-geospatial's altitude correction); without an eye, it is
+/// centred on the Terrain.
 ///
 /// References:
+/// - takram-design-engineering, three-geospatial,
+///   `Ellipsoid.getOsculatingSphereCenter` and
+///   `getAltitudeCorrectionOffset` (its sphere touches the ellipsoid
+///   rather than osculating it).
+///   https://github.com/takram-design-engineering/three-geospatial
 /// - H. Moritz, "Geodetic Reference System 1980", Journal of Geodesy
 ///   74(1):128-133, 2000 (the Earth's mean radius R1, 6371.0088 km).
 ///   https://doi.org/10.1007/s001900050278
@@ -420,9 +433,9 @@ double AtmospherePresetRadius(std::string_view preset);
 ///   https://doi.org/10.1007/s10569-017-9805-5
 /// @throws std::invalid_argument for another prim type or an unknown
 /// preset.
-AtmosphereParams AtmosphereParamsOf(const Scene& scene,
-                                    const Path& path,
-                                    const Path& terrain);
+AtmosphereParams AtmosphereParamsOf(
+    const Scene& scene, const Path& path, const Path& terrain,
+    const std::optional<glm::dvec3>& eye = std::nullopt);
 
 /// The planet an Atmosphere wraps, in world space.
 struct PlanetSphere {

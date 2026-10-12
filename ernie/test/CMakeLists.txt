@@ -6,6 +6,7 @@ ernie_add_test_suite(
     SOURCES
     device_shader_compiler_test.cpp
     geometry_cube_sphere_lod_test.cpp
+    geometry_ellipsoid_test.cpp
     geometry_frustum_test.cpp
     geometry_lod_quadtree_test.cpp
     geometry_mesh_data_test.cpp

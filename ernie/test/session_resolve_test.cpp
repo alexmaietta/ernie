@@ -950,6 +950,46 @@ TEST(AtmosphereParamsOf, PlacesThePlanet) {
                  std::invalid_argument);
 }
 
+// On an ellipsoid Terrain the air's sphere touches the ground under
+// the eye: the eye keeps its altitude, and the sphere's normal there
+// is the ellipsoid's.
+TEST(AtmosphereParamsOf, AnEllipsoidsAirTouchesTheGroundUnderTheEye) {
+    const glm::dvec3 wgs84(6378137.0, 6378137.0, 6356752.314245);
+    Scene scene;
+    ernie::Atmosphere::Define(scene, "/World/Air");
+    ernie::Terrain::Define(scene, "/World/Earth")
+        .SetPlanetRadii(wgs84);
+    scene.Set(
+        "/World/Earth", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(5.0, 0.0, 0.0)));
+    const RenderPrims prims = ernie::ResolveRenderPrims(scene, {});
+    for (const double latitude : {0.0, 0.5, 1.2, 1.5707}) {
+        // A point 1000 m up the normal at this geodetic latitude.
+        const glm::dvec3 normal(std::cos(latitude), 0.0,
+                                std::sin(latitude));
+        const glm::dvec3 foot =
+            normal * wgs84 * wgs84 /
+            std::sqrt(glm::dot(normal * wgs84, normal * wgs84));
+        const glm::dvec3 eye =
+            glm::dvec3(5.0, 0.0, 0.0) + foot + 1000.0 * normal;
+        const ernie::AtmosphereParams air = ernie::AtmosphereParamsOf(
+            scene, prims.atmosphere, prims.terrain, eye);
+        EXPECT_DOUBLE_EQ(air.planetRadius, 6371.0088e3)
+            << "the preset's";
+        EXPECT_NEAR(glm::distance(eye, air.planetCentre) -
+                        air.planetRadius,
+                    1000.0, 1e-3);
+        EXPECT_NEAR(
+            glm::dot(glm::normalize(eye - air.planetCentre), normal),
+            1.0, 1e-12);
+    }
+    // Without an eye, about the Terrain's centre.
+    EXPECT_EQ(ernie::AtmosphereParamsOf(scene, prims.atmosphere,
+                                        prims.terrain)
+                  .planetCentre,
+              glm::dvec3(5.0, 0.0, 0.0));
+}
+
 // Of several Atmospheres, a frame renders the one nearest the camera:
 // the one it is in, else the nearest top of air.
 TEST(AtmosphereParamsOf, TheNearestAtmosphereRenders) {

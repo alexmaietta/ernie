@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/session/resolve.h"
 
+#include "ernie/geometry/ellipsoid.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/geometry/sphere_tessellation.h"
 #include "ernie/scene/camera_schemas.h"
@@ -2495,9 +2496,10 @@ double AtmospherePresetRadius(std::string_view preset) {
     return 0.0;
 }
 
-AtmosphereParams AtmosphereParamsOf(const Scene& scene,
-                                    const Path& path,
-                                    const Path& terrain) {
+AtmosphereParams
+AtmosphereParamsOf(const Scene& scene, const Path& path,
+                   const Path& terrain,
+                   const std::optional<glm::dvec3>& eye) {
     if (scene.TypeOf(path) != tokens::kAtmosphere) {
         throw std::invalid_argument("'" + path.String() +
                                     "' is not an Atmosphere");
@@ -2522,10 +2524,19 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
                                     "' has no anchor '" + anchor +
                                     "'; use 'ground' or 'centre'");
     }
-    const double planetTerrain =
-        terrain.IsEmpty() || anchor == tokens::kAnchorCentre
-            ? 0.0
-            : Terrain(scene, terrain).GetPlanetRadius();
+    // A planet Terrain's radii: equal ones are a sphere's radius.
+    glm::dvec3 radii(0.0);
+    if (!terrain.IsEmpty() && anchor == tokens::kAnchorGround) {
+        const Terrain planet(scene, terrain);
+        radii = planet.HasPlanetRadii()
+                    ? planet.GetPlanetRadii()
+                    : glm::dvec3(planet.GetPlanetRadius());
+        if (!(glm::all(glm::greaterThan(radii, glm::dvec3(0.0))))) {
+            radii = glm::dvec3(0.0);
+        }
+    }
+    const bool ellipsoid = radii.x != radii.y || radii.y != radii.z;
+    const double planetTerrain = ellipsoid ? 0.0 : radii.x;
     const double radius = prim.GetPlanetRadius();
     params.planetRadius = radius > 0.0          ? radius
                           : planetTerrain > 0.0 ? planetTerrain
@@ -2535,10 +2546,17 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
             ? glm::dvec3(0.0)
             : glm::dvec3(0.0, 0.0, -params.planetRadius);
     params.planetCentre =
-        planetTerrain > 0.0
+        planetTerrain > 0.0 || ellipsoid
             ? glm::dvec3(scene.WorldTransform(terrain)[3])
             : glm::dvec3(scene.WorldTransform(path) *
                          glm::dvec4(local, 1.0));
+    // On an ellipsoid, the sphere touching it under the eye.
+    if (ellipsoid && eye) {
+        const glm::dvec3 foot =
+            GeodeticSurfacePoint(*eye - params.planetCentre, radii);
+        params.planetCentre +=
+            foot - GeodeticNormal(foot, radii) * params.planetRadius;
+    }
     params.groundAlbedo =
         std::clamp(prim.GetGroundAlbedo(), 0.0, 1.0);
     params.hazeOpticalDepth =
@@ -2793,7 +2811,7 @@ FrameParams FrameParamsOf(const Scene& scene,
             scene, glm::dvec3(params.camera.transform[3]));
         params.atmosphere = AtmosphereParamsOf(
             scene, nearest.IsEmpty() ? prims.atmosphere : nearest,
-            prims.terrain);
+            prims.terrain, glm::dvec3(params.camera.transform[3]));
     }
     for (const Path& body : prims.bodies) {
         params.bodies.push_back(BodyParamsOf(scene, body));
