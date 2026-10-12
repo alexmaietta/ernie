@@ -711,6 +711,7 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
 
 void MeshDrawable::SetPoints(std::uint32_t mesh,
                              std::span<const float> points) {
+    ForgetBounds();
     const auto it = meshes_.find(mesh);
     if (it == meshes_.end()) {
         throw std::invalid_argument("Unknown mesh " +
@@ -725,12 +726,14 @@ void MeshDrawable::SetPoints(std::uint32_t mesh,
         PointBounds(it->second.data.points);
     it->second.devicePoints = Tensor();
     it->second.pointsDirty = true;
+    activeMeshes_.insert(mesh);
 }
 
 void MeshDrawable::SetPoints(
     std::uint32_t mesh, const Tensor& points,
     std::optional<std::pair<glm::vec3, glm::vec3>> bounds,
     std::uintptr_t stream) {
+    ForgetBounds();
     const auto it = meshes_.find(mesh);
     if (it == meshes_.end()) {
         throw std::invalid_argument("Unknown mesh " +
@@ -761,6 +764,7 @@ void MeshDrawable::SetPoints(
     target.devicePoints = points;
     target.deviceStream = stream;
     target.pointsDirty = true;
+    activeMeshes_.insert(mesh);
     // Normals it has follow the points on the GPU, unless they come
     // from the device too.
     const bool recompute = !target.data.normals.empty() &&
@@ -802,6 +806,7 @@ void MeshDrawable::SetNormals(std::uint32_t mesh,
     target.deviceNormals = normals;
     target.normalsStream = stream;
     target.normalsDirty = true;
+    activeMeshes_.insert(mesh);
 }
 
 void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors,
@@ -825,6 +830,7 @@ void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors,
     target.deviceColors = colors;
     target.colorsStream = stream;
     target.colorsDirty = true;
+    activeMeshes_.insert(mesh);
 }
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
@@ -900,6 +906,7 @@ Tensor MeshDrawable::MapPoints(std::uint32_t mesh,
         3 * std::size_t{PointBase(target) + target.firstVertex},
         {count, 3});
     FlipPoints(target);
+    activeMeshes_.insert(mesh);
     target.mappedPoints = PoolView(
         points_,
         3 * std::size_t{PointBase(target) + target.firstVertex},
@@ -913,6 +920,7 @@ Tensor MeshDrawable::MapPoints(std::uint32_t mesh,
 Tensor MeshDrawable::MapInstances(std::uint32_t instancer,
                                   std::size_t array,
                                   std::uintptr_t stream) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -957,6 +965,7 @@ Tensor MeshDrawable::MapInstances(std::uint32_t instancer,
 Tensor MeshDrawable::MapComposedOp(std::uint32_t instancer,
                                    std::size_t op,
                                    std::uintptr_t stream) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -1038,6 +1047,8 @@ void MeshDrawable::RemoveMesh(std::uint32_t mesh) {
     std::erase_if(items_, [mesh](const MeshItem& item) {
         return item.mesh == mesh;
     });
+    activeMeshes_.erase(mesh);
+    ForgetBounds();
     itemPipelines_.clear();
     geometryDirty_ = true;
 }
@@ -1055,6 +1066,7 @@ std::uint32_t MeshDrawable::AddInstancer(InstanceData data) {
 
 void MeshDrawable::SetInstances(std::uint32_t instancer,
                                 InstanceData data) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -1100,6 +1112,7 @@ void MeshDrawable::CheckDeviceTensor(const Tensor& tensor,
 
 void MeshDrawable::SetInstances(std::uint32_t instancer,
                                 const DeviceInstanceData& data) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -1164,6 +1177,7 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
 
 void MeshDrawable::SetInstances(std::uint32_t instancer,
                                 const ComposedInstanceData& data) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -1257,6 +1271,7 @@ void MeshDrawable::SetComputeInterop(ComputeInterop* compute) {
 }
 
 void MeshDrawable::RemoveInstancer(std::uint32_t instancer) {
+    ForgetBounds();
     const auto it = instancers_.find(instancer);
     if (it == instancers_.end()) {
         throw std::invalid_argument("Unknown instancer " +
@@ -1347,23 +1362,32 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     ++layoutVersion_;
     itemPipelines_.clear();
     drawsDirty_ = true;
+    itemsMoving_ = true;
     UpdateTransforms();
 }
 
 void MeshDrawable::SettleMotion() {
-    for (std::size_t i = 0; i < items_.size(); ++i) {
-        if (previous_[i] != items_[i].transform) {
-            previous_[i] = items_[i].transform;
-            drawsDirty_ = true;
+    if (itemsMoving_) {
+        itemsMoving_ = false;
+        for (std::size_t i = 0; i < items_.size(); ++i) {
+            if (previous_[i] != items_[i].transform) {
+                previous_[i] = items_[i].transform;
+                drawsDirty_ = true;
+            }
         }
     }
     // Points and instance arrays that moved stand still until written
     // again.
-    for (auto& [handle, mesh] : meshes_) {
+    for (auto it = activeMeshes_.begin();
+         it != activeMeshes_.end();) {
+        Mesh& mesh = meshes_.at(*it);
         drawsDirty_ = drawsDirty_ || mesh.pointsMoving;
         mesh.pointsMoving = false;
         mesh.pointsWritten = false;
         mesh.mappedPoints = {};
+        const bool pending =
+            mesh.pointsDirty || mesh.normalsDirty || mesh.colorsDirty;
+        it = pending ? std::next(it) : activeMeshes_.erase(it);
     }
     for (auto& [handle, instancer] : instancers_) {
         drawsDirty_ = drawsDirty_ || instancer.moving;
@@ -1388,6 +1412,7 @@ void MeshDrawable::SetOrigin(const glm::dvec3& origin) {
 }
 
 void MeshDrawable::UpdateTransforms() {
+    ForgetBounds();
     const auto relative = [&](glm::dmat4 world) {
         world[3] -= glm::dvec4(origin_, 0.0);
         return glm::mat4(world);
@@ -1403,6 +1428,7 @@ void MeshDrawable::UpdateTransforms() {
 void MeshDrawable::RebuildGeometry() {
     ERNIE_ZONE("Mesh rebuild geometry");
     ++layoutVersion_;
+    ForgetBounds();
     std::vector<float> points;
     std::vector<float> normals;
     std::vector<float> colors;
@@ -1479,6 +1505,7 @@ void MeshDrawable::RebuildGeometry() {
 void MeshDrawable::RebuildInstances() {
     ERNIE_ZONE("Mesh rebuild instances");
     ++layoutVersion_;
+    ForgetBounds();
     std::vector<float> positions;
     std::vector<float> orientations;
     std::vector<float> scales;
@@ -1537,6 +1564,7 @@ void MeshDrawable::RebuildInstances() {
 
 void MeshDrawable::RebuildCompose() {
     ERNIE_ZONE("Mesh rebuild compose");
+    ForgetBounds();
     std::uint32_t raw = 0;
     std::uint32_t records = 0;
     std::vector<glm::uvec4> ops;
@@ -1909,7 +1937,8 @@ void MeshDrawable::Prepare(const FrameParams& params,
     } else {
         // Only meshes whose points move recompute their normals.
         pendingNormals_.clear();
-        for (auto& [handle, mesh] : meshes_) {
+        for (const std::uint32_t handle : activeMeshes_) {
+            Mesh& mesh = meshes_.at(handle);
             if (compute_ != nullptr) {
                 CopyDeviceAttributes(mesh, false);
             }
@@ -2019,6 +2048,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
 
 void MeshDrawable::WriteDraws() {
     ERNIE_ZONE("Mesh write draws");
+    cullItemsDirty_ = true;
     itemIdOffsets_.clear();
     itemIndices_.clear();
     std::vector<GpuDraw> draws(items_.size());
@@ -2107,7 +2137,10 @@ void MeshDrawable::WriteDraws() {
 }
 
 std::optional<Bounds3> MeshDrawable::Bounds() const {
-    std::optional<Bounds3> bounds;
+    if (bounds_) {
+        return *bounds_;
+    }
+    std::optional<Bounds3>& bounds = bounds_.emplace();
     const auto add = [&bounds](
                          const std::pair<glm::vec3, glm::vec3>& box) {
         bounds = bounds
@@ -2157,7 +2190,10 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
 }
 
 std::map<std::int32_t, Bounds3> MeshDrawable::WorldsBounds() const {
-    std::map<std::int32_t, Bounds3> bounds;
+    if (worldsBounds_) {
+        return *worldsBounds_;
+    }
+    std::map<std::int32_t, Bounds3>& bounds = worldsBounds_.emplace();
     for (std::size_t i = 0;
          i < items_.size() && i < itemRanges_.size(); ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
@@ -2475,17 +2511,24 @@ void MeshDrawable::Cull(const FrameParams& params,
         visible = viewLayout_.visible;
         draws = viewLayout_.draws;
         viewJobStarts_ = viewLayout_.jobStarts;
-        for (std::size_t v = 0; v < params.Views(); ++v) {
-            const glm::mat4 viewProjection =
-                params.View(v).ViewProjection();
-            const float perUnit =
-                glm::length(glm::vec3(viewProjection[0][1],
-                                      viewProjection[1][1],
-                                      viewProjection[2][1])) *
-                0.5f * static_cast<float>(params.camera.height);
-            pushView(Frustum::FromMatrix(viewProjection),
-                     viewProjection, perUnit,
-                     occlusion_ != Occlusion::Off);
+        // The GPU writes each view's planes and matrix
+        // (`RecordViewPoses`); the rest of a block is the camera's,
+        // the same for every view: the first view's, copied.
+        const glm::mat4 viewProjection =
+            params.View(0).ViewProjection();
+        const float perUnit =
+            glm::length(glm::vec3(viewProjection[0][1],
+                                  viewProjection[1][1],
+                                  viewProjection[2][1])) *
+            0.5f * static_cast<float>(params.camera.height);
+        pushView(Frustum::FromMatrix(viewProjection), viewProjection,
+                 perUnit, occlusion_ != Occlusion::Off);
+        const std::vector<glm::vec4> block(
+            views.end() -
+                static_cast<std::ptrdiff_t>(kCullViewStride),
+            views.end());
+        for (std::size_t v = 1; v < params.Views(); ++v) {
+            views.insert(views.end(), block.begin(), block.end());
         }
     }
     if (!reuse) {
@@ -2635,15 +2678,9 @@ void MeshDrawable::Cull(const FrameParams& params,
     visibilityStride_ = instanceIds;
 }
 
-void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
-                                 const std::vector<glm::vec4>& views,
-                                 std::uint32_t visible,
-                                 std::uint32_t draws) {
-    ERNIE_ZONE("Mesh write cull jobs");
-    cullJobs_.assign(jobs.begin(), jobs.end());
-    if (jobs.empty()) {
-        return;
-    }
+void MeshDrawable::WriteCullItems() {
+    ERNIE_ZONE("Mesh write cull items");
+    cullItemsDirty_ = false;
     std::vector<GpuCullItem> items(items_.size());
     // Each instanced mesh's levels, once: first index (relative),
     // count, error bits, unused.
@@ -2707,17 +2744,32 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         }
         std::memcpy(&entry.info[1], &flags, sizeof(flags));
     }
-    const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer,
-                            std::span<const std::byte> bytes) {
-        Reserve(context_, buffer, bytes.size(),
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        renderer_.Uploads().Write(*buffer, bytes);
-    };
-    upload(cullItemBuffer_, std::as_bytes(std::span(items)));
-    upload(cullJobBuffer_, std::as_bytes(std::span(jobs)));
-    upload(cullViewBuffer_, std::as_bytes(std::span(views)));
-    upload(cullLevelBuffer_, std::as_bytes(std::span(levels)));
+    UploadCull(cullItemBuffer_, std::as_bytes(std::span(items)));
+    UploadCull(cullLevelBuffer_, std::as_bytes(std::span(levels)));
+}
+
+void MeshDrawable::UploadCull(std::unique_ptr<GpuBuffer>& buffer,
+                              std::span<const std::byte> bytes) {
+    Reserve(context_, buffer, bytes.size(),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    renderer_.Uploads().Write(*buffer, bytes);
+}
+
+void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
+                                 const std::vector<glm::vec4>& views,
+                                 std::uint32_t visible,
+                                 std::uint32_t draws) {
+    ERNIE_ZONE("Mesh write cull jobs");
+    cullJobs_.assign(jobs.begin(), jobs.end());
+    if (jobs.empty()) {
+        return;
+    }
+    // The items change only with the draws.
+    if (cullItemsDirty_) {
+        WriteCullItems();
+    }
+    UploadCull(cullJobBuffer_, std::as_bytes(std::span(jobs)));
+    UploadCull(cullViewBuffer_, std::as_bytes(std::span(views)));
     Reserve(context_, visibleIds_,
             VkDeviceSize{visible} * sizeof(std::uint32_t),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);

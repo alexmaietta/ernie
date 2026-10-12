@@ -2125,7 +2125,10 @@ void RasterRenderer::WriteLights(
                 const std::int32_t world = maps.worlds[s];
                 const auto fitted = maps.fitted.find(world);
                 if (fitted == maps.fitted.end()) {
-                    lightViews_.push_back(lightViews_[base]);
+                    // Its world's casters only, culled as such.
+                    ShadowCascade copy = lightViews_[base];
+                    copy.world = world;
+                    lightViews_.push_back(copy);
                     layeredPasses_.push_back(
                         {ShadowCasters{false, world}, base, true});
                     continue;

@@ -17,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -625,6 +626,10 @@ class MeshDrawable : public RasterDrawable {
     void WriteDraws();
     /// Rebuilds `transforms_` from the items and the origin.
     void UpdateTransforms();
+    void ForgetBounds() {
+        bounds_.reset();
+        worldsBounds_.reset();
+    }
     void RebuildGeometry();
     void RebuildInstances();
     /// Lays out the composed instancers: their raw arrays' and
@@ -703,6 +708,12 @@ class MeshDrawable : public RasterDrawable {
     void WriteCullJobs(const std::vector<GpuCullJob>& jobs,
                        const std::vector<glm::vec4>& views,
                        std::uint32_t visible, std::uint32_t draws);
+    /// Uploads the draws' culling data (`cullItemsDirty_`): each
+    /// draw's transform, bounds, levels and instances.
+    void WriteCullItems();
+    /// Uploads `bytes` into `buffer`, grown to hold them.
+    void UploadCull(std::unique_ptr<GpuBuffer>& buffer,
+                    std::span<const std::byte> bytes);
     /// Records `ranges`, those `casters` draws when given, with the
     /// shadow pipeline or each draw's G-buffer pipeline; GPU-culled
     /// ranges draw indirectly. Records the direct draws among them
@@ -914,6 +925,21 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GpuBuffer> cullJobBuffer_;
     std::unique_ptr<GpuBuffer> cullViewBuffer_;
     std::unique_ptr<GpuBuffer> cullLevelBuffer_;
+    /// Whether `cullItemBuffer_` and `cullLevelBuffer_` are out of
+    /// date: they change only with the draws (`WriteDraws`).
+    bool cullItemsDirty_ = true;
+    /// `Bounds` and `WorldsBounds` as last computed, until the items,
+    /// their transforms, points or instances change
+    /// (`ForgetBounds`).
+    mutable std::optional<std::optional<Bounds3>> bounds_;
+    mutable std::optional<std::map<std::int32_t, Bounds3>>
+        worldsBounds_;
+    /// Meshes with work for the next frame or to settle after it:
+    /// points, normals or colours written or mapped.
+    std::set<std::uint32_t> activeMeshes_;
+    /// Whether `SetItems` may have moved items `SettleMotion` has yet
+    /// to settle.
+    bool itemsMoving_ = false;
     std::vector<std::uint32_t>
         cullDrawCounts_;  ///< Per job, its indirect draws (levels).
     /// Counts changes to what the cull lists are made of: the items,
