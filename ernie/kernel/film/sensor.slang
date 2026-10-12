@@ -165,7 +165,7 @@ public struct SensorConstants {
     public uint4 table;
     // x: the layers from a raster radiance layer to its Stokes Q, and on to U, for a polarizer
     // (0 without them); y: the render vars written to linear buffers too (`linear`), a kHolds*
-    // bit each; zw unused.
+    // bit each; z: the AOV slots so, a bit each; w unused.
     public uint4 stokes;
     // The custom filters' parameters, packed in chain order (`SensorPlan::params`), then a lens
     // of rays' table.
@@ -177,13 +177,14 @@ public struct SensorConstants {
     public SensorLinear* linear;
 }
 
-// The render vars up to MotionVector (kHolds* bits 0 to 10) a frame also holds as linear buffers
-// over all its views (`FrameImages::Linear`), a compute API viewing them in place: each var's
-// address, its texels in its image's format view after view (a band after a band within a view
-// for SpectralRadiance).
-public static const uint kLinearVars = 11;
+// The render vars (kHolds* bits 0 to 13) and AOV slots a frame also holds as linear buffers over
+// all its views (`FrameImages::Linear`), a compute API viewing them in place: each one's address,
+// its texels in its image's format view after view (a band after a band within a view for
+// SpectralRadiance; float RGBA for the AOVs).
+public static const uint kLinearVars = 14;
 public struct SensorLinear {
     public uint* vars[kLinearVars];
+    public uint* aovs[8];
 }
 
 // Binding 0 holds the uniforms every view shares, a SensorUniforms whose per-view fields are
@@ -265,6 +266,17 @@ void storeLinear(uint bit, uint texel, uint4 words, uint count) {
     let vars = pass.linear.vars[bit];
     for (uint c = 0; c < count; ++c) {
         vars[texel * count + c] = words[c];
+    }
+}
+
+// Stores `value` at texel `texel` of AOV slot `slot`, when it is held linear (`stokes.z`).
+void storeLinearAov(uint slot, uint texel, float4 value) {
+    if (slot >= 8u || ((pass.stokes.z >> slot) & 1u) == 0) {
+        return;
+    }
+    let aov = pass.linear.aovs[slot];
+    for (uint c = 0; c < 4; ++c) {
+        aov[texel * 4 + c] = asuint(value[c]);
     }
 }
 
@@ -1108,15 +1120,24 @@ public struct Lens : ISpatialSource {
             stokes *= falloff;
         }
         let id = pixel.id;
+        let texel = linearTexel(id);
         if ((holds & kHoldsDegreeOfLinearPolarization) != 0) {
-            degreeOfPolarization[id] = stokes.x > 0.0 ? saturate(length(stokes.yz) / stokes.x) : 0.0;
+            let degree = stokes.x > 0.0 ? saturate(length(stokes.yz) / stokes.x) : 0.0;
+            degreeOfPolarization[id] = degree;
+            storeLinear(firstbitlow(kHoldsDegreeOfLinearPolarization), texel,
+                        uint4(asuint(degree)), 1);
         }
         if ((holds & kHoldsAngleOfLinearPolarization) != 0) {
-            let angle = 0.5 * atan2(stokes.z, stokes.y);
-            angleOfPolarization[id] = angle < 0.0 ? angle + 3.14159265 : angle;
+            var angle = 0.5 * atan2(stokes.z, stokes.y);
+            angle = angle < 0.0 ? angle + 3.14159265 : angle;
+            angleOfPolarization[id] = angle;
+            storeLinear(firstbitlow(kHoldsAngleOfLinearPolarization), texel,
+                        uint4(asuint(angle)), 1);
         }
         if ((holds & kHoldsLinearStokes) != 0) {
-            linearStokes[id] = float4(stokes, 0.0);
+            let held = float4(stokes, 0.0);
+            linearStokes[id] = held;
+            storeLinear(firstbitlow(kHoldsLinearStokes), texel, asuint(held), 4);
         }
     }
 }
@@ -1196,6 +1217,7 @@ public void writeOutput(PixelContext pixel, uint output, float4 value) {
         aov7[id] = value;
         break;
     }
+    storeLinearAov(slot, linearTexel(id), value);
 }
 
 // Writes band `band` of SpectralRadiance.

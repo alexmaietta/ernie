@@ -600,10 +600,15 @@ struct SensorConstants {
     VkDeviceAddress params;
     std::uint32_t normalSlot;
     std::uint32_t depthSlot;
-    /// The frame's linear vars' addresses (sensor.slang's
-    /// `SensorLinear`), those held so a bit each in `stokes[1]`.
+    /// The frame's linear vars' and AOV slots' addresses
+    /// (sensor.slang's `SensorLinear`), those held so a bit each in
+    /// `stokes[1]` and `stokes[2]`.
     VkDeviceAddress linear;
 };
+/// `RenderTargets::LinearVars::written`'s var bits, below its AOV
+/// slots'.
+constexpr std::uint32_t kLinearVarBits =
+    (1u << RenderTargets::LinearVars::kVars) - 1u;
 static_assert(sizeof(SensorConstants) == 72,
               "SensorConstants must match sensor.slang");
 
@@ -3415,8 +3420,8 @@ void RasterRenderer::Update(
             }
         }
         // Each light shadow view's volumes cast as its geometry does.
-        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
-                                                  lightCasters_.world);
+        std::vector<std::int32_t> lightViewWorlds(
+            lightViews_.size(), lightCasters_.world);
         for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
             lightViewWorlds[firstLayeredView_ + k] =
                 layeredPasses_[k].casters.world;
@@ -5797,7 +5802,12 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             {pass.tableOffset, lensTable_[1], lensTable_[2],
              lensTable_[3]},
             {targets.Stokes() ? targets.StokesOffset() : 0u,
-             linear != nullptr ? linear->written : 0u, 0u, 0u},
+             linear != nullptr ? linear->written & kLinearVarBits
+                               : 0u,
+             linear != nullptr
+                 ? linear->written >> RenderTargets::LinearVars::kVars
+                 : 0u,
+             0u},
             pass.params->Address(),
             sensorSlots_[0].Index(),
             sensorSlots_[1].Index(),
@@ -6000,7 +6010,8 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
-void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
+void RasterRenderer::SetVolumeComputeInterop(
+    ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);
 }
 

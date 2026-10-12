@@ -2892,26 +2892,26 @@ RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
             return;
         }
         frame.linearVars = &linearVars;
-        std::vector<std::string> names;
+        // The entries (vars, then AOV slots) the targets hold whose
+        // vars were mapped so, by any of their names.
+        std::uint32_t heldEntries = 0;
         for (const std::string_view name : held) {
-            if (linearVars.contains(name)) {
-                names.emplace_back(name);
+            if (const std::optional<std::size_t> entry =
+                    RenderTargets::LinearEntry(name, aovNames)) {
+                heldEntries |= 1u << *entry;
+            }
+        }
+        std::uint32_t wanted = 0;
+        for (const std::string& name : linearVars) {
+            if (const std::optional<std::size_t> entry =
+                    RenderTargets::LinearEntry(name, aovNames)) {
+                wanted |= (1u << *entry) & heldEntries;
             }
         }
         const std::vector<RenderTargets*> targets =
             TargetsOf(*frame.images);
         const RenderTargets::LinearVars* current =
             targets.front()->GetLinearVars();
-        std::uint32_t wanted = 0;
-        const auto all = RenderTargets::VarNames();
-        for (const std::string& name : names) {
-            const auto i = static_cast<std::size_t>(
-                std::find(all.begin(), all.end(), name) -
-                all.begin());
-            if (i < RenderTargets::LinearVars::kVars) {
-                wanted |= 1u << i;
-            }
-        }
         if ((current != nullptr ? current->held : 0u) == wanted) {
             return;
         }
@@ -2923,7 +2923,7 @@ RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
         std::shared_ptr<RenderTargets::LinearVars> linear =
             wanted == 0 ? nullptr
                         : RenderTargets::MakeLinearVars(
-                              context_, extent, views, bands, names);
+                              context_, extent, views, bands, wanted);
         for (RenderTargets* chunk : targets) {
             chunk->SetLinearVars(linear);
         }

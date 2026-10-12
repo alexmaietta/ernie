@@ -208,13 +208,17 @@ class RenderTargets : public FrameImages {
     /// API copies nothing (`FrameImages::Linear`).
     struct LinearVars {
         /// The vars the sensor can write so: `VarNames` up to
-        /// MotionVector (sensor.slang's `kLinearVars`).
-        static constexpr std::size_t kVars = 11;
-        /// Per var, its buffer (shared memory), or none.
-        std::array<std::shared_ptr<GpuBuffer>, kVars> buffers;
+        /// LinearStokes (sensor.slang's `kLinearVars`).
+        static constexpr std::size_t kVars = 14;
+        /// Then the AOV slots.
+        static constexpr std::size_t kEntries = kVars + kMaxAovs;
+        /// Per var, then AOV slot, its buffer (shared memory), or
+        /// none.
+        std::array<std::shared_ptr<GpuBuffer>, kEntries> buffers;
         /// The buffers' addresses, as the sensor reads them.
         std::unique_ptr<GpuBuffer> table;
-        /// The vars held so, a bit each in `VarNames` order.
+        /// The vars and AOV slots held so, a bit each in `buffers`'
+        /// order.
         std::uint32_t held = 0;
         /// Those the frame's sensor wrote: overlays drawn over
         /// LdrColor after it leave that out
@@ -222,13 +226,21 @@ class RenderTargets : public FrameImages {
         std::uint32_t written = 0;
     };
 
-    /// Linear buffers of vars `names` (those `LinearVars` can hold)
-    /// for `views` views of `extent` and `bands` bands, in shared
-    /// memory.
+    /// Render var `name`'s entry in `LinearVars::buffers`: a var's
+    /// index in `VarNames`, or an AOV slot's (by slot name or as
+    /// "aov:<output>" of `aovs`, the outputs in slot order) after
+    /// them; none for another.
+    static std::optional<std::size_t>
+    LinearEntry(std::string_view name,
+                std::span<const std::string> aovs);
+
+    /// Linear buffers of the `LinearVars` entries in `entries` (a bit
+    /// each) for `views` views of `extent` and `bands` bands, in
+    /// shared memory.
     static std::shared_ptr<LinearVars>
     MakeLinearVars(const VulkanContext& context, VkExtent2D extent,
                    std::uint32_t views, int bands,
-                   std::span<const std::string> names);
+                   std::uint32_t entries);
 
     /// Makes the sensor write the vars `linear` holds into its
     /// buffers too (each chunk of a frame's views shares the

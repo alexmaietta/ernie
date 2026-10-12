@@ -230,6 +230,67 @@ def test_cuda_observations_written_in_place_match_cpu_ones(
     assert renderer.take_validation_messages() == []
 
 
+def test_aovs_and_polarization_written_in_place_match_cpu_ones(
+    renderer, terrain_scene
+):
+    # A filter's AOV and the polarization vars, as the others: copied
+    # on the first CUDA map, written in place by the sensor after.
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    scene = noiseless(terrain_scene)
+    names = (
+        "Electrons",
+        "aov:overflow",
+        "DegreeOfLinearPolarization",
+        "AngleOfLinearPolarization",
+        "LinearStokes",
+    )
+    filters = []
+    for i, kind in enumerate(("qe", "blooming")):
+        path = f"/Render/Filters/F{i}"
+        scene.define(path, ernie.SensorFilter, filter_type=kind)
+        filters.append(ernie.Path(path))
+    paths = []
+    for i, name in enumerate(names):
+        path = f"/Render/Vars/V{i}"
+        scene.define(path, ernie.RenderVar, source_name=name)
+        paths.append(ernie.Path(path))
+    scene.define(
+        "/Render/Linear",
+        ernie.RenderProduct,
+        camera="/World/Camera",
+        resolution=(32, 24),
+    ).set(tokens.ORDERED_VARS, paths).set(tokens.FILTERS, filters)
+
+    def step(device):
+        frame = renderer.step(
+            scene, render_products=["/Render/Linear"]
+        )["/Render/Linear"].frames[0]
+        vars = frame.render_vars
+        if device == ernie.Device.CPU:
+            return {
+                str(p): np.array(vars[str(p)].map(device=device))
+                for p in paths
+            }
+        return {
+            str(p): np.array(
+                renderer.cuda_download(
+                    vars[str(p)].map(device=device)
+                )
+            )
+            for p in paths
+        }
+
+    expected = step(ernie.Device.CPU)
+    for i in range(4):
+        got = step(ernie.Device.CUDA)
+        for path, array in expected.items():
+            np.testing.assert_array_equal(
+                got[path], array, err_msg=f"{path}, step {i}"
+            )
+    assert renderer.take_validation_messages() == []
+
+
 def test_minimal_batch_with_poses_mapped_in_place(renderer):
     if not renderer.cuda_available:
         pytest.skip("No CUDA interop on this machine")

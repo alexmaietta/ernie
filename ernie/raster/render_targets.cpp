@@ -311,26 +311,45 @@ std::span<const std::string_view> RenderTargets::VarNames() {
     return kVarNames;
 }
 
+std::optional<std::size_t>
+RenderTargets::LinearEntry(std::string_view name,
+                           std::span<const std::string> aovs) {
+    for (std::size_t i = 0; i < LinearVars::kVars; ++i) {
+        if (kVarNames[i] == name) {
+            return i;
+        }
+    }
+    for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
+        if (name == kAovSlotNames[slot] ||
+            (name.starts_with(kAovPrefix) && slot < aovs.size() &&
+             name.substr(kAovPrefix.size()) == aovs[slot])) {
+            return LinearVars::kVars + slot;
+        }
+    }
+    return std::nullopt;
+}
+
 std::shared_ptr<RenderTargets::LinearVars>
 RenderTargets::MakeLinearVars(const VulkanContext& context,
                               VkExtent2D extent, std::uint32_t views,
-                              int bands,
-                              std::span<const std::string> names) {
+                              int bands, std::uint32_t entries) {
     auto linear = std::make_shared<LinearVars>();
-    std::array<VkDeviceAddress, LinearVars::kVars> addresses{};
-    for (std::size_t i = 0; i < LinearVars::kVars; ++i) {
-        if (std::find(names.begin(), names.end(), kVarNames[i]) ==
-            names.end()) {
+    std::array<VkDeviceAddress, LinearVars::kEntries> addresses{};
+    for (std::size_t i = 0; i < LinearVars::kEntries; ++i) {
+        if (((entries >> i) & 1u) == 0) {
             continue;
         }
         // SpectralRadiance a layer per band, the others one, per
-        // view.
+        // view; the AOVs float RGBA.
         const VkDeviceSize layers =
             VkDeviceSize{views} *
             (i == 0 ? static_cast<VkDeviceSize>(bands) : 1u);
-        const VkDeviceSize bytes =
-            layers * extent.width * extent.height *
-            GpuImage::TexelBytes(kVarFormats[i]);
+        const VkFormat format = i < LinearVars::kVars
+                                    ? kVarFormats[i]
+                                    : VK_FORMAT_R32G32B32A32_SFLOAT;
+        const VkDeviceSize bytes = layers * extent.width *
+                                   extent.height *
+                                   GpuImage::TexelBytes(format);
         linear->buffers[i] = std::make_shared<GpuBuffer>(
             context, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             BufferMemory::Shared);
@@ -349,13 +368,15 @@ RenderTargets::Linear(std::string_view name) const {
     if (linear_ == nullptr) {
         return {};
     }
-    for (std::size_t i = 0; i < LinearVars::kVars; ++i) {
-        if (kVarNames[i] == name &&
-            ((linear_->written >> i) & 1u) != 0) {
-            return {linear_->buffers[i], kVarFormats[i]};
-        }
+    const std::optional<std::size_t> entry =
+        LinearEntry(name, aovNames_);
+    if (!entry || ((linear_->written >> *entry) & 1u) == 0) {
+        return {};
     }
-    return {};
+    return {linear_->buffers[*entry],
+            *entry < LinearVars::kVars
+                ? kVarFormats[*entry]
+                : VK_FORMAT_R32G32B32A32_SFLOAT};
 }
 
 std::uint64_t RenderTargets::GpuBytes() const {
