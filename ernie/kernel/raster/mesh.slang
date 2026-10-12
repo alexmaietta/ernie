@@ -529,6 +529,7 @@ struct ShadowCutoutLayered {
     float4 position : SV_Position;
     float2 uv : TEXCOORD;
     uint layer : SV_RenderTargetArrayIndex;
+    float clip[4] : SV_ClipDistance;
 }
 
 [shader("vertex")]
@@ -541,6 +542,7 @@ ShadowCutoutLayered meshShadowCutoutVertex(uint vertexIndex : SV_VertexID,
     out.position = at.position;
     out.uv = v.uv;
     out.layer = at.layer;
+    out.clip = at.clip;
     return out;
 }
 

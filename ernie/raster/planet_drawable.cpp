@@ -407,6 +407,31 @@ void PlanetDrawable::Select(const glm::dvec3& eye,
     }
 }
 
+std::vector<LodRange>
+PlanetDrawable::ShadowRanges(std::span<const LodRange> ranges,
+                             const ShadowCascade& view) const {
+    // A level-L patch's quads are 2^(L + 1) fine cells across, a fine
+    // cell about a quarter of the circumference over `FineCells()`:
+    // levels with quads finer than a texel of the view are never
+    // subdivided into, so a level of a virtual shadow map a kilometre
+    // a texel draws kilometre quads, not the eye's metre ones.
+    std::vector<LodRange> out(ranges.begin(), ranges.end());
+    const double fineCell = lod_.Radius() * 0.5 * std::numbers::pi /
+                            static_cast<double>(lod_.FineCells());
+    const double texel = view.texelWorldSize;
+    if (texel <= 0.0 || fineCell <= 0.0) {
+        return out;
+    }
+    const double coarsest =
+        std::floor(std::log2(texel / fineCell)) - 1.0;
+    const auto finest = static_cast<std::size_t>(
+        std::clamp(coarsest, 0.0, static_cast<double>(out.size())));
+    for (std::size_t level = 0; level < finest; ++level) {
+        out[level].morphEnd = -1.0f;
+    }
+    return out;
+}
+
 void PlanetDrawable::Prepare(
     const FrameParams& frame,
     std::span<const ShadowCascade> cascades) {
@@ -568,7 +593,8 @@ void PlanetDrawable::Prepare(
         const bool culls =
             !cascade.moving &&
             (!cascade.gpuFitted || cascade.cullViewProjection);
-        Select(lodEyes_.front(), ranges, culls ? &light : nullptr);
+        Select(lodEyes_.front(), ShadowRanges(ranges, cascade),
+               culls ? &light : nullptr);
         cascadeRanges_[c] = {
             first,
             static_cast<std::uint32_t>(patches_.size()) - first};

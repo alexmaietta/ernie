@@ -2,9 +2,11 @@
 #include "ernie/raster/virtual_shadow_map.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 
 using ernie::VirtualShadowLevel;
 using ernie::VirtualShadowMap;
@@ -90,4 +92,64 @@ TEST(VirtualShadowMap, LevelsSuitTheDistance) {
             std::ldexp(1.0, VirtualShadowMap::LevelFor(d, 0.0) + 1);
         EXPECT_LT(d, r);
     }
+}
+
+// The Sun's penumbrae filter in a receiver's own level; a wide
+// light's in as many coarser ones as span them, up to the most.
+TEST(VirtualShadowMap, WideLightsFilterInCoarserLevels) {
+    EXPECT_EQ(VirtualShadowMap::FilterLevelsFor(0.0), 0u);
+    EXPECT_EQ(VirtualShadowMap::FilterLevelsFor(
+                  std::tan(0.5 * 0.53 * std::numbers::pi / 180.0)),
+              0u);
+    // 4096 tan(5 degrees) is 358 texels: three levels of 64.
+    EXPECT_EQ(VirtualShadowMap::FilterLevelsFor(
+                  std::tan(5.0 * std::numbers::pi / 180.0)),
+              3u);
+    EXPECT_EQ(VirtualShadowMap::FilterLevelsFor(1.0),
+              VirtualShadowMap::kMaxFilterLevels);
+}
+
+// A level draws only the casters over where its receivers can be:
+// what the camera sees at the distances it suits, not what lies
+// behind it; a level for distances nearer than the near plane draws
+// nothing.
+TEST(VirtualShadowMap, LevelsCullToTheirReceivers) {
+    // 10 m up looking along +y, reversed-Z, the near plane 0.1 m
+    // away.
+    const glm::dvec3 eye(0.0, 0.0, 10.0);
+    const glm::dmat4 view = glm::lookAtRH(
+        eye, eye + glm::dvec3(0, 1, 0), glm::dvec3(0.0, 0.0, 1.0));
+    glm::dmat4 reverse(1.0);
+    reverse[2][2] = -1.0;
+    reverse[3][2] = 1.0;
+    const glm::dmat4 projection =
+        reverse *
+        glm::perspectiveRH_ZO(glm::radians(60.0), 1.0, 0.1, 1.0e4);
+    const glm::mat4 inverse(glm::inverse(projection * view));
+    const auto levels = VirtualShadowMap::FitLevels(
+        kToSun, eye, glm::dvec3(0.0), -4, 22);
+    constexpr float kBias = 1.0f;
+    // Level -4 holds distances to 2^(-4) m, short of the near plane.
+    EXPECT_FALSE(VirtualShadowMap::CasterCull(
+        levels[0], inverse, glm::vec3(eye), kBias, 0, false, false));
+    // Level 5 holds 16 to 32 m.
+    const VirtualShadowLevel& level = levels[5 + 4];
+    ASSERT_EQ(level.level, 5);
+    const std::optional<glm::mat4> cull =
+        VirtualShadowMap::CasterCull(level, inverse, glm::vec3(eye),
+                                     kBias, 0, false, false);
+    ASSERT_TRUE(cull);
+    const auto inside = [&](const glm::dvec3& p) {
+        const glm::dvec4 clip =
+            glm::dmat4(*cull) * glm::dvec4(p, 1.0);
+        return std::abs(clip.x) <= 1.0 && std::abs(clip.y) <= 1.0;
+    };
+    EXPECT_TRUE(inside(eye + glm::dvec3(0.0, 20.0, 0.0))) << "seen";
+    EXPECT_TRUE(inside(eye + glm::dvec3(8.0, 20.0, -5.0)))
+        << "seen off the axis";
+    EXPECT_FALSE(inside(eye + glm::dvec3(0.0, -20.0, 0.0)))
+        << "behind the camera";
+    EXPECT_GT(std::abs((*cull)[0][0]),
+              std::abs(level.viewProjection[0][0]))
+        << "narrower than the level";
 }

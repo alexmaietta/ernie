@@ -176,6 +176,10 @@ class PlanetDrawable : public RasterDrawable {
     void Select(const glm::dvec3& eye,
                 std::span<const LodRange> ranges,
                 const Frustum* frustum);
+    /// `ranges` for shadow view `view`: no finer than its texels.
+    std::vector<LodRange>
+    ShadowRanges(std::span<const LodRange> ranges,
+                 const ShadowCascade& view) const;
     std::vector<DescriptorResource>
     Resources(const RasterFrame& frame, std::size_t view) const;
     void DrawPatches(VkCommandBuffer commands, DrawRange range,

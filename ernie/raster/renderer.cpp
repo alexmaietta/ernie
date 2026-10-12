@@ -67,8 +67,11 @@ struct ShadowUniforms {
     /// A virtual shadow map's level being drawn: its block's address
     /// (low, high), the level, 1.
     std::uint32_t virtualMap[4];
+    /// With a level being drawn, the address of the levels'
+    /// rectangles of backed pages (low, high), which casters clip to.
+    std::uint32_t virtualRects[4];
 };
-static_assert(sizeof(ShadowUniforms) == 496,
+static_assert(sizeof(ShadowUniforms) == 512,
               "ShadowUniforms must match frame.slang");
 
 struct ShadingUniforms {
@@ -2967,9 +2970,15 @@ void RasterRenderer::WriteLights(
                       static_cast<float>(std::max(
                           params.camera.width, kVirtualMinWidth))) +
             params.shadows.virtualBias;
-        virtualShadow_->SetLevels(levels, bias, &uploads_);
+        // As many coarser levels marked as the light's penumbrae
+        // filter in: its angular radius's tangent in `extentY`.
+        const std::uint32_t filterLevels =
+            VirtualShadowMap::FilterLevelsFor(entry.extentY[3]);
+        virtualShadow_->SetLevels(levels, bias, &uploads_,
+                                  filterLevels);
         virtualBias_ = bias;
-        for (const VirtualShadowLevel& level : levels) {
+        for (std::size_t i = 0; i < levels.size(); ++i) {
+            const VirtualShadowLevel& level = levels[i];
             ShadowCascade cascade;
             cascade.lightViewProjection = level.viewProjection;
             cascade.texelWorldSize =
@@ -2982,7 +2991,16 @@ void RasterRenderer::WriteLights(
             cascade.gpuFitted = true;
             cascade.gpuMatrix =
                 static_cast<std::uint32_t>(lightViews_.size());
-            cascade.cullViewProjection = level.viewProjection;
+            // Terrain and planets draw only what can shadow the
+            // level's receivers; a level none of them reach draws
+            // nothing.
+            const std::optional<glm::mat4> cull =
+                VirtualShadowMap::CasterCull(
+                    level, virtualInverse_, virtualEye_, bias,
+                    filterLevels, i == 0, i + 1 == levels.size());
+            cascade.cullViewProjection =
+                cull.value_or(level.viewProjection);
+            cascade.drawn = cull.has_value();
             cascade.shadowMask =
                 params.lights[static_cast<std::size_t>(virtualLight_)]
                     .shadowMask;
@@ -3084,11 +3102,14 @@ void RasterRenderer::WriteLights(
         if (!blocks.empty()) {
             uploads_.Write(lightShadowBlocks_, blocks);
         }
-        // The virtual shadow map's levels' blocks: each its matrix
-        // and the map's block with the level (`Shadows::virtualMap`).
+        // The virtual shadow map's levels' blocks: each its matrix,
+        // the map's block with the level (`Shadows::virtualMap`) and
+        // the rectangles its casters clip to.
         if (virtualLight_ >= 0) {
             const VkDeviceAddress address =
                 virtualShadow_->Block().Address();
+            const VkDeviceAddress rects =
+                virtualShadow_->Rects().Address();
             std::vector<std::byte> levels(
                 (lightViews_.size() - firstVirtualView_) *
                 kLightShadowBlockStride);
@@ -3106,6 +3127,10 @@ void RasterRenderer::WriteLights(
                 block.virtualMap[2] =
                     static_cast<std::uint32_t>(v - firstVirtualView_);
                 block.virtualMap[3] = 1;
+                block.virtualRects[0] =
+                    static_cast<std::uint32_t>(rects);
+                block.virtualRects[1] =
+                    static_cast<std::uint32_t>(rects >> 32);
                 std::memcpy(levels.data() +
                                 (v - firstVirtualView_) *
                                     kLightShadowBlockStride,
@@ -5156,6 +5181,26 @@ void RasterRenderer::RecordVirtualShadows(
     ShadowCasters casters = lightCasters_;
     for (std::size_t v = firstVirtualView_; v < lightViews_.size();
          ++v) {
+        if (!lightViews_[v].drawn) {
+            continue;
+        }
+        // Each level's zone, named for as long as the profiler keeps
+        // it.
+        static const std::array<std::string,
+                                VirtualShadowMap::kMaxLevels>
+            kLevelNames = [] {
+                std::array<std::string, VirtualShadowMap::kMaxLevels>
+                    names;
+                for (std::size_t i = 0; i < names.size(); ++i) {
+                    names[i] = "Level " +
+                               std::to_string(kVirtualFirstLevel +
+                                              static_cast<int>(i));
+                }
+                return names;
+            }();
+        ERNIE_GPU_ZONE_NAMED(
+            context_, commands,
+            kLevelNames[v - firstVirtualView_].c_str());
         BeginRendering(commands, target);
         RasterFrame own = given;
         own.shadows = DescriptorResource::Of(

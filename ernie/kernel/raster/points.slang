@@ -280,6 +280,7 @@ struct ShadowVertexLayered {
     float2 corner : CORNER;
     nointerpolation float4 sphere : SPHERE;
     uint layer : SV_RenderTargetArrayIndex;
+    float clip[4] : SV_ClipDistance;
 }
 
 // The light's view direction away from it, and two directions across it, from its
@@ -310,6 +311,7 @@ ShadowVertexLayered shadowVertex(uint vertexIndex : SV_VertexID, uint instance :
     out.corner = corner;
     out.sphere = sphere;
     out.layer = at.layer;
+    out.clip = at.clip;
     return out;
 }
 

@@ -580,10 +580,10 @@ LightTap lightTap(LightGpu light, float3 point) {
 }
 
 // The level from `index` on, each twice as coarse, in which `texels` of level `index` span at most
-// `kMaxLightFilterTexels`, up to the coarsest the marking backs (`kVirtualFilterLevels`).
+// `kMaxLightFilterTexels`, up to the coarsest the marking backs (`VirtualShadow::filterLevels`).
 uint virtualCoarserFor(VirtualShadow* map, uint index, float texels) {
     let steps = texels > kMaxLightFilterTexels ? ceil(log2(texels / kMaxLightFilterTexels)) : 0.0;
-    return min(index + min(uint(steps), kVirtualFilterLevels), map.levelCount - 1);
+    return min(index + min(uint(steps), map.filterLevels), map.levelCount - 1);
 }
 
 // The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
@@ -621,7 +621,9 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     let angle = 6.28318530718 * interleavedGradientNoise(pixel);
     let rotation = float2(cos(angle), sin(angle));
     let softness = sh.lightShadow.x;
-    // How far the receiver's plane falls towards the light per world unit across it.
+    // The receiver's plane across the light: at offset `o` from the receiver it lies
+    // -dot(n, o) / dot(n, L) towards the light (`rise`), which each tap compares against, signed,
+    // so the plane falling away on one side does not hide blockers a little above it.
     let cosine = clamp(nDotL, 0.05, 1.0);
     let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
     // The comparisons' slack: a texel and a half of the level used, and more as the receiver's
@@ -640,20 +642,19 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
         var blockers = 0.0;
         var blockerSum = 0.0;
         for (uint i = 0; i < 16; ++i) {
-            let point = receiver + lightDisk(i, rotation, across, across2,
-                                             searchTexels * searchTexel);
+            let tap = lightDisk(i, rotation, across, across2, searchTexels * searchTexel);
             float stored;
             float depth;
             uint used;
-            if (!virtualShadowDepth(map, searchIndex, point, stored, depth, used)) {
+            if (!virtualShadowDepth(map, searchIndex, receiver + tap, stored, depth, used)) {
                 continue;
             }
+            // Metres towards the light above the receiver's plane there.
             let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-            let gap = (stored - depth) / perWorld;
-            let drop = length(lightPoisson(i)) * searchTexels * searchTexel * tilt;
-            if (gap > drop + searchSlack) {
+            let height = (stored - depth) / perWorld + dot(n, tap) / cosine;
+            if (height > searchSlack) {
                 blockers += 1.0;
-                blockerSum += gap;
+                blockerSum += height;
             }
         }
         if (blockers == 0.0) {
@@ -669,20 +670,18 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     let filterSlack = (1.5 + 1.5 * tilt) * filterTexel;
     var lit = 0.0;
     for (uint i = 0; i < 16; ++i) {
-        let point =
-            receiver + lightDisk(i, rotation, across, across2, filterTexels * filterTexel);
+        let tap = lightDisk(i, rotation, across, across2, filterTexels * filterTexel);
         float stored;
         float depth;
         uint used;
-        if (!virtualShadowDepth(map, filterIndex, point, stored, depth, used)) {
+        if (!virtualShadowDepth(map, filterIndex, receiver + tap, stored, depth, used)) {
             lit += 1.0;
             continue;
         }
-        // Compared at the receiver's plane, raised towards the light by the tap's distance across
-        // it, with the slack.
+        // Compared at the receiver's plane there, with the slack.
         let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-        let drop = length(lightPoisson(i)) * filterTexels * filterTexel * tilt;
-        lit += stored <= depth + (drop + filterSlack) * perWorld ? 1.0 : 0.0;
+        let rise = -dot(n, tap) / cosine;
+        lit += stored <= depth + (rise + filterSlack) * perWorld ? 1.0 : 0.0;
     }
     return lit / 16.0;
 }
@@ -2210,7 +2209,11 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
     // row's pose for a pushbroom.
     let v = viewVector(ndc.xy, world);
-    let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
+    // The surface's normal, which shadows offset and compare along, and the one shading uses, bent
+    // to face the viewer: at grazing views the two part, and the bent one would lift the receiver
+    // sideways rather than off the surface.
+    let surfaceNormal = normalize(gNormal.Load(pixel).xyz);
+    let n = facingNormal(surfaceNormal, v);
     // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
     // layers on to Q, as many more to U): the image's +x and +y across the light reaching the eye.
     let stokes = kShadePolarization ? pass.model.z : 0u;
@@ -2396,10 +2399,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
+            let surfaceDotL = dot(surfaceNormal, toLight);
             let visibility =
                 k == resources.virtualLight
-                    ? virtualVisibility(light, shadowPoint, n, nDotL, float2(id.xy))
-                    : lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy));
+                    ? virtualVisibility(light, shadowPoint, surfaceNormal, surfaceDotL,
+                                        float2(id.xy))
+                    : lightVisibility(light, shadowPoint, surfaceNormal, surfaceDotL,
+                                      float2(id.xy));
             scale *= visibility * volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;

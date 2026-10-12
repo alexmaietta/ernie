@@ -86,8 +86,9 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     const glm::dvec3 eye(0.0, 0.0, 5.0);
     const auto levels = VirtualShadowMap::FitLevels(
         glm::normalize(glm::dvec3(0.3, 0.2, 1.0)), eye, eye, -2, 12);
-    // Texels about 3 cm at 5 m: what a coarse depth buffer suits.
-    map.SetLevels(levels, 4.0f);
+    // Texels about 3 cm at 5 m: what a coarse depth buffer suits; the
+    // four coarser levels a wide light's penumbrae filter in.
+    map.SetLevels(levels, 4.0f, nullptr, 4);
     // Clip x, y in [-1, 1] at depth 0.5 to the ground below the eye,
     // relative to the origin (the eye).
     glm::mat4 inverse(0.0f);

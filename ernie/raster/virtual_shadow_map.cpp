@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -33,8 +34,11 @@ struct BlockGpu {
     std::uint32_t levelCount;
     std::int32_t firstLevel;
     float bias;
+    VkDeviceAddress rects;
+    std::uint32_t filterLevels;
+    std::uint32_t padding;
 };
-static_assert(sizeof(BlockGpu) == 56,
+static_assert(sizeof(BlockGpu) == 72,
               "BlockGpu must match virtual_shadow.slang");
 
 /// virtual_shadow.slang's `VirtualLevel`.
@@ -123,6 +127,9 @@ VirtualShadowMap::VirtualShadowMap(const VulkanContext& context,
     counter_ =
         std::make_unique<GpuBuffer>(context, sizeof(std::uint32_t),
                                     kStorage, BufferMemory::Readback);
+    rects_ = std::make_unique<GpuBuffer>(
+        context, levelCount_ * 4 * sizeof(std::uint32_t), kStorage,
+        BufferMemory::Device);
     block_ = std::make_unique<GpuBuffer>(
         context, sizeof(BlockGpu),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | kStorage,
@@ -195,7 +202,7 @@ std::int32_t VirtualShadowMap::LevelFor(double distance,
 
 void VirtualShadowMap::SetLevels(
     std::span<const VirtualShadowLevel> levels, float bias,
-    FrameUploads* uploads) {
+    FrameUploads* uploads, std::uint32_t filterLevels) {
     if (levels.size() != levelCount_) {
         throw std::invalid_argument(
             "Virtual shadow maps need one fit per level");
@@ -225,8 +232,97 @@ void VirtualShadowMap::SetLevels(
                          pages_,
                          levelCount_,
                          firstLevel_,
-                         bias};
+                         bias,
+                         rects_->Address(),
+                         std::min(filterLevels, kMaxFilterLevels),
+                         0};
     write(*block_, std::as_bytes(std::span(&block, 1)));
+}
+
+std::optional<glm::mat4> VirtualShadowMap::CasterCull(
+    const VirtualShadowLevel& level,
+    const glm::mat4& inverseViewProjection, const glm::vec3& eye,
+    float bias, std::uint32_t filterLevels, bool first, bool last) {
+    // Its receivers' distances, a little wider for the shaders' float
+    // rounding of the level.
+    const double near =
+        first ? 0.0
+              : 0.99 * std::exp2(level.level -
+                                 static_cast<double>(filterLevels) -
+                                 bias);
+    const double far = 1.01 * std::exp2(level.level + 1.0 - bias);
+    const auto unproject = [&](float x, float y, float z) {
+        const glm::vec4 h =
+            inverseViewProjection * glm::vec4(x, y, z, 1.0f);
+        return glm::dvec3(h) / static_cast<double>(h.w);
+    };
+    // The frustum between view depths `near` (as a depth: the nearest
+    // a point that far can be along the view) and `far`, which holds
+    // every point of it at those distances: its corners along the
+    // edges from the near plane.
+    const glm::dvec3 from(eye);
+    const glm::dvec3 forward = glm::normalize(
+        unproject(0.0f, 0.0f, 0.5f) - unproject(0.0f, 0.0f, 1.0f));
+    glm::dvec3 corners[4];
+    glm::dvec3 rays[4];
+    double slant = 1.0;
+    for (int i = 0; i < 4; ++i) {
+        const float x = (i & 1) != 0 ? 1.0f : -1.0f;
+        const float y = (i & 2) != 0 ? 1.0f : -1.0f;
+        corners[i] = unproject(x, y, 1.0f);
+        rays[i] = glm::normalize(unproject(x, y, 0.5f) - corners[i]);
+        slant = std::min(slant, glm::dot(rays[i], forward));
+    }
+    // Parallel rays (an orthographic camera) keep every depth from
+    // the near plane.
+    const double nearDepth = slant < 0.9999 ? near * slant : 0.0;
+    glm::dvec2 low(std::numeric_limits<double>::infinity());
+    glm::dvec2 high(-std::numeric_limits<double>::infinity());
+    for (int i = 0; i < 4; ++i) {
+        const double start = glm::dot(corners[i] - from, forward);
+        const double along = glm::dot(rays[i], forward);
+        if (far < start) {
+            continue;
+        }
+        for (const double depth : {std::max(nearDepth, start), far}) {
+            const glm::dvec3 point =
+                corners[i] + rays[i] * ((depth - start) / along);
+            const glm::dvec4 clip = glm::dmat4(level.viewProjection) *
+                                    glm::dvec4(point, 1.0);
+            low = glm::min(low, glm::dvec2(clip));
+            high = glm::max(high, glm::dvec2(clip));
+        }
+    }
+    // The coarsest level's four pages about the camera, which every
+    // frame marks (`markMain`).
+    const double page = 2.0 / kPagesAcross;
+    if (last) {
+        low = glm::min(low, glm::dvec2(-page));
+        high = glm::max(high, glm::dvec2(page));
+    }
+    // A page beside, clip space's 2 over 128 pages.
+    low = glm::max(low - page, glm::dvec2(-1.0));
+    high = glm::min(high + page, glm::dvec2(1.0));
+    if (!(low.x < high.x && low.y < high.y)) {
+        return std::nullopt;
+    }
+    // x and y of the box to [-1, 1], z as it was.
+    glm::dmat4 narrow(1.0);
+    narrow[0][0] = 2.0 / (high.x - low.x);
+    narrow[1][1] = 2.0 / (high.y - low.y);
+    narrow[3][0] = -(high.x + low.x) / (high.x - low.x);
+    narrow[3][1] = -(high.y + low.y) / (high.y - low.y);
+    return glm::mat4(narrow * glm::dmat4(level.viewProjection));
+}
+
+std::uint32_t VirtualShadowMap::FilterLevelsFor(double tanRadius) {
+    const double texels = 4096.0 * tanRadius;
+    if (!(texels > 64.0)) {
+        return 0;
+    }
+    return std::min(static_cast<std::uint32_t>(
+                        std::ceil(std::log2(texels / 64.0))),
+                    kMaxFilterLevels);
 }
 
 void VirtualShadowMap::SetVolumes(
@@ -351,6 +447,8 @@ void VirtualShadowMap::RecordAllocate(
     Prepare(commands);
     vkCmdFillBuffer(commands, counter_->Handle(), 0,
                     sizeof(std::uint32_t), 0);
+    vkCmdFillBuffer(commands, rects_->Handle(), 0, VK_WHOLE_SIZE,
+                    ~0u);
     TransferBarrier(commands);
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       allocatePipeline_->Handle());

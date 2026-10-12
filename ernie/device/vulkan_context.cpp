@@ -581,6 +581,10 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         supported.features.fragmentStoresAndAtomics;
     c.fragmentAtomics_ =
         supported.features.fragmentStoresAndAtomics == VK_TRUE;
+    // For shadow casters, which clip to a virtual shadow map level's
+    // backed pages (frame.slang's `shadowClipDistances`).
+    features.features.shaderClipDistance =
+        supported.features.shaderClipDistance;
     c.depthClamp_ = supported.features.depthClamp == VK_TRUE;
     features.features.multiDrawIndirect =
         supported.features.multiDrawIndirect;

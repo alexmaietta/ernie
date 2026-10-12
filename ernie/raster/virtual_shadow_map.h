@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -105,9 +106,38 @@ class VirtualShadowMap {
 
     /// Uploads `levels` (one per level of the clipmap) and the bias
     /// that picks a receiver's level: through `uploads`, ordered with
-    /// the frame's work, or written at once without.
+    /// the frame's work, or written at once without. Each receiver
+    /// marks `filterLevels` coarser levels beside its own (at most
+    /// `kMaxFilterLevels`), which wide penumbrae read
+    /// (`FilterLevelsFor`).
     void SetLevels(std::span<const VirtualShadowLevel> levels,
-                   float bias, FrameUploads* uploads = nullptr);
+                   float bias, FrameUploads* uploads = nullptr,
+                   std::uint32_t filterLevels = 0);
+
+    static constexpr std::uint32_t kMaxFilterLevels = 4;
+
+    /// What `level` draws, as a cull matrix: its view-projection with
+    /// x and y narrowed to where its receivers can be, the camera's
+    /// frustum (`inverseViewProjection` from clip space to
+    /// origin-relative world, reversed-Z, the camera at `eye`)
+    /// between the distances whose level it is or, with
+    /// `filterLevels`, filters in (`LevelFor` with `bias`), seen
+    /// along the light and widened by a page for the pages marked
+    /// beside them; none when no receiver reaches it. Casters outside
+    /// it shadow none of its backed pages. `first` takes every
+    /// distance below too; `last`, the coarsest, its pages about the
+    /// camera, which are always marked.
+    static std::optional<glm::mat4>
+    CasterCull(const VirtualShadowLevel& level,
+               const glm::mat4& inverseViewProjection,
+               const glm::vec3& eye, float bias,
+               std::uint32_t filterLevels, bool first, bool last);
+
+    /// The coarser levels a light of angular radius whose tangent is
+    /// `tanRadius` filters in: its blockers searched up to a level's
+    /// radius, 4096 texels, over at most 64 texels a level
+    /// (shading.slang's `virtualVisibility`); none for the Sun.
+    static std::uint32_t FilterLevelsFor(double tanRadius);
 
     /// The volumes' boxes (origin-relative low and high corners),
     /// whose points along the camera's rays `RecordMark` marks too,
@@ -158,6 +188,12 @@ class VirtualShadowMap {
     const GpuBuffer& Counter() const {
         return *counter_;
     }
+    /// Each level's rectangle of backed pages, which its casters clip
+    /// to: four uints, its first column and row and its last column
+    /// and row bitwise inverted (all ones for none).
+    const GpuBuffer& Rects() const {
+        return *rects_;
+    }
 
   private:
     /// virtual_shadow.slang's `VirtualConstants`.
@@ -179,6 +215,7 @@ class VirtualShadowMap {
     std::unique_ptr<GpuBuffer> requests_;
     std::unique_ptr<GpuBuffer> levels_;
     std::unique_ptr<GpuBuffer> counter_;
+    std::unique_ptr<GpuBuffer> rects_;
     std::unique_ptr<GpuBuffer> block_;
     std::unique_ptr<GpuImage> noDepth_;
     std::unique_ptr<GpuBuffer> volumeBoxes_;

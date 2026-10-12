@@ -51,6 +51,14 @@ public struct VirtualShadow {
     public int firstLevel;
     // Added to log2 of a receiver's distance to pick its level.
     public float bias;
+    // Each level's rectangle of backed pages, four uints: its first column and row, and its last
+    // column and row bitwise inverted, so atomic minima from all ones gather all four
+    // (`allocateMain`); casters clip to it (frame.slang's `shadowPosition`).
+    public uint* rects;
+    // The coarser levels marked beside a receiver's own, at most `kVirtualFilterLevels`: as many
+    // as the light's widest penumbra needs (shading.slang's `virtualCoarserFor`), none for the
+    // Sun's.
+    public uint filterLevels;
 }
 
 // The virtual texel at clip-space `clip` of a level, as its casters rasterize it: x right, y
@@ -181,7 +189,7 @@ void markMain(uint3 id: SV_DispatchThreadID) {
     }
     // Its level and the next coarser ones, which wide filters read as a mip chain's.
     let first = uint(max(level, 0));
-    for (uint index = first; index <= min(first + kVirtualFilterLevels, count - 1); ++index) {
+    for (uint index = first; index <= min(first + map.filterLevels, count - 1); ++index) {
         let clip = mul(map.levels[index].viewProjection, float4(world, 1.0));
         if (all(abs(clip.xy) <= 1.0)) {
             markAround(index, virtualTexelAt(clip.xy));
@@ -242,7 +250,8 @@ void markVolumesMain(uint3 id: SV_DispatchThreadID) {
 }
 
 // One thread per page of every level: flagged pages take the next physical page, in order; the
-// rest are unbacked. Pages past the pool stay unbacked (the counter still counts them).
+// rest are unbacked. Pages past the pool stay unbacked (the counter still counts them). Backed
+// pages widen their level's rectangle (`VirtualShadow::rects`).
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void allocateMain(uint3 id: SV_DispatchThreadID) {
@@ -258,6 +267,11 @@ void allocateMain(uint3 id: SV_DispatchThreadID) {
         InterlockedAdd(map.counter[0], 1u, n);
         if (n < map.pages) {
             entry = n | kVirtualBacked;
+            let rect = 4 * id.z;
+            InterlockedMin(map.rects[rect], id.x);
+            InterlockedMin(map.rects[rect + 1], id.y);
+            InterlockedMin(map.rects[rect + 2], ~id.x);
+            InterlockedMin(map.rects[rect + 3], ~id.y);
         }
     }
     map.pageTable[page] = entry;
