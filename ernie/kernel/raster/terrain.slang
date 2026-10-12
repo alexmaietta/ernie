@@ -2,7 +2,9 @@
 // Terrain resources and the CDLOD grid vertex, used by the terrain's shadow and colour passes.
 // Besides the frame (bindings 0 and 1, frame.slang) and material (5, surface.slang) the
 // passes bind
-//   10 TerrainUniforms, 11 heights, 12 LOD patches, 13 height gradients.
+//   10 TerrainUniforms, whose `textures` name the heights and height gradients in the bindless
+//   heap, and 12 LOD patches.
+import bindless;
 __exported import frame;
 
 public struct TerrainUniforms {
@@ -23,19 +25,19 @@ public struct TerrainUniforms {
     public uint4 ids;
     // xyz: towards the hillshade's light (x east, y north, z up).
     public float4 hillshade;
+    // Slots in the bindless heap's `heapTextures`: x the heights, y the central-difference height
+    // gradients (dz/dx east, dz/dy north) per raster cell, before exaggeration, filterable unlike
+    // the heights; zw unused.
+    public uint4 textures;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<TerrainUniforms> t;
-[[vk::binding(11, 0)]] public Texture2D<float> heights;
 // Per patch: origin column, origin row, LOD level (vertex spacing 2^level cells), unused.
 [[vk::binding(12, 0)]] public StructuredBuffer<uint4> patches;
-// Central-difference height gradient (dz/dx east, dz/dy north) per raster cell, before
-// exaggeration; filterable, unlike `heights`.
-[[vk::binding(13, 0)]] public Texture2D<float2> gradients;
 
 public float heightAt(int2 cell) {
     let last = int2(t.dims.xy) - int2(1, 1);
-    return heights.Load(int3(clamp(cell, int2(0, 0), last), 0));
+    return heapTextures[t.textures.x].Load(int3(clamp(cell, int2(0, 0), last), 0)).x;
 }
 
 float2 morphRange(uint level) {
@@ -97,7 +99,7 @@ public GridVertex gridVertex(uint vertexIndex, uint instanceIndex) {
 public float2 terrainSlope(float3 world) {
     let extent = float2(t.dims.xy) * t.grid.z;
     let uv = float2(world.x - t.grid.x, t.grid.y - world.y) / extent;
-    return gradients.Sample(clampSampler(), uv) * t.grid.w;
+    return heapTextures[t.textures.y].Sample(clampSampler(), uv).xy * t.grid.w;
 }
 
 public float3 slopeNormal(float2 slope) {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/device/bindless.h"
 #include "ernie/device/buffer.h"
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/frame_uploads.h"
@@ -346,6 +347,9 @@ class TerrainDrawable : public RasterDrawable {
     GpuBuffer uniforms_;
     std::unique_ptr<GpuImage> heights_;
     std::unique_ptr<GpuImage> gradients_;
+    /// Their bindless heap slots that the uniforms name, as of the
+    /// last `Prepare`.
+    std::vector<BindlessHeap::Slot> heapSlots_;
     std::unique_ptr<GpuBuffer> patchBuffer_;
 
     LodQuadtree tree_;

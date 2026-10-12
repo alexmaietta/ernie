@@ -2,8 +2,10 @@
 // Planet resources and the cube-sphere CDLOD grid vertex, used by the planet's shadow and colour
 // passes. Besides the frame (bindings 0 and 1, frame.slang) and material (5, surface.slang)
 // the passes bind
-//   10 PlanetUniforms, 11 heights, 12 LOD patches, 13 height gradients, 14 patch anchors.
+//   10 PlanetUniforms, whose `textures` name the heights and height gradients in the bindless
+//   heap, 12 LOD patches, 14 patch anchors.
 __exported import frame;
+import bindless;
 import brdf;
 
 public struct PlanetUniforms {
@@ -25,17 +27,17 @@ public struct PlanetUniforms {
     public uint4 refine;
     // xyz: (body.x / a_i)^2 for the ellipsoid's semi-axes a_i, all 1 on a sphere.
     public float4 shape;
+    // Slots in the bindless heap's `heapTextureArrays`: x the heights, one layer per cube face
+    // (`CubeSphereLod`) of (faces cells + 1) squared vertex heights; y per vertex and face the
+    // height's slope along the directions of increasing column and row, before exaggeration,
+    // filterable unlike the heights; zw unused.
+    public uint4 textures;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<PlanetUniforms> p;
-// One layer per cube face (`CubeSphereLod`) of (faces cells + 1) squared vertex heights.
-[[vk::binding(11, 0)]] public Texture2DArray<float> heights;
 // Per patch: origin column, origin row (fine grid), LOD level (vertex spacing 2^level fine
 // cells), face.
 [[vk::binding(12, 0)]] public StructuredBuffer<uint4> patches;
-// Per vertex and face, the height's slope along the directions of increasing column and row,
-// before exaggeration; filterable, unlike `heights`.
-[[vk::binding(13, 0)]] public Texture2DArray<float2> gradients;
 // Per patch: xyz the radius-high point above its origin vertex relative to the frame's origin,
 // computed in double on the host, so vertices are small offsets from it.
 [[vk::binding(14, 0)]] public StructuredBuffer<float4> anchors;
@@ -124,10 +126,11 @@ public float heightAt(uint face, int2 g) {
     let last = int(p.dims.x);
     let next = min(cell + 1, int2(last, last));
     let t = float2(g & int((1u << k) - 1u)) / float(1u << k);
-    let h00 = heights.Load(int4(cell, int(face), 0));
-    let h10 = heights.Load(int4(next.x, cell.y, int(face), 0));
-    let h01 = heights.Load(int4(cell.x, next.y, int(face), 0));
-    let h11 = heights.Load(int4(next, int(face), 0));
+    let heights = heapTextureArrays[p.textures.x];
+    let h00 = heights.Load(int4(cell, int(face), 0)).x;
+    let h10 = heights.Load(int4(next.x, cell.y, int(face), 0)).x;
+    let h01 = heights.Load(int4(cell.x, next.y, int(face), 0)).x;
+    let h11 = heights.Load(int4(next, int(face), 0)).x;
     return lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y);
 }
 
@@ -226,7 +229,9 @@ public float3 planetNormal(uint face, float2 grid, out float3 up) {
     let tu = normalize(f.u - up * dot(up, f.u));
     let tv = normalize(f.v - up * dot(up, f.v));
     let size = float(p.dims.x + 1);
-    let slope = gradients.Sample(clampSampler(), float3((grid + 0.5) / size, float(face))) *
+    let slope = heapTextureArrays[p.textures.y]
+                    .Sample(clampSampler(), float3((grid + 0.5) / size, float(face)))
+                    .xy *
                 p.body.y;
     // The gradient from its components along the two grid directions, which meet at an angle.
     let c = dot(tu, tv);

@@ -35,8 +35,10 @@ struct PlanetUniforms {
     float hillshade[4];
     std::uint32_t refine[4];
     float shape[4];
+    /// The heights' and gradients' bindless heap slots; unused.
+    std::uint32_t textures[4];
 };
-static_assert(sizeof(PlanetUniforms) == 368,
+static_assert(sizeof(PlanetUniforms) == 384,
               "PlanetUniforms must match planet.slang");
 
 constexpr VkDeviceSize kUniformsStride = 512;
@@ -58,16 +60,15 @@ static_assert(sizeof(DrawConstants) == 96,
 constexpr VkShaderStageFlags kGraphics =
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-/// Frame (0 and 1), material (5) and planet (10 to 14) bindings;
-/// see planet.slang.
+/// Frame (0 and 1), material (5) and planet (10 its uniforms, which
+/// name its heights and gradients in the bindless heap; 12 its LOD
+/// patches; 14 their anchors) bindings; see planet.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {11, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
@@ -486,6 +487,16 @@ void PlanetDrawable::Prepare(
     uniforms.ids[0] = material;
     uniforms.ids[1] = params_.primId;
     uniforms.ids[2] = params_.linkGroup;
+    // The heights and gradients in the bindless heap, in fresh slots:
+    // the last ones retire once no frame in flight reads them.
+    BindlessHeap& heap = renderer_.Context().Bindless();
+    heapSlots_.clear();
+    for (const GpuImage* image : {heights_.get(), gradients_.get()}) {
+        heapSlots_.push_back(heap.AddImage(
+            BindlessHeap::Kind::Texture2DArray, image->View()));
+        uniforms.textures[heapSlots_.size() - 1] =
+            heapSlots_.back().Index();
+    }
     const VkDeviceSize bytes = views * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());
@@ -581,9 +592,7 @@ PlanetDrawable::Resources(const RasterFrame& frame,
         .AppendResources(resources);
     resources.push_back(DescriptorResource::Of(
         uniforms_, view * kUniformsStride, sizeof(PlanetUniforms)));
-    resources.push_back(DescriptorResource::Of(heights_->View()));
     resources.push_back(DescriptorResource::Of(*patchBuffer_));
-    resources.push_back(DescriptorResource::Of(gradients_->View()));
     resources.push_back(DescriptorResource::Of(*anchorBuffer_));
     return resources;
 }
