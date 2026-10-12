@@ -18,45 +18,33 @@ Ernie is built to be customized and to work alongside other tools. You can add y
 
 Its key features are aimed at planetary robotics and sensing:
 
-- **Cameras and sensors**
-  - Exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting.
-  - Perspective, fisheye and orthographic projections, and line-scan pushbroom cameras like LROC's.
-  - Quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth.
-  - USGS CSM camera models for non-standard instruments.
-  - Sensor filter chains (noise models, lens flare, vignetting), with your own filters written in Slang.
-- **Planetary environments**
-  - Terrain as a built-in prim, with continuous level of detail through quadtrees, updated in place where its heights change.
-  - Whole planets and moons from a Terrain with a radius, drawn from orbit down to the ground.
-  - Earth and Mars atmospheres from physical models, seen from the ground or from orbit, with aerial perspective.
-  - Star fields from your own catalogs, with brightness from magnitudes and color from B-V indices.
-- **Light and materials**
-  - Spectral rendering: light is carried in bands (16 across 380-780 nm by default) from the sources, through the materials, to the sensor.
-  - Distant lights with an angular size, for soft penumbrae from the sun's width in the sky.
-  - Illuminants (blackbody, CIE daylight, the measured solar spectrum) and custom spectral curves, for example Earthshine on the lunar surface.
-  - Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert BRDFs built in, and your own for the surfaces you study.
-- **Simulation and learning**
-  - Batch rendering: many worlds, each with its own camera, rendered in one step for RL and Monte Carlo workloads.
-  - Meshes, instances and points written from CUDA or Warp arrays without copies, for rover and particle simulations.
-  - A floating origin, so large scenes keep their precision.
-- **Tools**
-  - A viewer with customizable panels, to drive your own simulations and workflows.
-  - Debug drawing for labels, trajectories and overlays in the scene.
+| | |
+| --- | --- |
+| **Cameras** | Exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting<br>Perspective, fisheye, orthographic and line-scan pushbroom cameras like LROC's<br>USGS CSM camera models for non-standard instruments |
+| **Sensors** | Quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth<br>Sensor filter chains (noise models, lens flare, vignetting), with your own filters written in Slang |
+| **Planets** | Terrain as a built-in prim, with continuous level of detail, updated in place where its heights change<br>Whole planets and moons drawn from orbit down to the ground<br>Earth and Mars atmospheres from physical models, from the ground or from orbit, with aerial perspective<br>Star fields from your own catalogs, with brightness from magnitudes and color from B-V indices |
+| **Light** | Spectral rendering: light carried in bands (16 across 380-780 nm by default) from the sources, through the materials, to the sensor<br>Distant lights with an angular size, for soft penumbrae from the sun's width in the sky<br>Illuminants (blackbody, CIE daylight, the measured solar spectrum) and custom spectral curves, such as Earthshine on the Moon |
+| **Materials** | Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert BRDFs built in, and your own for the surfaces you study |
+| **Simulation and learning** | Batch rendering: many worlds, each with its own camera, rendered in one step for RL and Monte Carlo workloads<br>Meshes, instances and points written from CUDA or Warp arrays without copies<br>A floating origin, so large scenes keep their precision |
+| **Tools** | A viewer with customizable panels, to drive your own simulations and workflows<br>Debug drawing for labels, trajectories and overlays in the scene |
+| **Integrations** | TerrainGen builds on Ernie's viewer, adding its own panels to render synthetic terrain<br>Newton Viewer and IsaacLab renderer backends, and a viewer and renderer for Project Chrono's Chrono Sensor |
 
 For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
 Future work:
 
 - A fully USD- and glTF-compliant renderer, loading OpenUSD, glTF, OBJ, STL and 3D Tiles, with the glTF material system, UsdPreviewSurface shaders and MDL and MaterialX support
-- Dust and other volumes from particle simulations through NanoVDB
+- Volumetric rendering
 - Differentiable rendering
-- Global illumination
+- Reflections and global illumination
 - OpenXR integrations
 - WebGPU backend
-- Gaussian splat and particle fields.
+- Gaussian splat and particle fields
+- LWIR thermal emissions
 - Lidar and radar sensors
 - A real-time ray-tracing renderer alongside the rasterizer
 - Integrations into Newton Viewer, Chrono Sensor, and IsaacLab
-- Compare benchmarks with RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality
+- Benchmark against RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality
 
 ## Getting Started
 
@@ -133,80 +121,25 @@ For the prim types and their attributes, transforms, relationships, arrays, vali
 
 ### Examples
 
-Planned future examples.
+Ernie ships with built-in demos, each written in both C++ and Python, covering cameras and sensors, lighting, atmospheres, terrain, lasers, batched rendering and the viewer. The two versions of a demo render the same image.
 
-**Demos**
+Run the `ernie` program with no arguments to open the Ernie Viewer, whose Demos panel lists every demo to pick and run. From the command line, `--list` prints the demos' names and `--demo` runs one:
 
-- Cornell box
+```sh
+ernie                               # the viewer, with the Demos panel
+ernie --list                        # every demo's name
+ernie --demo demo_atmosphere_earth  # run one demo
+```
 
-**Cameras**
+With the Python package installed, `python -m ernie` opens the same viewer and takes the same options, and `python -m ernie.demos` runs the Python version of a demo:
 
-- Pinhole, fisheye, orthographic
-- Distortion
-- LRO NAC and WAC
-- Shadowcam
-- Mars2020 Navcam, Mastcam
-- LWIR, NIR, UV
-- Narrowband camera
+```sh
+python -m ernie --demo demo_atmosphere_earth
+python -m ernie.demos --list
+python -m ernie.demos demo_atmosphere_earth
+```
 
-**Camera Filters and Noise**
-
-- Vignetting
-- Lens flare
-- Bloom
-- Narrowband filter
-
-**Terrain**
-
-- SLDEM global and multiple tiles
-- Mars terrains
-- Asteroid shape files
-- Saturn and its rings
-- Pluto
-
-**Lighting**
-
-- Distant light
-- Custom radiance curves to model Earthshine
-- Dome light shadows
-- Illuminants across the same scene
-- Laser lines competing with sunlight
-
-**Lasers**
-
-- Lasers from 405 to 940 nm seen by RGB, narrowband, NIR and wideband cameras (`demo_lasers_wavelengths`)
-- A projector's patterns: spot, line, grid, dots, fringes and rings written in Slang (`demo_lasers_patterns`)
-- A pulsed line laser against long, in-step and between-pulse exposures (`demo_lasers_pulsed`)
-- Gray-code structured light decoded to projector columns (`demo_lasers_structured_light`)
-- NASA Ames' virtual bumper: 11 dots at 660 nm finding rocks at night, in Earth daylight and in lunar daylight (`demo_lasers_virtual_bumper`)
-- A projector's pattern drawn by a Warp kernel straight into the renderer's memory every frame (`demo_interop_laser_pattern`, Python)
-
-**Star Field**
-
-- Hipparcos star catalog
-- Stars viewed from another galaxy
-
-**Atmosphere**
-
-- Earth atmosphere (from orbit and ground)
-- Mars atmosphere (compare against existing images)
-
-**Volumes**
-
-- NanoVDB interop
-- Clouds in Earth orbit
-- Dust clouds on lunar surface
-
-**Batched and RL**
-
-- Batched camera rendering and setting poses
-
-**Viewer**
-
-- Adding a custom panel
-- Hiding default panels and menus
-- Extending HUD options
-- Physics debug draw overlays
+Every demo takes common options, such as `--viewer null` to render without a window and `--output frame.png` to save the last frame; `--help` lists them. The sources are in [demos/](demos/), as `demos/<category>/demo_<category>_<name>.{cpp,py}`, and make a good starting point for your own: subclass `ernie.demo.Demo` in Python or `ernie::app::Demo` in C++.
 
 ## Installation
 
@@ -245,6 +178,21 @@ uv pip install dist/ernie_renderer-*.whl
 Packages are built with `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a GPU on lavapipe, and benchmarks.
+
+## Citation
+
+If you use Ernie in your research, please cite it. GitHub's "Cite this repository" button gives the same citation from [CITATION.cff](CITATION.cff).
+
+```bibtex
+@software{maietta2026ernie,
+  author  = {Maietta, Alex},
+  title   = {Ernie: Efficient Renderer for Natural and Interplanetary Environments},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/alexmaietta/ernie},
+  license = {BSD-3-Clause}
+}
+```
 
 ## License
 
