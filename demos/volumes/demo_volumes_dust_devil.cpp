@@ -227,8 +227,8 @@ class DustDevilDemo : public app::Demo {
         numFrames = 6;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
-        // Mars's soil and air in a clear season, the sun 25 degrees up
-        // and 50 to the view's left: the dust lit from behind,
+        // Mars's soil and air in a clear season, the sun 25 degrees
+        // up and 50 to the view's left: the dust lit from behind,
         // scattering forward, clear of the sky's glow about the sun.
         demos::DefinePlanetSurface(scene, "/World/Mars", 3389.5e3,
                                    glm::dvec3(0.33, 0.22, 0.14),
@@ -242,7 +242,8 @@ class DustDevilDemo : public app::Demo {
             .SetPhysicalIlluminant(std::string(tokens::kSun))
             .SetAngle(0.35)
             .SetShadowEnable(true)
-            .SetTransform(DistantLightTransform({0.265, 0.867, 0.423}));
+            .SetTransform(
+                DistantLightTransform({0.265, 0.867, 0.423}));
 
         // The dust, written on the GPU each frame, its first cell at
         // (-19.6875, -19.6875, 0.3125) m.
