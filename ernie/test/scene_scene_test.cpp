@@ -381,6 +381,34 @@ TEST(Scene, CloneCopiesASubtreeAndMovesItsInnerRelationships) {
         << "inside";
 }
 
+TEST(Scene, CloneMovesShaderConnectionsInsideTheSource) {
+    // A material's network: the surface reads its own texture, which
+    // reads coordinates from outside the material.
+    Scene scene;
+    scene.Define("/Looks/M", "Material")
+        .Set("outputs:surface.connect",
+             std::string("/Looks/M/Surface.outputs:surface"));
+    scene.Define("/Looks/M/Surface", "Shader")
+        .Set("inputs:diffuseColor.connect",
+             std::string("/Looks/M/Tex.outputs:rgb"));
+    scene.Define("/Looks/M/Tex", "Shader")
+        .Set("inputs:st.connect",
+             std::string("/Looks/St.outputs:result"));
+
+    scene.Clone("/Looks/M", "/Looks/N");
+    EXPECT_EQ(scene.Get<std::string>("/Looks/N",
+                                     "outputs:surface.connect", ""),
+              "/Looks/N/Surface.outputs:surface");
+    EXPECT_EQ(scene.Get<std::string>("/Looks/N/Surface",
+                                     "inputs:diffuseColor.connect",
+                                     ""),
+              "/Looks/N/Tex.outputs:rgb");
+    EXPECT_EQ(scene.Get<std::string>("/Looks/N/Tex",
+                                     "inputs:st.connect", ""),
+              "/Looks/St.outputs:result")
+        << "connections outside stay";
+}
+
 TEST(Scene, MappedArraysAreWrittenInPlaceAndCommittedByUnmap) {
     Scene scene;
     scene.Define("/Rocks", "PointInstancer")

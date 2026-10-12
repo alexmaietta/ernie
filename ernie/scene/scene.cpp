@@ -291,6 +291,22 @@ Prim Scene::Clone(const Path& source, const Path& destination) {
                     moved.push_back(remap(each));
                 }
                 Set(copy, attribute, std::move(moved));
+            } else if (const auto* text = value->Get<std::string>();
+                       text != nullptr &&
+                       attribute.ends_with(tokens::kConnectSuffix)) {
+                // A shader connection, "prim path.output".
+                const std::size_t dot = text->rfind('.');
+                std::string moved = *text;
+                if (dot != std::string::npos && dot > 0) {
+                    try {
+                        moved = remap(Path(text->substr(0, dot)))
+                                    .String() +
+                                text->substr(dot);
+                    } catch (const std::invalid_argument&) {
+                        // Not a prim path: copied as it is.
+                    }
+                }
+                Set(copy, attribute, std::move(moved));
             } else {
                 Set(copy, attribute, *value);
             }

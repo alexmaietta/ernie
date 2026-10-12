@@ -1626,8 +1626,8 @@ void BindScene(nb::module_& m) {
         .def("clone", &Scene::Clone, nb::arg("source"),
              nb::arg("destination"), nb::keep_alive<0, 1>(),
              "Copies `source` and its descendants to `destination`, "
-             "sharing tensors and pointing "
-             "relationships inside `source` at their copies; returns "
+             "sharing tensors and pointing relationships and shader "
+             "connections inside `source` at their copies; returns "
              "the copy.")
         .def("remove", &Scene::Remove, nb::arg("path"))
         .def("has", &Scene::Has, nb::arg("path"))

@@ -211,9 +211,10 @@ class Scene {
     /// Copies the prim at `source` and its descendants to
     /// `destination`, as one environment is copied into many: types,
     /// values and tensors (sharing the tensors' memory) come along,
-    /// and relationships to prims inside `source`, such as a
-    /// PointInstancer's prototypes or a bound material, point to
-    /// their copies. Returns the copy.
+    /// and relationships and shader connections to prims inside
+    /// `source`, such as a PointInstancer's prototypes, a bound
+    /// material or a material's shader network, point to their
+    /// copies. Returns the copy.
     /// @throws std::invalid_argument if `source` does not exist, or
     /// `destination` exists, is the root, or is inside `source`.
     Prim Clone(const Path& source, const Path& destination);
