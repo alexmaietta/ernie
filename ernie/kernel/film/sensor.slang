@@ -690,7 +690,10 @@ void distancesAt(SensorUniforms cam, float3 ndc, out float imagePlane, out float
 // Lens: maps each sensor pixel through the lens's projection (`lensPinholeOf`) to the pinhole
 // raster image, resamples spectral radiance there (bilinearly) with the lens's natural vignetting
 // (`lensFalloff`), and the geometry outputs
-// (nearest). Sensor pixels whose rays leave the raster image are background.
+// (nearest). Sensor pixels whose rays leave the raster image are background. The geometry
+// outputs (PrimId and the like) are point samples of the raster texel nearest each ray, so where
+// the raster's grid drifts against the sensor's (a pushbroom's overscanned line) they land within
+// half a pixel.
 public struct Lens : ISpatialSource {
     int3 base;   // the bilinear footprint's first texel (x, y, layer)
     int2 next;   // and its last
