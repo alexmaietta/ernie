@@ -6,7 +6,7 @@
 //
 // Bindings: 0 the view's Uniforms (frame.slang; only its view-projection and pushbroom strip are
 // read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites, 5
-// batches' arrays, 6 batches.
+// batches' arrays, 6 batches, 7 batches' items in world order (overlay_sort.slang).
 //
 // References:
 // - M. Rougier, "Shader-Based Antialiased, Dashed, Stroked Polylines", JCGT 2(2), 2013: lines as
@@ -59,7 +59,8 @@ struct OverlayConstants {
     int4 view;
     // Image width and height in pixels, near and far planes.
     float4 viewport;
-    // x: the batch the batch shaders draw (`batches`).
+    // x: the batch the batch shaders draw (`batches`); y: 1 when the draw takes one slot's items
+    // in world order (`sortedItems`): z the slot, w the batch's slots.
     uint4 batch;
 }
 
@@ -72,7 +73,7 @@ struct Batch {
     // First floats in `batchData` of: x points, y ends, half extents or radii, z orientations,
     // w colours.
     uint4 arrays;
-    // x sizes, y worlds.
+    // x sizes, y worlds, z its first item in world order in `sortedItems` (overlay_sort.slang).
     uint4 extras;
     // The style's: x packed colour, y depth mode and marker shape as `info.y`, z world.
     uint4 style;
@@ -124,6 +125,7 @@ static const uint kKindSprite = 2;
 [[vk::binding(4, 0)]] StructuredBuffer<Sprite> sprites;
 [[vk::binding(5, 0)]] StructuredBuffer<float> batchData;
 [[vk::binding(6, 0)]] StructuredBuffer<Batch> batches;
+[[vk::binding(7, 0)]] StructuredBuffer<uint> sortedItems;
 [[vk::push_constant]] ConstantBuffer<OverlayConstants> constants;
 
 struct VertexOutput {
@@ -304,6 +306,19 @@ uint4 batchInfo(Batch b, uint i) {
     return uint4(color, b.style.y, world, 0);
 }
 
+// The item at position `at` of the draw's items: for a draw of one slot's (overlay_sort.slang),
+// its items in world order from the slot's first, the slot's cursor less its count.
+uint batchItem(Batch b, uint at) {
+    if (constants.batch.y == 0) {
+        return at;
+    }
+    let slot = constants.batch.z;
+    let slots = constants.batch.w;
+    let counts = b.extras.z - 2 * slots;
+    let first = sortedItems[counts + slots + slot] - sortedItems[counts + slot];
+    return sortedItems[b.extras.z + first + at];
+}
+
 // Item `i`'s line width or marker size in pixels.
 float batchSize(Batch b, uint i) {
     return (b.shape.w & kBatchHasSizes) != 0 ? batchData[b.extras.x + i] : b.origin.w;
@@ -329,7 +344,7 @@ float3 arrowHead(Batch b, float3 start, float3 end) {
 VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
     let segment = vertexIndex / 6;
-    let i = segment / b.shape.z;
+    let i = batchItem(b, segment / b.shape.z);
     let k = segment % b.shape.z;  // the item's segment
     let p = batchPoint(b, b.arrays.x, i);
     Segment s;
@@ -395,7 +410,7 @@ VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
 VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
     let triangle = vertexIndex / 3;
-    let i = triangle / (2 * kConeSides);
+    let i = batchItem(b, triangle / (2 * kConeSides));
     let k = triangle % (2 * kConeSides);
     let start = batchPoint(b, b.arrays.x, i);
     let end = batchPoint(b, b.arrays.y, i);
@@ -432,7 +447,7 @@ VertexOutput batchTriangleVertex(uint vertexIndex : SV_VertexID) {
 [shader("vertex")]
 VertexOutput batchSpriteVertex(uint vertexIndex : SV_VertexID) {
     let b = batches[constants.batch.x];
-    let i = vertexIndex / 6;
+    let i = batchItem(b, vertexIndex / 6);
     let half = 0.5 * batchSize(b, i);
     Sprite s;
     s.anchor = float4(batchPoint(b, b.arrays.x, i), 0.0);

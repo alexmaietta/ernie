@@ -60,8 +60,9 @@ Overlay::Overlay() {
     Touch();
 }
 
-void Overlay::Touch() {
+Overlay& Overlay::Touch() {
     version_ = nextVersion.fetch_add(1);
+    return *this;
 }
 
 Overlay& Overlay::Clear() {

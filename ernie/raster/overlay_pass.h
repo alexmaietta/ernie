@@ -42,12 +42,16 @@ class OverlayPass {
     /// when an overlay or the origin changed. Batches' arrays
     /// (`OverlayBatch`) are copied as they are into the batch buffer,
     /// device to device from the compute device, and expanded into
-    /// items as they are drawn. With `pushbroom`, first compiles the
-    /// pipelines for a pushbroom camera's targets, unless it has.
+    /// items as they are drawn. Batches with worlds are sorted by
+    /// world on the GPU for `worlds` worlds (the frame's views'
+    /// worlds are below it), so each view draws only its own world's
+    /// items and the shared ones. With `pushbroom`, first compiles
+    /// the pipelines for a pushbroom camera's targets, unless it has.
     /// @throws std::invalid_argument for batch arrays on a GPU
     /// without `SetComputeInterop`, or on another device.
     void Prepare(std::span<const Overlay* const> overlays,
-                 const glm::dvec3& origin, bool pushbroom = false);
+                 const glm::dvec3& origin, bool pushbroom = false,
+                 std::uint32_t worlds = 0);
 
     /// Connects the compute device batches' GPU arrays are copied
     /// from; the frames must wait for its copies
@@ -102,6 +106,10 @@ class OverlayPass {
     /// `batchData_`, their records and draws.
     void PrepareBatches(const glm::dvec3& origin);
 
+    /// Sorts the batches with worlds by world into `sortData_` and
+    /// writes their draws' arguments (`sortPending_`).
+    void RecordSort(VkCommandBuffer commands) const;
+
     const VulkanContext& context_;
     const ShaderCompiler& compiler_;
     FrameUploads& uploads_;
@@ -115,13 +123,37 @@ class OverlayPass {
     std::array<std::unique_ptr<GpuBuffer>, 3> buffers_;
     std::array<std::uint32_t, 3> counts_{};
     /// One draw of a batch: the batch, its primitive (0 segments, 1
-    /// triangles, 2 sprites) and vertex count.
+    /// triangles, 2 sprites) and vertex count; for a batch sorted by
+    /// world, its draw arguments for the shared items (each world's
+    /// follow, 2 apart).
     struct BatchDraw {
         std::uint32_t batch = 0;
         std::size_t primitive = 0;
         std::uint32_t vertices = 0;
+        bool sorted = false;
+        std::uint32_t args = 0;
     };
     std::vector<BatchDraw> batchDraws_;
+    /// A batch sorted by world (overlay_sort.slang): its slots, first
+    /// word of sort data, first draw arguments, items, and vertices
+    /// per item of its first and second draws.
+    struct SortJob {
+        std::uint32_t batch = 0;
+        std::uint32_t slots = 0;
+        std::uint32_t first = 0;
+        std::uint32_t args = 0;
+        std::uint32_t count = 0;
+        std::array<std::uint32_t, 2> vertices{};
+    };
+    std::vector<SortJob> sortJobs_;
+    /// Whether the next `Record` sorts the batches first.
+    mutable bool sortPending_ = false;
+    std::uint32_t worlds_ = 0;
+    std::unique_ptr<GpuBuffer> sortData_;
+    std::unique_ptr<GpuBuffer> drawArgs_;
+    PipelineLayout sortLayout_;
+    /// overlay_sort.slang's clear, count, scan and scatter.
+    std::array<std::unique_ptr<ComputePipeline>, 4> sortPipelines_;
     /// The batches' arrays, shared with the compute device when
     /// connected, and their `Batch` records (overlay.slang).
     std::shared_ptr<GpuBuffer> batchData_;

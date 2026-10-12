@@ -237,7 +237,7 @@ class Overlay {
 
     /// Many items of one kind from arrays (`OverlayBatch`), kept as
     /// they are and drawn on the GPU. The overlay holds the arrays:
-    /// add the batch again after writing into them in place.
+    /// `Touch` it after writing into them in place.
     /// @throws std::invalid_argument for arrays of the wrong type or
     /// shape, rows that differ in number, or ones the kind needs
     /// missing.
@@ -266,8 +266,11 @@ class Overlay {
                sprites_.empty() && batches_.empty();
     }
 
+    /// Marks the layer changed, so the renderer reads its batches'
+    /// arrays again: after writing into them in place.
+    Overlay& Touch();
+
   private:
-    void Touch();
     void AddSegment(const glm::dvec3& a, const glm::dvec3& b,
                     const OverlayStyle& style,
                     const glm::vec4& color);

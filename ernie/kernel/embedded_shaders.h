@@ -66,6 +66,8 @@ extern const char kFilterWhiteBalanceSlang[];
 
 /// Debug drawing over the display image.
 extern const char kOverlaySlang[];
+/// Overlay batches' items sorted by world, for batched views.
+extern const char kOverlaySortSlang[];
 
 /// The infinite ground plane's pass.
 extern const char kGroundSlang[];

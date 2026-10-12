@@ -284,3 +284,32 @@ def test_overlay_batches_show_in_their_worlds(renderer):
         assert white > 20, (
             "the batch without worlds shows in every view"
         )
+
+
+def test_overlay_batches_redraw_arrays_written_in_place(renderer):
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    wp = pytest.importorskip("warp")
+    scene = batch_scene()
+    points = wp.array(
+        np.float32([[-20, 0, 0]]), dtype=wp.vec3, device="cuda:0"
+    )
+    overlay = scene.overlay("debug").points(
+        points,
+        shape="square",
+        size=8,
+        color=(1, 0, 1),
+        depth="always",
+    )
+    before = np.array(renderer.render(scene))
+    points.assign(np.float32([[20, 0, 0]]))
+    overlay.touch()
+    after = np.array(renderer.render(scene))
+    magenta = lambda image: (  # noqa: E731
+        (image[..., 0] > 200)
+        & (image[..., 1] < 60)
+        & (image[..., 2] > 200)
+    )
+    columns = lambda image: np.nonzero(magenta(image).any(0))[0]  # noqa: E731
+    assert columns(before).size and columns(after).size
+    assert columns(after).mean() > columns(before).mean() + 5

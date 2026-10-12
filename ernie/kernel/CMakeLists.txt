@@ -60,6 +60,7 @@ set(ernie_shaders
     raster/motion.slang=kMotionSlang
     raster/motion_vectors.slang=kMotionVectorsSlang
     raster/overlay.slang=kOverlaySlang
+    raster/overlay_sort.slang=kOverlaySortSlang
     raster/planet.slang=kPlanetSlang
     raster/planet_color.slang=kPlanetColorSlang
     raster/planet_shadow.slang=kPlanetShadowSlang

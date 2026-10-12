@@ -58,6 +58,31 @@ struct GpuBatch {
 static_assert(sizeof(GpuBatch) == 96,
               "GpuBatch must match overlay.slang");
 
+/// overlay_sort.slang's push constants.
+struct SortConstants {
+    std::uint32_t batch[4];
+    std::uint32_t vertices[4];
+};
+
+constexpr DescriptorBinding kSortBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+constexpr const char* kSortEntries[] = {
+    "sortClearMain", "sortCountMain", "sortScanMain",
+    "sortScatterMain"};
+
+constexpr VkBufferUsageFlags kArgsUsage =
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+    VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
 // overlay.slang's kBatchHas* flags, segments of a sphere's circles
 // and sides of an arrow head's cone.
 constexpr std::uint32_t kBatchHasColors = 1;
@@ -97,6 +122,7 @@ constexpr DescriptorBinding kBindings[] = {
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// LdrColor's format, which headless products draw overlays into.
@@ -139,8 +165,16 @@ OverlayPass::OverlayPass(const VulkanContext& context,
                          VkFormat presentFormat)
     : context_(context), compiler_(compiler), uploads_(uploads),
       presentFormat_(presentFormat),
-      layout_(context, kBindings, sizeof(OverlayConstants)) {
+      layout_(context, kBindings, sizeof(OverlayConstants)),
+      sortLayout_(context, kSortBindings, sizeof(SortConstants)) {
     CreatePipelines(false);
+    const std::vector<ShaderModuleSource> sort{
+        {"overlay_sort", shaders::kOverlaySortSlang}};
+    for (std::size_t k = 0; k < sortPipelines_.size(); ++k) {
+        sortPipelines_[k] = std::make_unique<ComputePipeline>(
+            context, sortLayout_,
+            compiler.CompileSpirv(sort, kSortEntries[k]));
+    }
     // Placeholders, so the bindings always have a buffer.
     for (std::unique_ptr<GpuBuffer>& buffer : buffers_) {
         buffer = std::make_unique<GpuBuffer>(
@@ -153,6 +187,11 @@ OverlayPass::OverlayPass(const VulkanContext& context,
     batchInfos_ = std::make_unique<GpuBuffer>(
         context, sizeof(GpuBatch), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Device);
+    sortData_ = std::make_unique<GpuBuffer>(
+        context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Device);
+    drawArgs_ = std::make_unique<GpuBuffer>(context, 64, kArgsUsage,
+                                            BufferMemory::Device);
 }
 
 void OverlayPass::SetComputeInterop(ComputeInterop* compute) {
@@ -211,7 +250,8 @@ void OverlayPass::Upload(std::unique_ptr<GpuBuffer>& buffer,
 }
 
 void OverlayPass::Prepare(std::span<const Overlay* const> overlays,
-                          const glm::dvec3& origin, bool pushbroom) {
+                          const glm::dvec3& origin, bool pushbroom,
+                          std::uint32_t worlds) {
     if (pushbroom) {
         CreatePipelines(true);
     }
@@ -222,12 +262,14 @@ void OverlayPass::Prepare(std::span<const Overlay* const> overlays,
             wanted.emplace_back(overlay, overlay->Version());
         }
     }
-    if (wanted == prepared_ && origin == preparedOrigin_) {
+    if (wanted == prepared_ && origin == preparedOrigin_ &&
+        worlds == worlds_) {
         return;
     }
     ERNIE_ZONE("Overlay prepare");
     prepared_ = std::move(wanted);
     preparedOrigin_ = origin;
+    worlds_ = worlds;
     std::vector<GpuSegment> segments;
     std::vector<GpuTriangle> triangles;
     std::vector<GpuSprite> sprites;
@@ -265,6 +307,11 @@ void OverlayPass::Prepare(std::span<const Overlay* const> overlays,
 
 void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
     batchDraws_.clear();
+    sortJobs_.clear();
+    sortPending_ = false;
+    // Words of sort data and draw arguments of the sorted batches.
+    std::uint32_t sortTotal = 0;
+    std::uint32_t argsTotal = 0;
     // Where each array goes in the batch buffer, in floats (or
     // int32s), and what fills it.
     struct Placed {
@@ -326,6 +373,7 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             gpu.params[1] = static_cast<float>(batch.length);
             const auto index =
                 static_cast<std::uint32_t>(records.size() - 1);
+            const std::size_t firstDraw = batchDraws_.size();
             if (batch.kind == OverlayBatchKind::Arrows) {
                 batchDraws_.push_back(
                     {index, 1, count * 2 * kConeSides * 3});
@@ -335,6 +383,31 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             } else {
                 batchDraws_.push_back(
                     {index, 0, count * gpu.shape[2] * 6});
+            }
+            // With worlds and batched views, sorted by world: slots
+            // for the shared items, each world's, and worlds no view
+            // shows (overlay_sort.slang).
+            if (worlds_ > 0 && !batch.worlds.Empty()) {
+                SortJob job;
+                job.batch = index;
+                job.slots = worlds_ + 2;
+                job.first = sortTotal;
+                job.args = argsTotal;
+                job.count = count;
+                gpu.extras[2] = sortTotal + 2 * job.slots;
+                sortTotal += 2 * job.slots + count;
+                argsTotal += 2 * (job.slots - 1);
+                for (std::size_t d = firstDraw;
+                     d < batchDraws_.size(); ++d) {
+                    BatchDraw& draw = batchDraws_[d];
+                    const auto k =
+                        static_cast<std::uint32_t>(d - firstDraw);
+                    job.vertices[k] =
+                        count > 0 ? draw.vertices / count : 0;
+                    draw.sorted = true;
+                    draw.args = job.args + k;
+                }
+                sortJobs_.push_back(job);
             }
         }
     }
@@ -388,6 +461,73 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     }
     uploads_.Write(*batchInfos_, infos);
+    if (sortJobs_.empty()) {
+        return;
+    }
+    const VkDeviceSize sortBytes =
+        VkDeviceSize{sortTotal} * sizeof(std::uint32_t);
+    const VkDeviceSize argsBytes =
+        VkDeviceSize{argsTotal} * sizeof(VkDrawIndirectCommand);
+    if (sortData_->Size() < sortBytes ||
+        drawArgs_->Size() < argsBytes) {
+        vkDeviceWaitIdle(context_.Device());
+        sortData_ = std::make_unique<GpuBuffer>(
+            context_, std::max<VkDeviceSize>(2 * sortBytes, 4096),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        drawArgs_ = std::make_unique<GpuBuffer>(
+            context_, std::max<VkDeviceSize>(2 * argsBytes, 4096),
+            kArgsUsage, BufferMemory::Device);
+    }
+    sortPending_ = true;
+}
+
+void OverlayPass::RecordSort(VkCommandBuffer commands) const {
+    const auto barrier = [commands](VkPipelineStageFlags2 dstStage,
+                                    VkAccessFlags2 dstAccess) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = dstStage;
+        memory.dstAccessMask = dstAccess;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*batchData_),
+        DescriptorResource::Of(*batchInfos_),
+        DescriptorResource::Of(*sortData_),
+        DescriptorResource::Of(*drawArgs_)};
+    // Each step for every batch, then a barrier before the next.
+    for (std::size_t step = 0; step < sortPipelines_.size(); ++step) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          sortPipelines_[step]->Handle());
+        sortLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                         resources);
+        for (const SortJob& job : sortJobs_) {
+            const SortConstants constants{
+                {job.batch, job.slots, job.first, job.args},
+                {job.vertices[0], job.vertices[1], 0, 0}};
+            sortLayout_.PushConstants(commands, &constants,
+                                      sizeof(constants));
+            const std::uint32_t threads = step == 0   ? job.slots
+                                          : step == 2 ? 1
+                                                      : job.count;
+            vkCmdDispatch(commands, (threads + 63) / 64, 1, 1);
+        }
+        barrier(step + 1 < sortPipelines_.size()
+                    ? VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                    : VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+                          VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+                step + 1 < sortPipelines_.size()
+                    ? VK_ACCESS_2_SHADER_READ_BIT |
+                          VK_ACCESS_2_SHADER_WRITE_BIT
+                    : VK_ACCESS_2_SHADER_READ_BIT |
+                          VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+    }
+    sortPending_ = false;
 }
 
 void OverlayPass::Record(VkCommandBuffer commands,
@@ -402,6 +542,11 @@ void OverlayPass::Record(VkCommandBuffer commands,
             "Overlays cannot draw into format " +
             std::to_string(static_cast<int>(target.format)));
     }
+    // The first draw since the batches changed sorts them by world,
+    // outside the rendering.
+    if (sortPending_) {
+        RecordSort(commands);
+    }
     RenderingTarget rendering;
     rendering.color = target.color;
     rendering.extent = target.extent;
@@ -414,7 +559,8 @@ void OverlayPass::Record(VkCommandBuffer commands,
         DescriptorResource::Of(*buffers_[1]),
         DescriptorResource::Of(*buffers_[2]),
         DescriptorResource::Of(*batchData_),
-        DescriptorResource::Of(*batchInfos_)};
+        DescriptorResource::Of(*batchInfos_),
+        DescriptorResource::Of(*sortData_)};
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                  resources);
     const bool srgb = target.format == VK_FORMAT_R8G8B8A8_SRGB ||
@@ -439,15 +585,35 @@ void OverlayPass::Record(VkCommandBuffer commands,
         vkCmdDraw(commands, counts_[kind] * kVertices[kind], 1, 0, 0);
     }
     // Then the batches, each expanded from its arrays as it draws:
-    // arrows' heads before their shafts.
+    // arrows' heads before their shafts. A view of one world draws a
+    // sorted batch's shared items and its world's, in world order.
+    const bool ofWorld =
+        target.world >= 0 &&
+        static_cast<std::uint32_t>(target.world) < worlds_;
     for (const BatchDraw& draw : batchDraws_) {
+        const bool sorted = draw.sorted && ofWorld;
         constants.batch[0] = draw.batch;
-        layout_.PushConstants(commands, &constants,
-                              sizeof(constants));
+        constants.batch[1] = sorted ? 1u : 0u;
+        constants.batch[3] = worlds_ + 2;  // the batch's slots
         vkCmdBindPipeline(
             commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
             found->second[3 + draw.primitive]->Handle());
-        vkCmdDraw(commands, draw.vertices, 1, 0, 0);
+        if (!sorted) {
+            layout_.PushConstants(commands, &constants,
+                                  sizeof(constants));
+            vkCmdDraw(commands, draw.vertices, 1, 0, 0);
+            continue;
+        }
+        for (const std::uint32_t slot :
+             {0u, static_cast<std::uint32_t>(target.world) + 1}) {
+            constants.batch[2] = slot;
+            layout_.PushConstants(commands, &constants,
+                                  sizeof(constants));
+            vkCmdDrawIndirect(commands, drawArgs_->Handle(),
+                              VkDeviceSize{draw.args + 2 * slot} *
+                                  sizeof(VkDrawIndirectCommand),
+                              1, sizeof(VkDrawIndirectCommand));
+        }
     }
     vkCmdEndRendering(commands);
 }
@@ -457,7 +623,8 @@ std::uint64_t OverlayPass::GpuBytes() const {
     for (const std::unique_ptr<GpuBuffer>& buffer : buffers_) {
         bytes += buffer->Size();
     }
-    return bytes + batchData_->Size() + batchInfos_->Size();
+    return bytes + batchData_->Size() + batchInfos_->Size() +
+           sortData_->Size() + drawArgs_->Size();
 }
 
 }  // namespace ernie

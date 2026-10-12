@@ -3014,8 +3014,17 @@ void RasterRenderer::Update(
     filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
     extent_ = {params.camera.width, params.camera.height};
+    // Overlay batches with worlds sort by the views' worlds.
+    std::uint32_t overlayWorlds = 0;
+    for (std::size_t v = 0;
+         v < std::min<std::size_t>(raster.worlds.size(), views_);
+         ++v) {
+        overlayWorlds = std::max(
+            overlayWorlds, static_cast<std::uint32_t>(
+                               std::max(raster.worlds[v], -1) + 1));
+    }
     overlays_->Prepare(overlays, params.origin,
-                       params.camera.pushbroom);
+                       params.camera.pushbroom, overlayWorlds);
     // A cube camera's overlays resample through its lens as the
     // sensor does, and with a rolling shutter its faces' texels take
     // the times of the sensor rows the lens maps them to.

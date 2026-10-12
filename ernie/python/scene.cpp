@@ -289,7 +289,8 @@ constexpr const char* kBatchDoc =
     " Arrays have a row per item and may live on the host or on the "
     "renderer's CUDA device (NumPy, PyTorch, JAX, CuPy, Warp): GPU "
     "ones are drawn from as they are, without copies to the host, "
-    "written on `stream`; add them again after writing into them. "
+    "written on `stream`; `touch` the overlay after writing into "
+    "them. "
     "Optional per-item arrays: `colors` (N, 3) or (N, 4) display "
     "colours, line widths or marker sizes in pixels, and `worlds` "
     "(N,) int32, the world whose views show each (batched cameras). "
@@ -307,6 +308,12 @@ void BindOverlay(nb::module_& m) {
         "until `clear`.")
         .def("clear", &Overlay::Clear,
              nb::rv_policy::reference_internal)
+        .def(
+            "touch", &Overlay::Touch,
+            nb::rv_policy::reference_internal,
+            "Marks the overlay changed, so the renderer reads its "
+            "batches' arrays again: after writing into them in place "
+            "(on the GPU, on their stream).")
         .def_prop_rw("visible", &Overlay::IsVisible,
                      [](Overlay& overlay, bool visible) {
                          overlay.SetVisible(visible);

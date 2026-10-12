@@ -562,6 +562,75 @@ TEST_F(RasterDelegateTest, CudaTrianglesDrawAndChangeInPlace) {
     EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
 }
 
+TEST_F(RasterDelegateTest,
+       CudaPointsOfDetailedPrototypesDrawAsHostOnes) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // MeshScene's rocks as bumpy grids of 16 x 16 cells (512
+    // triangles, enough for levels of detail), four times as large,
+    // drawn through GPU culling: a coarser level shades differently.
+    const auto gridScene = [] {
+        Scene scene = MeshScene();
+        constexpr int kCells = 16;
+        std::vector<float> points;
+        std::vector<std::int32_t> indices;
+        for (int y = 0; y <= kCells; ++y) {
+            for (int x = 0; x <= kCells; ++x) {
+                const float u = -1.5f + 3.0f * x / kCells;
+                const float v = -1.5f + 3.0f * y / kCells;
+                points.insert(
+                    points.end(),
+                    {u, v,
+                     0.6f * std::sin(4.0f * u) * std::cos(4.0f * v)});
+            }
+        }
+        const std::array<float, 9> scales{4, 4, 4, 4, 4, 4, 4, 4, 4};
+        ernie::PointInstancer(scene, "/World/Rocks")
+            .SetScales(Tensor::Copy<float>(scales, {3, 3}));
+        for (int y = 0; y < kCells; ++y) {
+            for (int x = 0; x < kCells; ++x) {
+                const int a = y * (kCells + 1) + x;
+                const int b = a + 1;
+                const int c = a + kCells + 1;
+                indices.insert(indices.end(),
+                               {a, b, c + 1, a, c + 1, c});
+            }
+        }
+        const std::vector<std::int32_t> counts(indices.size() / 3, 3);
+        ernie::Mesh(scene, "/World/Rocks/Rock")
+            .SetPoints(Tensor::Copy<float>(
+                points,
+                {static_cast<std::int64_t>(points.size() / 3), 3}))
+            .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(
+                counts, {static_cast<std::int64_t>(counts.size())}))
+            .SetFaceVertexIndices(Tensor::Copy<std::int32_t>(
+                indices,
+                {static_cast<std::int64_t>(indices.size())}));
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetCulling(tokens::kGpu);
+        return scene;
+    };
+    Scene host = gridScene();
+    RasterDelegate reference(*context_);
+    const Tensor expected = reference.Render(host);
+    EXPECT_GT(TexelAt(host, expected, {12, 0, 0})[1], 100)
+        << "the green grid drawn";
+
+    Scene device = gridScene();
+    device.Write("/World/Rocks/Rock", tokens::kPoints,
+                 cuda->Upload(*device.Read("/World/Rocks/Rock",
+                                           tokens::kPoints)));
+    const Tensor image = delegate.Render(device);
+    EXPECT_EQ(std::memcmp(image.Data(), expected.Data(),
+                          static_cast<std::size_t>(image.Elements())),
+              0)
+        << "levels of detail from the device's points, not zeros";
+}
+
 TEST(ExtentOf, ReadsValuesAndArrays) {
     Scene scene;
     scene.Define("/A", tokens::kMesh)

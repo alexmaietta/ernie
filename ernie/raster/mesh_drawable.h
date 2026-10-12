@@ -560,6 +560,10 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t firstIndex = 0;
         std::uint32_t firstVertex = 0;
         bool pointsDirty = false;
+        /// Whether its levels of detail wait for its points: those it
+        /// was added with were zeros holding the place of device
+        /// ones.
+        bool levelsPending = false;
         Tensor devicePoints;  ///< CUDA points replacing `data.points`
                               ///< on the GPU, if any.
         std::uintptr_t deviceStream =
@@ -658,6 +662,9 @@ class MeshDrawable : public RasterDrawable {
         worldsBounds_.reset();
     }
     void RebuildGeometry();
+    /// Simplifies a mesh's coarser levels of detail from its host
+    /// data.
+    void BuildLevels(Mesh& mesh) const;
     void RebuildInstances();
     /// Lays out the composed instancers: their raw arrays' and
     /// parents' offsets, their ops, and each instance's level, in

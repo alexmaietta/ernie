@@ -696,8 +696,35 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     }
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
-    mesh.levels.push_back(
+    mesh.data = std::move(data);
+    // Points all zero hold the place of device ones (`MeshDataOf`):
+    // levels simplified from them would be degenerate, so they wait
+    // for the first device points (`SetPoints`).
+    mesh.levelsPending =
+        !mesh.data.indices.empty() &&
+        std::ranges::all_of(mesh.data.points,
+                            [](float p) { return p == 0.0f; });
+    if (mesh.levelsPending) {
+        mesh.levels.push_back(
+            {0, static_cast<std::uint32_t>(mesh.data.indices.size()),
+             0.0f});
+    } else {
+        BuildLevels(mesh);
+    }
+    const std::uint32_t handle = nextHandle_++;
+    meshes_.emplace(handle, std::move(mesh));
+    geometryDirty_ = true;
+    return handle;
+}
+
+void MeshDrawable::BuildLevels(Mesh& mesh) const {
+    ERNIE_ZONE("Mesh LOD simplify");
+    const MeshData& data = mesh.data;
+    mesh.levels.assign(
+        1,
         {0, static_cast<std::uint32_t>(data.indices.size()), 0.0f});
+    mesh.lodIndices.clear();
+    mesh.lodUvs.clear();
     std::vector<std::vector<glm::vec2>> pointUvs;
     std::vector<unsigned char> locked;
     if (!data.uvs.empty()) {
@@ -715,11 +742,6 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     if (!data.uvs.empty()) {
         mesh.lodUvs = LodUvs(pointUvs, mesh.lodIndices);
     }
-    mesh.data = std::move(data);
-    const std::uint32_t handle = nextHandle_++;
-    meshes_.emplace(handle, std::move(mesh));
-    geometryDirty_ = true;
-    return handle;
 }
 
 void MeshDrawable::SetPoints(std::uint32_t mesh,
@@ -740,6 +762,12 @@ void MeshDrawable::SetPoints(std::uint32_t mesh,
     it->second.devicePoints = Tensor();
     it->second.pointsDirty = true;
     activeMeshes_.insert(mesh);
+    if (it->second.levelsPending &&
+        it->second.deviceIndices.Empty()) {
+        it->second.levelsPending = false;
+        BuildLevels(it->second);
+        geometryDirty_ = true;
+    }
 }
 
 void MeshDrawable::SetPoints(
@@ -759,14 +787,25 @@ void MeshDrawable::SetPoints(
         throw std::invalid_argument(
             "SetPoints must keep the number of points");
     }
-    if (bounds) {
-        std::tie(target.low, target.high) = *bounds;
-    } else {
+    // Levels of detail waiting for the first points need them on the
+    // host, once.
+    const bool levels =
+        target.levelsPending && target.deviceIndices.Empty();
+    if (!bounds || levels) {
         const Tensor host = compute_->Download(points);
         target.data.points.assign(host.As<float>(),
                                   host.As<float>() + host.Elements());
+    }
+    if (bounds) {
+        std::tie(target.low, target.high) = *bounds;
+    } else {
         std::tie(target.low, target.high) =
             PointBounds(target.data.points);
+    }
+    if (levels) {
+        target.levelsPending = false;
+        BuildLevels(target);
+        geometryDirty_ = true;
     }
     // The view `MapPoints` gave out, handed back: the points are in
     // the pool already.
@@ -878,6 +917,7 @@ void MeshDrawable::SetIndices(std::uint32_t mesh,
     }
     // Levels simplified from the host's placeholder zeros mean
     // nothing; nor do triangles around the points from them.
+    target.levelsPending = false;
     if (target.levels.size() > 1 || target.recomputeNormals) {
         target.levels.resize(1);
         target.lodIndices.clear();
