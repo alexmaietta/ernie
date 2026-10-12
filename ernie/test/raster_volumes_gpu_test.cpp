@@ -306,6 +306,46 @@ TEST_F(RasterDelegateTest, AVolumeShadowsAnother) {
     }
 }
 
+TEST_F(RasterDelegateTest,
+       AVolumesLightFollowsWhatChangesBetweenFrames) {
+    // A frame whose volumes and lights are as the last's keeps its
+    // lighting caches and shadow maps; one where any changed is lit
+    // as a new renderer would light it.
+    RasterDelegate delegate(*context_);
+    Scene scene = SideScene(1.0);
+    ernie::Volume upper =
+        ernie::Volume::Define(scene, "/World/Upper");
+    upper.GetPrim().SetXform({.translate = glm::dvec3(0.0, 0.0, 3.5),
+                              .scale = glm::dvec3(2.0, 2.0, 1.0)});
+    ernie::OpenVDBAsset::Define(scene, "/World/Upper/Density")
+        .SetFilePath(CubeFile());
+    upper.SetField("density", "/World/Upper/Density")
+        .SetMaterialBinding("/Looks/Upper");
+    ernie::Material::Define(scene, "/Looks/Upper").SetDensity(0.8);
+    const auto asNew = [&](const char* change) {
+        const std::vector<double> kept =
+            CentreSpectrum(delegate, scene);
+        RasterDelegate fresh(*context_);
+        const std::vector<double> built =
+            CentreSpectrum(fresh, scene);
+        for (std::size_t b = 0; b < built.size(); ++b) {
+            ASSERT_GT(built[b], 0.0) << change << ", band " << b;
+            EXPECT_NEAR(kept[b], built[b], 0.03 * built[b])
+                << change << ", band " << b;
+        }
+    };
+    asNew("the first frame");
+    asNew("nothing");
+    upper.GetPrim().SetXform({.translate = glm::dvec3(4.0, 0.0, 3.5),
+                              .scale = glm::dvec3(2.0, 2.0, 1.0)});
+    asNew("the upper cube moved");
+    ernie::Material(scene, "/Looks/Upper").SetDensity(2.0);
+    asNew("its density");
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetTransform(ernie::DistantLightTransform({1.0, 0.3, 1.0}));
+    asNew("the sun moved");
+}
+
 TEST_F(RasterDelegateTest, TheAirDimsAndReddensTheSunInAVolume) {
     // The sun 5 degrees up: what the cube scatters, less the sky
     // behind it dimmed through it, against the same without air.

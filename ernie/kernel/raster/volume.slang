@@ -226,6 +226,14 @@ struct VolumeResources {
     uint shadowSize;
     uint lightCount;
     uint cacheSlots;
+    // What the caches and shadow maps last read (`volumeChangesMain`), and the two indirect
+    // dispatches that rebuild them, the caches' then the maps'.
+    uint* previous;
+    uint* rebuild;
+    uint materialCount;
+    uint shadowViewCount;
+    uint unused0;
+    uint unused1;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -1319,6 +1327,63 @@ void denseScatterMain(uint3 id : SV_DispatchThreadID) {
     let inLeaf = ((id.x & 7u) << 6) | ((id.y & 7u) << 3) | (id.z & 7u);
     gridsOut[constants.offsets.x + leaf * constants.offsets.y + constants.offsets.z + inLeaf] =
         asuint(value);
+}
+
+// The parts of the frame `volumeChangesMain` found changed since the last: bit 1 for the lighting
+// caches, bit 2 for the shadow maps.
+groupshared uint changedParts;
+
+// Compares `count` words from `from` with the last frame's at `pass.previous[at]` on, keeping the
+// new ones and marking `parts` changed where any differs.
+void compareWords(uint thread, uint* from, uint count, uint at, uint parts) {
+    for (uint i = thread; i < count; i += 256) {
+        let word = from[i];
+        if (pass.previous[at + i] != word) {
+            pass.previous[at + i] = word;
+            InterlockedOr(changedParts, parts);
+        }
+    }
+}
+
+// Whether the volumes' lighting caches and shadow maps need building again, decided on the GPU
+// so a still scene's volumes keep last frame's: the volumes, their materials and the lights are
+// compared with the last frame's (both), the lights' views and their worlds too (the maps', which
+// the GPU fits). Writes the two dispatches `pass.rebuild` holds, `constants.layout.xyz` groups for
+// the caches and `constants.offsets.xyz` for the maps, or none where nothing they read changed.
+// `constants.layout.w` holds the parts the host changed itself (the grids, the settings).
+[shader("compute")]
+[numthreads(256, 1, 1)]
+void volumeChangesMain(uint3 id: SV_DispatchThreadID) {
+    if (id.x == 0) {
+        changedParts = constants.layout.w;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    var at = 0u;
+    let instances = pass.volumeCount * uint(sizeof(VolumeGpu)) / 4;
+    compareWords(id.x, (uint*)volumes, instances, at, 3u);
+    at += instances;
+    let materials = pass.materialCount * uint(sizeof(VolumeMaterialGpu)) / 4;
+    compareWords(id.x, (uint*)pass.materials, materials, at, 3u);
+    at += materials;
+    let lights = pass.lightCount * uint(sizeof(LightGpu)) / 4;
+    compareWords(id.x, (uint*)pass.shadowLights, lights, at, 3u);
+    at += lights;
+    if (pass.shadowViewCount > 0) {
+        compareWords(id.x, (uint*)pass.shadowViews, 16 * pass.shadowViewCount, at, 2u);
+        at += 16 * pass.shadowViewCount;
+        compareWords(id.x, (uint*)pass.shadowWorlds, pass.shadowViewCount, at, 2u);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (id.x == 0) {
+        let caches = (changedParts & 1u) != 0 ? constants.layout.xyz : uint3(0);
+        let maps = (changedParts & 2u) != 0 ? constants.offsets.xyz : uint3(0);
+        pass.rebuild[0] = caches.x;
+        pass.rebuild[1] = caches.y;
+        pass.rebuild[2] = caches.z;
+        pass.rebuild[3] = maps.x;
+        pass.rebuild[4] = maps.y;
+        pass.rebuild[5] = maps.z;
+    }
 }
 
 // The most steps a lighting cache's cell takes through one volume (`lightCacheMain`).

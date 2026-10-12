@@ -61,6 +61,12 @@ constexpr DescriptorBinding kCacheBindings[] = {
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
 };
 
+// What decides whether the caches and shadow maps are built again
+// (volume.slang's `volumeChangesMain`): the pass's buffers.
+constexpr DescriptorBinding kChangeBindings[] = {
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+};
+
 // volume.slang's VolumeResources.
 struct VolumeResources {
     VkDeviceAddress volumes;
@@ -75,8 +81,13 @@ struct VolumeResources {
     std::uint32_t shadowSize;
     std::uint32_t lightCount;
     std::uint32_t cacheSlots;
+    VkDeviceAddress previous;
+    VkDeviceAddress rebuild;
+    std::uint32_t materialCount;
+    std::uint32_t shadowViewCount;
+    std::uint32_t unused[2];
 };
-static_assert(sizeof(VolumeResources) == 80,
+static_assert(sizeof(VolumeResources) == 112,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -316,11 +327,18 @@ VolumePass::VolumePass(const VulkanContext& context,
       shadowLayout_(context, kShadowBindings),
       scatterLayout_(context, kScatterBindings,
                      sizeof(VolumeConstants)),
-      cacheLayout_(context, kCacheBindings) {
+      cacheLayout_(context, kCacheBindings),
+      changeLayout_(context, kChangeBindings,
+                    sizeof(VolumeConstants)) {
     pool_ = Grow(context_, nullptr, kGridAlignment);
     resources_ = std::make_unique<GpuBuffer>(
         context_, sizeof(VolumeResources),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
+    rebuild_ = std::make_unique<GpuBuffer>(
+        context_, 6 * sizeof(std::uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        BufferMemory::Device);
 }
 
 const VolumePass::LoadedGrid*
@@ -703,6 +721,9 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     seed_ = static_cast<std::uint32_t>(frame * 2654435761u);
     bandGroups_ = static_cast<std::uint32_t>(
         std::clamp<std::size_t>((bands.count + 3) / 4, 1, 16));
+    if (!(settings == settings_)) {
+        hostChanged_ = 3;
+    }
     settings_ = settings;
     views_ = static_cast<std::uint32_t>(viewWorlds.size());
     for (auto& [key, loaded] : grids_) {
@@ -744,13 +765,18 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     }
     if (poolStale_) {
         RebuildPool();
+        hostChanged_ = 3;
     }
     for (auto& [key, loaded] : grids_) {
         if (loaded.copy) {
             CopyDeviceGrid(loaded);
+            hostChanged_ = 3;
         }
     }
     StageDenseGrids(uploads);
+    if (!scatters_.empty()) {
+        hostChanged_ = 3;
+    }
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -972,6 +998,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                   runs_->Address(), lists_->Address(),
                   lightViewWorlds_->Address()};
     volumeCount_ = static_cast<std::uint32_t>(instances.size());
+    materialCount_ = static_cast<std::uint32_t>(materials.size());
     cacheCells_ = cacheCells;
     cacheLargest_ = cacheLargest;
 }
@@ -1098,10 +1125,53 @@ void VolumePass::Prepare(VkCommandBuffer commands,
             cache_ = std::make_unique<GpuBuffer>(
                 context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 BufferMemory::Device);
+            hostChanged_ |= 1;
         }
         resources.lightCache = cache_->Address();
         resources.cacheSlots = slots;
     }
+    shadowViews_ = shadowViews;
+    const std::uint32_t size = ShadowSize();
+    if (shadowViews > 0 &&
+        (shadowMap_ == nullptr ||
+         shadowMap_->Desc().layers != 3 * shadowViews ||
+         shadowMap_->Desc().width != size)) {
+        if (shadowMap_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        shadowMap_ = std::make_unique<GpuImage>(
+            context_, ImageDesc{size, size, 3 * shadowViews, 1,
+                                VK_FORMAT_R32G32B32A32_SFLOAT,
+                                VK_IMAGE_USAGE_STORAGE_BIT |
+                                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                                false, true});
+        hostChanged_ |= 2;
+    }
+    // What the caches and maps read, for the next frame to compare
+    // with: laid out again, and so built again, when a count changes.
+    const std::array<std::uint32_t, 4> counts{
+        volumeCount_, materialCount_, lightCount, shadowViews};
+    if (counts != compared_) {
+        compared_ = counts;
+        hostChanged_ = 3;
+    }
+    const VkDeviceSize compared =
+        volumeCount_ * sizeof(VolumeGpu) +
+        materialCount_ * sizeof(VolumeMaterialGpu) + lights.Size() +
+        shadowViews * (sizeof(glm::mat4) + sizeof(std::int32_t));
+    if (previous_ == nullptr || previous_->Size() < compared) {
+        if (previous_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        previous_ = std::make_unique<GpuBuffer>(
+            context_, std::max<VkDeviceSize>(compared, 16),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        hostChanged_ = 3;
+    }
+    resources.previous = previous_->Address();
+    resources.rebuild = rebuild_->Address();
+    resources.materialCount = materialCount_;
+    resources.shadowViewCount = shadowViews;
     // After whatever read the last frame's, before the passes reading
     // these.
     VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -1123,9 +1193,67 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     dependency.pMemoryBarriers = &after;
     vkCmdPipelineBarrier2(commands, &dependency);
 
+    {
+        // Whether to build the caches and maps again, on the GPU:
+        // after the last frame's comparison and the dispatches it
+        // sized.
+        ERNIE_ZONE("Record volume changes");
+        VkMemoryBarrier2 last{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        last.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT |
+                            VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+        last.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT |
+                             VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+        last.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        last.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                             VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        dependency.pMemoryBarriers = &last;
+        vkCmdPipelineBarrier2(commands, &dependency);
+        if (changePipeline_ == nullptr ||
+            changePipelinePatterns_ != patterns.Models().size()) {
+            ERNIE_ZONE("Volume change pipeline");
+            if (changePipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            changePipeline_ = std::make_unique<ComputePipeline>(
+                context_, changeLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "volumeChangesMain"));
+            changePipelinePatterns_ = patterns.Models().size();
+        }
+        VolumeConstants constants{};
+        if (cacheCells_ > 0) {
+            constants.layout[0] =
+                static_cast<std::uint32_t>((cacheLargest_ + 63) / 64);
+            constants.layout[1] = slots;
+            constants.layout[2] = volumeCount_;
+        }
+        constants.layout[3] = hostChanged_;
+        constants.offsets[0] = Groups(size);
+        constants.offsets[1] = Groups(size);
+        constants.offsets[2] = shadowViews;
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          changePipeline_->Handle());
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*resources_)};
+        changeLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           buffers);
+        changeLayout_.PushConstants(commands, &constants,
+                                    sizeof(constants));
+        vkCmdDispatch(commands, 1, 1, 1);
+        hostChanged_ = 0;
+        VkMemoryBarrier2 sized{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        sized.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        sized.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        sized.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+        sized.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+        dependency.pMemoryBarriers = &sized;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
+
     if (cacheCells_ > 0) {
         // Each cell's optical depth towards each light and up and
-        // down, once for every view and step to read.
+        // down, once for every view and step to read; none when what
+        // it reads is as last frame's.
         ERNIE_ZONE("Record volume lighting caches");
         ERNIE_GPU_ZONE(context_, commands, "Volume lighting caches");
         if (cachePipeline_ == nullptr ||
@@ -1143,10 +1271,11 @@ void VolumePass::Prepare(VkCommandBuffer commands,
         const DescriptorResource buffers[] = {
             DescriptorResource::Of(*pool_),
             DescriptorResource::Of(*resources_)};
-        cachePipeline_->Dispatch(
-            commands, buffers,
-            static_cast<std::uint32_t>((cacheLargest_ + 63) / 64),
-            slots, volumeCount_);
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          cachePipeline_->Handle());
+        cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          buffers);
+        vkCmdDispatchIndirect(commands, rebuild_->Handle(), 0);
         VkMemoryBarrier2 built{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
         built.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
         built.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
@@ -1156,23 +1285,8 @@ void VolumePass::Prepare(VkCommandBuffer commands,
         vkCmdPipelineBarrier2(commands, &dependency);
     }
 
-    shadowViews_ = shadowViews;
     if (shadowViews == 0) {
         return;
-    }
-    const std::uint32_t size = ShadowSize();
-    if (shadowMap_ == nullptr ||
-        shadowMap_->Desc().layers != 3 * shadowViews ||
-        shadowMap_->Desc().width != size) {
-        if (shadowMap_ != nullptr) {
-            vkDeviceWaitIdle(context_.Device());
-        }
-        shadowMap_ = std::make_unique<GpuImage>(
-            context_, ImageDesc{size, size, 3 * shadowViews, 1,
-                                VK_FORMAT_R32G32B32A32_SFLOAT,
-                                VK_IMAGE_USAGE_STORAGE_BIT |
-                                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                                false, true});
     }
     if (shadowPipeline_ == nullptr ||
         shadowPipelinePatterns_ != patterns.Models().size()) {
@@ -1197,7 +1311,9 @@ void VolumePass::Prepare(VkCommandBuffer commands,
                       shadowPipeline_->Handle());
     shadowLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                        resourcesOf);
-    vkCmdDispatch(commands, Groups(size), Groups(size), shadowViews);
+    // None when what the maps read is as last frame's.
+    vkCmdDispatchIndirect(commands, rebuild_->Handle(),
+                          3 * sizeof(std::uint32_t));
     shadowMap_->Transition(commands,
                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }

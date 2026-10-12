@@ -274,6 +274,19 @@ class VolumePass {
     mutable std::size_t cachePipelinePatterns_ = 0;
     mutable std::unique_ptr<GpuImage> shadowMap_;
     mutable std::uint32_t shadowViews_ = 0;
+    /// Whether the caches and shadow maps are built again
+    /// (`volumeChangesMain`): what they last read, the two indirect
+    /// dispatches it writes, the parts the host changed since (a bit
+    /// each, caches 1 and maps 2: the grids, the settings, the
+    /// buffers) and the counts the last comparison laid out.
+    PipelineLayout changeLayout_;
+    mutable std::unique_ptr<ComputePipeline> changePipeline_;
+    mutable std::size_t changePipelinePatterns_ = 0;
+    mutable std::unique_ptr<GpuBuffer> previous_;
+    std::unique_ptr<GpuBuffer> rebuild_;
+    mutable std::uint32_t hostChanged_ = 3;
+    mutable std::array<std::uint32_t, 4> compared_{};
+    std::uint32_t materialCount_ = 0;
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
     VolumeSettings settings_;
