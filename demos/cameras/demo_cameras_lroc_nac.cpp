@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// LROC's Narrow Angle Camera line-scanning the Moon's south pole at a
-// low Sun, posed from a real ISD on LOLA's terrain (fetched on the
-// first run, 12 MB).
+// LROC's Narrow Angle Camera line-scanning the flank of Tycho's
+// central peak as it took image M1282557272RE, posed from that
+// image's ISD on LROC's 2 m stereo terrain of the peak (a window of
+// it fetched on the first run, 88 MB read for 13 MB kept).
 //
 // References:
 // - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera
 //   (LROC) Instrument Overview", Space Science Reviews 150:81-124,
 //   2010: Table 2 (the NACs) and Appendix A (their companding).
-// - USGS Astrogeology, usgscsm's test data (toughLroNacLineScan.json,
-//   an ISD ALE wrote for a NAC image) and ALE,
-//   https://github.com/DOI-USGS/usgscsm and
+// - USGS Astrogeology, ISIS and ALE (the ISD, from the image's EDR
+//   with SPICE from the USGS web service),
+//   https://github.com/DOI-USGS/ISIS3 and
 //   https://github.com/DOI-USGS/ale
-// - D. E. Smith et al., "The Lunar Orbiter Laser Altimeter
-//   Investigation on the Lunar Reconnaissance Orbiter Mission", Space
-//   Science Reviews 150:209-241, 2010 (LOLA, whose polar LDEM is the
-//   terrain).
+// - M. R. Henriksen et al., "Extracting accurate and precise
+//   topography from LROC narrow angle camera stereo observations",
+//   Icarus 283:122-137, 2017 (the NAC DTMs; NAC_DTM_TYCHOPK).
 // - G. Kopp and J. L. Lean, "A new, lower value of total solar
 //   irradiance", Geophysical Research Letters 38:L01706, 2011 (1361
 //   W/m^2 at 1 au).
@@ -40,8 +40,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <numbers>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -54,16 +56,17 @@ using demos::Check;
 constexpr double kPi = std::numbers::pi;
 constexpr double kDegree = kPi / 180.0;
 
-/// The image lines rendered: 8 strips of 64 about the image's middle,
-/// where it passes the pole.
-constexpr std::uint32_t kFirstLine = 3840;
-constexpr std::uint32_t kStripLines = 64;
+/// The image lines rendered: 8 strips of 256 near the image's
+/// southern end, beside the peak.
+constexpr std::uint32_t kFirstLine = 22528;
+constexpr std::uint32_t kStripLines = 256;
 constexpr std::uint32_t kStrips = 8;
 
-/// The terrain about the middle line's ground: cells of 5 m, the
-/// DEM's own, 12 km across.
-constexpr std::uint32_t kCells = 2401;
-constexpr double kCellSize = 5.0;
+/// The terrain about the middle line's ground: cells of 2 m, the
+/// DTM's own, 3.2 km across.
+constexpr std::uint32_t kCells = 1601;
+constexpr double kCellSize = 2.0;
+constexpr double kMoonRadius = 1737400.0;
 
 /// The Sun's radius and the astronomical unit, metres; the total
 /// solar irradiance at 1 au, W/m^2 (Kopp and Lean 2011).
@@ -71,7 +74,7 @@ constexpr double kSunRadius = 6.957e8;
 constexpr double kAu = 1.495978707e11;
 constexpr double kSolarConstant = 1361.0;
 
-/// NAC-L's published values (Robinson et al. 2010, Table 2; section
+/// The NACs' published values (Robinson et al. 2010, Table 2; section
 /// 3.1.2 for the KLI-5001G's QE): focal ratio, gain, detector noise
 /// and full well. The ISD sets the geometry and line time.
 constexpr double kNacFNumber = 3.577;
@@ -89,117 +92,170 @@ double NacCompand(double x) {
                       : std::floor(x / 32 + 128);
 }
 
-// ---------------------------------------------------------------
-// LOLA
+// ----------------------------------------------------------------
+// DTM
 
-/// LOLA's 5 m polar LDEM south of 87.5 S at the PDS Geosciences Node:
-/// 30336 x 30336 16-bit samples, the pole at line and sample 15167.5.
-constexpr const char* kLdemUrl =
-    "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/"
-    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.img";
-constexpr std::uint64_t kLdemSize = 30336;
-constexpr double kLdemOffset = 15167.5;
-constexpr double kLdemScale = 5.0;
-constexpr double kMoonRadius = 1737400.0;
+/// LROC's NAC DTM mosaic of the peak in the PDS: a GeoTIFF of 32-bit
+/// reals, one row a strip, on an equirectangular grid true at 43.3 S
+/// (its PDS3 label's values).
+constexpr const char* kDtmUrl =
+    "https://pds.mcp.nasa.gov/data/store/img/lunar_reconnaissance_"
+    "orbiter/pds4/lroc/lro-l-lroc-5-rdr/LROLRC_2001/DATA/SDP/NAC_DTM/"
+    "TYCHOPK/NAC_DTM_TYCHOPK.TIF";
+constexpr std::uint64_t kDtmLines = 30892;
+constexpr std::uint64_t kDtmSamples = 12240;
+constexpr double kDtmPixelsPerDegree = 15161.675212075;
+constexpr double kDtmParallel = -43.3;
+constexpr double kDtmNorth = -42.3668223;
+constexpr double kDtmWest = 348.0633983;
 
 /// The cached window's label.
-std::filesystem::path LdemLabel() {
-    return demos::CacheDir() / "lola" / "ldem_875s_5m_lroc_nac.lbl";
+std::filesystem::path DtmLabel() {
+    return demos::CacheDir() / "lroc" / "nac_dtm_tychopk_nac.lbl";
 }
 
-/// The polar grid's fractional (line, sample) of a latitude and east
-/// longitude (`PolarStereographicDem::ToGrid`).
-glm::dvec2 LdemGrid(double latitudeDeg, double longitudeDeg) {
-    PolarStereographicDem grid;
-    grid.mapScale = kLdemScale;
-    grid.lineProjectionOffset = kLdemOffset;
-    grid.sampleProjectionOffset = kLdemOffset;
-    grid.referenceRadius = kMoonRadius;
-    return grid.ToGrid(latitudeDeg, longitudeDeg);
+/// The bytes of `url` from `first` for `count`, little-endian.
+std::string Bytes(const std::string& url, std::uint64_t first,
+                  std::uint64_t count) {
+    const std::pair<std::uint64_t, std::uint64_t> range[] = {
+        {first, first + count - 1}};
+    return demos::FetchRanges(url, range).front();
 }
 
-/// Fetches the window of the polar LDEM `half` pixels about latitude
-/// `latitudeDeg` and longitude `longitudeDeg`, 256 lines a request,
-/// each line's samples in the window alone (HTTP range requests; the
-/// product is 1.8 GB), and writes it to the cache as an image and a
-/// PDS3 label of its own, which `ReadPolarStereographicDem` reads as
-/// it would the whole product. As demo_cameras_lroc_nac.py's
-/// `fetch_ldem_window`.
-void FetchLdemWindow(double latitudeDeg, double longitudeDeg,
-                     std::uint64_t half) {
-    const glm::dvec2 centre = LdemGrid(latitudeDeg, longitudeDeg);
-    const auto firstLine =
-        static_cast<std::uint64_t>(std::lround(centre.x)) - half;
-    const auto firstSample =
-        static_cast<std::uint64_t>(std::lround(centre.y)) - half;
-    const std::uint64_t size = 2 * half + 1;
-    std::printf("Fetching %llu lines of %llu samples from %s\n",
-                static_cast<unsigned long long>(size),
-                static_cast<unsigned long long>(size), kLdemUrl);
-    std::string rows;
-    const std::uint64_t rowBytes = 2 * kLdemSize;
-    for (std::uint64_t start = 0; start < size; start += 256) {
-        std::vector<std::pair<std::uint64_t, std::uint64_t>> ranges;
-        for (std::uint64_t line = firstLine + start;
-             line < firstLine + std::min(start + 256, size); ++line) {
-            ranges.emplace_back(line * rowBytes + 2 * firstSample,
-                                line * rowBytes +
-                                    2 * (firstSample + size) - 1);
-        }
-        for (const std::string& part :
-             demos::FetchRanges(kLdemUrl, ranges)) {
-            rows += part;
-        }
+template <typename T>
+T Read(const std::string& bytes, std::size_t at) {
+    T value{};
+    std::memcpy(&value, bytes.data() + at, sizeof(T));
+    return value;
+}
+
+/// The byte offset of every row of a little-endian TIFF of one row a
+/// strip (its StripOffsets, tag 273).
+std::vector<std::uint64_t> RowOffsets(const std::string& url,
+                                      std::uint64_t firstRow,
+                                      std::uint64_t rows) {
+    const std::string header = Bytes(url, 0, 8);
+    if (header.substr(0, 2) != "II") {
+        throw std::runtime_error(url +
+                                 " is not a little-endian TIFF");
     }
-    const std::filesystem::path label = LdemLabel();
+    const auto ifd = Read<std::uint32_t>(header, 4);
+    const auto entries = Read<std::uint16_t>(Bytes(url, ifd, 2), 0);
+    const std::string table = Bytes(url, ifd + 2, 12u * entries);
+    for (std::uint16_t e = 0; e < entries; ++e) {
+        if (Read<std::uint16_t>(table, 12u * e) != 273) {
+            continue;
+        }
+        const auto type = Read<std::uint16_t>(table, 12u * e + 2);
+        const auto at = Read<std::uint32_t>(table, 12u * e + 8);
+        const std::uint64_t size = type == 16 ? 8 : 4;
+        const std::string offsets =
+            Bytes(url, at + size * firstRow, size * rows);
+        std::vector<std::uint64_t> result;
+        for (std::uint64_t r = 0; r < rows; ++r) {
+            result.push_back(
+                size == 8 ? Read<std::uint64_t>(offsets, 8 * r)
+                          : Read<std::uint32_t>(offsets, 4 * r));
+        }
+        return result;
+    }
+    throw std::runtime_error(url + " has no strip offsets");
+}
+
+/// Fetches the window of the DTM about latitude `latitudeDeg` and
+/// longitude `longitudeDeg` reaching `half` metres each way (its rows
+/// by HTTP range requests; the DTM is 1.5 GB), and writes it to the
+/// cache as an image and a PDS3 label of its own, which
+/// `ReadCylindricalDem` reads. As demo_cameras_lroc_nac.py's
+/// `fetch_dtm_window`.
+void FetchDtmWindow(double latitudeDeg, double longitudeDeg,
+                    double half) {
+    const double along = kDtmPixelsPerDegree;
+    const double across = along * std::cos(kDtmParallel * kDegree);
+    const double degrees = half / kMoonRadius / kDegree;
+    const auto firstRow = static_cast<std::uint64_t>(
+        std::floor((kDtmNorth - latitudeDeg - degrees) * along));
+    const auto rows =
+        static_cast<std::uint64_t>(std::ceil(2.0 * degrees * along));
+    const double spread = degrees / std::cos(latitudeDeg * kDegree);
+    const auto firstColumn = static_cast<std::uint64_t>(std::floor(
+        (std::fmod(longitudeDeg - kDtmWest + 720.0, 360.0) - spread) *
+        across));
+    const auto columns =
+        static_cast<std::uint64_t>(std::ceil(2.0 * spread * across));
+    if (firstRow + rows > kDtmLines ||
+        firstColumn + columns > kDtmSamples) {
+        throw std::runtime_error("The window leaves the DTM");
+    }
+    std::printf("Fetching %llu rows of %llu samples from %s\n",
+                static_cast<unsigned long long>(rows),
+                static_cast<unsigned long long>(columns), kDtmUrl);
+    const std::vector<std::uint64_t> offsets =
+        RowOffsets(kDtmUrl, firstRow, rows);
+    // Rows lie back to back in runs (the server serves one range a
+    // request): each run's whole rows at once, the window's columns
+    // cut from them.
+    const std::uint64_t rowBytes = 4 * kDtmSamples;
+    std::string data;
+    for (std::uint64_t start = 0; start < rows;) {
+        std::uint64_t end = start + 1;
+        while (end < rows &&
+               offsets[end] == offsets[end - 1] + rowBytes) {
+            ++end;
+        }
+        const std::string run =
+            Bytes(kDtmUrl, offsets[start], (end - start) * rowBytes);
+        for (std::uint64_t r = 0; r < end - start; ++r) {
+            data.append(run, r * rowBytes + 4 * firstColumn,
+                        4 * columns);
+        }
+        start = end;
+    }
+    const std::filesystem::path label = DtmLabel();
     std::filesystem::create_directories(label.parent_path());
     {
         std::ofstream image(label.parent_path() /
-                                "ldem_875s_5m_lroc_nac.img",
+                                "nac_dtm_tychopk_nac.img",
                             std::ios::binary);
-        image.write(rows.data(),
-                    static_cast<std::streamsize>(rows.size()));
+        image.write(data.data(),
+                    static_cast<std::streamsize>(data.size()));
     }
     std::filesystem::path part = label;
     part += ".part";
     {
         std::ofstream text(part);
+        text.precision(12);
         text << "PDS_VERSION_ID = PDS3\n"
-                "/* A window of LOLA's LDEM_875S_5M "
-                "(LRO-L-LOLA-4-GDR-V1.0), fetched\n   by "
-                "demos/cameras/demo_cameras_lroc_nac from the PDS "
-                "Geosciences Node. */\n"
+                "/* A window of LROC's NAC_DTM_TYCHOPK "
+                "(LRO-L-LROC-5-RDR-V1.0), fetched\n   by "
+                "demos/cameras/demo_cameras_lroc_nac from the PDS. "
+                "*/\n"
                 "RECORD_TYPE = FIXED_LENGTH\n"
-             << "RECORD_BYTES = " << 2 * size << "\n"
-             << "FILE_RECORDS = " << size << "\n"
-             << "^IMAGE = \"LDEM_875S_5M_LROC_NAC.IMG\"\n"
+             << "RECORD_BYTES = " << 4 * columns << "\n"
+             << "FILE_RECORDS = " << rows << "\n"
+             << "^IMAGE = \"NAC_DTM_TYCHOPK_NAC.IMG\"\n"
                 "OBJECT = IMAGE\n"
-             << "  LINES = " << size << "\n"
-             << "  LINE_SAMPLES = " << size << "\n"
-             << "  SAMPLE_TYPE = LSB_INTEGER\n"
-                "  SAMPLE_BITS = 16\n"
+             << "  LINES = " << rows << "\n"
+             << "  LINE_SAMPLES = " << columns << "\n"
+             << "  SAMPLE_TYPE = PC_REAL\n"
+                "  SAMPLE_BITS = 32\n"
                 "  UNIT = METER\n"
-                "  SCALING_FACTOR = 0.5\n"
-                "  OFFSET = 1737400.\n"
                 "END_OBJECT = IMAGE\n"
                 "OBJECT = IMAGE_MAP_PROJECTION\n"
-                "  MAP_PROJECTION_TYPE = \"POLAR STEREOGRAPHIC\"\n"
-                "  A_AXIS_RADIUS = 1737.4 <km>\n"
-                "  CENTER_LATITUDE = -90 <deg>\n"
-                "  CENTER_LONGITUDE = 0 <deg>\n"
-                "  MAP_SCALE = 5 <m/pix>\n"
-             << "  LINE_PROJECTION_OFFSET = "
-             << kLdemOffset - static_cast<double>(firstLine)
-             << " <pix>\n"
-             << "  SAMPLE_PROJECTION_OFFSET = "
-             << kLdemOffset - static_cast<double>(firstSample)
-             << " <pix>\n"
-                "END_OBJECT = IMAGE_MAP_PROJECTION\n"
+                "  MAP_PROJECTION_TYPE = \"EQUIRECTANGULAR\"\n"
+                "  A_AXIS_RADIUS = 1737.4 <KM>\n"
+             << "  CENTER_LATITUDE = " << kDtmParallel << " <DEG>\n"
+             << "  MAP_RESOLUTION = " << along << " <PIX/DEG>\n"
+             << "  MAXIMUM_LATITUDE = "
+             << kDtmNorth - double(firstRow) / along << " <DEG>\n"
+             << "  WESTERNMOST_LONGITUDE = "
+             << kDtmWest + double(firstColumn) / across << " <DEG>\n"
+             << "END_OBJECT = IMAGE_MAP_PROJECTION\n"
                 "END\n";
     }
     std::filesystem::rename(part, label);
     std::printf("Wrote %s (%.1f MB)\n", label.string().c_str(),
-                double(rows.size()) / 1e6);
+                double(data.size()) / 1e6);
 }
 
 // ------------------------------------------------------------ the
@@ -226,7 +282,7 @@ class LrocNacDemo : public app::Demo {
     LrocNacDemo(app::Viewer* viewer, const app::DemoOptions& options)
         : Demo(viewer, options),
           nac_(ReadIsdFile(
-              demos::DataFile("toughLroNacLineScan.json").string())) {
+              demos::DataFile("lroNacM1282557272RE.json").string())) {
         numFrames = 1;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
@@ -237,32 +293,36 @@ class LrocNacDemo : public app::Demo {
         const glm::dvec3 ground =
             nac_.ImageToGround(middle, 0.5 * samples, 0.0);
         const glm::dvec2 site = LatitudeLongitude(ground);
-        // LOLA's terrain there, else the bare sphere, in a frame
-        // there: x east, y north, z up. Fetched once, but not for the
-        // checks, which run offline.
-        const std::filesystem::path label = LdemLabel();
+        // The NAC DTM there inside LOLA's terrain (the lroc demo's
+        // cached window), else the bare sphere, in a frame there: x
+        // east, y north, z up. Fetched once, but not for the checks,
+        // which run offline.
+        const double half = 0.5 * (kCells - 1) * kCellSize + 200.0;
+        const std::filesystem::path label = DtmLabel();
         if (!std::filesystem::exists(label) && !options.test &&
             demos::CanDownload()) {
             try {
-                FetchLdemWindow(
-                    site.x, site.y,
-                    static_cast<std::uint64_t>(std::lround(
-                        (kCells - 1) / 2 * kCellSize / kLdemScale)) +
-                        40);
+                FetchDtmWindow(site.x, site.y, half);
             } catch (const std::exception& error) {
                 std::printf("%s\n", error.what());
             }
         }
-        dem_.referenceRadius = kMoonRadius;
+        dtm_.referenceRadius = kMoonRadius;
+        lola_.referenceRadius = kMoonRadius;
         if (std::filesystem::exists(label)) {
-            dem_ = ReadPolarStereographicDem(label.string());
+            dtm_ = ReadCylindricalDem(label.string());
         } else {
-            std::printf("No LOLA terrain in %s; the bare sphere "
-                        "stands in.\n",
+            std::printf("No NAC DTM in %s; LOLA's terrain or the "
+                        "bare sphere stands in.\n",
                         label.parent_path().string().c_str());
         }
-        const LocalTerrain terrain =
-            LocalTerrainOf(dem_, site.x, site.y, kCells, kCellSize);
+        const std::filesystem::path lola =
+            demos::CacheDir() / "lola" / "ldem_512_lroc.lbl";
+        if (std::filesystem::exists(lola)) {
+            lola_ = ReadCylindricalDem(lola.string());
+        }
+        const LocalTerrain terrain = LocalTerrainOf(
+            dtm_, lola_, site.x, site.y, kCells, kCellSize);
         bodyToLocal_ = terrain.bodyToLocal;
         // The regolith's normal albedo, about 0.1, flat (its
         // reddening left out).
@@ -281,10 +341,10 @@ class LrocNacDemo : public app::Demo {
         const double distance = glm::length(toSun);
         const glm::dvec3 local =
             glm::dmat3(bodyToLocal_) * (toSun / distance);
-        sunElevation_ = std::asin(local.z) / kDegree;
-        std::printf("%.3f S, %.2f E; the Sun %.4f au away, %.2f "
+        std::printf("%.3f S, %.2f E; the Sun %.4f au away, %.1f "
                     "degrees up\n",
-                    -site.x, site.y, distance / kAu, sunElevation_);
+                    -site.x, std::fmod(site.y + 360.0, 360.0),
+                    distance / kAu, std::asin(local.z) / kDegree);
         DistantLight::Define(scene, "/World/Sun")
             .SetIrradiance(kSolarConstant * (kAu / distance) *
                            (kAu / distance))
@@ -295,8 +355,8 @@ class LrocNacDemo : public app::Demo {
                   DistantLightTransform(local));
 
         DefineNac();
-        // The viewer's own view: the site from 3 km up to the
-        // south-west of it, the Sun low behind.
+        // The viewer's own view: the flank from 1.5 km up to its
+        // south-west.
         Camera::Define(scene, "/World/View")
             .SetFocalLength(24.0)
             .SetClippingRange(glm::dvec2(10.0, 1e5))
@@ -306,8 +366,8 @@ class LrocNacDemo : public app::Demo {
             .SetExposureIso(100.0)
             .SetExposureTime(1.0 / 100.0);
         scene.Set("/World/View", tokens::kTransform,
-                  LookAtTransform({-4e3, -4e3, 3e3}, {0.0, 0.0, 0.0},
-                                  {0.0, 0.0, 1.0}));
+                  LookAtTransform({-1.8e3, -1.8e3, 1.5e3},
+                                  {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(Path("/World/View"))
             .SetResolution(glm::dvec2(480, 320))
@@ -325,7 +385,7 @@ class LrocNacDemo : public app::Demo {
     void TestFinal() override {
         Camera(GetScene(), "/World/Nac").SetSensorNoise(false);
         CheckStripsSeeTheGroundWhereTheIsdPutsIt();
-        CheckCompanding();
+        CheckReadout();
         Camera(GetScene(), "/World/Nac").SetSensorNoise(true);
     }
 
@@ -428,34 +488,41 @@ class LrocNacDemo : public app::Demo {
             pixels, {std::int64_t(lines), std::int64_t(samples), 4});
     }
 
-    /// Balls on the ground (lifted 20 m up the pixels' rays, clear of
+    /// The terrain's height (m) at body-fixed `point`'s latitude and
+    /// longitude: the DTM's, else LOLA's.
+    double HeightAt(const glm::dvec3& point) const {
+        const glm::dvec2 at = LatitudeLongitude(point);
+        const double h = dtm_.HeightAt(at.x, at.y);
+        return std::isnan(h) ? lola_.HeightAt(at.x, at.y) : h;
+    }
+
+    /// Balls on the ground (lifted 10 m up the pixels' rays, clear of
     /// the terrain's cells) where the ISD's model puts three pixels'
-    /// rays on LOLA's terrain show on those pixels of their strips:
-    /// the ISD's geometry, as Ernie draws it in the local frame.
+    /// rays on the terrain show on those pixels of their strips: the
+    /// ISD's geometry, as Ernie draws it in the local frame.
     void CheckStripsSeeTheGroundWhereTheIsdPutsIt() {
         Scene& scene = GetScene();
         const std::uint32_t samples = nac_.Isd().samples;
         const std::array<std::array<std::uint32_t, 2>, 3> pixels = {
-            {{kFirstLine + 100, 300},
-             {kFirstLine + 256, 1266},
-             {kFirstLine + 400, 2200}}};
+            {{kFirstLine + 100, 600},
+             {kFirstLine + 1100, 2532},
+             {kFirstLine + 1900, 4400}}};
         for (std::size_t i = 0; i < pixels.size(); ++i) {
             const auto [line, sample] = pixels[i];
             const double l = line + 0.5;
             const double s = sample + 0.5;
             double h = 0.0;
             glm::dvec3 ground(0.0);
-            for (int k = 0; k < 4; ++k) {
+            for (int k = 0; k < 6; ++k) {
                 ground = nac_.ImageToGround(l, s, h);
-                const glm::dvec2 at = LatitudeLongitude(ground);
-                h = dem_.HeightAt(at.x, at.y);
+                h = HeightAt(ground);
             }
             const glm::dvec3 eye = nac_.Position(nac_.ImageTime(l));
             const glm::dvec3 lifted =
-                ground + 20.0 * glm::normalize(eye - ground);
+                ground + 10.0 * glm::normalize(eye - ground);
             const Path ball("/World/Marker" + std::to_string(i));
-            // About two lines and 40 samples across.
-            Sphere::Define(scene, ball).SetRadius(15.0);
+            // About ten pixels across.
+            Sphere::Define(scene, ball).SetRadius(3.0);
             scene.Set(
                 ball, tokens::kTransform,
                 glm::translate(glm::dmat4(1.0),
@@ -485,21 +552,21 @@ class LrocNacDemo : public app::Demo {
             std::printf("marker %zu: (%.2f, %.2f) for (%.2f, %.2f)\n",
                         i, centre.x, centre.y, row, s);
             Check(std::abs(centre.x - row) < 1.0 &&
-                      std::abs(centre.y - s) < 1.5,
+                      std::abs(centre.y - s) < 1.0,
                   "a marker should land on its pixel");
         }
     }
 
     /// Every pixel's 8-bit number is the table's of its 12-bit one,
     /// its electrons over the gain (either side of a half DN, which
-    /// the GPU's floats may round either way); some of the ground is
-    /// lit.
-    void CheckCompanding() {
+    /// the GPU's floats may round either way); the daylit ground is
+    /// exposed within the ADC's range.
+    void CheckReadout() {
         RenderProductSetOutputs outputs = RenderStrip(kStrips / 2);
         const Tensor electrons =
             Var(outputs, "/Render/Nac", "Electrons");
         const Tensor raw = Var(outputs, "/Render/Nac", "RawDN");
-        std::int64_t lit = 0;
+        std::int64_t within = 0;
         for (std::int64_t i = 0; i < raw.Elements(); ++i) {
             const double e = std::min<double>(
                 electrons.As<float>()[i], kNacFullWell);
@@ -511,24 +578,24 @@ class LrocNacDemo : public app::Demo {
             const std::uint16_t dn = raw.As<std::uint16_t>()[i];
             Check(dn == code(1.0 - 1e-6) || dn == code(1.0 + 1e-6),
                   "the NAC should send its table's 8-bit numbers");
-            lit += e > 1000.0 ? 1 : 0;
+            within += dn > 0 && dn < 255 ? 1 : 0;
         }
-        std::printf("NAC: %lld lit pixels of %lld\n",
-                    static_cast<long long>(lit),
+        std::printf("NAC: %lld of %lld numbers within the range\n",
+                    static_cast<long long>(within),
                     static_cast<long long>(raw.Elements()));
-        Check(lit > 0, "the low Sun should light some of the ground");
+        Check(within > raw.Elements() / 8,
+              "the daylit ground should be exposed within the range");
     }
 
     IsdLineScanner nac_;
-    PolarStereographicDem dem_;
+    CylindricalDem dtm_;
+    CylindricalDem lola_;
     glm::dmat4 bodyToLocal_{1.0};
-    double sunElevation_ = 0.0;
 };
 
 }  // namespace
 
-ERNIE_REGISTER_DEMO(
-    LrocNacDemo, "cameras", "lroc_nac",
-    "LROC's Narrow Angle Camera over the Moon's south "
-    "pole as an ISD has it, on LOLA's polar terrain "
-    "under a Sun 1 degree up.");
+ERNIE_REGISTER_DEMO(LrocNacDemo, "cameras", "lroc_nac",
+                    "LROC's Narrow Angle Camera over Tycho's central "
+                    "peak as image M1282557272RE's ISD has it, on "
+                    "LROC's 2 m stereo terrain.");

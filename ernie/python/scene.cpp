@@ -1420,6 +1420,8 @@ void BindScene(nb::module_& m) {
         .def_ro("pixels_per_degree", &CylindricalDem::pixelsPerDegree)
         .def_ro("max_latitude", &CylindricalDem::maxLatitudeDeg)
         .def_ro("west_longitude", &CylindricalDem::westLongitudeDeg)
+        .def_ro("standard_parallel",
+                &CylindricalDem::standardParallelDeg)
         .def_ro("reference_radius", &CylindricalDem::referenceRadius)
         .def("height_at", &CylindricalDem::HeightAt,
              nb::arg("latitude"), nb::arg("longitude"),
@@ -1490,7 +1492,20 @@ void BindScene(nb::module_& m) {
                                     const CylindricalDem*>
                            dem,
                        double latitude, double longitude,
-                       std::uint32_t cells, double cellSize) {
+                       std::uint32_t cells, double cellSize,
+                       const CylindricalDem* fallback) {
+            if (fallback != nullptr) {
+                const auto* const* grid =
+                    std::get_if<const CylindricalDem*>(&dem);
+                if (grid == nullptr) {
+                    throw std::invalid_argument(
+                        "A fallback DEM backs a cylindrical DEM "
+                        "only");
+                }
+                return localTerrain(
+                    LocalTerrainOf(**grid, *fallback, latitude,
+                                   longitude, cells, cellSize));
+            }
             return std::visit(
                 [&](const auto* grid) {
                     return localTerrain(LocalTerrainOf(
@@ -1500,6 +1515,7 @@ void BindScene(nb::module_& m) {
         },
         nb::arg("dem"), nb::arg("latitude"), nb::arg("longitude"),
         nb::arg("cells"), nb::arg("cell_size"),
+        nb::arg("fallback").none() = nb::none(),
         "The cells x cells heightfield of `dem`, `cell_size` m "
         "apart, "
         "about a latitude and east longitude (degrees), in a local "
@@ -1507,7 +1523,9 @@ void BindScene(nb::module_& m) {
         "reference sphere), the planet's curvature in the heights: a "
         "dict of heights (float32, the first row northern), origin "
         "(x, y of the north-western cell), cell_size and "
-        "body_to_local (body-fixed metres to the local frame).");
+        "body_to_local (body-fixed metres to the local frame). Where "
+        "`dem` has no data, `fallback`'s heights (a cylindrical DEM "
+        "about a high-resolution DTM), else the reference sphere.");
 
     nb::class_<CahvoreModel>(
         m, "CahvoreModel",

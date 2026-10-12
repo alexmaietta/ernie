@@ -8,6 +8,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <numbers>
 #include <sstream>
 #include <stdexcept>
@@ -169,9 +170,20 @@ double Bilinear(const std::vector<float>& heights,
         return static_cast<double>(
             heights[std::size_t(l) * samples + s]);
     };
-    const double top = at(l0, s0) + tx * (at(l0, s1) - at(l0, s0));
-    const double bottom = at(l1, s0) + tx * (at(l1, s1) - at(l1, s0));
-    return top + ty * (bottom - top);
+    // The corners weighted, those of no weight left out, so a cell
+    // without data (NaN) reaches only the points beside it.
+    const double weights[4] = {(1.0 - tx) * (1.0 - ty),
+                               tx * (1.0 - ty), (1.0 - tx) * ty,
+                               tx * ty};
+    const double values[4] = {at(l0, s0), at(l0, s1), at(l1, s0),
+                              at(l1, s1)};
+    double sum = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        if (weights[i] > 0.0) {
+            sum += weights[i] * values[i];
+        }
+    }
+    return sum;
 }
 
 /// The label at `labelPath`, parsed.
@@ -303,7 +315,12 @@ DemGrid ReadGrid(const Pds3Label& label,
             std::memcpy(&v, raw.data() + 4 * i, 4);
             value = v;
         }
-        dem.heights[i] = static_cast<float>(value * scale + addend);
+        // PDS's null for reals, -3.4028227e38, and non-finite values
+        // are no data.
+        dem.heights[i] =
+            real && !(value > -1e30 && std::isfinite(value))
+                ? std::numeric_limits<float>::quiet_NaN()
+                : static_cast<float>(value * scale + addend);
     }
     return dem;
 }
@@ -325,7 +342,9 @@ double CylindricalDem::HeightAt(double latitudeDeg,
     return Bilinear(heights, lines, samples,
                     (maxLatitudeDeg - latitudeDeg) * pixelsPerDegree -
                         0.5,
-                    east * pixelsPerDegree - 0.5);
+                    east * pixelsPerDegree *
+                            std::cos(standardParallelDeg * kDegree) -
+                        0.5);
 }
 
 CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
@@ -350,6 +369,11 @@ CylindricalDem ReadCylindricalDem(const std::string& labelPath) {
         label.Number("IMAGE_MAP_PROJECTION.MAXIMUM_LATITUDE");
     dem.westLongitudeDeg =
         label.Number("IMAGE_MAP_PROJECTION.WESTERNMOST_LONGITUDE");
+    dem.standardParallelDeg =
+        projection == "EQUIRECTANGULAR" &&
+                label.Get("IMAGE_MAP_PROJECTION.CENTER_LATITUDE")
+            ? label.Number("IMAGE_MAP_PROJECTION.CENTER_LATITUDE")
+            : 0.0;
     return dem;
 }
 
@@ -432,6 +456,19 @@ LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
         latitudeDeg, longitudeDeg, cells, cellSize);
 }
 
+LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
+                            const CylindricalDem& fallback,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize) {
+    return LocalTerrainOn(
+        dem.referenceRadius,
+        [&dem, &fallback](double lat, double lon) {
+            const double h = dem.HeightAt(lat, lon);
+            return std::isnan(h) ? fallback.HeightAt(lat, lon) : h;
+        },
+        latitudeDeg, longitudeDeg, cells, cellSize);
+}
+
 LocalTerrain LocalTerrainOf(const PolarStereographicDem& dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize) {
@@ -493,6 +530,9 @@ LocalTerrain LocalTerrainOn(double radius, const HeightAt& heightAt,
                     std::asin(std::clamp(d.z, -1.0, 1.0)) / kDegree;
                 const double along = std::atan2(d.y, d.x) / kDegree;
                 h = heightAt(lat, along);
+                if (std::isnan(h)) {
+                    h = 0.0;
+                }
             }
             const double r = radius + h;
             z = std::sqrt(std::max(r * r - x * x - y * y, 0.0)) -

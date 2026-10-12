@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""LROC's Narrow Angle Camera line-scanning the Moon's south pole at a
-low Sun, posed from a real ISD on LOLA's terrain (fetched on the first
-run, 12 MB).
+"""LROC's Narrow Angle Camera line-scanning the flank of Tycho's central
+peak as it took image M1282557272RE, posed from that image's ISD on
+LROC's 2 m stereo terrain of the peak (a window of it fetched on the
+first run, 88 MB read for 13 MB kept).
 
 References:
 - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC)
   Instrument Overview", Space Science Reviews 150:81-124, 2010: Table 2
   (the NACs) and Appendix A (their companding).
-- USGS Astrogeology, usgscsm's test data (toughLroNacLineScan.json, an
-  ISD ALE wrote for a NAC image) and ALE,
-  https://github.com/DOI-USGS/usgscsm and
-  https://github.com/DOI-USGS/ale
-- D. E. Smith et al., "The Lunar Orbiter Laser Altimeter Investigation
-  on the Lunar Reconnaissance Orbiter Mission", Space Science Reviews
-  150:209-241, 2010 (LOLA, whose polar LDEM is the terrain).
+- USGS Astrogeology, ISIS and ALE (the ISD, from the image's EDR with
+  SPICE from the USGS web service), https://github.com/DOI-USGS/ISIS3
+  and https://github.com/DOI-USGS/ale
+- M. R. Henriksen et al., "Extracting accurate and precise topography
+  from LROC narrow angle camera stereo observations", Icarus
+  283:122-137, 2017 (the NAC DTMs; NAC_DTM_TYCHOPK).
 - G. Kopp and J. L. Lean, "A new, lower value of total solar
   irradiance", Geophysical Research Letters 38:L01706, 2011 (1361
   W/m^2 at 1 au).
@@ -21,6 +21,7 @@ References:
 
 import math
 import os
+import struct
 
 import numpy as np
 
@@ -34,16 +35,17 @@ from ernie.demo import (
     write_png,
 )
 
-# The image lines rendered: 8 strips of 64 about the image's middle,
-# where it passes the pole.
-FIRST_LINE = 3840
-STRIP_LINES = 64
+# The image lines rendered: 8 strips of 256 near the image's southern
+# end, beside the peak.
+FIRST_LINE = 22528
+STRIP_LINES = 256
 STRIPS = 8
 
-# The terrain about the middle line's ground: cells of 5 m, the DEM's
-# own, 12 km across.
-CELLS = 2401
-CELL_SIZE = 5.0
+# The terrain about the middle line's ground: cells of 2 m, the DTM's
+# own, 3.2 km across.
+CELLS = 1601
+CELL_SIZE = 2.0
+MOON_RADIUS = 1737400.0
 
 # The Sun's radius and the astronomical unit, metres; the total solar
 # irradiance at 1 au, W/m^2 (Kopp and Lean 2011).
@@ -51,9 +53,9 @@ SUN_RADIUS = 6.957e8
 AU = 1.495978707e11
 SOLAR_CONSTANT = 1361.0
 
-# NAC-L's published values (Robinson et al. 2010, Table 2; section 3.1.2
-# for the KLI-5001G's QE): focal ratio, gain, detector noise and full
-# well. The ISD sets the geometry and line time.
+# The NACs' published values (Robinson et al. 2010, Table 2; section
+# 3.1.2 for the KLI-5001G's QE): focal ratio, gain, detector noise and
+# full well. The ISD sets the geometry and line time.
 NAC_F_NUMBER = 3.577
 NAC_ELECTRONS_PER_DN = 90.5
 NAC_READ_NOISE = 101.0
@@ -74,112 +76,137 @@ def nac_compand(x):
     return math.floor(x / 32 + 128)
 
 
-# ----------------------------------------------------------------- LOLA
+# ------------------------------------------------------------------ DTM
 
-# LOLA's 5 m polar LDEM south of 87.5 S at the PDS Geosciences Node: 30336
-# x 30336 16-bit samples, the pole at line and sample 15167.5.
-LDEM_URL = (
-    "https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/"
-    "lrolol_1xxx/data/lola_gdr/polar/img/ldem_875s_5m.img"
+# LROC's NAC DTM mosaic of the peak in the PDS: a GeoTIFF of 32-bit
+# reals, one row a strip, on an equirectangular grid true at 43.3 S (its
+# PDS3 label's values).
+DTM_URL = (
+    "https://pds.mcp.nasa.gov/data/store/img/lunar_reconnaissance_"
+    "orbiter/pds4/lroc/lro-l-lroc-5-rdr/LROLRC_2001/DATA/SDP/NAC_DTM/"
+    "TYCHOPK/NAC_DTM_TYCHOPK.TIF"
 )
-LDEM_SIZE = 30336
-LDEM_OFFSET = 15167.5
-LDEM_SCALE = 5.0
-MOON_RADIUS = 1737400.0
+DTM_LINES = 30892
+DTM_SAMPLES = 12240
+DTM_PIXELS_PER_DEGREE = 15161.675212075
+DTM_PARALLEL = -43.3
+DTM_NORTH = -42.3668223
+DTM_WEST = 348.0633983
 
 
-def ldem_label():
+def dtm_label():
     """The cached window's label."""
     return os.path.join(
-        cache_dir(), "lola", "ldem_875s_5m_lroc_nac.lbl"
+        cache_dir(), "lroc", "nac_dtm_tychopk_nac.lbl"
     )
 
 
-def ldem_grid(latitude, longitude):
-    """The polar grid's fractional (line, sample) of a latitude and
-    east longitude, as `ernie.PolarStereographicDem.to_grid`: polar
-    distance rho = 2 R tan(45 + lat / 2), x = rho sin(lon) and y = rho
-    cos(lon) (Snyder 1987, eq. 21-33 and 21-34)."""
-    rho = (
-        2.0
-        * MOON_RADIUS
-        * math.tan(0.25 * math.pi + 0.5 * math.radians(latitude))
-    )
-    x = rho * math.sin(math.radians(longitude))
-    y = rho * math.cos(math.radians(longitude))
-    return (
-        LDEM_OFFSET - y / LDEM_SCALE,
-        LDEM_OFFSET + x / LDEM_SCALE,
-    )
+def fetch_bytes(url, first, count):
+    """The bytes of `url` from `first` for `count`."""
+    return fetch_ranges(url, [(first, first + count - 1)])[0]
 
 
-def fetch_ldem_window(latitude, longitude, half):
-    """Fetches the window of the polar LDEM `half` pixels about a
-    latitude and longitude, 256 lines a request, each line's samples in
-    the window alone (HTTP range requests; the product is 1.8 GB), and
-    writes it to the cache as an image and a PDS3 label of its own,
-    which `ernie.read_polar_stereographic_dem` reads as it would the
-    whole product. As demo_cameras_lroc_nac.cpp's
-    `FetchLdemWindow`."""
-    centre = ldem_grid(latitude, longitude)
-    first_line = round(centre[0]) - half
-    first_sample = round(centre[1]) - half
-    size = 2 * half + 1
-    print(f"Fetching {size} lines of {size} samples from {LDEM_URL}")
-    rows = bytearray()
-    row_bytes = 2 * LDEM_SIZE
-    for start in range(0, size, 256):
-        ranges = [
-            (
-                line * row_bytes + 2 * first_sample,
-                line * row_bytes + 2 * (first_sample + size) - 1,
-            )
-            for line in range(
-                first_line + start,
-                first_line + min(start + 256, size),
-            )
-        ]
-        for data in fetch_ranges(LDEM_URL, ranges):
-            rows += data
-    label = ldem_label()
+def row_offsets(url, first_row, rows):
+    """The byte offset of every row of a little-endian TIFF of one row a
+    strip (its StripOffsets, tag 273)."""
+    header = fetch_bytes(url, 0, 8)
+    if header[:2] != b"II":
+        raise RuntimeError(f"{url} is not a little-endian TIFF")
+    ifd = struct.unpack("<I", header[4:8])[0]
+    entries = struct.unpack("<H", fetch_bytes(url, ifd, 2))[0]
+    table = fetch_bytes(url, ifd + 2, 12 * entries)
+    for e in range(entries):
+        tag, kind, _, at = struct.unpack(
+            "<HHII", table[12 * e : 12 * e + 12]
+        )
+        if tag != 273:
+            continue
+        size = 8 if kind == 16 else 4
+        data = fetch_bytes(url, at + size * first_row, size * rows)
+        return list(
+            struct.unpack(f"<{rows}{'Q' if size == 8 else 'I'}", data)
+        )
+    raise RuntimeError(f"{url} has no strip offsets")
+
+
+def fetch_dtm_window(latitude, longitude, half):
+    """Fetches the window of the DTM about a latitude and longitude
+    reaching `half` metres each way (its rows by HTTP range requests;
+    the DTM is 1.5 GB), and writes it to the cache as an image and a
+    PDS3 label of its own, which `ernie.read_cylindrical_dem` reads. As
+    demo_cameras_lroc_nac.cpp's `FetchDtmWindow`."""
+    along = DTM_PIXELS_PER_DEGREE
+    across = along * math.cos(math.radians(DTM_PARALLEL))
+    degrees = math.degrees(half / MOON_RADIUS)
+    first_row = math.floor((DTM_NORTH - latitude - degrees) * along)
+    rows = math.ceil(2.0 * degrees * along)
+    spread = degrees / math.cos(math.radians(latitude))
+    east = math.fmod(longitude - DTM_WEST + 720.0, 360.0)
+    first_column = math.floor((east - spread) * across)
+    columns = math.ceil(2.0 * spread * across)
+    if (
+        first_row + rows > DTM_LINES
+        or first_column + columns > DTM_SAMPLES
+    ):
+        raise RuntimeError("The window leaves the DTM")
+    print(f"Fetching {rows} rows of {columns} samples from {DTM_URL}")
+    offsets = row_offsets(DTM_URL, first_row, rows)
+    # Rows lie back to back in runs (the server serves one range a
+    # request): each run's whole rows at once, the window's columns cut
+    # from them.
+    row_bytes = 4 * DTM_SAMPLES
+    data = bytearray()
+    start = 0
+    while start < rows:
+        end = start + 1
+        while (
+            end < rows
+            and offsets[end] == offsets[end - 1] + row_bytes
+        ):
+            end += 1
+        run = fetch_bytes(
+            DTM_URL, offsets[start], (end - start) * row_bytes
+        )
+        for r in range(end - start):
+            at = r * row_bytes + 4 * first_column
+            data += run[at : at + 4 * columns]
+        start = end
+    label = dtm_label()
     directory = os.path.dirname(label)
     os.makedirs(directory, exist_ok=True)
     with open(
-        os.path.join(directory, "ldem_875s_5m_lroc_nac.img"), "wb"
+        os.path.join(directory, "nac_dtm_tychopk_nac.img"), "wb"
     ) as f:
-        f.write(rows)
+        f.write(data)
     with open(label + ".part", "w") as f:
         f.write(
             f"""PDS_VERSION_ID = PDS3
-/* A window of LOLA's LDEM_875S_5M (LRO-L-LOLA-4-GDR-V1.0), fetched
-   by demos/cameras/demo_cameras_lroc_nac from the PDS Geosciences Node. */
+/* A window of LROC's NAC_DTM_TYCHOPK (LRO-L-LROC-5-RDR-V1.0), fetched
+   by demos/cameras/demo_cameras_lroc_nac from the PDS. */
 RECORD_TYPE = FIXED_LENGTH
-RECORD_BYTES = {2 * size}
-FILE_RECORDS = {size}
-^IMAGE = "LDEM_875S_5M_LROC_NAC.IMG"
+RECORD_BYTES = {4 * columns}
+FILE_RECORDS = {rows}
+^IMAGE = "NAC_DTM_TYCHOPK_NAC.IMG"
 OBJECT = IMAGE
-  LINES = {size}
-  LINE_SAMPLES = {size}
-  SAMPLE_TYPE = LSB_INTEGER
-  SAMPLE_BITS = 16
+  LINES = {rows}
+  LINE_SAMPLES = {columns}
+  SAMPLE_TYPE = PC_REAL
+  SAMPLE_BITS = 32
   UNIT = METER
-  SCALING_FACTOR = 0.5
-  OFFSET = 1737400.
 END_OBJECT = IMAGE
 OBJECT = IMAGE_MAP_PROJECTION
-  MAP_PROJECTION_TYPE = "POLAR STEREOGRAPHIC"
-  A_AXIS_RADIUS = 1737.4 <km>
-  CENTER_LATITUDE = -90 <deg>
-  CENTER_LONGITUDE = 0 <deg>
-  MAP_SCALE = 5 <m/pix>
-  LINE_PROJECTION_OFFSET = {LDEM_OFFSET - first_line:g} <pix>
-  SAMPLE_PROJECTION_OFFSET = {LDEM_OFFSET - first_sample:g} <pix>
+  MAP_PROJECTION_TYPE = "EQUIRECTANGULAR"
+  A_AXIS_RADIUS = 1737.4 <KM>
+  CENTER_LATITUDE = {DTM_PARALLEL:.12g} <DEG>
+  MAP_RESOLUTION = {along:.12g} <PIX/DEG>
+  MAXIMUM_LATITUDE = {DTM_NORTH - first_row / along:.12g} <DEG>
+  WESTERNMOST_LONGITUDE = {DTM_WEST + first_column / across:.12g} <DEG>
 END_OBJECT = IMAGE_MAP_PROJECTION
 END
 """
         )
     os.replace(label + ".part", label)
-    print(f"Wrote {label} ({len(rows) / 1e6:.1f} MB)")
+    print(f"Wrote {label} ({len(data) / 1e6:.1f} MB)")
 
 
 # ------------------------------------------------------------- the demo
@@ -228,7 +255,7 @@ class Demo(ernie.demo.Demo):
         super().__init__(viewer, args)
         scene = self.scene
         self.nac = ernie.IsdLineScanner.from_file(
-            data_file("toughLroNacLineScan.json")
+            data_file("lroNacM1282557272RE.json")
         )
         scene.define("/World", ernie.Xform)
         # The middle line's ground, on the reference sphere.
@@ -239,34 +266,42 @@ class Demo(ernie.demo.Demo):
             )
         )
         site = latitude_longitude(ground)
-        # LOLA's terrain there, else the bare sphere, in a frame there:
-        # x east, y north, z up. Fetched once, but not for the checks,
-        # which run offline.
-        label = ldem_label()
+        # The NAC DTM there inside LOLA's terrain (the lroc demo's cached
+        # window), else the bare sphere, in a frame there: x east, y
+        # north, z up. Fetched once, but not for the checks, which run
+        # offline.
+        half = 0.5 * (CELLS - 1) * CELL_SIZE + 200.0
+        label = dtm_label()
         if (
             not os.path.exists(label)
             and not args.test
             and can_download()
         ):
             try:
-                fetch_ldem_window(
-                    site[0],
-                    site[1],
-                    (CELLS - 1) // 2 * int(CELL_SIZE / LDEM_SCALE)
-                    + 40,
-                )
+                fetch_dtm_window(site[0], site[1], half)
             except (OSError, RuntimeError) as error:
                 print(error)
         if os.path.exists(label):
-            self.dem = ernie.read_polar_stereographic_dem(label)
+            self.dtm = ernie.read_cylindrical_dem(label)
         else:
             print(
-                f"No LOLA terrain in {os.path.dirname(label)}; the "
-                "bare sphere stands in."
+                f"No NAC DTM in {os.path.dirname(label)}; LOLA's terrain "
+                "or the bare sphere stands in."
             )
-            self.dem = ernie.PolarStereographicDem(MOON_RADIUS)
+            self.dtm = ernie.CylindricalDem(MOON_RADIUS)
+        lola = os.path.join(cache_dir(), "lola", "ldem_512_lroc.lbl")
+        self.lola = (
+            ernie.read_cylindrical_dem(lola)
+            if os.path.exists(lola)
+            else ernie.CylindricalDem(MOON_RADIUS)
+        )
         terrain = ernie.local_terrain_of(
-            self.dem, site[0], site[1], CELLS, CELL_SIZE
+            self.dtm,
+            site[0],
+            site[1],
+            CELLS,
+            CELL_SIZE,
+            fallback=self.lola,
         )
         self.body_to_local = np.asarray(terrain["body_to_local"])
         # The regolith's normal albedo, about 0.1, flat (its reddening
@@ -291,9 +326,9 @@ class Demo(ernie.demo.Demo):
         distance = float(np.linalg.norm(to_sun))
         local = self.body_to_local[:3, :3] @ (to_sun / distance)
         print(
-            f"{-site[0]:.3f} S, {site[1]:.2f} E; the Sun "
-            f"{distance / AU:.4f} au away, "
-            f"{math.degrees(math.asin(local[2])):.2f} degrees up"
+            f"{-site[0]:.3f} S, {math.fmod(site[1] + 360.0, 360.0):.2f} E; "
+            f"the Sun {distance / AU:.4f} au away, "
+            f"{math.degrees(math.asin(local[2])):.1f} degrees up"
         )
         scene.define(
             "/World/Sun",
@@ -306,8 +341,8 @@ class Demo(ernie.demo.Demo):
         ).set(tokens.TRANSFORM, ernie.distant_light_transform(local))
 
         self.define_nac()
-        # The viewer's own view: the site from 3 km up to the
-        # south-west of it, the Sun low behind.
+        # The viewer's own view: the flank from 1.5 km up to its
+        # south-west.
         view = scene.define(
             "/World/View",
             ernie.Camera,
@@ -322,7 +357,9 @@ class Demo(ernie.demo.Demo):
         view.set(
             tokens.TRANSFORM,
             ernie.look_at_transform(
-                (-4e3, -4e3, 3e3), (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)
+                (-1.8e3, -1.8e3, 1.5e3),
+                (0.0, 0.0, 0.0),
+                (0.0, 0.0, 1.0),
             ),
         )
         scene.define(
@@ -342,7 +379,7 @@ class Demo(ernie.demo.Demo):
     def test_final(self):
         self.camera().sensor_noise = False
         self.check_strips_see_the_ground_where_the_isd_puts_it()
-        self.check_companding()
+        self.check_readout()
         self.camera().sensor_noise = True
 
     # -------------------------------------------------------- helpers
@@ -462,36 +499,43 @@ class Demo(ernie.demo.Demo):
 
     # --------------------------------------------------------- checks
 
+    def height_at(self, point):
+        """The terrain's height (m) at body-fixed `point`'s latitude and
+        longitude: the DTM's, else LOLA's."""
+        at = latitude_longitude(point)
+        h = self.dtm.height_at(*at)
+        return self.lola.height_at(*at) if math.isnan(h) else h
+
     def check_strips_see_the_ground_where_the_isd_puts_it(self):
-        """Balls on the ground (lifted 20 m up the pixels' rays, clear
+        """Balls on the ground (lifted 10 m up the pixels' rays, clear
         of the terrain's cells) where the ISD's model puts three pixels'
-        rays on LOLA's terrain show on those pixels of their strips: the
+        rays on the terrain show on those pixels of their strips: the
         ISD's geometry, as Ernie draws it in the local frame."""
         samples = self.nac.samples
         pixels = [
-            (FIRST_LINE + 100, 300),
-            (FIRST_LINE + 256, 1266),
-            (FIRST_LINE + 400, 2200),
+            (FIRST_LINE + 100, 600),
+            (FIRST_LINE + 1100, 2532),
+            (FIRST_LINE + 1900, 4400),
         ]
         for i, (line, sample) in enumerate(pixels):
             at_line, s = line + 0.5, sample + 0.5
             h = 0.0
-            for _ in range(4):
+            for _ in range(6):
                 ground = np.asarray(
                     self.nac.image_to_ground(at_line, s, h)
                 )
-                h = self.dem.height_at(*latitude_longitude(ground))
+                h = self.height_at(ground)
             eye = np.asarray(
                 self.nac.position(self.nac.image_time(at_line))
             )
             towards = eye - ground
-            lifted = ground + 20.0 * towards / np.linalg.norm(towards)
+            lifted = ground + 10.0 * towards / np.linalg.norm(towards)
             ball = f"/World/Marker{i}"
-            # About two lines and 40 samples across.
+            # About ten pixels across.
             self.scene.define(
                 ball,
                 ernie.Sphere,
-                radius=15.0,
+                radius=3.0,
                 translate=tuple(
                     transformed(self.body_to_local, lifted)
                 ),
@@ -516,14 +560,14 @@ class Demo(ernie.demo.Demo):
             )
             assert (
                 abs(centre[0] - row) < 1.0
-                and abs(centre[1] - s) < 1.5
+                and abs(centre[1] - s) < 1.0
             ), "a marker should land on its pixel"
 
-    def check_companding(self):
+    def check_readout(self):
         """Every pixel's 8-bit number is the table's of its 12-bit one,
         its electrons over the gain (either side of a half DN, which the
-        GPU's floats may round either way); some of the ground is
-        lit."""
+        GPU's floats may round either way); the daylit ground is exposed
+        within the ADC's range."""
         out = self.render_strip(STRIPS // 2)
         electrons = np.minimum(
             out["Electrons"].ravel(), NAC_FULL_WELL
@@ -540,9 +584,11 @@ class Demo(ernie.demo.Demo):
             assert dn in (code(e, 1 - 1e-6), code(e, 1 + 1e-6)), (
                 "the NAC should send its table's 8-bit numbers"
             )
-        lit = int(np.count_nonzero(electrons > 1000.0))
-        print(f"NAC: {lit} lit pixels of {raw.size}")
-        assert lit > 0, "the low Sun should light some of the ground"
+        within = int(np.count_nonzero((raw > 0) & (raw < 255)))
+        print(f"NAC: {within} of {raw.size} numbers within the range")
+        assert within > raw.size // 8, (
+            "the daylit ground should be exposed within the range"
+        )
 
 
 if __name__ == "__main__":

@@ -193,3 +193,46 @@ END
     assert math.isclose(dem.height_at(latitude, 0.0), 90.0)
     terrain = ernie.local_terrain_of(dem, -89.9999, 0.0, 3, 1.0)
     assert np.asarray(terrain["heights"]).shape == (3, 3)
+
+
+def test_local_terrains_fall_back_where_a_dtm_has_no_data(tmp_path):
+    # A DTM of PDS null reals over a flat LOLA-style DEM 100 m up: the
+    # terrain takes the fallback's heights.
+    (tmp_path / "DTM.IMG").write_bytes(
+        np.full((4, 4), -3.4028227e38, "<f4").tobytes()
+    )
+    (tmp_path / "DTM.LBL").write_text(
+        """PDS_VERSION_ID = PDS3
+^IMAGE = "DTM.IMG"
+OBJECT = IMAGE
+  LINES = 4
+  LINE_SAMPLES = 4
+  SAMPLE_TYPE = PC_REAL
+  SAMPLE_BITS = 32
+END_OBJECT = IMAGE
+OBJECT = IMAGE_MAP_PROJECTION
+  MAP_PROJECTION_TYPE = "EQUIRECTANGULAR"
+  A_AXIS_RADIUS = 1737.4 <KM>
+  CENTER_LATITUDE = -40.0 <DEG>
+  MAP_RESOLUTION = 4 <PIX/DEG>
+  MAXIMUM_LATITUDE = -40.0 <DEG>
+  WESTERNMOST_LONGITUDE = 340.0 <DEG>
+END_OBJECT = IMAGE_MAP_PROJECTION
+END
+"""
+    )
+    dtm = ernie.read_cylindrical_dem(str(tmp_path / "DTM.LBL"))
+    assert dtm.standard_parallel == -40.0
+    assert math.isnan(dtm.height_at(-40.5, 340.5))
+    sub = tmp_path / "lola"
+    sub.mkdir()
+    lola = ernie.read_cylindrical_dem(
+        write_dem(sub, np.full((40, 80), 100.0), -35.0, 330.0, 2)
+    )
+    terrain = ernie.local_terrain_of(
+        dtm, -40.5, 340.5, 3, 1.0, fallback=lola
+    )
+    assert (
+        abs(float(np.asarray(terrain["heights"])[1, 1]) - 100.0)
+        < 1e-2
+    )

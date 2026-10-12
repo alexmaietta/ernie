@@ -49,32 +49,39 @@ struct Pds3Label {
 /// quotes or parentheses.
 Pds3Label ParsePds3Label(std::string_view text);
 
-/// A planet's radius on a simple cylindrical (equirectangular) grid,
-/// as LOLA's LDEM products hold it: `heights` (metres above
-/// `referenceRadius`) row by row from the northern, each row from the
-/// western sample eastwards, `pixelsPerDegree` both ways. Sample s of
-/// line l is centred at latitude maxLatitude - (l + 0.5) / ppd and
-/// east longitude westLongitude + (s + 0.5) / ppd.
+/// A planet's radius on an equirectangular grid, as LOLA's LDEM
+/// products (simple cylindrical, true at the equator) and LROC's NAC
+/// DTMs (true at a standard parallel) hold it: `heights` (metres
+/// above `referenceRadius`; NaN where the product has no data) row by
+/// row from the northern, each row from the western sample eastwards,
+/// `pixelsPerDegree` along the meridians and that times
+/// cos(standardParallel) along the parallels. Sample s of line l is
+/// centred at latitude maxLatitude - (l + 0.5) / ppd and east
+/// longitude westLongitude + (s + 0.5) / (ppd cos(standardParallel)).
 struct CylindricalDem {
     std::uint32_t lines = 0;
     std::uint32_t samples = 0;
     double pixelsPerDegree = 1.0;
     double maxLatitudeDeg = 90.0;
     double westLongitudeDeg = 0.0;
+    double standardParallelDeg = 0.0;
     double referenceRadius = 0.0;  ///< Metres.
     std::vector<float> heights;
 
     /// The height at latitude `latitudeDeg` and east longitude
     /// `longitudeDeg` (any multiple of 360 apart), bilinear between
-    /// the cells' centres, clamped to the grid's edges.
+    /// the cells' centres, clamped to the grid's edges; NaN beside a
+    /// cell without data.
     double HeightAt(double latitudeDeg, double longitudeDeg) const;
 };
 
 /// Reads the DEM a PDS3 label at `labelPath` describes: its IMAGE
 /// object (16- or 32-bit LSB integers, or 32-bit LSB reals, each
 /// times SCALING_FACTOR, plus the label's OFFSET where the label says
-/// the heights are radii) in the file its ^IMAGE pointer names beside
-/// the label, on its IMAGE_MAP_PROJECTION's simple cylindrical grid.
+/// the heights are radii; reals below -1e30, PDS's null, or not
+/// finite are no data) in the file its ^IMAGE pointer names beside
+/// the label, on its IMAGE_MAP_PROJECTION's simple cylindrical or
+/// equirectangular grid (true at CENTER_LATITUDE).
 /// @throws std::runtime_error if a file cannot be read, or
 /// std::invalid_argument for another projection, sample type or a
 /// label it cannot follow.
@@ -119,7 +126,8 @@ ReadPolarStereographicDem(const std::string& labelPath);
 /// x east, y north and z up, its origin on the reference sphere at
 /// the point. Each cell holds the height above that tangent plane of
 /// the surface straight below or above it, so the planet's curvature
-/// is in the heights (a drop of about x^2 / 2R).
+/// is in the heights (a drop of about x^2 / 2R). Where the DEM has no
+/// data the surface is the reference sphere.
 struct LocalTerrain {
     Tensor heights;     ///< float32 (rows, cols), the first northern.
     glm::dvec2 origin;  ///< x and y of the north-western cell.
@@ -138,6 +146,13 @@ LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 LocalTerrain LocalTerrainOf(const PolarStereographicDem& dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
+/// As `LocalTerrainOf(dem, ...)`, with `fallback`'s heights wherever
+/// `dem` has none: a high-resolution DTM inside a regional DEM. Both
+/// share `dem`'s reference radius.
+LocalTerrain LocalTerrainOf(const CylindricalDem& dem,
+                            const CylindricalDem& fallback,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 

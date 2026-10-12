@@ -179,3 +179,56 @@ TEST(PolarStereographicDem, ReadsLolasPolarLabelsAndProjectsThePole) {
         ernie::LocalTerrainOf(dem, -89.9999, 0.0, 3, 1.0);
     EXPECT_EQ(terrain.heights.Shape()[0], 3);
 }
+
+TEST(CylindricalDem, ReadsNacDtmsTrueAtTheirParallelWithNullCells) {
+    // A 2 x 4 grid of 32-bit reals, as LROC's NAC DTMs hold theirs: 4
+    // pixels a degree along the meridians, true at 60 S so 2 along
+    // the parallels, its last sample PDS's null.
+    const std::filesystem::path directory =
+        std::filesystem::temp_directory_path() /
+        "ernie_scene_dem_test_dtm";
+    std::filesystem::create_directories(directory);
+    {
+        std::ofstream image(directory / "DTM.IMG", std::ios::binary);
+        const float values[8] = {1.0f, 2.0f, 3.0f, -3.4028227e38f,
+                                 5.0f, 6.0f, 7.0f, 8.0f};
+        image.write(reinterpret_cast<const char*>(values),
+                    sizeof(values));
+    }
+    std::ofstream(directory / "DTM.LBL")
+        << "PDS_VERSION_ID = PDS3\n"
+           "^IMAGE = \"DTM.IMG\"\n"
+           "OBJECT = IMAGE\n"
+           "  LINES = 2\n"
+           "  LINE_SAMPLES = 4\n"
+           "  SAMPLE_TYPE = PC_REAL\n"
+           "  SAMPLE_BITS = 32\n"
+           "END_OBJECT = IMAGE\n"
+           "OBJECT = IMAGE_MAP_PROJECTION\n"
+           "  MAP_PROJECTION_TYPE = \"EQUIRECTANGULAR\"\n"
+           "  A_AXIS_RADIUS = 1737.4 <KM>\n"
+           "  CENTER_LATITUDE = -60.0 <DEG>\n"
+           "  MAP_RESOLUTION = 4 <PIX/DEG>\n"
+           "  MAXIMUM_LATITUDE = -59.5 <DEG>\n"
+           "  WESTERNMOST_LONGITUDE = 10.0 <DEG>\n"
+           "END_OBJECT = IMAGE_MAP_PROJECTION\n"
+           "END\n";
+    const ernie::CylindricalDem dtm =
+        ernie::ReadCylindricalDem((directory / "DTM.LBL").string());
+    EXPECT_DOUBLE_EQ(dtm.standardParallelDeg, -60.0);
+    EXPECT_EQ(dtm.referenceRadius, 1737400.0);
+    // Line 1, sample 2 is centred at 59.875 S, 11.25 E (two samples a
+    // degree of longitude).
+    EXPECT_NEAR(dtm.HeightAt(-59.875, 11.25), 7.0, 1e-9);
+    EXPECT_TRUE(std::isnan(dtm.HeightAt(-59.625, 11.75)));
+    // Where it has no data a fallback stands in.
+    ernie::CylindricalDem fallback;
+    fallback.referenceRadius = 1737400.0;
+    fallback.lines = fallback.samples = 1;
+    fallback.pixelsPerDegree = 1.0 / 360.0;
+    fallback.maxLatitudeDeg = 90.0;
+    fallback.heights = {100.0f};
+    const ernie::LocalTerrain terrain =
+        ernie::LocalTerrainOf(dtm, fallback, -59.625, 11.75, 3, 1.0);
+    EXPECT_NEAR(terrain.heights.As<float>()[4], 100.0, 1e-3);
+}
