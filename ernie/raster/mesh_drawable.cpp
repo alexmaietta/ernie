@@ -49,8 +49,9 @@ struct GpuDraw {
     /// double-buffered pools, now and at the last frame.
     std::uint32_t motion[4];
     std::uint32_t uv[4];  ///< The mesh's first corner in the texture
-                          ///< coordinate pool, and its slot of active
-                          ///< counts plus 1 (0 for none); unused.
+                          ///< coordinate pool, its slot of active
+                          ///< counts plus 1 (0 for none) and the
+                          ///< points it holds; unused.
 };
 static_assert(sizeof(GpuDraw) == 272,
               "GpuDraw must match MeshDraw in mesh.slang");
@@ -1024,11 +1025,12 @@ void MeshDrawable::SetActiveCounts(std::uint32_t mesh,
     }
     Mesh& target = it->second;
     if (!counts.Empty()) {
-        if (counts.Type() != DType::Int32 || counts.Elements() != 2 ||
-            !counts.IsContiguous()) {
+        if (counts.Type() != DType::Int32 || counts.Rank() != 1 ||
+            counts.Elements() < 2 || !counts.IsContiguous()) {
             throw std::invalid_argument(
-                "Active counts must be a contiguous int32 (2,) "
-                "tensor: points, then triangles");
+                "Active counts must be a contiguous int32 (n >= 2,) "
+                "tensor: points, then triangle indices, then "
+                "anything");
         }
         if (IsGpu(counts.Location().kind) &&
             (compute_ == nullptr ||
@@ -1051,7 +1053,10 @@ void MeshDrawable::SetActiveCounts(std::uint32_t mesh,
             geometryDirty_ = true;
         }
     }
-    target.activeCounts = counts;
+    // The first two: a simulator's own counts may carry more, such as
+    // an overflow flag.
+    target.activeCounts =
+        counts.Empty() ? counts : counts.Slice(0, 2);
     target.countsStream = stream;
     target.countsDirty = true;
     activeMeshes_.insert(mesh);
@@ -1873,7 +1878,7 @@ void MeshDrawable::RebuildGeometry() {
                 counts.push_back(static_cast<std::int32_t>(
                     mesh.data.points.size() / 3));
                 counts.push_back(static_cast<std::int32_t>(
-                    mesh.data.indices.size() / 3));
+                    mesh.data.indices.size()));
             } else {
                 counts.push_back(
                     mesh.activeCounts.As<std::int32_t>()[0]);
@@ -2586,6 +2591,8 @@ void MeshDrawable::WriteDraws() {
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
+        draw.uv[2] =
+            static_cast<std::uint32_t>(mesh.data.points.size() / 3);
         if (item.instancer) {
             const Instancer& instancer =
                 instancers_.at(*item.instancer);

@@ -614,10 +614,10 @@ TEST_F(RasterDelegateTest, ActiveCountsDrawTheTrianglesInUse) {
         expectHalves(true, "no counts");
         const std::size_t meshes = delegate.Meshes().MeshCount();
 
-        // One triangle of two in use, from the host, then from the
-        // GPU.
-        const std::array<std::int32_t, 2> one{4, 1};
-        const std::array<std::int32_t, 2> both{4, 2};
+        // One triangle of two in use (3 indices of 6), from the host,
+        // then from the GPU.
+        const std::array<std::int32_t, 2> one{4, 3};
+        const std::array<std::int32_t, 2> both{4, 6};
         scene.Write("/World/Quad", tokens::kActiveCounts,
                     Tensor::Copy<std::int32_t>(one, {2}));
         expectHalves(false, "host counts: the first triangle");
@@ -631,13 +631,21 @@ TEST_F(RasterDelegateTest, ActiveCountsDrawTheTrianglesInUse) {
         EXPECT_EQ(delegate.Meshes().MeshCount(), meshes)
             << "counts change in place";
 
+        // As a simulator counts them: its overflow flag after the
+        // counts, and only whole triangles of the indices drawn.
+        const std::array<std::int32_t, 3> flagged{4, 5, 0};
+        scene.Write(
+            "/World/Quad", tokens::kActiveCounts,
+            cuda->Upload(Tensor::Copy<std::int32_t>(flagged, {3})));
+        expectHalves(false, "CUDA counts with a flag: one triangle");
+
         // Without them, every triangle again.
         scene.Clear("/World/Quad", tokens::kActiveCounts);
         expectHalves(true, "no counts");
 
-        const std::array<std::int32_t, 3> wrong{4, 1, 0};
+        const std::array<std::int32_t, 1> wrong{4};
         scene.Write("/World/Quad", tokens::kActiveCounts,
-                    Tensor::Copy<std::int32_t>(wrong, {3}));
+                    Tensor::Copy<std::int32_t>(wrong, {1}));
         EXPECT_THROW(delegate.Sync(scene), std::invalid_argument);
     }
 }
@@ -698,7 +706,7 @@ TEST_F(RasterDelegateTest,
     points.insert(points.end(), {0.0f, 0.0f, 500.0f});
     scene.Write("/World/Quad", tokens::kPoints,
                 cuda->Upload(Tensor::Copy<float>(points, {5, 3})));
-    const std::array<std::int32_t, 2> used{4, 2};
+    const std::array<std::int32_t, 2> used{4, 6};
     scene.Write("/World/Quad", tokens::kActiveCounts,
                 Tensor::Copy<std::int32_t>(used, {2}));
     delegate.Render(scene);
@@ -745,7 +753,7 @@ void main() {
         push.indices[i] = fan[i];
     }
     push.counts[0] = 4;
-    push.counts[1] = push.triangles;
+    push.counts[1] = 3 * push.triangles;
 }
 )";
 

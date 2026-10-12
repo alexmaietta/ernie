@@ -284,12 +284,13 @@ class MeshDrawable : public RasterDrawable {
     /// indices are not on the device, or without `SetComputeInterop`.
     Tensor MapIndices(std::uint32_t mesh, std::uintptr_t stream = 1);
 
-    /// Sets the points and triangles a mesh uses of those it holds
-    /// (its capacity), as a contiguous int32 (2,) tensor on the host
-    /// or the compute device, read on the GPU: the triangles past the
-    /// count are not drawn, and only the points in use bound it. The
-    /// counts are copied each time they are set. An empty tensor
-    /// uses them all.
+    /// Sets the points and triangle indices a mesh uses of those it
+    /// holds (its capacity), as the first two of a contiguous int32
+    /// (n >= 2,) tensor on the host or the compute device (the rest
+    /// ignored, as a simulator's overflow flag), read on the GPU: the
+    /// triangles past the count are not drawn, and only the points in
+    /// use bound it. The counts are copied each time they are set. An
+    /// empty tensor uses them all.
     /// @throws std::invalid_argument for an unknown mesh, a tensor of
     /// another type or shape, or device counts without
     /// `SetComputeInterop`.
@@ -621,7 +622,7 @@ class MeshDrawable : public RasterDrawable {
         /// indices set are already in it.
         Tensor mappedIndices;
         bool indicesInPlace = false;
-        /// Points and triangles in use (`SetActiveCounts`), their
+        /// Points and indices in use (`SetActiveCounts`), their
         /// stream, and its slot in `activeCounts_` (0 for none, else
         /// the slot plus 1), assigned when the geometry is rebuilt.
         Tensor activeCounts;
@@ -1030,7 +1031,7 @@ class MeshDrawable : public RasterDrawable {
     /// Linear RGB per instance, laid out as `scales_`; 1 where an
     /// instancer has none.
     std::shared_ptr<GpuBuffer> instanceColors_;
-    /// Meshes' points and triangles in use (int32 pairs), by
+    /// Meshes' points and triangle indices in use (int32 pairs), by
     /// `Mesh::countSlot`; read by the vertex and bounds shaders.
     std::shared_ptr<GpuBuffer> activeCounts_;
     /// Meshes with writers (`SetWriter`).

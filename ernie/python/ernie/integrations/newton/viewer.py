@@ -22,7 +22,10 @@ References:
 
 from __future__ import annotations
 
+import atexit
+import gc
 import re
+import weakref
 from collections.abc import Callable
 from typing import Any
 
@@ -155,6 +158,112 @@ class _Mesh:
         self.prim: ernie.Mesh | None = None
 
 
+class _Surface:
+    """A particle surface Newton extracted (`ViewerErnie.
+    log_particle_surface`), drawn from the first of its buffers' entries:
+    a power of two above those in use lately, as Newton's capacity is
+    often far larger."""
+
+    def __init__(self, prim: ernie.Mesh) -> None:
+        self.prim = prim
+        self.surface: Any = None  # its ExtractionMesh, last logged
+        self.points = 0  # entries drawn of its vertices
+        self.indices = 0  # and of its indices
+        # Counts on their way to the host, oldest first, and buffers
+        # free for more.
+        self.readbacks: list[tuple[wp.array, wp.Event]] = []
+        self.free: list[wp.array] = []
+
+    def fit(self, points: int, indices: int, surface: Any) -> None:
+        """Grows the entries drawn to hold `points` and `indices`, with
+        room to spare, within the buffers."""
+
+        def room(used: int, least: int) -> int:
+            return 1 << max(least, int(1.25 * used)).bit_length()
+
+        if points > self.points:
+            self.points = min(
+                room(points, 1024), surface.vertices.shape[0]
+            )
+        if indices > self.indices:
+            self.indices = min(
+                3 * room(indices // 3, 2048), surface.indices.shape[0]
+            )
+
+    def read(self, counts: wp.array, stream: wp.Stream) -> None:
+        """Fits the counts read back frames ago, and reads this
+        frame's without waiting for them."""
+        while self.readbacks and self.readbacks[0][1].is_complete:
+            host, _ = self.readbacks.pop(0)
+            self.fit(
+                int(host.numpy()[0]),
+                int(host.numpy()[1]),
+                self.surface,
+            )
+            self.free.append(host)
+        if len(self.readbacks) < 3:
+            host = (
+                self.free.pop()
+                if self.free
+                else wp.empty(
+                    counts.shape[0],
+                    dtype=wp.int32,
+                    device="cpu",
+                    pinned=True,
+                )
+            )
+            wp.copy(host, counts, stream=stream)
+            self.readbacks.append((host, stream.record_event()))
+
+
+# Surfaces extracted into preallocated buffers, by their vertex
+# buffer's address, as `ExtractionMesh.to_arrays` last saw them
+# (`track_particle_surfaces`).
+_extractions: weakref.WeakValueDictionary[int, Any] = (
+    weakref.WeakValueDictionary()
+)
+
+
+def _surface_counts(surface: Any) -> wp.array | None:
+    """The device counts of a surface Newton extracted into
+    preallocated buffers: vertices, indices, then an overflow flag;
+    None for one of exact-sized buffers."""
+    counts = getattr(surface, "_counts", None)
+    if getattr(surface, "_exact", True) or counts is None:
+        return None
+    return counts
+
+
+def track_particle_surfaces() -> None:
+    """Has ``ViewerErnie.log_mesh`` recognise the arrays of a surface
+    ``newton.geometry.ParticleSurface`` extracted into preallocated
+    buffers: ``ExtractionMesh.to_arrays`` records its surface, so the
+    exact-length slices an example logs are drawn from the buffers at
+    their capacity (``log_particle_surface``), not re-uploaded as
+    their size changes."""
+    try:
+        from newton.geometry import ParticleSurface  # noqa: PLC0415
+    except ImportError:
+        return
+    extraction = getattr(ParticleSurface, "ExtractionMesh", None)
+    if extraction is None or getattr(
+        extraction, "_ernie_tracked", False
+    ):
+        return
+    to_arrays = extraction.to_arrays
+
+    def tracked(self):
+        if (
+            self.vertices is not None
+            and _surface_counts(self) is not None
+        ):
+            _extractions[self.vertices.ptr] = self
+        return to_arrays(self)
+
+    extraction.to_arrays = tracked
+    extraction._ernie_tracked = True
+
+
 class _Batch:
     """A PointInstancer of a batch of instances, with its prototype
     and per-instance arrays."""
@@ -222,6 +331,7 @@ class ViewerErnie(ViewerGL):
         )
         super().__init__(*args, **kwargs)
         lit = scene is not None
+        self._own_scene = scene is None
         self.ernie_scene = (
             scene if scene is not None else ernie.Scene()
         )
@@ -230,6 +340,8 @@ class ViewerErnie(ViewerGL):
         self.root = root
         self._rotation = np.eye(3)
         self._meshes: dict[str, _Mesh] = {}
+        self._surfaces: dict[str, _Surface] = {}
+        track_particle_surfaces()
         self._batches: dict[str, _Batch] = {}
         self._planes: dict[str, list[ernie.GroundPlane]] = {}
         self._points: dict[
@@ -248,6 +360,40 @@ class ViewerErnie(ViewerGL):
         self._shown: Any = None
         self._define_view(lit, bands, sky)
         self._ernie_ready = True
+        # Released before the interpreter tears Warp down, even when an
+        # example fails before closing the viewer.
+        release = weakref.WeakMethod(self._release_ernie)
+        atexit.register(lambda: (method := release()) and method())
+
+    def close(self) -> None:
+        """Closes the window, first releasing what Ernie holds of
+        Newton's arrays (`_release_ernie`)."""
+        self._release_ernie()
+        super().close()
+
+    def _release_ernie(self) -> None:
+        """Releases Ernie's renderer and the prims and overlays holding
+        Newton's arrays, and the scene if the viewer made it: Ernie
+        frees a Warp array through Warp, which the interpreter tears
+        down before it collects what is left. On close, or at exit
+        when an example fails before closing."""
+        if not getattr(self, "_ernie_ready", False):
+            return
+        self._ernie_ready = False
+        self._pending = self._shown = None
+        self.ernie_renderer = None
+        for name in self._overlays:
+            self.ernie_scene.remove_overlay(name)
+        if self.ernie_scene.has(self.root):
+            self.ernie_scene.remove(self.root)
+        self._meshes.clear()
+        self._surfaces.clear()
+        self._batches.clear()
+        self._points.clear()
+        self._wireframes.clear()
+        if self._own_scene:
+            self.ernie_scene = None
+        gc.collect()
 
     def _define_view(self, lit: bool, bands: int, sky: str) -> None:
         """The camera and render settings Ernie renders Newton's view
@@ -475,6 +621,28 @@ class ViewerErnie(ViewerGL):
         )
         if not self._ernie_ready:
             return
+        # A particle surface's slices: drawn from its whole buffers.
+        surface = (
+            _extractions.get(points.ptr)
+            if isinstance(points, wp.array) and points.ptr
+            else None
+        )
+        if surface is not None and surface.vertices.ptr == points.ptr:
+            self.log_particle_surface(
+                name,
+                surface,
+                hidden=hidden,
+                color=color,
+                used=(len(points), len(indices)),
+            )
+            return
+        if self._qualify(name) in self._surfaces:
+            # Logged empty, as examples do when it has no triangles.
+            self._show(
+                self._surfaces[self._qualify(name)].prim, False
+            )
+            if hidden:
+                return
         name = self._qualify(name)
         mesh = self._meshes.setdefault(name, _Mesh())
         # Triangles written as Newton's array, without counts on the
@@ -505,6 +673,83 @@ class ViewerErnie(ViewerGL):
         for batch in self._batches.values():
             if batch.mesh == name and batch.prototype is not None:
                 self._write_mesh(mesh, batch.prototype, topology)
+
+    def log_particle_surface(
+        self,
+        name: str,
+        surface: Any,
+        *,
+        hidden: bool = False,
+        color: tuple[float, float, float] | None = None,
+        used: tuple[int, int] | None = None,
+    ) -> None:
+        """Draws a surface ``newton.geometry.ParticleSurface`` extracted
+        into preallocated buffers (``max_grid_cells`` set), its
+        ``ExtractionMesh``, from those buffers at their capacity: the
+        vertex and index counts stay on the GPU as the mesh's
+        ``ernie:activeCounts``, so nothing waits for the GPU and nothing
+        is re-uploaded as the surface changes size. Its bounds are
+        measured on the GPU.
+
+        Only the first of the buffers' entries are copied each frame: a
+        power of two above the counts lately, which ``used`` (vertices
+        and indices) gives when known on the host, else the counts read
+        back frames late. Until it grows, triangles past it are not
+        drawn.
+
+        Raises:
+            ValueError: for a surface of exact-sized buffers.
+        """
+        if not self._ernie_ready:
+            return
+        counts = _surface_counts(surface)
+        if counts is None:
+            raise ValueError(
+                "log_particle_surface needs a surface extracted into "
+                "preallocated buffers (ParticleSurface(max_grid_cells=...))"
+            )
+        name = self._qualify(name)
+        state = self._surfaces.get(name)
+        if state is None:
+            prim = self.ernie_scene.define(
+                f"{self.root}/Surfaces/{_identifier(name)}",
+                ernie.Mesh,
+            )
+            prim.display_color = _linear(color or (0.7, 0.7, 0.7))
+            state = self._surfaces[name] = _Surface(prim)
+        elif color is not None:
+            state.prim.display_color = _linear(color)
+        self._show(state.prim, not hidden)
+        if hidden or surface.vertices is None:
+            return
+        state.surface = surface
+        if used is not None:
+            state.fit(*used, surface)
+        elif counts.device.is_cuda:
+            if state.points == 0:
+                # Its size, once, before any counts come back.
+                host = counts.numpy()
+                state.fit(int(host[0]), int(host[1]), surface)
+            state.read(counts, self.device.stream)
+        else:
+            state.fit(
+                int(counts.numpy()[0]),
+                int(counts.numpy()[1]),
+                surface,
+            )
+        self._write(
+            state.prim, "points", surface.vertices[: state.points]
+        )
+        self._write(
+            state.prim,
+            "faceVertexIndices",
+            surface.indices[: state.indices],
+        )
+        if surface.normals is not None:
+            self._write(
+                state.prim, "normals", surface.normals[: state.points]
+            )
+        self._write(state.prim, "ernie:activeCounts", counts)
 
     def log_instances(
         self,

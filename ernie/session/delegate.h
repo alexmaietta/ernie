@@ -63,8 +63,8 @@ struct MeshWriteTarget {
     /// Triangle indices, three uint32 per triangle into the points,
     /// `triangleCapacity` triangles.
     VkDeviceAddress indices = 0;
-    /// The points and triangles in use, two int32: the rest are
-    /// neither drawn nor bounded.
+    /// The points and triangle indices in use, two int32: the rest
+    /// are neither drawn nor bounded.
     VkDeviceAddress counts = 0;
     std::uint32_t pointCapacity = 0;
     std::uint32_t triangleCapacity = 0;
@@ -77,8 +77,8 @@ using MeshWriter =
 
 /// Where a DenseField's writer (`RenderDelegate::SetFieldWriter`)
 /// writes this frame: its (x, y, z) float32 values, z fastest, at
-/// device address `values`, which is `offset` bytes into `buffer` (for
-/// copies), `shape` of them.
+/// device address `values`, which is `offset` bytes into `buffer`
+/// (for copies), `shape` of them.
 struct FieldWriteTarget {
     VkDeviceAddress values = 0;
     VkBuffer buffer = VK_NULL_HANDLE;
@@ -86,9 +86,9 @@ struct FieldWriteTarget {
     std::array<std::uint32_t, 3> shape{};
 };
 
-/// Records GPU work writing a DenseField's values (`FieldWriteTarget`)
-/// into a frame's command buffer, such as a simulation's compute
-/// dispatches.
+/// Records GPU work writing a DenseField's values
+/// (`FieldWriteTarget`) into a frame's command buffer, such as a
+/// simulation's compute dispatches.
 using FieldWriter =
     std::function<void(VkCommandBuffer, const FieldWriteTarget&)>;
 

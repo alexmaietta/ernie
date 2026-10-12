@@ -268,8 +268,9 @@ def triangulate(
 @wp.kernel
 @no_type_check
 def clamp_counts(counts: wp.array[wp.int32]):
+    """The points and triangle indices in use, within the capacity."""
     counts[0] = wp.min(counts[0], MAX_POINTS)
-    counts[1] = wp.min(counts[1], MAX_TRIANGLES)
+    counts[1] = 3 * wp.min(counts[1], MAX_TRIANGLES)
 
 
 def blob_centres(time, count):
@@ -425,7 +426,8 @@ class Demo(ernie.demo.Demo):
             self.history.append(tuple(self.counts.numpy()))
 
     def test_final(self):
-        used, triangles = self.history[-1]
+        used, indices = self.history[-1]
+        triangles = indices // 3
         print(f"{used} points and {triangles} triangles in use")
         assert 0 < used < MAX_POINTS and 0 < triangles < MAX_TRIANGLES
         assert len(set(self.history)) > 1, (

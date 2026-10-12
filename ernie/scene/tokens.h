@@ -233,8 +233,9 @@ inline constexpr std::string_view kFaceVertexCounts =
     "faceVertexCounts";
 inline constexpr std::string_view kFaceVertexIndices =
     "faceVertexIndices";
-/// Ernie: a Mesh's points and triangles in use, of those its arrays
-/// hold, for topology that changes on the GPU within a capacity.
+/// Ernie: a Mesh's points and triangle indices in use, of those its
+/// arrays hold, for topology that changes on the GPU within a
+/// capacity.
 inline constexpr std::string_view kActiveCounts =
     "ernie:activeCounts";
 inline constexpr std::string_view kDisplayColor =

@@ -41,7 +41,8 @@ struct MeshDraw {
     // frame's (equal to the current ones when they stood still).
     uint4 motion;
     // x: the mesh's first corner in `uvs` (its levels of detail's corners follow, as in
-    // `indices`); y: its slot in `activeCounts` plus 1, 0 for all its triangles drawn; zw unused.
+    // `indices`); y: its slot in `activeCounts` plus 1, 0 for all its triangles drawn; z: with a
+    // slot, the points it holds; w unused.
     uint4 uv;
 }
 
@@ -72,7 +73,7 @@ struct MeshDraw {
 // Linear RGB per instance, double-buffered as `scales`, in place of the prototype's colours
 // (`kHasInstanceColors`).
 [[vk::binding(27, 0)]] StructuredBuffer<float> instanceColors;
-// Meshes' points and triangles in use, pairs by slot (`MeshDraw.uv.y`).
+// Meshes' points and triangle indices in use, pairs by slot (`MeshDraw.uv.y`).
 [[vk::binding(28, 0)]] StructuredBuffer<int> activeCounts;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
@@ -174,11 +175,18 @@ Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint 
 MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float motion = 1.0) {
     let d = draws[call.item];
     let flags = d.offsets.w;
-    // A triangle past the mesh's triangles in use (`activeCounts`, slot d.uv.y - 1) takes its
-    // first point at all three corners: no area, so nothing drawn.
-    let dead = d.uv.y != 0 &&
-               (call.indexOffset + vertexIndex) / 3 >=
-                   uint(max(activeCounts[2 * (d.uv.y - 1) + 1], 0));
+    // A triangle past the mesh's indices in use (`activeCounts`, slot d.uv.y - 1, whole
+    // triangles of them), or with a corner past its points in use (as a simulator's overflow
+    // leaves), takes its first point at all three corners: no area, so nothing drawn.
+    var dead = false;
+    if (d.uv.y != 0) {
+        let slot = d.uv.y - 1;
+        let at = call.indexOffset + vertexIndex;
+        let first = d.offsets.x + at - vertexIndex % 3;
+        let points = min(uint(max(activeCounts[2 * slot], 0)), d.uv.z);
+        dead = at / 3 >= uint(max(activeCounts[2 * slot + 1], 0)) / 3 || indices[first] >= points ||
+               indices[first + 1] >= points || indices[first + 2] >= points;
+    }
     let corner = dead ? 0u : indices[d.offsets.x + call.indexOffset + vertexIndex];
     let index = d.offsets.y + corner;
     let instance = (flags & kInstanced) != 0

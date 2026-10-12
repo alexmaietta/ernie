@@ -124,6 +124,12 @@ class Tensor {
     /// `index` is out of range.
     Tensor Row(std::int64_t index) const;
 
+    /// A view of `count` entries along the first dimension from
+    /// `first`, sharing this tensor's memory and owner.
+    /// @throws std::out_of_range if the tensor has no dimensions or
+    /// the entries are out of range.
+    Tensor Slice(std::int64_t first, std::int64_t count) const;
+
     bool IsContiguous() const;
 
     /// A contiguous, owning CPU copy, or this tensor itself when it

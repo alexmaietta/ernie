@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import functools
 
-from .viewer import ViewerErnie
+from .viewer import ViewerErnie, track_particle_surfaces
 
 __all__ = ["ViewerErnie", "install"]
 
@@ -27,6 +27,8 @@ def install(default: bool = False) -> None:
     if _installed:
         return
     _installed = True
+    # Particle surfaces' slices drawn from their whole buffers.
+    track_particle_surfaces()
     create_parser, init = examples.create_parser, examples.init
 
     @functools.wraps(create_parser)

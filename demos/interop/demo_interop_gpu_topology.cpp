@@ -234,12 +234,12 @@ void triangulate(uint3 id: SV_DispatchThreadID) {
     emit(ae, bf, be);
 }
 
-// The points and triangles in use, within the capacity.
+// The points and triangle indices in use, within the capacity.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void finish() {
     push.counts[0] = min(counters[0], push.pointCapacity);
-    push.counts[1] = min(counters[1], push.triangleCapacity);
+    push.counts[1] = 3 * min(counters[1], push.triangleCapacity);
 }
 )";
 

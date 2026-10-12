@@ -244,6 +244,20 @@ Tensor Tensor::Row(std::int64_t index) const {
                   owner_);
 }
 
+Tensor Tensor::Slice(std::int64_t first, std::int64_t count) const {
+    if (shape_.empty() || first < 0 || count < 0 ||
+        first + count > shape_[0]) {
+        throw std::out_of_range("Tensor::Slice entries out of range");
+    }
+    void* data = static_cast<std::byte*>(data_) +
+                 first * strides_[0] *
+                     static_cast<std::int64_t>(SizeOf(type_));
+    std::vector<std::int64_t> shape = shape_;
+    shape[0] = count;
+    return Tensor(data, type_, std::move(shape), strides_, device_,
+                  owner_);
+}
+
 bool Tensor::IsContiguous() const {
     return strides_ == RowMajor(shape_) || Elements() <= 1;
 }

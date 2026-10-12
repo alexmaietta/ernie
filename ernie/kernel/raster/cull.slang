@@ -32,8 +32,8 @@
 // (VkDrawIndirectCommand, 4 uints each, one per level), 9 the levels of detail (first index
 // relative to the mesh's, index count, error in mesh units as bits, unused), 10 the views' depth
 // pyramids (one layer per view of the chunk), 11 each view's visibility of each instance in its
-// previous frame, one bit per (view, instance id), 12 meshes' points and triangles in use (int32
-// pairs by slot, `CullItem.info.w`).
+// previous frame, one bit per (view, instance id), 12 meshes' points and triangle indices in use
+// (int32 pairs by slot, `CullItem.info.w`).
 //
 // References:
 // - U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015 Advances in
@@ -372,7 +372,8 @@ void cullMain(uint3 group : SV_GroupID, uint thread : SV_GroupIndex) {
         // Only the triangles in use, which a mesh with counts holds first, in its one level.
         let countSlot = asuint(item.info.w);
         if (countSlot != 0) {
-            vertices = min(vertices, 3 * uint(max(activeCounts[2 * (countSlot - 1) + 1], 0)));
+            let indices = uint(max(activeCounts[2 * (countSlot - 1) + 1], 0));
+            vertices = min(vertices, indices - indices % 3);
         }
         commands[command] = vertices;
         commands[command + 1] = levelCounts[thread];
