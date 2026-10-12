@@ -507,3 +507,50 @@ TEST_F(RasterDelegateTest, StoredBc5NormalMapsRebuildZ) {
     EXPECT_THROW(Render(delegate, scene, "HdrColor"),
                  std::invalid_argument);
 }
+
+TEST_F(RasterDelegateTest, MaterialsReadingOneTextureShareItsUpload) {
+    // Two materials reading one 256 x 256 RGBA8 file hold one upload
+    // of it; reading two files, two. The second file's upload goes
+    // with its last reader.
+    const std::vector<std::uint8_t> texels(256 * 256 * 4, 200);
+    constexpr std::uint64_t kBytes = 256 * 256 * 4;
+    const std::string first =
+        WriteDds("shared_a.dds", 256, 256, "", texels);
+    const std::string second =
+        WriteDds("shared_b.dds", 256, 256, "", texels);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(first);
+    // A second material with its own texture reader, sharing
+    // /Looks/M's coordinates.
+    ernie::Material::Define(scene, "/Looks/N");
+    ernie::Shader::Define(scene, "/Looks/N/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface);
+    ernie::Shader::Define(scene, "/Looks/N/Tex")
+        .SetInfoId(tokens::kUsdUVTexture)
+        .SetSourceColorSpace("raw")
+        .SetFile(first);
+    ernie::Connect(scene, "/Looks/N", tokens::kSurfaceOutput,
+                   "/Looks/N/Surface", tokens::kSurfaceOutput);
+    ernie::Connect(scene, "/Looks/N/Surface", tokens::kDiffuseColor,
+                   "/Looks/N/Tex", "outputs:rgb");
+    ernie::Connect(scene, "/Looks/N/Tex", tokens::kSt, "/Looks/M/St",
+                   "outputs:result");
+    RasterDelegate delegate(*context_);
+    // Each state renders twice, so what a first frame allocates is in
+    // every measurement.
+    const auto bytes = [&] {
+        Render(delegate, scene, "HdrColor");
+        Render(delegate, scene, "HdrColor");
+        return delegate.Stats().gpuBytes;
+    };
+    const std::uint64_t shared = bytes();
+
+    ernie::Shader(scene, "/Looks/N/Tex").SetFile(second);
+    const std::uint64_t separate = bytes();
+    EXPECT_EQ(separate, shared + kBytes);
+
+    ernie::Shader(scene, "/Looks/N/Tex").SetFile(first);
+    EXPECT_EQ(bytes(), shared);
+}

@@ -23,6 +23,62 @@
 
 namespace ernie {
 
+/// The textures a UsdPreviewSurface reads through mesh texture
+/// coordinates (bindings 22 to 26 of mesh.slang, in this order).
+enum class MaterialTextureSlot : std::uint32_t {
+    Albedo,
+    Normal,
+    Roughness,
+    Metallic,
+    Opacity,
+};
+
+inline constexpr std::size_t kMaterialTextureSlots = 5;
+
+/// A texture uploaded for one `MaterialTextureSlot`, which every
+/// material reading the same source the same way can share
+/// (`RasterDelegate` keeps a cache of them).
+struct MaterialTexture {
+    std::unique_ptr<GpuImage> image;
+    /// For normal maps, how mesh.slang decodes it
+    /// (`Surface::textures.y`): 1 n * 127 + 128 with the slope
+    /// deviation in alpha (uploaded from an `Image`), 2 n / 2 + 1/2
+    /// in rgb, 3 the same in rg with z rebuilt (stored textures).
+    float normalEncoding = 1.0f;
+};
+
+/// Uploads `image` as `slot`'s texture as `reader` reads it, mipped:
+/// albedo as linear colour (its scale and bias applied by the
+/// shader); a normal map's raw values turned into normals by
+/// `reader`'s scale and bias (UsdPreviewSurface's convention; scale 2
+/// and bias -1 for the usual n / 2 + 1/2 encoding); one-channel
+/// textures `reader`'s channel, scaled and biased as it says, clamped
+/// to [0, 1].
+/// @throws std::invalid_argument if the image is empty or larger than
+/// the device allows.
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot, const Image& image,
+                      const TextureReader& reader);
+
+/// As above, for a texture read as stored from a DDS or KTX2 file
+/// (`LoadTextureFile`): the first layer's mips upload as they are,
+/// BC1 to BC7 blocks included, never decoded. A reader's colour space
+/// picks the sRGB or plain variant of formats with both (raw plain,
+/// sRGB sRGB, auto the file's own); one- and two-channel albedo reads
+/// as grey (and alpha). One-channel textures take `reader`'s channel
+/// through the image view, with no scale or bias. Normal maps hold n
+/// / 2 + 1/2 under the usual scale 2 and bias -1, in three channels
+/// or in two (BC5), the shader rebuilding z; they carry no slope
+/// deviation for roughness, as `MipFilter::NormalSlopes` adds.
+/// @throws std::invalid_argument for a texture larger than the device
+/// allows, a block-compressed one without
+/// `VulkanContext::SupportsTextureCompressionBc`, a scale or bias
+/// other than those, or a normal map of one channel.
+std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
+    const VulkanContext& context, MaterialTextureSlot slot,
+    const TextureData& texture, const TextureReader& reader);
+
 /// A material's GPU resources: the material uniform, an optional
 /// albedo map and optional tileable detail albedo and normal
 /// textures, bound at bindings 5 to 9 of every raster pass
@@ -87,68 +143,17 @@ class RasterMaterial {
     /// @throws std::invalid_argument as `SetDetailTextures`.
     void SetDetailNormal(const Image* normal);
 
-    /// Uploads the texture of `MaterialSettings::albedoTexture`
-    /// (linear colour), sampled through mesh texture coordinates as
-    /// `reader` wraps them; nullptr removes it. Its scale, bias and
-    /// coordinate transform come from the settings of `Update`.
-    /// @throws std::invalid_argument if the image is empty or larger
-    /// than the device allows.
-    void SetAlbedoTexture(const Image* albedo,
-                          const TextureReader& reader);
+    /// Reads `texture` (from `UploadMaterialTexture`, and shareable
+    /// with other materials) for `slot` through mesh texture
+    /// coordinates, wrapping as `reader` says; nullptr removes it.
+    /// Its scale, bias and coordinate transform come from the
+    /// settings of `Update`.
+    void SetTexture(MaterialTextureSlot slot,
+                    std::shared_ptr<const MaterialTexture> texture,
+                    const TextureReader& reader);
 
-    /// Uploads the tangent-space normal map of
-    /// `MaterialSettings::normalTexture`: `normal` holds raw values,
-    /// which `reader`'s scale and bias turn into normals
-    /// (UsdPreviewSurface's convention; scale 2 and bias -1 for the
-    /// usual n / 2 + 1/2 encoding). nullptr removes it.
-    /// @throws std::invalid_argument as `SetAlbedoTexture`.
-    void SetNormalTexture(const Image* normal,
-                          const TextureReader& reader);
-
-    /// The one-channel textures:
-    /// `MaterialSettings::roughnessTexture`, `metallicTexture` and
-    /// `opacityTexture`.
-    enum class Scalar { Roughness, Metallic, Opacity };
-
-    /// Uploads one-channel texture `which`: `reader`'s channel of
-    /// `image`, scaled and biased as it says, clamped to [0, 1].
-    /// nullptr removes it.
-    /// @throws std::invalid_argument as `SetAlbedoTexture`.
-    void SetScalarTexture(Scalar which, const Image* image,
-                          const TextureReader& reader);
-
-    /// As the overloads above, for textures read as stored from DDS
-    /// and KTX2 files (`LoadTextureFile`): the first layer's mips
-    /// upload as they are, BC1 to BC7 blocks included, never decoded.
-    /// A reader's colour space picks the sRGB or plain variant of
-    /// formats with both (raw plain, sRGB sRGB, auto the file's own);
-    /// one- and two-channel albedo reads as grey (and alpha).
-    /// Scalars take `reader`'s channel through the image view, with
-    /// no scale or bias. Normal maps hold n / 2 + 1/2 under the usual
-    /// scale 2 and bias -1, in three channels or in two (BC5), the
-    /// shader rebuilding z; they carry no slope deviation for
-    /// roughness, as `MipFilter::NormalSlopes` adds.
-    /// @throws std::invalid_argument for a texture larger than the
-    /// device allows, a block-compressed one without
-    /// `VulkanContext::SupportsTextureCompressionBc`, a scale or bias
-    /// other than those, or a normal map of one channel.
-    void SetAlbedoTexture(const TextureData& albedo,
-                          const TextureReader& reader);
-    void SetNormalTexture(const TextureData& normal,
-                          const TextureReader& reader);
-    void SetScalarTexture(Scalar which, const TextureData& image,
-                          const TextureReader& reader);
-
-    bool HasAlbedoTexture() const {
-        return hasAlbedoTexture_;
-    }
-
-    bool HasScalarTexture(Scalar which) const {
-        return hasScalarTexture_[static_cast<std::size_t>(which)];
-    }
-
-    bool HasNormalTexture() const {
-        return hasNormalTexture_;
+    bool HasTexture(MaterialTextureSlot slot) const {
+        return textures_[static_cast<std::size_t>(slot)] != nullptr;
     }
 
     /// The textures mesh passes read through texture coordinates,
@@ -209,23 +214,13 @@ class RasterMaterial {
         return luminance_;
     }
 
-    /// GPU memory held for textures and the uniform, in bytes.
+    /// GPU memory held for the uniform and the material's own
+    /// textures, in bytes: not those of `SetTexture`, which materials
+    /// may share.
     std::uint64_t GpuBytes() const;
 
   private:
-    void CheckDetailImage(const Image* image) const;
     void WriteUniform();
-    std::unique_ptr<GpuImage> UploadMips(const Image& image,
-                                         MipFilter filter,
-                                         ImageEncoding encoding,
-                                         VkFormat format) const;
-    /// The first layer's mips of a stored texture, in its format or
-    /// that format's sRGB or plain variant per `reader`, viewed
-    /// through `components`.
-    std::unique_ptr<GpuImage>
-    UploadStored(const TextureData& texture,
-                 const TextureReader& reader,
-                 VkComponentMapping components) const;
 
     const VulkanContext& context_;
     FrameUploads& uploads_;
@@ -239,23 +234,18 @@ class RasterMaterial {
     std::unique_ptr<GpuImage> albedoMap_;
     std::unique_ptr<GpuImage> detailAlbedo_;
     std::unique_ptr<GpuImage> detailNormal_;
-    std::unique_ptr<GpuImage> albedoTexture_;
-    std::unique_ptr<GpuImage> normalTexture_;
-    std::unique_ptr<Sampler> albedoSampler_;
-    std::unique_ptr<Sampler> normalSampler_;
-    std::array<std::unique_ptr<GpuImage>, 3>
-        scalarTextures_;  ///< By `Scalar`.
-    std::array<std::unique_ptr<Sampler>, 3> scalarSamplers_;
+    /// By `MaterialTextureSlot`: the texture of `SetTexture`, null
+    /// for none; the 1 x 1 one bound in its place (white albedo, a
+    /// flat normal, zero); and the sampler.
+    std::array<std::shared_ptr<const MaterialTexture>,
+               kMaterialTextureSlots>
+        textures_;
+    std::array<std::unique_ptr<GpuImage>, kMaterialTextureSlots>
+        fallbacks_;
+    std::array<std::unique_ptr<Sampler>, kMaterialTextureSlots>
+        samplers_;
 
     bool hasAlbedoMap_ = false;
-    bool hasAlbedoTexture_ = false;
-    bool hasNormalTexture_ = false;
-    /// How mesh.slang decodes the normal map (`Surface::textures.y`):
-    /// 1 n * 127 + 128 with the slope deviation in alpha (uploaded
-    /// from an `Image`), 2 n / 2 + 1/2 in rgb, 3 the same in rg with
-    /// z rebuilt (stored textures).
-    float normalEncoding_ = 1.0f;
-    std::array<bool, 3> hasScalarTexture_{false, false, false};
     bool hasDetailAlbedo_ = false;
     bool hasDetailNormal_ = false;
     glm::vec3 detailMean_{1.0f};

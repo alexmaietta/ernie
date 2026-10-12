@@ -383,6 +383,12 @@ class RasterDelegate : public RenderDelegate {
     void SyncMaterials(const Scene& scene);
     void SyncMaterial(const Scene& scene, const Path& path,
                       SyncedMaterial& material);
+    /// The upload of what `reader` reads into `slot`, shared with
+    /// every material reading it the same way: from `sharedTextures_`
+    /// while a material holds it, else loaded and uploaded.
+    std::shared_ptr<const MaterialTexture>
+    SharedTexture(const Scene& scene, MaterialTextureSlot slot,
+                  const TextureReader& reader);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -600,6 +606,12 @@ class RasterDelegate : public RenderDelegate {
         sensorStates_;          ///< By product, pass.
     std::optional<Key> stars_;  ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
+    /// Material textures by what they were uploaded from and how
+    /// (`SharedTexture`), held by the materials reading them: one
+    /// upload however many read it, freed with the last.
+    std::unordered_map<std::string,
+                       std::weak_ptr<const MaterialTexture>>
+        sharedTextures_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;

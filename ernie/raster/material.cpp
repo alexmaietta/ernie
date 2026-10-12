@@ -174,7 +174,228 @@ std::span<const std::byte> Bytes(const auto& values) {
     return std::as_bytes(std::span(values));
 }
 
+/// Throws unless `image` (when given) has pixels and fits the device.
+void CheckImage(const VulkanContext& context, const Image* image) {
+    if (image == nullptr) {
+        return;
+    }
+    if (image->width == 0 || image->height == 0 ||
+        image->pixels.size() !=
+            static_cast<std::size_t>(image->width) * image->height) {
+        throw std::invalid_argument("Texture is empty");
+    }
+    const std::uint32_t maxSize =
+        context.Limits().maxImageDimension2D;
+    if (image->width > maxSize || image->height > maxSize) {
+        throw std::invalid_argument(
+            "Texture exceeds the device's maximum texture size");
+    }
+}
+
+/// `image` and its mips (`MipChain`) as 8-bit texels of `format`.
+std::unique_ptr<GpuImage> UploadMips(const VulkanContext& context,
+                                     const Image& image,
+                                     MipFilter filter,
+                                     ImageEncoding encoding,
+                                     VkFormat format) {
+    std::vector<Image> mips = MipChain(image, filter);
+    if (filter == MipFilter::NormalSlopes) {
+        // Normals stored as n * 127 + 128 in 8 bits, so flat is
+        // exactly byte 128 and decodes to exactly 0 (surface.slang's
+        // `detailTap`); n / 2 + 1/2 would store 0 as 127.5, tilting
+        // every normal by 1/255. Source maps that stored flat as 128
+        // decode to flat too.
+        for (Image& mip : mips) {
+            for (glm::vec4& texel : mip.pixels) {
+                const glm::vec3 n = 2.0f * glm::vec3(texel) - 1.0f;
+                const glm::vec3 bytes = glm::round(
+                    glm::clamp(n * 127.0f + 128.0f, 1.0f, 255.0f));
+                texel = glm::vec4(bytes / 255.0f, texel.a);
+            }
+        }
+    }
+    auto texture = std::make_unique<GpuImage>(
+        context, ImageDesc{image.width, image.height, 1,
+                           static_cast<std::uint32_t>(mips.size()),
+                           format, VK_IMAGE_USAGE_SAMPLED_BIT});
+    std::vector<std::vector<std::uint8_t>> data;
+    std::vector<std::span<const std::byte>> spans;
+    for (const Image& mip : mips) {
+        data.push_back(ToRgba8(mip, encoding));
+    }
+    for (const auto& bytes : data) {
+        spans.push_back(Bytes(bytes));
+    }
+    texture->Upload(spans);
+    return texture;
+}
+
+/// The first layer's mips of a stored texture, in its format or that
+/// format's sRGB or plain variant per `reader`, viewed through
+/// `components`.
+std::unique_ptr<GpuImage>
+UploadStored(const VulkanContext& context, const TextureData& texture,
+             const TextureReader& reader,
+             VkComponentMapping components) {
+    TextureFormat format = texture.format;
+    if (reader.colorSpace != TextureColorSpace::Auto) {
+        format = WithSrgb(format, reader.colorSpace ==
+                                      TextureColorSpace::Srgb);
+    }
+    if (InfoOf(format).compressed() &&
+        !context.SupportsTextureCompressionBc()) {
+        throw std::invalid_argument(
+            "The device cannot sample BC-compressed textures");
+    }
+    const std::uint32_t maxSize =
+        context.Limits().maxImageDimension2D;
+    if (texture.width > maxSize || texture.height > maxSize) {
+        throw std::invalid_argument(
+            "Texture exceeds the device's maximum texture size");
+    }
+    ImageDesc desc{texture.width,
+                   texture.height,
+                   1,
+                   texture.mips,
+                   VkFormatOf(format),
+                   VK_IMAGE_USAGE_SAMPLED_BIT};
+    desc.components = components;
+    auto image = std::make_unique<GpuImage>(context, desc);
+    std::vector<std::span<const std::byte>> mips;
+    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+        mips.push_back(texture.Mip(0, mip));
+    }
+    image->Upload(mips);
+    return image;
+}
+
+/// What a slot reads without a texture: white albedo, a flat normal,
+/// zero.
+std::unique_ptr<GpuImage>
+FallbackTexture(const VulkanContext& context,
+                MaterialTextureSlot slot) {
+    switch (slot) {
+    case MaterialTextureSlot::Albedo:
+        return UploadMips(context, Image(1, 1, glm::vec4(1.0f)),
+                          MipFilter::Average, ImageEncoding::Srgb,
+                          VK_FORMAT_R8G8B8A8_SRGB);
+    case MaterialTextureSlot::Normal:
+        return UploadMips(
+            context, Image(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)),
+            MipFilter::NormalSlopes, ImageEncoding::Linear,
+            VK_FORMAT_R8G8B8A8_UNORM);
+    default:
+        return UploadMips(context, Image(1, 1, glm::vec4(0.0f)),
+                          MipFilter::Average, ImageEncoding::Linear,
+                          VK_FORMAT_R8G8B8A8_UNORM);
+    }
+}
+
 }  // namespace
+
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot, const Image& image,
+                      const TextureReader& reader) {
+    CheckImage(context, &image);
+    auto texture = std::make_shared<MaterialTexture>();
+    if (slot == MaterialTextureSlot::Albedo) {
+        texture->image =
+            UploadMips(context, image, MipFilter::Average,
+                       ImageEncoding::Srgb, VK_FORMAT_R8G8B8A8_SRGB);
+    } else if (slot == MaterialTextureSlot::Normal) {
+        // The reader's scale and bias turn the raw values into
+        // normals, stored as n / 2 + 1/2 for
+        // `MipFilter::NormalSlopes`.
+        Image normals = image;
+        for (glm::vec4& texel : normals.pixels) {
+            glm::vec3 n = glm::vec3(texel) * glm::vec3(reader.scale) +
+                          glm::vec3(reader.bias);
+            n = glm::length(n) > 0.0f ? glm::normalize(n)
+                                      : glm::vec3(0.0f, 0.0f, 1.0f);
+            texel = glm::vec4(0.5f * n + 0.5f, 0.0f);
+        }
+        texture->image = UploadMips(
+            context, normals, MipFilter::NormalSlopes,
+            ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+    } else {
+        Image values = image;
+        const int channel = std::clamp(reader.channel, 0, 3);
+        for (glm::vec4& texel : values.pixels) {
+            const float value =
+                std::clamp(texel[channel] * reader.scale[channel] +
+                               reader.bias[channel],
+                           0.0f, 1.0f);
+            texel = glm::vec4(value, value, value, 1.0f);
+        }
+        texture->image = UploadMips(
+            context, values, MipFilter::Average,
+            ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+    }
+    return texture;
+}
+
+std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
+    const VulkanContext& context, MaterialTextureSlot slot,
+    const TextureData& stored, const TextureReader& reader) {
+    auto texture = std::make_shared<MaterialTexture>();
+    const std::uint32_t channels = InfoOf(stored.format).channels;
+    if (slot == MaterialTextureSlot::Albedo) {
+        // Grey textures, with alpha in a second channel, read as rgb.
+        VkComponentMapping components{};
+        if (channels <= 2) {
+            components = {VK_COMPONENT_SWIZZLE_R,
+                          VK_COMPONENT_SWIZZLE_R,
+                          VK_COMPONENT_SWIZZLE_R,
+                          channels == 2 ? VK_COMPONENT_SWIZZLE_G
+                                        : VK_COMPONENT_SWIZZLE_ONE};
+        }
+        texture->image =
+            UploadStored(context, stored, reader, components);
+    } else if (slot == MaterialTextureSlot::Normal) {
+        if (channels < 2) {
+            throw std::invalid_argument(
+                "A normal map needs two or three channels");
+        }
+        const int axes = channels == 2 ? 2 : 3;
+        for (int c = 0; c < axes; ++c) {
+            if (reader.scale[c] != 2.0f || reader.bias[c] != -1.0f) {
+                throw std::invalid_argument(
+                    "A stored normal map is read with scale 2 and "
+                    "bias "
+                    "-1");
+            }
+        }
+        texture->image = UploadStored(context, stored, reader,
+                                      VkComponentMapping{});
+        texture->normalEncoding = channels == 2 ? 3.0f : 2.0f;
+    } else {
+        const int channel = std::clamp(reader.channel, 0, 3);
+        if (reader.scale[channel] != 1.0f ||
+            reader.bias[channel] != 0.0f) {
+            throw std::invalid_argument(
+                "A stored one-channel texture is read without scale "
+                "or "
+                "bias");
+        }
+        // The reader's channel into r, which the shaders read; a
+        // channel the format lacks reads as its alpha would (1) or,
+        // for grey images, as the grey.
+        constexpr std::array<VkComponentSwizzle, 4> kSwizzles{
+            VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+            VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+        VkComponentSwizzle source =
+            kSwizzles[static_cast<std::size_t>(channel)];
+        if (static_cast<std::uint32_t>(channel) >= channels) {
+            source = channel == 3 ? VK_COMPONENT_SWIZZLE_ONE
+                                  : VK_COMPONENT_SWIZZLE_R;
+        }
+        texture->image = UploadStored(
+            context, stored, reader,
+            {source, source, source, VK_COMPONENT_SWIZZLE_ONE});
+    }
+    return texture;
+}
 
 RasterMaterial::RasterMaterial(const VulkanContext& context,
                                FrameUploads& uploads)
@@ -188,178 +409,34 @@ RasterMaterial::RasterMaterial(const VulkanContext& context,
                                     16.0f, false}) {
     ClearAlbedoMap();
     SetDetailTextures(nullptr, nullptr);
-    SetAlbedoTexture(nullptr, TextureReader());
-    SetNormalTexture(nullptr, TextureReader());
-    for (const Scalar which :
-         {Scalar::Roughness, Scalar::Metallic, Scalar::Opacity}) {
-        SetScalarTexture(which, nullptr, TextureReader());
+    for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
+        fallbacks_[slot] = FallbackTexture(
+            context, static_cast<MaterialTextureSlot>(slot));
+        samplers_[slot] = TextureSampler(context, TextureReader());
     }
 }
 
-void RasterMaterial::SetScalarTexture(Scalar which,
-                                      const Image* image,
-                                      const TextureReader& reader) {
-    CheckDetailImage(image);
-    Image values(1, 1, glm::vec4(0.0f));
-    if (image != nullptr) {
-        values = *image;
-        const int channel = std::clamp(reader.channel, 0, 3);
-        for (glm::vec4& texel : values.pixels) {
-            const float value =
-                std::clamp(texel[channel] * reader.scale[channel] +
-                               reader.bias[channel],
-                           0.0f, 1.0f);
-            texel = glm::vec4(value, value, value, 1.0f);
-        }
-    }
-    auto texture =
-        UploadMips(values, MipFilter::Average, ImageEncoding::Linear,
-                   VK_FORMAT_R8G8B8A8_UNORM);
+void RasterMaterial::SetTexture(
+    MaterialTextureSlot slot,
+    std::shared_ptr<const MaterialTexture> texture,
+    const TextureReader& reader) {
     auto sampler = TextureSampler(context_, reader);
     vkDeviceWaitIdle(context_.Device());
-    const auto slot = static_cast<std::size_t>(which);
-    scalarTextures_[slot] = std::move(texture);
-    scalarSamplers_[slot] = std::move(sampler);
-    hasScalarTexture_[slot] = image != nullptr;
-    WriteUniform();
-}
-
-void RasterMaterial::SetAlbedoTexture(const Image* albedo,
-                                      const TextureReader& reader) {
-    CheckDetailImage(albedo);
-    const Image white(1, 1, glm::vec4(1.0f));
-    auto image = UploadMips(albedo != nullptr ? *albedo : white,
-                            MipFilter::Average, ImageEncoding::Srgb,
-                            VK_FORMAT_R8G8B8A8_SRGB);
-    auto sampler = TextureSampler(context_, reader);
-    vkDeviceWaitIdle(context_.Device());
-    albedoTexture_ = std::move(image);
-    albedoSampler_ = std::move(sampler);
-    hasAlbedoTexture_ = albedo != nullptr;
-    WriteUniform();
-}
-
-void RasterMaterial::SetNormalTexture(const Image* normal,
-                                      const TextureReader& reader) {
-    CheckDetailImage(normal);
-    // The reader's scale and bias turn the raw values into normals,
-    // stored as n / 2 + 1/2 for `MipFilter::NormalSlopes`.
-    Image normals(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    if (normal != nullptr) {
-        normals = *normal;
-        for (glm::vec4& texel : normals.pixels) {
-            glm::vec3 n = glm::vec3(texel) * glm::vec3(reader.scale) +
-                          glm::vec3(reader.bias);
-            n = glm::length(n) > 0.0f ? glm::normalize(n)
-                                      : glm::vec3(0.0f, 0.0f, 1.0f);
-            texel = glm::vec4(0.5f * n + 0.5f, 0.0f);
-        }
-    }
-    auto image =
-        UploadMips(normals, MipFilter::NormalSlopes,
-                   ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
-    auto sampler = TextureSampler(context_, reader);
-    vkDeviceWaitIdle(context_.Device());
-    normalTexture_ = std::move(image);
-    normalSampler_ = std::move(sampler);
-    hasNormalTexture_ = normal != nullptr;
-    normalEncoding_ = 1.0f;
-    WriteUniform();
-}
-
-void RasterMaterial::SetAlbedoTexture(const TextureData& albedo,
-                                      const TextureReader& reader) {
-    // Grey textures, with alpha in a second channel, read as rgb.
-    VkComponentMapping components{};
-    const std::uint32_t channels = InfoOf(albedo.format).channels;
-    if (channels <= 2) {
-        components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_R,
-                      VK_COMPONENT_SWIZZLE_R,
-                      channels == 2 ? VK_COMPONENT_SWIZZLE_G
-                                    : VK_COMPONENT_SWIZZLE_ONE};
-    }
-    auto image = UploadStored(albedo, reader, components);
-    auto sampler = TextureSampler(context_, reader);
-    vkDeviceWaitIdle(context_.Device());
-    albedoTexture_ = std::move(image);
-    albedoSampler_ = std::move(sampler);
-    hasAlbedoTexture_ = true;
-    WriteUniform();
-}
-
-void RasterMaterial::SetNormalTexture(const TextureData& normal,
-                                      const TextureReader& reader) {
-    const std::uint32_t channels = InfoOf(normal.format).channels;
-    if (channels < 2) {
-        throw std::invalid_argument(
-            "A normal map needs two or three channels");
-    }
-    const int axes = channels == 2 ? 2 : 3;
-    for (int c = 0; c < axes; ++c) {
-        if (reader.scale[c] != 2.0f || reader.bias[c] != -1.0f) {
-            throw std::invalid_argument(
-                "A stored normal map is read with scale 2 and bias "
-                "-1");
-        }
-    }
-    auto image = UploadStored(normal, reader, VkComponentMapping{});
-    auto sampler = TextureSampler(context_, reader);
-    vkDeviceWaitIdle(context_.Device());
-    normalTexture_ = std::move(image);
-    normalSampler_ = std::move(sampler);
-    hasNormalTexture_ = true;
-    normalEncoding_ = channels == 2 ? 3.0f : 2.0f;
-    WriteUniform();
-}
-
-void RasterMaterial::SetScalarTexture(Scalar which,
-                                      const TextureData& image,
-                                      const TextureReader& reader) {
-    const int channel = std::clamp(reader.channel, 0, 3);
-    if (reader.scale[channel] != 1.0f ||
-        reader.bias[channel] != 0.0f) {
-        throw std::invalid_argument(
-            "A stored one-channel texture is read without scale or "
-            "bias");
-    }
-    // The reader's channel into r, which the shaders read; a channel
-    // the format lacks reads as its alpha would (1) or, for grey
-    // images, as the grey.
-    const std::uint32_t channels = InfoOf(image.format).channels;
-    constexpr std::array<VkComponentSwizzle, 4> kSwizzles{
-        VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
-        VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
-    VkComponentSwizzle source = kSwizzles[channel];
-    if (static_cast<std::uint32_t>(channel) >= channels) {
-        source = channel == 3 ? VK_COMPONENT_SWIZZLE_ONE
-                              : VK_COMPONENT_SWIZZLE_R;
-    }
-    auto texture = UploadStored(
-        image, reader,
-        {source, source, source, VK_COMPONENT_SWIZZLE_ONE});
-    auto sampler = TextureSampler(context_, reader);
-    vkDeviceWaitIdle(context_.Device());
-    const auto slot = static_cast<std::size_t>(which);
-    scalarTextures_[slot] = std::move(texture);
-    scalarSamplers_[slot] = std::move(sampler);
-    hasScalarTexture_[slot] = true;
+    const auto index = static_cast<std::size_t>(slot);
+    textures_[index] = std::move(texture);
+    samplers_[index] = std::move(sampler);
     WriteUniform();
 }
 
 void RasterMaterial::AppendTextureResources(
     std::vector<DescriptorResource>& resources) const {
-    resources.push_back(DescriptorResource::Of(
-        albedoTexture_->View(),
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *albedoSampler_));
-    resources.push_back(DescriptorResource::Of(
-        normalTexture_->View(),
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, *normalSampler_));
-    for (std::size_t slot = 0; slot < scalarTextures_.size();
-         ++slot) {
+    for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
+        const GpuImage& image = textures_[slot] != nullptr
+                                    ? *textures_[slot]->image
+                                    : *fallbacks_[slot];
         resources.push_back(DescriptorResource::Of(
-            scalarTextures_[slot]->View(),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            *scalarSamplers_[slot]));
+            image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            *samplers_[slot]));
     }
 }
 
@@ -427,18 +504,19 @@ void RasterMaterial::ClearAlbedoMap() {
 
 void RasterMaterial::SetDetailTextures(const Image* albedo,
                                        const Image* normal) {
-    CheckDetailImage(albedo);
-    CheckDetailImage(normal);
+    CheckImage(context_, albedo);
+    CheckImage(context_, normal);
     SetDetailAlbedo(albedo);
     SetDetailNormal(normal);
 }
 
 void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
-    CheckDetailImage(albedo);
+    CheckImage(context_, albedo);
     const Image white(1, 1, glm::vec4(1.0f));
-    auto image = UploadMips(albedo != nullptr ? *albedo : white,
-                            MipFilter::Average, ImageEncoding::Srgb,
-                            VK_FORMAT_R8G8B8A8_SRGB);
+    auto image =
+        UploadMips(context_, albedo != nullptr ? *albedo : white,
+                   MipFilter::Average, ImageEncoding::Srgb,
+                   VK_FORMAT_R8G8B8A8_SRGB);
     vkDeviceWaitIdle(context_.Device());
     detailAlbedo_ = std::move(image);
     hasDetailAlbedo_ = albedo != nullptr;
@@ -448,32 +526,16 @@ void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
 }
 
 void RasterMaterial::SetDetailNormal(const Image* normal) {
-    CheckDetailImage(normal);
+    CheckImage(context_, normal);
     const Image flat(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    auto image = UploadMips(
-        normal != nullptr ? *normal : flat, MipFilter::NormalSlopes,
-        ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+    auto image =
+        UploadMips(context_, normal != nullptr ? *normal : flat,
+                   MipFilter::NormalSlopes, ImageEncoding::Linear,
+                   VK_FORMAT_R8G8B8A8_UNORM);
     vkDeviceWaitIdle(context_.Device());
     detailNormal_ = std::move(image);
     hasDetailNormal_ = normal != nullptr;
     WriteUniform();
-}
-
-void RasterMaterial::CheckDetailImage(const Image* image) const {
-    if (image == nullptr) {
-        return;
-    }
-    if (image->width == 0 || image->height == 0 ||
-        image->pixels.size() !=
-            static_cast<std::size_t>(image->width) * image->height) {
-        throw std::invalid_argument("Detail texture is empty");
-    }
-    const std::uint32_t maxSize =
-        context_.Limits().maxImageDimension2D;
-    if (image->width > maxSize || image->height > maxSize) {
-        throw std::invalid_argument("Detail texture exceeds the "
-                                    "device's maximum texture size");
-    }
 }
 
 void RasterMaterial::Update(const MaterialSettings& settings,
@@ -574,21 +636,26 @@ void RasterMaterial::WriteUniform() {
     WriteUvTransform(
         settings.opacityTexture.value_or(TextureReader()),
         u.opacityUv);
+    using Slot = MaterialTextureSlot;
+    const auto bound = [&](Slot slot, bool wanted) {
+        return wanted && HasTexture(slot) ? 1.0f : 0.0f;
+    };
     u.textures[0] =
-        hasAlbedoTexture_ && settings.albedoTexture ? 1.0f : 0.0f;
-    u.textures[1] = hasNormalTexture_ && settings.normalTexture
-                        ? normalEncoding_
+        bound(Slot::Albedo, settings.albedoTexture.has_value());
+    // A normal map's flag is its encoding (`MaterialTexture`).
+    const MaterialTexture* normal =
+        textures_[static_cast<std::size_t>(Slot::Normal)].get();
+    u.textures[1] = settings.normalTexture && normal != nullptr
+                        ? normal->normalEncoding
                         : 0.0f;
-    u.textures[2] = hasScalarTexture_[0] && settings.roughnessTexture
-                        ? 1.0f
-                        : 0.0f;
-    u.textures[3] = hasScalarTexture_[1] && settings.metallicTexture
-                        ? 1.0f
-                        : 0.0f;
+    u.textures[2] =
+        bound(Slot::Roughness, settings.roughnessTexture.has_value());
+    u.textures[3] =
+        bound(Slot::Metallic, settings.metallicTexture.has_value());
     u.opacity[0] = settings.opacity;
     u.opacity[1] = settings.opacityThreshold;
     u.opacity[2] =
-        hasScalarTexture_[2] && settings.opacityTexture ? 1.0f : 0.0f;
+        bound(Slot::Opacity, settings.opacityTexture.has_value());
     const std::size_t count =
         std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
     if (count > 0) {
@@ -607,83 +674,13 @@ void RasterMaterial::WriteUniform() {
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {
-    return uniform_.Size() + albedoMap_->Bytes() +
-           detailAlbedo_->Bytes() + detailNormal_->Bytes() +
-           albedoTexture_->Bytes() + normalTexture_->Bytes() +
-           scalarTextures_[0]->Bytes() + scalarTextures_[1]->Bytes() +
-           scalarTextures_[2]->Bytes();
-}
-
-std::unique_ptr<GpuImage>
-RasterMaterial::UploadStored(const TextureData& texture,
-                             const TextureReader& reader,
-                             VkComponentMapping components) const {
-    TextureFormat format = texture.format;
-    if (reader.colorSpace != TextureColorSpace::Auto) {
-        format = WithSrgb(format, reader.colorSpace ==
-                                      TextureColorSpace::Srgb);
+    std::uint64_t bytes = uniform_.Size() + albedoMap_->Bytes() +
+                          detailAlbedo_->Bytes() +
+                          detailNormal_->Bytes();
+    for (const auto& fallback : fallbacks_) {
+        bytes += fallback->Bytes();
     }
-    if (InfoOf(format).compressed() &&
-        !context_.SupportsTextureCompressionBc()) {
-        throw std::invalid_argument(
-            "The device cannot sample BC-compressed textures");
-    }
-    const std::uint32_t maxSize =
-        context_.Limits().maxImageDimension2D;
-    if (texture.width > maxSize || texture.height > maxSize) {
-        throw std::invalid_argument(
-            "Texture exceeds the device's maximum texture size");
-    }
-    ImageDesc desc{texture.width,
-                   texture.height,
-                   1,
-                   texture.mips,
-                   VkFormatOf(format),
-                   VK_IMAGE_USAGE_SAMPLED_BIT};
-    desc.components = components;
-    auto image = std::make_unique<GpuImage>(context_, desc);
-    std::vector<std::span<const std::byte>> mips;
-    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
-        mips.push_back(texture.Mip(0, mip));
-    }
-    image->Upload(mips);
-    return image;
-}
-
-std::unique_ptr<GpuImage>
-RasterMaterial::UploadMips(const Image& image, MipFilter filter,
-                           ImageEncoding encoding,
-                           VkFormat format) const {
-    std::vector<Image> mips = MipChain(image, filter);
-    if (filter == MipFilter::NormalSlopes) {
-        // Normals stored as n * 127 + 128 in 8 bits, so flat is
-        // exactly byte 128 and decodes to exactly 0 (surface.slang's
-        // `detailTap`); n / 2 + 1/2 would store 0 as 127.5, tilting
-        // every normal by 1/255. Source maps that stored flat as 128
-        // decode to flat too.
-        for (Image& mip : mips) {
-            for (glm::vec4& texel : mip.pixels) {
-                const glm::vec3 n = 2.0f * glm::vec3(texel) - 1.0f;
-                const glm::vec3 bytes = glm::round(
-                    glm::clamp(n * 127.0f + 128.0f, 1.0f, 255.0f));
-                texel = glm::vec4(bytes / 255.0f, texel.a);
-            }
-        }
-    }
-    auto texture = std::make_unique<GpuImage>(
-        context_, ImageDesc{image.width, image.height, 1,
-                            static_cast<std::uint32_t>(mips.size()),
-                            format, VK_IMAGE_USAGE_SAMPLED_BIT});
-    std::vector<std::vector<std::uint8_t>> data;
-    std::vector<std::span<const std::byte>> spans;
-    for (const Image& mip : mips) {
-        data.push_back(ToRgba8(mip, encoding));
-    }
-    for (const auto& bytes : data) {
-        spans.push_back(Bytes(bytes));
-    }
-    texture->Upload(spans);
-    return texture;
+    return bytes;
 }
 
 }  // namespace ernie

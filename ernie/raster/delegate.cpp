@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <functional>
 #include <set>
 #include <stdexcept>
@@ -68,14 +69,20 @@ ImageEncoding EncodingOf(const TextureReader& reader) {
 /// path holds another one), colour space, wrapping, channel, and the
 /// scale and bias that normal maps and one-channel textures apply
 /// before upload.
-std::string TextureKey(const Scene& scene,
-                       const TextureReader& reader) {
+std::string SourceKey(const Scene& scene,
+                      const TextureReader& reader) {
     std::string key = reader.Source();
     if (!reader.image.empty()) {
         key += "@" + std::to_string(scene.Id()) + ":" +
                std::to_string(scene.AttributeVersion(
                    Path(reader.image), tokens::kShaderTexture));
     }
+    return key;
+}
+
+std::string TextureKey(const Scene& scene,
+                       const TextureReader& reader) {
+    std::string key = SourceKey(scene, reader);
     key += "|" + std::to_string(static_cast<int>(reader.colorSpace)) +
            "|" + std::to_string(static_cast<int>(reader.wrapS)) +
            "|" + std::to_string(static_cast<int>(reader.wrapT)) +
@@ -83,6 +90,42 @@ std::string TextureKey(const Scene& scene,
     for (int c = 0; c < 4; ++c) {
         key += "|" + std::to_string(reader.scale[c]) + "|" +
                std::to_string(reader.bias[c]);
+    }
+    return key;
+}
+
+/// What `slot`'s upload of `reader`'s texture depends on, so
+/// materials that agree on it share one
+/// (`RasterDelegate::SharedTexture`): the source, a file's
+/// modification time, the colour space, and for normal maps and
+/// one-channel textures the scale, bias and channel applied before
+/// upload. Wrapping is the sampler's, each material's own.
+std::string UploadKey(const Scene& scene, MaterialTextureSlot slot,
+                      const TextureReader& reader) {
+    std::string key = SourceKey(scene, reader);
+    if (reader.image.empty()) {
+        std::error_code error;
+        const auto time =
+            std::filesystem::last_write_time(reader.file, error);
+        key += "@" + std::to_string(
+                         error ? 0 : time.time_since_epoch().count());
+    }
+    key += "|" + std::to_string(static_cast<int>(reader.colorSpace));
+    const auto values = [&](int c) {
+        key += "|" + std::to_string(reader.scale[c]) + "|" +
+               std::to_string(reader.bias[c]);
+    };
+    if (slot == MaterialTextureSlot::Albedo) {
+        key += "|albedo";
+    } else if (slot == MaterialTextureSlot::Normal) {
+        key += "|normal";
+        for (int c = 0; c < 3; ++c) {
+            values(c);
+        }
+    } else {
+        const int channel = std::clamp(reader.channel, 0, 3);
+        key += "|scalar" + std::to_string(channel);
+        values(channel);
     }
     return key;
 }
@@ -480,6 +523,12 @@ RenderStats RasterDelegate::Stats() const {
         renderer_.GpuBytes() + terrain_.GpuBytes() +
         planet_.GpuBytes() +
         (viewTargets_ != nullptr ? viewTargets_->GpuBytes() : 0);
+    // Material textures once each, however many materials share them.
+    for (const auto& [key, cached] : sharedTextures_) {
+        if (const auto texture = cached.lock()) {
+            stats.gpuBytes += texture->image->Bytes();
+        }
+    }
     for (const auto& [product, frames] : frames_) {
         for (const std::shared_ptr<ProductFrame>& frame : frames) {
             if (const auto* minimal =
@@ -561,6 +610,9 @@ void RasterDelegate::SyncMaterials(const Scene& scene) {
         renderer_.RemoveMaterial(it->second.id);
         it = materials_.erase(it);
     }
+    std::erase_if(sharedTextures_, [](const auto& entry) {
+        return entry.second.expired();
+    });
     if (!errors.empty()) {
         throw std::invalid_argument(errors.front());
     }
@@ -591,37 +643,14 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
         }
         material.textures[slot] = key;
         try {
-            // DDS and KTX2 files upload as stored, never decoded.
-            if (reader && reader->image.empty() &&
-                IsTextureFile(reader->file)) {
-                const TextureData stored =
-                    LoadTextureFile(reader->file);
-                if (slot == 0) {
-                    gpu.SetAlbedoTexture(stored, *reader);
-                } else if (slot == 1) {
-                    gpu.SetNormalTexture(stored, *reader);
-                } else {
-                    gpu.SetScalarTexture(
-                        static_cast<RasterMaterial::Scalar>(slot - 2),
-                        stored, *reader);
-                }
-                continue;
-            }
-            const std::optional<Image> image =
-                reader ? std::optional(TextureImageOf(scene, *reader))
-                       : std::nullopt;
-            const Image* data = image ? &*image : nullptr;
-            const TextureReader wrap =
-                reader.value_or(TextureReader());
-            if (slot == 0) {
-                gpu.SetAlbedoTexture(data, wrap);
-            } else if (slot == 1) {
-                gpu.SetNormalTexture(data, wrap);
-            } else {
-                gpu.SetScalarTexture(
-                    static_cast<RasterMaterial::Scalar>(slot - 2),
-                    data, wrap);
-            }
+            // The readers come in `MaterialTextureSlot`'s order.
+            const auto textureSlot =
+                static_cast<MaterialTextureSlot>(slot);
+            gpu.SetTexture(
+                textureSlot,
+                reader ? SharedTexture(scene, textureSlot, *reader)
+                       : nullptr,
+                reader.value_or(TextureReader()));
         } catch (const std::exception& error) {
             throw UploadError(path, kInputs[slot], error.what());
         }
@@ -673,6 +702,28 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             throw UploadError(path, attribute, error.what());
         }
     }
+}
+
+std::shared_ptr<const MaterialTexture>
+RasterDelegate::SharedTexture(const Scene& scene,
+                              MaterialTextureSlot slot,
+                              const TextureReader& reader) {
+    std::weak_ptr<const MaterialTexture>& cached =
+        sharedTextures_[UploadKey(scene, slot, reader)];
+    if (auto texture = cached.lock()) {
+        return texture;
+    }
+    // DDS and KTX2 files upload as stored, never decoded.
+    std::shared_ptr<const MaterialTexture> texture =
+        reader.image.empty() && IsTextureFile(reader.file)
+            ? UploadMaterialTexture(context_, slot,
+                                    LoadTextureFile(reader.file),
+                                    reader)
+            : UploadMaterialTexture(context_, slot,
+                                    TextureImageOf(scene, reader),
+                                    reader);
+    cached = texture;
+    return texture;
 }
 
 void RasterDelegate::SyncHeightfield(const Scene& scene,
