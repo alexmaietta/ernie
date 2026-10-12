@@ -28,15 +28,10 @@
 // A pushbroom's rows each see the stars from their own pose, through the detector line's pixels
 // (`starOffset`).
 //
-// Bindings: 0 every view's ShadingUniforms, 1 G-buffer normal, 2 G-buffer albedo, 3 G-buffer ids,
-// 4 depth (one layer per view each), 5 materials, 6 RGB-to-spectrum coefficient table, 7 its
-// sampler, 8 spectral radiance, 9 lights, 10 the lights' shadow maps, 11 their comparison sampler,
-// 12 their view-projections, 13 the dome's map, 14 the stars, 15 their grid cells, 16 the map
-// that lights the scene (13's, without its sun when that is lit on its own), 17 and 18 the dome
-// occlusion, raw and filtered, 19 the terrain's horizon map, 20 the lights' profiles, 21 the
-// terrain's heights, 22 the atmosphere's transmittance table, 23 its multiple scattering table,
-// 24 its medium, 25 its constituents' densities, 26 their phase functions, 28 its sky irradiance
-// table, 30 its refraction table.
+// Bindings: 0 the pass's resources (`ShadingResources`: its buffers' addresses and its textures'
+// and samplers' indices in the bindless heap, bindless.slang's set 1), 1 G-buffer normal, 2
+// G-buffer albedo, 3 G-buffer ids, 4 depth (one layer per view each), 8 spectral radiance, 17 and
+// 18 the dome occlusion, raw and filtered, 29 the light patterns' data (light_pattern's).
 //
 // References:
 // - W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral Upsampling",
@@ -46,6 +41,8 @@
 // - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Annalen der Physik
 //   309(3):553-563, 1901 (black-body spectra).
 import brdf;
+// The device's textures and samplers by index (bindless.slang).
+import bindless;
 // The planet's atmosphere: the sun's transmittance through it (atmosphere.slang).
 import atmosphere;
 import light_pattern;
@@ -208,33 +205,94 @@ struct ShadingConstants {
     float4 horizonLevels;
 }
 
-[[vk::binding(0, 0)]] StructuredBuffer<ShadingUniforms> shadingViews;
+// The pass's buffers, read through their addresses, and its textures and samplers, by their
+// indices in the bindless heap (the renderer's `ShadingResources`).
+struct ShadingResources {
+    // Every view's ShadingUniforms.
+    ShadingUniforms* views;
+    MaterialGpu* materials;
+    LightGpu* lights;
+    // The lights' shadow views' view-projections.
+    float4x4* lightViews;
+    // Lights' IES profiles (`LightParams::profile`): per slot kProfileRows rows from the light's
+    // axis (0) to opposite it (180 degrees), of kProfileColumns columns around it from its +x
+    // towards +y.
+    float* lightProfiles;
+    // Per light slot, its laser's pattern's integral over its extent (1 for a normalized pattern,
+    // else the renderer's `patternNormMain`), which its emission is divided by so the laser emits
+    // its power.
+    float* patternNorms;
+    // Per shaded view and light slot, kMaxLit (sequence frame, weight) pairs: the frames a laser
+    // shows over the view's span of the sensor clock and how much, its pulses' energy then over
+    // their average included (the renderer's `WriteLightTiming`).
+    float2* lightTiming;
+    // The stars (right ascension and declination in radians, temperature in kelvin, spectral
+    // irradiance at 555 nm) sorted by grid cell, and each cell's first star and count.
+    float4* stars;
+    uint2* starCells;
+    // The atmosphere's medium, its constituents' densities and their phase functions.
+    float4* atmosphereMedium;
+    float* atmosphereDensities;
+    float* atmospherePhases;
+    // Heap indices. Jakob-Hanika sigmoid coefficients (c0, c1, c2) over linear RGB in [0, 1]^3:
+    // red along x, green along y and blue across layers, at `size.z` samples per axis (an array),
+    // and its linear sampler.
+    uint sigmoidTable;
+    uint tableSampler;
+    // The lights' shadow maps (an array) and their comparison sampler.
+    uint lightShadowMaps;
+    uint lightShadowSampler;
+    // The dome's latitude-longitude RGB map with its mips (rows from +z down, columns from +x
+    // through +y), and the map that lights the scene, of the same size: the dome map, or the dome
+    // map without its sun when the sun lights the scene as a shadowed distant light of its own
+    // (`ExtractDomeSun`); both 2D.
+    uint domeMap;
+    uint domeLighting;
+    // The terrain's horizon map (an array) and its heights (2D).
+    uint horizonMap;
+    uint terrainHeights;
+    // The atmosphere's transmittance, multiple scattering, sky irradiance and refraction tables
+    // (arrays).
+    uint atmosphereTransmittance;
+    uint atmosphereMultiple;
+    uint atmosphereSkyIrradiance;
+    uint atmosphereRefraction;
+}
+
+[[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
 [[vk::push_constant]] ConstantBuffer<ShadingConstants> pass;
 [[vk::binding(1, 0)]] Texture2DArray<float4> gNormal;
 [[vk::binding(2, 0)]] Texture2DArray<float4> gAlbedo;
 [[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
 [[vk::binding(4, 0)]] Texture2DArray<float> gDepth;
-[[vk::binding(5, 0)]] StructuredBuffer<MaterialGpu> materials;
-// Jakob-Hanika sigmoid coefficients (c0, c1, c2) over linear RGB in [0, 1]^3: red along x, green
-// along y and blue across layers, at `size.z` samples per axis.
-[[vk::binding(6, 0)]] Texture2DArray<float4> sigmoidTable;
-[[vk::binding(7, 0)]] SamplerState tableSampler;
 [[vk::image_format("r32f")]] [[vk::binding(8, 0)]] RWTexture2DArray<float> spectral;
-[[vk::binding(9, 0)]] StructuredBuffer<LightGpu> lights;
-[[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
-[[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
-[[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
-// Lights' IES profiles (`LightParams::profile`): per slot kProfileRows rows from the light's axis
-// (0) to opposite it (180 degrees), of kProfileColumns columns around it from its +x towards +y.
-[[vk::binding(20, 0)]] StructuredBuffer<float> lightProfiles;
-// Per light slot, its laser's pattern's integral over its extent (1 for a normalized pattern, else
-// the renderer's `patternNormMain`), which its emission is divided by so the laser emits its
-// power.
-[[vk::binding(27, 0)]] StructuredBuffer<float> patternNorms;
-// Per shaded view and light slot, kMaxLit (sequence frame, weight) pairs: the frames a laser shows
-// over the view's span of the sensor clock and how much, its pulses' energy then over their
-// average included (the renderer's `WriteLightTiming`).
-[[vk::binding(31, 0)]] StructuredBuffer<float2> lightTiming;
+
+// The resources under the names the pass reads them by: buffers as arrays, textures as the
+// heap's (float4; one-channel ones read as `.x`).
+#define shadingViews (resources.views)
+#define materials (resources.materials)
+#define lights (resources.lights)
+#define lightViews (resources.lightViews)
+#define lightProfiles (resources.lightProfiles)
+#define patternNorms (resources.patternNorms)
+#define lightTiming (resources.lightTiming)
+#define stars (resources.stars)
+#define starCells (resources.starCells)
+#define atmosphereMedium (resources.atmosphereMedium)
+#define atmosphereDensities (resources.atmosphereDensities)
+#define atmospherePhases (resources.atmospherePhases)
+#define sigmoidTable (heapTextureArrays[resources.sigmoidTable])
+#define tableSampler (heapSamplers[resources.tableSampler])
+#define lightShadowMaps (heapTextureArrays[resources.lightShadowMaps])
+#define lightShadowSampler (heapComparisonSamplers[resources.lightShadowSampler])
+#define domeMap (heapTextures[resources.domeMap])
+#define domeLightingMap (heapTextures[resources.domeLighting])
+#define horizonMap (heapTextureArrays[resources.horizonMap])
+#define terrainHeights (heapTextures[resources.terrainHeights])
+#define atmosphereTransmittance (heapTextureArrays[resources.atmosphereTransmittance])
+#define atmosphereMultiple (heapTextureArrays[resources.atmosphereMultiple])
+#define atmosphereSkyIrradiance (heapTextureArrays[resources.atmosphereSkyIrradiance])
+#define atmosphereRefraction (heapTextureArrays[resources.atmosphereRefraction])
 static const uint kMaxLit = 4;
 static const uint kProfileRows = 129;
 static const uint kProfileColumns = 64;
@@ -259,16 +317,6 @@ float lightProfile(LightGpu light, float3 direction) {
     return lerp(lerp(lightProfiles[row0 + c0], lightProfiles[row0 + c1], tc),
                 lerp(lightProfiles[row1 + c0], lightProfiles[row1 + c1], tc), tr);
 }
-// The dome's latitude-longitude RGB map with its mips (rows from +z down, columns from +x
-// through +y), its stars (right ascension and declination in radians, temperature in kelvin,
-// spectral irradiance at 555 nm) sorted by grid cell, and each cell's first star and count.
-[[vk::binding(13, 0)]] Texture2D<float4> domeMap;
-[[vk::binding(14, 0)]] StructuredBuffer<float4> stars;
-[[vk::binding(15, 0)]] StructuredBuffer<uint2> starCells;
-// The map that lights the scene, of the same size: the dome map, or the dome map without its sun
-// when the sun lights the scene as a shadowed distant light of its own (`ExtractDomeSun`).
-[[vk::binding(16, 0)]] Texture2D<float4> domeLighting;
-
 // The uniforms of the view this thread shades (`shadeMain` sets it).
 static uint shadedView;
 #define sh shadingViews[shadedView]
@@ -559,7 +607,7 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
                 continue;
             }
             let texel = min(int2(tap.uv * size), int2(int(size) - 1));
-            let stored = lightShadowMaps.Load(int4(texel, int(tap.view), 0));
+            let stored = lightShadowMaps.Load(int4(texel, int(tap.view), 0)).x;
             let drop =
                 length(lightPoisson(i)) * searchTexels * texelWorld * tilt;
             if (orthographic) {
@@ -954,21 +1002,12 @@ float4 occlusionSlice(float3 n, float3 tangent, float3 v, float2 horizons) {
     return float4(projectedLength * (t0 * tangent + t1 * v), projectedLength * arc);
 }
 
-// The terrain's horizon map (terrain_horizon.slang): per texel and level (a height above the
-// ground, `ShadingConstants::horizonLevels`), the tangents of the horizon's elevation towards
-// azimuths 0 to 135 degrees (layer 2 level) and 180 to 315 (layer 2 level + 1), before vertical
-// exaggeration.
-[[vk::binding(19, 0)]] Texture2DArray<float4> horizonMap;
-// The terrain's heights, before exaggeration, rows from its north edge.
-[[vk::binding(21, 0)]] Texture2D<float> terrainHeights;
-// The atmosphere's transmittance to its top (atmosphere.slang), a layer per four bands.
-[[vk::binding(22, 0)]] Texture2DArray<float4> atmosphereTransmittance;
-[[vk::binding(23, 0)]] Texture2DArray<float4> atmosphereMultiple;
-[[vk::binding(24, 0)]] StructuredBuffer<float4> atmosphereMedium;
-[[vk::binding(25, 0)]] StructuredBuffer<float> atmosphereDensities;
-[[vk::binding(26, 0)]] StructuredBuffer<float> atmospherePhases;
-[[vk::binding(28, 0)]] Texture2DArray<float4> atmosphereSkyIrradiance;
-[[vk::binding(30, 0)]] Texture2DArray<float4> atmosphereRefraction;
+// `horizonMap`, the terrain's horizon map (terrain_horizon.slang): per texel and level (a height
+// above the ground, `ShadingConstants::horizonLevels`), the tangents of the horizon's elevation
+// towards azimuths 0 to 135 degrees (layer 2 level) and 180 to 315 (layer 2 level + 1), before
+// vertical exaggeration. `terrainHeights`, the terrain's heights before exaggeration, rows from its
+// north edge. `atmosphereTransmittance`, the atmosphere's transmittance to its top
+// (atmosphere.slang), a layer per four bands (then the planet's shadow, its layers after).
 
 // The apparent direction from `eye` (relative to the frame's origin, metres) of something at
 // infinity in true direction `w`, lifted towards the zenith by the atmosphere's refraction in the
@@ -1545,7 +1584,7 @@ bool aboveTerrain(float3 world, out float above) {
     float h[4];
     for (uint k = 0; k < 4; ++k) {
         let at = clamp(base + int2(k & 1, k >> 1), int2(0), size - 1);
-        h[k] = terrainHeights.Load(int3(at, 0));
+        h[k] = terrainHeights.Load(int3(at, 0)).x;
         if ((pass.heightsGrid.w > 0.5 && h[k] == pass.heightsGrid.z) || isnan(h[k])) {
             return false;
         }
@@ -2078,7 +2117,7 @@ float3 rayThrough(float2 ndc) {
 float3 domeTexel(int x, int y, uint level, int2 size, bool lighting) {
     let wrapped = int2((x % size.x + size.x) % size.x, clamp(y, 0, size.y - 1));
     let at = int3(wrapped, int(level));
-    return lighting ? domeLighting.Load(at).rgb : domeMap.Load(at).rgb;
+    return lighting ? domeLightingMap.Load(at).rgb : domeMap.Load(at).rgb;
 }
 
 // The dome map bilinearly at (`u`, `v`) in mip `level`.

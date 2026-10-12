@@ -451,6 +451,23 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         accelerationSupport.pNext = &rayQuerySupport;
     }
     vkGetPhysicalDeviceFeatures2(c.physicalDevice_, &supported);
+    if (supported12.bufferDeviceAddress != VK_TRUE ||
+        supported12.scalarBlockLayout != VK_TRUE ||
+        supported12.runtimeDescriptorArray != VK_TRUE ||
+        supported12.shaderSampledImageArrayNonUniformIndexing !=
+            VK_TRUE ||
+        supported12.descriptorBindingPartiallyBound != VK_TRUE ||
+        supported12.descriptorBindingSampledImageUpdateAfterBind !=
+            VK_TRUE ||
+        supported12.descriptorBindingUpdateUnusedWhilePending !=
+            VK_TRUE ||
+        supported12.descriptorBindingVariableDescriptorCount !=
+            VK_TRUE) {
+        throw std::runtime_error(
+            "The Vulkan device lacks buffer device addresses, scalar "
+            "block layout or descriptor indexing (Vulkan 1.2), which "
+            "Ernie's shaders need");
+    }
     c.rayQuery_ =
         rayExtensions && accelerationSupport.accelerationStructure &&
         rayQuerySupport.rayQuery && supported12.bufferDeviceAddress;
@@ -481,7 +498,17 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     // Layered rendering: a batch's views draw their G-buffers in one
     // pass, each into its layer.
     features12.shaderOutputLayer = VK_TRUE;
-    features12.bufferDeviceAddress = supported12.bufferDeviceAddress;
+    // Shaders read buffers through their addresses and textures from
+    // a bindless heap (`BindlessHeap`), not one push binding each.
+    features12.bufferDeviceAddress = VK_TRUE;
+    features12.scalarBlockLayout = VK_TRUE;
+    features12.descriptorIndexing = VK_TRUE;
+    features12.runtimeDescriptorArray = VK_TRUE;
+    features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    features12.descriptorBindingPartiallyBound = VK_TRUE;
+    features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+    features12.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
+    features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
     // For the profiler's GPU zones (GpuTimer), which free their
     // queries from the host.
     features12.hostQueryReset = supported12.hostQueryReset;
@@ -544,9 +571,7 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     functions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
     VmaAllocatorCreateInfo allocatorInfo{};
     allocatorInfo.flags =
-        supported12.bufferDeviceAddress
-            ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
-            : 0;
+        VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
     allocatorInfo.physicalDevice = c.physicalDevice_;
     allocatorInfo.device = c.device_;
@@ -577,6 +602,7 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         c.timer_ = std::make_unique<GpuTimer>(
             c.device_, bits, c.limits_.timestampPeriod);
     }
+    c.bindless_ = std::make_unique<BindlessHeap>(c);
 #if ERNIE_TRACY
     if (c.limits_.timestampComputeAndGraphics) {
         // Tracy records into its command buffer more than once, so
@@ -659,6 +685,7 @@ VulkanContext::~VulkanContext() {
             }
         }
         timer_.reset();
+        bindless_.reset();
 #if ERNIE_TRACY
         if (gpuProfiler_ != nullptr) {
             TracyVkDestroy(static_cast<tracy::VkCtx*>(gpuProfiler_));

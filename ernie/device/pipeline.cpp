@@ -89,10 +89,14 @@ PipelineLayout::PipelineLayout(
             "vkCreateDescriptorSetLayout");
     const VkPushConstantRange range{VK_SHADER_STAGE_ALL, 0,
                                     pushConstantBytes};
+    // Set 0 the pass's pushed resources, set 1 the bindless heap.
+    const std::array<VkDescriptorSetLayout, 2> sets{
+        setLayout_, context.Bindless().Layout()};
     VkPipelineLayoutCreateInfo layoutInfo{
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts = &setLayout_;
+    layoutInfo.setLayoutCount =
+        static_cast<std::uint32_t>(sets.size());
+    layoutInfo.pSetLayouts = sets.data();
     layoutInfo.pushConstantRangeCount = pushConstantBytes > 0 ? 1 : 0;
     layoutInfo.pPushConstantRanges = &range;
     CheckVk(vkCreatePipelineLayout(context.Device(), &layoutInfo,
@@ -133,6 +137,9 @@ void PipelineLayout::Push(
     context_.PushDescriptorSet()(
         commands, point, layout_, 0,
         static_cast<std::uint32_t>(writes.size()), writes.data());
+    // Another layout's set 0 disturbs set 1, so the heap is bound
+    // again with each push.
+    context_.Bindless().Bind(commands, point, layout_);
 }
 
 void PipelineLayout::PushConstants(VkCommandBuffer commands,

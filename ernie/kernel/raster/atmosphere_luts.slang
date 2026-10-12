@@ -18,10 +18,10 @@
 // integrated over the upper hemisphere of a level surface, by 64 directions spread evenly over its
 // projected disc (a cosine-weighted Fibonacci spiral), so the irradiance is pi times their mean.
 //
-// Bindings: 0 the medium, 1 the constituents' densities, 2 the transmittance table (storage),
+// Bindings: 0 the buffers' addresses (`AtmosphereBuffers`), 2 the transmittance table (storage),
 // 3 the transmittance table (sampled), 4 a linear sampler, 5 the multiple scattering table
-// (storage), 6 the constituents' phase functions, 7 the sky irradiance table (storage), 8 the
-// multiple scattering table (sampled), 9 the refraction table (storage). Every image is in the
+// (storage), 7 the sky irradiance table (storage), 8 the multiple scattering table (sampled), 9
+// the refraction table (storage), 10 the refraction table (sampled). Every image is in the
 // general layout.
 //
 // References:
@@ -46,21 +46,30 @@ static const uint kDirections = 64;
 // reference).
 static const uint kScatteringSteps = 128;
 
-[[vk::binding(0, 0)]] StructuredBuffer<float4> medium;
-[[vk::binding(1, 0)]] StructuredBuffer<float> densities;
+// The tables' buffers, read through their addresses (`AtmosphereLuts`): the medium, its
+// constituents' densities and phase functions, and the planet shadow's settings (x: the sine of
+// the sun's angular radius, y: the cloud tops' height (km), below which clouds block rays grazing
+// the planet; z: the first band's lower wavelength (nm), w: the band width; then x: the fraction
+// of the limb the clouds cover).
+struct AtmosphereBuffers {
+    float4* medium;
+    float* densities;
+    float* phases;
+    float4* shadowSettings;
+}
+[[vk::binding(0, 0)]] ConstantBuffer<AtmosphereBuffers> buffers;
+#define medium (buffers.medium)
+#define densities (buffers.densities)
+#define phases (buffers.phases)
+#define shadowSettings (buffers.shadowSettings)
 [[vk::image_format("rgba32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float4> transmittanceOut;
 [[vk::binding(3, 0)]] Texture2DArray<float4> transmittance;
 [[vk::binding(4, 0)]] SamplerState linear;
 [[vk::image_format("rgba32f")]] [[vk::binding(5, 0)]] RWTexture2DArray<float4> multipleOut;
-[[vk::binding(6, 0)]] StructuredBuffer<float> phases;
 [[vk::image_format("rgba32f")]] [[vk::binding(7, 0)]] RWTexture2DArray<float4> irradianceOut;
 [[vk::binding(8, 0)]] Texture2DArray<float4> multiple;
 [[vk::image_format("rgba32f")]] [[vk::binding(9, 0)]] RWTexture2DArray<float4> refractionOut;
 [[vk::binding(10, 0)]] Texture2DArray<float4> refraction;
-// x: the sine of the sun's angular radius, y: the cloud tops' height (km), below which clouds
-// block rays grazing the planet; z: the first band's lower wavelength (nm), w: the band width;
-// then x: the fraction of the limb the clouds cover.
-[[vk::binding(12, 0)]] StructuredBuffer<float4> shadowSettings;
 
 // Refraction, per apparent zenith angle and height: a ray traced out of the atmosphere by the ray
 // equation d(n t)/ds = grad n through its spherically layered refractive index, the bands' bending

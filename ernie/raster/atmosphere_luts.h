@@ -140,6 +140,8 @@ class AtmosphereLuts {
     std::unique_ptr<GpuImage> refraction_;
     /// atmosphere_luts.slang's shadow settings.
     std::unique_ptr<GpuBuffer> shadowSettings_;
+    /// The buffers' addresses, which the tables' passes read them by.
+    mutable std::unique_ptr<GpuBuffer> addresses_;
     float sunAngle_ = 0.0f;
     mutable bool stale_ = false;
     /// Whether the planet's shadow alone needs rebuilding.

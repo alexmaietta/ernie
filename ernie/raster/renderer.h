@@ -744,6 +744,10 @@ class RasterRenderer {
     /// sub-frame's).
     void Shade(VkCommandBuffer commands, RenderTargets& targets,
                std::uint32_t firstView) const;
+    /// Records shading's resources (shading.slang's ShadingResources)
+    /// into `shadingResources_`: its buffers' addresses and its
+    /// textures in fresh slots of the bindless heap.
+    void WriteShadingResources(VkCommandBuffer commands) const;
     /// Adds sub-frame `subframe`'s raster radiance into `targets`'
     /// sum (motion.slang), each row weighted for its share of its
     /// exposure; the last leaves the sum in the raster radiance.
@@ -1035,6 +1039,15 @@ class RasterRenderer {
     std::array<float, 4> presentRange_{};
     GpuImage sigmoidTable_;
     Sampler tableSampler_;
+    /// The samplers' slots in the bindless heap, and the textures'
+    /// of shading's last recording (`Shade`), each recording taking
+    /// fresh ones so nothing in flight sees a slot change.
+    BindlessHeap::Slot tableSamplerSlot_;
+    BindlessHeap::Slot shadowSamplerSlot_;
+    mutable std::vector<BindlessHeap::Slot> shadingSlots_;
+    /// shading.slang's ShadingResources, written as each recording
+    /// shades.
+    std::unique_ptr<GpuBuffer> shadingResources_;
     GpuBuffer shadingUniforms_;
     GpuBuffer sensorUniforms_;
     GpuBuffer lightTable_;

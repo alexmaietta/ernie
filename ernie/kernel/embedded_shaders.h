@@ -129,6 +129,9 @@ extern const char kPlanetSlang[];
 extern const char kPlanetColorSlang[];
 extern const char kPlanetShadowSlang[];
 
+/// The bindless heap's arrays (`BindlessHeap`), module `bindless`.
+extern const char kBindlessSlang[];
+
 /// The volume march (`VolumePass`), and PNanoVDB's reader
 /// (third_party/nanovdb) with what precedes it, which the march is
 /// compiled after.

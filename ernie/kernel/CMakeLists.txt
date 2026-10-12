@@ -77,6 +77,7 @@ set(ernie_shaders
     raster/terrain_horizon.slang=kTerrainHorizonSlang
     raster/views.slang=kViewsSlang
     raster/volume.slang=kVolumeSlang
+    bindless.slang=kBindlessSlang
     raster/pnanovdb_prelude.slang=kPNanoVdbPreludeSlang
     ../../third_party/nanovdb/PNanoVDB.h=kPNanoVdbHeader)
 set(shader_files)

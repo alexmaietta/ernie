@@ -56,16 +56,16 @@ public static const uint kIrradianceWidth = 64;
 public static const uint kIrradianceHeight = 16;
 public static const float kIrradianceMinMuSun = -0.2;
 
-public float atmosphereBottom(StructuredBuffer<float4> medium) {
+public float atmosphereBottom(float4* medium) {
     return medium[0].x;
 }
 
-public float atmosphereTop(StructuredBuffer<float4> medium) {
+public float atmosphereTop(float4* medium) {
     return medium[0].y;
 }
 
 // The relative density of constituent `c` at `altitude` (km), linear between its samples.
-float densityAt(StructuredBuffer<float4> medium, StructuredBuffer<float> densities, uint c,
+float densityAt(float4* medium, float* densities, uint c,
                 float altitude) {
     let samples = uint(medium[0].w);
     let height = medium[0].y - medium[0].x;
@@ -77,7 +77,7 @@ float densityAt(StructuredBuffer<float4> medium, StructuredBuffer<float> densiti
 }
 
 // The scattering and extinction coefficients (km^-1) of band group `group` at `altitude` (km).
-public void mediumAt(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+public void mediumAt(float4* medium, float* densities,
                      float altitude, uint group, out float4 scattering, out float4 extinction) {
     let constituents = uint(medium[0].z);
     let groups = uint(medium[1].x);
@@ -92,7 +92,7 @@ public void mediumAt(StructuredBuffer<float4> medium, StructuredBuffer<float> de
     }
 }
 
-public float4 groundAlbedo(StructuredBuffer<float4> medium, uint group) {
+public float4 groundAlbedo(float4* medium, uint group) {
     let constituents = uint(medium[0].z);
     let groups = uint(medium[1].x);
     return medium[2 + constituents * 2 * groups + group];
@@ -100,7 +100,7 @@ public float4 groundAlbedo(StructuredBuffer<float4> medium, uint group) {
 
 // The refractive index less 1 of band group `group` at `altitude` (km): each constituent's
 // refractivity where its density is 1 (after the ground albedo in the medium) times its density.
-public float4 refractivityAt(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+public float4 refractivityAt(float4* medium, float* densities,
                              float altitude, uint group) {
     let constituents = uint(medium[0].z);
     let groups = uint(medium[1].x);
@@ -117,7 +117,7 @@ public float4 refractivityAt(StructuredBuffer<float4> medium, StructuredBuffer<f
 // constant along a ray in a spherically layered atmosphere: it meets the ground only heading down
 // with n0 r sin z below the ground's n times its radius (with n r growing with height, as it does
 // without ducting).
-public bool4 escapesAtmosphere(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
+public bool4 escapesAtmosphere(float4* medium, float* densities,
                                float r, float mu, uint group) {
     let bottom = atmosphereBottom(medium);
     if (mu >= 0.0) {
@@ -310,7 +310,7 @@ public float4 skyIrradiance(Texture2DArray<float4> table, SamplerState linear, f
 
 // The phase function (sr^-1) of constituent `c` in band `band` at scattering cosine `nu`, linear
 // between its table's angles.
-float phaseAt(StructuredBuffer<float4> medium, StructuredBuffer<float> phases, uint c, uint band,
+float phaseAt(float4* medium, float* phases, uint c, uint band,
               float nu) {
     let bands = uint(medium[1].y);
     let angles = uint(medium[1].z);
@@ -383,8 +383,8 @@ public bool clipSegment(float3 p, float3 d, float span, float top, out float sta
 // single and its multiple scattering: Psi_ms assumes the sun lights all the air around a point
 // alike, so inside a moon's umbra, about a hundred kilometres across, the light scattered in
 // from the sunlit air beyond is left out, and the sky there is darker than it should be.
-public void scatterAlong(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
-                         StructuredBuffer<float> phases, Texture2DArray<float4> transmittanceTable,
+public void scatterAlong(float4* medium, float* densities,
+                         float* phases, Texture2DArray<float4> transmittanceTable,
                          Texture2DArray<float4> multipleTable, SamplerState linear, float3 p,
                          float3 d, float start, float end, float3 sun, float sunSine,
                          Eclipse eclipse, uint group, uint steps, out float4 radiance,
@@ -411,8 +411,8 @@ public struct SkyLights {
 
 // `scatterAlong` for `lights`, the light scattered being theirs (W m^-2 sr^-1 nm^-1) rather than
 // per unit irradiance; the air's coefficients are found once per step for them all.
-public void scatterAlongLights(StructuredBuffer<float4> medium, StructuredBuffer<float> densities,
-                               StructuredBuffer<float> phases,
+public void scatterAlongLights(float4* medium, float* densities,
+                               float* phases,
                                Texture2DArray<float4> transmittanceTable,
                                Texture2DArray<float4> multipleTable, SamplerState linear, float3 p,
                                float3 d, float start, float end, SkyLights lights, Eclipse eclipse,

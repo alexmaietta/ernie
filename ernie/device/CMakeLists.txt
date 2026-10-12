@@ -2,6 +2,7 @@
 ernie_add_library(
     ernie_device
     SOURCES
+    bindless.cpp
     buffer.cpp
     compute_interop.cpp
     cuda_interop.cpp

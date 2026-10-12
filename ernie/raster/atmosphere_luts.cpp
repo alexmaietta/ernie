@@ -9,8 +9,10 @@
 #include <glm/trigonometric.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -22,18 +24,17 @@ constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
 /// atmosphere_luts.slang's bindings.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    // The buffers' addresses (atmosphere_luts.slang's
+    // AtmosphereBuffers).
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {4, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
     {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {7, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// atmosphere.slang's table sizes.
@@ -306,19 +307,25 @@ void AtmosphereLuts::Record(VkCommandBuffer commands) const {
         return DescriptorResource::Of(image.View(),
                                       VK_IMAGE_LAYOUT_GENERAL);
     };
+    // The buffers by their addresses (AtmosphereBuffers), in a block
+    // of their own, new with each rebuild as the buffers are.
+    const std::array<VkDeviceAddress, 4> addresses{
+        medium_->Address(), densities_->Address(), phases_->Address(),
+        shadowSettings_->Address()};
+    addresses_ = std::make_unique<GpuBuffer>(
+        context_, sizeof(addresses),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Upload);
+    addresses_->Write(std::as_bytes(std::span(addresses)));
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(*medium_),
-        DescriptorResource::Of(*densities_),
+        DescriptorResource::Of(*addresses_),
         general(*transmittance_),
         general(*transmittance_),
         DescriptorResource::Of(sampler_),
         general(*multipleScattering_),
-        DescriptorResource::Of(*phases_),
         general(*skyIrradiance_),
         general(*multipleScattering_),
         general(*refraction_),
-        general(*refraction_),
-        DescriptorResource::Of(*shadowSettings_)};
+        general(*refraction_)};
     const std::uint32_t groups = transmittance_->Desc().layers / 2;
     // Each table reads the ones before it.
     const auto barrier = [commands] {

@@ -62,6 +62,11 @@ class GpuBuffer {
         return memory_;
     }
 
+    /// The buffer's address on the GPU, which shaders read it through
+    /// as a pointer (Slang's `T*`, in natural layout: the plain
+    /// `float[4]` structs Ernie writes) in place of a binding.
+    VkDeviceAddress Address() const;
+
     /// For `Shared` buffers, a new handle to the buffer's memory (a
     /// file descriptor, or a Win32 handle on Windows), owned by the
     /// caller until it imports it elsewhere (`CloseExternalHandle`).

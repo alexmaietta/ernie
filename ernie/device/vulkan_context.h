@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/device/bindless.h"
 #include "ernie/device/gpu_timer.h"
 
 #include <vk_mem_alloc.h>
@@ -224,6 +225,12 @@ class VulkanContext {
         return pushDescriptorSet_;
     }
 
+    /// The device's textures and samplers for every pass, by index
+    /// (set 1 of every `PipelineLayout`).
+    BindlessHeap& Bindless() const {
+        return *bindless_;
+    }
+
     /// Validation and error messages reported since the last call,
     /// oldest first.
     std::vector<std::string> TakeValidationMessages();
@@ -318,6 +325,7 @@ class VulkanContext {
     void* gpuProfiler_ =
         nullptr;  ///< A tracy::VkCtx in a profiling build.
     std::unique_ptr<GpuTimer> timer_;
+    std::unique_ptr<BindlessHeap> bindless_;
     mutable std::mutex profilerMutex_;
     /// Timeline signalled by every `SubmitAsync`, and its command
     /// buffers awaiting recycling.

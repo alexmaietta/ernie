@@ -47,7 +47,8 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
     VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     info.size = size;
     info.usage = usage | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     if (memory == BufferMemory::Shared) {
         if (!context.SupportsExternalMemory()) {
             throw std::runtime_error(
@@ -70,9 +71,14 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
             VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO};
         exported.handleTypes = kExternalMemoryHandleType;
         exported.pNext = &dedicated;
+        // Shaders read it through its address (`Address`).
+        VkMemoryAllocateFlagsInfo flags{
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+        flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        flags.pNext = &exported;
         VkMemoryAllocateInfo allocate{
             VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-        allocate.pNext = &exported;
+        allocate.pNext = &flags;
         allocate.allocationSize = requirements.size;
         allocate.memoryTypeIndex = context.DeviceLocalMemoryType(
             requirements.memoryTypeBits);
@@ -189,6 +195,13 @@ void GpuBuffer::Release() {
         buffer_ = VK_NULL_HANDLE;
         allocation_ = VK_NULL_HANDLE;
     }
+}
+
+VkDeviceAddress GpuBuffer::Address() const {
+    VkBufferDeviceAddressInfo info{
+        VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+    info.buffer = buffer_;
+    return vkGetBufferDeviceAddress(context_->Device(), &info);
 }
 
 ExternalHandle GpuBuffer::ExportHandle() const {

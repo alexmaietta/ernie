@@ -509,40 +509,53 @@ constexpr std::uint32_t kTableResolution = 17;
 
 constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
+// Shading pushes its per-dispatch images and a block of its
+// resources (`ShadingResources`); the rest it reads by address and
+// from the bindless heap.
 constexpr DescriptorBinding kShadingBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {7, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
     {8, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {11, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {17, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {19, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {21, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {22, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {23, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {24, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {25, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {26, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {28, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    // light_pattern's pattern data.
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {30, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    {31, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
+
+/// shading.slang's ShadingResources: its buffers' addresses, then its
+/// textures' and samplers' indices in the bindless heap.
+struct ShadingResources {
+    VkDeviceAddress views;
+    VkDeviceAddress materials;
+    VkDeviceAddress lights;
+    VkDeviceAddress lightViews;
+    VkDeviceAddress lightProfiles;
+    VkDeviceAddress patternNorms;
+    VkDeviceAddress lightTiming;
+    VkDeviceAddress stars;
+    VkDeviceAddress starCells;
+    VkDeviceAddress atmosphereMedium;
+    VkDeviceAddress atmosphereDensities;
+    VkDeviceAddress atmospherePhases;
+    std::uint32_t sigmoidTable;
+    std::uint32_t tableSampler;
+    std::uint32_t lightShadowMaps;
+    std::uint32_t lightShadowSampler;
+    std::uint32_t domeMap;
+    std::uint32_t domeLighting;
+    std::uint32_t horizonMap;
+    std::uint32_t terrainHeights;
+    std::uint32_t atmosphereTransmittance;
+    std::uint32_t atmosphereMultiple;
+    std::uint32_t atmosphereSkyIrradiance;
+    std::uint32_t atmosphereRefraction;
+};
+static_assert(sizeof(ShadingResources) == 144 &&
+                  offsetof(ShadingResources, sigmoidTable) == 96,
+              "ShadingResources must match shading.slang");
 
 /// shading.slang's ShadingConstants: the dispatch's model and first
 /// view, and the terrain horizon the dome occlusion reads
@@ -657,6 +670,7 @@ ShadingModules(const BrdfModel& brdf,
                    {{"brdf", std::string(BrdfSlang())},
                     {BrdfModuleName(brdf), brdf.slang},
                     ProjectionModule(pushbroom),
+                    {"bindless", shaders::kBindlessSlang},
                     {"atmosphere", shaders::kAtmosphereSlang},
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
@@ -1342,6 +1356,13 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     atmosphere_ =
         std::make_unique<AtmosphereLuts>(context_, compiler_);
     volumes_ = std::make_unique<VolumePass>(context_, compiler_);
+    tableSamplerSlot_ =
+        context_.Bindless().AddSampler(tableSampler_.Handle());
+    shadowSamplerSlot_ =
+        context_.Bindless().AddSampler(shadowSampler_.Handle(), true);
+    shadingResources_ = std::make_unique<GpuBuffer>(
+        context_, sizeof(ShadingResources),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
 
     const std::vector<ShaderModuleSource> hzbModules{
         {"hzb", shaders::kHzbSlang}};
@@ -2469,6 +2490,8 @@ void RasterRenderer::Update(
     std::span<const Overlay* const> overlays) {
     ERNIE_ZONE("Renderer::Update");
     ERNIE_PLOT("Views", frame.Views());
+    // Heap slots freed frames ago may be reused.
+    context_.Bindless().AdvanceFrame();
     // With motion blur, a view per sub-frame and view
     // (`FrameParams::Subframes`): the drawables cull and draw each,
     // and the sensor reads their sum.
@@ -4957,6 +4980,80 @@ void RasterRenderer::BuildPyramid(VkCommandBuffer commands,
     }
 }
 
+void RasterRenderer::WriteShadingResources(
+    VkCommandBuffer commands) const {
+    BindlessHeap& heap = context_.Bindless();
+    using Kind = BindlessHeap::Kind;
+    // The last recording's slots retire; nothing in flight sees them
+    // change.
+    shadingSlots_.clear();
+    const auto texture = [&](Kind kind, const GpuImage& image) {
+        shadingSlots_.push_back(heap.AddImage(kind, image.View()));
+        return shadingSlots_.back().Index();
+    };
+    ShadingResources resources{};
+    resources.views = shadingUniforms_.Address();
+    resources.materials = materialTable_->Address();
+    resources.lights = lightTable_.Address();
+    resources.lightViews = lightViewMatrices_->Address();
+    resources.lightProfiles = lightProfiles_.Address();
+    resources.patternNorms = patternNorms_.Address();
+    resources.lightTiming = lightTiming_->Address();
+    resources.stars = stars_->Address();
+    resources.starCells = starCells_->Address();
+    resources.atmosphereMedium = atmosphere_->Medium().Address();
+    resources.atmosphereDensities =
+        atmosphere_->Densities().Address();
+    resources.atmospherePhases = atmosphere_->Phases().Address();
+    resources.sigmoidTable =
+        texture(Kind::Texture2DArray, sigmoidTable_);
+    resources.tableSampler = tableSamplerSlot_.Index();
+    resources.lightShadowMaps =
+        texture(Kind::Texture2DArray, *lightShadowMaps_);
+    resources.lightShadowSampler = shadowSamplerSlot_.Index();
+    resources.domeMap = texture(Kind::Texture2D, *domeMap_);
+    resources.domeLighting = texture(
+        Kind::Texture2D,
+        domeLighting_ != nullptr ? *domeLighting_ : *domeMap_);
+    resources.horizonMap =
+        texture(Kind::Texture2DArray, terrainHorizon_.image != nullptr
+                                          ? *terrainHorizon_.image
+                                          : *noHorizon_);
+    resources.terrainHeights =
+        texture(Kind::Texture2D, terrainHorizon_.heights != nullptr
+                                     ? *terrainHorizon_.heights
+                                     : *noHeights_);
+    resources.atmosphereTransmittance =
+        texture(Kind::Texture2DArray, atmosphere_->Transmittance());
+    resources.atmosphereMultiple = texture(
+        Kind::Texture2DArray, atmosphere_->MultipleScattering());
+    resources.atmosphereSkyIrradiance =
+        texture(Kind::Texture2DArray, atmosphere_->SkyIrradiance());
+    resources.atmosphereRefraction =
+        texture(Kind::Texture2DArray, atmosphere_->Refraction());
+
+    // In the command stream, after the dispatches reading the last
+    // and before those reading this.
+    VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    before.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    before.srcAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &before;
+    vkCmdPipelineBarrier2(commands, &dependency);
+    vkCmdUpdateBuffer(commands, shadingResources_->Handle(), 0,
+                      sizeof(resources), &resources);
+    VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    after.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    after.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    after.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    dependency.pMemoryBarriers = &after;
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
 void RasterRenderer::Shade(VkCommandBuffer commands,
                            RenderTargets& targets,
                            std::uint32_t firstView) const {
@@ -5001,46 +5098,19 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                 image->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
             }
         }
+        WriteShadingResources(commands);
         const DescriptorResource shading[] = {
-            DescriptorResource::Of(shadingUniforms_),
+            DescriptorResource::Of(*shadingResources_),
             sampled(targets.GBuffer(0)),
             sampled(targets.GBuffer(1)),
             sampled(targets.GBuffer(2)),
             sampled(targets.Depth()),
-            DescriptorResource::Of(*materialTable_),
-            DescriptorResource::Of(sigmoidTable_.View()),
-            DescriptorResource::Of(tableSampler_),
             general(targets.RasterRadiance()),
-            DescriptorResource::Of(lightTable_),
-            DescriptorResource::Of(lightShadowMaps_->View()),
-            DescriptorResource::Of(shadowSampler_),
-            DescriptorResource::Of(*lightViewMatrices_),
-            sampled(*domeMap_),
-            DescriptorResource::Of(*stars_),
-            DescriptorResource::Of(*starCells_),
-            sampled(domeLighting_ != nullptr ? *domeLighting_
-                                             : *domeMap_),
             general(occlusion_[0] != nullptr ? *occlusion_[0]
                                              : *noOcclusion_),
             general(occlusion_[1] != nullptr ? *occlusion_[1]
                                              : *noOcclusion_),
-            sampled(terrainHorizon_.image != nullptr
-                        ? *terrainHorizon_.image
-                        : *noHorizon_),
-            DescriptorResource::Of(lightProfiles_),
-            sampled(terrainHorizon_.heights != nullptr
-                        ? *terrainHorizon_.heights
-                        : *noHeights_),
-            sampled(atmosphere_->Transmittance()),
-            sampled(atmosphere_->MultipleScattering()),
-            DescriptorResource::Of(atmosphere_->Medium()),
-            DescriptorResource::Of(atmosphere_->Densities()),
-            DescriptorResource::Of(atmosphere_->Phases()),
-            DescriptorResource::Of(patternNorms_),
-            sampled(atmosphere_->SkyIrradiance()),
-            DescriptorResource::Of(*patternData_),
-            sampled(atmosphere_->Refraction()),
-            DescriptorResource::Of(*lightTiming_)};
+            DescriptorResource::Of(*patternData_)};
         // The dispatch's model and first view, and the terrain
         // horizon (none without its image).
         const auto constantsFor = [&](std::uint32_t model) {

@@ -41,11 +41,15 @@ struct DescriptorResource {
                                  const Sampler& sampler);
 };
 
-/// A pipeline layout with one push-descriptor set and an optional
+/// A pipeline layout with one push-descriptor set (set 0), the
+/// device's bindless heap (set 1, `BindlessHeap`) and an optional
 /// push-constant block shared by all stages.
 ///
-/// Every pass binds its resources by pushing descriptors when it
-/// records, so there are no descriptor pools or sets to manage.
+/// Every pass binds its per-dispatch resources (render targets,
+/// storage images, a uniform block) by pushing descriptors when it
+/// records; its long-lived textures are heap indices and its buffers
+/// addresses (`GpuBuffer::Address`), so no pass needs descriptor
+/// pools of its own, and no more than a few push bindings.
 class PipelineLayout {
   public:
     /// @throws std::runtime_error if the layout cannot be created.
