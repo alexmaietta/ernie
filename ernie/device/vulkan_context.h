@@ -241,6 +241,10 @@ class VulkanContext {
     /// oldest first.
     std::vector<std::string> TakeValidationMessages();
 
+    /// Waits for the device to finish all its work, as before freeing
+    /// what submitted work may still use.
+    void WaitIdle() const;
+
     /// Records commands with `record` into a one-off command buffer,
     /// submits it and waits for the device to finish it. Its writes
     /// are then visible to the host and to later submissions. The

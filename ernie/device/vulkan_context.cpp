@@ -910,6 +910,10 @@ SubmitInfos(std::span<const TimelinePoint> points) {
 
 }  // namespace
 
+void VulkanContext::WaitIdle() const {
+    vkDeviceWaitIdle(device_);
+}
+
 void VulkanContext::Submit(
     const std::function<void(VkCommandBuffer)>& record,
     std::span<const TimelinePoint> waits,

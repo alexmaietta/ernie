@@ -213,6 +213,19 @@ void ComputePipeline::Dispatch(
     Dispatch(commands, resources, groupsX, groupsY, groupsZ);
 }
 
+void ComputeBarrier(VkCommandBuffer commands) {
+    VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    memory.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    memory.dstAccessMask =
+        VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &memory;
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
 GraphicsPipeline::GraphicsPipeline(const VulkanContext& context,
                                    const PipelineLayout& layout,
                                    const GraphicsPipelineDesc& desc)

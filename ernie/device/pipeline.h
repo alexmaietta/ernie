@@ -132,6 +132,12 @@ class ComputePipeline {
     VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 
+/// A barrier between compute dispatches recorded into `commands`: the
+/// earlier ones' shader writes before the later ones' shader reads
+/// and writes. For code linking Ernie as a shared library, whose
+/// Vulkan functions it keeps to itself.
+void ComputeBarrier(VkCommandBuffer commands);
+
 /// Fixed-function state of a graphics pipeline that draws triangle
 /// lists without vertex buffers.
 struct GraphicsPipelineDesc {

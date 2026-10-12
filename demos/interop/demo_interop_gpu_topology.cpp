@@ -304,28 +304,13 @@ class Polygoniser {
         const std::array<std::uint32_t, 4> threads{
             kGridPoints, 7 * kGridPoints,
             6 * kCells * kCells * kCells, 1};
+        // Through Ernie's own calls: linked as a shared library, it
+        // keeps its Vulkan functions to itself.
+        layout_.PushConstants(commands, &push, sizeof(push));
         for (std::size_t p = 0; p < pipelines_.size(); ++p) {
-            vkCmdBindPipeline(commands,
-                              VK_PIPELINE_BIND_POINT_COMPUTE,
-                              pipelines_[p]->Handle());
-            layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                         resources);
-            layout_.PushConstants(commands, &push, sizeof(push));
-            vkCmdDispatch(commands, (threads[p] + 63) / 64, 1, 1);
-            VkMemoryBarrier2 memory{
-                VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-            memory.srcStageMask =
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-            memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-            memory.dstStageMask =
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-            memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
-                                   VK_ACCESS_2_SHADER_WRITE_BIT;
-            VkDependencyInfo dependency{
-                VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-            dependency.memoryBarrierCount = 1;
-            dependency.pMemoryBarriers = &memory;
-            vkCmdPipelineBarrier2(commands, &dependency);
+            pipelines_[p]->Dispatch(commands, resources,
+                                    (threads[p] + 63) / 64);
+            ComputeBarrier(commands);
         }
     }
 
@@ -413,7 +398,7 @@ class GpuTopologyDemo : public app::Demo {
     void Close() override {
         for (const Written& written : written_) {
             written.delegate->SetMeshWriter(kBlobs, nullptr);
-            vkDeviceWaitIdle(written.context->Device());
+            written.context->WaitIdle();
         }
         written_.clear();
         polygonisers_.clear();
