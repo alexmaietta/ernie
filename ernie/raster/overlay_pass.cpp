@@ -106,6 +106,7 @@ constexpr std::uint32_t kBatchHasPoints = 128;
 constexpr std::uint32_t kBatchHasHeads = 256;
 constexpr std::uint32_t kBatchFade = 512;
 constexpr std::uint32_t kBatchDirections = 1024;
+constexpr std::uint32_t kBatchPointColors = 2048;
 constexpr std::uint32_t kCircleSegments = 48;
 constexpr std::uint32_t kConeSides = 8;
 /// Segments of a capsule (overlay.slang's `capsuleSegment`): two
@@ -524,7 +525,13 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                 (batch.points.Empty() ? 0 : kBatchHasPoints) |
                 (batch.heads.Empty() ? 0 : kBatchHasHeads) |
                 (batch.fade ? kBatchFade : 0) |
-                (batch.directions ? kBatchDirections : 0);
+                (batch.directions ? kBatchDirections : 0) |
+                (trail > 1 && !batch.colors.Empty() &&
+                         static_cast<std::uint32_t>(
+                             batch.colors.Elements()) ==
+                             count * trail * (alpha ? 4u : 3u)
+                     ? kBatchPointColors
+                     : 0);
             gpu.arrays[0] = array("points", batch.points);
             gpu.arrays[1] =
                 !batch.ends.Empty() ? array("ends", batch.ends)

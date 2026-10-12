@@ -612,3 +612,23 @@ def test_overlay_capsules_draw_around_their_axes(renderer):
         ernie.Scene().overlay("o").capsules(
             np.zeros((1, 3)), np.ones(1), np.ones(2)
         )
+
+
+def test_overlay_trails_colour_each_segment_by_its_newer_point(renderer):
+    ring = np.float32([[[-20, 0, 0], [0, 10, 0], [20, 0, 0]]])
+    colors = np.float32([[[1, 0, 0], [0, 1, 0], [0, 0, 1]]])
+    # Newest last: segments 2-1 in blue, 1-0 in green.
+    expected = render_overlay(
+        renderer,
+        lambda o: o.segments(
+            ring[0][[2, 1]],
+            ring[0][[1, 0]],
+            colors=colors[0][[2, 1]],
+            width=3,
+        ),
+    )
+    trailed = render_overlay(
+        renderer,
+        lambda o: o.trails(ring, colors=colors, fade=False, width=3),
+    )
+    assert differing(trailed, expected) == 0

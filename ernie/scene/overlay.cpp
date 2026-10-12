@@ -297,8 +297,26 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
     if (!batch.colors.Empty()) {
         const std::int64_t columns =
             batch.colors.Rank() > 1 ? batch.colors.Shape().back() : 3;
-        require(batch.colors, "colours", columns == 4 ? 4 : 3,
-                DType::Float32, false);
+        // A trail's colours may be one per point, (n, length, 3 or
+        // 4).
+        const bool perPoint =
+            kind == Kind::Trails &&
+            static_cast<std::size_t>(batch.colors.Elements()) ==
+                batch.Count() * batch.TrailLength() *
+                    static_cast<std::size_t>(columns == 4 ? 4 : 3);
+        if (perPoint) {
+            if (batch.colors.Type() != DType::Float32 ||
+                !batch.colors.IsContiguous() ||
+                batch.colors.Location() != lead.Location()) {
+                throw std::invalid_argument(
+                    "Overlay colours must be contiguous float32 on "
+                    "the "
+                    "points' device");
+            }
+        } else {
+            require(batch.colors, "colours", columns == 4 ? 4 : 3,
+                    DType::Float32, false);
+        }
     }
     require(batch.sizes, "sizes", 1, DType::Float32, false);
     require(batch.worlds, "worlds", 1, DType::Int32, false);

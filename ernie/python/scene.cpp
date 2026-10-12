@@ -276,10 +276,11 @@ ScreenPlacement PlacementFromPython(nb::handle at, nb::handle offset,
 constexpr const char* kPlacementDoc =
     " Placed on the image at `at` (fractions of its width and height "
     "from its top left), moved `offset` pixels (y down), with its "
-    "own "
-    "point `align` (fractions of its size; `at` when None) there, so "
-    "at=(1, 0) is the top right corner. Drawn over everything, in "
-    "every view (or `world`'s).";
+    "own point `align` (fractions of its size) there. Without "
+    "`align`, each axis snaps `at` to 0, 0.5 or 1, keeping the item "
+    "away from the nearer edge: at=(1, 0) is the top right corner, "
+    "at=(0, 0.3) hangs it down the left side from there. Drawn over "
+    "everything, in every view (or `world`'s).";
 
 /// An overlay batch's array (`OverlayBatch`): one on a GPU adopted as
 /// it is, without copying; a host one as a contiguous NumPy array of
@@ -911,8 +912,9 @@ void BindOverlay(nb::module_& m) {
                  "last without), fading to clear at its oldest with "
                  "`fade`; a segment with a NaN end is left out, so "
                  "NaN rows start a trail afresh. Per-item arrays "
-                 "have "
-                 "a row per trail.") +
+                 "have a row per trail; `colors` may instead be one "
+                 "per point, (N, L, 3 or 4), each segment in its "
+                 "newer point's colour (a speed gradient).") +
              kBatchDoc + kStyleDoc)
                 .c_str())
         .def(

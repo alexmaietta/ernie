@@ -208,6 +208,13 @@ TEST(Overlay, ScreenTextSitsByItsPlacement) {
     }
     EXPECT_LE(right, -10.0f + 1e-3f) << "inside the right edge";
     EXPECT_GE(top, 10.0f - 1e-3f) << "below the top";
+    // Without an alignment, a point off the edges keeps its corner on
+    // the side away from the nearer edge.
+    ernie::ScreenPlacement side;
+    side.at = {0.0f, 0.3f};
+    EXPECT_EQ(side.Align(), glm::vec2(0.0f, 0.0f));
+    side.at = {0.8f, 0.7f};
+    EXPECT_EQ(side.Align(), glm::vec2(1.0f, 1.0f));
     // Centred on the image's centre.
     ernie::ScreenPlacement centre;
     centre.at = {0.5f, 0.5f};

@@ -126,6 +126,7 @@ static const uint kBatchHasPoints = 128;
 static const uint kBatchHasHeads = 256;
 static const uint kBatchFade = 512;
 static const uint kBatchDirections = 1024;  // ends are vectors from the points, times params.y
+static const uint kBatchPointColors = 2048;  // a trail's colours one per point
 
 // The font (`OverlayGlyphs`): from ' ', per character its sixteen rows of sixteen bits two to a
 // word, its box (x0, y0, x1, y1 a byte each) and its advance, on a grid of which a line is 12.
@@ -488,6 +489,13 @@ VertexOutput batchSegmentVertex(uint vertexIndex : SV_VertexID) {
         }
         s.a.xyz = a + b.origin.xyz;
         s.b.xyz = c + b.origin.xyz;
+        if ((b.shape.w & kBatchPointColors) != 0) {
+            // The newer point's colour.
+            let alpha = (b.shape.w & kBatchHasAlpha) != 0;
+            let at = b.arrays.w + (alpha ? 4 : 3) * (i * length + newer);
+            s.info.x = packColor(float4(batchData[at], batchData[at + 1], batchData[at + 2],
+                                        alpha ? batchData[at + 3] : unpackColor(b.style.x).a));
+        }
         if ((b.shape.w & kBatchFade) != 0) {
             var color = unpackColor(s.info.x);
             color.a *= 1.0 - float(k) / float(max(length - 1, 1));

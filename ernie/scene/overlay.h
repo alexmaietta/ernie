@@ -60,16 +60,25 @@ struct OverlayStyle {
 /// image's width and height from its top left corner) moved `offset`
 /// pixels (y down), with the item's own point `align` (fractions of
 /// its width and height from its top left) there. Without `align`,
-/// the item's point at `at`, so `at` {1, 0} puts it in the top right
-/// corner.
+/// each axis keeps the item on the side of `at` away from the nearer
+/// edge: its left (top) edge at `at` in the image's left (top) half,
+/// its right (bottom) in the other, its centre at the centre; so
+/// `at` {1, 0} puts it in the top right corner, and {0, 0.3} hangs it
+/// down the left side from there.
 struct ScreenPlacement {
     glm::vec2 at{0.0f};
     glm::vec2 offset{0.0f};
     std::optional<glm::vec2> align;
 
-    /// `align`, else `at`.
+    /// `align`, else `at` snapped to 0, 0.5 or 1 on each axis.
     glm::vec2 Align() const {
-        return align.value_or(at);
+        if (align) {
+            return *align;
+        }
+        const auto snap = [](float t) {
+            return t < 0.5f ? 0.0f : (t > 0.5f ? 1.0f : 0.5f);
+        };
+        return {snap(at.x), snap(at.y)};
     }
 };
 
@@ -236,7 +245,9 @@ struct OverlayBatch {
     /// one for every item, or one per item, such as a link of each
     /// world's robot. The style's anchor without them.
     std::vector<Path> anchors;
-    /// (n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.
+    /// (n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity;
+    /// a trail's may be one per point, (n, length, 3 or 4), each
+    /// segment taking its newer point's.
     Tensor colors;
     /// (n,) pixels: line widths, or markers' sizes.
     Tensor sizes;
