@@ -728,7 +728,7 @@ void RasterMaterial::WriteUniform() {
         heapSlots_.push_back(heap.AddImage(
             BindlessHeap::Kind::Texture2D, sparse.View()));
         u.heap[4] = heapSlots_.back().Index();
-        u.heap[14] = image(&texture.MinLodMap());
+        u.heap[14] = image(&texture.MinLodMap(frameSlot_));
         u.virtualAlbedo[0] = sparse.TailMip();
         u.virtualAlbedo[1] = sparse.Desc().mips;
         u.virtualAlbedo[2] = sparse.Desc().width;

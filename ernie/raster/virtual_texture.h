@@ -27,10 +27,17 @@ namespace ernie {
 /// bottom); `BeginFrame` reads the flags its frame slot's last frame
 /// wrote, loads the wanted tiles from the source coarsest first (each
 /// with its coarser ancestors), evicts the least recently wanted past
-/// the budget, and rewrites the min-LOD map: per mip-0 tile, the
-/// finest mip resident there and around it (one tile of margin,
+/// the budget, and rewrites the slot's min-LOD map: per mip-0 tile,
+/// the finest mip resident there and around it (one tile of margin,
 /// wrapping), which shaders clamp the level of detail to, so no
 /// sample reaches an unbound tile. The mip tail is always resident.
+///
+/// Nothing waits for the device: new tiles are bound before any frame
+/// that maps them, their texels and each slot's map copied in queue
+/// order ahead of the frame; an evicted tile first leaves the maps
+/// and is unbound only once the frames that could still sample it
+/// have finished (a frame later), so the budget may run over by a
+/// frame's evictions.
 ///
 /// Shaders: surface.slang's `virtualTexture`.
 ///
@@ -57,12 +64,16 @@ class VirtualTexture {
                    VkFormat format,
                    VkComponentMapping components = {},
                    VkDeviceSize budget = VkDeviceSize{1} << 30);
+    /// Waits for its maps' last copies.
+    ~VirtualTexture();
+    VirtualTexture(const VirtualTexture&) = delete;
+    VirtualTexture& operator=(const VirtualTexture&) = delete;
 
     /// Serves the requests frame slot `slot` (below
     /// `FrameUploads::kSlots`) gathered in its last frame, which has
     /// finished, and clears them for this frame; does nothing more
-    /// for a `frame` it has seen. Waits for the device when tiles
-    /// change.
+    /// for a `frame` it has seen. `frame` counts up by one each
+    /// frame, whatever its slot.
     void BeginFrame(std::uint32_t slot, std::uint64_t frame);
 
     /// Marks `tile` (and its coarser ancestors) wanted, as a shader's
@@ -73,9 +84,9 @@ class VirtualTexture {
         return *image_;
     }
 
-    /// The min-LOD map: one R32 float per mip-0 tile.
-    const GpuImage& MinLodMap() const {
-        return *minLod_;
+    /// Frame slot `slot`'s min-LOD map: one R32 float per mip-0 tile.
+    const GpuImage& MinLodMap(std::uint32_t slot) const {
+        return *minLods_[slot];
     }
 
     /// The address of slot `slot`'s request flags.
@@ -83,9 +94,10 @@ class VirtualTexture {
         return requests_[slot]->Address();
     }
 
-    /// Tiles resident now, the tail's not counted.
+    /// Tiles resident now, the tail's and those evicted but still
+    /// bound not counted.
     std::size_t ResidentTiles() const {
-        return image_->BoundTiles();
+        return image_->BoundTiles() - retiring_.size();
     }
 
     /// The finest mip resident at mip-0 tile (`x`, `y`), before the
@@ -104,12 +116,23 @@ class VirtualTexture {
     /// `tile`'s blocks cut from the source, rows top to bottom.
     std::vector<std::byte> TileData(const SparseTile& tile) const;
     void Want(const SparseTile& tile);
-    void WriteMinLod();
+    /// Whether `tile` is bound and not on its way out.
+    bool Resident(const SparseTile& tile) const;
+    /// Rewrites slot `slot`'s min-LOD map, copied ahead of its frame.
+    void WriteMinLod(std::uint32_t slot);
 
     const VulkanContext& context_;
     std::shared_ptr<const TextureData> source_;
     std::unique_ptr<SparseImage> image_;
-    std::unique_ptr<GpuImage> minLod_;
+    std::array<std::unique_ptr<GpuImage>, FrameUploads::kSlots>
+        minLods_;
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
+        minLodStaging_;
+    /// Residency changes so far, and the count each slot's map shows.
+    std::uint64_t version_ = 0;
+    std::array<std::uint64_t, FrameUploads::kSlots> mapVersions_{};
+    /// Each slot's last map copy, by its submission (0 for none).
+    std::array<std::uint64_t, FrameUploads::kSlots> mapCopies_{};
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
         requests_;
     /// The first flag of each mip above the tail, and the total.
@@ -120,6 +143,8 @@ class VirtualTexture {
     /// resident tile was last wanted in.
     std::set<SparseTile> wanted_;
     std::map<SparseTile, std::uint64_t> lastWanted_;
+    /// Evicted tiles still bound, by the frame they left the maps in.
+    std::map<SparseTile, std::uint64_t> retiring_;
 };
 
 }  // namespace ernie

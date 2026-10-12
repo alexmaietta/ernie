@@ -177,6 +177,9 @@ SparseImage::SparseImage(const VulkanContext& context,
 }
 
 SparseImage::~SparseImage() {
+    for (const auto& pending : staging_) {
+        context_.WaitForSubmission(pending.first);
+    }
     if (view_ != VK_NULL_HANDLE) {
         vkDestroyImageView(context_.Device(), view_, nullptr);
     }
@@ -312,27 +315,46 @@ void SparseImage::Write(
         regions.push_back(region);
         total += texels[i].size();
     }
+    Copy(regions, texels);
+    Track();
+}
+
+void SparseImage::Copy(
+    std::span<const VkBufferImageCopy> regions,
+    std::span<const std::span<const std::byte>> data) {
+    // Staging whose copies the device has finished goes.
+    std::erase_if(staging_, [&](const auto& pending) {
+        return context_.WaitForSubmission(pending.first, 0);
+    });
+    VkDeviceSize total = 0;
+    for (const std::span<const std::byte>& bytes : data) {
+        total += bytes.size();
+    }
     if (total == 0) {
-        Track();
         return;
     }
-    GpuBuffer staging(context_, total, 0, BufferMemory::Upload);
-    for (std::size_t i = 0; i < tiles.size(); ++i) {
-        staging.Write(texels[i], regions[i].bufferOffset);
+    auto staging = std::make_unique<GpuBuffer>(context_, total, 0,
+                                               BufferMemory::Upload);
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        staging->Write(data[i], regions[i].bufferOffset);
     }
-    context_.Submit([&](VkCommandBuffer commands) {
-        TransitionImage(commands, image_, aspect_, layout_,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        vkCmdCopyBufferToImage(
-            commands, staging.Handle(), image_,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            static_cast<std::uint32_t>(regions.size()),
-            regions.data());
-        TransitionImage(commands, image_, aspect_,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    });
-    Track();
+    // The barriers order the copy after earlier work on the image and
+    // before later work in queue order, so frames submitted next read
+    // the texels without the host waiting.
+    const std::uint64_t submission =
+        context_.SubmitAsync([&](VkCommandBuffer commands) {
+            TransitionImage(commands, image_, aspect_, layout_,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            vkCmdCopyBufferToImage(
+                commands, staging->Handle(), image_,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                static_cast<std::uint32_t>(regions.size()),
+                regions.data());
+            TransitionImage(commands, image_, aspect_,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        });
+    staging_.emplace_back(submission, std::move(staging));
 }
 
 void SparseImage::WriteTail(
@@ -360,25 +382,7 @@ void SparseImage::WriteTail(
         regions.push_back(region);
         total += mips[i].size();
     }
-    if (total == 0) {
-        return;
-    }
-    GpuBuffer staging(context_, total, 0, BufferMemory::Upload);
-    for (std::size_t i = 0; i < mips.size(); ++i) {
-        staging.Write(mips[i], regions[i].bufferOffset);
-    }
-    context_.Submit([&](VkCommandBuffer commands) {
-        TransitionImage(commands, image_, aspect_, layout_,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        vkCmdCopyBufferToImage(
-            commands, staging.Handle(), image_,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            static_cast<std::uint32_t>(regions.size()),
-            regions.data());
-        TransitionImage(commands, image_, aspect_,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    });
+    Copy(regions, mips);
 }
 
 void SparseImage::Release(std::span<const SparseTile> tiles) {
@@ -392,7 +396,6 @@ void SparseImage::Release(std::span<const SparseTile> tiles) {
     if (bound.empty()) {
         return;
     }
-    vkDeviceWaitIdle(context_.Device());
     const std::vector<VmaAllocation> none(bound.size(),
                                           VK_NULL_HANDLE);
     BindTiles(bound, none);

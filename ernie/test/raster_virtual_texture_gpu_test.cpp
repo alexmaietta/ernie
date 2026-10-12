@@ -172,8 +172,19 @@ TEST_F(VirtualTextureTest, TheBudgetEvictsTheLeastRecentlyWanted) {
     texture.Request({mip, 0, 1});
     texture.BeginFrame(0, 3);
     EXPECT_EQ(texture.ResidentTiles(), 3u);
-    EXPECT_FALSE(image.Bound({mip, 0, 0}))
-        << "the least recently wanted";
+    // The least recently wanted tile leaves the maps at once, but
+    // stays bound until the frame before, which may still sample it,
+    // is done.
+    const std::uint32_t x = 1u
+                            << mip;  // Under mip `mip`'s tile (1, 0).
+    EXPECT_GT(texture.FinestResident(0, 0), mip)
+        << "no longer resident";
+    EXPECT_EQ(texture.FinestResident(x, 0), mip)
+        << "its neighbour is";
+    EXPECT_TRUE(image.Bound({mip, 0, 0})) << "still bound";
+    texture.BeginFrame(1, 4);
+    EXPECT_FALSE(image.Bound({mip, 0, 0})) << "unbound a frame later";
+    EXPECT_EQ(texture.ResidentTiles(), 3u);
     EXPECT_TRUE(image.Bound({mip, 1, 0}));
     EXPECT_TRUE(image.Bound({mip, 0, 1}));
     EXPECT_TRUE(image.Bound({mip + 1, 0, 0}))

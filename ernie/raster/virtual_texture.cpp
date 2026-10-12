@@ -70,7 +70,21 @@ VirtualTexture::VirtualTexture(
     maxTiles_ = std::max<std::size_t>(
         1,
         static_cast<std::size_t>(budget / image_->TileMemoryBytes()));
-    WriteMinLod();
+    const VkExtent2D count = image_->TailMip() > 0
+                                 ? image_->TileCount(0)
+                                 : VkExtent2D{1, 1};
+    for (std::uint32_t slot = 0; slot < FrameUploads::kSlots;
+         ++slot) {
+        minLods_[slot] = std::make_unique<GpuImage>(
+            context, ImageDesc{count.width, count.height, 1, 1,
+                               VK_FORMAT_R32_SFLOAT,
+                               VK_IMAGE_USAGE_SAMPLED_BIT});
+        minLodStaging_[slot] = std::make_unique<GpuBuffer>(
+            context,
+            VkDeviceSize{count.width} * count.height * sizeof(float),
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, BufferMemory::Upload);
+        WriteMinLod(slot);
+    }
 }
 
 std::size_t VirtualTexture::FlagIndex(const SparseTile& tile) const {
@@ -154,12 +168,30 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
         requests.Write(std::as_bytes(std::span(zeros)));
     }
 
+    // Evicted tiles go once every frame whose map still showed them
+    // has finished: the frames before the one they left the maps in,
+    // the last of which ran in the other slot.
+    bool changed = false;
+    std::vector<SparseTile> unbind;
+    for (auto it = retiring_.begin(); it != retiring_.end();) {
+        if (it->second + FrameUploads::kSlots - 1 <= frame) {
+            unbind.push_back(it->first);
+            it = retiring_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    image_->Release(unbind);
+
     // Wanted tiles not resident, coarsest first so detail sharpens in
-    // order; the rest wait for later frames.
+    // order; the rest wait for later frames. Evicted tiles wanted
+    // again come back as they are.
     std::vector<SparseTile> load;
     for (const SparseTile& tile : wanted_) {
         lastWanted_[tile] = frame;
-        if (!image_->Bound(tile)) {
+        if (retiring_.erase(tile) > 0) {
+            changed = true;
+        } else if (!image_->Bound(tile)) {
             load.push_back(tile);
         }
     }
@@ -177,7 +209,7 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
     if (resident + load.size() > maxTiles_) {
         std::vector<std::pair<std::uint64_t, SparseTile>> candidates;
         for (const auto& [tile, last] : lastWanted_) {
-            if (image_->Bound(tile) && !wanted_.contains(tile)) {
+            if (Resident(tile) && !wanted_.contains(tile)) {
                 candidates.emplace_back(last, tile);
             }
         }
@@ -204,33 +236,49 @@ void VirtualTexture::BeginFrame(std::uint32_t slot,
     // Tiles wanted this frame are asked for again by the shaders that
     // still sample them; those loaded leave the list.
     for (auto it = wanted_.begin(); it != wanted_.end();) {
-        it = image_->Bound(*it) ? wanted_.erase(it) : std::next(it);
+        it = Resident(*it) ? wanted_.erase(it) : std::next(it);
     }
-    if (load.empty() && evict.empty()) {
-        return;
-    }
-    vkDeviceWaitIdle(context_.Device());
-    image_->Release(evict);
     for (const SparseTile& tile : evict) {
+        retiring_[tile] = frame;
         lastWanted_.erase(tile);
+        changed = true;
     }
-    std::vector<std::vector<std::byte>> data;
-    std::vector<std::span<const std::byte>> spans;
-    for (const SparseTile& tile : load) {
-        data.push_back(TileData(tile));
+    if (!load.empty()) {
+        std::vector<std::vector<std::byte>> data;
+        std::vector<std::span<const std::byte>> spans;
+        for (const SparseTile& tile : load) {
+            data.push_back(TileData(tile));
+        }
+        for (const auto& bytes : data) {
+            spans.push_back(bytes);
+        }
+        image_->Write(load, spans);
+        changed = true;
     }
-    for (const auto& bytes : data) {
-        spans.push_back(bytes);
+    if (changed) {
+        ++version_;
     }
-    image_->Write(load, spans);
-    WriteMinLod();
+    // This slot's map, if it shows an older residency.
+    if (mapVersions_[slot] != version_) {
+        WriteMinLod(slot);
+    }
+}
+
+VirtualTexture::~VirtualTexture() {
+    for (const std::uint64_t copy : mapCopies_) {
+        context_.WaitForSubmission(copy);
+    }
+}
+
+bool VirtualTexture::Resident(const SparseTile& tile) const {
+    return image_->Bound(tile) && !retiring_.contains(tile);
 }
 
 std::uint32_t VirtualTexture::FinestResident(std::uint32_t x,
                                              std::uint32_t y) const {
     std::uint32_t finest = image_->TailMip();
     for (std::uint32_t mip = image_->TailMip(); mip-- > 0;) {
-        if (!image_->Bound({mip, x >> mip, y >> mip})) {
+        if (!Resident({mip, x >> mip, y >> mip})) {
             break;
         }
         finest = mip;
@@ -238,7 +286,7 @@ std::uint32_t VirtualTexture::FinestResident(std::uint32_t x,
     return finest;
 }
 
-void VirtualTexture::WriteMinLod() {
+void VirtualTexture::WriteMinLod(std::uint32_t slot) {
     const VkExtent2D count = image_->TailMip() > 0
                                  ? image_->TileCount(0)
                                  : VkExtent2D{1, 1};
@@ -276,18 +324,35 @@ void VirtualTexture::WriteMinLod() {
             clamp[std::size_t{y} * count.width + x] = coarsest;
         }
     }
-    auto map = std::make_unique<GpuImage>(
-        context_,
-        ImageDesc{count.width, count.height, 1, 1,
-                  VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT});
-    const std::span<const std::byte> mips[] = {
-        std::as_bytes(std::span(clamp))};
-    map->Upload(mips);
-    minLod_ = std::move(map);
+    // The last copy from this staging has almost always finished with
+    // the slot's last frame (not when the texture was made
+    // mid-frame); this copy runs ahead of the slot's next frame.
+    context_.WaitForSubmission(mapCopies_[slot]);
+    GpuBuffer& staging = *minLodStaging_[slot];
+    staging.Write(std::as_bytes(std::span(clamp)));
+    GpuImage& map = *minLods_[slot];
+    mapCopies_[slot] =
+        context_.SubmitAsync([&](VkCommandBuffer commands) {
+            map.Transition(commands,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VkBufferImageCopy region{};
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0,
+                                       0, 1};
+            region.imageExtent = {count.width, count.height, 1};
+            vkCmdCopyBufferToImage(
+                commands, staging.Handle(), map.Handle(),
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+            map.Transition(commands,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        });
+    mapVersions_[slot] = version_;
 }
 
 VkDeviceSize VirtualTexture::Bytes() const {
-    VkDeviceSize bytes = image_->Bytes() + minLod_->Bytes();
+    VkDeviceSize bytes = image_->Bytes();
+    for (const auto& map : minLods_) {
+        bytes += map->Bytes();
+    }
     for (const auto& requests : requests_) {
         bytes += requests->Size();
     }

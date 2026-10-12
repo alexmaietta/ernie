@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/device/buffer.h"
 #include "ernie/device/vulkan_context.h"
 
 #include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <span>
+#include <utility>
+#include <vector>
 
 namespace ernie {
 
@@ -41,9 +45,11 @@ struct SparseImageDesc {
 /// Tiles have the format's standard block shape (64 KiB each: 128 x
 /// 128 texels of 32-bit texels, 256 x 256 of BC7). Mips smaller than
 /// a tile share the mip tail, bound at creation and written with
-/// `WriteTail`. Binding and writing wait for the device; releasing
-/// waits for it to go idle, so nothing in flight reads a tile as it
-/// goes.
+/// `WriteTail`. Binding waits for the bind alone; texels are copied
+/// in submissions the host does not wait for, ordered before work
+/// submitted after them. Releasing unbinds at once: callers keep work
+/// in flight off the tiles they release (`VirtualTexture` lets a
+/// frame pass first).
 ///
 /// Requires `VulkanContext::SupportsSparseResidency`.
 ///
@@ -104,20 +110,20 @@ class SparseImage {
 
     /// Binds memory to the tiles not yet bound among `tiles` and
     /// writes `texels[i]` (`TileDataBytes(tiles[i])` bytes, rows top
-    /// to bottom) into tile `i`. Waits for the device.
+    /// to bottom) into tile `i`, for work submitted after it to read.
     /// @throws std::invalid_argument for a tile the image does not
     /// have, or data of the wrong size.
     void Write(std::span<const SparseTile> tiles,
                std::span<const std::span<const std::byte>> texels);
 
     /// Writes the mip tail: `mips[i]` holds mip `TailMip() + i`,
-    /// tightly packed. Waits for the device.
+    /// tightly packed, for work submitted after it to read.
     /// @throws std::invalid_argument for the wrong number of mips or
     /// a mip of the wrong size.
     void WriteTail(std::span<const std::span<const std::byte>> mips);
 
-    /// Unbinds `tiles` and frees their memory, once the device is
-    /// idle. Tiles not bound are skipped.
+    /// Unbinds `tiles` and frees their memory now; no work in flight
+    /// may read them. Tiles not bound are skipped.
     void Release(std::span<const SparseTile> tiles);
 
     bool Bound(const SparseTile& tile) const {
@@ -138,6 +144,11 @@ class SparseImage {
     void BindTiles(std::span<const SparseTile> tiles,
                    std::span<const VmaAllocation> memory);
     void Track() const;
+    /// Copies `data[i]` into `regions[i]` (whose buffer offsets lay
+    /// the data out one after another) in a submission the host does
+    /// not wait for, keeping the staging until the device is done.
+    void Copy(std::span<const VkBufferImageCopy> regions,
+              std::span<const std::span<const std::byte>> data);
 
     const VulkanContext& context_;
     SparseImageDesc desc_;
@@ -152,6 +163,9 @@ class SparseImage {
     VkDeviceSize tailBytes_ = 0;
     std::map<SparseTile, VmaAllocation> tiles_;
     VkImageLayout layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
+    /// Staging of copies in flight, by their submission.
+    std::vector<std::pair<std::uint64_t, std::unique_ptr<GpuBuffer>>>
+        staging_;
 };
 
 }  // namespace ernie
