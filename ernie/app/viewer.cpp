@@ -2949,8 +2949,13 @@ struct Viewer::State {
             const auto focus =
                 std::find(focusRequests.begin(), focusRequests.end(),
                           panel.Title());
+            // Not behind an open popup, such as a file dialog, which
+            // focus elsewhere would close: the request waits for it.
             if (focus != focusRequests.end() &&
-                drawnPanels.contains(panel.Title())) {
+                drawnPanels.contains(panel.Title()) &&
+                !ImGui::IsPopupOpen(
+                    "", ImGuiPopupFlags_AnyPopupId |
+                            ImGuiPopupFlags_AnyPopupLevel)) {
                 ImGui::SetNextWindowFocus();
                 focusRequests.erase(focus);
             }
