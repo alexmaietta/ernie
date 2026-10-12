@@ -67,7 +67,7 @@ public float surfaceAlbedoScale(float3 world) {
     }
     let extent = surface.albedoMapSize.xy * surface.albedoMap.z;
     let uv = float2(world.x - surface.albedoMap.x, surface.albedoMap.y - world.y) / extent;
-    let m = albedoMap.SampleLevel(clampSampler, uv, 0);
+    let m = albedoMap.SampleLevel(clampSampler(), uv, 0);
     return m.r + (1.0 - m.g) * surface.albedo.a;
 }
 

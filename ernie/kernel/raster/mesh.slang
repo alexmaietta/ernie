@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Mesh and PointInstancer passes. Geometry is pulled from storage buffers rather than vertex
-// buffers, read through their addresses. Besides the frame (bindings 0 to 4, frame.slang) and
+// buffers, read through their addresses. Besides the frame (bindings 0 and 1, frame.slang) and
 // the draw's material (5 to 9, surface.slang) the passes bind
 //   10 the buffers' addresses (`MeshResources`),
 //   22 the material's albedo texture, 23 its normal map, 24 its roughness, 25 its metallic and

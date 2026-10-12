@@ -84,6 +84,7 @@ class HexTilingGpuTest : public ernie::testing::VulkanTest {
         const std::vector<ShaderModuleSource> modules = {
             {"brdf", std::string(ernie::BrdfSlang())},
             {"projection", ShaderSource("raster/projection_pinhole")},
+            {"bindless", ShaderSource("bindless")},
             {"frame", ShaderSource("raster/frame")},
             {"surface", ShaderSource("raster/surface")},
             {"harness", kHarness}};

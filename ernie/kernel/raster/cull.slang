@@ -22,18 +22,20 @@
 // choices keeps each level's instances in their original order, so images do not depend on thread
 // timing, and the workgroup writes the draws' instance counts last.
 //
-// Bindings: 0 draws' culling data, 1 jobs, 2 views (12 float4 each: 6 normalised frustum planes,
+// Its inputs, read through their addresses in the push constants (`CullConstants`), and outputs:
+// 0 draws' culling data, 1 jobs, 2 views (12 float4 each: 6 normalised frustum planes,
 // the view-projection's 4 columns, then pixels per world unit at w = 1 and the error in pixels,
 // then the depth pyramid's level-0 width and height and level count, 0 without one; a pushbroom's
 // view holds its strip in the matrix's place, the strip's intrinsics' first two after the error
 // and its line after the level count, its planes those of the strip's envelope), 3 instance
-// ids of the draws (mesh.slang's binding 18), 4 positions, 5 orientations, 6 scales, 7 the
+// ids of the draws (mesh.slang's `instanceIds`), 4 positions, 5 orientations, 6 scales, 7 the
 // compacted visible ids (a run of the job's instance count per level), 8 the indirect draws
 // (VkDrawIndirectCommand, 4 uints each, one per level), 9 the levels of detail (first index
 // relative to the mesh's, index count, error in mesh units as bits, unused), 10 the views' depth
 // pyramids (one layer per view of the chunk), 11 each view's visibility of each instance in its
 // previous frame, one bit per (view, instance id), 12 meshes' points and triangle indices in use
-// (int32 pairs by slot, `CullItem.info.w`).
+// (int32 pairs by slot, `CullItem.info.w`). Of those, 7, 8, 10 and 11 are bound; the rest are read
+// by address.
 //
 // References:
 // - U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015 Advances in
@@ -84,22 +86,35 @@ struct CullConstants {
     // x: mode (see above), y: first view of the depth pyramids' layer 0, z: instance ids per view
     // in the visibility bits, w: unused.
     uint4 mode;
+    // The buffers it reads, by address: the items, jobs and views, the instances' ids,
+    // positions, orientations and scales, the levels of detail and the meshes' active counts.
+    CullItem* items;
+    CullJob* jobs;
+    float4* views;
+    uint* instanceIds;
+    float* positions;
+    float* orientations;
+    float* scales;
+    uint4* lods;
+    int* activeCounts;
 }
 
-[[vk::binding(0, 0)]] StructuredBuffer<CullItem> items;
-[[vk::binding(1, 0)]] StructuredBuffer<CullJob> jobs;
-[[vk::binding(2, 0)]] StructuredBuffer<float4> views;
-[[vk::binding(3, 0)]] StructuredBuffer<uint> instanceIds;
-[[vk::binding(4, 0)]] StructuredBuffer<float> positions;
-[[vk::binding(5, 0)]] StructuredBuffer<float> orientations;
-[[vk::binding(6, 0)]] StructuredBuffer<float> scales;
+// Bindings, what it writes (atomically) and the depth pyramids: 7 the visible instance ids, 8
+// the indirect draws, 10 the depth pyramids, 11 the visibility bits.
 [[vk::binding(7, 0)]] RWStructuredBuffer<uint> visibleIds;
 [[vk::binding(8, 0)]] RWStructuredBuffer<uint> commands;
-[[vk::binding(9, 0)]] StructuredBuffer<uint4> lods;
 [[vk::binding(10, 0)]] Texture2DArray<float> hzb;
 [[vk::binding(11, 0)]] RWStructuredBuffer<uint> visibility;
-[[vk::binding(12, 0)]] StructuredBuffer<int> activeCounts;
 [[vk::push_constant]] ConstantBuffer<CullConstants> constants;
+static CullItem* items = constants.items;
+static CullJob* jobs = constants.jobs;
+static float4* views = constants.views;
+static uint* instanceIds = constants.instanceIds;
+static float* positions = constants.positions;
+static float* orientations = constants.orientations;
+static float* scales = constants.scales;
+static uint4* lods = constants.lods;
+static int* activeCounts = constants.activeCounts;
 
 static const uint kGroup = 64;
 static const uint kMaxLods = 8;
@@ -120,7 +135,7 @@ static const uint kTwoPassSecond = 3;
 groupshared uint chosen[kGroup];
 groupshared uint levelCounts[kMaxLods];
 
-float3 load3(StructuredBuffer<float> buffer, uint i) {
+float3 load3(float* buffer, uint i) {
     return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
 }
 

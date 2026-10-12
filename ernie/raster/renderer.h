@@ -770,6 +770,8 @@ class RasterRenderer {
     /// unless already compiled.
     void SensorPipelines(const SensorPlan& plan);
     void WriteMaterialTable();
+    /// Writes `frameResources_` for the frame's recordings.
+    void WriteFrameResources();
     void WriteShading(const FrameParams& params);
     /// The sensor's uniforms for `params`' camera, its views a
     /// sub-frame's each; `raster` the views the raster passes draw (a
@@ -1170,6 +1172,12 @@ class RasterRenderer {
     BindlessHeap::Slot shadowSamplerSlot_;
     /// `clampSampler_`'s, for the sensor's channel pyramids.
     BindlessHeap::Slot clampSamplerSlot_;
+    /// frame.slang's FrameResources, the drawables' binding 0: with
+    /// the light shadow maps, and with shadow passes' placeholder;
+    /// and the maps' heap slots of the last update
+    /// (`WriteFrameResources`).
+    std::unique_ptr<GpuBuffer> frameResources_[2];
+    std::vector<BindlessHeap::Slot> frameSlots_;
     mutable std::vector<BindlessHeap::Slot> shadingSlots_;
     /// The lights in `lightTable_`'s first copy (`WriteShading`).
     std::uint32_t lightCount_ = 0;

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Per-frame resources every raster pass shares, at fixed bindings of its push-descriptor set:
-//   0 every view's Uniforms (view and light; `u` is the drawn view's), 1 Shadows (a shadow pass's
-//   light view, the cascades' splits), 2 the light shadow maps, 3 shadow comparison sampler, 4
-//   clamping linear sampler;
+//   0 the frame's resources (`FrameResources`: every view's Uniforms by address, view and light,
+//   `u` the drawn view's; the light shadow maps', shadow comparison sampler's and clamping linear
+//   sampler's slots in the bindless heap), 1 Shadows (a shadow pass's light view, the cascades'
+//   splits); 2 to 4 are free;
 // the per-draw push constants; and reflectance helpers. Materials take
 // bindings 5 to 9 (surface.slang) and each drawable's own resources start at 10.
 //
 // Passes place world points in the image with `projectWorld`, from module `projection`: a frame
 // camera's view-projection (projection_pinhole.slang), or a pushbroom's strip
 // (projection_pushbroom.slang), whichever the pass was compiled with.
+import bindless;
 import projection;
 
 public struct Uniforms {
@@ -127,19 +129,30 @@ public struct Shadows {
     public uint4 virtualMap;
 }
 
-// Every view's Uniforms, so a pass binds them once for all its views and each draw names its
-// view (`DrawConstants::view`).
-[[vk::binding(0, 0)]] public StructuredBuffer<Uniforms> views;
+// The frame's resources (renderer's `FrameResources`): every view's Uniforms, so a pass binds them
+// once for all its views and each draw names its view (`DrawConstants::view`); the light shadow
+// maps' slot in the bindless heap's `heapTextureArrays` (a placeholder in shadow passes, which
+// draw into them), and the shadow comparison and clamping linear samplers'.
+public struct FrameResources {
+    public Uniforms* views;
+    public uint shadowMap;
+    public uint shadowSampler;
+    public uint clampSampler;
+    uint padding;
+}
+[[vk::binding(0, 0)]] public ConstantBuffer<FrameResources> frameResources;
 [[vk::binding(1, 0)]] public ConstantBuffer<Shadows> s;
-[[vk::binding(2, 0)]] public Texture2DArray<float> shadowMap;
-[[vk::binding(3, 0)]] public SamplerComparisonState shadowSampler;
-[[vk::binding(4, 0)]] public SamplerState clampSampler;
+
+// The clamping linear sampler.
+public SamplerState clampSampler() {
+    return heapSamplers[frameResources.clampSampler];
+}
 [[vk::push_constant]] public ConstantBuffer<DrawConstants> draw;
 
 // The Uniforms of the view drawn.
 public property Uniforms u {
     get {
-        return views[draw.view];
+        return frameResources.views[draw.view];
     }
 }
 
@@ -226,6 +239,7 @@ public float minimalShadow(float3 world, float3 normal) {
     if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
         return 1.0;
     }
+    let shadowMap = heapTextureArrays[frameResources.shadowMap];
     uint width;
     uint height;
     uint layers;
@@ -238,7 +252,7 @@ public float minimalShadow(float3 world, float3 normal) {
     for (uint i = 0; i < 4; ++i) {
         let tap = float2((i & 1u) != 0 ? 0.5 : -0.5, (i & 2u) != 0 ? 0.5 : -0.5) * texel;
         lit += shadowMap.SampleCmpLevelZero(
-            shadowSampler,
+            heapComparisonSamplers[frameResources.shadowSampler],
             float3(clamp(at + tap, float2(0.0), float2(corner - 0.5 * texel)), layer), depth);
     }
     return lit * 0.25;

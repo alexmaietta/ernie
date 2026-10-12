@@ -623,6 +623,19 @@ constexpr DescriptorBinding kShadingBindings[] = {
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+/// frame.slang's FrameResources, every drawable's binding 0: the
+/// views' uniforms' address, and the shadow maps' and samplers'
+/// bindless heap slots.
+struct FrameResources {
+    VkDeviceAddress views;
+    std::uint32_t shadowMap;
+    std::uint32_t shadowSampler;
+    std::uint32_t clampSampler;
+    std::uint32_t padding;
+};
+static_assert(sizeof(FrameResources) == 24,
+              "FrameResources must match frame.slang");
+
 /// shading.slang's ShadingResources: its buffers' addresses, then its
 /// textures' and samplers' indices in the bindless heap.
 struct ShadingResources {
@@ -874,6 +887,7 @@ ShadingModules(const BrdfModel& brdf,
                     {"bindless", shaders::kBindlessSlang},
                     {"atmosphere", shaders::kAtmosphereSlang},
                     {"virtual_shadow", shaders::kVirtualShadowSlang},
+                    {"laser_beams", shaders::kLaserBeamsSlang},
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
                                     brdf.typeName + ";\n" +
@@ -3984,7 +3998,37 @@ void RasterRenderer::Update(
     }
     // Overlays posed under instances, once the meshes placed them.
     overlays_->PoseAnchors(params.origin);
+    WriteFrameResources();
     updated_ = true;
+}
+
+void RasterRenderer::WriteFrameResources() {
+    // Fresh heap slots each update: the last ones retire once no
+    // frame in flight reads them.
+    BindlessHeap& heap = context_.Bindless();
+    frameSlots_.clear();
+    const auto slot = [&](const GpuImage& image) {
+        frameSlots_.push_back(heap.AddImage(
+            BindlessHeap::Kind::Texture2DArray, image.View()));
+        return frameSlots_.back().Index();
+    };
+    // The light shadow maps, which minimal shading reads; shadow
+    // passes, which draw into them, read a placeholder instead.
+    const std::uint32_t maps[2] = {slot(*lightShadowMaps_),
+                                   slot(*shadowMaps_)};
+    for (std::size_t k = 0; k < 2; ++k) {
+        const FrameResources resources{uniforms_.Address(), maps[k],
+                                       shadowSamplerSlot_.Index(),
+                                       clampSamplerSlot_.Index(), 0u};
+        if (frameResources_[k] == nullptr) {
+            frameResources_[k] = std::make_unique<GpuBuffer>(
+                context_, sizeof(resources),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        uploads_.Write(*frameResources_[k],
+                       std::as_bytes(std::span(&resources, 1)));
+    }
 }
 
 const ComputePipeline&
@@ -4769,15 +4813,11 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
-    // The light shadow maps, which minimal shading reads; shadow
-    // passes, which draw into them, bind a placeholder instead
+    // With the light shadow maps, which minimal shading reads; shadow
+    // passes, which draw into them, read a placeholder instead
     // (`RecordShadowMaps`).
-    return {DescriptorResource::Of(uniforms_),
-            view,
-            DescriptorResource::Of(shadowUniforms_),
-            DescriptorResource::Of(lightShadowMaps_->View()),
-            DescriptorResource::Of(shadowSampler_),
-            DescriptorResource::Of(clampSampler_)};
+    return {DescriptorResource::Of(*frameResources_[0]), view,
+            DescriptorResource::Of(shadowUniforms_)};
 }
 
 bool RasterRenderer::CanPresent(std::string_view name) {
@@ -4956,7 +4996,7 @@ void RasterRenderer::RecordShadowMaps(
     // Drawing into the light shadow maps, the passes bind a texel in
     // their place.
     RasterFrame frame = given;
-    frame.shadowMap = DescriptorResource::Of(shadowMaps_->View());
+    frame.resources = DescriptorResource::Of(*frameResources_[1]);
     // Moving lights' views at the sub-frame's time, written over the
     // frame's where the last sub-frame's draws and shading have read
     // them.

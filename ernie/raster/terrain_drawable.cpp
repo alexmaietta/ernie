@@ -69,14 +69,11 @@ static_assert(sizeof(DrawConstants) == 96,
 constexpr VkShaderStageFlags kGraphics =
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-/// Frame (0 to 4), material (5 to 9) and terrain (10 to 13) bindings;
-/// see terrain.slang.
+/// Frame (0 and 1), material (5 to 9) and terrain (10 to 13)
+/// bindings; see terrain.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
@@ -92,6 +89,7 @@ std::vector<ShaderModuleSource>
 TerrainModules(bool pushbroom = false) {
     return {{"brdf", std::string(BrdfSlang())},
             ProjectionModule(pushbroom),
+            {"bindless", shaders::kBindlessSlang},
             {"frame", shaders::kFrameSlang},
             {"terrain", shaders::kTerrainSlang},
             {"surface", shaders::kSurfaceSlang}};
@@ -1050,9 +1048,8 @@ void TerrainDrawable::Prepare(
 std::vector<DescriptorResource>
 TerrainDrawable::Resources(const RasterFrame& frame,
                            std::size_t view) const {
-    std::vector<DescriptorResource> resources = {
-        frame.uniforms, frame.shadows, frame.shadowMap,
-        frame.shadowSampler, frame.clampSampler};
+    std::vector<DescriptorResource> resources = {frame.resources,
+                                                 frame.shadows};
     renderer_.MaterialOrDefault(params_.material)
         .AppendResources(resources);
     resources.push_back(DescriptorResource::Of(

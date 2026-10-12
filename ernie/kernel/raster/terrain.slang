@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Terrain resources and the CDLOD grid vertex, used by the terrain's shadow and colour passes.
-// Besides the frame (bindings 0 to 4, frame.slang) and material (5 to 9, surface.slang) the
+// Besides the frame (bindings 0 and 1, frame.slang) and material (5 to 9, surface.slang) the
 // passes bind
 //   10 TerrainUniforms, 11 heights, 12 LOD patches, 13 height gradients.
 __exported import frame;
@@ -97,7 +97,7 @@ public GridVertex gridVertex(uint vertexIndex, uint instanceIndex) {
 public float2 terrainSlope(float3 world) {
     let extent = float2(t.dims.xy) * t.grid.z;
     let uv = float2(world.x - t.grid.x, t.grid.y - world.y) / extent;
-    return gradients.Sample(clampSampler, uv) * t.grid.w;
+    return gradients.Sample(clampSampler(), uv) * t.grid.w;
 }
 
 public float3 slopeNormal(float2 slope) {

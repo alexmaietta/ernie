@@ -8,7 +8,7 @@
 // footprint so it fades to its mean colour with distance instead of aliasing (Quilez, "Filtering
 // the Checkerboard Pattern", https://iquilezles.org/articles/checkerfiltering/).
 //
-// Bindings: frame 0 to 4 (frame.slang), material 5 to 9 (surface.slang), 10 GroundUniforms.
+// Bindings: frame 0 and 1 (frame.slang), material 5 to 9 (surface.slang), 10 GroundUniforms.
 import frame;
 import projection;
 import surface;

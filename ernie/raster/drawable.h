@@ -39,12 +39,13 @@ inline ShaderModuleSource ProjectionModule(bool pushbroom) {
 /// 4; and the view drawn, which draws name in their push constants
 /// (`DrawConstants::view`).
 struct RasterFrame {
-    DescriptorResource uniforms;
+    /// Binding 0, frame.slang's FrameResources: every view's uniforms
+    /// by address, and the light shadow maps' (a placeholder in
+    /// shadow passes) and samplers' bindless heap slots.
+    DescriptorResource resources;
     std::uint32_t view = 0;
+    /// Binding 1, frame.slang's Shadows.
     DescriptorResource shadows;
-    DescriptorResource shadowMap;
-    DescriptorResource shadowSampler;
-    DescriptorResource clampSampler;
     /// Shadow passes: `shadows` is the light view's own block, whose
     /// first view-projection the pass draws with
     /// (`DrawConstants::shadowFromFrame`), as the GPU may have fitted

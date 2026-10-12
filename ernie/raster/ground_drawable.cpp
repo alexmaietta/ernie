@@ -50,14 +50,11 @@ constexpr std::size_t kViewWord = 21;
 constexpr VkShaderStageFlags kGraphics =
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-/// Frame (0 to 4), material (5 to 9) and ground (10) bindings; see
+/// Frame (0 and 1), material (5 to 9) and ground (10) bindings; see
 /// ground.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
@@ -80,6 +77,7 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
     const std::vector<ShaderModuleSource> modules{
         {"brdf", std::string(BrdfSlang())},
         ProjectionModule(pushbroom),
+        {"bindless", shaders::kBindlessSlang},
         {"frame", shaders::kFrameSlang},
         {"surface", shaders::kSurfaceSlang},
         {"ground", shaders::kGroundSlang}};
@@ -220,9 +218,8 @@ void GroundDrawable::RecordColorViews(
     // Every view binds the same resources, the views' uniforms
     // indexed by the view drawn.
     const RasterFrame& frame = frames.front();
-    std::vector<DescriptorResource> resources = {
-        frame.uniforms, frame.shadows, frame.shadowMap,
-        frame.shadowSampler, frame.clampSampler};
+    std::vector<DescriptorResource> resources = {frame.resources,
+                                                 frame.shadows};
     renderer_.MaterialOrDefault(params_.material)
         .AppendResources(resources);
     resources.push_back(DescriptorResource::Of(uniforms_));

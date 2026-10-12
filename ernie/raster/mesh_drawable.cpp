@@ -95,23 +95,33 @@ static_assert(sizeof(MeshDrawable::GpuCullJob) == 32,
 
 constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
-/// cull.slang's bindings: culling data, jobs, planes, instance ids
-/// and arrays, and the outputs.
+/// cull.slang's bindings: what it writes (visible ids, indirect
+/// draws, visibility bits) and the depth pyramids; it reads the rest
+/// by address (`CullConstants`).
 constexpr DescriptorBinding kCullBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
+
+/// cull.slang's CullConstants: the dispatch's jobs and mode, then the
+/// buffers it reads by address.
+struct CullConstants {
+    std::uint32_t size[4];
+    std::uint32_t mode[4];
+    VkDeviceAddress items;
+    VkDeviceAddress jobs;
+    VkDeviceAddress views;
+    VkDeviceAddress instanceIds;
+    VkDeviceAddress positions;
+    VkDeviceAddress orientations;
+    VkDeviceAddress scales;
+    VkDeviceAddress lods;
+    VkDeviceAddress activeCounts;
+};
+static_assert(sizeof(CullConstants) == 104,
+              "CullConstants must match cull.slang");
 
 /// active_draws.slang's bindings: counts in use and the draws.
 constexpr DescriptorBinding kActiveDrawsBindings[] = {
@@ -267,15 +277,12 @@ void Reserve(const VulkanContext& context,
         std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10, its buffers'
+/// Frame (0 and 1), material (5 to 9) and mesh (10, its buffers'
 /// addresses; 22 to 26, its material's textures) bindings; see
 /// mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
@@ -292,11 +299,8 @@ constexpr DescriptorBinding kBindings[] = {
 /// The motion pass's: the mesh passes' and 20, the view's
 /// MotionUniforms (frame.slang), last as the pass appends it.
 constexpr DescriptorBinding kMotionBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {3, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {4, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
@@ -336,6 +340,7 @@ std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
     return {
         {"brdf", std::string(BrdfSlang())},
         ProjectionModule(pushbroom),
+        {"bindless", shaders::kBindlessSlang},
         {"frame", shaders::kFrameSlang},
         {"surface", shaders::kSurfaceSlang},
         {"virtual_shadow", shaders::kVirtualShadowSlang},
@@ -550,7 +555,8 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
                          16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       lightCullLayout_(renderer.Context(), kLightCullBindings, 64),
-      cullLayout_(renderer.Context(), kCullBindings, 32) {
+      cullLayout_(renderer.Context(), kCullBindings,
+                  sizeof(CullConstants)) {
     const std::vector<ShaderModuleSource> normals{
         {"mesh_normals", shaders::kMeshNormalsSlang}};
     normalsPipeline_ = std::make_unique<ComputePipeline>(
@@ -2982,9 +2988,8 @@ std::vector<DescriptorResource>
 MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
                         bool culled) const {
     const MeshItem& draw = items_[item];
-    std::vector<DescriptorResource> resources = {
-        frame.uniforms, frame.shadows, frame.shadowMap,
-        frame.shadowSampler, frame.clampSampler};
+    std::vector<DescriptorResource> resources = {frame.resources,
+                                                 frame.shadows};
     renderer_.MaterialOrDefault(draw.material)
         .AppendResources(resources);
     resources.push_back(
@@ -3639,21 +3644,12 @@ void MeshDrawable::Dispatch(VkCommandBuffer commands, VkImageView hzb,
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       cullPipeline_->Handle());
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(*cullItemBuffer_),
-        DescriptorResource::Of(*cullJobBuffer_),
-        DescriptorResource::Of(*cullViewBuffer_),
-        DescriptorResource::Of(*instanceIds_),
-        DescriptorResource::Of(*positions_),
-        DescriptorResource::Of(*orientations_),
-        DescriptorResource::Of(*scales_),
         DescriptorResource::Of(*visibleIds_),
         DescriptorResource::Of(*cullCommands_),
-        DescriptorResource::Of(*cullLevelBuffer_),
         DescriptorResource::Of(hzb, VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(visibility_ != nullptr
                                    ? *visibility_
-                                   : *cullLevelBuffer_),
-        DescriptorResource::Of(*activeCounts_)};
+                                   : *cullLevelBuffer_)};
     cullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                      resources);
     // One workgroup per job, spread over y beyond the x limit every
@@ -3661,10 +3657,20 @@ void MeshDrawable::Dispatch(VkCommandBuffer commands, VkImageView hzb,
     const std::uint32_t groupsX =
         std::min<std::uint32_t>(jobs, 65535);
     const std::uint32_t groupsY = (jobs + groupsX - 1) / groupsX;
-    const std::uint32_t constants[8] = {
-        jobs, groupsX,   firstJob,          0,
-        mode, firstView, visibilityStride_, 0};
-    cullLayout_.PushConstants(commands, constants, sizeof(constants));
+    const CullConstants constants{
+        {jobs, groupsX, firstJob, 0},
+        {mode, firstView, visibilityStride_, 0},
+        cullItemBuffer_->Address(),
+        cullJobBuffer_->Address(),
+        cullViewBuffer_->Address(),
+        instanceIds_->Address(),
+        positions_->Address(),
+        orientations_->Address(),
+        scales_->Address(),
+        cullLevelBuffer_->Address(),
+        activeCounts_->Address()};
+    cullLayout_.PushConstants(commands, &constants,
+                              sizeof(constants));
     vkCmdDispatch(commands, groupsX, groupsY, 1);
 }
 
