@@ -92,7 +92,7 @@ warn_redundant_casts = true
 exclude = ["build/python/ernie/demos/"]
 
 [[tool.mypy.overrides]]
-module = ["warp", "warp.*", "torch", "torch.*", "PIL", "PIL.*"]
+module = ["warp", "warp.*", "torch", "torch.*", "PIL", "PIL.*", "newton", "newton.*"]
 ignore_missing_imports = true
 
 # Generated stubs: each prim type's define() and set() name its own
