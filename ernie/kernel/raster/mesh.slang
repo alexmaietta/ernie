@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Mesh and PointInstancer passes. Geometry is pulled from storage buffers rather than vertex
-// buffers. Besides the frame (bindings 0 to 4, frame.slang) and the draw's material (5 to 9,
-// surface.slang) the passes bind
-//   10 points, 11 normals, 12 triangle indices, 13 draws, 14 vertex colours,
-//   15 instance positions, 16 instance orientations, 17 instance scales, 18 instance ids,
-//   19 per-draw records of multi-draws (draw, instance offset, index offset, unused),
-//   21 texture coordinates per triangle corner, 22 the material's albedo texture, 23 its normal
-//   map, 24 its roughness, 25 its metallic and 26 its opacity texture, each with its own
-//   sampler (`RasterMaterial::AppendTextureResources`).
+// buffers, read through their addresses. Besides the frame (bindings 0 to 4, frame.slang) and
+// the draw's material (5 to 9, surface.slang) the passes bind
+//   10 the buffers' addresses (`MeshResources`),
+//   22 the material's albedo texture, 23 its normal map, 24 its roughness, 25 its metallic and
+//   26 its opacity texture, each with its own sampler
+//   (`RasterMaterial::AppendTextureResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
@@ -47,21 +45,47 @@ struct MeshDraw {
     uint4 uv;
 }
 
-[[vk::binding(10, 0)]] StructuredBuffer<float> points;
-[[vk::binding(11, 0)]] StructuredBuffer<float> normals;
-[[vk::binding(12, 0)]] StructuredBuffer<uint> indices;
-[[vk::binding(13, 0)]] StructuredBuffer<MeshDraw> draws;
-[[vk::binding(14, 0)]] StructuredBuffer<float> colors;
-[[vk::binding(15, 0)]] StructuredBuffer<float> positions;
-// Quaternions as (x, y, z, w), imaginary part first, as in USD's quath memory layout.
-[[vk::binding(16, 0)]] StructuredBuffer<float> orientations;
-[[vk::binding(17, 0)]] StructuredBuffer<float> scales;
-// Per instanced draw, the instances of its prototype as indices into the instance arrays.
-[[vk::binding(18, 0)]] StructuredBuffer<uint> instanceIds;
-// Per draw of an indirect multi-draw, what its push constants would hold.
-[[vk::binding(19, 0)]] StructuredBuffer<uint4> drawRecords;
-// Texture coordinates (s, t) per corner of every mesh's triangles, its levels of detail's too.
-[[vk::binding(21, 0)]] StructuredBuffer<float> uvs;
+// The passes' buffers' addresses (renderer's `MeshResources`, mesh_drawable.cpp).
+struct MeshResources {
+    float* points;
+    float* normals;
+    // Triangle indices.
+    uint* indices;
+    MeshDraw* draws;
+    // Vertex colours.
+    float* colors;
+    float* positions;
+    // Quaternions as (x, y, z, w), imaginary part first, as in USD's quath memory layout.
+    float* orientations;
+    float* scales;
+    // Per instanced draw, the instances of its prototype as indices into the instance arrays
+    // (those culling left, for culled draws).
+    uint* instanceIds;
+    // Per draw of an indirect multi-draw, what its push constants would hold (draw, instance
+    // offset, index offset, unused).
+    uint4* drawRecords;
+    // Texture coordinates (s, t) per corner of every mesh's triangles, its levels of detail's too.
+    float* uvs;
+    // Linear RGB per instance, double-buffered as `scales`, in place of the prototype's colours
+    // (`kHasInstanceColors`).
+    float* instanceColors;
+    // Meshes' points and triangle indices in use, pairs by slot (`MeshDraw.uv.y`).
+    int* activeCounts;
+}
+[[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
+static float* points = meshResources.points;
+static float* normals = meshResources.normals;
+static uint* indices = meshResources.indices;
+static MeshDraw* draws = meshResources.draws;
+static float* colors = meshResources.colors;
+static float* positions = meshResources.positions;
+static float* orientations = meshResources.orientations;
+static float* scales = meshResources.scales;
+static uint* instanceIds = meshResources.instanceIds;
+static uint4* drawRecords = meshResources.drawRecords;
+static float* uvs = meshResources.uvs;
+static float* instanceColors = meshResources.instanceColors;
+static int* activeCounts = meshResources.activeCounts;
 [[vk::binding(22, 0)]] Sampler2D albedoTexture;
 // Tangent-space normals as `surface.textures.y` says: 1 stored as n * 127 + 128 in 8 bits, with
 // the deviation of the slopes each texel covers in alpha (`MipFilter::NormalSlopes`), as the
@@ -103,7 +127,7 @@ DrawCall drawCall(uint drawIndex) {
     return call;
 }
 
-float3 load3(StructuredBuffer<float> buffer, uint i) {
+float3 load3(float* buffer, uint i) {
     return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
 }
 

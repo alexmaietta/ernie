@@ -267,8 +267,9 @@ void Reserve(const VulkanContext& context,
         std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 to 4), material (5 to 9) and mesh (10 to 19, 21 to 27)
-/// bindings; see mesh.slang.
+/// Frame (0 to 4), material (5 to 9) and mesh (10, its buffers'
+/// addresses; 22 to 26, its material's textures) bindings; see
+/// mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -280,24 +281,12 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {28, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's
@@ -313,26 +302,34 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {21, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {27, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {28, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
+
+/// mesh.slang's MeshResources: the mesh passes' buffers' addresses.
+struct MeshResources {
+    VkDeviceAddress points;
+    VkDeviceAddress normals;
+    VkDeviceAddress indices;
+    VkDeviceAddress draws;
+    VkDeviceAddress colors;
+    VkDeviceAddress positions;
+    VkDeviceAddress orientations;
+    VkDeviceAddress scales;
+    /// Every instance's ids, or for culled draws those culling left.
+    VkDeviceAddress instanceIds;
+    VkDeviceAddress drawRecords;
+    VkDeviceAddress uvs;
+    VkDeviceAddress instanceColors;
+    VkDeviceAddress activeCounts;
+};
+static_assert(sizeof(MeshResources) == 104,
+              "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
 std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
@@ -2587,6 +2584,8 @@ void MeshDrawable::Prepare(const FrameParams& params,
     }
     WriteBoundsJobs();
     Cull(params, cascades);
+    // Last, once every buffer the passes read is in place.
+    WriteResources();
 }
 
 void MeshDrawable::WriteDraws() {
@@ -2988,26 +2987,41 @@ MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
         frame.shadowSampler, frame.clampSampler};
     renderer_.MaterialOrDefault(draw.material)
         .AppendResources(resources);
-    const std::array<const GpuBuffer*, 10> buffers{
-        points_.get(),
-        normals_.get(),
-        indices_.get(),
-        draws_.get(),
-        colors_.get(),
-        positions_.get(),
-        orientations_.get(),
-        scales_.get(),
-        culled ? visibleIds_.get() : instanceIds_.get(),
-        drawRecords_.get()};
-    for (const GpuBuffer* buffer : buffers) {
-        resources.push_back(DescriptorResource::Of(*buffer));
-    }
-    resources.push_back(DescriptorResource::Of(*uvs_));
+    resources.push_back(
+        DescriptorResource::Of(*meshResources_[culled ? 1 : 0]));
     renderer_.MaterialOrDefault(draw.material)
         .AppendTextureResources(resources);
-    resources.push_back(DescriptorResource::Of(*instanceColors_));
-    resources.push_back(DescriptorResource::Of(*activeCounts_));
     return resources;
+}
+
+void MeshDrawable::WriteResources() {
+    const auto address = [](const auto& buffer) {
+        return buffer != nullptr ? buffer->Address()
+                                 : VkDeviceAddress{0};
+    };
+    // Every instance's ids, then those culling left.
+    for (int culled = 0; culled < 2; ++culled) {
+        const MeshResources resources{
+            address(points_),
+            address(normals_),
+            address(indices_),
+            address(draws_),
+            address(colors_),
+            address(positions_),
+            address(orientations_),
+            address(scales_),
+            address(culled != 0 ? visibleIds_ : instanceIds_),
+            address(drawRecords_),
+            address(uvs_),
+            address(instanceColors_),
+            address(activeCounts_)};
+        Reserve(context_, meshResources_[culled], sizeof(resources),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                BufferMemory::Device);
+        renderer_.Uploads().Write(
+            *meshResources_[culled],
+            std::as_bytes(std::span(&resources, 1)));
+    }
 }
 
 std::optional<Bounds3>

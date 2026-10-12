@@ -811,10 +811,15 @@ class MeshDrawable : public RasterDrawable {
                            std::size_t components,
                            const char* what) const;
     /// Draw `item`'s bindings; with `culled`, the visible ids of GPU
-    /// culling at binding 18.
+    /// culling as its instance ids (`meshResources_[1]`).
     std::vector<DescriptorResource>
     Resources(const RasterFrame& frame, std::size_t item,
               bool culled = false) const;
+    /// Writes `meshResources_` from the buffers in place (`Prepare`).
+    void WriteResources();
+    /// mesh.slang's MeshResources, the passes' buffers' addresses:
+    /// with every instance's ids, and with those culling left.
+    std::unique_ptr<GpuBuffer> meshResources_[2];
     /// A run of an instanced draw's instances in one world.
     struct WorldRange {
         std::int32_t world = -1;
