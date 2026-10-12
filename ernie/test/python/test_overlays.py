@@ -614,7 +614,9 @@ def test_overlay_capsules_draw_around_their_axes(renderer):
         )
 
 
-def test_overlay_trails_colour_each_segment_by_its_newer_point(renderer):
+def test_overlay_trails_colour_each_segment_by_its_newer_point(
+    renderer,
+):
     ring = np.float32([[[-20, 0, 0], [0, 10, 0], [20, 0, 0]]])
     colors = np.float32([[[1, 0, 0], [0, 1, 0], [0, 0, 1]]])
     # Newest last: segments 2-1 in blue, 1-0 in green.
@@ -632,3 +634,83 @@ def test_overlay_trails_colour_each_segment_by_its_newer_point(renderer):
         lambda o: o.trails(ring, colors=colors, fade=False, width=3),
     )
     assert differing(trailed, expected) == 0
+
+
+def test_overlay_texts_draw_as_text_does(renderer):
+    # Rows of codes print as the same text from the host, beside
+    # points and on the screen.
+    style = dict(size=8, color=(1, 1, 0.3), depth="always")
+    expected = render_overlay(
+        renderer, lambda o: o.label((0, 10, 0), "goal", **style)
+    )
+    texts = render_overlay(
+        renderer,
+        lambda o: o.texts(
+            ["goal"], points=np.float32([[0, 10, 0]]), **style
+        ),
+    )
+    assert differing(texts, expected) == 0
+    line = 8 + 2 * 0.25 * 8
+
+    def host(o):
+        for i, text in enumerate(["p0", "body 12"]):
+            o.text(text, offset=(2, 2 + line * i), **style)
+
+    expected = render_overlay(renderer, host)
+    codes = np.zeros((2, 8), np.int32)
+    for i, text in enumerate(["p0", "body 12"]):
+        codes[i, : len(text)] = [ord(c) for c in text]
+    texts = render_overlay(
+        renderer,
+        lambda o: o.texts(codes, screen=True, offset=(2, 2), **style),
+    )
+    assert differing(texts, expected) == 0
+
+
+def test_overlay_items_take_their_anchors_worlds(renderer):
+    # Three views of three worlds: markers posed under pose rows of
+    # each world, and under prims of each world, show only in their
+    # own world's view.
+    scene = make_terrain_scene()
+    camera = ernie.batch.BatchCamera(
+        renderer, scene, "/World/Camera", 3, resolution=(48, 48)
+    )
+    scene.get_prim(camera.product).set("ernie:overlays", "*")
+    for w in range(3):
+        env = scene.define(f"/Envs/Env{w}", ernie.Xform)
+        env.world = w
+        env.define("Marker", ernie.Xform)
+    overlay = scene.overlay("debug")
+    # Red, green and yellow: not the background's blue.
+    colors = np.float32([[1, 0, 0], [0, 1, 0], [1, 1, 0]])
+    poses = np.float32([[-20, 0, 0, 0, 0, 0, 1]] * 3)
+    overlay.points(
+        np.zeros((3, 3), np.float32),
+        poses=poses,
+        pose_worlds=np.arange(3, dtype=np.int32),
+        colors=colors,
+        shape="square",
+        size=12,
+        depth="always",
+    )
+    overlay.points(
+        np.float32([[20, 0, 0]] * 3),
+        anchors=[f"/Envs/Env{w}/Marker" for w in range(3)],
+        colors=colors,
+        shape="square",
+        size=12,
+        depth="always",
+    )
+    images = np.asarray(
+        camera.step(
+            worlds=np.arange(3, dtype=np.int32), device="cpu"
+        )["LdrColor"]
+    )
+    for view in range(3):
+        image = images[view, ..., :3].astype(int)
+        shown = [
+            int((np.abs(image - 255 * color).max(-1) < 10).sum())
+            for color in colors
+        ]
+        assert shown[view] > 40, "both markers of the view's world"
+        assert sum(shown) == shown[view], (view, shown)

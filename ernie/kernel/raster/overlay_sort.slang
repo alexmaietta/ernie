@@ -9,7 +9,8 @@
 // overlay.slang). Its draw arguments: per slot but the last, per draw of the batch (2), a
 // VkDrawIndirectCommand.
 //
-// Bindings: 0 batches' arrays, 1 batches, 2 sort data, 3 draw arguments.
+// Bindings: 0 batches' arrays, 1 batches, 2 sort data, 3 draw arguments, 4 the anchor table, 5
+// its rows' worlds.
 
 // overlay.slang's Batch.
 struct Batch {
@@ -31,7 +32,7 @@ struct SortConstants {
     // `posesMain`: x the batch, y its first anchor row, z its items, w its poses' first float.
     uint4 batch;
     // Vertices per item of the batch's first and second draws (0 for none). For `posesMain`: x
-    // 1 + its pose indices' first float, or 0.
+    // 1 + its pose indices' first float, y 1 + its pose worlds', or 0 for none.
     uint4 vertices;
     // `posesMain`: the poses' frame, its top three rows, relative to the frame's origin.
     float4 frame[3];
@@ -42,7 +43,13 @@ struct SortConstants {
 [[vk::binding(2, 0)]] RWStructuredBuffer<uint> sortData;
 [[vk::binding(3, 0)]] RWStructuredBuffer<uint4> drawArgs;
 [[vk::binding(4, 0)]] RWStructuredBuffer<float4> anchors;
+// Per anchor row its world, -1 for none (overlay.slang's `anchorWorlds`).
+[[vk::binding(5, 0)]] RWStructuredBuffer<int> anchorWorlds;
 [[vk::push_constant]] ConstantBuffer<SortConstants> constants;
+
+// overlay.slang's kBatch* flags read here.
+static const uint kBatchHasWorlds = 8;
+static const uint kBatchItemAnchors = 32;
 
 // The items of batch `b` in use: its rows, or as many as its count says.
 uint itemsInUse(Batch b) {
@@ -52,9 +59,14 @@ uint itemsInUse(Batch b) {
     return min(uint(max(asint(batchData[b.more.z - 1]), 0)), b.shape.y);
 }
 
-// Item `i`'s slot.
+// Item `i`'s slot: by its world, or the style's, or its anchor's.
 uint slotOf(Batch b, uint i) {
-    let world = asint(batchData[b.extras.y + i]);
+    var world = (b.shape.w & kBatchHasWorlds) != 0 ? asint(batchData[b.extras.y + i])
+                                                   : int(b.style.z);
+    if (world < 0 && b.extras.w != 0) {
+        let row = b.extras.w - 1 + ((b.shape.w & kBatchItemAnchors) != 0 ? i : 0);
+        world = anchorWorlds[row];
+    }
     let slots = constants.batch.y;
     if (world < 0) {
         return 0;
@@ -159,4 +171,6 @@ void posesMain(uint3 id : SV_DispatchThreadID) {
     for (uint r = 0; r < 4; ++r) {
         anchors[row + r] = m[r];
     }
+    let worlds = constants.vertices.y;
+    anchorWorlds[constants.batch.y + i] = worlds != 0 ? asint(batchData[worlds - 1 + pose]) : -1;
 }

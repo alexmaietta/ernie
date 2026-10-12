@@ -167,8 +167,11 @@ Overlay& Overlay::Clear() {
 
 std::size_t OverlayBatch::Count() const {
     if (points.Empty()) {
-        return kind == OverlayBatchKind::Numbers
-                   ? static_cast<std::size_t>(values.Elements())
+        if (kind == OverlayBatchKind::Numbers) {
+            return static_cast<std::size_t>(values.Elements());
+        }
+        return kind == OverlayBatchKind::Texts && chars.Rank() == 2
+                   ? static_cast<std::size_t>(chars.Shape()[0])
                    : 0;
     }
     return static_cast<std::size_t>(points.Elements()) / 3 /
@@ -185,10 +188,14 @@ std::size_t OverlayBatch::TrailLength() const {
 Overlay& Overlay::Batch(OverlayBatch batch) {
     using Kind = OverlayBatchKind;
     const Kind kind = batch.kind;
-    // Screen numbers may go without points, at their placement.
-    const bool placed = kind == Kind::Numbers && batch.screen;
+    // Screen numbers and texts may go without points, at their
+    // placement.
+    const bool text = kind == Kind::Numbers || kind == Kind::Texts;
+    const bool placed = text && batch.screen;
     const Tensor& lead =
-        placed && batch.points.Empty() ? batch.values : batch.points;
+        placed && batch.points.Empty()
+            ? (kind == Kind::Numbers ? batch.values : batch.chars)
+            : batch.points;
     const auto require = [&](const Tensor& array, const char* what,
                              std::int64_t columns, DType type,
                              bool needed) {
@@ -223,9 +230,9 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
                 " must have one row per item");
         }
     };
-    if (batch.screen && kind != Kind::Numbers) {
+    if (batch.screen && !text) {
         throw std::invalid_argument(
-            "Only overlay numbers go on the screen");
+            "Only overlay numbers and texts go on the screen");
     }
     if (kind == Kind::Trails && batch.points.Rank() != 3) {
         throw std::invalid_argument(
@@ -286,6 +293,30 @@ Overlay& Overlay::Batch(OverlayBatch batch) {
     }
     require(batch.values, "values", 1, DType::Float32,
             kind == Kind::Numbers);
+    if (kind == Kind::Texts) {
+        if (batch.chars.Rank() != 2 ||
+            batch.chars.Type() != DType::Int32 ||
+            !batch.chars.IsContiguous() ||
+            batch.chars.Location() != lead.Location() ||
+            static_cast<std::size_t>(batch.chars.Shape()[0]) !=
+                batch.Count() ||
+            batch.chars.Shape()[1] < 1) {
+            throw std::invalid_argument(
+                "Overlay texts' chars must be contiguous int32 "
+                "(items, "
+                "length) on the points' device");
+        }
+    }
+    if (!batch.poseWorlds.Empty() &&
+        (batch.poses.Empty() ||
+         batch.poseWorlds.Type() != DType::Int32 ||
+         !batch.poseWorlds.IsContiguous() ||
+         batch.poseWorlds.Location() != lead.Location() ||
+         batch.poseWorlds.Elements() * 7 != batch.poses.Elements())) {
+        throw std::invalid_argument(
+            "Overlay pose worlds must be contiguous int32, one per "
+            "pose, on the points' device");
+    }
     require(batch.ends, "ends", 3, DType::Float32,
             kind == Kind::Lines || kind == Kind::Arrows);
     require(batch.halfExtents, "half extents", 3, DType::Float32,
@@ -366,7 +397,9 @@ void Overlay::ReplaceBatchArray(std::size_t batch,
         {"heads", &b.heads},
         {"count", &b.count},
         {"poses", &b.poses},
-        {"pose_indices", &b.poseIndices}};
+        {"pose_indices", &b.poseIndices},
+        {"pose_worlds", &b.poseWorlds},
+        {"chars", &b.chars}};
     for (const auto& [name, field] : arrays) {
         if (name != array) {
             continue;

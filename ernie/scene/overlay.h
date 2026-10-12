@@ -45,7 +45,8 @@ struct OverlayStyle {
         12.0f;  ///< Marker diameter, or label text height, in pixels.
     OverlayDepth depth = OverlayDepth::Test;
     std::int32_t world = -1;  ///< The world whose views show the
-                              ///< item; -1 shows it in every view.
+                              ///< item; -1 shows it in every view, or
+                              ///< in its anchor's world's.
     glm::vec4 background{
         0.0f, 0.0f, 0.0f,
         0.55f};  ///< Labels' backing box; alpha 0 for none.
@@ -170,6 +171,8 @@ enum class OverlayBatchKind : std::uint8_t {
                ///< turned by `orientations`: a cylinder of `radii`
                ///< reaching `halfHeights` each way, capped by
                ///< hemispheres.
+    Texts,     ///< Each row of `chars` as text, at `points` as
+               ///< labels' or on the screen as `Numbers`'.
 };
 
 /// How a `Numbers` batch prints each of its values: `prefix`, the
@@ -229,11 +232,17 @@ struct OverlayBatch {
     /// the GPU every frame, then by `poseFrame`.
     Tensor poses;
     Tensor poseIndices;  ///< (n,) int32: each item's pose.
+    /// (m,) int32: each pose's world (Newton's `body_world`), the
+    /// world of the items under it without worlds of their own.
+    Tensor poseWorlds;
     /// The poses' frame in the world, such as an engine's Y-up model
     /// turned Z-up.
     glm::dmat4 poseFrame{1.0};
     /// (n,): numbers'; their number when they have no points.
     Tensor values;
+    /// (n, k) int32: texts' character codes (printable ASCII), each
+    /// row up to its first 0; their number when they have no points.
+    Tensor chars;
     OverlayNumberFormat format;  ///< Numbers'.
     /// Numbers drawn on the image rather than in the world, over
     /// everything.
@@ -251,7 +260,10 @@ struct OverlayBatch {
     Tensor colors;
     /// (n,) pixels: line widths, or markers' sizes.
     Tensor sizes;
-    Tensor worlds;  ///< (n,) int32: the world whose views show each.
+    /// (n,) int32: the world whose views show each. Without them and
+    /// a style's world, items posed under prims or poses take their
+    /// anchors' (`tokens::kWorld`, `poseWorlds`).
+    Tensor worlds;
     /// Arrows' heads' length; 0 makes each a fifth of its arrow.
     double head = 0.0;
     /// Frames' axis length; the scale of `directions`.

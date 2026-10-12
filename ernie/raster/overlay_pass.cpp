@@ -83,6 +83,8 @@ constexpr DescriptorBinding kSortBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 constexpr const char* kSortEntries[] = {
@@ -155,6 +157,7 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// LdrColor's format, which headless products draw overlays into.
@@ -287,6 +290,9 @@ OverlayPass::OverlayPass(const VulkanContext& context,
         context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Device);
     anchorRecords_ = std::make_unique<GpuBuffer>(
+        context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Device);
+    anchorWorlds_ = std::make_unique<GpuBuffer>(
         context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Device);
     const std::vector<std::uint32_t> glyphs = GlyphWords();
@@ -466,6 +472,7 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
     countJobs_.clear();
     poseJobs_.clear();
     poseRows_ = 0;
+    sortsByAnchors_ = false;
     sortPending_ = false;
     // Words of sort data and draw arguments of the sorted batches.
     std::uint32_t sortTotal = 0;
@@ -498,6 +505,9 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
             };
             const bool numbers =
                 batch.kind == OverlayBatchKind::Numbers;
+            // Numbers and texts draw as glyphs (`batchNumberVertex`).
+            const bool text =
+                numbers || batch.kind == OverlayBatchKind::Texts;
             const bool alpha = !batch.colors.Empty() &&
                                batch.colors.Rank() > 1 &&
                                batch.colors.Shape().back() == 4;
@@ -561,10 +571,16 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                         : array("pose_indices", batch.poseIndices) +
                               1;
                 gpu.more[1] = indices;
+                const std::uint32_t poses =
+                    array("poses", batch.poses);
+                const std::uint32_t worlds =
+                    batch.poseWorlds.Empty()
+                        ? 0
+                        : array("pose_worlds", batch.poseWorlds) + 1;
                 poseJobs_.push_back(
                     {static_cast<std::uint32_t>(records.size() - 1),
-                     poseRows_, count, array("poses", batch.poses),
-                     indices, batch.poseFrame});
+                     poseRows_, count, poses, indices,
+                     batch.poseFrame, worlds});
                 poseRows_ += count;
             }
             // One anchor shared through the table; per-item ones a
@@ -590,42 +606,17 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                      batch.anchors.empty() && !posed && !batch.screen
                          ? origin
                          : glm::dvec3(0.0),
-                     batch.kind == OverlayBatchKind::Markers ||
-                             numbers
+                     batch.kind == OverlayBatchKind::Markers || text
                          ? batch.style.size
                          : batch.style.width);
             gpu.params[0] = static_cast<float>(batch.head);
             gpu.params[1] = static_cast<float>(batch.length);
-            // Numbers' alignment, or lines' dashes.
+            // Text's alignment, or lines' dashes.
             gpu.params[2] =
-                numbers ? batch.format.align.x : batch.style.dash;
+                text ? batch.format.align.x : batch.style.dash;
             gpu.params[3] = batch.format.align.y;
             std::uint32_t chars = 0;
-            if (numbers) {
-                // The text's characters, prefix then suffix, as
-                // floats among the arrays.
-                std::vector<float> text;
-                for (const char c :
-                     batch.format.prefix + batch.format.suffix) {
-                    text.push_back(static_cast<float>(
-                        c >= 32 && c < 127 ? c : '?'));
-                }
-                gpu.text[0] =
-                    text.empty()
-                        ? 0
-                        : place({overlay, b, "", nullptr,
-                                 Tensor::Copy<float>(
-                                     text, {static_cast<std::int64_t>(
-                                               text.size())}),
-                                 stream});
-                gpu.text[1] = static_cast<std::uint32_t>(
-                    batch.format.prefix.size());
-                gpu.text[2] = static_cast<std::uint32_t>(
-                    batch.format.suffix.size());
-                gpu.text[3] =
-                    static_cast<std::uint32_t>(batch.format.decimals);
-                chars = static_cast<std::uint32_t>(text.size()) +
-                        kNumberChars + gpu.text[3];
+            if (text) {
                 gpu.place[0] = batch.placement.at.x;
                 gpu.place[1] = batch.placement.at.y;
                 gpu.place[2] = batch.placement.offset.x;
@@ -635,6 +626,41 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                     gpu.params[2] = align.x;
                     gpu.params[3] = align.y;
                 }
+            }
+            if (batch.kind == OverlayBatchKind::Texts) {
+                // Each row of codes, its length the most characters.
+                gpu.text[0] = array("chars", batch.chars);
+                chars = static_cast<std::uint32_t>(
+                    batch.chars.Shape()[1]);
+                gpu.text[1] = chars;
+                gpu.shape[2] = chars + 1;
+            }
+            if (numbers) {
+                // The text's characters, prefix then suffix, as
+                // floats among the arrays.
+                std::vector<float> affixes;
+                for (const char c :
+                     batch.format.prefix + batch.format.suffix) {
+                    affixes.push_back(static_cast<float>(
+                        c >= 32 && c < 127 ? c : '?'));
+                }
+                gpu.text[0] =
+                    affixes.empty()
+                        ? 0
+                        : place({overlay, b, "", nullptr,
+                                 Tensor::Copy<float>(
+                                     affixes,
+                                     {static_cast<std::int64_t>(
+                                         affixes.size())}),
+                                 stream});
+                gpu.text[1] = static_cast<std::uint32_t>(
+                    batch.format.prefix.size());
+                gpu.text[2] = static_cast<std::uint32_t>(
+                    batch.format.suffix.size());
+                gpu.text[3] =
+                    static_cast<std::uint32_t>(batch.format.decimals);
+                chars = static_cast<std::uint32_t>(affixes.size()) +
+                        kNumberChars + gpu.text[3];
                 // Each item's sprites: its backing box, then a glyph
                 // per character.
                 gpu.shape[2] = chars + 1;
@@ -646,7 +672,7 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                 batchDraws_.push_back(
                     {index, 1, count * 2 * kConeSides * 3});
             }
-            if (numbers) {
+            if (text) {
                 batchDraws_.push_back({index, 3,
                                        count * gpu.shape[2] * 6,
                                        false, 0, batch.screen});
@@ -656,10 +682,17 @@ void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
                 batchDraws_.push_back(
                     {index, 0, count * segments * 6});
             }
-            // With worlds and batched views, sorted by world: slots
-            // for the shared items, each world's, and worlds no view
-            // shows (overlay_sort.slang).
-            if (worlds_ > 0 && !batch.worlds.Empty()) {
+            // With worlds, their own or their anchors', and batched
+            // views, sorted by world: slots for the shared items,
+            // each world's, and worlds no view shows
+            // (overlay_sort.slang).
+            const bool anchorWorlds =
+                batch.worlds.Empty() && batch.style.world < 0 &&
+                (posed || !batch.anchors.empty());
+            sortsByAnchors_ =
+                sortsByAnchors_ || (worlds_ > 0 && anchorWorlds);
+            if (worlds_ > 0 &&
+                (!batch.worlds.Empty() || anchorWorlds)) {
                 SortJob job;
                 job.batch = index;
                 job.slots = worlds_ + 2;
@@ -868,11 +901,14 @@ void OverlayPass::PoseAnchors(const glm::dvec3& origin) {
     // jobs' rows after, written on the GPU.
     std::vector<glm::vec4> matrices;
     matrices.reserve(4 * (anchorPaths_.size() + poseRows_));
+    std::vector<std::int32_t> worlds;
+    worlds.reserve(anchorPaths_.size() + poseRows_);
     std::vector<glm::vec4> records;
     const glm::dmat4 relative =
         glm::translate(glm::dmat4(1.0), -origin);
     for (std::size_t a = 0; a < anchorPaths_.size(); ++a) {
         const OverlayAnchorPose pose = resolve_(anchorPaths_[a]);
+        worlds.push_back(pose.world);
         const glm::mat4 frame(relative * pose.frame);
         if (pose.slot != 0xFFFFFFFFu && meshes_ != nullptr) {
             MeshDrawable::AppendAnchorRecord(
@@ -888,11 +924,17 @@ void OverlayPass::PoseAnchors(const glm::dvec3& origin) {
     }
     matrices.resize(4 * (anchorPaths_.size() + poseRows_),
                     glm::vec4(0.0f));
+    worlds.resize(anchorPaths_.size() + poseRows_, -1);
     Upload(anchorMatrices_, std::as_bytes(std::span(matrices)));
+    Upload(anchorWorlds_, std::as_bytes(std::span(worlds)));
     if (gpuAnchors_ > 0) {
         Upload(anchorRecords_, std::as_bytes(std::span(records)));
     }
     anchorsPending_ = gpuAnchors_ > 0 || !poseJobs_.empty();
+    // Items may follow their anchors into other worlds.
+    if (sortsByAnchors_) {
+        sortPending_ = true;
+    }
 }
 
 void OverlayPass::RecordAnchorPoses(VkCommandBuffer commands) const {
@@ -903,7 +945,8 @@ void OverlayPass::RecordAnchorPoses(VkCommandBuffer commands) const {
             DescriptorResource::Of(*batchInfos_),
             DescriptorResource::Of(*sortData_),
             DescriptorResource::Of(*drawArgs_),
-            DescriptorResource::Of(*anchorMatrices_)};
+            DescriptorResource::Of(*anchorMatrices_),
+            DescriptorResource::Of(*anchorWorlds_)};
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           posePipeline_->Handle());
         sortLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -917,7 +960,7 @@ void OverlayPass::RecordAnchorPoses(VkCommandBuffer commands) const {
             const glm::mat4 frame(relative * job.frame);
             SortConstants constants{
                 {job.batch, first + job.row, job.count, job.poses},
-                {job.indices, 0, 0, 0},
+                {job.indices, job.worlds, 0, 0},
                 {}};
             for (int r = 0; r < 3; ++r) {
                 for (int c = 0; c < 4; ++c) {
@@ -937,7 +980,9 @@ void OverlayPass::RecordAnchorPoses(VkCommandBuffer commands) const {
     VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
     memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-    memory.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    // For the draws, and the sort reading the worlds.
+    memory.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
     VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
     dependency.memoryBarrierCount = 1;
@@ -965,7 +1010,8 @@ void OverlayPass::RecordSort(VkCommandBuffer commands) const {
         DescriptorResource::Of(*batchInfos_),
         DescriptorResource::Of(*sortData_),
         DescriptorResource::Of(*drawArgs_),
-        DescriptorResource::Of(*anchorMatrices_)};
+        DescriptorResource::Of(*anchorMatrices_),
+        DescriptorResource::Of(*anchorWorlds_)};
     // Each step for every batch, then a barrier before the next.
     for (std::size_t step = 0;
          !sortJobs_.empty() && step < sortPipelines_.size(); ++step) {
@@ -1028,11 +1074,12 @@ void OverlayPass::Record(VkCommandBuffer commands,
     // The first draw since the batches changed sorts them by world,
     // and the first of a frame poses its anchors under instances,
     // outside the rendering.
-    if (sortPending_) {
-        RecordSort(commands);
-    }
+    // Poses first: sorting by world reads the worlds they write.
     if (anchorsPending_) {
         RecordAnchorPoses(commands);
+    }
+    if (sortPending_) {
+        RecordSort(commands);
     }
     const auto drawn = [layer](bool screen) {
         return layer == Layer::All ||
@@ -1053,7 +1100,8 @@ void OverlayPass::Record(VkCommandBuffer commands,
         DescriptorResource::Of(*batchInfos_),
         DescriptorResource::Of(*sortData_),
         DescriptorResource::Of(*anchorMatrices_),
-        DescriptorResource::Of(*glyphs_)};
+        DescriptorResource::Of(*glyphs_),
+        DescriptorResource::Of(*anchorWorlds_)};
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                  resources);
     const bool srgb = target.format == VK_FORMAT_R8G8B8A8_SRGB ||
@@ -1142,7 +1190,7 @@ std::uint64_t OverlayPass::GpuBytes() const {
     return bytes + batchData_->Size() + batchInfos_->Size() +
            sortData_->Size() + drawArgs_->Size() +
            anchorMatrices_->Size() + anchorRecords_->Size() +
-           glyphs_->Size();
+           anchorWorlds_->Size() + glyphs_->Size();
 }
 
 }  // namespace ernie

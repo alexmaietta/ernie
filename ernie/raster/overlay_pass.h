@@ -37,6 +37,9 @@ struct OverlayAnchorPose {
     /// The pools the instance's pose fills
     /// (`MeshDrawable::AnchorOps`).
     std::uint32_t ops = 0;
+    /// The prim's world (`tokens::kWorld`), the world of the items
+    /// under it without worlds of their own; -1 for none.
+    std::int32_t world = -1;
 };
 
 /// Poses the prim at a path for this frame (`OverlayAnchorPose`).
@@ -254,6 +257,8 @@ class OverlayPass {
         std::uint32_t poses = 0;
         std::uint32_t indices = 0;
         glm::dmat4 frame{1.0};
+        /// 1 + where its poses' worlds are in `batchData_`, or 0.
+        std::uint32_t worlds = 0;
     };
     std::vector<PoseJob> poseJobs_;
     /// Anchor rows of the pose jobs, after the prims'.
@@ -316,6 +321,12 @@ class OverlayPass {
     std::vector<Path> anchorPaths_;
     std::unordered_map<Path, std::uint32_t> anchorIndices_;
     std::unique_ptr<GpuBuffer> anchorMatrices_;
+    /// Per anchor row its world (int32, -1 for none): the prims' from
+    /// the host, the poses' from `posesMain`.
+    std::unique_ptr<GpuBuffer> anchorWorlds_;
+    /// Whether a sorted batch's worlds come from its anchors, which
+    /// may move between worlds: sorted again every frame.
+    bool sortsByAnchors_ = false;
     std::unique_ptr<GpuBuffer> anchorRecords_;
     std::uint32_t gpuAnchors_ = 0;
     mutable bool anchorsPending_ = false;

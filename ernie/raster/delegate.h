@@ -368,6 +368,7 @@ class RasterDelegate : public RenderDelegate {
         std::uint64_t version = 0;
         std::optional<GpuAnchor> gpu;
         glm::dmat4 world{1.0};
+        std::int32_t index = -1;  ///< Its world (`WorldOf`).
     };
     mutable std::unordered_map<Path, OverlayAnchor> overlayAnchors_;
     std::uint64_t overlayAnchorsScene_ = 0;  ///< Their scene's id.

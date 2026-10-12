@@ -1693,15 +1693,20 @@ RasterDelegate::OverlayAnchorOf(const Scene& scene,
         anchor.world = exists && !anchor.gpu
                            ? scene.WorldTransform(path)
                            : glm::dmat4(1.0);
+        anchor.index = exists ? WorldOf(scene, path) : -1;
     }
     if (anchor.gpu) {
         return {anchor.gpu->frame,
                 meshes_.AnchorSlot(anchor.gpu->instancer,
                                    anchor.gpu->row),
                 anchor.gpu->below,
-                meshes_.AnchorOps(anchor.gpu->instancer)};
+                meshes_.AnchorOps(anchor.gpu->instancer),
+                anchor.index};
     }
-    return {anchor.world};
+    OverlayAnchorPose pose;
+    pose.frame = anchor.world;
+    pose.world = anchor.index;
+    return pose;
 }
 
 HostArrayReader RasterDelegate::HostArrays(const Scene& scene) const {

@@ -83,15 +83,16 @@ Batch methods draw many items of one kind from arrays with a row per item. The a
 | `capsules` | Wireframe capsules along their local z axis |
 | `trails` | A polyline per item from a ring buffer |
 | `numbers` | Values printed as text, formatted on the GPU |
+| `texts` | A string per item: a list of strings, or an (N, K) int32 array of character codes a program may rewrite |
 
-Every batch takes optional per-item `colors`, line `widths` or marker `sizes`, and `worlds`. With `worlds`, a batched camera's views each draw only their own world's items, sorted by world on the GPU, so thousands of worlds cost no more per view than one. Coordinates are float32 relative to `origin`, so a point far from the world's origin keeps its precision.
+Every batch takes optional per-item `colors`, line `widths` or marker `sizes`, and `worlds`. With `worlds`, a batched camera's views each draw only their own world's items, sorted by world on the GPU, so thousands of worlds cost no more per view than one. Items without `worlds` or a style's `world` take their anchors' worlds: a prim's `ernie:world` (from it or an ancestor), or `pose_worlds` for items posed under pose arrays. Coordinates are float32 relative to `origin`, so a point far from the world's origin keeps its precision.
 
 ## Physics engines
 
 Batches can be fed straight from a physics engine's GPU arrays, so debug drawing needs no work on the host each step:
 
 - `count`: a one-element int32 array of the rows in use, such as a contact counter. The GPU draws only those, through indirect draws, so arrays can be allocated at their capacity and the count changed on the GPU.
-- `poses`: rows of position then quaternion x, y, z, w, as Warp's `transform` and Newton's `body_q` hold them. The items are posed under them, item i under pose `pose_indices[i]` (or pose i), turned on the GPU every frame and then placed by `pose_frame` (for a Y-up model, say).
+- `poses`: rows of position then quaternion x, y, z, w, as Warp's `transform` and Newton's `body_q` hold them. The items are posed under them, item i under pose `pose_indices[i]` (or pose i), turned on the GPU every frame and then placed by `pose_frame` (for a Y-up model, say). With `pose_worlds` (Newton's `body_world`), each item is in its body's world.
 - `directions=True`: for segments and arrows, `ends` are vectors from the starts, scaled by `scale`. Velocities and forces draw from the simulation's own arrays.
 - `trails`: (N, L, 3) points, a ring buffer per item whose newest point is at `heads`. A segment with a NaN end is left out, so NaN rows start a trail afresh. `fade` fades each trail to its oldest point, and `colors` may be one per point (a speed gradient).
 - `numbers`: values printed as `prefix`, the value with `decimals` digits, then `suffix`, formatted on the GPU. Beside points in the world, or with `screen=True` on the image, a line apart from `at`.
@@ -104,6 +105,7 @@ scene.overlay("velocities").arrows(positions, velocities, directions=True, scale
 scene.overlay("frames").frames(zeros, length=0.5, poses=body_q)
 scene.overlay("trails").trails(trail_points, heads=heads, width=2)
 scene.overlay("hud").numbers(stats[:1], prefix="t = ", suffix=" s", screen=True, offset=(12, 12))
+scene.overlay("names").texts(body_names, points=label_offsets, poses=body_q, pose_worlds=body_world)
 ```
 
 ## Writing in place

@@ -9,7 +9,8 @@
 // Bindings: 0 the view's Uniforms (frame.slang; only its view-projection and pushbroom strip are
 // read, through module `projection`), 1 the views' depth, 2 segments, 3 triangles, 4 sprites, 5
 // batches' arrays, 6 batches, 7 batches' items in world order (overlay_sort.slang), 8 the anchor
-// table (four rows of a transform per anchor, relative to the frame's origin), 9 the font.
+// table (four rows of a transform per anchor, relative to the frame's origin), 9 the font, 10 the
+// anchor table's rows' worlds (-1 for none).
 //
 // References:
 // - M. Rougier, "Shader-Based Antialiased, Dashed, Stroked Polylines", JCGT 2(2), 2013: lines as
@@ -114,6 +115,7 @@ static const uint kBatchFrames = 5;
 static const uint kBatchNumbers = 6;
 static const uint kBatchTrails = 7;
 static const uint kBatchCapsules = 8;
+static const uint kBatchTexts = 9;
 
 static const uint kBatchHasColors = 1;
 static const uint kBatchHasAlpha = 2;  // colours with opacity, 4 floats each
@@ -165,6 +167,7 @@ static const uint kKindSprite = 2;
 [[vk::binding(7, 0)]] StructuredBuffer<uint> sortedItems;
 [[vk::binding(8, 0)]] StructuredBuffer<float4> anchors;
 [[vk::binding(9, 0)]] StructuredBuffer<uint> glyphs;
+[[vk::binding(10, 0)]] StructuredBuffer<int> anchorWorlds;
 [[vk::push_constant]] ConstantBuffer<OverlayConstants> constants;
 
 struct VertexOutput {
@@ -201,7 +204,11 @@ float4 unpackColor(uint packed) {
 
 // Whether the item shows in this view's world.
 bool inWorld(uint4 info) {
-    let world = int(info.z);
+    var world = int(info.z);
+    // Without a world of its own, its anchor's.
+    if (world < 0 && info.w != 0) {
+        world = anchorWorlds[info.w - 1];
+    }
     return world < 0 || constants.view.x < 0 || world == constants.view.x;
 }
 
@@ -635,7 +642,8 @@ float4 glyphBox(uint c) {
 static const uint kNumberChars = 12;
 
 // A value as a number's text prints it (`OverlayNumberFormat`): its prefix, the value with `text.w`
-// decimals (or "nan", or "inf" past 4e9 units of its last decimal), its suffix.
+// decimals (or "nan", or "inf" past 4e9 units of its last decimal), its suffix. Or a texts' item's
+// row of character codes, up to its first 0.
 struct NumberText {
     uint length;        // characters in all
     uint first;         // the number's first character
@@ -645,10 +653,27 @@ struct NumberText {
     uint whole;         // its integer part's digits
     bool negative;
     uint special;       // 0 a number, 1 nan, 2 inf
+    uint row;           // a texts' item's first character code in `batchData`
 }
 
-NumberText numberText(Batch b, float value) {
+// Item `i`'s text.
+NumberText numberText(Batch b, uint i) {
     NumberText t;
+    t.row = 0;
+    if (b.shape.x == kBatchTexts) {
+        // Codes `text.y` to a row, ending at the first 0.
+        t.row = b.text.x + i * b.text.y;
+        t.length = 0;
+        while (t.length < b.text.y && asint(batchData[t.row + t.length]) != 0) {
+            ++t.length;
+        }
+        t.first = t.length;
+        t.count = 0;
+        t.negative = false;
+        t.special = 0;
+        return t;
+    }
+    let value = batchData[b.arrays.y + i];
     let decimals = b.text.w;
     var unit = 1.0;
     for (uint d = 0; d < decimals; ++d) {
@@ -676,6 +701,9 @@ NumberText numberText(Batch b, float value) {
 
 // Character `k` of a number's text.
 uint numberChar(Batch b, NumberText t, uint k) {
+    if (b.shape.x == kBatchTexts) {
+        return uint(asint(batchData[t.row + k]));
+    }
     if (k < t.first) {
         return uint(batchData[b.text.x + k]);
     }
@@ -716,7 +744,7 @@ VertexOutput batchNumberVertex(uint vertexIndex : SV_VertexID) {
         return culled();
     }
     let k = sprite % b.shape.z;
-    let t = numberText(b, batchData[b.arrays.y + i]);
+    let t = numberText(b, i);
     let size = batchSize(b, i);
     let scale = size / kLineHeight;
     var width = 0.0;

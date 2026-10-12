@@ -329,7 +329,7 @@ Overlay& AddBatch(Overlay& overlay, OverlayBatch batch,
         if (value.is_none() &&
             (name == "anchors" || name == "count" ||
              name == "poses" || name == "pose_indices" ||
-             name == "pose_frame")) {
+             name == "pose_frame" || name == "pose_worlds")) {
             continue;
         }
         if (name == "anchors") {
@@ -344,6 +344,8 @@ Overlay& AddBatch(Overlay& overlay, OverlayBatch batch,
             batch.poseIndices = BatchArray(value, "int32");
         } else if (name == "pose_frame") {
             batch.poseFrame = TransformFromPython(value);
+        } else if (name == "pose_worlds") {
+            batch.poseWorlds = BatchArray(value, "int32");
         } else if (name == "directions") {
             batch.directions = nb::cast<bool>(value);
         } else if (name == "scale") {
@@ -369,16 +371,17 @@ constexpr const char* kBatchDoc =
     "Coordinates are float32, relative to `origin` (a point far "
     "from the world's origin keeps them precise), or in the space of "
     "the style's `anchor`, or of `anchors`, one prim per item (each "
-    "world's robot link, followed on the GPU). "
+    "world's robot link, followed on the GPU); without `worlds` or a "
+    "style's `world`, items take their anchors' worlds. "
     "For physics engines: `count`, a (1,) int32 array of the rows in "
     "use (a contact count), the GPU drawing only those; `poses`, (M, "
     "7) float32 rows of position then quaternion x, y, z, w (Warp "
     "transforms, Newton's body_q) the items are posed under, item i "
     "under pose `pose_indices[i]` (or i), turned on the GPU every "
-    "frame and placed by the 4 x 4 `pose_frame`; and for segments "
-    "and "
-    "arrows `directions=True`, `ends` then vectors from the starts "
-    "times `scale` (velocities, forces).";
+    "frame and placed by the 4 x 4 `pose_frame`, each in its world "
+    "of (M,) int32 `pose_worlds` (Newton's body_world); and for "
+    "segments and arrows `directions=True`, `ends` then vectors from "
+    "the starts times `scale` (velocities, forces).";
 
 void BindOverlay(nb::module_& m) {
     nb::class_<Overlay>(
@@ -880,6 +883,74 @@ void BindOverlay(nb::module_& m) {
                  "apart, its box's point `align` there. A sim's "
                  "time or each world's reward, read on the GPU "
                  "every frame with no copy to the host.") +
+             kBatchDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "texts",
+            [](Overlay& o, nb::handle texts, nb::handle points,
+               bool screen, nb::handle at, nb::handle offset,
+               nb::handle align, nb::handle colors, nb::handle sizes,
+               nb::handle worlds, nb::handle origin,
+               nb::handle stream,
+               const nb::kwargs& style) -> Overlay& {
+                OverlayBatch batch;
+                batch.kind = OverlayBatchKind::Texts;
+                // Strings become rows of codes, padded with 0s.
+                if (nb::isinstance<nb::list>(texts) ||
+                    nb::isinstance<nb::tuple>(texts)) {
+                    std::vector<std::string> rows;
+                    std::size_t longest = 1;
+                    for (nb::handle text : texts) {
+                        rows.push_back(nb::cast<std::string>(text));
+                        longest =
+                            std::max(longest, rows.back().size());
+                    }
+                    std::vector<std::int32_t> codes(
+                        rows.size() * longest, 0);
+                    for (std::size_t r = 0; r < rows.size(); ++r) {
+                        for (std::size_t c = 0; c < rows[r].size();
+                             ++c) {
+                            codes[r * longest + c] =
+                                static_cast<unsigned char>(
+                                    rows[r][c]);
+                        }
+                    }
+                    batch.chars = Tensor::Copy<std::int32_t>(
+                        codes,
+                        {static_cast<std::int64_t>(rows.size()),
+                         static_cast<std::int64_t>(longest)});
+                } else {
+                    batch.chars = BatchArray(texts, "int32");
+                }
+                batch.points = BatchArray(points, "float32");
+                batch.screen = screen;
+                batch.placement =
+                    PlacementFromPython(at, offset, align);
+                if (!align.is_none()) {
+                    batch.format.align = Vec2FromPython(align);
+                }
+                return AddBatch(
+                    o, std::move(batch),
+                    {colors, sizes, worlds, origin, stream}, style);
+            },
+            nb::arg("texts"), nb::arg("points") = nb::none(),
+            nb::arg("screen") = false,
+            nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(),
+            nb::arg("colors") = nb::none(),
+            nb::arg("sizes") = nb::none(),
+            nb::arg("worlds") = nb::none(),
+            nb::arg("origin") = nb::none(),
+            nb::arg("stream") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "Text per item, drawn on the GPU: `texts` a list of "
+                 "strings, or an (N, K) int32 array of character "
+                 "codes (printable ASCII, each row ending at its "
+                 "first 0) that a program may rewrite in place. "
+                 "Beside (N, 3) `points` as labels, or with `screen` "
+                 "on the image as `numbers`.") +
              kBatchDoc + kStyleDoc)
                 .c_str())
         .def(
