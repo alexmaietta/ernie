@@ -350,6 +350,22 @@ float bandValue(float4 values[16], uint band) {
     return values[band / 4][band % 4];
 }
 
+// Band `band` of material `id`'s reflectance or emission, and of light `k`'s spectrum or its tinted
+// part, each read in place through its pointer: a struct's band array copied into a thread and
+// indexed by a band known only at run time spills to local memory.
+float reflectanceBand(uint id, uint band) {
+    return materials[id].reflectance[band / 4][band % 4];
+}
+float emissionBand(uint id, uint band) {
+    return materials[id].emission[band / 4][band % 4];
+}
+float spectrumBand(uint k, uint band) {
+    return lights[k].spectrum[band / 4][band % 4];
+}
+float tintedBand(uint k, uint band) {
+    return lights[k].tinted[band / 4][band % 4];
+}
+
 // The modulation colour as a spectrum value at `wavelength`: its largest component times the
 // sigmoid spectrum of the colour divided by it (Jakob and Hanika 2019), which reproduces the colour
 // for any brightness, including modulations above 1.
@@ -2021,7 +2037,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
     // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
     // layers on to Q, as many more to U): the image's +x and +y across the light reaching the eye.
-    let stokes = pass.model.z;
+    let stokes = kShadePolarization ? pass.model.z : 0u;
     float3 frameX = float3(0.0);
     float3 frameY = float3(0.0);
     if (stokes != 0) {
@@ -2094,14 +2110,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
 
     // Per light: direction towards it and the scale on its spectrum (inverse square, cone and
     // shadow); 0 for lights that cannot reach the point.
-    let lightCount = unlit ? 0 : min(sh.size.w, kMaxLights);
-    float3 lightDirections[kMaxLights];
-    float lightScales[kMaxLights];
-    float lightFocus[kMaxLights];  // |cos|^focus off a focused light's axis, else 1
+    let lightCount = unlit ? 0 : min(sh.size.w, kShadeLights);
+    float3 lightDirections[kShadeLights];
+    float lightScales[kShadeLights];
+    float lightFocus[kShadeLights];  // |cos|^focus off a focused light's axis, else 1
     // Per light, with a polarizer: its reflected light's linear Stokes Q and U over I in the
     // pixel's frame, its polarization as far as the surface's diffuse reflection keeps it, along
     // its electric field seen across the light reaching the eye.
-    float2 lightStokes[kMaxLights];
+    float2 lightStokes[kShadeLights];
     let retention = stokes != 0 ? saturate(asfloat(material.info.w)) : 0.0;
     float3x2 footprint = float3x2(0.0);  // the pixel's, once a laser wants it
     bool footprinted = false;
@@ -2122,7 +2138,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         var toLight = light.position.xyz;
         var scale = 1.0;
         let type = uint(light.position.w);
-        if (type == 5) {
+        if (kShadeLasers && type == 5) {
             // A laser: its beam's irradiance, arriving along the beam.
             if (!footprinted) {
                 footprint = pixelFootprint(int2(id.xy), id.z, world);
@@ -2213,7 +2229,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         lightDirections[k] = toLight;
         lightScales[k] = scale;
         let polarized = light.polarization.w * retention;
-        if (polarized > 0.0) {
+        if (kShadePolarization && polarized > 0.0) {
             let field = light.polarization.xyz;
             let x = dot(field, frameX);
             let y = dot(field, frameY);
@@ -2223,15 +2239,19 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             }
         }
     }
+    // The air's light and dimming, only in variants with air (`kShadeAir`): without, their arrays
+    // of every band are never made.
     float aerialTransmittance[kMaxBands];
     float aerialScattered[kMaxBands];
-    aerialPerspective(world, ndc.xy, aerialTransmittance, aerialScattered);
     float surround[kMaxBands];
-    skyLight(world, lookup, unlit ? 0.0 : occlusion, surround);
+    if (kShadeAir) {
+        aerialPerspective(world, ndc.xy, aerialTransmittance, aerialScattered);
+        skyLight(world, lookup, unlit ? 0.0 : occlusion, surround);
+    }
     // Distant lights as refraction shows them here, such as the sun still above the horizon a
     // little after it has set, each dimmed through the air and past the bodies.
-    let throughAir = sh.atmosphere[1].y != 0.0 || anyBodies();
-    float3 apparentLights[kMaxLights];
+    let throughAir = kShadeAir && (sh.atmosphere[1].y != 0.0 || anyBodies());
+    float3 apparentLights[kShadeLights];
     for (uint k = 0; k < lightCount; ++k) {
         apparentLights[k] = throughAir && lightScales[k] > 0.0 && isSkyLight(k)
                                 ? apparentDirection(world, lights[shv.view.z + k].position.xyz)
@@ -2243,7 +2263,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         for (uint k = 0; k < 3; ++k) {
             let band = min(first + k, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
-            bandAlbedo[k] = bandValue(material.reflectance, band) * albedo.x *
+            bandAlbedo[k] = reflectanceBand(ids.x, band) * albedo.x *
                             modulationAt(coefficients, scale, wavelength);
             unlitIrradiance[k] = bandValue(sh.irradiance, band);
         }
@@ -2270,10 +2290,10 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             let dome = bandValue(sh.dome, band);
             if (material.info.z != 0 && !unlit) {
-                radiance[j] += bandValue(material.emission, band);
+                radiance[j] += emissionBand(ids.x, band);
             }
             // The atmosphere's sky and ground around it, diffusely.
-            radiance[j] += environment.diffuse[j] * surround[band];
+            radiance[j] += environment.diffuse[j] * (kShadeAir ? surround[band] : 0.0);
             if (domeScale > 0.0) {
                 radiance[j] += environment.diffuse[j] * dome *
                                modulationAt(domeCoefficients, domeScale, wavelength);
@@ -2299,9 +2319,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             float3 lightSpectrum;
             for (uint j = 0; j < 3; ++j) {
                 let band = min(first + j, bands - 1);
-                lightSpectrum[j] = bandValue(lights[k].spectrum, band) * lightFocus[k] +
-                                   bandValue(lights[k].tinted, band);
-                if (any(apparentLights[k] != 0.0)) {
+                lightSpectrum[j] = spectrumBand(k, band) * lightFocus[k] + tintedBand(k, band);
+                if (throughAir && any(apparentLights[k] != 0.0)) {
                     lightSpectrum[j] *= distantLightThrough(k, world, apparentLights[k], band);
                 }
             }
@@ -2339,17 +2358,18 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
             let band = first + k;
             let layer = id.z * bands + band;
-            spectral[int3(id.xy, layer)] =
-                radiance[k] * aerialTransmittance[band] + aerialScattered[band];
+            let transmittance = kShadeAir ? aerialTransmittance[band] : 1.0;
+            let scattered = kShadeAir ? aerialScattered[band] : 0.0;
+            spectral[int3(id.xy, layer)] = radiance[k] * transmittance + scattered;
             if (stokes != 0) {
                 if (band / 4 != airGroup) {
                     airGroup = band / 4;
                     skyPolarization(airGroup, -v, frameX, frameY, airQ, airU);
                 }
                 spectral[int3(id.xy, stokes + layer)] =
-                    q[k] * aerialTransmittance[band] + aerialScattered[band] * airQ[band % 4];
+                    q[k] * transmittance + scattered * airQ[band % 4];
                 spectral[int3(id.xy, 2 * stokes + layer)] =
-                    u[k] * aerialTransmittance[band] + aerialScattered[band] * airU[band % 4];
+                    u[k] * transmittance + scattered * airU[band % 4];
             }
         }
     }

@@ -28,6 +28,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -1076,10 +1077,14 @@ class RasterRenderer {
         requiredVars_;  ///< The vars the last `Update`'s frame needs.
 
     PipelineLayout shadingLayout_;
-    /// Per model and whether for a pushbroom's views.
-    std::map<std::pair<std::size_t, bool>,
+    /// Per model, whether for a pushbroom's views and shading variant
+    /// (renderer.cpp's `ShadingVariantOf`), the variants a frame has
+    /// needed so far.
+    std::map<std::tuple<std::size_t, bool, std::uint32_t>,
              std::unique_ptr<ComputePipeline>>
         shadingPipelines_;
+    /// The last `Update`'s shading variant.
+    std::uint32_t shadingVariant_ = 0;
     PipelineLayout filterLayout_;
     /// The fused sensor kernel of each plan used so far, by
     /// `SensorPlan::Key`.

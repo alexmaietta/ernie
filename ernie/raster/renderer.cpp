@@ -790,12 +790,69 @@ SensorPlan ProbePlan(const SensorFilterModel& model,
     return PlanSensor(chain, vars, registry);
 }
 
+/// What `shadeMain` is compiled with, as bits of a key: the air's
+/// light (an atmosphere or celestial bodies), polarization and
+/// lasers, and in bits 8 up the most lights it shades. A frame shades
+/// with the leanest it needs (`ShadingVariantOf`): the full kernel
+/// holds every band's air and every light's state at once, 255
+/// registers a thread and spilling (`ERNIE_PIPELINE_STATISTICS`),
+/// where a scene without air, polarization or lasers needs about 170
+/// and shades in two thirds the time.
+constexpr std::uint32_t kShadeAir = 1;
+constexpr std::uint32_t kShadePolarization = 2;
+constexpr std::uint32_t kShadeLasers = 4;
+constexpr std::uint32_t kShadeLightsShift = 8;
+constexpr std::uint32_t kFullShading =
+    kShadeAir | kShadePolarization | kShadeLasers |
+    (16u << kShadeLightsShift);
+
+/// `variant`'s constants for shading.slang, ahead of its source.
+std::string ShadingVariantSource(std::uint32_t variant) {
+    const auto flag = [variant](std::uint32_t bit) {
+        return (variant & bit) != 0 ? "true" : "false";
+    };
+    return std::string("static const bool kShadeAir = ") +
+           flag(kShadeAir) +
+           ";\nstatic const bool kShadePolarization = " +
+           flag(kShadePolarization) +
+           ";\nstatic const bool kShadeLasers = " +
+           flag(kShadeLasers) +
+           ";\nstatic const uint kShadeLights = " +
+           std::to_string(variant >> kShadeLightsShift) + ";\n";
+}
+
+/// The leanest shading variant `params` needs, with polarization when
+/// its frame measures Stokes vectors (`stokes`): lights in powers of
+/// two from 2 up to shading.slang's 16.
+std::uint32_t ShadingVariantOf(const FrameParams& params,
+                               bool stokes) {
+    std::uint32_t variant = 0;
+    if (params.atmosphere || !params.bodies.empty()) {
+        variant |= kShadeAir;
+    }
+    if (stokes) {
+        variant |= kShadePolarization;
+    }
+    std::uint32_t lights = 2;
+    for (const LightParams& light : params.lights) {
+        if (light.type == LightType::Laser) {
+            variant |= kShadeLasers;
+        }
+    }
+    while (lights < std::min<std::size_t>(params.lights.size(), 16)) {
+        lights *= 2;
+    }
+    return variant | (lights << kShadeLightsShift);
+}
+
 /// The modules of the shading and sky passes with `brdf` as the
 /// active model and `patterns`' light patterns, for a frame camera's
-/// views or a pushbroom's.
+/// views or a pushbroom's, shading.slang compiled as shading variant
+/// `variant`.
 std::vector<ShaderModuleSource>
 ShadingModules(const BrdfModel& brdf,
-               const LightPatternRegistry& patterns, bool pushbroom) {
+               const LightPatternRegistry& patterns, bool pushbroom,
+               std::uint32_t variant = kFullShading) {
     std::vector<ShaderModuleSource> modules =
         LightPatternModules(patterns);
     modules.insert(modules.end(),
@@ -808,6 +865,7 @@ ShadingModules(const BrdfModel& brdf,
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
                                     brdf.typeName + ";\n" +
+                                    ShadingVariantSource(variant) +
                                     shaders::kShadingSlang}});
     return modules;
 }
@@ -3793,6 +3851,7 @@ void RasterRenderer::Update(
     orthographic_ = params.camera.orthographic;
     pushbroom_ = params.camera.pushbroom;
     WriteMaterialTable();
+    shadingVariant_ = ShadingVariantOf(params, stokes_);
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
     }
@@ -3892,7 +3951,8 @@ RasterRenderer::LensPipeline(const std::string& lens,
 
 const ComputePipeline&
 RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
-    if (const auto it = shadingPipelines_.find({model, pushbroom});
+    const auto key = std::tuple(model, pushbroom, shadingVariant_);
+    if (const auto it = shadingPipelines_.find(key);
         it != shadingPipelines_.end()) {
         return *it->second;
     }
@@ -3900,7 +3960,8 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
     const BrdfModel& brdf = brdfs_.Models()[model];
     try {
         spirv = compiler_.CompileSpirv(
-            ShadingModules(brdf, lightPatterns_, pushbroom),
+            ShadingModules(brdf, lightPatterns_, pushbroom,
+                           shadingVariant_),
             "shadeMain");
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument(
@@ -6337,7 +6398,9 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                 profiler::Intern(brdfs_.Models()[model].name));
             vkCmdBindPipeline(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                shadingPipelines_.at({model, pushbroom_})->Handle());
+                shadingPipelines_
+                    .at({model, pushbroom_, shadingVariant_})
+                    ->Handle());
             shadingLayout_.Push(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             const ShadingConstants constants =
