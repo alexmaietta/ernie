@@ -10,6 +10,9 @@
 //
 //     // Until the end of the scope.
 //     ERNIE_GPU_ZONE(context, commands, "Shadow passes");
+//     // A name chosen at run time, which must outlive the profile
+//     // (a string literal, such as a drawable's `ProfileName`).
+//     ERNIE_GPU_ZONE_NAMED(context, commands, drawable.ProfileName());
 //
 // Finished zones reach the profilers when later command buffers
 // collect them (`VulkanContext::CollectGpuProfile`, which `Submit`
@@ -65,7 +68,15 @@ class ScopedGpuZone {
                      TracyConcat(ernieGpuZone, TracyLine), commands, \
                      name, ERNIE_GPU_PROFILER(context) != nullptr);  \
     ERNIE_OWN_GPU_ZONE(context, commands, name)
+#define ERNIE_GPU_ZONE_NAMED(context, commands, name)                \
+    TracyVkZoneTransient(ERNIE_GPU_PROFILER(context),                \
+                         TracyConcat(ernieGpuZone, TracyLine),       \
+                         commands, name,                             \
+                         ERNIE_GPU_PROFILER(context) != nullptr);    \
+    ERNIE_OWN_GPU_ZONE(context, commands, name)
 #else
 #define ERNIE_GPU_ZONE(context, commands, name)                      \
+    ERNIE_OWN_GPU_ZONE(context, commands, name)
+#define ERNIE_GPU_ZONE_NAMED(context, commands, name)                \
     ERNIE_OWN_GPU_ZONE(context, commands, name)
 #endif

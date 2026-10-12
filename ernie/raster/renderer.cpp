@@ -5161,6 +5161,10 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             }
         }
         for (const std::size_t model : modelsInUse_) {
+            // A zone per material model, named for it.
+            ERNIE_GPU_ZONE_NAMED(
+                context_, commands,
+                profiler::Intern(brdfs_.Models()[model].name));
             vkCmdBindPipeline(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                 shadingPipelines_.at({model, pushbroom_})->Handle());

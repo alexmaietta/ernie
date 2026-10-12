@@ -6,6 +6,7 @@
 #include <chrono>
 #include <deque>
 #include <mutex>
+#include <set>
 
 namespace ernie::profiler {
 
@@ -138,6 +139,18 @@ std::vector<std::string> ThreadNames() {
     State& s = Global();
     std::lock_guard lock(s.mutex);
     return s.threadNames;
+}
+
+const char* Intern(std::string_view name) {
+    static std::mutex mutex;
+    // Node-based: the strings never move.
+    static std::set<std::string, std::less<>> names;
+    std::lock_guard lock(mutex);
+    auto found = names.find(name);
+    if (found == names.end()) {
+        found = names.emplace(name).first;
+    }
+    return found->c_str();
 }
 
 void AddGpuZone(std::uint64_t frame, const Zone& zone) {

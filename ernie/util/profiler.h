@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 /// Ernie's in-process profiler: the zones of `ERNIE_ZONE` and
@@ -83,6 +84,11 @@ void Clear();
 std::uint32_t ThreadIndex();
 void SetThreadName(std::string name);
 std::vector<std::string> ThreadNames();
+
+/// A copy of `name` that lives as long as the process, for zones
+/// named at run time (zones keep their name's pointer); the same
+/// pointer for the same name.
+const char* Intern(std::string_view name);
 
 /// Adds a GPU zone recorded during frame `frame`; dropped if that
 /// frame is no longer kept.
