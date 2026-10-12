@@ -464,16 +464,25 @@ GBuffer meshCutoutFragmentMain(VertexOutput in) {
     return out;
 }
 
+// Shading normal `normal` of a two-sided surface, turned to the side the viewer sees: flipped
+// where it disagrees with the triangle's own face towards the viewer (`flat`, the screen
+// derivatives' cross product, either way round), as on a back face. Not where it merely points a
+// little away from the viewer, as interpolated normals do on a curved mesh's silhouette: flipping
+// those there turned the unlit side's limb towards the light, speckling it with lit pixels.
+float3 twoSided(float3 normal, float3 flat, float3 toEye) {
+    let facing = dot(flat, toEye) < 0.0 ? -flat : flat;
+    return dot(normal, facing) < 0.0 ? -normal : normal;
+}
+
 // Minimal shading without colour (kMinimalNone): the ids and the geometric normal, two-sided,
 // with no material evaluated or lighting; and its cutout variant.
 Minimal meshIds(VertexOutput in) {
     let d = draws[in.item];
-    var normal = (d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
-                     ? normalize(in.normal)
-                     : normalize(cross(ddx(in.world), ddy(in.world)));
-    if (dot(normal, towardsViewer(in.world)) < 0.0) {
-        normal = -normal;
-    }
+    let flat = cross(ddx(in.world), ddy(in.world));
+    let normal = twoSided((d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
+                              ? normalize(in.normal)
+                              : normalize(flat),
+                          flat, towardsViewer(in.world));
     Minimal out;
     out.color = float4(0.0, 0.0, 0.0, 1.0);
     out.ids = uint4(d.points.z, in.instance, packOctahedral(normal), 0u);
@@ -564,9 +573,7 @@ GBuffer meshGBuffer(VertexOutput in) {
     var normal = (d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
                      ? normalize(in.normal)
                      : normalize(flat);
-    if (dot(normal, toEye) < 0.0) {
-        normal = -normal;
-    }
+    normal = twoSided(normal, flat, toEye);
     var shadingNormal = normal;
     let textured = uvTextures(in.uv, in.world, shadingNormal);
     let detail = triplanarDetail(in.world, shadingNormal);

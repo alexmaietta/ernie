@@ -94,7 +94,7 @@ class Demo(ernie.demo.Demo):
     def place(self):
         """Flies the drone, renders what it sees and shows it."""
         scene = self.scene
-        t = self.frame * self.frame_dt
+        t = self.time
         self.ball.set(
             translate=(0.0, -1.0, 0.5 + 1.5 * abs(math.sin(2.5 * t)))
         )

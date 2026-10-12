@@ -497,7 +497,7 @@ class Demo(ernie.demo.Demo):
         hud.clear()
         launches = sum(p.launches for p in self.projectiles)
         hud.text(
-            f"physics debug draw\nt = {self.frame * self.frame_dt:.2f} s\n"
+            f"physics debug draw\nt = {self.time:.2f} s\n"
             f"launches {launches}  contacts {self.total_contacts}",
             offset=(12, 12),
             size=14,

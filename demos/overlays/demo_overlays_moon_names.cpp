@@ -224,16 +224,23 @@ class MoonNamesDemo : public app::Demo {
             .SetCamera(Path("/World/Camera"))
             .SetResolution(glm::dvec2(kWidth, kHeight))
             .SetOverlays("*");
-        // In the viewer the camera is free, starting framed on the
-        // Moon; the checks follow a descent.
+        // In the viewer the camera is free, starting 2500 km over
+        // Oceanus Procellarum, near enough for names; the checks
+        // follow a descent.
         free_ = viewer != nullptr && !options.test;
         if (viewer != nullptr) {
             Pose(0.0);
             viewer->SetActiveCamera("/World/Camera");
             if (free_) {
-                const Path moon("/World/Moon");
-                viewer->Frame(std::span(&moon, 1));
+                viewer->LookAt((kRadius + 2.5e6) *
+                                   Direction(10.0, 315.0),
+                               glm::dvec3(0.0));
             }
+            // The Sun's gizmo would sit at the Moon's centre.
+            app::ViewportDisplay display =
+                viewer->GetViewportDisplay();
+            display.lights = false;
+            viewer->SetViewportDisplay(display);
         }
         // The Gazetteer when cached; else a few features while it is
         // fetched in the background, but not for the checks, which
@@ -313,15 +320,15 @@ class MoonNamesDemo : public app::Demo {
     }
 
     /// The camera at `t` of its descent: from four radii out, looking
-    /// at the Moon, to a low orbit over Copernicus, looking ahead to
-    /// its horizon.
+    /// at the Moon, to a low orbit past Copernicus, looking back down
+    /// at Kepler.
     void Pose(double t) {
         const double distance = kRadius * (4.0 - 2.8 * t);
         const double lat = 10.0 + 5.0 * t;
         const double lon = 300.0 + 35.0 * t;
         const glm::dvec3 eye = distance * Direction(lat, lon);
         const glm::dvec3 target =
-            t * kRadius * Direction(lat, lon + 14.0);
+            t * kRadius * Direction(lat - 5.0, lon - 13.0);
         GetScene().Set("/World/Camera", tokens::kTransform,
                        LookAtTransform(eye, target, {0.0, 0.0, 1.0}));
     }

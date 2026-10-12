@@ -17,9 +17,20 @@ PAUSE, RESET, ADD, TRAILS, LABELS = range(1, 6)
 BUTTON = (150.0, 26.0)
 
 
+ROWS = 5
+
+
 def button_offset(row):
-    """Where button `row` of the menu sits on the image."""
-    return (16.0, 16.0 + 34.0 * row)
+    """Where button `row` of the menu sits from the image's bottom
+    right corner: a column there, the last row lowest."""
+    return (-16.0, -16.0 - 34.0 * (ROWS - 1 - row))
+
+
+def button_corner(row, extent):
+    """Button `row`'s top left pixel on an image `extent` pixels
+    across."""
+    x, y = button_offset(row)
+    return (extent[0] + x - BUTTON[0], extent[1] + y - BUTTON[1])
 
 
 class Ball:
@@ -168,8 +179,9 @@ class Demo(ernie.demo.Demo):
         for row, label in enumerate(labels):
             menu.button(
                 label,
+                at=(1, 1),
                 offset=button_offset(row),
-                align=(0, 0),
+                align=(1, 1),
                 box=BUTTON,
                 id=row + PAUSE,
                 size=13,
@@ -187,11 +199,11 @@ class Demo(ernie.demo.Demo):
         menu = self.scene.overlay("menu")
         extent = (WIDTH, HEIGHT)
         for id in range(PAUSE, LABELS + 1):
-            x, y = button_offset(id - PAUSE)
+            x, y = button_corner(id - PAUSE, extent)
             centre = (x + 0.5 * BUTTON[0], y + 0.5 * BUTTON[1])
             assert menu.screen_item_at(centre, extent) == id, id
         balls = len(self.balls)
-        x, y = button_offset(ADD - PAUSE)
+        x, y = button_corner(ADD - PAUSE, extent)
         self.click(menu.screen_item_at((x + 1, y + 1), extent))
         assert len(self.balls) == balls + 1, "Add ball adds one"
         height = self.balls[0].height

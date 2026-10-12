@@ -126,7 +126,7 @@ class Demo(ernie.demo.Demo):
             self.initial_energy = energy
         hud = self.scene.overlay("hud").clear()
         hud.text(
-            f"t = {self.frame * self.frame_dt:.2f} s\nstep {self.frame}",
+            f"t = {self.time:.2f} s\nstep {self.frame}",
             offset=(12, 12),
             size=16,
         )

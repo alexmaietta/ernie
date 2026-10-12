@@ -146,14 +146,22 @@ class Demo(ernie.demo.Demo):
             resolution=(WIDTH, HEIGHT),
             overlays="*",
         )
-        # In the viewer the camera is free, starting framed on the
-        # Moon; the checks follow a descent.
+        # In the viewer the camera is free, starting 2500 km over
+        # Oceanus Procellarum, near enough for names; the checks
+        # follow a descent.
         self.free = viewer is not None and not args.test
         if viewer is not None:
             self.pose(0.0)
             viewer.active_camera = "/World/Camera"
             if self.free:
-                viewer.frame(["/World/Moon"])
+                viewer.look_at(
+                    tuple((RADIUS + 2.5e6) * direction(10.0, 315.0)),
+                    (0.0, 0.0, 0.0),
+                )
+            # The Sun's gizmo would sit at the Moon's centre.
+            display = viewer.viewport_display
+            display.lights = False
+            viewer.viewport_display = display
         # The Gazetteer when cached; else a few features while it is
         # fetched in the background, but not for the checks, which run
         # offline.
@@ -239,13 +247,13 @@ class Demo(ernie.demo.Demo):
 
     def pose(self, t):
         """The camera at `t` of its descent: from four radii out,
-        looking at the Moon, to a low orbit over Copernicus, looking
-        ahead to its horizon."""
+        looking at the Moon, to a low orbit past Copernicus, looking
+        back down at Kepler."""
         distance = RADIUS * (4.0 - 2.8 * t)
         lat = 10.0 + 5.0 * t
         lon = 300.0 + 35.0 * t
         eye = distance * direction(lat, lon)
-        target = t * RADIUS * direction(lat, lon + 14.0)
+        target = t * RADIUS * direction(lat - 5.0, lon - 13.0)
         self.camera.set(
             tokens.TRANSFORM,
             ernie.look_at_transform(

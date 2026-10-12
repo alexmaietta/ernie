@@ -623,6 +623,16 @@ void BindApp(nb::module_& parent) {
             nb::arg("paths") = std::vector<Path>{},
             "Frames `paths` (the whole scene when empty) with the "
             "active camera.")
+        .def(
+            "look_at",
+            [](Viewer& viewer, const std::array<double, 3>& eye,
+               const std::array<double, 3>& target) {
+                viewer.LookAt({eye[0], eye[1], eye[2]},
+                              {target[0], target[1], target[2]});
+            },
+            nb::arg("eye"), nb::arg("target"),
+            "Puts the active camera at `eye` looking at `target` (z "
+            "up), which it then orbits and zooms towards.")
         .def("camera_from_view", &Viewer::CameraFromView,
              nb::arg("path"),
              "Defines a Camera prim at `path` with the active "

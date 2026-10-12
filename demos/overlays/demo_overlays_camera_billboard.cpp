@@ -94,7 +94,7 @@ class CameraBillboardDemo : public app::Demo {
     /// Flies the drone, renders what it sees and shows it.
     void Place() {
         Scene& scene = GetScene();
-        const double t = frame * frameDt;
+        const double t = time;
         SetXform(scene, "/World/Ball",
                  {.translate = glm::dvec3(
                       0.0, -1.0,

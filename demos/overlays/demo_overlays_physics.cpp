@@ -458,8 +458,7 @@ class PhysicsDemo : public app::Demo {
         std::snprintf(line, sizeof(line),
                       "physics debug draw\nt = %.2f s\nlaunches %d  "
                       "contacts %d",
-                      static_cast<double>(frame) * frameDt, launches,
-                      totalContacts_);
+                      time, launches, totalContacts_);
         hud.Text({.offset = {12.0f, 12.0f}}, line, text);
         // The legend: a swatch and a name a row, down the left side.
         const std::pair<glm::vec4, const char*> legend[] = {

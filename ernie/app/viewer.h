@@ -506,6 +506,13 @@ class Viewer {
     /// camera (the F key).
     void Frame(std::span<const Path> paths = {});
 
+    /// Puts the active camera at `eye` looking at `target` (z up),
+    /// which it then orbits and zooms towards: a view from a chosen
+    /// distance, where `Frame` fits the whole prim.
+    /// @throws std::invalid_argument if `eye` equals `target` or
+    /// looks straight up or down.
+    void LookAt(const glm::dvec3& eye, const glm::dvec3& target);
+
     /// Defines a Camera prim at `path` in the scene with the active
     /// camera's transform and lens, and returns it.
     /// @throws std::invalid_argument if `path` exists or is under

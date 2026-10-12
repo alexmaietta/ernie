@@ -34,11 +34,21 @@ constexpr std::uint32_t kHeight = 360;
 enum : std::uint32_t { kPause = 1, kReset, kAdd, kTrails, kLabels };
 constexpr glm::vec2 kButton{150.0f, 26.0f};
 
-/// Where button `row` of the menu sits on the image.
+constexpr int kRows = 5;
+
+/// Where button `row` of the menu sits on the image: a column in its
+/// bottom right corner, the last row lowest.
 ScreenPlacement ButtonAt(int row) {
-    return {
-        .offset = {16.0f, 16.0f + 34.0f * static_cast<float>(row)},
-        .align = glm::vec2(0.0f)};
+    return {.at = {1.0f, 1.0f},
+            .offset = {-16.0f, -16.0f - 34.0f * static_cast<float>(
+                                                    kRows - 1 - row)},
+            .align = glm::vec2(1.0f)};
+}
+
+/// Button `row`'s top left pixel on an image `extent` pixels across.
+glm::vec2 ButtonCorner(int row, const glm::vec2& extent) {
+    const ScreenPlacement at = ButtonAt(row);
+    return at.at * extent + at.offset - at.Align() * kButton;
 }
 
 class MenuDemo : public app::Demo {
@@ -98,15 +108,16 @@ class MenuDemo : public app::Demo {
         const Overlay& menu = *GetScene().FindOverlay("menu");
         const glm::vec2 extent(kWidth, kHeight);
         for (std::uint32_t id = kPause; id <= kLabels; ++id) {
-            const ScreenPlacement at =
-                ButtonAt(static_cast<int>(id) - 1);
-            Check(menu.ScreenItemAt(at.offset + 0.5f * kButton,
+            const glm::vec2 corner =
+                ButtonCorner(static_cast<int>(id) - 1, extent);
+            Check(menu.ScreenItemAt(corner + 0.5f * kButton,
                                     extent) == id,
                   "button " + std::to_string(id) +
                       " is hit at its centre");
         }
         const std::size_t balls = balls_.size();
-        Click(menu.ScreenItemAt(ButtonAt(2).offset + 1.0f, extent));
+        Click(menu.ScreenItemAt(ButtonCorner(2, extent) + 1.0f,
+                                extent));
         Check(balls_.size() == balls + 1, "Add ball adds one");
         const double height = balls_.front().height;
         Click(kPause);

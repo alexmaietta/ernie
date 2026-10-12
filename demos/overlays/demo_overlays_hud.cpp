@@ -154,8 +154,7 @@ class HudDemo : public app::Demo {
         text.size = 16.0f;
         char line[96];
         std::snprintf(line, sizeof(line), "t = %.2f s\nstep %llu",
-                      static_cast<double>(frame) * frameDt,
-                      static_cast<unsigned long long>(frame));
+                      time, static_cast<unsigned long long>(frame));
         hud.Text({.offset = {12.0f, 12.0f}}, line, text);
         hud.Text({.at = {1.0f, 0.0f}, .offset = {-12.0f, 12.0f}},
                  std::to_string(kBalls) + " balls", text);

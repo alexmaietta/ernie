@@ -4144,6 +4144,14 @@ void Viewer::Frame(std::span<const Path> paths) {
     }
 }
 
+void Viewer::LookAt(const glm::dvec3& eye, const glm::dvec3& target) {
+    State& s = *state_;
+    s.controller = ControllerFromTransform(
+        LookAtTransform(eye, target, {0.0, 0.0, 1.0}),
+        glm::distance(eye, target), s.controller.verticalFov);
+    s.WriteActiveCamera();
+}
+
 Path Viewer::CameraFromView(const Path& path) {
     State& s = *state_;
     if (IsSessionPath(path)) {
