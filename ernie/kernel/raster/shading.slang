@@ -559,27 +559,17 @@ LightTap lightTap(LightGpu light, float3 point) {
     return tap;
 }
 
-// Fraction of a light reaching `world` past its shadow map: Poisson-disk PCF with normal offset,
-// as the sun's shadows (frame.slang). Points outside the map are lit.
-//
-// The taps lie on a disk across the light's ray through the receiver, each looked up in the view
-// that sees it, so a cube's filter crosses the seams between its faces.
-//
-// Lights with a size get percentage-closer soft shadows, as the sun's: a blocker search averages
-// the distance of occluders within the light's footprint, and the filter widens to the penumbra
-// they cast. A local light of radius R (`extentX.w`), seen from the receiver at distance d_r past
-// blockers at d_b, casts a penumbra of R (d_r - d_b) / (d_b d_r) radians as the map sees it; a
-// distant light's (`extentY.w`, the tangent of its angular radius) is its gap to the blockers
-// times that tangent. Every tap compares against the receiver's plane, which the disk across the
-// ray meets at a slant, so tilted surfaces do not shadow themselves.
+// The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
+// towards it): the level that suits the point's distance from the camera (about a texel a pixel),
+// a coarser one where a tap's page is not backed; lit past the last level or off every backed page.
+// As `lightVisibility` for a cascade: the receiver offset along its normal, filtered over the
+// light's Poisson disk, and with the light's angular size percentage-closer soft shadows, whose
+// blockers' mean height over the receiver times the tangent of the light's angular radius widens
+// the filter. A level's reversed-Z depth spans 2000 of its radii, so a depth difference is metres
+// times 0.5 / (1000 R).
 //
 // Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
 // https://doi.org/10.1145/1187112.1187153
-// The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
-// towards it): the level that suits the point's distance from the camera (about a texel a pixel),
-// a coarser one where its page is not backed; the receiver offset along its normal and filtered
-// over the light's Poisson disk as `lightVisibility` does, in that level's texels; lit past the
-// last level or off every backed page.
 float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
     let map = resources.virtualShadow;
     let level = virtualLevelFor(length(world - shv.eye.xyz), map.bias) - map.firstLevel;
@@ -602,35 +592,80 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     let across2 = cross(towards, across);
     let angle = 6.28318530718 * interleavedGradientNoise(pixel);
     let rotation = float2(cos(angle), sin(angle));
-    let radius = sh.lightShadow.x * texelWorld;
-    // How far the receiver's plane falls towards the light per world unit across it, and a
-    // texel and a half of it as bias.
+    let softness = sh.lightShadow.x;
+    // How far the receiver's plane falls towards the light per world unit across it.
     let cosine = clamp(nDotL, 0.05, 1.0);
     let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
+    // A texel and a half of the level used, and more as the receiver's plane tilts.
+    let slack = (1.5 + 1.5 * tilt) * texelWorld;
+    var filterTexels = softness;
+    let tanRadius = light.extentY.w;
+    if (tanRadius > 0.0) {
+        // Blockers up to the level's near plane, 1000 R above the receiver, could shadow it.
+        let reach = 1000.0 * map.levels[index].info.y;
+        let searchTexels =
+            clamp(reach * tanRadius / texelWorld, softness, kMaxLightFilterTexels);
+        var blockers = 0.0;
+        var blockerSum = 0.0;
+        for (uint i = 0; i < 16; ++i) {
+            let point = receiver + lightDisk(i, rotation, across, across2,
+                                             searchTexels * texelWorld);
+            float stored;
+            float depth;
+            uint used;
+            if (!virtualShadowDepth(map, index, point, stored, depth, used)) {
+                continue;
+            }
+            let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
+            let gap = (stored - depth) / perWorld;
+            let drop = length(lightPoisson(i)) * searchTexels * texelWorld * tilt;
+            if (gap > drop + slack) {
+                blockers += 1.0;
+                blockerSum += gap;
+            }
+        }
+        if (blockers == 0.0) {
+            return 1.0;
+        }
+        filterTexels =
+            clamp(blockerSum / blockers * tanRadius / texelWorld, softness, kMaxLightFilterTexels);
+    }
     var lit = 0.0;
     for (uint i = 0; i < 16; ++i) {
-        let pair = sh.poisson[i / 2];
-        let disk = (i % 2 == 0) ? pair.xy : pair.zw;
-        let turned = float2(disk.x * rotation.x - disk.y * rotation.y,
-                            disk.x * rotation.y + disk.y * rotation.x) * radius;
-        let tap = receiver + across * turned.x + across2 * turned.y;
+        let point =
+            receiver + lightDisk(i, rotation, across, across2, filterTexels * texelWorld);
         float stored;
         float depth;
         uint used;
-        if (!virtualShadowDepth(map, index, tap, stored, depth, used)) {
+        if (!virtualShadowDepth(map, index, point, stored, depth, used)) {
             lit += 1.0;
             continue;
         }
-        // Reversed-Z depth per world unit towards the light in the level used, and the bias.
-        let level = map.levels[used];
-        let perWorld = 0.5 / (1000.0 * level.info.y);
-        let bias = (1.5 + tilt * length(turned) / level.info.x + 1.5 * tilt) * level.info.x *
-                   perWorld;
-        lit += stored <= depth + bias ? 1.0 : 0.0;
+        // Compared at the receiver's plane, raised towards the light by the tap's distance across
+        // it, with the slack.
+        let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
+        let drop = length(lightPoisson(i)) * filterTexels * texelWorld * tilt;
+        lit += stored <= depth + (drop + slack) * perWorld ? 1.0 : 0.0;
     }
     return lit / 16.0;
 }
 
+// Fraction of a light reaching `world` past its shadow map: Poisson-disk PCF with normal offset,
+// as the sun's shadows (frame.slang). Points outside the map are lit.
+//
+// The taps lie on a disk across the light's ray through the receiver, each looked up in the view
+// that sees it, so a cube's filter crosses the seams between its faces.
+//
+// Lights with a size get percentage-closer soft shadows, as the sun's: a blocker search averages
+// the distance of occluders within the light's footprint, and the filter widens to the penumbra
+// they cast. A local light of radius R (`extentX.w`), seen from the receiver at distance d_r past
+// blockers at d_b, casts a penumbra of R (d_r - d_b) / (d_b d_r) radians as the map sees it; a
+// distant light's (`extentY.w`, the tangent of its angular radius) is its gap to the blockers
+// times that tangent. Every tap compares against the receiver's plane, which the disk across the
+// ray meets at a slant, so tilted surfaces do not shadow themselves.
+//
+// Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
+// https://doi.org/10.1145/1187112.1187153
 float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
     if (light.cone.w <= 0.0) {
         return 1.0;

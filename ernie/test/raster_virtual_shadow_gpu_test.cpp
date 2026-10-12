@@ -12,6 +12,7 @@
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
+#include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
 #include <glm/glm.hpp>
@@ -313,4 +314,74 @@ TEST_F(VirtualShadowMapTest, TheFirstFrameShadowsAsTheNext) {
     const std::size_t next = DarkPixels(delegate.Render(scene));
     EXPECT_GT(first, 0u);
     EXPECT_EQ(first, next);
+}
+
+namespace {
+
+/// Pixels of `image` (RGBA8) in a shadow's penumbra: green between a
+/// quarter and three quarters of the image's brightest.
+std::size_t PenumbraPixels(const ernie::Tensor& image) {
+    const auto* pixels = image.As<std::uint8_t>();
+    const auto count = static_cast<std::size_t>(image.Elements() / 4);
+    int lit = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        lit = std::max<int>(lit, pixels[i * 4 + 1]);
+    }
+    std::size_t penumbra = 0;
+    for (std::size_t i = 0; i < count; ++i) {
+        const int g = pixels[i * 4 + 1];
+        penumbra += g > lit / 4 && g < 3 * lit / 4 ? 1u : 0u;
+    }
+    return penumbra;
+}
+
+/// A 2 m square roof `height` metres over a floor, under a sun of
+/// angular diameter `angle` degrees straight above, seen from above
+/// through the virtual shadow map.
+ernie::Tensor RoofShadow(ernie::RasterDelegate& delegate,
+                         double height, double angle) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    Scene scene;
+    GroundPlane::Define(scene, "/World/Floor")
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    ernie::testing::DefineQuad(scene, "/World/Roof", 1.0f);
+    scene.Set("/World/Roof", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 0.0, height)));
+    DistantLight::Define(scene, "/World/Sun").SetAngle(angle);
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({0.0, 0.0, 1.0}));
+    Camera::Define(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetClippingRange(glm::dvec2(0.1, 1000.0));
+    // Below the roof's height, looking up under it at the floor would
+    // hide nothing: from the side and above, the floor beside it.
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({0.0, -6.0, height + 2.0},
+                              {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}));
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(96.0, 96.0))
+        .SetAmbient(0.0)
+        .SetShadowVirtual(true);
+    return delegate.Render(scene);
+}
+
+}  // namespace
+
+// The sun's angular size softens the virtual map's shadows as it
+// does the cascades': the penumbra widens with the caster's height
+// over the receiver, and a point sun's stays a texel or two.
+TEST_F(VirtualShadowMapTest, TheSunsSizeWidensThePenumbraWithHeight) {
+    ernie::RasterDelegate delegate(*context_);
+    const std::size_t low =
+        PenumbraPixels(RoofShadow(delegate, 0.5, 5.0));
+    const std::size_t high =
+        PenumbraPixels(RoofShadow(delegate, 3.0, 5.0));
+    const std::size_t point =
+        PenumbraPixels(RoofShadow(delegate, 3.0, 0.0));
+    EXPECT_GT(high, 2 * low);
+    EXPECT_GT(high, 3 * point);
 }
