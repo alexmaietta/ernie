@@ -51,6 +51,10 @@ _SKY_UPPER = tuple((c / 255.0) ** 2.2 for c in (68.0, 161.0, 255.0))
 _SKY_LUX = 28000.0
 _AMBIENT = (0.8, 0.8, 0.85)
 _AMBIENT_LUMINANCE = 1500.0
+# Minimal shading's fill, which stands in for the sky's light on what
+# the sun leaves: stronger, and the sky's blue, as ViewerGL's ambient.
+_MINIMAL_AMBIENT = (0.55, 0.7, 1.0)
+_MINIMAL_AMBIENT_LUMINANCE = 12000.0
 
 
 def _sky_gradient(rows: int = 64, columns: int = 8) -> np.ndarray:
@@ -141,6 +145,10 @@ def _up_rotation(
             [[0, 0, -1], [0, 1, 0], [1, 0, 0]], np.float64
         ), (0.0, -90.0, 0.0)
     return np.eye(3), (0.0, 0.0, 0.0)
+
+
+# The view's shadings, as Ernie's minimal modes.
+_SHADING = {"minimal": "diffuseGlossyEmission", "full": "off"}
 
 
 class _Mesh:
@@ -305,6 +313,11 @@ class ViewerErnie(ViewerGL):
             slower.
         bands: Spectral bands the view renders with: 3 for an
             interactive view, Ernie's 16 for a sensor's.
+        shading: "minimal", diffuse colours lit by the sun with its
+            shadows, the ambient and the sky, with highlights and
+            emission (Ernie's minimal mode, ``diffuseGlossyEmission``,
+            about four times faster), or "full", Ernie's spectral
+            shading and sensor.
         render_scale: The view's resolution against the window's,
             which shows it stretched: below 1 for speed.
         pipelined: Whether each frame shows the last frame's render
@@ -321,6 +334,7 @@ class ViewerErnie(ViewerGL):
         scene_setup: Callable[[ernie.Scene], None] | None = None,
         root: str = "/World/Newton",
         bands: int = 16,
+        shading: str = "minimal",
         sky: str = "gradient",
         render_scale: float = 1.0,
         pipelined: bool = True,
@@ -332,6 +346,7 @@ class ViewerErnie(ViewerGL):
         super().__init__(*args, **kwargs)
         lit = scene is not None
         self._own_scene = scene is None
+        self._own_lighting = False  # until _define_view lights it
         self.ernie_scene = (
             scene if scene is not None else ernie.Scene()
         )
@@ -354,16 +369,43 @@ class ViewerErnie(ViewerGL):
         self._wireframes: dict[str, tuple[Any, np.ndarray]] = {}
         self.render_scale = render_scale
         self.pipelined = pipelined
+        self._shading = "full"  # the settings' default until set
         # The render under way, and the image last shown, kept until
         # the next is.
         self._pending: Any = None
         self._shown: Any = None
         self._define_view(lit, bands, sky)
+        self.shading = shading
         self._ernie_ready = True
         # Released before the interpreter tears Warp down, even when an
         # example fails before closing the viewer.
         release = weakref.WeakMethod(self._release_ernie)
         atexit.register(lambda: (method := release()) and method())
+
+    @property
+    def shading(self) -> str:
+        """How the view is shaded: "minimal" or "full" (the
+        constructor's ``shading``)."""
+        return self._shading
+
+    @shading.setter
+    def shading(self, shading: str) -> None:
+        if shading not in _SHADING:
+            raise ValueError(
+                f"shading must be one of {', '.join(_SHADING)}, not {shading!r}"
+            )
+        self._shading = shading
+        self._settings.set("ernie:minimal:mode", _SHADING[shading])
+        if self._own_lighting:
+            minimal = shading == "minimal"
+            self._settings.ambient = (
+                _MINIMAL_AMBIENT_LUMINANCE
+                if minimal
+                else _AMBIENT_LUMINANCE
+            )
+            self._settings.ambient_color = (
+                _MINIMAL_AMBIENT if minimal else _AMBIENT
+            )
 
     def close(self) -> None:
         """Closes the window, first releasing what Ernie holds of
@@ -442,6 +484,7 @@ class ViewerErnie(ViewerGL):
             self._settings.dome_light_mode = "approximate"
             self._settings.ambient = _AMBIENT_LUMINANCE
             self._settings.ambient_color = _AMBIENT
+            self._own_lighting = True
         scene.define(
             "/World/Sun",
             ernie.DistantLight,

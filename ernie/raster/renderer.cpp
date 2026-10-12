@@ -949,6 +949,18 @@ constexpr DescriptorBinding kResolveBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
     {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
+    {11, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// minimal_resolve.slang's push constants.
+struct ResolveConstants {
+    std::uint32_t size[4];    ///< Width, height, views, first view.
+    std::uint32_t layout[4];  ///< Held vars and the blocks' layout.
+    float toDome[3][4];       ///< Rows of the world-to-dome rotation.
+    /// The dome's luminance in minimal units (0 unseen), 1 with a
+    /// map, and the map's width and height.
+    float sky[4];
 };
 
 /// depth_range.slang: the views' depth and the range it reduces to.
@@ -1241,6 +1253,33 @@ glm::vec3 MinimalAmbient(const FrameParams& params,
                          : 1.0f);
 }
 
+/// The dome's luminance as minimal shading's background shows it, in
+/// `MinimalAmbient`'s units (a white surface facing the brightest
+/// distant light), or 1 per cd/m^2 without one; 0 when camera rays do
+/// not see it.
+float MinimalSky(const FrameParams& params,
+                 const SpectralBands& bands) {
+    if (!params.dome || !params.dome->visible) {
+        return 0.0f;
+    }
+    double luminance = 0.0;
+    for (int b = 0;
+         b < bands.count &&
+         b < static_cast<int>(params.dome->radiance.size());
+         ++b) {
+        luminance +=
+            params.dome->radiance[static_cast<std::size_t>(b)] *
+            CieXyz(bands.Centre(b)).y * bands.Width();
+    }
+    luminance *= kLuminousEfficacy;
+    const LightParams* brightest = BrightestDistant(params, bands);
+    const double white = brightest != nullptr
+                             ? WhiteLuminance(*brightest, bands)
+                             : 0.0;
+    return static_cast<float>(white > 0.0 ? luminance / white
+                                          : luminance);
+}
+
 void CopyMatrix(float (&target)[16], const glm::mat4& matrix) {
     std::memcpy(target, glm::value_ptr(matrix), sizeof(target));
 }
@@ -1455,7 +1494,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       depthRangeLayout_(context, kDepthRangeBindings,
                         sizeof(DepthRangeConstants)),
       meterLayout_(context, kMeterBindings, sizeof(MeterConstants)),
-      resolveLayout_(context, kResolveBindings, 32),
+      resolveLayout_(context, kResolveBindings,
+                     sizeof(ResolveConstants)),
       unheldVar_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                  BufferMemory::Device),
       exposureLayout_(context, {}, sizeof(MeterConstants)),
@@ -3052,6 +3092,9 @@ void RasterRenderer::Update(
     // Minimal shading draws one layer per view (`MinimalTargets`).
     minimal_ = params.minimal;
     minimalClear_ = params.clearColor;
+    minimalSky_ = MinimalSky(params, params.camera.bands);
+    minimalToDome_ =
+        params.dome ? params.dome->toDome : glm::mat3(1.0f);
     if (minimal_ != MinimalMode::Off && resolvePipeline_ == nullptr) {
         const std::vector<ShaderModuleSource> resolve{
             {"minimal_resolve", shaders::kMinimalResolveSlang}};
@@ -5049,20 +5092,27 @@ void RasterRenderer::RecordMinimal(
                 linear.buffer != nullptr ? *linear.buffer
                                          : unheldVar_));
         }
+        resources.push_back(DescriptorResource::Of(
+            domeMap_->View(), domeMap_->Layout()));
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           resolvePipeline_->Handle());
         resolveLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                             resources);
-        const std::uint32_t constants[8] = {
-            extent_.width,
-            extent_.height,
-            views,
-            first,
-            holds,
-            static_cast<std::uint32_t>(kUniformsStride),
-            static_cast<std::uint32_t>(kShadingStride),
-            static_cast<std::uint32_t>(kShadingShared)};
-        resolveLayout_.PushConstants(commands, constants,
+        ResolveConstants constants{
+            {extent_.width, extent_.height, views, first},
+            {holds, static_cast<std::uint32_t>(kUniformsStride),
+             static_cast<std::uint32_t>(kShadingStride),
+             static_cast<std::uint32_t>(kShadingShared)},
+            {},
+            {minimalSky_, hasDomeMap_ ? 1.0f : 0.0f,
+             static_cast<float>(domeMap_->Desc().width),
+             static_cast<float>(domeMap_->Desc().height)}};
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                constants.toDome[r][c] = minimalToDome_[c][r];
+            }
+        }
+        resolveLayout_.PushConstants(commands, &constants,
                                      sizeof(constants));
         vkCmdDispatch(commands, Groups(extent_.width),
                       Groups(extent_.height), views);

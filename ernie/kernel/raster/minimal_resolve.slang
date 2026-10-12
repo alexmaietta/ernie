@@ -2,13 +2,15 @@
 // Minimal shading's outputs (`MinimalTargets`): from a chunk of views' attachments, each held
 // render var's texels, written into its linear buffer over every view (view, row, column), as
 // the full pipeline writes them (sensor.slang's geometry vars): the background at infinity, with
-// no normal, prim or instance. One thread per pixel of each view of the chunk.
+// no normal, prim or instance, and in LdrColor the dome light where camera rays see it (its map
+// at their direction, as bright as against a white surface facing the sun). One thread per pixel
+// of each view of the chunk.
 //
 // Bindings: 0 colour (sRGB RGBA8), 1 ids (prim id, instance id, octahedral normal, flags; all
 // ones for the background), 2 depth ([0, 1]); 3 the views' Uniforms (frame.slang) and 4 their
 // ShadingUniforms (shading.slang), as bytes, which GPU poses may have patched; 5 LdrColor,
 // 6 DistanceToImagePlane, 7 DistanceToCamera, 8 Normal, 9 PrimId and 10 InstanceId, each written
-// only when held (`constants.holds`).
+// only when held (`constants.holds`), 11 the dome's map (linear RGB, longitude across).
 
 struct ResolveConstants {
     uint4 size;    // width, height, the chunk's views, its first view
@@ -16,6 +18,11 @@ struct ResolveConstants {
     // (shading.slang's ShadingView, each starting with its inverse view-projection) and where they
     // start, after the shared ShadingUniforms.
     uint4 layout;
+    // Rows of the rotation from world directions to the dome's frame.
+    float4 toDome[3];
+    // The dome's luminance against a white surface facing the sun (0 when unseen), 1 when its map
+    // shapes it, and the map's width and height.
+    float4 sky;
 }
 
 [[vk::binding(0, 0)]] Texture2DArray<float4> color;
@@ -29,6 +36,7 @@ struct ResolveConstants {
 [[vk::binding(8, 0)]] RWStructuredBuffer<float4> normalOut;
 [[vk::binding(9, 0)]] RWStructuredBuffer<uint> primId;
 [[vk::binding(10, 0)]] RWStructuredBuffer<uint> instanceId;
+[[vk::binding(11, 0)]] Texture2D<float4> domeMap;
 [[vk::push_constant]] ConstantBuffer<ResolveConstants> constants;
 
 static const uint kBackground = 0xFFFFFFFFu;
@@ -67,6 +75,39 @@ float3 unpackOctahedral(uint packed) {
     return normalize(n);
 }
 
+float3 srgbEncode(float3 c) {
+    let x = saturate(c);
+    return select(x <= 0.0031308, 12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055);
+}
+
+// The dome map at texel `at`, wrapping in longitude.
+float3 domeTexel(int2 at, int2 size) {
+    let wrapped = int2((at.x % size.x + size.x) % size.x, clamp(at.y, 0, size.y - 1));
+    return max(domeMap.Load(int3(wrapped, 0)).rgb, float3(0.0));
+}
+
+// The dome as minimal shading shows it in world direction `d`: its map bilinearly, in the units of
+// a white surface facing the sun.
+float3 domeAt(float3 d) {
+    let sky = constants.sky;
+    if (sky.y == 0.0) {
+        return float3(sky.x);
+    }
+    let local = float3(dot(constants.toDome[0].xyz, d), dot(constants.toDome[1].xyz, d),
+                       dot(constants.toDome[2].xyz, d));
+    var u = atan2(local.y, local.x) / (2.0 * 3.14159265);
+    u = u < 0.0 ? u + 1.0 : u;
+    let v = acos(clamp(local.z, -1.0, 1.0)) / 3.14159265;
+    let size = int2(sky.zw);
+    let p = float2(u, v) * sky.zw - 0.5;
+    let base = int2(floor(p));
+    let f = p - float2(base);
+    let rgb = lerp(lerp(domeTexel(base, size), domeTexel(base + int2(1, 0), size), f.x),
+                   lerp(domeTexel(base + int2(0, 1), size), domeTexel(base + int2(1, 1), size), f.x),
+                   f.y);
+    return rgb * sky.x;
+}
+
 uint packUnorm(float4 c) {
     let q = uint4(round(saturate(c) * 255.0));
     return q.x | (q.y << 8) | (q.z << 16) | (q.w << 24);
@@ -84,11 +125,23 @@ void resolveMain(uint3 id : SV_DispatchThreadID) {
     let texel = int4(int2(id.xy), int(id.z), 0);
     let index = (view * height + id.y) * width + id.x;
     let holds = constants.layout.x;
-    if ((holds & kHoldsLdrColor) != 0) {
-        ldrColor[index] = packUnorm(color.Load(texel));
-    }
     let ids4 = ids.Load(texel);
     let background = ids4.x == kBackground;
+    if ((holds & kHoldsLdrColor) != 0) {
+        var ldr = color.Load(texel);
+        if (background && constants.sky.x > 0.0) {
+            // The dome along the pixel's ray: from the near plane (reverse-Z depth 1) to twice its
+            // distance (1/2).
+            let ndc = float2((float(id.x) + 0.5) / float(width) * 2.0 - 1.0,
+                             1.0 - (float(id.y) + 0.5) / float(height) * 2.0);
+            let toWorld = inverseViewProj(constants.layout.w + view * constants.layout.z);
+            let near = mul(toWorld, float4(ndc, 1.0, 1.0));
+            let beyond = mul(toWorld, float4(ndc, 0.5, 1.0));
+            let d = normalize(beyond.xyz / beyond.w - near.xyz / near.w);
+            ldr = float4(srgbEncode(domeAt(d)), 1.0);
+        }
+        ldrColor[index] = packUnorm(ldr);
+    }
     if ((holds & (kHoldsImagePlane | kHoldsCamera)) != 0) {
         float imagePlane = asfloat(0x7F800000u);  // infinity
         float camera = imagePlane;

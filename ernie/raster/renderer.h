@@ -1330,6 +1330,11 @@ class RasterRenderer {
     glm::vec3 minimalClear_{
         0.0f};  ///< The background's linear colour
                 ///< (`FrameParams::clearColor`).
+    /// The dome minimal shading shows where camera rays see it: its
+    /// luminance in minimal units (`MinimalSky`, 0 unseen) and the
+    /// rotation into its frame.
+    float minimalSky_ = 0.0f;
+    glm::mat3 minimalToDome_{1.0f};
     PipelineLayout resolveLayout_;
     std::unique_ptr<ComputePipeline> resolvePipeline_;
     GpuBuffer unheldVar_;
