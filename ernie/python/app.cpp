@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "bindings.h"
+#include "held.h"
 
 #include <nanobind/operators.h>
 #include <nanobind/stl/array.h>
@@ -56,24 +57,24 @@ void ColourProperty(nb::class_<Theme>& theme, const char* name,
         doc);
 }
 
-/// A Python callable that C++ may copy and drop without the GIL;
-/// calls take the GIL.
+/// A Python callable that the viewer holds, shown to the collector
+/// through it (held.h); C++ may copy and drop it without the GIL, and
+/// calls take the GIL. Once the collector clears it, calls do
+/// nothing.
 class Callable {
   public:
-    explicit Callable(nb::callable callable)
-        : held_(new nb::callable(std::move(callable)),
-                [](nb::callable* held) {
-                    nb::gil_scoped_acquire gil;
-                    delete held;
-                }) {}
+    Callable(const Viewer& owner, nb::callable callable)
+        : held_(Hold(&owner, std::move(callable))) {}
 
     /// Calls the callable with the viewer itself (not a copy)
     /// followed by `args`.
     template <typename... Args>
     void operator()(Viewer& viewer, Args&&... args) const {
         nb::gil_scoped_acquire gil;
-        (*held_)(nb::cast(&viewer, nb::rv_policy::reference),
-                 std::forward<Args>(args)...);
+        if (held_->is_valid()) {
+            (*held_)(nb::cast(&viewer, nb::rv_policy::reference),
+                     std::forward<Args>(args)...);
+        }
     }
 
     /// Calls the callable with the viewer and converts what it
@@ -81,13 +82,33 @@ class Callable {
     template <typename Result>
     Result Call(const Viewer& viewer) const {
         nb::gil_scoped_acquire gil;
+        if (!held_->is_valid()) {
+            return Result{};
+        }
         return nb::cast<Result>(
             (*held_)(nb::cast(&viewer, nb::rv_policy::reference)));
     }
 
   private:
-    std::shared_ptr<nb::callable> held_;
+    Held held_;
 };
+
+/// A widget's callback for `panel`, held through it (held.h); none
+/// for None.
+template <typename... Args>
+std::function<void(Args...)> WidgetCallback(const WidgetPanel& panel,
+                                            nb::object callback) {
+    if (callback.is_none()) {
+        return {};
+    }
+    const Held held = Hold(&panel, std::move(callback));
+    return [held](Args... args) {
+        nb::gil_scoped_acquire gil;
+        if (held->is_valid()) {
+            (*held)(args...);
+        }
+    };
+}
 
 }  // namespace
 
@@ -249,7 +270,9 @@ void BindApp(nb::module_& parent) {
             "show.")
         .def(nb::self == nb::self);
 
-    nb::class_<WidgetPanel>(m, "WidgetPanel",
+    // A __dict__, which the collector traverses: a viewer's panel
+    // keeps it alive there (`add_panel`).
+    nb::class_<WidgetPanel>(m, "WidgetPanel", nb::dynamic_attr(),
                             "A dockable panel of simple widgets; "
                             "each calls its callback when the "
                             "user changes it.")
@@ -260,31 +283,92 @@ void BindApp(nb::module_& parent) {
         .def("text", &WidgetPanel::Text, nb::arg("text"),
              "Adds a line of text; returns its id.")
         .def("separator", &WidgetPanel::Separator)
-        .def("button", &WidgetPanel::Button, nb::arg("label"),
-             nb::arg("on_click"))
-        .def("checkbox", &WidgetPanel::Checkbox, nb::arg("label"),
-             nb::arg("value"),
-             nb::arg("on_change").none() = nb::none())
-        .def("slider", &WidgetPanel::Slider, nb::arg("label"),
-             nb::arg("min"), nb::arg("max"), nb::arg("value"),
-             nb::arg("on_change").none() = nb::none())
-        .def("combo", &WidgetPanel::Combo, nb::arg("label"),
-             nb::arg("items"), nb::arg("selected") = 0,
-             nb::arg("on_change").none() = nb::none())
-        .def("input_text", &WidgetPanel::InputText, nb::arg("label"),
-             nb::arg("value") = "",
-             nb::arg("on_change").none() = nb::none(),
-             "A field of editable text; on_change gets the text "
-             "after each edit.")
-        .def("color", &WidgetPanel::Color, nb::arg("label"),
-             nb::arg("value"),
-             nb::arg("on_change").none() = nb::none(),
-             "An RGB colour swatch with a picker; on_change gets "
-             "(r, g, b) in [0, 1].")
-        .def("plot", &WidgetPanel::Plot, nb::arg("label"),
-             nb::arg("source"),
-             "A line plot of the floats `source()` returns, read "
-             "each frame.")
+        // The callbacks are held through the panel (held.h).
+        .def(
+            "button",
+            [](WidgetPanel& panel, std::string label,
+               nb::callable onClick) {
+                return panel.Button(std::move(label),
+                                    WidgetCallback<>(panel, onClick));
+            },
+            nb::arg("label"), nb::arg("on_click"))
+        .def(
+            "checkbox",
+            [](WidgetPanel& panel, std::string label, bool value,
+               nb::object onChange) {
+                return panel.Checkbox(
+                    std::move(label), value,
+                    WidgetCallback<bool>(panel, onChange));
+            },
+            nb::arg("label"), nb::arg("value"),
+            nb::arg("on_change").none() = nb::none())
+        .def(
+            "slider",
+            [](WidgetPanel& panel, std::string label, double min,
+               double max, double value, nb::object onChange) {
+                return panel.Slider(
+                    std::move(label), min, max, value,
+                    WidgetCallback<double>(panel, onChange));
+            },
+            nb::arg("label"), nb::arg("min"), nb::arg("max"),
+            nb::arg("value"),
+            nb::arg("on_change").none() = nb::none())
+        .def(
+            "combo",
+            [](WidgetPanel& panel, std::string label,
+               std::vector<std::string> items, std::size_t selected,
+               nb::object onChange) {
+                return panel.Combo(
+                    std::move(label), std::move(items), selected,
+                    WidgetCallback<std::size_t>(panel, onChange));
+            },
+            nb::arg("label"), nb::arg("items"),
+            nb::arg("selected") = 0,
+            nb::arg("on_change").none() = nb::none())
+        .def(
+            "input_text",
+            [](WidgetPanel& panel, std::string label,
+               std::string value, nb::object onChange) {
+                return panel.InputText(
+                    std::move(label), std::move(value),
+                    WidgetCallback<const std::string&>(panel,
+                                                       onChange));
+            },
+            nb::arg("label"), nb::arg("value") = "",
+            nb::arg("on_change").none() = nb::none(),
+            "A field of editable text; on_change gets the text "
+            "after each edit.")
+        .def(
+            "color",
+            [](WidgetPanel& panel, std::string label,
+               std::array<double, 3> value, nb::object onChange) {
+                return panel.Color(
+                    std::move(label), value,
+                    WidgetCallback<std::array<double, 3>>(panel,
+                                                          onChange));
+            },
+            nb::arg("label"), nb::arg("value"),
+            nb::arg("on_change").none() = nb::none(),
+            "An RGB colour swatch with a picker; on_change gets "
+            "(r, g, b) in [0, 1].")
+        .def(
+            "plot",
+            [](WidgetPanel& panel, std::string label,
+               nb::callable source) {
+                const Held held = Hold(&panel, std::move(source));
+                return panel.Plot(
+                    std::move(label), [held]() -> std::vector<float> {
+                        nb::gil_scoped_acquire gil;
+                        if (!held->is_valid()) {
+                            return {};
+                        }
+                        return nb::cast<std::vector<float>>(
+                            (*held)());
+                    });
+            },
+            nb::arg("label"), nb::arg("source"),
+            "A line plot of the floats `source()` returns, read "
+            "each frame.")
         .def(
             "set",
             [](WidgetPanel& panel, WidgetPanel::Id widget,
@@ -312,7 +396,9 @@ void BindApp(nb::module_& parent) {
         .def("remove", &WidgetPanel::Remove, nb::arg("widget"))
         .def("clear", &WidgetPanel::Clear);
 
+    // Shows the collector the callbacks it holds (held.h).
     nb::class_<Viewer>(m, "Viewer",
+                       nb::type_slots(HeldSlots<Viewer>()),
                        "A window onto a Scene: a docked viewport "
                        "plus panels. Edits from code and "
                        "from the GUI go through the same scene. "
@@ -370,7 +456,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "on_frame",
             [](Viewer& viewer, nb::callable callback) {
-                const Callable call(std::move(callback));
+                const Callable call(viewer, std::move(callback));
                 return viewer.OnFrame(
                     [call](Viewer& v, const FrameInfo& info) {
                         call(v, info);
@@ -383,7 +469,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "on_pre_render",
             [](Viewer& viewer, nb::callable callback) {
-                const Callable call(std::move(callback));
+                const Callable call(viewer, std::move(callback));
                 return viewer.OnPreRender(
                     [call](Viewer& v, const FrameInfo& info) {
                         call(v, info);
@@ -397,7 +483,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "on_post_render",
             [](Viewer& viewer, nb::callable callback) {
-                const Callable call(std::move(callback));
+                const Callable call(viewer, std::move(callback));
                 return viewer.OnPostRender(
                     [call](Viewer& v, const FrameInfo& info) {
                         call(v, info);
@@ -410,7 +496,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "on_selection",
             [](Viewer& viewer, nb::callable callback) {
-                const Callable call(std::move(callback));
+                const Callable call(viewer, std::move(callback));
                 return viewer.OnSelection(
                     [call](Viewer& v, std::span<const Path> paths) {
                         call(v, std::vector<Path>(paths.begin(),
@@ -853,11 +939,32 @@ void BindApp(nb::module_& parent) {
         .def("capture", &Viewer::Capture, nb::arg("path"),
              nb::arg("var") = "",
              "Writes the next viewport frame to `path` as PNG.")
-        .def("add_panel", &Viewer::AddWidgetPanel, nb::arg("title"),
-             nb::arg("dock") = app::Dock::Right,
-             nb::rv_policy::reference_internal,
-             "Adds a WidgetPanel titled `title`, docked at `dock` in "
-             "the default layout.")
+        .def(
+            "add_panel",
+            [](Viewer& viewer, const std::string& title,
+               app::Dock dock) {
+                WidgetPanel& panel =
+                    viewer.AddWidgetPanel(title, dock);
+                // Its callbacks count as the viewer's while it has
+                // it.
+                Adopt(&viewer, &panel, [&viewer, &panel, title] {
+                    return viewer.FindPanel(title) == &panel;
+                });
+                // The panel keeps the viewer alive through its
+                // __dict__, where the collector sees it (unlike
+                // keep_alive).
+                nb::object wrapper =
+                    nb::cast(&panel, nb::rv_policy::reference);
+                nb::setattr(
+                    wrapper, "_viewer",
+                    nb::cast(&viewer, nb::rv_policy::reference));
+                return wrapper;
+            },
+            nb::arg("title"), nb::arg("dock") = app::Dock::Right,
+            nb::sig("def add_panel(self, title: str, dock: Dock = "
+                    "Dock.RIGHT) -> WidgetPanel"),
+            "Adds a WidgetPanel titled `title`, docked at `dock` in "
+            "the default layout.")
         .def("remove_panel", &Viewer::RemovePanel, nb::arg("title"))
         .def(
             "panel_visible",
@@ -894,7 +1001,7 @@ void BindApp(nb::module_& parent) {
             "add_menu_item",
             [](Viewer& viewer, const std::string& menu,
                const std::string& label, nb::callable action) {
-                const Callable call(std::move(action));
+                const Callable call(viewer, std::move(action));
                 viewer.AddMenuItem(menu, label,
                                    [call](Viewer& v) { call(v); });
             },
@@ -912,7 +1019,7 @@ void BindApp(nb::module_& parent) {
                std::optional<nb::callable> changed) {
                 std::function<void(Viewer&, bool)> callback;
                 if (changed) {
-                    const Callable call(std::move(*changed));
+                    const Callable call(viewer, std::move(*changed));
                     callback = [call](Viewer& v, bool on) {
                         call(v, on);
                     };
@@ -933,7 +1040,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "add_overlay_pick_handler",
             [](Viewer& viewer, nb::callable picked) {
-                const Callable call(std::move(picked));
+                const Callable call(viewer, std::move(picked));
                 return viewer.AddOverlayPickHandler(
                     [call](Viewer& v, const OverlayHit& hit) {
                         call(v, hit);
@@ -948,7 +1055,7 @@ void BindApp(nb::module_& parent) {
         .def(
             "add_overlay_click_handler",
             [](Viewer& viewer, nb::callable clicked) {
-                const Callable call(std::move(clicked));
+                const Callable call(viewer, std::move(clicked));
                 return viewer.AddOverlayClickHandler(
                     [call](Viewer& v, const std::string& overlay,
                            std::uint32_t id) {
@@ -972,7 +1079,7 @@ void BindApp(nb::module_& parent) {
             "add_hud_item",
             [](Viewer& viewer, std::string label, nb::callable value,
                bool shown) {
-                const Callable call(std::move(value));
+                const Callable call(viewer, std::move(value));
                 return viewer.AddHudItem(
                     std::move(label),
                     [call](Viewer& v) {
@@ -992,10 +1099,10 @@ void BindApp(nb::module_& parent) {
             "add_viewport_menu_item",
             [](Viewer& viewer, std::string label, nb::callable action,
                std::optional<nb::callable> checked) {
-                const Callable call(std::move(action));
+                const Callable call(viewer, std::move(action));
                 std::function<bool(const Viewer&)> isChecked;
                 if (checked) {
-                    const Callable check(std::move(*checked));
+                    const Callable check(viewer, std::move(*checked));
                     isChecked = [check](const Viewer& v) {
                         return check.Call<bool>(v);
                     };

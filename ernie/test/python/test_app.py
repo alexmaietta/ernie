@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
+import gc
 import math
 import os
 import tempfile
+import weakref
 
 import pytest
 
@@ -58,6 +60,44 @@ def test_step_runs_frame_callbacks_and_close_ends_run(viewer):
     assert not viewer.is_open
     assert not viewer.step()
     viewer.remove_callback(callback)
+
+
+def test_callbacks_reaching_their_viewer_are_collected():
+    """A viewer and its panel whose callbacks lead back to them are a
+    cycle the garbage collector frees, and only once nothing else
+    holds the viewer."""
+
+    class Holder:
+        pass
+
+    calls = []
+
+    def cycle(viewer):
+        holder = Holder()
+        holder.viewer = viewer
+        viewer.on_frame(lambda v, info: calls.append(holder))
+        holder.panel = viewer.add_panel("Cycle")
+        holder.panel.slider(
+            "Value", 0.0, 1.0, 0.5, lambda value: holder
+        )
+        return weakref.ref(holder)
+
+    # Its own viewer, which the test alone holds (one at a time).
+    try:
+        own = app.Viewer(
+            cube_scene(), hidden=True, width=64, height=64
+        )
+    except RuntimeError as error:
+        pytest.skip(f"No Vulkan device: {error}")
+    holder = cycle(own)
+    gc.collect()
+    assert holder() is not None, "kept while the viewer is"
+    own.step()
+    assert calls and calls[-1] is holder(), "its callback still runs"
+    calls.clear()
+    del own
+    gc.collect()
+    assert holder() is None, "freed with the viewer"
 
 
 def test_python_exceptions_in_callbacks_propagate(viewer):

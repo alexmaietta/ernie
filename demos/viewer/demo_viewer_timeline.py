@@ -4,7 +4,6 @@ time code, so the timeline plays, pauses, scrubs, steps and loops them
 (Space plays; the Capture panel records the loop)."""
 
 import math
-import weakref
 
 import ernie
 import ernie.demo
@@ -84,10 +83,8 @@ class Demo(ernie.demo.Demo):
         if viewer is not None:
             # The timeline drives the poses: after it moves on, before
             # the frame renders.
-            # Weakly: the viewer holding the demo would be a cycle.
-            demo = weakref.proxy(self)
             viewer.on_frame(
-                lambda viewer, info: demo.place(info.time_code / FPS)
+                lambda viewer, info: self.place(info.time_code / FPS)
             )
             viewer.looping = True
             viewer.play()

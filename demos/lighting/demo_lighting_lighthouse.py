@@ -13,7 +13,6 @@ References:
 """
 
 import math
-import weakref
 
 import numpy as np
 
@@ -241,10 +240,8 @@ class Demo(ernie.demo.Demo):
             display.grid = False
             viewer.viewport_display = display
             # The timeline turns the beacon: play, scrub or step it.
-            # Weakly: the viewer holding the demo would be a cycle.
-            demo = weakref.proxy(self)
             viewer.on_frame(
-                lambda viewer, info: demo.turn_at(demo.time())
+                lambda viewer, info: self.turn_at(self.time())
             )
             viewer.play()
 

@@ -13,7 +13,7 @@ nanobind_add_module(
     tensor.cpp)
 target_link_libraries(_ernie PRIVATE ernie ernie_build_options)
 if(TARGET ernie_app)
-    target_sources(_ernie PRIVATE app.cpp demo.cpp)
+    target_sources(_ernie PRIVATE app.cpp demo.cpp held.cpp)
     target_link_libraries(_ernie PRIVATE ernie_app)
     target_compile_definitions(_ernie PRIVATE ERNIE_HAS_APP)
 endif()

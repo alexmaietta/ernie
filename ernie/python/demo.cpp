@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "bindings.h"
+#include "held.h"
 
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/function.h>
@@ -45,6 +46,9 @@ using app::DemoRunner;
 class PyDemo : public Demo {
   public:
     NB_TRAMPOLINE(Demo);
+
+    /// The viewer, held where the collector sees it (held.h).
+    Held viewer;
 
     void Step() override {
         NB_OVERRIDE_NAME("step", Step);
@@ -161,17 +165,31 @@ void BindDemo(nb::module_& m) {
         "the program name, leaving "
         "the others in extra; raises ValueError for a bad value.");
 
+    // Shows the collector its viewer and widgets' callbacks (held.h).
     nb::class_<Demo, PyDemo>(
-        m, "Demo",
+        m, "Demo", nb::type_slots(HeldSlots<Demo>()),
         "A demo: a scene built in __init__, advanced by step, drawn "
         "by render and checked by "
         "test_final, run by DemoRunner in a window, headless or "
         "without a viewer. Subclass "
         "ernie.demo.Demo in Python, which adds argparse options and "
         "NumPy images.")
-        .def(nb::init<app::Viewer*, const DemoOptions&>(),
-             nb::arg("viewer").none(), nb::arg("options"),
-             nb::keep_alive<1, 2>())
+        .def(
+            "__init__",
+            [](Demo* self, app::Viewer* viewer,
+               const DemoOptions& options) {
+                // The trampoline, which Python subclasses need.
+                auto* demo = new (self) PyDemo(viewer, options);
+                // Keeps the viewer alive where the collector sees it
+                // (held.h), unlike keep_alive: a demo whose viewer's
+                // callbacks reach it is then a cycle it can free.
+                if (viewer != nullptr) {
+                    demo->viewer = Hold(
+                        static_cast<const Demo*>(demo),
+                        nb::cast(viewer, nb::rv_policy::reference));
+                }
+            },
+            nb::arg("viewer").none(), nb::arg("options"))
         .def("step", &Demo::Step,
              "Advances the scene by frame_dt; nothing by default.")
         .def("render", &Demo::Render,
@@ -215,11 +233,21 @@ void BindDemo(nb::module_& m) {
                      "A Renderer of the demo's own, opened on first "
                      "use with the run's device, "
                      "backend and validation.")
-        .def_prop_ro("widgets", &Demo::SharedWidgets,
-                     "The demo's controls in the Demos panel's "
-                     "Options section: a WidgetPanel "
-                     "to add sliders, checkboxes and combos to, with "
-                     "or without a viewer.")
+        .def_prop_ro(
+            "widgets",
+            [](Demo& demo) {
+                std::shared_ptr<app::WidgetPanel> panel =
+                    demo.SharedWidgets();
+                // Its callbacks count as the demo's (held.h).
+                Adopt(&demo, panel.get(),
+                      [weak = std::weak_ptr<app::WidgetPanel>(
+                           panel)] { return !weak.expired(); });
+                return panel;
+            },
+            "The demo's controls in the Demos panel's "
+            "Options section: a WidgetPanel "
+            "to add sliders, checkboxes and combos to, with "
+            "or without a viewer.")
         .def("log_scalar", &Demo::LogScalar, nb::arg("name"),
              nb::arg("value"), nb::arg("clear") = false,
              nb::arg("smoothing") = 1,
