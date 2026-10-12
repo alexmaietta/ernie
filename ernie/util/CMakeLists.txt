@@ -4,6 +4,7 @@ ernie_add_library(
     SOURCES
     astronomy.cpp
     atmosphere.cpp
+    disk_cache.cpp
     ies.cpp
     image.cpp
     log.cpp
@@ -18,6 +19,7 @@ ernie_add_library(
     spectrum.cpp
     tensor.cpp
     texture_bake.cpp
+    texture_cache.cpp
     texture_file.cpp
     PUBLIC
     ernie_glm
@@ -33,4 +35,5 @@ ernie_add_library(
     ernie_bc7enc)
 # The banner's version (log.h).
 set_source_files_properties(
-    log.cpp PROPERTIES COMPILE_DEFINITIONS ERNIE_VERSION="${ERNIE_VERSION}")
+    log.cpp PROPERTIES COMPILE_DEFINITIONS
+                       ERNIE_VERSION="${ERNIE_VERSION}")

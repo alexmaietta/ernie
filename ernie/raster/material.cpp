@@ -359,6 +359,11 @@ std::shared_ptr<const MaterialTexture>
 UploadMaterialTexture(const VulkanContext& context,
                       MaterialTextureSlot slot, TextureData stored,
                       const TextureReader& reader) {
+    // Devices that cannot sample BC blocks read them decoded.
+    if (InfoOf(stored.format).compressed() &&
+        !context.SupportsTextureCompressionBc()) {
+        stored = DecodeBlocks(stored);
+    }
     auto texture = std::make_shared<MaterialTexture>();
     const std::uint32_t channels = InfoOf(stored.format).channels;
     if (slot == MaterialTextureSlot::Albedo) {

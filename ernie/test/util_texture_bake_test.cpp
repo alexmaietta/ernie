@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/texture_bake.h"
+#include "ernie/util/texture_cache.h"
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -8,6 +9,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -228,4 +231,88 @@ TEST_F(TextureBake, MosaicsBakeAsTheirJoinedImage) {
     normal.role = TextureRole::Normal;
     EXPECT_THROW(BakeMosaic(mixed, 2, dir_ / "bad.dds", normal),
                  std::invalid_argument);
+}
+
+TEST_F(TextureBake, DecodedBlocksMatchTheirSources) {
+    // An 8 x 8 diagonal gradient's mips (its colours on one line, as
+    // BC1 and BC7's one subset fit) baked to BC1, BC4, BC5 and BC7
+    // decode to the same channels near it; BC2 is not decoded.
+    Image image(8, 8);
+    for (std::uint32_t y = 0; y < 8; ++y) {
+        for (std::uint32_t x = 0; x < 8; ++x) {
+            const float t = static_cast<float>(x + y) / 14.0f;
+            image.At(x, y) = glm::vec4(t, 1.0f - t, 0.5f * t, 1.0f);
+        }
+    }
+    const std::vector<Image> mips =
+        MipChain(image, MipFilter::Average);
+    const std::pair<TextureFormat, TextureFormat> kFormats[] = {
+        {TextureFormat::Bc1Srgb, TextureFormat::Rgba8Srgb},
+        {TextureFormat::Bc4, TextureFormat::R8},
+        {TextureFormat::Bc5, TextureFormat::Rg8},
+        {TextureFormat::Bc7, TextureFormat::Rgba8}};
+    for (const auto& [format, decodedFormat] : kFormats) {
+        const ImageEncoding encoding = ernie::InfoOf(format).srgb
+                                           ? ImageEncoding::Srgb
+                                           : ImageEncoding::Linear;
+        const TextureData decoded = ernie::DecodeBlocks(
+            EncodeTexture(mips, format, encoding));
+        ASSERT_EQ(decoded.format, decodedFormat);
+        ASSERT_EQ(decoded.mips, 4u);
+        const std::uint32_t channels =
+            ernie::InfoOf(decodedFormat).channels;
+        const std::vector<std::uint8_t> source =
+            ernie::ToRgba8(image, encoding);
+        const std::span<const std::byte> texels = decoded.Mip(0, 0);
+        ASSERT_EQ(texels.size(), std::size_t{64} * channels);
+        // BC1's four colours a block, 5:6:5 bit endpoints, err most.
+        const int tolerance =
+            format == TextureFormat::Bc1Srgb ? 26 : 12;
+        for (std::size_t i = 0; i < 64; ++i) {
+            for (std::uint32_t c = 0; c < channels; ++c) {
+                EXPECT_NEAR(
+                    static_cast<int>(texels[i * channels + c]),
+                    static_cast<int>(source[i * 4 + c]), tolerance)
+                    << "format " << static_cast<int>(format)
+                    << ", texel " << i << ", channel " << c;
+            }
+        }
+    }
+    TextureData bc2;
+    bc2.format = TextureFormat::Bc2;
+    bc2.width = 4;
+    bc2.height = 4;
+    bc2.bytes.resize(16);
+    bc2.offsets = {0};
+    EXPECT_THROW(ernie::DecodeBlocks(bc2), std::invalid_argument);
+}
+
+TEST_F(TextureBake, TheTextureCacheKeepsTheRecentlyUsed) {
+    // Three 16 x 16 RGBA8 textures in a cache with room for two: the
+    // one least recently used goes. Without a folder nothing is kept.
+    TextureData texture = EncodeTexture(
+        std::vector<Image>{Image(16, 16, glm::vec4(0.25f))},
+        TextureFormat::Rgba8, ImageEncoding::Linear);
+    const std::uintmax_t bytes = texture.bytes.size() + 200;
+    const ernie::TextureCache cache(dir_ / "cache", 2 * bytes);
+    EXPECT_TRUE(cache.Enabled());
+    EXPECT_FALSE(cache.Read("a"));
+    cache.Write("a", texture);
+    texture.bytes[0] = std::byte{1};
+    cache.Write("b", texture);
+    const std::optional<TextureData> a = cache.Read("a");
+    ASSERT_TRUE(a);
+    EXPECT_EQ(a->width, 16u);
+    EXPECT_EQ(a->Mip(0, 0)[0], std::byte{64});
+    cache.Write("c", texture);
+    EXPECT_TRUE(cache.Read("a"));
+    EXPECT_FALSE(cache.Read("b"));
+    const std::optional<TextureData> c = cache.Read("c");
+    ASSERT_TRUE(c);
+    EXPECT_EQ(c->Mip(0, 0)[0], std::byte{1});
+
+    const ernie::TextureCache none(std::nullopt);
+    EXPECT_FALSE(none.Enabled());
+    none.Write("a", texture);
+    EXPECT_FALSE(none.Read("a"));
 }

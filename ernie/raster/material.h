@@ -69,7 +69,9 @@ UploadMaterialTexture(const VulkanContext& context,
 
 /// As above, for a texture read as stored from a DDS or KTX2 file
 /// (`LoadTextureFile`): the first layer's mips upload as they are,
-/// BC1 to BC7 blocks included, never decoded. A reader's colour space
+/// BC1 to BC7 blocks included, decoded (`DecodeBlocks`) only on
+/// devices without `VulkanContext::SupportsTextureCompressionBc`. A
+/// reader's colour space
 /// picks the sRGB or plain variant of formats with both (raw plain,
 /// sRGB sRGB, auto the file's own); one- and two-channel albedo reads
 /// as grey (and alpha). One-channel textures take `reader`'s channel
@@ -83,8 +85,8 @@ UploadMaterialTexture(const VulkanContext& context,
 /// over `kVirtualTextureSide` texels, on devices with sparse
 /// residency; they then need every mip.
 /// @throws std::invalid_argument for a texture larger than the device
-/// allows, a block-compressed one without
-/// `VulkanContext::SupportsTextureCompressionBc`, a scale or bias
+/// allows, BC2, BC6H or signed BC4 or BC5 on a device that cannot
+/// sample them (`DecodeBlocks`), a scale or bias
 /// other than those, a normal map of one channel, or a virtual
 /// texture without every mip; std::runtime_error for a virtual
 /// texture the device cannot make.
@@ -172,7 +174,8 @@ class RasterMaterial {
     /// @throws std::invalid_argument if the size does not match or
     /// exceeds the device's maximum texture size.
     void SetTemperatureTexture(std::span<const float> kelvin,
-                               std::uint32_t width, std::uint32_t height);
+                               std::uint32_t width,
+                               std::uint32_t height);
 
     bool HasTemperatureTexture() const {
         return temperatureTexture_ != nullptr;

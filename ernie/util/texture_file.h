@@ -130,4 +130,16 @@ TextureData LoadTextureFile(const std::filesystem::path& path);
 TextureData ReadDds(std::span<const std::byte> file);
 TextureData ReadKtx2(std::span<const std::byte> file);
 
+/// `texture` with its BC blocks decoded, for devices that cannot
+/// sample them: to the same channels, 8 bits each (BC1, BC3 and BC7
+/// to RGBA8, sRGB where they were; BC4 to R8; BC5 to RG8), every
+/// layer and mip. Uncompressed textures come back as they are.
+///
+/// Reference: R. Geldreich, "bc7enc_rdo" (rgbcx's BC1 to BC5
+/// decoders, bc7decomp's BC7), MIT or public domain.
+/// https://github.com/richgel999/bc7enc_rdo
+/// @throws std::invalid_argument for BC2, BC6H and signed BC4 and
+/// BC5, which it does not decode.
+TextureData DecodeBlocks(const TextureData& texture);
+
 }  // namespace ernie

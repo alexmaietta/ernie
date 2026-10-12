@@ -2,6 +2,8 @@
 #include "ernie/util/texture_file.h"
 
 #include <basisu_transcoder.h>
+#include <bc7decomp.h>
+#include <rgbcx.h>
 #include <zstd.h>
 
 #include <algorithm>
@@ -664,6 +666,103 @@ TextureData LoadTextureFile(const std::filesystem::path& path) {
     } catch (const std::runtime_error& error) {
         throw std::runtime_error(path.string() + ": " + error.what());
     }
+}
+
+TextureData DecodeBlocks(const TextureData& texture) {
+    const TextureFormatInfo info = InfoOf(texture.format);
+    if (!info.compressed()) {
+        return texture;
+    }
+    TextureFormat decoded = TextureFormat::Rgba8;
+    switch (texture.format) {
+    case TextureFormat::Bc1:
+    case TextureFormat::Bc3:
+    case TextureFormat::Bc7:
+        break;
+    case TextureFormat::Bc1Srgb:
+    case TextureFormat::Bc3Srgb:
+    case TextureFormat::Bc7Srgb:
+        decoded = TextureFormat::Rgba8Srgb;
+        break;
+    case TextureFormat::Bc4:
+        decoded = TextureFormat::R8;
+        break;
+    case TextureFormat::Bc5:
+        decoded = TextureFormat::Rg8;
+        break;
+    default:
+        throw std::invalid_argument(
+            "BC2, BC6H and signed BC4 and BC5 are not decoded");
+    }
+    const std::uint32_t channels = InfoOf(decoded).channels;
+
+    TextureData out;
+    out.format = decoded;
+    out.width = texture.width;
+    out.height = texture.height;
+    out.layers = texture.layers;
+    out.mips = texture.mips;
+    out.cube = texture.cube;
+    for (std::uint32_t layer = 0; layer < texture.layers; ++layer) {
+        for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+            const std::uint32_t w =
+                std::max(1u, texture.width >> mip);
+            const std::uint32_t h =
+                std::max(1u, texture.height >> mip);
+            const std::span<const std::byte> blocks =
+                texture.Mip(layer, mip);
+            out.offsets.push_back(out.bytes.size());
+            const std::size_t start = out.bytes.size();
+            out.bytes.resize(start + ImageBytes(decoded, w, h));
+            std::byte* texels = out.bytes.data() + start;
+            const std::uint32_t across = (w + 3) / 4;
+            for (std::uint32_t by = 0; by < (h + 3) / 4; ++by) {
+                for (std::uint32_t bx = 0; bx < across; ++bx) {
+                    const std::byte* block =
+                        blocks.data() +
+                        (std::size_t{by} * across + bx) *
+                            info.blockBytes;
+                    // The block's 4 x 4 texels as RGBA8.
+                    std::array<std::uint8_t, 64> rgba{};
+                    switch (texture.format) {
+                    case TextureFormat::Bc1:
+                    case TextureFormat::Bc1Srgb:
+                        rgbcx::unpack_bc1(block, rgba.data());
+                        break;
+                    case TextureFormat::Bc3:
+                    case TextureFormat::Bc3Srgb:
+                        rgbcx::unpack_bc3(block, rgba.data());
+                        break;
+                    case TextureFormat::Bc4:
+                        rgbcx::unpack_bc4(block, rgba.data());
+                        break;
+                    case TextureFormat::Bc5:
+                        rgbcx::unpack_bc5(block, rgba.data());
+                        break;
+                    default:
+                        bc7decomp::unpack_bc7(
+                            block,
+                            reinterpret_cast<bc7decomp::color_rgba*>(
+                                rgba.data()));
+                        break;
+                    }
+                    for (std::uint32_t i = 0; i < 16; ++i) {
+                        const std::uint32_t x = bx * 4 + i % 4;
+                        const std::uint32_t y = by * 4 + i / 4;
+                        if (x >= w || y >= h) {
+                            continue;
+                        }
+                        std::memcpy(texels +
+                                        (std::size_t{y} * w + x) *
+                                            channels,
+                                    rgba.data() + std::size_t{i} * 4,
+                                    channels);
+                    }
+                }
+            }
+        }
+    }
+    return out;
 }
 
 }  // namespace ernie

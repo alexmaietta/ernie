@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/shader_compiler.h"
 
+#include "ernie/util/disk_cache.h"
+
 #include "ernie/util/log.h"
 
 #include <slang-com-ptr.h>
 #include <slang.h>
 
-#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -40,66 +40,6 @@ std::string Text(slang::IBlob* blob) {
 /// Bumped when what the cache stores, or how it keys it, changes.
 constexpr std::string_view kCacheFormat = "ernie-spirv-1";
 constexpr std::uint32_t kSpirvMagic = 0x07230203;
-
-/// Where compiled SPIR-V is kept between runs: `ERNIE_SHADER_CACHE`
-/// (empty or "0" for none), else the user's cache folder.
-std::optional<fs::path> CacheDirectory() {
-    if (const char* own = std::getenv("ERNIE_SHADER_CACHE")) {
-        const std::string_view value(own);
-        if (value.empty() || value == "0") {
-            return std::nullopt;
-        }
-        return fs::path(value);
-    }
-    if (const char* xdg = std::getenv("XDG_CACHE_HOME");
-        xdg != nullptr && *xdg != '\0') {
-        return fs::path(xdg) / "ernie" / "shaders";
-    }
-#if defined(_WIN32)
-    if (const char* local = std::getenv("LOCALAPPDATA");
-        local != nullptr && *local != '\0') {
-        return fs::path(local) / "ernie" / "shaders";
-    }
-#else
-    if (const char* home = std::getenv("HOME");
-        home != nullptr && *home != '\0') {
-        return fs::path(home) / ".cache" / "ernie" / "shaders";
-    }
-#endif
-    return std::nullopt;
-}
-
-/// Two 64-bit FNV-1a hashes from different starts, a 128-bit key for
-/// everything a compile depends on; each piece is length-prefixed.
-class CacheKey {
-  public:
-    void Add(std::string_view text) {
-        const std::uint64_t size = text.size();
-        Bytes(&size, sizeof(size));
-        Bytes(text.data(), text.size());
-    }
-
-    std::string Hex() const {
-        char text[33];
-        std::snprintf(text, sizeof(text), "%016llx%016llx",
-                      static_cast<unsigned long long>(hashes_[0]),
-                      static_cast<unsigned long long>(hashes_[1]));
-        return text;
-    }
-
-  private:
-    void Bytes(const void* data, std::size_t size) {
-        const auto* bytes = static_cast<const unsigned char*>(data);
-        for (std::uint64_t& hash : hashes_) {
-            for (std::size_t i = 0; i < size; ++i) {
-                hash = (hash ^ bytes[i]) * 0x100000001b3ull;
-            }
-        }
-    }
-
-    std::array<std::uint64_t, 2> hashes_{0xcbf29ce484222325ull,
-                                         0x84222325cbf29ce4ull};
-};
 
 /// The SPIR-V cached at `path`, if it is there and whole.
 std::optional<std::vector<std::uint32_t>>
@@ -164,7 +104,9 @@ struct ShaderCompiler::Impl {
     /// loads Slang's core module, a good part of a second.
     mutable Slang::ComPtr<slang::IGlobalSession> global;
     mutable std::mutex mutex;
-    std::optional<fs::path> cache = CacheDirectory();
+    // Compiled SPIR-V kept between runs.
+    std::optional<fs::path> cache =
+        CacheDirectory("ERNIE_SHADER_CACHE", "shaders");
     mutable std::atomic<std::size_t> cacheHits{0};
 
     /// `global`, created if need be; under `mutex`.
