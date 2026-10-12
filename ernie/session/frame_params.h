@@ -571,6 +571,9 @@ struct VolumeSettings {
     /// too, clamped to what the frame marched about each pixel; off,
     /// they march in full.
     bool temporalAnimated = true;
+    /// The march's resolution against the image's: 1, or 0.5 for a
+    /// pixel a 2 x 2 of the image's, upsampled by depth.
+    double resolutionScale = 1.0;
     /// Steps per pixel far off, at most: the march's steps grow with
     /// distance once a pixel spans more than this many of the
     /// volume's own; 0 keeps them the volume's own everywhere.
@@ -623,6 +626,10 @@ struct VolumeMaterialParams {
     std::string phase = "henyeyGreenstein";
     double b = 0.25;
     double c = 0.5;
+    /// Cloud droplets' (`cloudDroplets`): effective radius,
+    /// micrometres, and the gamma of their size distribution.
+    double dropletRadius = 7.0;
+    double dropletSpread = 2.0;
     /// Orders of scattering approximated, and each order's
     /// scattering, extinction and anisotropy of the one before's
     /// (Wrenninge's a, b and c).

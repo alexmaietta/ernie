@@ -4,6 +4,7 @@ ernie_add_library(
     SOURCES
     astronomy.cpp
     atmosphere.cpp
+    cloud_phase.cpp
     disk_cache.cpp
     ies.cpp
     image.cpp

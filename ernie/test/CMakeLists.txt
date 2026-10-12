@@ -53,6 +53,7 @@ ernie_add_test_suite(
     util_texture_file_test.cpp
     util_reflectance_library_test.cpp
     util_ies_test.cpp
+    util_cloud_phase_test.cpp
     util_nanovdb_test.cpp
     util_noise_test.cpp
     util_profile_report_test.cpp

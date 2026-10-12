@@ -10,6 +10,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/cloud_phase.h"
 #include "ernie/util/nanovdb.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
@@ -104,6 +105,32 @@ TEST_F(RasterDelegateTest, AVolumeDimsWhatIsBehindIt) {
     const std::vector<double> bare = CentreSpectrum(delegate, scene);
     ASSERT_EQ(through.size(), bare.size());
     const double expected = std::exp(-kSigma * kDepth);
+    for (std::size_t b = 0; b < bare.size(); ++b) {
+        ASSERT_GT(bare[b], 0.0) << "band " << b;
+        EXPECT_NEAR(through[b] / bare[b], expected, 0.02 * expected)
+            << "band " << b;
+    }
+}
+
+TEST_F(RasterDelegateTest, CloudDropletsLetTheirForwardPeakThrough) {
+    // Cloud droplets' narrow forward peak counts as light let through
+    // (Bouthors et al.'s modified Mie): the ground behind the cube
+    // dims by its extinction less the peak's share.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetPhaseFunction(std::string(tokens::kCloudDroplets));
+    const std::vector<double> through =
+        CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> bare = CentreSpectrum(delegate, scene);
+    const double forward =
+        ernie::DropletPhase(7.0, 2.0, ernie::SpectralBands{}, 1024)
+            .forwardFraction;
+    const double expected =
+        std::exp(-(1.0 - forward) * kSigma * kDepth);
     for (std::size_t b = 0; b < bare.size(); ++b) {
         ASSERT_GT(bare[b], 0.0) << "band " << b;
         EXPECT_NEAR(through[b] / bare[b], expected, 0.02 * expected)

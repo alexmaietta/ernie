@@ -86,6 +86,7 @@ static const uint kHenyeyGreenstein = 0;
 static const uint kDoubleHenyeyGreenstein = 1;
 static const uint kRayleigh = 2;
 static const uint kIsotropic = 3;
+static const uint kCloudDroplets = 4;
 
 // One field of a volume: rows of the affine map from the volume's local frame to the grid's index
 // space, and the grid: its byte offset in `grids` (kNoGrid for none) and PNANOVDB_GRID_TYPE_*.
@@ -265,6 +266,11 @@ struct VolumeResources {
     // A brick's optical depth across at most, below which its steps are taken as one
     // (`stepsInThinBrick`; 0, never).
     float thinOpticalDepth;
+    // Cloud droplets' phase tables (`dropletAt`): their values, each row's angles, and the bands
+    // (the row past them the bands' mean).
+    float* dropletTables;
+    uint dropletAngles;
+    uint dropletBands;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -727,10 +733,26 @@ float hash(uint3 p) {
     return float(v.x >> 8) / 16777216.0;
 }
 
+// Cloud droplets' phase function (`DropletPhaseTable`) of `material` at phase angle cosine `cosG`
+// (as `phaseOf`'s, the scattering angle's cosine negated), per steradian: band `row`'s, or the
+// bands' mean at row `pass.dropletBands`, linear between the table's angles, theta(u) = pi / 2
+// (1 - cos pi u).
+float dropletAt(VolumeMaterialGpu material, uint row, float cosG) {
+    let theta = acos(clamp(-cosG, -1.0, 1.0));
+    let u = acos(clamp(1.0 - 2.0 * theta / PI, -1.0, 1.0)) / PI;
+    let at = u * float(pass.dropletAngles - 1);
+    let i = min(uint(at), pass.dropletAngles - 2);
+    let base = asuint(material.phase.y) + row * pass.dropletAngles + i;
+    return lerp(pass.dropletTables[base], pass.dropletTables[base + 1], at - float(i));
+}
+
 // The material's phase function at phase angle cosine `cosG` (towards the light and towards the
 // eye), per steradian, its anisotropy scaled by `spread` (1 as it is, 0 isotropic).
 float phaseOf(VolumeMaterialGpu material, float cosG, float spread = 1.0) {
     switch (uint(material.phase.x)) {
+    case kCloudDroplets:
+        // The bands' mean, as light scattered many times blurs their colours.
+        return lerp(1.0 / (4.0 * PI), dropletAt(material, pass.dropletBands, cosG), spread);
     case kDoubleHenyeyGreenstein:
         return doubleHenyeyGreenstein(material.phase.y * spread, material.phase.z, cosG) /
                (4.0 * PI);
@@ -1402,6 +1424,19 @@ bool temporal() {
     return (constants.flags.w & kTemporal) != 0;
 }
 
+// Half resolution (`VolumeSettings::resolutionScale`): the march's pixels a 2 x 2 of the image's
+// each, written only to the history, which `volumeUpsampleMain` composites at the image's own.
+static const uint kHalfResolution = 1024u;
+
+bool halfResolution() {
+    return (constants.flags.w & kHalfResolution) != 0;
+}
+
+// Whether the march writes its history: to reproject (temporal amortisation), or to upsample.
+bool keepsHistory() {
+    return temporal() || halfResolution();
+}
+
 // Whether pixel `id` (its ray from `origin` along unit `direction` to the geometry `tMax` along it)
 // shows the last frame's result, reprojected: the volumes' `transmittance`, `front` and what they
 // add (`added`) where the point they held back last frame was then. Not where that falls outside
@@ -1535,7 +1570,9 @@ void clampRangesMain(uint3 id: SV_DispatchThreadID) {
     if (pass.rebuild[6] != 0 || pass.rebuild[7] == 0) {
         return;
     }
-    let size = viewLoad(constants.offsets.w).xy;
+    // The march's size: half the image's across and down at half resolution.
+    let imageSize = viewLoad(constants.offsets.w).xy;
+    let size = halfResolution() ? (imageSize + 1) / 2 : imageSize;
     let block = temporalBlock();
     let blocks = (size + block - 1) / block;
     if (any(id.xy >= blocks)) {
@@ -1646,7 +1683,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     // The view's own fields at their offsets in its block; those every view shares (the bands,
     // size, shadow maps and air) at theirs from the start.
     let block = (constants.layout.x + id.z) * constants.layout.y;
-    let size = viewLoad(constants.offsets.w);
+    // The image's size, and the march's: half of it across and down at half resolution.
+    let imageSize = viewLoad(constants.offsets.w);
+    let size = halfResolution() ? uint4((imageSize.xy + 1) / 2, imageSize.zw) : imageSize;
     if (temporal() && !marchOnly && all(thread.xy == 0)) {
         // The view's camera, for the next frame to reproject through.
         let camera = loadMatrix(block + constants.offsets.x);
@@ -1665,7 +1704,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     let bands = uint(range.z);
     // The frame's band groups, (bands + 3) / 4, compiled in.
     let groups = kMaxGroups;
-    let pixel = int4(id.xyz, 0);
+    // The image's pixel whose geometry the ray meets: at half resolution, its 2 x 2's nearest the
+    // ray through its middle, the lower right.
+    let pixel = int4(halfResolution() ? min(2 * id.xy + 1, imageSize.xy - 1) : id.xy, id.z, 0);
     let background = gIds.Load(pixel).x == kBackground;
     // A background shading left unwritten: no radiance behind the volumes.
     let unwritten = background && constants.flags.x == 0;
@@ -1673,10 +1714,14 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     let run = runs.xy;
     let shadowRun = runs.zw;
     if (run.y == 0) {
-        writeMediaTemperature(id, float2(0.0));
-        if (temporal()) {
+        if (keepsHistory()) {
             constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
         }
+        // At half resolution, the upsampling writes the image.
+        if (halfResolution()) {
+            return;
+        }
+        writeMediaTemperature(id, float2(0.0));
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
                 writeNoRadiance(id, id.z * bands + b);
@@ -1735,10 +1780,14 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         ++count;
     }
     if (count == 0) {
-        writeMediaTemperature(id, float2(0.0));
-        if (temporal()) {
+        if (keepsHistory()) {
             constants.historyNow[historyAt(kHistoryTransmittance, id.z, id.xy, size.xy)] = -1.0;
         }
+        // At half resolution, the upsampling writes the image.
+        if (halfResolution()) {
+            return;
+        }
+        writeMediaTemperature(id, float2(0.0));
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
                 writeNoRadiance(id, id.z * bands + b);
@@ -1769,8 +1818,10 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                 clampToMarched(id, size.xy, bands, kept, added);
             }
             writeHistory(id, size.xy, kept, front, tMax, bands, added, media);
-            writeMediaTemperature(id, media);
-            composite(id, bands, unwritten, kept, added);
+            if (!halfResolution()) {
+                writeMediaTemperature(id, media);
+                composite(id, bands, unwritten, kept, added);
+            }
             return;
         }
     }
@@ -1853,6 +1904,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         // here rather than at each step.
         uint sun = kNoSun;
         float sunPhases[kMaxOctaves];
+        // Its first octave's phase in each band: cloud droplets' each its own (their fogbow's and
+        // glory's colours), else `sunPhases[0]`.
+        float4 sunFirst[kMaxGroups];
         float4 sunTints[kMaxGroups];
         uint3 sunLinks = uint3(0);
         float3 sunTowards = float3(0.0);
@@ -1879,9 +1933,18 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                 sunPhases[n] = n < sunOctaves ? phaseOf(material, cosG, spread) : 0.0;
                 spread *= material.scattering.w;
             }
+            let droplets = uint(material.phase.x) == kCloudDroplets;
             for (uint g = 0; g < groups; ++g) {
                 sunTints[g] = volumeMaterials[materialIndex].albedo[g] *
                               (light.spectrum[g] + light.tinted[g]);
+                sunFirst[g] = float4(sunPhases[0]);
+                if (droplets) {
+                    for (uint c = 0; c < 4; ++c) {
+                        sunFirst[g][c] = 4 * g + c < pass.dropletBands
+                                             ? dropletAt(material, 4 * g + c, cosG)
+                                             : 0.0;
+                    }
+                }
             }
         }
         // A black body's glow, its parts at each band's wavelength found once for the span: what
@@ -2005,15 +2068,17 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                         ? cachedDepth(volume, slot, local)
                                         : volumesDepth(shadowRun, world, sunTowards, 1e30,
                                                        sunLinks.y, shadowSteps());
-                        float octaves = 0.0;
-                        float a = 1.0;
-                        float b = 1.0;
-                        for (uint n = 0; n < sunOctaves; ++n) {
-                            octaves += a * exp(-b * depth) * sunPhases[n];
+                        // The first octave per band (`sunFirst`), the others alike in all.
+                        let first = exp(-depth);
+                        float others = 0.0;
+                        float a = material.scattering.y;
+                        float b = material.scattering.z;
+                        for (uint n = 1; n < sunOctaves; ++n) {
+                            others += a * exp(-b * depth) * sunPhases[n];
                             a *= material.scattering.y;
                             b *= material.scattering.z;
                         }
-                        let lit = weight * sigma * octaves *
+                        let lit = weight * sigma *
                                   geometryShadow(shading.lights[slot], k, world, origin,
                                                  viewLights.y, mapTexels);
                         if (lit > 0.0) {
@@ -2027,7 +2092,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                                              sunTowards, sunSine, g, air[0].w,
                                                              air[1].x);
                                 }
-                                emitted[g] += lit * tint;
+                                emitted[g] += lit * (first * sunFirst[g] + others) * tint;
                             }
                         }
                         continue;
@@ -2129,12 +2194,14 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     for (uint g = 0; g < groups; ++g) {
         added[g] = airThrough[g] * emitted[g] + airLight[g] * (1.0 - transmittance);
     }
-    if (temporal()) {
+    if (keepsHistory()) {
         let front = transmittance < 1.0 ? frontSum / (1.0 - transmittance) : 0.0;
         writeHistory(id, size.xy, transmittance, front, tMax, bands, added, media);
     }
-    writeMediaTemperature(id, media);
-    composite(id, bands, unwritten, transmittance, added);
+    if (!halfResolution()) {
+        writeMediaTemperature(id, media);
+        composite(id, bands, unwritten, transmittance, added);
+    }
 }
 
 // No radiance at layer `layer` of pixel `id`, its Stokes Q and U too with a polarizer.
@@ -2145,6 +2212,94 @@ void writeNoRadiance(uint3 id, uint layer) {
         spectral[int3(id.xy, stokes + layer)] = 0.0;
         spectral[int3(id.xy, 2 * stokes + layer)] = 0.0;
     }
+}
+
+// Half resolution's image (`halfResolution`): pixel `id.xy` of view `id.z` through the volumes as
+// the march found them at its four nearest (this frame's history, at the middles of the image's
+// 2 x 2s), weighted bilinearly and by whether the geometry behind each is as far as the pixel's
+// own, within 5% (or both have none): the volumes keep to the edges of what stands before them.
+//
+// References:
+// - J. Kopf, M. F. Cohen, D. Lischinski and M. Uyttendaele, "Joint Bilateral Upsampling", ACM
+//   Transactions on Graphics 26(3), SIGGRAPH 2007.
+// - S. Hillaire, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", SIGGRAPH
+//   2016 Course (volumetric clouds traced at a lower resolution, upsampled by depth).
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void volumeUpsampleMain(uint3 id: SV_DispatchThreadID) {
+    let block = (constants.layout.x + id.z) * constants.layout.y;
+    let imageSize = viewLoad(constants.offsets.w);
+    if (id.x >= imageSize.x || id.y >= imageSize.y) {
+        return;
+    }
+    let size = (imageSize.xy + 1) / 2;
+    let bands = uint(asfloat(viewLoad(constants.offsets.z)).z);
+    let pixel = int4(id.xyz, 0);
+    let background = gIds.Load(pixel).x == kBackground;
+    let unwritten = background && constants.flags.x == 0;
+    // How far along its ray the pixel's geometry is (`kNoSurface` for none).
+    float tMax = kNoSurface;
+    if (!background) {
+        let invViewProj = loadMatrix(block + constants.offsets.x);
+        let strip = asfloat(viewLoad(block + constants.offsets.y));
+        let ndc = float2((float(id.x) + 0.5) / float(imageSize.x) * 2.0 - 1.0,
+                         1.0 - (float(id.y) + 0.5) / float(imageSize.y) * 2.0);
+        float3 origin;
+        float3 toFar;
+        cameraRayThrough(invViewProj, strip, ndc, origin, toFar);
+        let direction = normalize(toFar);
+        tMax = dot(cameraPoint(invViewProj, strip, ndc, gDepth.Load(pixel)) - origin, direction);
+    }
+    // The march's samples about the pixel, in their own pixels.
+    let at = (float2(id.xy) + 0.5) * 0.5 - 0.5;
+    let base = int2(floor(at));
+    let f = at - float2(base);
+    let now = constants.historyNow;
+    float total = 0.0;
+    float transmittance = 0.0;
+    float2 media = float2(0.0);
+    float4 added[kMaxGroups];
+    for (uint g = 0; g < kMaxGroups; ++g) {
+        added[g] = float4(0.0);
+    }
+    bool seen = false;
+    for (int k = 0; k < 4; ++k) {
+        let q = uint2(clamp(base + int2(k & 1, k >> 1), int2(0), int2(size) - 1));
+        let surface = now[historyAt(kHistorySurface, id.z, q, size)];
+        let same = (surface >= kNoSurface) == (tMax >= kNoSurface) &&
+                   (tMax >= kNoSurface || abs(surface - tMax) <= 0.05 * tMax);
+        let weight = ((k & 1) != 0 ? f.x : 1.0 - f.x) * ((k >> 1) != 0 ? f.y : 1.0 - f.y) *
+                     (same ? 1.0 : 1e-3);
+        total += weight;
+        let t = now[historyAt(kHistoryTransmittance, id.z, q, size)];
+        // Volumes not in view there: all let through, nothing added.
+        if (t < 0.0) {
+            transmittance += weight;
+            continue;
+        }
+        seen = true;
+        transmittance += weight * t;
+        media += weight * float2(now[historyAt(kHistoryMediaKelvin, id.z, q, size)],
+                                 now[historyAt(kHistoryMediaShare, id.z, q, size)]);
+        for (uint b = 0; b < bands; ++b) {
+            added[b / 4][b % 4] += weight * historyBand(now, b, id.z, q, size);
+        }
+    }
+    if (!seen) {
+        writeMediaTemperature(id, float2(0.0));
+        if (unwritten) {
+            for (uint b = 0; b < bands; ++b) {
+                writeNoRadiance(id, id.z * bands + b);
+            }
+        }
+        return;
+    }
+    let inverse = total > 0.0 ? 1.0 / total : 0.0;
+    for (uint g = 0; g < kMaxGroups; ++g) {
+        added[g] *= inverse;
+    }
+    writeMediaTemperature(id, media * inverse);
+    composite(id, bands, unwritten, transmittance * inverse, added);
 }
 
 // The volumes' shadow maps, which shading reads (shading.slang's `volumeTransmittance`): per light

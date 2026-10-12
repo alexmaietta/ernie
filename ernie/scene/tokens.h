@@ -141,6 +141,15 @@ inline constexpr std::string_view kDoubleHenyeyGreenstein =
     "doubleHenyeyGreenstein";
 inline constexpr std::string_view kRayleigh = "rayleigh";
 inline constexpr std::string_view kIsotropic = "isotropic";
+/// Cloud droplets' Mie scattering (`DropletPhase`), by
+/// `inputs:dropletRadius` and `inputs:dropletSpread`.
+inline constexpr std::string_view kCloudDroplets = "cloudDroplets";
+/// float, micrometres: the effective radius of a cloud's droplets.
+inline constexpr std::string_view kVolumeDropletRadius =
+    "inputs:dropletRadius";
+/// float: the width of their gamma size distribution (its gamma).
+inline constexpr std::string_view kVolumeDropletSpread =
+    "inputs:dropletSpread";
 /// Hapke's double Henyey-Greenstein lobe width b and backscatter
 /// weight c (`brdf.cpp`'s hapke model's parameters).
 inline constexpr std::string_view kPhaseB = "inputs:b";
@@ -1278,6 +1287,8 @@ inline constexpr std::string_view kVolumeTemporalBlock =
     "ernie:volumes:temporalBlock";
 inline constexpr std::string_view kVolumeTemporalAnimated =
     "ernie:volumes:temporalAnimated";
+inline constexpr std::string_view kVolumeResolutionScale =
+    "ernie:volumes:resolutionScale";
 inline constexpr std::string_view kVolumeStepsPerPixel =
     "ernie:volumes:stepsPerPixel";
 inline constexpr std::string_view kVolumeThinOpticalDepth =

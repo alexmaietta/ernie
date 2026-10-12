@@ -247,6 +247,8 @@ class VolumePass {
     /// Temporal amortisation's clamp ranges (`clampRangesMain`), with
     /// the march's layout, compiled as its first pipeline is.
     mutable std::unique_ptr<ComputePipeline> rangesPipeline_;
+    /// Half resolution's upsampling (`volumeUpsampleMain`), likewise.
+    mutable std::unique_ptr<ComputePipeline> upsamplePipeline_;
     /// The light patterns each pipeline was compiled with.
     mutable std::size_t pipelinePatterns_[2] = {};
     /// The band groups each pipeline was compiled for, and the
@@ -299,6 +301,22 @@ class VolumePass {
         glm::ivec3 bricks{0};
     };
     void PlanDistanceGrids();
+    /// Cloud droplets' phase tables (volume.slang's `dropletAt`), by
+    /// their effective radius and spread, for the frame's bands:
+    /// where each starts in `dropletTables_` (floats) and its forward
+    /// peak's share, which the extinction loses. Built as materials
+    /// first ask for them, all again when the bands change.
+    struct DropletEntry {
+        std::uint32_t offset = 0;
+        double forward = 0.0;
+    };
+    void PrepareDropletTables(std::span<const VolumeParams> volumes,
+                              const SpectralBands& bands,
+                              FrameUploads& uploads);
+    std::map<std::pair<double, double>, DropletEntry> droplets_;
+    std::vector<float> dropletValues_;
+    std::unique_ptr<GpuBuffer> dropletTables_;
+    SpectralBands dropletBands_;
     std::unique_ptr<GpuBuffer> distances_;
     std::uint64_t distanceWords_ = 0;
     mutable std::vector<DistanceBuild> distanceBuilds_;

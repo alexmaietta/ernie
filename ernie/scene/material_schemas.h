@@ -163,13 +163,27 @@
                               .doc = "How what scatters spreads its light: Henyey-Greenstein by "  \
                                      "the anisotropy; Hapke's double Henyey-Greenstein by the b "  \
                                      "and c a Hapke surface reads (inputs:b, inputs:c), so dust "  \
-                                     "and the regolith it rose from scatter alike; Rayleigh; or "  \
-                                     "isotropic.",                                                 \
+                                     "and the regolith it rose from scatter alike; Rayleigh; "     \
+                                     "isotropic; or cloud droplets' Mie scattering by their "      \
+                                     "radius and spread, with clouds' silver linings, fogbows "    \
+                                     "and glories.",                                               \
                               .group = "Volume",                                                   \
                               .options = {::ernie::tokens::kHenyeyGreenstein,                      \
                                           ::ernie::tokens::kDoubleHenyeyGreenstein,                \
                                           ::ernie::tokens::kRayleigh,                              \
-                                          ::ernie::tokens::kIsotropic}}))                          \
+                                          ::ernie::tokens::kIsotropic,                             \
+                                          ::ernie::tokens::kCloudDroplets}}))                      \
+    X(double, DropletRadius, ::ernie::tokens::kVolumeDropletRadius, 7.0,                           \
+      (::ernie::AttributeMeta{.label = "Droplet radius (um)",                                      \
+                              .doc = "Cloud droplets' effective radius, micrometres: about 5 to "  \
+                                     "10 in stratus, 10 to 15 in cumulus; larger droplets "        \
+                                     "scatter more forwards and tighten the glory.",               \
+                              .group = "Volume", .min = 1.0, .max = 30.0}))                        \
+    X(double, DropletSpread, ::ernie::tokens::kVolumeDropletSpread, 2.0,                           \
+      (::ernie::AttributeMeta{.label = "Droplet spread",                                           \
+                              .doc = "The gamma of their size distribution: larger, more alike "   \
+                                     "in size, their fogbow and glory more coloured.",             \
+                              .group = "Volume", .min = 0.5, .max = 20.0}))                        \
     X(double, Anisotropy, ::ernie::tokens::kVolumeAnisotropy, 0.0,                                 \
       (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
                                      "backwards.",                                                 \

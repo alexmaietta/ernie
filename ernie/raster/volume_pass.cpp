@@ -8,12 +8,14 @@
 #include "ernie/raster/render_targets.h"
 #include "ernie/scene/light_pattern.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/cloud_phase.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -95,8 +97,11 @@ struct VolumeResources {
     VkDeviceAddress distances;
     float stepsPerPixel;
     float thinOpticalDepth;
+    VkDeviceAddress dropletTables;
+    std::uint32_t dropletAngles;
+    std::uint32_t dropletBands;
 };
-static_assert(sizeof(VolumeResources) == 160,
+static_assert(sizeof(VolumeResources) == 176,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -168,6 +173,12 @@ constexpr std::uint32_t kHostGrids = 8;
 constexpr std::uint32_t kHostDiscrete = 16;
 // Its temporal flag for volumes whose grids changed to reproject too.
 constexpr std::uint32_t kAnimated = 256;
+// Its flag for half resolution, the march's pixels 2 x 2 of the
+// image's.
+constexpr std::uint32_t kHalfResolution = 1024;
+// Angles of each row of the cloud droplets' phase tables
+// (`DropletPhaseTable`).
+constexpr int kDropletAngles = 1024;
 // volume.slang's flag for writing the volumes' temperature
 // (`RenderTargets::MediaTemperature`).
 constexpr std::uint32_t kMediaTemperature = 512;
@@ -192,6 +203,9 @@ float PhaseOf(const std::string& phase) {
     }
     if (phase == tokens::kIsotropic) {
         return 3.0f;
+    }
+    if (phase == tokens::kCloudDroplets) {
+        return 4.0f;
     }
     return 0.0f;
 }
@@ -261,8 +275,12 @@ double LuminanceIntegral() {
     return integral;
 }
 
+// A volume's material on the GPU; with cloud droplets' phase
+// function, its table's first float in the droplet tables at
+// `dropletOffset`.
 VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
-                             const SpectralBands& bands) {
+                             const SpectralBands& bands,
+                             std::uint32_t dropletOffset) {
     VolumeMaterialGpu material{};
     const std::vector<float> albedo =
         RgbToSpectrum(glm::clamp(params.albedo, 0.0, 1.0)).Bin(bands);
@@ -292,8 +310,12 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
                              ? 1.0f
                              : 0.0f;
     material.phase[0] = PhaseOf(params.phase);
+    // Hapke's b, or a droplet table's offset (its bits, volume.slang
+    // reading them as a uint).
     material.phase[1] =
-        static_cast<float>(std::clamp(params.b, 0.0, 0.99));
+        params.phase == tokens::kCloudDroplets
+            ? std::bit_cast<float>(dropletOffset)
+            : static_cast<float>(std::clamp(params.b, 0.0, 0.99));
     material.phase[2] =
         static_cast<float>(std::clamp(params.c, -1.0, 1.0));
     material.phase[3] =
@@ -756,6 +778,55 @@ void VolumePass::StageDenseGrids(FrameUploads& uploads) {
     }
 }
 
+void VolumePass::PrepareDropletTables(
+    std::span<const VolumeParams> volumes, const SpectralBands& bands,
+    FrameUploads& uploads) {
+    // Built again for other bands.
+    if (bands.count != dropletBands_.count ||
+        bands.minNm != dropletBands_.minNm ||
+        bands.maxNm != dropletBands_.maxNm ||
+        bands.rgb != dropletBands_.rgb) {
+        droplets_.clear();
+        dropletValues_.clear();
+        dropletBands_ = bands;
+    }
+    bool added = false;
+    for (const VolumeParams& volume : volumes) {
+        const VolumeMaterialParams& material = volume.material;
+        const std::pair key{material.dropletRadius,
+                            material.dropletSpread};
+        if (material.phase != tokens::kCloudDroplets ||
+            droplets_.contains(key)) {
+            continue;
+        }
+        ERNIE_ZONE("Volume droplet phase");
+        const DropletPhaseTable table = DropletPhase(
+            key.first, key.second, bands, kDropletAngles);
+        droplets_[key] = {
+            static_cast<std::uint32_t>(dropletValues_.size()),
+            table.forwardFraction};
+        dropletValues_.insert(dropletValues_.end(),
+                              table.values.begin(),
+                              table.values.end());
+        added = true;
+    }
+    if (!added) {
+        return;
+    }
+    const VkDeviceSize bytes = dropletValues_.size() * sizeof(float);
+    if (dropletTables_ == nullptr || dropletTables_->Size() < bytes) {
+        if (dropletTables_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        dropletTables_ = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Device);
+    }
+    uploads.Write(*dropletTables_,
+                  std::as_bytes(std::span(dropletValues_)));
+    hostChanged_ |= 3 | kHostDiscrete;
+}
+
 void VolumePass::PlanDistanceGrids() {
     // Each scalar grid's over its active bounds in bricks of 8^3
     // voxels (volume.slang's `kBrick`), after a header of 8 words:
@@ -912,6 +983,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
         hostChanged_ |= 3 | kHostGrids;
     }
     PlanDistanceGrids();
+    PrepareDropletTables(volumes, bands, uploads);
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -955,7 +1027,16 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             }
             const auto material =
                 static_cast<std::uint32_t>(materials.size());
-            materials.push_back(MaterialOf(volume.material, bands));
+            // Cloud droplets': their table, and their forward peak
+            // folded into the extinction.
+            DropletEntry droplet;
+            if (volume.material.phase == tokens::kCloudDroplets) {
+                droplet =
+                    droplets_.at({volume.material.dropletRadius,
+                                  volume.material.dropletSpread});
+            }
+            materials.push_back(
+                MaterialOf(volume.material, bands, droplet.offset));
 
             VolumeGpu gpu{};
             gpu.boundsMin[0] = static_cast<float>(lo.x);
@@ -983,8 +1064,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     static_cast<std::uint32_t>(loaded->grid.type);
                 slot.grid[2] = loaded->distances;
             }
-            gpu.params[0] =
-                static_cast<float>(volume.material.density);
+            gpu.params[0] = static_cast<float>(
+                volume.material.density * (1.0 - droplet.forward));
             gpu.params[1] =
                 static_cast<float>(volume.material.temperature);
             gpu.params[2] =
@@ -1321,6 +1402,11 @@ void VolumePass::Prepare(
         static_cast<float>(settings_.stepsPerPixel);
     resources.thinOpticalDepth =
         static_cast<float>(settings_.thinOpticalDepth);
+    resources.dropletTables =
+        dropletTables_ != nullptr ? dropletTables_->Address() : 0;
+    resources.dropletAngles = kDropletAngles;
+    resources.dropletBands =
+        static_cast<std::uint32_t>(dropletBands_.count);
     resources.timing = timing.Address();
     resources.timingWords = static_cast<std::uint32_t>(
         timing.Size() / sizeof(std::uint32_t));
@@ -1602,6 +1688,12 @@ void VolumePass::Record(VkCommandBuffer commands,
                                                  bandGroups_),
                                    "volumeMain"));
         if (!pushbroom) {
+            upsamplePipeline_ = std::make_unique<ComputePipeline>(
+                context_, layout_,
+                compiler_.CompileSpirv(
+                    VolumeModules(*shading.patterns, false,
+                                  bandGroups_),
+                    "volumeUpsampleMain"));
             rangesPipeline_ = std::make_unique<ComputePipeline>(
                 context_, layout_,
                 compiler_.CompileSpirv(
@@ -1649,18 +1741,25 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.lights[0] = layout.view;
     constants.lights[1] = layout.lightShadow;
     constants.lights[2] = layout.atmosphere;
+    // At half resolution the march's pixels are 2 x 2 of the image's
+    // each, written to the history, which the upsampling composites.
+    const bool half = settings_.resolutionScale < 0.75 && !pushbroom;
+    const std::uint32_t marchWidth = half ? (width + 1) / 2 : width;
+    const std::uint32_t marchHeight =
+        half ? (height + 1) / 2 : height;
     // Temporal amortisation: a history per dispatch, this frame's
     // written as the last's is read, the last's held when it was the
     // frame before's for the same images.
-    if (settings_.temporal && !pushbroom) {
+    if ((settings_.temporal || half) && !pushbroom) {
         const std::uint32_t views = targets.RasterLayers();
         History& history = histories_[firstView];
         if (history.buffers[0] == nullptr ||
             history.frame != frame_) {
-            const bool same =
-                history.buffers[0] != nullptr &&
-                history.width == width && history.height == height &&
-                history.views == views && history.bands == bandCount_;
+            const bool same = history.buffers[0] != nullptr &&
+                              history.width == marchWidth &&
+                              history.height == marchHeight &&
+                              history.views == views &&
+                              history.bands == bandCount_;
             if (same) {
                 history.held = history.frame + 1 == frame_;
                 history.now ^= 1;
@@ -1675,7 +1774,7 @@ void VolumePass::Record(VkCommandBuffer commands,
                     4 * (32 * VkDeviceSize{views} +
                          VkDeviceSize{kHistoryChannels + 1 +
                                       (bandCount_ + 1) / 2} *
-                             views * width * height);
+                             views * marchWidth * marchHeight);
                 for (auto& buffer : history.buffers) {
                     buffer = std::make_unique<GpuBuffer>(
                         context_, bytes,
@@ -1687,11 +1786,12 @@ void VolumePass::Record(VkCommandBuffer commands,
                 history.ranges = std::make_unique<GpuBuffer>(
                     context_,
                     4 * 2 * VkDeviceSize{1 + bandCount_} * views *
-                        ((width + 1) / 2) * ((height + 1) / 2),
+                        ((marchWidth + 1) / 2) *
+                        ((marchHeight + 1) / 2),
                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                     BufferMemory::Device);
-                history.width = width;
-                history.height = height;
+                history.width = marchWidth;
+                history.height = marchHeight;
                 history.views = views;
                 history.bands = bandCount_;
                 history.held = false;
@@ -1721,13 +1821,18 @@ void VolumePass::Record(VkCommandBuffer commands,
         };
         const bool changing =
             frame_ >= 4 && full(frame_ - 3) && full(frame_ - 4);
-        constants.flags[3] =
-            kTemporal |
-            (history.held && !changing ? kHistoryHeld : 0u) |
-            (four ? kBlocksOfFour : 0u) | (marched.x << 4) |
-            (marched.y << 6);
-        if (settings_.temporalAnimated) {
-            constants.flags[3] |= kAnimated;
+        if (settings_.temporal) {
+            constants.flags[3] =
+                kTemporal |
+                (history.held && !changing ? kHistoryHeld : 0u) |
+                (four ? kBlocksOfFour : 0u) | (marched.x << 4) |
+                (marched.y << 6);
+            if (settings_.temporalAnimated) {
+                constants.flags[3] |= kAnimated;
+            }
+        }
+        if (half) {
+            constants.flags[3] |= kHalfResolution;
         }
         constants.lights[3] = views;
         // After the last frame's march wrote its history.
@@ -1747,8 +1852,10 @@ void VolumePass::Record(VkCommandBuffer commands,
         // not hold.
         const std::uint32_t block =
             (constants.flags[3] & kBlocksOfFour) != 0 ? 4 : 2;
-        const std::uint32_t blocksX = (width + block - 1) / block;
-        const std::uint32_t blocksY = (height + block - 1) / block;
+        const std::uint32_t blocksX =
+            (marchWidth + block - 1) / block;
+        const std::uint32_t blocksY =
+            (marchHeight + block - 1) / block;
         {
             ERNIE_GPU_ZONE(context_, commands, "Volume march");
             VolumeConstants marching = constants;
@@ -1777,11 +1884,23 @@ void VolumePass::Record(VkCommandBuffer commands,
         }
         vkCmdDispatch(commands, Groups(blocksX * (block * block - 1)),
                       Groups(blocksY), targets.RasterLayers());
-        return;
+    } else {
+        layout_.PushConstants(commands, &constants,
+                              sizeof(constants));
+        vkCmdDispatch(commands, Groups(marchWidth),
+                      Groups(marchHeight), targets.RasterLayers());
     }
-    layout_.PushConstants(commands, &constants, sizeof(constants));
-    vkCmdDispatch(commands, Groups(width), Groups(height),
-                  targets.RasterLayers());
+    if (half) {
+        // The image's pixels from the march's about each.
+        ERNIE_GPU_ZONE(context_, commands, "Volume upsampling");
+        ComputeBarrier(commands);
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          upsamplePipeline_->Handle());
+        layout_.PushConstants(commands, &constants,
+                              sizeof(constants));
+        vkCmdDispatch(commands, Groups(width), Groups(height),
+                      targets.RasterLayers());
+    }
 }
 
 }  // namespace ernie

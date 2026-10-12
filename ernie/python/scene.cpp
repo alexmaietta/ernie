@@ -2814,6 +2814,7 @@ void BindScene(nb::module_& m) {
         {"VOXEL_SIZE", tokens::kVoxelSize},
         {"HENYEY_GREENSTEIN", tokens::kHenyeyGreenstein},
         {"DOUBLE_HENYEY_GREENSTEIN", tokens::kDoubleHenyeyGreenstein},
+        {"CLOUD_DROPLETS", tokens::kCloudDroplets},
         {"PHASE_B", tokens::kPhaseB},
         {"PHASE_C", tokens::kPhaseC},
         {"FILE_PATH", tokens::kFilePath},

@@ -296,6 +296,13 @@
                                      "to what the frame marched about it; off, they march in "     \
                                      "full each frame.",                                           \
                               .group = "Volumes"}))                                                \
+    X(double, VolumeResolutionScale, ::ernie::tokens::kVolumeResolutionScale, 1.0,                 \
+      (::ernie::AttributeMeta{.label = "Resolution scale",                                         \
+                              .doc = "The march's resolution against the image's: 1, or 0.5 "     \
+                                     "for a pixel a 2 x 2 of the image's, about four times "       \
+                                     "faster, upsampled by depth so volumes keep to the edges "    \
+                                     "of what stands before them.",                                \
+                              .group = "Volumes", .min = 0.5, .max = 1.0}))                        \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, "approximate",                  \
       (::ernie::AttributeMeta{.label = "Mode",                                                     \
                               .doc = "approximate: unoccluded; full: also shadowed; directions: "  \
