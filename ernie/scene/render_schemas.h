@@ -239,7 +239,13 @@
     X(std::vector<::ernie::Path>, Filters, ::ernie::tokens::kFilters,                              \
       std::vector<::ernie::Path>{},                                                                \
       (::ernie::AttributeMeta{.doc = "The SensorFilter prims of its sensor chain, in order.",      \
-                              .group = "Image", .options = {::ernie::tokens::kSensorFilter}}))
+                              .group = "Image", .options = {::ernie::tokens::kSensorFilter}}))     \
+    X(bool, OutputsInPlace, ::ernie::tokens::kOutputsInPlace, true,                                \
+      (::ernie::AttributeMeta{.label = "Outputs in place",                                         \
+                              .doc = "Render vars mapped to GPU tensors are written in place by "  \
+                                     "its later frames, which map without a copy; off, each map "  \
+                                     "copies.",                                                    \
+                              .group = "Image"}))
 
 #define ERNIE_RENDER_VAR_ATTRIBUTES(X)                                                             \
     X(std::string, SourceName, ::ernie::tokens::kSourceName, ::ernie::tokens::kLdrColor,           \

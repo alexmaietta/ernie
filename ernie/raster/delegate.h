@@ -456,13 +456,16 @@ class RasterDelegate : public RenderDelegate {
     /// that last used it has finished; returns it.
     std::uint32_t BeginFrame();
     /// `faces` raster layers per view: a camera rendered on cube
-    /// faces' (`NeedsCubeFaces`).
+    /// faces' (`NeedsCubeFaces`). With `inPlace`, vars mapped to
+    /// linear GPU tensors before are written in place too
+    /// (`tokens::kOutputsInPlace`).
     std::shared_ptr<ProductFrame>
     AcquireFrame(const Path& product, VkExtent2D extent, int bands,
                  std::uint32_t views, bool batched,
                  std::span<const std::string_view> vars,
                  std::span<const std::string> aovs = {},
-                 std::uint32_t faces = 1, bool minimal = false);
+                 std::uint32_t faces = 1, bool minimal = false,
+                 bool inPlace = true);
     std::uint32_t PrimIdOf(const Path& path) const;
     void SetMeshPoints(const Scene& scene, const Path& path,
                        std::uint32_t handle);

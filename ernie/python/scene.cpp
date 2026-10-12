@@ -2394,6 +2394,7 @@ void BindScene(nb::module_& m) {
         {"LIGHT_TEXTURE", tokens::kLightTexture},
         {"LIGHT_SPECTRUM", tokens::kLightSpectrum},
         {"FILTERS", tokens::kFilters},
+        {"OUTPUTS_IN_PLACE", tokens::kOutputsInPlace},
         {"SENSOR_FILTER", tokens::kSensorFilter},
         {"FILTER_TYPE", tokens::kFilterType},
         {"HORIZONTAL_APERTURE_OFFSET",

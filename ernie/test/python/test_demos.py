@@ -28,6 +28,7 @@ AWAITING_TWINS = set()
 #: Vulkan in CI renders slowly.
 SMALL_BATCHES = {
     "demo_batched_cameras": ["--views", "64"],
+    "demo_batched_zero_copy": ["--views", "64"],
     "demo_interop_robot_arms": ["--worlds", "16"],
     "demo_batched_gpu_poses": ["--views", "32"],
 }

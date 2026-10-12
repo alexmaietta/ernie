@@ -2833,13 +2833,12 @@ void RasterDelegate::Record(VkCommandBuffer commands,
                      var);
 }
 
-std::shared_ptr<ProductFrame>
-RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
-                             int bands, std::uint32_t views,
-                             bool batched,
-                             std::span<const std::string_view> vars,
-                             std::span<const std::string> aovs,
-                             std::uint32_t faces, bool minimal) {
+std::shared_ptr<ProductFrame> RasterDelegate::AcquireFrame(
+    const Path& product, VkExtent2D extent, int bands,
+    std::uint32_t views, bool batched,
+    std::span<const std::string_view> vars,
+    std::span<const std::string> aovs, std::uint32_t faces,
+    bool minimal, bool inPlace) {
     ERNIE_ZONE("AcquireFrame");
     const std::vector<std::string_view> held =
         minimal ? std::vector<std::string_view>{}
@@ -2901,10 +2900,13 @@ RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
                 heldEntries |= 1u << *entry;
             }
         }
+        // None with the product's outputs not in place: each map
+        // copies.
         std::uint32_t wanted = 0;
         for (const std::string& name : linearVars) {
             if (const std::optional<std::size_t> entry =
-                    RenderTargets::LinearEntry(name, aovNames)) {
+                    RenderTargets::LinearEntry(name, aovNames);
+                entry && inPlace) {
                 wanted |= (1u << *entry) & heldEntries;
             }
         }
@@ -3266,7 +3268,10 @@ RasterDelegate::StepAsync(const Scene& scene,
                 : 1u;
         std::shared_ptr<ProductFrame> frame = AcquireFrame(
             spec.product, spec.resolution, bands, views, batched,
-            vars, aovs, faces, minimal != MinimalMode::Off);
+            vars, aovs, faces, minimal != MinimalMode::Off,
+            scene.TypeOf(spec.product) != tokens::kRenderProduct ||
+                RenderProduct(scene, spec.product)
+                    .GetOutputsInPlace());
         std::optional<glm::dmat4> posesParent;
         if (gpuPoses != nullptr) {
             posesParent = PosesParentOf(scene, cameras.front());

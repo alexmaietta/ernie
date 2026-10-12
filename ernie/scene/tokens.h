@@ -1061,6 +1061,13 @@ inline constexpr std::string_view kOrderedVars =
 /// Sensor filter chain of a RenderProduct (Ernie): paths of
 /// SensorFilter prims in order.
 inline constexpr std::string_view kFilters = "ernie:filters";
+/// bool, on a RenderProduct (Ernie): whether its render vars mapped
+/// to linear GPU tensors (`MapDevice::Gpu`) are written in place by
+/// its later frames, which the sensor writes into buffers beside its
+/// images so their maps copy nothing (true, the default), or copied
+/// at each map (false, and no such buffers).
+inline constexpr std::string_view kOutputsInPlace =
+    "ernie:outputs:inPlace";
 inline constexpr std::string_view kSensorFilter =
     "SensorFilter";  ///< Prim type.
 /// A SensorFilter prim's filter: "lens", "qe", "noise", "adc", "cie",
