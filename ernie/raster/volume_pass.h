@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
@@ -90,6 +91,13 @@ class VolumePass {
              std::span<const std::int32_t> lightViewWorlds,
              std::uint64_t frame, FrameUploads& uploads);
 
+    /// The compute device whose arrays NanoVDBFields may hold, which
+    /// copies their grids into the pool; Vulkan work reading the pool
+    /// waits for it (`ComputeInterop::VulkanWait`).
+    void SetComputeInterop(ComputeInterop* compute) {
+        compute_ = compute;
+    }
+
     /// Whether any volume is drawn this frame.
     bool Active() const {
         return active_;
@@ -148,9 +156,16 @@ class VolumePass {
         auto operator<=>(const GridKey&) const = default;
     };
     struct LoadedGrid {
-        NanoVdbGrid grid;
+        NanoVdbGrid grid;  ///< Without its buffer when on a device.
         std::filesystem::file_time_type written;
         std::uint64_t version = 0;  ///< An array's.
+        /// An array on a compute device: it, where the grid starts in
+        /// it, the stream it was written on, and whether the grid
+        /// still has to be copied into its place in the pool.
+        Tensor device;
+        std::uint64_t deviceOffset = 0;
+        std::uintptr_t stream = 1;
+        bool copy = false;
         std::uint64_t offset = 0;  ///< In the pool, bytes.
         bool used = false;
     };
@@ -158,9 +173,11 @@ class VolumePass {
     const LoadedGrid* Load(const VolumeFieldParams& field,
                            const std::string& prim);
     void RebuildPool();
+    void CopyDeviceGrid(LoadedGrid& loaded);
 
     const VulkanContext& context_;
     const ShaderCompiler& compiler_;
+    ComputeInterop* compute_ = nullptr;
     PipelineLayout layout_;
     mutable std::unique_ptr<ComputePipeline> pipelines_[2];
     /// The light patterns each pipeline was compiled with.

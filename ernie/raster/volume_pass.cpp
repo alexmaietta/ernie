@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/volume_pass.h"
 
+#include "ernie/device/compute_interop.h"
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/drawable.h"
@@ -235,6 +236,15 @@ std::unique_ptr<GpuBuffer> Grow(const VulkanContext& context,
     return buffer;
 }
 
+// `count` bytes of contiguous `tensor` from byte `offset`, a view on
+// its device.
+Tensor BytesOf(const Tensor& tensor, std::uint64_t offset,
+               std::uint64_t count) {
+    return Tensor(static_cast<std::uint8_t*>(tensor.Data()) + offset,
+                  DType::UInt8, {static_cast<std::int64_t>(count)},
+                  {}, tensor.Location());
+}
+
 }  // namespace
 
 VolumePass::VolumePass(const VulkanContext& context,
@@ -258,29 +268,93 @@ VolumePass::Load(const VolumeFieldParams& field,
         auto found = grids_.find(key);
         if (found == grids_.end() ||
             found->second.version != field.version) {
-            const Tensor bytes = field.buffer.Contiguous();
-            const std::vector<NanoVdbGrid> grids =
-                NanoVdbGridsOf(std::span(
-                    static_cast<const std::uint8_t*>(bytes.Data()),
-                    static_cast<std::size_t>(bytes.Elements()) *
-                        SizeOf(bytes.Type())));
-            const NanoVdbGrid* grid =
-                FindNanoVdbGrid(grids, field.gridName, field.gridIndex);
-            if (grid == nullptr) {
-                throw std::runtime_error(
+            ERNIE_ZONE("Volume grid array");
+            const auto missing = [&] {
+                return std::runtime_error(
                     "Volume " + prim + ": " + field.array +
                     " has no grid " +
                     (field.gridName.empty()
                          ? std::string("#")
                          : "'" + field.gridName + "' #") +
                     std::to_string(field.gridIndex));
-            }
+            };
             LoadedGrid loaded;
-            loaded.grid = *grid;
             loaded.version = field.version;
+            if (field.buffer.Location().kind == DeviceKind::Cpu) {
+                const Tensor bytes = field.buffer.Contiguous();
+                const std::vector<NanoVdbGrid> grids =
+                    NanoVdbGridsOf(std::span(
+                        static_cast<const std::uint8_t*>(
+                            bytes.Data()),
+                        static_cast<std::size_t>(bytes.Elements()) *
+                            SizeOf(bytes.Type())));
+                const NanoVdbGrid* grid = FindNanoVdbGrid(
+                    grids, field.gridName, field.gridIndex);
+                if (grid == nullptr) {
+                    throw missing();
+                }
+                loaded.grid = *grid;
+            } else {
+                // On a compute device: only each grid's head comes to
+                // the host, to find the grid and read its header; the
+                // grid is copied into the pool there.
+                if (compute_ == nullptr) {
+                    throw std::runtime_error("Volume " + prim + ": " +
+                                             field.array +
+                                             " is on a device, which "
+                                             "needs compute interop");
+                }
+                const std::uint64_t total =
+                    static_cast<std::uint64_t>(
+                        field.buffer.Elements()) *
+                    SizeOf(field.buffer.Type());
+                std::uint64_t offset = 0;
+                int matched = 0;
+                bool held = false;
+                while (!held && offset < total) {
+                    const Tensor head = compute_->Download(
+                        BytesOf(
+                            field.buffer, offset,
+                            std::min<std::uint64_t>(kNanoVdbHeadBytes,
+                                                    total - offset)),
+                        field.stream);
+                    NanoVdbGrid grid = NanoVdbGridHead(std::span(
+                        head.As<std::uint8_t>(),
+                        static_cast<std::size_t>(head.Elements())));
+                    if (offset + grid.size > total) {
+                        throw std::runtime_error(
+                            "Volume " + prim + ": " + field.array +
+                            "'s grid runs past its array");
+                    }
+                    if ((field.gridName.empty() ||
+                         grid.name == field.gridName) &&
+                        matched++ == field.gridIndex) {
+                        loaded.grid = std::move(grid);
+                        loaded.device = field.buffer;
+                        loaded.deviceOffset = offset;
+                        loaded.stream = field.stream;
+                        held = true;
+                    }
+                    offset += grid.size;
+                }
+                if (!held) {
+                    throw missing();
+                }
+            }
+            // A device grid written again at its size is copied over
+            // itself, the pool kept (`Set`).
+            const bool inPlace =
+                found != grids_.end() && !loaded.device.Empty() &&
+                !found->second.device.Empty() &&
+                found->second.grid.size == loaded.grid.size;
+            if (inPlace) {
+                loaded.offset = found->second.offset;
+                loaded.copy = true;
+            } else {
+                poolStale_ = true;
+            }
             found =
                 grids_.insert_or_assign(key, std::move(loaded)).first;
-            poolStale_ = true;
         }
         found->second.used = true;
         return &found->second;
@@ -297,6 +371,7 @@ VolumePass::Load(const VolumeFieldParams& field,
                       field.gridName, field.gridIndex};
     auto found = grids_.find(key);
     if (found == grids_.end() || found->second.written != written) {
+        ERNIE_ZONE("Volume grid read");
         const std::vector<NanoVdbGrid> grids = ReadNanoVdb(path);
         const NanoVdbGrid* grid =
             FindNanoVdbGrid(grids, field.gridName, field.gridIndex);
@@ -319,12 +394,26 @@ VolumePass::Load(const VolumeFieldParams& field,
     return &found->second;
 }
 
+void VolumePass::CopyDeviceGrid(LoadedGrid& loaded) {
+    ERNIE_ZONE("Volume grid copy");
+    compute_->CopyToBuffer(
+        BytesOf(loaded.device, loaded.deviceOffset, loaded.grid.size),
+        *pool_, loaded.offset, loaded.stream);
+    loaded.copy = false;
+}
+
 void VolumePass::RebuildPool() {
+    ERNIE_ZONE("Volume grid pool");
     std::uint64_t bytes = 0;
+    bool device = false;
     for (auto& [key, loaded] : grids_) {
         loaded.offset = bytes;
-        bytes += (loaded.grid.buffer.size() + kGridAlignment - 1) /
-                 kGridAlignment * kGridAlignment;
+        const std::uint64_t size = loaded.device.Empty()
+                                       ? loaded.grid.buffer.size()
+                                       : loaded.grid.size;
+        bytes += (size + kGridAlignment - 1) / kGridAlignment *
+                 kGridAlignment;
+        device = device || !loaded.device.Empty();
     }
     // PNanoVDB's 32-bit addresses on the GPU.
     if (bytes >= (std::uint64_t{1} << 32)) {
@@ -339,12 +428,18 @@ void VolumePass::RebuildPool() {
                     loaded.grid.buffer.size());
     }
     vkDeviceWaitIdle(context_.Device());
+    // Shared with the compute device when it copies grids in.
     pool_ = std::make_unique<GpuBuffer>(
         context_, pool.size(),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
             VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        BufferMemory::Device);
+        device ? BufferMemory::Shared : BufferMemory::Device);
     pool_->Write(std::as_bytes(std::span(pool)));
+    for (auto& [key, loaded] : grids_) {
+        if (!loaded.device.Empty()) {
+            CopyDeviceGrid(loaded);
+        }
+    }
     poolBytes_ = bytes;
     poolStale_ = false;
 }
@@ -369,17 +464,22 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
         const LoadedGrid* emission = nullptr;
     };
     std::vector<Fields> fields(volumes.size());
-    for (std::size_t i = 0; i < volumes.size(); ++i) {
-        const VolumeParams& volume = volumes[i];
-        if (volume.density) {
-            fields[i].density = Load(*volume.density, volume.prim);
-        }
-        if (volume.temperature) {
-            fields[i].temperature =
-                Load(*volume.temperature, volume.prim);
-        }
-        if (volume.emission) {
-            fields[i].emission = Load(*volume.emission, volume.prim);
+    {
+        ERNIE_ZONE("Volume fields");
+        for (std::size_t i = 0; i < volumes.size(); ++i) {
+            const VolumeParams& volume = volumes[i];
+            if (volume.density) {
+                fields[i].density =
+                    Load(*volume.density, volume.prim);
+            }
+            if (volume.temperature) {
+                fields[i].temperature =
+                    Load(*volume.temperature, volume.prim);
+            }
+            if (volume.emission) {
+                fields[i].emission =
+                    Load(*volume.emission, volume.prim);
+            }
         }
     }
     // Grids no volume names any more leave the pool.
@@ -394,113 +494,126 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     if (poolStale_) {
         RebuildPool();
     }
+    for (auto& [key, loaded] : grids_) {
+        if (loaded.copy) {
+            CopyDeviceGrid(loaded);
+        }
+    }
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
     // Each instance's world and its bounds relative to the origin.
     std::vector<std::int32_t> worlds;
     std::vector<std::pair<glm::dvec3, glm::dvec3>> boxes;
-    for (std::size_t i = 0; i < volumes.size(); ++i) {
-        const VolumeParams& volume = volumes[i];
-        const Fields& held = fields[i];
-        const std::pair<const LoadedGrid*, const VolumeFieldParams*>
-            all[] = {{held.density,
-                      volume.density ? &*volume.density : nullptr},
-                     {held.temperature, volume.temperature
-                                            ? &*volume.temperature
-                                            : nullptr},
-                     {held.emission,
-                      volume.emission ? &*volume.emission : nullptr}};
-        // The volume's local bounds: its fields' active values.
-        glm::dvec3 lo(std::numeric_limits<double>::infinity());
-        glm::dvec3 hi = -lo;
-        for (const auto& [loaded, field] : all) {
-            if (loaded == nullptr || loaded->grid.Empty()) {
+    {
+        ERNIE_ZONE("Volume instances");
+        for (std::size_t i = 0; i < volumes.size(); ++i) {
+            const VolumeParams& volume = volumes[i];
+            const Fields& held = fields[i];
+            const std::pair<const LoadedGrid*,
+                            const VolumeFieldParams*>
+                all[] = {
+                    {held.density,
+                     volume.density ? &*volume.density : nullptr},
+                    {held.temperature, volume.temperature
+                                           ? &*volume.temperature
+                                           : nullptr},
+                    {held.emission,
+                     volume.emission ? &*volume.emission : nullptr}};
+            // The volume's local bounds: its fields' active values.
+            glm::dvec3 lo(std::numeric_limits<double>::infinity());
+            glm::dvec3 hi = -lo;
+            for (const auto& [loaded, field] : all) {
+                if (loaded == nullptr || loaded->grid.Empty()) {
+                    continue;
+                }
+                glm::dvec3 min;
+                glm::dvec3 max;
+                loaded->grid.GridBounds(min, max);
+                Transform(field->toVolume, min, max);
+                lo = glm::min(lo, min);
+                hi = glm::max(hi, max);
+            }
+            if (glm::any(glm::greaterThan(lo, hi))) {
                 continue;
             }
-            glm::dvec3 min;
-            glm::dvec3 max;
-            loaded->grid.GridBounds(min, max);
-            Transform(field->toVolume, min, max);
-            lo = glm::min(lo, min);
-            hi = glm::max(hi, max);
-        }
-        if (glm::any(glm::greaterThan(lo, hi))) {
-            continue;
-        }
-        const auto material =
-            static_cast<std::uint32_t>(materials.size());
-        materials.push_back(MaterialOf(volume.material, bands));
+            const auto material =
+                static_cast<std::uint32_t>(materials.size());
+            materials.push_back(MaterialOf(volume.material, bands));
 
-        VolumeGpu gpu{};
-        gpu.boundsMin[0] = static_cast<float>(lo.x);
-        gpu.boundsMin[1] = static_cast<float>(lo.y);
-        gpu.boundsMin[2] = static_cast<float>(lo.z);
-        gpu.boundsMax[0] = static_cast<float>(hi.x);
-        gpu.boundsMax[1] = static_cast<float>(hi.y);
-        gpu.boundsMax[2] = static_cast<float>(hi.z);
-        FieldGpu* const slots[] = {&gpu.density, &gpu.temperature,
-                                   &gpu.emission};
-        for (std::size_t f = 0; f < 3; ++f) {
-            const auto& [loaded, field] = all[f];
-            FieldGpu& slot = *slots[f];
-            slot.grid[0] = kNoGrid;
-            if (loaded == nullptr) {
-                continue;
+            VolumeGpu gpu{};
+            gpu.boundsMin[0] = static_cast<float>(lo.x);
+            gpu.boundsMin[1] = static_cast<float>(lo.y);
+            gpu.boundsMin[2] = static_cast<float>(lo.z);
+            gpu.boundsMax[0] = static_cast<float>(hi.x);
+            gpu.boundsMax[1] = static_cast<float>(hi.y);
+            gpu.boundsMax[2] = static_cast<float>(hi.z);
+            FieldGpu* const slots[] = {&gpu.density, &gpu.temperature,
+                                       &gpu.emission};
+            for (std::size_t f = 0; f < 3; ++f) {
+                const auto& [loaded, field] = all[f];
+                FieldGpu& slot = *slots[f];
+                slot.grid[0] = kNoGrid;
+                if (loaded == nullptr) {
+                    continue;
+                }
+                Rows(glm::inverse(loaded->grid.indexToGrid) *
+                         glm::inverse(field->toVolume),
+                     slot.toIndex);
+                slot.grid[0] =
+                    static_cast<std::uint32_t>(loaded->offset);
+                slot.grid[1] =
+                    static_cast<std::uint32_t>(loaded->grid.type);
             }
-            Rows(glm::inverse(loaded->grid.indexToGrid) *
-                     glm::inverse(field->toVolume),
-                 slot.toIndex);
-            slot.grid[0] = static_cast<std::uint32_t>(loaded->offset);
-            slot.grid[1] =
-                static_cast<std::uint32_t>(loaded->grid.type);
-        }
-        gpu.params[0] = static_cast<float>(volume.material.density);
-        gpu.params[1] =
-            static_cast<float>(volume.material.temperature);
-        gpu.params[2] =
-            static_cast<float>(volume.material.temperatureScale);
-        gpu.info[0] = material;
+            gpu.params[0] =
+                static_cast<float>(volume.material.density);
+            gpu.params[1] =
+                static_cast<float>(volume.material.temperature);
+            gpu.params[2] =
+                static_cast<float>(volume.material.temperatureScale);
+            gpu.info[0] = material;
 
-        // The step: a fraction of the voxels of its densest field
-        // (the density's, else the first), as placed in the world.
-        const auto& [stepGrid, stepField] =
-            held.density != nullptr    ? all[0]
-            : held.emission != nullptr ? all[2]
-                                       : all[1];
-        const glm::dmat4 voxelToLocal =
-            stepField->toVolume * stepGrid->grid.indexToGrid;
-        const std::vector<glm::dmat4> placements =
-            volume.instances.empty()
-                ? std::vector<glm::dmat4>{volume.transform}
-                : volume.instances;
-        for (std::size_t k = 0; k < placements.size(); ++k) {
-            const glm::dmat4& transform = placements[k];
-            const std::int32_t world =
-                k < volume.instanceWorlds.size()
-                    ? volume.instanceWorlds[k]
-                    : volume.world;
-            const glm::dmat4 toVoxel = transform * voxelToLocal;
-            const double voxel =
-                std::min({glm::length(glm::dvec3(toVoxel[0])),
-                          glm::length(glm::dvec3(toVoxel[1])),
-                          glm::length(glm::dvec3(toVoxel[2]))});
-            VolumeGpu placed = gpu;
-            Rows(glm::inverse(transform) *
-                     glm::translate(glm::dmat4(1.0), origin),
-                 placed.toLocal);
-            placed.params[3] = static_cast<float>(
-                std::max(voxel, 1e-9) / kStepsPerVoxel);
-            placed.info[1] = static_cast<std::uint32_t>(world);
-            placed.info[2] = volume.linkGroup;
-            instances.push_back(placed);
-            worlds.push_back(world);
-            glm::dvec3 min = lo;
-            glm::dvec3 max = hi;
-            Transform(glm::translate(glm::dmat4(1.0), -origin) *
-                          transform,
-                      min, max);
-            boxes.emplace_back(min, max);
+            // The step: a fraction of the voxels of its densest field
+            // (the density's, else the first), as placed in the
+            // world.
+            const auto& [stepGrid, stepField] =
+                held.density != nullptr    ? all[0]
+                : held.emission != nullptr ? all[2]
+                                           : all[1];
+            const glm::dmat4 voxelToLocal =
+                stepField->toVolume * stepGrid->grid.indexToGrid;
+            const std::vector<glm::dmat4> placements =
+                volume.instances.empty()
+                    ? std::vector<glm::dmat4>{volume.transform}
+                    : volume.instances;
+            for (std::size_t k = 0; k < placements.size(); ++k) {
+                const glm::dmat4& transform = placements[k];
+                const std::int32_t world =
+                    k < volume.instanceWorlds.size()
+                        ? volume.instanceWorlds[k]
+                        : volume.world;
+                const glm::dmat4 toVoxel = transform * voxelToLocal;
+                const double voxel =
+                    std::min({glm::length(glm::dvec3(toVoxel[0])),
+                              glm::length(glm::dvec3(toVoxel[1])),
+                              glm::length(glm::dvec3(toVoxel[2]))});
+                VolumeGpu placed = gpu;
+                Rows(glm::inverse(transform) *
+                         glm::translate(glm::dmat4(1.0), origin),
+                     placed.toLocal);
+                placed.params[3] = static_cast<float>(
+                    std::max(voxel, 1e-9) / kStepsPerVoxel);
+                placed.info[1] = static_cast<std::uint32_t>(world);
+                placed.info[2] = volume.linkGroup;
+                instances.push_back(placed);
+                worlds.push_back(world);
+                glm::dvec3 min = lo;
+                glm::dvec3 max = hi;
+                Transform(glm::translate(glm::dmat4(1.0), -origin) *
+                              transform,
+                          min, max);
+                boxes.emplace_back(min, max);
+            }
         }
     }
     active_ = !instances.empty();
@@ -515,38 +628,45 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     std::vector<std::uint32_t> runs(
         4 * std::max<std::size_t>(views_, 1), 0);
     std::vector<std::uint32_t> lists;
-    for (std::uint32_t v = 0; v < views_; ++v) {
-        const std::int32_t world = viewWorlds[v];
-        const auto inWorld = [&](std::size_t i) {
-            return worlds[i] == -1 || world == -1 ||
-                   worlds[i] == world;
-        };
-        runs[4 * v] = static_cast<std::uint32_t>(lists.size());
-        for (std::size_t i = 0; i < instances.size(); ++i) {
-            if (!inWorld(i) ||
-                (v < viewProjections.size() &&
-                 !InFrustum(viewProjections[v], boxes[i].first,
-                            boxes[i].second))) {
-                continue;
-            }
-            lists.push_back(static_cast<std::uint32_t>(i));
-        }
-        runs[4 * v + 1] =
-            static_cast<std::uint32_t>(lists.size()) - runs[4 * v];
-        runs[4 * v + 2] = static_cast<std::uint32_t>(lists.size());
-        for (std::size_t i = 0; i < instances.size(); ++i) {
-            if (inWorld(i)) {
+    {
+        ERNIE_ZONE("Volume view lists");
+        for (std::uint32_t v = 0; v < views_; ++v) {
+            const std::int32_t world = viewWorlds[v];
+            const auto inWorld = [&](std::size_t i) {
+                return worlds[i] == -1 || world == -1 ||
+                       worlds[i] == world;
+            };
+            runs[4 * v] = static_cast<std::uint32_t>(lists.size());
+            for (std::size_t i = 0; i < instances.size(); ++i) {
+                if (!inWorld(i) ||
+                    (v < viewProjections.size() &&
+                     !InFrustum(viewProjections[v], boxes[i].first,
+                                boxes[i].second))) {
+                    continue;
+                }
                 lists.push_back(static_cast<std::uint32_t>(i));
             }
+            runs[4 * v + 1] =
+                static_cast<std::uint32_t>(lists.size()) -
+                runs[4 * v];
+            runs[4 * v + 2] =
+                static_cast<std::uint32_t>(lists.size());
+            for (std::size_t i = 0; i < instances.size(); ++i) {
+                if (inWorld(i)) {
+                    lists.push_back(static_cast<std::uint32_t>(i));
+                }
+            }
+            runs[4 * v + 3] =
+                static_cast<std::uint32_t>(lists.size()) -
+                runs[4 * v + 2];
         }
-        runs[4 * v + 3] = static_cast<std::uint32_t>(lists.size()) -
-                          runs[4 * v + 2];
     }
     if (lists.empty()) {
         lists.push_back(0);
     }
     const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer,
                             std::span<const std::byte> bytes) {
+        ERNIE_ZONE("Volume upload");
         buffer = Grow(context_, std::move(buffer), bytes.size());
         uploads.Write(*buffer, bytes);
     };
@@ -576,6 +696,7 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     if (!active_) {
         return;
     }
+    ERNIE_ZONE("Record volume shadows");
     ERNIE_GPU_ZONE(context_, commands, "Volume shadows");
     VolumeResources resources{};
     resources.volumes = addresses_[0];
@@ -628,6 +749,7 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     }
     if (shadowPipeline_ == nullptr ||
         shadowPipelinePatterns_ != patterns.Models().size()) {
+        ERNIE_ZONE("Volume shadow pipeline");
         std::vector<ShaderModuleSource> modules =
             LightPatternModules(patterns);
         modules.insert(
@@ -674,11 +796,13 @@ void VolumePass::Record(VkCommandBuffer commands,
     if (!active_) {
         return;
     }
+    ERNIE_ZONE("Record volumes");
     ERNIE_GPU_ZONE(context_, commands, "Volumes");
     const std::size_t slot = pushbroom ? 1 : 0;
     std::unique_ptr<ComputePipeline>& pipeline = pipelines_[slot];
     const std::size_t patterns = shading.patterns->Models().size();
     if (pipeline == nullptr || pipelinePatterns_[slot] != patterns) {
+        ERNIE_ZONE("Volume pipeline");
         // The light patterns as shading takes them (`lightPattern`),
         // for lasers' beams in the medium.
         std::vector<ShaderModuleSource> modules =

@@ -5667,6 +5667,10 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
+void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
+    volumes_->SetComputeInterop(compute);
+}
+
 std::uint64_t RasterRenderer::GpuBytes() const {
     std::uint64_t bytes =
         uniforms_.Size() + shadowUniforms_.Size() +

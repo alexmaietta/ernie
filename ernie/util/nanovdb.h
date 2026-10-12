@@ -68,8 +68,11 @@ struct NanoVdbGrid {
     double minValue = 0.0;
     double maxValue = 0.0;
     /// The grid itself, from its GridData header on, padded to a
-    /// multiple of 4 bytes.
+    /// multiple of 8 bytes; empty when only its head was read
+    /// (`NanoVdbGridHead`).
     std::vector<std::uint8_t> buffer;
+    /// The grid's bytes, as its header gives them.
+    std::uint64_t size = 0;
 
     /// Whether the grid holds active values.
     bool Empty() const;
@@ -99,6 +102,19 @@ ReadNanoVdb(const std::filesystem::path& path);
 /// NanoVDB grid of major version 32.
 std::vector<NanoVdbGrid>
 NanoVdbGridsOf(std::span<const std::uint8_t> bytes);
+
+/// The bytes of a grid's start that hold its header, its tree's and
+/// its root's (the root's statistics included), as NanoVDB lays them
+/// out one after another.
+inline constexpr std::size_t kNanoVdbHeadBytes = 1024;
+
+/// A grid's header from its first bytes `head` (`kNanoVdbHeadBytes`,
+/// or fewer when the grid is smaller), without its buffer: for a grid
+/// on a device, of which only the head comes to the host. `size`
+/// says where the next grid of a multi-grid buffer starts.
+/// @throws std::runtime_error if `head` does not start a NanoVDB grid
+/// of major version 32 or ends before its root.
+NanoVdbGrid NanoVdbGridHead(std::span<const std::uint8_t> head);
 
 /// The grid UsdVol's OpenVDBAsset names: the `index`th grid (0 the
 /// first) named `name`, or the `index`th grid of the file when `name`

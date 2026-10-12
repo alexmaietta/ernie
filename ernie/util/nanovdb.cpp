@@ -71,23 +71,25 @@ void CheckVersion(std::uint32_t version) {
     }
 }
 
-// The header fields Ernie keeps, read through PNanoVDB's own
-// accessors from a copy of the grid aligned for them.
-NanoVdbGrid GridOf(std::span<const std::uint8_t> bytes) {
+// The header fields Ernie keeps of the grid `bytes` starts (all of
+// it, or its head), read through PNanoVDB's own accessors from a copy
+// aligned for them.
+NanoVdbGrid HeaderOf(std::span<const std::uint8_t> bytes) {
     NanoVdbGrid grid;
-    grid.buffer.assign(bytes.begin(), bytes.end());
-    grid.buffer.resize((bytes.size() + 7) / 8 * 8, 0);
     // PNanoVDB reads 64-bit words, so read from an aligned copy.
-    std::vector<std::uint64_t> words(grid.buffer.size() / 8);
-    std::memcpy(words.data(), grid.buffer.data(), grid.buffer.size());
+    std::vector<std::uint64_t> words((bytes.size() + 7) / 8, 0);
+    std::memcpy(words.data(), bytes.data(), bytes.size());
     const pnanovdb_buf_t buf = pnanovdb_make_buf(
         reinterpret_cast<std::uint32_t*>(words.data()),
         words.size() * 2);
     const pnanovdb_grid_handle_t handle{pnanovdb_address_null()};
-    // Each grid of a multi-grid buffer becomes its own buffer.
-    pnanovdb_grid_set_grid_index(buf, handle, 0);
-    pnanovdb_grid_set_grid_count(buf, handle, 1);
-    std::memcpy(grid.buffer.data(), words.data(), grid.buffer.size());
+    // What PNanoVDB reads at `address`, `size` bytes, must be there.
+    const auto within = [&](pnanovdb_address_t address,
+                            std::size_t size) {
+        return address.byte_offset + size <= bytes.size();
+    };
+    grid.size =
+        Load<std::uint64_t>(bytes, PNANOVDB_GRID_OFF_GRID_SIZE);
 
     char name[257] = {};
     for (std::uint32_t i = 0; i < 64; ++i) {
@@ -119,6 +121,10 @@ NanoVdbGrid GridOf(std::span<const std::uint8_t> bytes) {
         pnanovdb_grid_get_tree(buf, handle);
     const pnanovdb_root_handle_t root =
         pnanovdb_tree_get_root(buf, tree);
+    if (!within(root.address, PNANOVDB_ROOT_BASE_SIZE)) {
+        throw std::runtime_error(
+            "NanoVDB grid's root lies past the bytes read");
+    }
     const pnanovdb_coord_t lo = pnanovdb_root_get_bbox_min(buf, root);
     const pnanovdb_coord_t hi = pnanovdb_root_get_bbox_max(buf, root);
     grid.indexMin = {lo.x, lo.y, lo.z};
@@ -135,6 +141,10 @@ NanoVdbGrid GridOf(std::span<const std::uint8_t> bytes) {
         pnanovdb_root_get_min_address(type, buf, root);
     const pnanovdb_address_t max =
         pnanovdb_root_get_max_address(type, buf, root);
+    if (!within(min, 12) || !within(max, 12)) {
+        grid.hasStatistics = false;
+        return grid;
+    }
     switch (grid.type) {
     case NanoVdbType::Float:
     case NanoVdbType::Fp4:
@@ -163,6 +173,23 @@ NanoVdbGrid GridOf(std::span<const std::uint8_t> bytes) {
     default:
         break;
     }
+    return grid;
+}
+
+// The grid `bytes` holds, with its own buffer.
+NanoVdbGrid GridOf(std::span<const std::uint8_t> bytes) {
+    NanoVdbGrid grid = HeaderOf(bytes);
+    // Each grid of a multi-grid buffer becomes its own buffer.
+    std::vector<std::uint64_t> words((bytes.size() + 7) / 8, 0);
+    std::memcpy(words.data(), bytes.data(), bytes.size());
+    const pnanovdb_buf_t buf = pnanovdb_make_buf(
+        reinterpret_cast<std::uint32_t*>(words.data()),
+        words.size() * 2);
+    const pnanovdb_grid_handle_t handle{pnanovdb_address_null()};
+    pnanovdb_grid_set_grid_index(buf, handle, 0);
+    pnanovdb_grid_set_grid_count(buf, handle, 1);
+    grid.buffer.resize(words.size() * 8);
+    std::memcpy(grid.buffer.data(), words.data(), grid.buffer.size());
     return grid;
 }
 
@@ -269,6 +296,20 @@ void NanoVdbGrid::GridBounds(glm::dvec3& min, glm::dvec3& max) const {
 std::vector<NanoVdbGrid>
 NanoVdbGridsOf(std::span<const std::uint8_t> bytes) {
     return RawGrids(bytes);
+}
+
+NanoVdbGrid NanoVdbGridHead(std::span<const std::uint8_t> head) {
+    const auto magic = Load<std::uint64_t>(head, 0);
+    if (magic != kMagicNumber && magic != kMagicGrid) {
+        throw std::runtime_error("NanoVDB grid signature not found");
+    }
+    CheckVersion(
+        Load<std::uint32_t>(head, PNANOVDB_GRID_OFF_VERSION));
+    NanoVdbGrid grid = HeaderOf(head);
+    if (grid.size < PNANOVDB_GRID_SIZE) {
+        throw std::runtime_error("NanoVDB grid size is too small");
+    }
+    return grid;
 }
 
 std::vector<NanoVdbGrid>

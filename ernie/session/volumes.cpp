@@ -10,6 +10,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/profile.h"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -42,12 +43,15 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         if (buffer == nullptr || buffer->Elements() == 0) {
             return std::nullopt;
         }
-        if (buffer->Location().kind != DeviceKind::Cpu) {
+        if (buffer->Location().kind != DeviceKind::Cpu &&
+            !buffer->IsContiguous()) {
             throw std::invalid_argument(
                 target.String() +
-                ": NanoVDB grids are read from CPU arrays only");
+                ": NanoVDB grids on a device must be contiguous");
         }
         VolumeFieldParams field;
+        field.stream =
+            scene.WriteStream(target, tokens::kNanoVdbBuffer);
         field.gridName = grids.GetFieldName();
         field.gridIndex = grids.GetFieldIndex();
         field.toVolume = toLocal * scene.WorldTransform(target);
@@ -146,6 +150,7 @@ glm::dmat4 InstanceTransform(const InstanceData& data, std::size_t i) {
 }  // namespace
 
 std::vector<VolumeParams> VolumesOf(const Scene& scene) {
+    ERNIE_ZONE("Resolve volumes");
     // PointInstancers' prototypes, which show only as their instances.
     const std::vector<Path> instancers =
         scene.Prims(tokens::kPointInstancer);

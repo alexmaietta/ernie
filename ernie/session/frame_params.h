@@ -503,12 +503,14 @@ struct VolumeFieldParams {
     int gridIndex = 0;     ///< `fieldIndex`.
     /// The field prim's frame to its volume's.
     glm::dmat4 toVolume{1.0};
-    /// A NanoVDBField's: its path, its array of grids on the CPU, and
-    /// the array's version (`Scene::AttributeVersion`), which changes
-    /// when it is written again.
+    /// A NanoVDBField's: its path, its array of grids (on the CPU or
+    /// a compute device, contiguous there), the array's version
+    /// (`Scene::AttributeVersion`), which changes when it is written
+    /// again, and the stream it was written on.
     std::string array;
     Tensor buffer;
     std::uint64_t version = 0;
+    std::uintptr_t stream = 1;
 
     bool operator==(const VolumeFieldParams& other) const {
         return file == other.file && gridName == other.gridName &&

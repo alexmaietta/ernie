@@ -2527,6 +2527,14 @@ void RasterDelegate::UpdatePrims(
     }
     for (VolumeParams& volume : frame.volumes) {
         volume.linkGroup = links_.GroupOf(Path(volume.prim));
+        // Grids written on a compute device are copied from it.
+        for (const auto* field :
+             {&volume.density, &volume.temperature, &volume.emission}) {
+            if (*field && !(*field)->buffer.Empty() &&
+                (*field)->buffer.Location().kind != DeviceKind::Cpu) {
+                renderer_.SetVolumeComputeInterop(&RequireCompute());
+            }
+        }
     }
     // The lights' poses at the last frame of `stateKey`, for motion
     // blur: none for a light's first frame or one posed on the GPU.

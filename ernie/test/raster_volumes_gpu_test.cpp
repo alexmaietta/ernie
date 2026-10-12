@@ -651,3 +651,42 @@ TEST_F(RasterDelegateTest, AVolumeReadsItsGridFromAnArray) {
     EXPECT_EQ(delegate.Renderer().Volumes().GridCount(), 1u);
     EXPECT_NEAR(again[0], fromArray[0], 1e-4 * fromArray[0]);
 }
+
+TEST_F(RasterDelegateTest, AVolumeReadsItsGridFromADeviceArray) {
+    // The cube's grid in CUDA memory, as a simulation writes it each
+    // step, shades as the file does; written again at its size, it is
+    // copied over itself in the pool.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::vector<double> fromFile =
+        CentreSpectrum(delegate, scene);
+    const std::vector<std::uint8_t> bytes =
+        ernie::ReadNanoVdb(CubeFile()).front().buffer;
+    const Tensor host = Tensor::Copy<std::uint8_t>(
+        bytes, {static_cast<std::int64_t>(bytes.size())});
+    ernie::NanoVDBField::Define(scene, "/World/Cube/Grids");
+    scene.Write("/World/Cube/Grids", tokens::kNanoVdbBuffer,
+                cuda->Upload(host));
+    ernie::Volume(scene, "/World/Cube")
+        .SetField("density", "/World/Cube/Grids");
+    const std::vector<double> fromDevice =
+        CentreSpectrum(delegate, scene);
+    const std::size_t poolBytes =
+        delegate.Renderer().Volumes().PoolBytes();
+    scene.Write("/World/Cube/Grids", tokens::kNanoVdbBuffer,
+                cuda->Upload(host));
+    const std::vector<double> again = CentreSpectrum(delegate, scene);
+    EXPECT_EQ(delegate.Renderer().Volumes().PoolBytes(), poolBytes);
+    for (std::size_t b = 0; b < fromFile.size(); ++b) {
+        EXPECT_NEAR(fromDevice[b], fromFile[b], 1e-4 * fromFile[b])
+            << "band " << b;
+        EXPECT_NEAR(again[b], fromFile[b], 1e-4 * fromFile[b])
+            << "band " << b;
+    }
+}

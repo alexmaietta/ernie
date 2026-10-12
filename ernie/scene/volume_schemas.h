@@ -53,7 +53,7 @@
     X(::ernie::Tensor, Buffer, ::ernie::tokens::kNanoVdbBuffer, nullptr,                           \
       (::ernie::AttributeMeta{.doc = "One or more NanoVDB grids back to back as NanoVDB keeps "    \
                                      "them in memory (Warp's Volume.array()), in an array of any " \
-                                     "type, on the CPU.",                                          \
+                                     "type, on the CPU or a CUDA device.",                         \
                               .group = "Field", .dirty = ::ernie::Dirty::Points}))                 \
     X(std::string, FieldName, ::ernie::tokens::kFieldName, "",                                     \
       (::ernie::AttributeMeta{.doc = "The grid's name in the buffer; unset, any grid.",            \

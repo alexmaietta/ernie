@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -91,6 +92,27 @@ TEST(NanoVdb, RawBufferMatchesTheFile) {
         ReadNanoVdb(Write("ball_raw.nvdb", bytes));
     ASSERT_EQ(read.size(), 1u);
     EXPECT_EQ(read[0].buffer, file.buffer);
+}
+
+TEST(NanoVdb, AGridsHeadHoldsItsHeader) {
+    const NanoVdbGrid file = ReadNanoVdb(Cube())[0];
+    const std::span<const std::uint8_t> bytes(file.buffer);
+    const NanoVdbGrid head = NanoVdbGridHead(
+        bytes.first(std::min(bytes.size(), kNanoVdbHeadBytes)));
+    EXPECT_TRUE(head.buffer.empty());
+    EXPECT_EQ(head.size, file.size);
+    EXPECT_LE(head.size, file.buffer.size());
+    EXPECT_EQ(head.name, file.name);
+    EXPECT_EQ(head.type, file.type);
+    EXPECT_EQ(head.indexToGrid, file.indexToGrid);
+    EXPECT_EQ(head.indexMin, file.indexMin);
+    EXPECT_EQ(head.indexMax, file.indexMax);
+    EXPECT_EQ(head.hasStatistics, file.hasStatistics);
+    EXPECT_EQ(head.maxValue, file.maxValue);
+    // The GridData header alone, 672 bytes.
+    EXPECT_THROW(NanoVdbGridHead(bytes.first(672)),
+                 std::runtime_error)
+        << "the root lies past a bare header";
 }
 
 TEST(NanoVdb, FindsGridsByNameAndIndex) {
