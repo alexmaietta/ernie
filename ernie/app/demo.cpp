@@ -2,6 +2,8 @@
 #include "ernie/app/demo.h"
 
 #include "ernie/app/panel.h"
+#include "ernie/util/profile_report.h"
+#include "ernie/util/profiler.h"
 
 #include <imgui.h>
 #include <stb_image_write.h>
@@ -9,6 +11,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <fstream>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
@@ -20,6 +23,46 @@ namespace {
 /// Frames a benchmark runs before it starts timing.
 constexpr std::uint64_t kBenchmarkWarmup = 5;
 
+/// Frames a profile keeps (the last of a longer run), and those it
+/// leaves out of its averages at the start, which compile shaders and
+/// upload the scene.
+constexpr std::size_t kProfileHistory = 10000;
+constexpr std::size_t kProfileWarmup = 5;
+
+/// Prints the profiler's zones over the frames recorded, after the
+/// warm-up, and writes them where `options` asks.
+void ReportProfile(const DemoOptions& options) {
+    profiler::SetEnabled(false);
+    std::vector<profiler::Frame> frames = profiler::Frames();
+    if (frames.size() > kProfileWarmup) {
+        frames.erase(frames.begin(), frames.begin() + kProfileWarmup);
+    }
+    const std::vector<std::string> threads = profiler::ThreadNames();
+    const profiler::Report report =
+        profiler::Summarize(frames, threads);
+    std::printf("Profile: %zu frames (%zu with GPU zones), means per "
+                "frame\n\n%s",
+                report.cpuFrames, report.gpuFrames,
+                profiler::ReportText(report, {}).c_str());
+    const auto write = [](const std::filesystem::path& path,
+                          const std::string& text) {
+        std::ofstream file(path, std::ios::binary);
+        file << text;
+        if (!file) {
+            throw std::runtime_error("Could not write " +
+                                     path.string());
+        }
+        std::printf("wrote %s\n", path.string().c_str());
+    };
+    if (!options.profileJson.empty()) {
+        write(options.profileJson, profiler::ReportJson(report));
+    }
+    if (!options.profileTrace.empty()) {
+        write(options.profileTrace,
+              profiler::TraceJson(frames, threads));
+    }
+}
+
 constexpr std::string_view kHelp =
     R"(  --viewer window|null   'window' shows the viewer (the default); 'null' renders the scene's
                          RenderSettings with a bare Renderer and no viewer
@@ -27,6 +70,10 @@ constexpr std::string_view kHelp =
   --num-frames N         frames to run; a window runs until closed, else the demo's own count
   --benchmark [SECONDS]  report frames per second, rendering with --viewer null; stop after
                          SECONDS, if given, or --num-frames
+  --profile              print the profiler's GPU and CPU zones, nested and averaged, at the end
+  --profile-json PATH    also write them as JSON (implies --profile)
+  --profile-trace PATH   also write a Chrome trace for Perfetto or chrome://tracing
+                         (implies --profile)
   --test                 run the demo's checks (TestPostStep and TestFinal)
   --output PATH          write the last frame here as PNG
   --paused               start paused (the Demos panel resumes)
@@ -140,6 +187,12 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
                 options.benchmarkSeconds =
                     ParseNumber(arg, args[++i]);
             }
+        } else if (arg == "--profile-json") {
+            options.profileJson = value();
+            options.profile = true;
+        } else if (arg == "--profile-trace") {
+            options.profileTrace = value();
+            options.profile = true;
         } else if (arg == "--output") {
             options.output = value();
         } else if (arg == "--device") {
@@ -150,6 +203,7 @@ DemoOptions ParseDemoOptions(std::span<const std::string> args) {
             options.demo = value();
         } else if (!flag("headless", options.headless) &&
                    !flag("test", options.test) &&
+                   !flag("profile", options.profile) &&
                    !flag("paused", options.paused) &&
                    !flag("validation", options.validation) &&
                    !flag("vsync", options.vsync)) {
@@ -601,6 +655,7 @@ DemoRunner::DemoRunner(DemoOptions options, const std::string& title)
     viewerOptions.device = s.options.device;
     viewerOptions.renderer = s.options.renderer;
     viewerOptions.vsync = s.options.vsync;
+    viewerOptions.profile = s.options.profile;
     s.viewer = std::make_unique<Viewer>(*s.scene, viewerOptions);
     s.display = s.viewer->GetViewportDisplay();
     s.exposure = s.viewer->GetExposure();
@@ -687,6 +742,11 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
             s.Announce(*demo);
         }
         s.paused = o.paused && o.Windowed();
+        if (o.profile) {
+            profiler::Clear();
+            profiler::SetHistory(kProfileHistory);
+            profiler::SetEnabled(true);
+        }
         std::optional<Clock::time_point> timerStart;
         std::uint64_t timedFrames = 0;
         Clock::time_point last = Clock::now();
@@ -710,6 +770,10 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                                           demo->NumFrames()));
             if (limit && demo->frame >= *limit) {
                 break;
+            }
+            // A viewer starts the profiler's frames itself.
+            if (o.profile && viewer == nullptr) {
+                profiler::BeginFrame();
             }
             const Clock::time_point now = Clock::now();
             demo->frameDt =
@@ -768,6 +832,9 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
         if (!o.output.empty() && demo) {
             demo->SaveOutput(o.output);
             std::printf("wrote %s\n", o.output.string().c_str());
+        }
+        if (o.profile) {
+            ReportProfile(o);
         }
         if (o.test && demo) {
             demo->TestFinal();

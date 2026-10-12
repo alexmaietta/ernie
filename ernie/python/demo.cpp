@@ -113,6 +113,12 @@ void BindDemo(nb::module_& m) {
         .def_rw("benchmark_seconds", &DemoOptions::benchmarkSeconds,
                 nb::arg("value").none(),
                 "Stops a benchmark after this many seconds, or None.")
+        .def_rw("profile", &DemoOptions::profile,
+                "Prints the profiler's zones at the end (--profile).")
+        .def_rw("profile_json", &DemoOptions::profileJson,
+                "Where to also write them as JSON, or ''.")
+        .def_rw("profile_trace", &DemoOptions::profileTrace,
+                "Where to also write a Chrome trace, or ''.")
         .def_rw("test", &DemoOptions::test,
                 "Runs test_post_step and test_final.")
         .def_rw("output", &DemoOptions::output,

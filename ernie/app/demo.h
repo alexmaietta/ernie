@@ -38,6 +38,15 @@ struct DemoOptions {
     /// Stops a benchmark after this many seconds (`--benchmark
     /// SECONDS`), or at `numFrames`.
     std::optional<double> benchmarkSeconds;
+    /// Records the profiler's CPU and GPU zones and prints them,
+    /// nested and averaged after a few frames' warm-up, at the end
+    /// (`--profile`, or either path below).
+    bool profile = false;
+    /// Where to also write them as JSON (`--profile-json`), or empty.
+    std::filesystem::path profileJson;
+    /// Where to also write the frames as a Chrome trace for Perfetto
+    /// or chrome://tracing (`--profile-trace`), or empty.
+    std::filesystem::path profileTrace;
     /// Runs the demo's checks (`--test`): `Demo::TestPostStep` after
     /// every step and `Demo::TestFinal` at the end.
     bool test = false;

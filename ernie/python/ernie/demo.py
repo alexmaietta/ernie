@@ -166,6 +166,24 @@ def create_parser(demo_class=Demo):
         "null; stop after SECONDS, if given, or --num-frames",
     )
     parser.add_argument(
+        "--profile",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="print the profiler's GPU and CPU zones, nested and "
+        "averaged, at the end",
+    )
+    parser.add_argument(
+        "--profile-json",
+        metavar="PATH",
+        help="also write them as JSON (implies --profile)",
+    )
+    parser.add_argument(
+        "--profile-trace",
+        metavar="PATH",
+        help="also write a Chrome trace for Perfetto or "
+        "chrome://tracing (implies --profile)",
+    )
+    parser.add_argument(
         "--test",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -221,6 +239,11 @@ def options_from_args(args):
     options.num_frames = args.num_frames
     options.benchmark = args.benchmark is not False
     options.benchmark_seconds = args.benchmark or None
+    options.profile_json = args.profile_json or ""
+    options.profile_trace = args.profile_trace or ""
+    options.profile = bool(
+        args.profile or args.profile_json or args.profile_trace
+    )
     options.test = args.test
     options.output = args.output or ""
     options.paused = args.paused

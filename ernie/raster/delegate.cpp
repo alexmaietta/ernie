@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/delegate.h"
 
+#include "ernie/device/gpu_profile.h"
+
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/material_schemas.h"
@@ -2756,6 +2758,9 @@ void RasterDelegate::Record(VkCommandBuffer commands,
     }
     const RasterDrawable* drawables[] = {
         &terrain_, &planet_, &meshes_, &ground_, &points_};
+    // The frame's passes under one zone, as the profiler's tree shows
+    // them.
+    ERNIE_GPU_ZONE(context_, commands, "Rendering");
     renderer_.Record(commands, *viewTargets_, drawables, &target,
                      var);
 }
@@ -3208,6 +3213,7 @@ RasterDelegate::StepAsync(const Scene& scene,
         ERNIE_ZONE_TEXT(spec.product.String());
         submission = context_.SubmitAsync(
             [&](VkCommandBuffer commands) {
+                ERNIE_GPU_ZONE(context_, commands, "Rendering");
                 renderer_.RecordShadows(commands, drawables);
                 if (minimalTargets != nullptr) {
                     renderer_.RecordMinimal(commands, *minimalTargets,

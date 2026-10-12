@@ -50,6 +50,20 @@ TEST(DemoOptions, BenchmarkTakesOptionalSecondsAndDropsTheViewer) {
     EXPECT_EQ(options.benchmarkSeconds, 2.5);
 }
 
+TEST(DemoOptions, ProfileFilesImplyProfiling) {
+    EXPECT_FALSE(ParseDemoOptions({}).profile);
+    EXPECT_TRUE(
+        ParseDemoOptions(std::vector<std::string>{"--profile"})
+            .profile);
+    const DemoOptions options =
+        ParseDemoOptions(std::vector<std::string>{
+            "--profile-json", "p.json", "--profile-trace=t.json"});
+    EXPECT_TRUE(options.profile);
+    EXPECT_EQ(options.profileJson, "p.json");
+    EXPECT_EQ(options.profileTrace, "t.json");
+    EXPECT_TRUE(options.extra.empty());
+}
+
 TEST(DemoOptions, RejectsBadValues) {
     EXPECT_THROW(
         ParseDemoOptions(std::vector<std::string>{"--viewer", "gl"}),

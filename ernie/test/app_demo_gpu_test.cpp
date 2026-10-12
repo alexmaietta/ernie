@@ -6,10 +6,13 @@
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/profiler.h"
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -127,6 +130,25 @@ TEST_F(DemoTest, WritesTheOutputWithoutAViewer) {
     runner.Run(std::make_shared<CubeDemo>(nullptr, runner.Options()));
     EXPECT_GT(std::filesystem::file_size(path), 100u);
     std::filesystem::remove(path);
+}
+
+TEST_F(DemoTest, ProfilesWithoutAViewerToJsonAndATrace) {
+    const std::filesystem::path json = TempFile("profile.json");
+    const std::filesystem::path trace = TempFile("trace.json");
+    DemoRunner runner(Options({"--viewer", "null", "--num-frames",
+                               "10", "--profile-json", json.string(),
+                               "--profile-trace", trace.string()}));
+    runner.Run(std::make_shared<CubeDemo>(nullptr, runner.Options()));
+    std::ifstream file(json);
+    const std::string text((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+    EXPECT_NE(text.find("\"gpu\""), std::string::npos);
+    EXPECT_NE(text.find("\"name\""), std::string::npos)
+        << "zones were recorded";
+    EXPECT_GT(std::filesystem::file_size(trace), 100u);
+    EXPECT_FALSE(profiler::Enabled()) << "recording stops at the end";
+    std::filesystem::remove(json);
+    std::filesystem::remove(trace);
 }
 
 TEST_F(DemoTest, BuildsIntoTheViewersSceneHeadless) {

@@ -75,6 +75,9 @@ struct ViewerOptions {
     Path settings;  ///< RenderSettings prim the viewport starts with;
                     ///< empty picks the first one, as
                     ///< `ResolveRenderPrims`.
+    /// Records the profiler's zones every frame (demos' `--profile`),
+    /// not only while the Profiler panel shows.
+    bool profile = false;
 };
 
 /// What the viewport draws over the scene, as Kit's viewport "show by

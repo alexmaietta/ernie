@@ -3232,8 +3232,11 @@ bool Viewer::State::Step() {
         }
     }
     // A profiler frame per viewer frame, recording only while the
-    // Profiler panel is drawn (its Draw turns recording back on).
-    if (!profilerPanel->IsVisible() || !profilerShown) {
+    // Profiler panel is drawn (its Draw turns recording back on), or
+    // always when profiling.
+    if (options.profile) {
+        profiler::SetEnabled(true);
+    } else if (!profilerPanel->IsVisible() || !profilerShown) {
         profiler::SetEnabled(false);
     }
     profiler::BeginFrame();
