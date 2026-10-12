@@ -20,6 +20,7 @@
 #include "ernie/util/ies.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/solar.h"
+#include "ernie/util/spectrum.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -2886,6 +2887,30 @@ FrameParams FrameParamsOf(const Scene& scene,
         params.dome =
             DomeParamsOf(scene, prims.dome, params.camera.bands);
     }
+    ThermalSettings& thermal = params.thermal;
+    thermal.enable = options.GetThermalEnable();
+    thermal.defaultTemperature = static_cast<float>(
+        std::max(options.GetThermalDefaultTemperature(), 0.0));
+    thermal.backgroundTemperature = static_cast<float>(
+        std::max(options.GetThermalBackgroundTemperature(), 0.0));
+    // The background, a black body all around: radiance added to the
+    // dome's, or a uniform dome of its own (sh of a map of 1).
+    if (thermal.enable && thermal.backgroundTemperature > 0.0f) {
+        if (!params.dome) {
+            params.dome.emplace();
+            params.dome->radiance.assign(
+                static_cast<std::size_t>(params.camera.bands.count),
+                0.0f);
+            params.dome->sh[0] =
+                glm::vec3(static_cast<float>(std::sqrt(4.0 * M_PI)));
+        }
+        const std::vector<float> glow = ThermalEmission(
+            params.camera.bands, thermal.backgroundTemperature,
+            [](double) { return 1.0; });
+        for (std::size_t b = 0; b < glow.size(); ++b) {
+            params.dome->radiance[b] += glow[b];
+        }
+    }
     if (!prims.stars.IsEmpty()) {
         params.stars = StarFieldParamsOf(scene, prims.stars);
     }
@@ -3358,6 +3383,35 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
                           : Shader(scene, surface).GetEmissiveColor();
     settings.emission =
         glm::max(glm::vec3(emission), glm::vec3(0.0f));
+    // Thermal emission, whatever the model.
+    const double temperature = view.GetThermalTemperature();
+    if (!(temperature >= 0.0)) {
+        throw std::invalid_argument(
+            "Material '" + material.String() + "' has '" +
+            std::string(kThermalTemperature) +
+            "' below 0 K: " + std::to_string(temperature));
+    }
+    settings.temperature = static_cast<float>(temperature);
+    if (const std::vector<float> emissivity =
+            view.GetThermalEmissivity();
+        !emissivity.empty()) {
+        const auto bad = [&](const std::string& why) {
+            return std::invalid_argument(
+                "Material '" + material.String() + "' has '" +
+                std::string(kThermalEmissivity) + "' " + why);
+        };
+        try {
+            settings.emissivity = Spectrum::FromPairs(emissivity);
+        } catch (const std::invalid_argument& error) {
+            throw bad(std::string("pairs that are not a spectrum: ") +
+                      error.what());
+        }
+        for (const double value : settings.emissivity.Values()) {
+            if (!(value >= 0.0 && value <= 1.0)) {
+                throw bad("values outside [0, 1]");
+            }
+        }
+    }
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));
     settings.speckleRoughness =

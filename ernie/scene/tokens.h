@@ -976,6 +976,26 @@ inline constexpr std::string_view kClearcoatRoughness =
 /// whatever the model.
 inline constexpr std::string_view kEmissiveColor =
     "inputs:emissiveColor";
+/// A material's temperature in kelvin (Ernie; default 0, none): above
+/// 0 it glows by Planck's law times its emissivity, whatever the
+/// model.
+inline constexpr std::string_view kThermalTemperature =
+    "ernie:thermal:temperature";
+/// A material's emissivity as (nm, value) pairs in [0, 1] (Ernie);
+/// unset, 1 minus its reflectance (Kirchhoff's law).
+inline constexpr std::string_view kThermalEmissivity =
+    "ernie:thermal:emissivity";
+/// RenderSettings' thermal emission (Ernie): whether materials glow
+/// at their temperatures (default off); the temperature in kelvin of
+/// materials without their own (default 0, none); and the
+/// background's (sky's or space's), an emitting environment that also
+/// lights the scene (default 0, none).
+inline constexpr std::string_view kThermalEnable =
+    "ernie:thermal:enable";
+inline constexpr std::string_view kThermalDefaultTemperature =
+    "ernie:thermal:defaultTemperature";
+inline constexpr std::string_view kThermalBackgroundTemperature =
+    "ernie:thermal:backgroundTemperature";
 /// Opacity (default 1; one texture channel, often a colour texture's
 /// outputs:a) and the threshold below which a surface is cut out
 /// (default 0, none).

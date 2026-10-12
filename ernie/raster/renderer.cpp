@@ -3841,6 +3841,7 @@ void RasterRenderer::Update(
     }
     filters_ = sensorPasses_.front().plan.filters;
     bands_ = params.camera.bands;
+    thermal_ = params.thermal;
     extent_ = {params.camera.width, params.camera.height};
     // Overlay batches with worlds sort by the views' worlds.
     std::uint32_t overlayWorlds = 0;
@@ -4084,20 +4085,48 @@ void RasterRenderer::WriteMaterialTable() {
         std::copy(shape.begin(), shape.end(), entry.reflectance);
         // Emission: its colour upsampled as a reflectance is
         // (`RgbToSpectrum`, on its largest component's scale) under
-        // the equal-energy illuminant of 1 cd/m^2 per unit.
+        // the equal-energy illuminant of 1 cd/m^2 per unit, over the
+        // visible range the colour describes (360 to 830 nm) and
+        // nothing outside it.
         const glm::vec3 emission = settings.emission;
         const float peak =
             std::max({emission.r, emission.g, emission.b});
         if (peak > 0.0f) {
             entry.info[2] = 1;
-            const std::vector<float> emitted =
-                RgbToSpectrum(glm::dvec3(emission / peak))
-                    .Bin(bands_);
+            const Spectrum emitted =
+                RgbToSpectrum(glm::dvec3(emission / peak));
             const double perNit =
                 1.0 / (kLuminousEfficacy * LuminanceIntegral());
-            for (std::size_t b = 0; b < emitted.size(); ++b) {
+            for (int b = 0; b < bands_.count; ++b) {
+                const double low = std::max(bands_.Lower(b), 360.0);
+                const double high =
+                    std::min(bands_.Lower(b) + bands_.Width(), 830.0);
+                const double visible =
+                    high > low ? emitted.Average(low, high) *
+                                     (high - low) / bands_.Width()
+                               : 0.0;
                 entry.emission[b] =
-                    static_cast<float>(emitted[b] * peak * perNit);
+                    static_cast<float>(visible * peak * perNit);
+            }
+        }
+        // Thermal emission, when the frame has it on: its emissivity,
+        // or 1 minus its reflectance (Kirchhoff), times Planck's
+        // radiance at its temperature or else the frame's default.
+        const float temperature = settings.temperature > 0.0f
+                                      ? settings.temperature
+                                      : thermal_.defaultTemperature;
+        if (thermal_.enable && temperature > 0.0f) {
+            entry.info[2] = 1;
+            const Spectrum& reflectance = material->Reflectance();
+            const std::vector<float> thermal =
+                ThermalEmission(bands_, temperature, [&](double nm) {
+                    return settings.emissivity.Empty()
+                               ? std::clamp(1.0 - reflectance(nm),
+                                            0.0, 1.0)
+                               : settings.emissivity(nm);
+                });
+            for (std::size_t b = 0; b < thermal.size(); ++b) {
+                entry.emission[b] += thermal[b];
             }
         }
     }

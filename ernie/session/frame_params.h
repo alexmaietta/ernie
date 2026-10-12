@@ -528,6 +528,17 @@ struct AtmosphereParams {
     }
 };
 
+/// Thermal emission (RenderSettings' `ernie:thermal:*`): whether
+/// materials glow at their temperatures, the temperature of those
+/// without their own (0, none), and the background's, which the
+/// frame's dome carries (`FrameParamsOf` adds it to the dome's
+/// radiance).
+struct ThermalSettings {
+    bool enable = false;
+    float defaultTemperature = 0.0f;
+    float backgroundTemperature = 0.0f;
+};
+
 /// How finely volumes render (RenderSettings' `ernie:volumes:*`):
 /// steps through each volume, towards each light, up and down for the
 /// sky's light (0, unoccluded) and through the air in front (0,
@@ -663,6 +674,8 @@ struct FrameParams {
     /// uniformly from all around, besides the lights
     /// (`ernie:ambient`); 0 none.
     float ambient = 0.0f;
+    /// Thermal emission (`ernie:thermal:*`).
+    ThermalSettings thermal;
     /// Its linear RGB colour, whatever its brightness
     /// (`ernie:ambientColor`).
     glm::vec3 ambientColor{1.0f};

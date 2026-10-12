@@ -108,6 +108,13 @@ struct MaterialSettings {
     /// surface emits, in cd/m^2 for white (the photometric units of
     /// lights' luminance), upsampled to a spectrum.
     glm::vec3 emission{0.0f};
+    /// Its temperature in kelvin (`tokens::kThermalTemperature`):
+    /// above 0 it emits emissivity times Planck's radiance in every
+    /// band.
+    float temperature = 0.0f;
+    /// Its emissivity (`tokens::kThermalEmissivity`); empty, 1 minus
+    /// its reflectance by Kirchhoff's law.
+    Spectrum emissivity;
     /// How much of incident polarization its diffuse reflection
     /// keeps (`tokens::kPolarizationRetention`), 0 to 1.
     float polarizationRetention = 0.0f;

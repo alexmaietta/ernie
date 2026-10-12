@@ -18,6 +18,7 @@
 #include "ernie/session/resolve.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/ies.h"
+#include "ernie/util/spectrum.h"
 #include "support/delegate_scenes.h"
 #include "support/test_raster.h"
 #include "support/vulkan_fixture.h"
@@ -2236,6 +2237,121 @@ TEST_F(RasterDelegateTest, EmissiveSurfacesShowTheirLuminanceUnlit) {
     const auto reds = MapVars(red);
     EXPECT_GT(At<float>(reds.at("HdrColor"), c, c, 0),
               3.0f * At<float>(reds.at("HdrColor"), c, c, 1));
+}
+
+TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
+    // FlatScene's floor without the sun, through an 8 to 14 um
+    // camera: each band holds the floor's emissivity times Planck's
+    // radiance at its temperature, averaged over the band.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    ernie::Camera(scene, "/World/Camera")
+        .SetSpectralRange(glm::dvec2(8000.0, 14000.0))
+        .SetSpectralBands(6);
+    ernie::Material grey(scene, "/Looks/Grey");
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto bands = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
+        std::vector<double> values;
+        for (std::size_t b = 0; b < 6; ++b) {
+            values.push_back(
+                spectral
+                    .As<float>()[(b * kVarSize + c) * kVarSize + c]);
+        }
+        return values;
+    };
+    // Planck's radiance over band b, by the midpoint rule at 1 nm.
+    const auto planck = [](std::size_t b, double kelvin) {
+        double sum = 0.0;
+        for (int i = 0; i < 1000; ++i) {
+            sum += ernie::PlanckRadiance(
+                8000.0 + 1000.0 * static_cast<double>(b) + i + 0.5,
+                kelvin);
+        }
+        return sum / 1000.0;
+    };
+    const auto expect = [&](double emissivity, double kelvin) {
+        const std::vector<double> values = bands();
+        for (std::size_t b = 0; b < values.size(); ++b) {
+            const double expected = emissivity * planck(b, kelvin);
+            EXPECT_NEAR(values[b], expected, 2e-3 * expected)
+                << "band " << b << " at " << kelvin << " K";
+        }
+    };
+    for (const double value : bands()) {
+        EXPECT_EQ(value, 0.0) << "cold and unlit";
+    }
+    grey.SetThermalTemperature(300.0).SetThermalEmissivity(
+        std::vector<float>{8000.0f, 0.8f, 14000.0f, 0.8f});
+    for (const double value : bands()) {
+        EXPECT_EQ(value, 0.0) << "thermal emission is off";
+    }
+    ernie::RenderSettings settings(scene, "/Render/Settings");
+    settings.SetThermalEnable(true);
+    expect(0.8, 300.0);
+    grey.SetThermalTemperature(350.0);
+    expect(0.8, 350.0);
+    // Unset, the emissivity is 1 minus the reflectance (Kirchhoff).
+    scene.Set("/Looks/Grey", tokens::kThermalEmissivity,
+              std::vector<float>{});
+    scene.Set("/Looks/Grey", tokens::kReflectance,
+              std::vector<float>{8000.0f, 0.3f, 14000.0f, 0.3f});
+    expect(0.7, 350.0);
+    // Without its own temperature, the frame's default.
+    grey.SetThermalTemperature(0.0);
+    settings.SetThermalDefaultTemperature(320.0);
+    expect(0.7, 320.0);
+    // A background at 250 K lights the floor as a uniform dome, which
+    // reflects its radiance times the reflectance (0.3).
+    settings.SetThermalBackgroundTemperature(250.0);
+    {
+        const std::vector<double> values = bands();
+        for (std::size_t b = 0; b < values.size(); ++b) {
+            const double expected =
+                0.7 * planck(b, 320.0) + 0.3 * planck(b, 250.0);
+            EXPECT_NEAR(values[b], expected, 5e-3 * expected)
+                << "band " << b << " under the background";
+        }
+    }
+    // A mono LWIR detector of flat QE counts the glow through the
+    // camera equation: Electrons is the sum over bands of radiance
+    // times electrons per unit radiance.
+    ernie::Camera(scene, "/World/Camera")
+        .SetSensorType("mono")
+        .SetSensorQeMono({7900.0f, 0.6f, 14100.0f, 0.6f})
+        .SetSensorDarkCurrent(0.0)
+        .SetExposureTime(1e-6);
+    {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        const Tensor& spectral = vars.at("SpectralRadiance");
+        const std::vector<float> perRadiance =
+            ernie::CameraParamsOf(scene, "/World/Camera", kVarSize,
+                                  kVarSize)
+                .ElectronsPerRadiance(0);
+        double expected = 0.0;
+        for (std::size_t b = 0; b < 6; ++b) {
+            expected +=
+                perRadiance[b] *
+                spectral
+                    .As<float>()[(b * kVarSize + c) * kVarSize + c];
+        }
+        ASSERT_GT(expected, 100.0);
+        ASSERT_LT(expected, 1e4) << "below the full well";
+        EXPECT_NEAR(At<float>(vars.at("Electrons"), c, c, 0),
+                    expected, 2e-3 * expected);
+    }
+    // emissiveColor describes visible light only.
+    settings.SetThermalEnable(false);
+    grey.SetEmissiveColor(glm::dvec3(2.0));
+    for (const double value : bands()) {
+        EXPECT_EQ(value, 0.0) << "visible emission in the infrared";
+    }
 }
 
 TEST_F(RasterDelegateTest,

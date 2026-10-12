@@ -331,6 +331,34 @@ TEST(MeshDataOf,
                  std::invalid_argument);
 }
 
+TEST(MaterialSettingsOf, ReadsTheThermalTemperatureAndEmissivity) {
+    Scene scene;
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    ernie::Material material =
+        ernie::Material::Define(scene, "/Looks/M");
+    ernie::MaterialSettings settings =
+        ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.temperature, 0.0f);
+    EXPECT_TRUE(settings.emissivity.Empty());
+    material.SetThermalTemperature(290.0).SetThermalEmissivity(
+        {8000.0f, 0.9f, 12000.0f, 0.95f});
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_EQ(settings.temperature, 290.0f);
+    EXPECT_NEAR(settings.emissivity(10000.0), 0.925, 1e-6);
+    material.SetThermalEmissivity({8000.0f, 1.5f});
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
+                 std::invalid_argument)
+        << "emissivity above 1";
+    material.SetThermalEmissivity({8000.0f});
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
+                 std::invalid_argument)
+        << "not pairs";
+    material.SetThermalEmissivity({}).SetThermalTemperature(-1.0);
+    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
+                 std::invalid_argument)
+        << "below absolute zero";
+}
+
 TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
     Scene scene;
     const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();

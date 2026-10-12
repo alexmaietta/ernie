@@ -225,6 +225,24 @@ std::vector<float> BlackbodyIrradiance(const SpectralBands& bands,
     return irradiance;
 }
 
+std::vector<float>
+ThermalEmission(const SpectralBands& bands, double kelvin,
+                const std::function<double(double)>& emissivity) {
+    bands.Check();
+    std::vector<float> radiance(static_cast<std::size_t>(bands.count),
+                                0.0f);
+    if (!(kelvin > 0.0)) {
+        return radiance;
+    }
+    for (int i = 0; i < bands.count; ++i) {
+        radiance[static_cast<std::size_t>(i)] =
+            static_cast<float>(BandAverage(bands, i, [&](double w) {
+                return emissivity(w) * PlanckRadiance(w, kelvin);
+            }));
+    }
+    return radiance;
+}
+
 glm::dvec3 CieXyz(double w) {
     const double x = 1.056 * Lobe(w, 599.8, 37.9, 31.0) +
                      0.362 * Lobe(w, 442.0, 16.0, 26.7) -

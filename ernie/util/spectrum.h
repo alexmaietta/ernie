@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <span>
 #include <utility>
 #include <vector>
@@ -123,6 +124,17 @@ double CieDaylight(double wavelengthNm, double kelvin);
 std::vector<float> BlackbodyIrradiance(const SpectralBands& bands,
                                        double kelvin,
                                        double totalIrradiance);
+
+/// The spectral radiance a surface at `kelvin` emits, averaged over
+/// each of `bands`: emissivity(lambda) times Planck's radiance, in
+/// W m^-2 sr^-1 nm^-1 (Kirchhoff's law of thermal radiation); zeros
+/// at or below 0 K.
+///
+/// Reference: M. Planck, "The Theory of Heat Radiation", 1914
+/// (Kirchhoff's law and the black-body spectrum).
+std::vector<float>
+ThermalEmission(const SpectralBands& bands, double kelvin,
+                const std::function<double(double)>& emissivity);
 
 /// The CIE 1931 2-degree colour matching functions x, y and z at a
 /// wavelength, from the multi-lobe Gaussian fit of Wyman, Sloan and

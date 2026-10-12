@@ -86,6 +86,18 @@
                               .doc = "Linear RGB radiance in cd/m^2 for white, without a "         \
                                      "UsdPreviewSurface (whose own is read then).",                \
                               .group = "Surface", .color = true}))                                 \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
+      (::ernie::AttributeMeta{.label = "Temperature",                                              \
+                              .doc = "Kelvin; above 0 the surface glows by Planck's law times "    \
+                                     "its emissivity, in every band.",                             \
+                              .group = "Thermal", .max = 5000.0}))                                 \
+    X(std::vector<float>, ThermalEmissivity, ::ernie::tokens::kThermalEmissivity,                  \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Emissivity",                                               \
+                              .doc = "(nm, value) pairs in [0, 1], wavelengths increasing; the "   \
+                                     "nearest value outside them. Unset, 1 minus the "             \
+                                     "reflectance (Kirchhoff).",                                   \
+                              .group = "Thermal"}))                                                \
     X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo " \
                                      "tiled over the surface.",                                    \

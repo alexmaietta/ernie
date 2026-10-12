@@ -85,6 +85,21 @@
                               .doc = "Linear RGB of the ambient light, whose luminance "           \
                                      "`ernie:ambient` sets whatever the colour's brightness.",     \
                               .group = "Image", .color = true}))                                   \
+    X(bool, ThermalEnable, ::ernie::tokens::kThermalEnable, false,                                 \
+      (::ernie::AttributeMeta{.label = "Thermal emission",                                         \
+                              .doc = "Materials glow at their temperatures by Planck's law "       \
+                                     "times their emissivity.",                                    \
+                              .group = "Thermal"}))                                                \
+    X(double, ThermalDefaultTemperature, ::ernie::tokens::kThermalDefaultTemperature, 0.0,         \
+      (::ernie::AttributeMeta{.label = "Default temperature",                                      \
+                              .doc = "Kelvin, of materials without their own; 0 none.",            \
+                              .group = "Thermal", .max = 5000.0}))                                 \
+    X(double, ThermalBackgroundTemperature, ::ernie::tokens::kThermalBackgroundTemperature, 0.0,   \
+      (::ernie::AttributeMeta{.label = "Background temperature",                                   \
+                              .doc = "Kelvin of the sky or space, a black body all around that "   \
+                                     "also lights the scene (through the DomeLight, whose map "    \
+                                     "tints it, or a dome of its own); 0 none.",                   \
+                              .group = "Thermal", .max = 5000.0}))                                 \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = "Background", .doc = "Linear display colour of LdrColor's " \
                                                             "background.",                         \

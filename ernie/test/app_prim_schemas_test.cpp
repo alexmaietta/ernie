@@ -98,8 +98,8 @@ TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
         SchemaOf(scene, "/Looks/Rock", brdfs, filters);
     EXPECT_EQ(Titles(rock),
               (std::vector<std::string>{
-                  "Surface", "Reflectance model", "Detail textures",
-                  "Volume", "Prim"}));
+                  "Surface", "Reflectance model", "Thermal",
+                  "Detail textures", "Volume", "Prim"}));
     const PropertyField* brdf = FieldOf(rock, tokens::kBrdf);
     ASSERT_NE(brdf, nullptr);
     EXPECT_EQ(brdf->kind, PropertyField::Kind::Token);
