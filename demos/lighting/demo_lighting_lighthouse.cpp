@@ -20,6 +20,7 @@
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
@@ -191,9 +192,18 @@ class LighthouseDemo : public app::Demo {
                          [this](double depth) { Thicken(depth); });
         Widgets().Slider("Turns per minute", 0.0, 30.0,
                          60.0 / kPeriod, [this](double turns) {
+                             // From where the beam points now, not a
+                             // jump.
                              speed_ = 2.0 * std::numbers::pi * turns /
                                       60.0;
+                             phase_ = angle_ - speed_ * Time();
                          });
+        // A turn of the beacon is the timeline's range, which loops.
+        Stage(scene)
+            .SetStartTimeCode(0.0)
+            .SetEndTimeCode(kPeriod *
+                            Stage(scene).GetTimeCodesPerSecond())
+            .SetTimeCode(0.0);
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->SetLighting(app::Lighting::Stage);
@@ -202,11 +212,28 @@ class LighthouseDemo : public app::Demo {
             display.lights = false;
             display.grid = false;
             viewer->SetViewportDisplay(display);
+            // The timeline turns the beacon: play, scrub or step it.
+            viewer->OnFrame(
+                [this](app::Viewer&, const app::FrameInfo&) {
+                    TurnAt(Time());
+                });
+            viewer->GetTimeline().Play();
         }
     }
 
     void Step() override {
-        Turn(angle_ + speed_ * frameDt);
+        if (GetViewer() != nullptr) {
+            return;
+        }
+        // Without a viewer, the demo plays the timeline itself.
+        Stage stage(GetScene());
+        const double length =
+            stage.GetEndTimeCode() - stage.GetStartTimeCode();
+        stage.SetTimeCode(
+            std::fmod(stage.GetTimeCode() +
+                          frameDt * stage.GetTimeCodesPerSecond(),
+                      length));
+        TurnAt(Time());
     }
 
     void SaveOutput(const std::filesystem::path& path) override {
@@ -266,6 +293,17 @@ class LighthouseDemo : public app::Demo {
         lamps_;  ///< Every light, which `Capture` turns off
     double angle_ = 0.0;
     double speed_ = 2.0 * std::numbers::pi / kPeriod;
+    double phase_ = 0.0;  ///< The beam's angle at time 0.
+
+    /// Seconds into the timeline.
+    double Time() {
+        return Stage(GetScene()).GetTime();
+    }
+
+    /// The beacon as it is `t` seconds into the timeline.
+    void TurnAt(double t) {
+        Turn(phase_ + speed_ * t);
+    }
 
     void Turn(double angle) {
         angle_ = angle;

@@ -13,6 +13,7 @@ References:
 """
 
 import math
+import weakref
 
 import numpy as np
 
@@ -88,8 +89,14 @@ class Demo(ernie.demo.Demo):
                 ),
                 material_binding="/World/Looks/Iron",
             )
+        # A turn of the beacon is the timeline's range, which loops.
+        stage = ernie.Stage(scene)
+        stage.start_time_code = 0.0
+        stage.end_time_code = PERIOD * stage.time_codes_per_second
+        stage.time_code = 0.0
         self.angle = 0.0
         self.speed = 2.0 * math.pi / PERIOD
+        self.phase = 0.0  # the beam's angle at time 0
         self.lamps = []
         for name in ("Beam", "Back"):
             self.lamps.append(
@@ -233,6 +240,21 @@ class Demo(ernie.demo.Demo):
             display.lights = False
             display.grid = False
             viewer.viewport_display = display
+            # The timeline turns the beacon: play, scrub or step it.
+            # Weakly: the viewer holding the demo would be a cycle.
+            demo = weakref.proxy(self)
+            viewer.on_frame(
+                lambda viewer, info: demo.turn_at(demo.time())
+            )
+            viewer.play()
+
+    def time(self):
+        """Seconds into the timeline."""
+        return ernie.Stage(self.scene).time
+
+    def turn_at(self, t):
+        """The beacon as it is `t` seconds into the timeline."""
+        self.turn(self.phase + self.speed * t)
 
     def turn(self, angle):
         self.angle = angle
@@ -243,10 +265,21 @@ class Demo(ernie.demo.Demo):
         self.air.haze_optical_depth = depth
 
     def spin(self, turns):
+        # From where the beam points now, not a jump.
         self.speed = 2.0 * math.pi * turns / 60.0
+        self.phase = self.angle - self.speed * self.time()
 
     def step(self):
-        self.turn(self.angle + self.speed * self.frame_dt)
+        if self.viewer is not None:
+            return
+        # Without a viewer, the demo plays the timeline itself.
+        stage = ernie.Stage(self.scene)
+        length = stage.end_time_code - stage.start_time_code
+        stage.time_code = (
+            stage.time_code
+            + self.frame_dt * stage.time_codes_per_second
+        ) % length
+        self.turn_at(stage.time)
 
     def capture(self, lit=True):
         """The radiance summed over the bands, with the beacon lit or
