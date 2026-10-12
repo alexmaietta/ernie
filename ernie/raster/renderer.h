@@ -502,8 +502,7 @@ class RasterRenderer {
     };
 
     /// Laser `key`'s region for a `width` x `height` image, made (or
-    /// made again, at another size, its old space taken by the next
-    /// regions that fit) as needed. Growing the buffer
+    /// made again, at another size) as needed. Growing the buffer
     /// waits for the device to idle and moves every region; a view of
     /// the previous buffer keeps it alive, so its values can still be
     /// copied.
@@ -604,6 +603,16 @@ class RasterRenderer {
     /// The key the next `Update`'s frame meters under, if it meters.
     void SetMeterKey(std::string key) {
         meterKey_ = std::move(key);
+    }
+
+    /// Exposes the next `Update`'s frame, which meters under its key
+    /// (`SetMeterKey`), automatically on the GPU: scaled by its key's
+    /// stops, which its meter then moves `blend` of the way (1 at
+    /// once) to those that key it to middle grey, for the next frame;
+    /// none for a fixed exposure. Nothing waits for the host to read
+    /// the meter (`MeteredLuminance` is for showing it).
+    void SetAutoExposure(std::optional<float> blend) {
+        autoExposure_ = blend;
     }
 
     /// Reads every finished frame's meter at once, rather than as its
@@ -737,16 +746,12 @@ class RasterRenderer {
     void BuildPyramid(VkCommandBuffer commands,
                       GpuImage& image) const;
     /// Records the sun's and the other lights' shadow maps of the
-    /// frame's casters, with `frame`'s uniforms: sub-frame
-    /// `subframe`'s, whose time (`Uniforms::motion`) places moving
-    /// casters, and whose poses place moving lights' views
-    /// (`subframeLightViews_`, written into the views' matrices in
-    /// the command stream, for its shading too).
+    /// frame's casters, with `frame`'s uniforms: a sub-frame's, whose
+    /// time (`Uniforms::motion`) places moving casters.
     void
     RecordShadowMaps(VkCommandBuffer commands,
                      std::span<const RasterDrawable* const> drawables,
-                     const RasterFrame& frame,
-                     std::uint32_t subframe) const;
+                     const RasterFrame& frame) const;
     /// Spectral shading and the sky of `targets`' views into their
     /// raster radiance, with the uniforms of view `firstView` on (a
     /// sub-frame's).
@@ -792,6 +797,9 @@ class RasterRenderer {
     /// this slot's buffer.
     void RecordDepthRange(VkCommandBuffer commands,
                           RenderTargets& targets) const;
+    /// Scales the frame's exposure by its automatic exposure's stops
+    /// on the GPU (`SetAutoExposure`), where its uniforms hold it.
+    void RecordExposure(VkCommandBuffer commands) const;
     /// Records the counting of view 0's log-luminance histogram into
     /// this slot's buffer.
     void RecordMeter(VkCommandBuffer commands,
@@ -905,10 +913,6 @@ class RasterRenderer {
     /// sub-frame, each posed at its time (`LightParams::previous`),
     /// which its views read (`ShadingUniforms::view`).
     bool lightSubframes_ = false;
-    /// With `lightSubframes_`, per sub-frame, the moving lights'
-    /// shadow views (index, view-projection) fitted at its time.
-    std::vector<std::vector<std::pair<std::uint32_t, glm::mat4>>>
-        subframeLightViews_;
     std::uint32_t faces_ =
         1;  ///< Raster layers per view: a cube camera's faces.
     /// Whether the last `Update`'s frame holds the MotionVector var,
@@ -1107,10 +1111,6 @@ class RasterRenderer {
     /// applications may write in place; the floats the regions take.
     std::map<std::string, PatternArrayRegion> patternArrayRegions_;
     std::size_t patternArrayFloats_ = 0;
-    /// Space regions left at another size (offset, floats), in order
-    /// and merged, which new regions take before the end grows.
-    std::vector<std::pair<std::size_t, std::size_t>>
-        patternArrayFree_;
     /// The frame's arrays to read into their regions
     /// (`PatternArrayWrites`), and the regions whose mip levels the
     /// frame builds (`RecordPatternMips`).
@@ -1270,6 +1270,25 @@ class RasterRenderer {
     /// The meter's histogram summed on the device, then copied to the
     /// slot's `meterBins_` (as `depthRangeSums_`).
     std::unique_ptr<GpuBuffer> meterSums_;
+    /// Automatic exposure on the GPU (meter.slang's `adaptMain` and
+    /// `applyMain`): each key's state (stops, luminance, metered) in
+    /// its slot, the gain the presented SpectralRadiance takes, the
+    /// next frame's blend, and the frame's slot, blend and camera's
+    /// linear exposure scale while it exposes automatically.
+    PipelineLayout exposureLayout_;
+    std::unique_ptr<ComputePipeline> exposureAdaptPipeline_;
+    std::unique_ptr<ComputePipeline> exposureApplyPipeline_;
+    GpuBuffer exposureStates_;
+    GpuBuffer exposureGain_;
+    std::map<std::string, std::uint32_t, std::less<>> exposureSlots_;
+    std::optional<float> autoExposure_;
+    struct Exposing {
+        std::uint32_t slot = 0;
+        float blend = 1.0f;
+        float scale = 1.0f;
+    };
+    std::optional<Exposing> exposing_;
+    std::uint32_t exposureViews_ = 0;  ///< Views with uniforms.
     std::array<bool, FrameUploads::kSlots> metered_{};
     std::optional<double> meteredLuminance_;
     /// The key each slot's frame metered under, the next frame's, and

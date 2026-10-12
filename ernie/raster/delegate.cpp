@@ -797,39 +797,28 @@ bool ExposesAutomatically(const Scene& scene, const Path& camera) {
 void RasterDelegate::ApplyAutoExposure(const Scene& scene,
                                        const Path& stateKey,
                                        FrameParams& frame) {
-    // The linear value an average scene is keyed to, as the viewer's.
-    constexpr double kMiddleGrey = 0.18;
-    if (!ExposesAutomatically(scene, prims_.camera)) {
-        autoStops_.erase(stateKey);
-        return;
-    }
-    // Metered every frame under its key, for the frames after it;
-    // batches of views meter none and keep their camera's exposure.
-    const std::string key = stateKey.String();
-    frame.meter = true;
-    renderer_.SetMeterKey(key);
-    const auto stops = autoStops_.find(stateKey);
-    if (const std::optional<double> luminance =
-            renderer_.MeteredLuminance(key)) {
-        // The metered HdrColor is the scene's luminance in cd/m^2,
-        // before any exposure.
-        const double target = std::log2(
-            kMiddleGrey /
-            (*luminance * frame.camera.LinearExposureScale()));
+    // How far each frame moves towards the metered exposure: the
+    // camera's adaptation, over frames, or the viewer's own.
+    std::optional<float> blend;
+    if (ExposesAutomatically(scene, prims_.camera)) {
         const double frames =
             Camera(scene, prims_.camera).GetExposureAdaptation();
-        if (stops == autoStops_.end() || !(frames > 0.0)) {
-            autoStops_[stateKey] = target;
-        } else {
-            stops->second += (target - stops->second) *
-                             (1.0 - std::exp(-1.0 / frames));
-        }
+        blend =
+            frames > 0.0
+                ? static_cast<float>(1.0 - std::exp(-1.0 / frames))
+                : 1.0f;
+    } else if (viewportFrame_ && viewportAutoExposure_) {
+        blend = *viewportAutoExposure_;
     }
-    if (const auto found = autoStops_.find(stateKey);
-        found != autoStops_.end()) {
-        frame.exposure *=
-            static_cast<float>(std::exp2(found->second));
+    renderer_.SetAutoExposure(blend);
+    if (!blend) {
+        return;
     }
+    // Metered every frame under its key, which the renderer's GPU
+    // state for it adapts to, for the frames after it; batches of
+    // views meter none and keep their camera's exposure.
+    frame.meter = true;
+    renderer_.SetMeterKey(stateKey.String());
 }
 
 bool RasterDelegate::NeedsMetering(
@@ -2362,10 +2351,18 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
         filters.empty()
             ? std::vector<std::string>{}
             : AovOutputsOf(filters, renderer_.SensorFilters());
-    UpdatePrims(scene, prims, extent,
-                NextFrame(scene, prims.settings, prims.settings),
-                prims.settings, filters, {}, {},
-                ViewHeldVars(viewAovs_.size(), viewOptIn_));
+    // The viewport's frame, which the viewer may expose itself.
+    viewportFrame_ = true;
+    try {
+        UpdatePrims(scene, prims, extent,
+                    NextFrame(scene, prims.settings, prims.settings),
+                    prims.settings, filters, {}, {},
+                    ViewHeldVars(viewAovs_.size(), viewOptIn_));
+    } catch (...) {
+        viewportFrame_ = false;
+        throw;
+    }
+    viewportFrame_ = false;
     ReadPatternArrays();
     SettleMotion();
 }
@@ -2533,7 +2530,8 @@ void RasterDelegate::UpdatePrims(
         volume.linkGroup = links_.GroupOf(Path(volume.prim));
         // Grids written on a compute device are copied from it.
         for (const auto* field :
-             {&volume.density, &volume.temperature, &volume.emission}) {
+             {&volume.density, &volume.temperature,
+              &volume.emission}) {
             if (*field && !(*field)->buffer.Empty() &&
                 (*field)->buffer.Location().kind != DeviceKind::Cpu) {
                 renderer_.SetVolumeComputeInterop(&RequireCompute());

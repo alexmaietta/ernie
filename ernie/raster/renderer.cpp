@@ -80,8 +80,8 @@ struct ShadingUniforms {
     float domeSh[9][4];
     float dome[SpectralBands::kMaxBands];
     /// The lights the view sees (a bit each), its world's slot among
-    /// the per-world maps, where its lights start in `lightTable_`,
-    /// and the float bits of the camera's aperture diameter, m.
+    /// the per-world maps, and where its lights start in
+    /// `lightTable_`.
     std::uint32_t view[4];
     float toDome[3][4];       ///< Rows of the rotation from world
                               ///< directions to the dome's frame.
@@ -166,8 +166,7 @@ static_assert(sizeof(LightGpu) == 800,
 /// (`FrameParams::Subframes`). Empty when none moved, when one is
 /// posed on the GPU (the light pass poses the frame's copy alone) or
 /// past `RasterRenderer::kMaxLightSubframes`. Distant lights stay
-/// put; moving lights' shadow views follow them
-/// (`RasterRenderer::subframeLightViews_`).
+/// put, and every light's shadow views stay the frame's.
 std::vector<LightGpu>
 SubframeLights(const FrameParams& params,
                const std::vector<LightGpu>& table,
@@ -884,6 +883,26 @@ constexpr std::uint32_t kMeterBins = 64;
 constexpr float kMeterLow = -12.0f;
 constexpr float kMeterBinsPerStop = 2.0f;
 
+/// meter.slang's push constants, for metering and for automatic
+/// exposure (`adaptMain`, `applyMain`), which reach their buffers by
+/// address.
+struct MeterConstants {
+    std::uint32_t size[4];
+    float range[4];
+    VkDeviceAddress histogram = 0;
+    VkDeviceAddress states = 0;
+    VkDeviceAddress lens = 0;
+    VkDeviceAddress eyes = 0;
+    VkDeviceAddress gain = 0;
+    std::uint32_t padding[2]{};
+    std::uint32_t layout[4];
+};
+static_assert(sizeof(MeterConstants) == 96,
+              "MeterConstants must match meter.slang");
+
+/// Automatic exposures kept at once, one per metering key.
+constexpr std::uint32_t kMaxExposureStates = 64;
+
 /// How far a view may move from the one whose depths a cascade fit
 /// reuses (`ShadowFit::Visible`): its eye by this fraction of the
 /// nearest depth seen, its direction by this cosine.
@@ -1260,7 +1279,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                      sizeof(ShadingConstants)),
       filterLayout_(context, kFilterBindings,
                     sizeof(SensorConstants)),
-      presentLayout_(context, kPresentBindings, 32),
+      presentLayout_(context, kPresentBindings, 48),
       hzbLayout_(context, kHzbBindings, 16),
       motionLayout_(context, kMotionBindings, 48),
       viewsLayout_(context, kViewsBindings, 48),
@@ -1310,10 +1329,17 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
           kViewUniformUsage, BufferMemory::Device),
       lightsLayout_(context, kLightsBindings, 48),
       depthRangeLayout_(context, kDepthRangeBindings, 32),
-      meterLayout_(context, kMeterBindings, 32),
+      meterLayout_(context, kMeterBindings, sizeof(MeterConstants)),
       resolveLayout_(context, kResolveBindings, 32),
       unheldVar_(context, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                 BufferMemory::Device) {
+                 BufferMemory::Device),
+      exposureLayout_(context, {}, sizeof(MeterConstants)),
+      exposureStates_(context, kMaxExposureStates * 4 * sizeof(float),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      BufferMemory::Device),
+      exposureGain_(context, sizeof(float),
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                    BufferMemory::Device) {
     if (brdfs_.Models().empty()) {
         throw std::invalid_argument(
             "RasterRenderer needs at least one BRDF");
@@ -1492,6 +1518,17 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     meterPipeline_ = std::make_unique<ComputePipeline>(
         context_, meterLayout_,
         compiler_.CompileSpirv(meterModules, "meterMain"));
+    exposureAdaptPipeline_ = std::make_unique<ComputePipeline>(
+        context_, exposureLayout_,
+        compiler_.CompileSpirv(meterModules, "adaptMain"));
+    exposureApplyPipeline_ = std::make_unique<ComputePipeline>(
+        context_, exposureLayout_,
+        compiler_.CompileSpirv(meterModules, "applyMain"));
+    {
+        // No key has metered yet (`z` 0).
+        const std::vector<float> zeros(kMaxExposureStates * 4, 0.0f);
+        exposureStates_.Write(std::as_bytes(std::span(zeros)));
+    }
     for (std::unique_ptr<GpuBuffer>& bins : meterBins_) {
         bins = std::make_unique<GpuBuffer>(
             context_, kMeterBins * sizeof(std::uint32_t),
@@ -1561,50 +1598,12 @@ RasterRenderer::EnsurePatternArray(const std::string& key,
         found->second.height == height) {
         return found->second;
     }
-    // Regions never move, so the frame's offsets already written stay
-    // where they are. One at another size frees its old space, which
-    // new regions take (the best fit) before the end grows: writes
-    // into a region wait for the frames already submitted, which read
-    // what it held before.
-    if (found != patternArrayRegions_.end()) {
-        patternArrayFree_.emplace_back(
-            found->second.offset,
-            MipTexels(found->second.width, found->second.height));
-        std::sort(patternArrayFree_.begin(), patternArrayFree_.end());
-        // Neighbours merged.
-        std::vector<std::pair<std::size_t, std::size_t>> merged;
-        for (const auto& [offset, floats] : patternArrayFree_) {
-            if (!merged.empty() &&
-                merged.back().first + merged.back().second ==
-                    offset) {
-                merged.back().second += floats;
-            } else {
-                merged.emplace_back(offset, floats);
-            }
-        }
-        patternArrayFree_ = std::move(merged);
-    }
-    const std::size_t floats = MipTexels(width, height);
-    auto best = patternArrayFree_.end();
-    for (auto it = patternArrayFree_.begin();
-         it != patternArrayFree_.end(); ++it) {
-        if (it->second >= floats &&
-            (best == patternArrayFree_.end() ||
-             it->second < best->second)) {
-            best = it;
-        }
-    }
-    PatternArrayRegion region{patternArrayFloats_, width, height};
-    if (best != patternArrayFree_.end()) {
-        region.offset = best->first;
-        best->first += floats;
-        best->second -= floats;
-        if (best->second == 0) {
-            patternArrayFree_.erase(best);
-        }
-    } else {
-        patternArrayFloats_ += floats;
-    }
+    // Regions only ever append, so the frame's offsets already
+    // written stay where they are; one at another size leaves its old
+    // space.
+    const PatternArrayRegion region{patternArrayFloats_, width,
+                                    height};
+    patternArrayFloats_ += MipTexels(width, height);
     patternArrayRegions_[key] = region;
     EnsurePatternData(patternArrayFloats_ + patternHostFloats_);
     return region;
@@ -1973,7 +1972,6 @@ void RasterRenderer::WriteLights(
     const std::uint32_t distantResolution =
         std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
-    subframeLightViews_.assign(subframes_, {});
     std::vector<std::size_t>
         perWorld;  ///< Lights with per-world maps.
     std::vector<LightGpu> table(params.lights.size());
@@ -2152,46 +2150,6 @@ void RasterRenderer::WriteLights(
                         views[v].gpuMatrix =
                             static_cast<std::uint32_t>(
                                 lightViews_.size() + v);
-                    }
-                }
-                // A light moving across the shutter: its views fitted
-                // again at each sub-frame's pose (`SubframeLights`),
-                // which that sub-frame's shadows draw from
-                // (`RecordShadowMaps`).
-                if (subframes_ > 1 && light.previous && !distant &&
-                    !light.posedOnGpu) {
-                    for (ShadowCascade& view : views) {
-                        view.moving = true;
-                    }
-                    const glm::dmat4 now =
-                        LightParams::Pose{light.position,
-                                          light.direction,
-                                          light.tangent}
-                            .Matrix();
-                    for (std::uint32_t k = 0; k < subframes_; ++k) {
-                        const glm::dmat4 then = InterpolatePose(
-                            light.previous->Matrix(), now,
-                            1.0 + params.camera.SubframeTime(
-                                      static_cast<int>(k)));
-                        LightParams posed = light;
-                        posed.position = glm::dvec3(then[3]);
-                        posed.direction = glm::vec3(
-                            -glm::normalize(glm::dvec3(then[2])));
-                        posed.tangent = glm::vec3(
-                            glm::normalize(glm::dvec3(then[0])));
-                        const std::vector<ShadowCascade> moved =
-                            FitLightShadowViews(
-                                posed,
-                                params.Relative(posed.position),
-                                bounds->first, bounds->second, own);
-                        for (std::size_t v = 0;
-                             v < moved.size() && v < views.size();
-                             ++v) {
-                            subframeLightViews_[k].emplace_back(
-                                static_cast<std::uint32_t>(
-                                    lightViews_.size() + v),
-                                moved[v].lightViewProjection);
-                        }
                     }
                 }
                 lightViews_.insert(lightViews_.end(), views.begin(),
@@ -2509,8 +2467,6 @@ void RasterRenderer::WriteLights(
     lightSubframes_ = !moving.empty();
     if (lightSubframes_) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(moving)));
-    } else {
-        subframeLightViews_.clear();
     }
     std::vector<glm::mat4> matrices;
     std::vector<std::byte> blocks(firstLayeredView_ *
@@ -2904,6 +2860,30 @@ void RasterRenderer::Update(
     meter_ = params.meter && !batch;
     metered_[uploads_.Slot()] = meter_;
     meterKeys_[uploads_.Slot()] = meter_ ? meterKey_ : std::string();
+    // Automatic exposure, on the GPU, in its key's state: the slot
+    // given at the key's first frame (the oldest's taken once all
+    // are, starting it afresh).
+    exposing_.reset();
+    if (meter_ && autoExposure_) {
+        auto found = exposureSlots_.find(meterKey_);
+        if (found == exposureSlots_.end()) {
+            if (exposureSlots_.size() >= kMaxExposureStates) {
+                exposureSlots_.clear();
+            }
+            const auto slot =
+                static_cast<std::uint32_t>(exposureSlots_.size());
+            found = exposureSlots_.emplace(meterKey_, slot).first;
+            // Not metered yet: its first metering sets it at once.
+            const std::array<float, 4> fresh{};
+            uploads_.Write(exposureStates_,
+                           std::as_bytes(std::span(fresh)),
+                           slot * sizeof(fresh));
+        }
+        exposing_ = Exposing{
+            found->second, std::clamp(*autoExposure_, 0.0f, 1.0f),
+            static_cast<float>(params.camera.LinearExposureScale())};
+    }
+    autoExposure_.reset();
     meterKey_.clear();
     // A visible fit's frame measures what it sees, for later frames'
     // cascades.
@@ -3052,6 +3032,8 @@ void RasterRenderer::Update(
         }
         uploads_.Write(uniforms_,
                        std::as_bytes(std::span(viewUniforms)));
+        exposureViews_ =
+            static_cast<std::uint32_t>(viewUniforms.size());
     }
 
     // The G-buffer passes' Shadows block: the view's cascade splits,
@@ -3631,15 +3613,6 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         const std::size_t subframe = v / (outputViews_ * faces_);
         shading.view[2] = static_cast<std::uint32_t>(
             lightSubframes_ ? subframe * kMaxLights : 0);
-        // The camera's aperture diameter (m), which sizes lasers'
-        // speckle: its lens's f-number, or the exposure's for a
-        // pinhole.
-        const double fNumber = params.camera.lensFStop > 0.0
-                                   ? params.camera.lensFStop
-                                   : params.camera.fStop;
-        shading.view[3] = std::bit_cast<std::uint32_t>(
-            static_cast<float>(params.camera.focalLengthMm * 1e-3 /
-                               std::max(fNumber, 1e-3)));
         viewShading.push_back(shading);
     }
     uploads_.Write(shadingUniforms_,
@@ -4181,6 +4154,7 @@ void RasterRenderer::RecordShadows(
             ERNIE_GPU_ZONE(context_, commands, "View poses");
             RecordViewPoses(commands, drawables);
         }
+        RecordExposure(commands);
         {
             ERNIE_GPU_ZONE(context_, commands, "Cull");
             // Culling and other compute the draws read, once for
@@ -4196,7 +4170,7 @@ void RasterRenderer::RecordShadows(
     ERNIE_GPU_ZONE(context_, commands, "Shadows");
     // The first sub-frame's (the frame's own without motion blur);
     // `RecordViews` the others'.
-    RecordShadowMaps(commands, drawables, Frame(0), 0);
+    RecordShadowMaps(commands, drawables, Frame(0));
     // The volumes' shadow maps, the light views now known.
     volumes_->Prepare(commands, lightTable_, *lightViewMatrices_,
                       lightCount_, lightPatterns_, *patternData_,
@@ -4218,54 +4192,11 @@ void RasterRenderer::RecordShadows(
 void RasterRenderer::RecordShadowMaps(
     VkCommandBuffer commands,
     std::span<const RasterDrawable* const> drawables,
-    const RasterFrame& given, std::uint32_t subframe) const {
+    const RasterFrame& given) const {
     // Drawing into the light shadow maps, the passes bind a texel in
     // their place.
     RasterFrame frame = given;
     frame.shadowMap = DescriptorResource::Of(shadowMaps_->View());
-    // Moving lights' views at the sub-frame's time, written over the
-    // frame's where the last sub-frame's draws and shading have read
-    // them.
-    std::vector<glm::mat4> matrices;
-    for (const ShadowCascade& view : lightViews_) {
-        matrices.push_back(view.lightViewProjection);
-    }
-    if (subframe < subframeLightViews_.size() &&
-        !subframeLightViews_[subframe].empty()) {
-        VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-        before.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        before.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
-                               VK_ACCESS_2_UNIFORM_READ_BIT;
-        before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-        before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-        VkDependencyInfo dependency{
-            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-        dependency.memoryBarrierCount = 1;
-        dependency.pMemoryBarriers = &before;
-        vkCmdPipelineBarrier2(commands, &dependency);
-        for (const auto& [v, matrix] :
-             subframeLightViews_[subframe]) {
-            matrices[v] = matrix;
-            vkCmdUpdateBuffer(commands, lightViewMatrices_->Handle(),
-                              v * sizeof(glm::mat4),
-                              sizeof(glm::mat4),
-                              glm::value_ptr(matrix));
-            if (v < firstLayeredView_) {
-                vkCmdUpdateBuffer(
-                    commands, lightShadowBlocks_.Handle(),
-                    v * kLightShadowBlockStride, sizeof(glm::mat4),
-                    glm::value_ptr(matrix));
-            }
-        }
-        VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-        after.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-        after.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-        after.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        after.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
-                              VK_ACCESS_2_UNIFORM_READ_BIT;
-        dependency.pMemoryBarriers = &after;
-        vkCmdPipelineBarrier2(commands, &dependency);
-    }
     if (!lightViews_.empty()) {
         ERNIE_GPU_ZONE(context_, commands, "Light shadows");
         lightShadowMaps_->Transition(
@@ -4291,8 +4222,10 @@ void RasterRenderer::RecordShadowMaps(
             for (const RasterDrawable* drawable : drawables) {
                 ERNIE_GPU_ZONE_NAMED(context_, commands,
                                      drawable->ProfileName());
-                drawable->RecordShadow(commands, own, v, matrices[v],
-                                       lightCasters_);
+                drawable->RecordShadow(
+                    commands, own, v,
+                    lightViews_[v].lightViewProjection,
+                    lightCasters_);
             }
             vkCmdEndRendering(commands);
         }
@@ -4435,8 +4368,7 @@ void RasterRenderer::RecordViews(
         // stay fitted to the frame's own view.
         if (subframes_ > 1 && (subframe > 0 || firstView > 0)) {
             RecordShadowMaps(commands, drawables,
-                             Frame(subframe * outputViews_ * faces_),
-                             subframe);
+                             Frame(subframe * outputViews_ * faces_));
         }
         // One layered pass for all the views: each view's draws go to
         // its layer (`Uniforms::flags`).
@@ -4661,17 +4593,60 @@ void RasterRenderer::RecordMeter(VkCommandBuffer commands,
         DescriptorResource::Of(bins)};
     meterLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       resources);
-    const struct {
-        std::uint32_t size[4];
-        float range[4];
-    } constants{{extent_.width, extent_.height, 0, 0},
-                {kMeterLow, kMeterBinsPerStop, 0.0f, 0.0f}};
+    MeterConstants constants{
+        {extent_.width, extent_.height, 0, 0},
+        {kMeterLow, kMeterBinsPerStop, 0.0f, 0.0f}};
     meterLayout_.PushConstants(commands, &constants,
                                sizeof(constants));
     vkCmdDispatch(commands, (extent_.width + 15) / 16,
                   (extent_.height + 15) / 16, 1);
+    // The automatic exposure adapts to it on the GPU, for the next
+    // frame of its key (`RecordExposure`).
+    if (exposing_) {
+        ShaderBarrier(commands);
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          exposureAdaptPipeline_->Handle());
+        constants.range[2] = exposing_->blend;
+        constants.range[3] = exposing_->scale;
+        constants.histogram = bins.Address();
+        constants.states = exposureStates_.Address();
+        constants.layout[0] = exposing_->slot;
+        exposureLayout_.PushConstants(commands, &constants,
+                                      sizeof(constants));
+        vkCmdDispatch(commands, 1, 1, 1);
+    }
+    // Read back only to show the metered luminance.
     CopyForHost(commands, bins, *meterBins_[uploads_.Slot()]);
     hdr->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+}
+
+void RasterRenderer::RecordExposure(VkCommandBuffer commands) const {
+    if (!exposing_) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Exposure");
+    // After the frame's uploads (and views posed on the GPU) wrote
+    // the exposures it scales.
+    ShaderBarrier(commands);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      exposureApplyPipeline_->Handle());
+    MeterConstants constants{};
+    constants.states = exposureStates_.Address();
+    constants.lens = sensorUniforms_.Address() +
+                     offsetof(SensorUniforms, lens) +
+                     2 * sizeof(float);
+    constants.eyes = uniforms_.Address() + offsetof(Uniforms, eye) +
+                     3 * sizeof(float);
+    constants.gain = exposureGain_.Address();
+    constants.layout[0] = exposing_->slot;
+    constants.layout[1] = exposureViews_;
+    constants.layout[2] =
+        static_cast<std::uint32_t>(kUniformsStride / sizeof(float));
+    exposureLayout_.PushConstants(commands, &constants,
+                                  sizeof(constants));
+    vkCmdDispatch(commands, std::max(1u, (exposureViews_ + 63) / 64),
+                  1, 1);
+    ShaderBarrier(commands);
 }
 
 void RasterRenderer::ReadFinishedMeters() {
@@ -5710,9 +5685,17 @@ void RasterRenderer::Present(VkCommandBuffer commands,
     struct {
         std::uint32_t flags[4];
         float range[4];
+        VkDeviceAddress gain = 0;
+        std::uint32_t hasGain = 0;
+        std::uint32_t padding = 0;
     } constants{{srgb ? 1u : 0u, mode.show, 0, 0},
                 {presentRange_[0], presentRange_[1], presentRange_[2],
                  presentRange_[3]}};
+    // The automatic exposure's scale, where the frame has one.
+    if (exposing_) {
+        constants.gain = exposureGain_.Address();
+        constants.hasGain = 1;
+    }
     if (var == render_vars::kRawDn) {
         constants.range[2] = presentRange_[3];
     }

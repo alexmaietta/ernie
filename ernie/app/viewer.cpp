@@ -461,9 +461,12 @@ struct Viewer::State {
     }
 
     /// The stops of exposure the viewport adds to the camera's: the
-    /// compensation, the scene settings' own, and when exposing
-    /// automatically the stops that bring the metered luminance to
-    /// middle grey, approached smoothly.
+    /// compensation and the scene settings' own. Exposing
+    /// automatically, the renderer adds the stops that bring the
+    /// metered luminance to middle grey on the GPU, approached
+    /// smoothly (`RenderDelegate::SetViewportAutoExposure`);
+    /// `autoStops` follows them from the meter's readings only to
+    /// show them.
     double ExposureStops() {
         // Middle grey: the linear display value an average scene is
         // keyed to.
@@ -471,13 +474,18 @@ struct Viewer::State {
         // Seconds the automatic exposure takes to cover most (63%) of
         // a change.
         constexpr double kAdaptation = 0.25;
-        double stops = compensation + RenderSettings::OrFallbacks(
-                                          scene, settingsSource)
-                                          .GetExposureCompensation();
+        const double blend =
+            1.0 - std::exp(-frameInfo.delta / kAdaptation);
+        const double stops =
+            compensation +
+            RenderSettings::OrFallbacks(scene, settingsSource)
+                .GetExposureCompensation();
         if (!AutoExposing()) {
+            delegate->SetViewportAutoExposure(std::nullopt);
             autoStops.reset();
             return stops;
         }
+        delegate->SetViewportAutoExposure(static_cast<float>(blend));
         if (const std::optional<double> luminance =
                 delegate->MeteredLuminance();
             luminance && scene.Has(activeCamera)) {
@@ -488,13 +496,10 @@ struct Viewer::State {
             const double target =
                 std::log2(kMiddleGrey / (*luminance * scale));
             autoStops =
-                autoStops ? *autoStops +
-                                (target - *autoStops) *
-                                    (1.0 - std::exp(-frameInfo.delta /
-                                                    kAdaptation))
+                autoStops ? *autoStops + (target - *autoStops) * blend
                           : target;
         }
-        return stops + autoStops.value_or(0.0);
+        return stops;
     }
     Lighting lighting = Lighting::Stage;
     bool clockPaused = false;  ///< See `SetClockPaused`.

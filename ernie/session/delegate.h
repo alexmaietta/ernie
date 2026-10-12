@@ -242,6 +242,15 @@ class RenderDelegate {
         return std::nullopt;
     }
 
+    /// Exposes the viewport's frames (`Record`) automatically, as a
+    /// viewer's automatic exposure asks: each frame moves `blend` of
+    /// the way (1 at once) to the exposure that keys the metered
+    /// luminance to middle grey, on the GPU where the backend can;
+    /// none for the camera's own exposure.
+    virtual void SetViewportAutoExposure(std::optional<float> blend) {
+        static_cast<void>(blend);
+    }
+
     /// Which spectral band `Record` shows when it presents
     /// SpectralRadiance: 0 to the camera's band count - 1, or -1 for
     /// the mean over the bands; backends that cannot choose ignore

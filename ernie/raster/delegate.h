@@ -188,6 +188,10 @@ class RasterDelegate : public RenderDelegate {
     std::optional<double> MeteredLuminance() const override {
         return renderer_.MeteredLuminance();
     }
+    void
+    SetViewportAutoExposure(std::optional<float> blend) override {
+        viewportAutoExposure_ = blend;
+    }
 
     /// GPU memory of the renderer, drawables and the view's targets;
     /// triangles drawn by the terrain and meshes; and the
@@ -354,9 +358,11 @@ class RasterDelegate : public RenderDelegate {
     /// the dome lights without its own diffuse light.
     void ApplyDomeDirections(FrameParams& frame) const;
     /// Exposes `frame` automatically when its camera's exposure mode
-    /// is auto: meters it under `stateKey`, and adds the stops that
-    /// bring the key's latest metered luminance to middle grey,
-    /// approached over the camera's adaptation frames.
+    /// is auto, or for the viewport when the viewer asks
+    /// (`SetViewportAutoExposure`): meters it under `stateKey`, and
+    /// has the renderer scale it on the GPU by the key's stops, which
+    /// its meter moves towards middle grey over the camera's
+    /// adaptation frames (or the viewer's blend).
     void ApplyAutoExposure(const Scene& scene, const Path& stateKey,
                            FrameParams& frame);
     /// Whether a product of `specs` exposes automatically with no
@@ -480,9 +486,10 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, std::vector<glm::dmat4>> lastPoses_;
     /// And its lights' poses at its last frame, by light.
     std::map<Path, std::map<Path, LightParams::Pose>> lastLightPoses_;
-    /// Per product (or the settings for the view) exposed
-    /// automatically, the stops it adds to its camera's exposure.
-    std::map<Path, double> autoStops_;
+    /// The viewer's automatic exposure for the viewport, and whether
+    /// the frame being prepared is the viewport's.
+    std::optional<float> viewportAutoExposure_;
+    bool viewportFrame_ = false;
     /// Inside the frame `StepAsync` meters before exposing.
     bool metering_ = false;
     /// The span of the sensor clock the frames being prepared cover

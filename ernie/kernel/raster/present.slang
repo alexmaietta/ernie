@@ -12,6 +12,11 @@ struct PresentConstants {
     // Distances: x near and y far end of the logarithmic range. Sensor vars: z the value shown
     // as white. SpectralRadiance: w the display value per W m^-2 sr^-1 nm^-1.
     float4 range;
+    // SpectralRadiance: the automatic exposure's scale on `range.w`, which the frame's exposure
+    // pass wrote (meter.slang), read when `hasGain` is 1 (a flag, not a null test, which would
+    // need 64-bit integers in the shader).
+    float* gain;
+    uint hasGain;
 }
 
 static const uint kShowLdr = 0;        // sRGB-encoded colour, as is.
@@ -141,7 +146,8 @@ float4 presentSpectral(VertexOutput in) : SV_Target {
         }
         radiance /= float(max(bands, 1u));
     }
-    return displayLinear(float3(radiance * constants.range.w));
+    let gain = constants.hasGain != 0 ? constants.gain[0] : 1.0;
+    return displayLinear(float3(radiance * constants.range.w * gain));
 }
 
 [shader("fragment")]
