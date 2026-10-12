@@ -3,6 +3,7 @@
 
 #include "ernie/device/buffer.h"
 #include "ernie/device/frame_uploads.h"
+#include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/session/frame_params.h"
@@ -23,6 +24,7 @@
 
 namespace ernie {
 
+class LightPatternRegistry;
 class RenderTargets;
 
 /// The volume pass (volume.slang): after shading, each pixel's ray
@@ -37,20 +39,33 @@ class RenderTargets;
 class VolumePass {
   public:
     /// Where the views' blocks of the shading uniforms hold what the
-    /// pass reads, and the lights' table theirs, in bytes. A light
-    /// holds its position, axis, cone and shadow (focus in z) as its
-    /// first four float4s.
+    /// pass reads, in bytes.
     struct ViewLayout {
         std::uint32_t stride = 0;
         std::uint32_t invViewProj = 0;
         std::uint32_t strip = 0;
         std::uint32_t range = 0;
         std::uint32_t size = 0;  ///< Its w the light count.
-        std::uint32_t view =
-            0;  ///< Light mask in x, first light in z.
-        std::uint32_t lightStride = 0;
-        std::uint32_t lightSpectrum = 0;
-        std::uint32_t lightTinted = 0;
+        /// The light mask, the world's slot in a batch's distant
+        /// light maps and the first light.
+        std::uint32_t view = 0;
+        std::uint32_t lightShadow = 0;  ///< Its z the maps' size.
+        std::uint32_t atmosphere = 0;   ///< Two float4s.
+    };
+
+    /// The shading pass's lights and what lights the medium with
+    /// them (volume.slang's bindings 9 to 16 and 29).
+    struct Lights {
+        const GpuBuffer* table = nullptr;
+        const GpuImage* shadowMaps = nullptr;
+        const Sampler* shadowSampler = nullptr;
+        const GpuBuffer* shadowViews = nullptr;
+        const GpuImage* transmittance = nullptr;
+        const Sampler* tableSampler = nullptr;
+        const GpuBuffer* patternNorms = nullptr;
+        const GpuBuffer* timing = nullptr;
+        const GpuBuffer* patternData = nullptr;
+        const LightPatternRegistry* patterns = nullptr;
     };
 
     /// The most steps a ray takes through one volume.
@@ -83,10 +98,11 @@ class VolumePass {
     /// Records the march over every view of `targets` (views
     /// `firstView` on in the shading uniforms), for a pinhole or a
     /// pushbroom camera; `sky` when the background holds radiance.
+    /// Its pipelines compile again when light patterns are added.
     /// The caller adds the barrier after it.
     void Record(VkCommandBuffer commands, RenderTargets& targets,
                 const GpuBuffer& shadingUniforms,
-                const GpuBuffer& lights, const ViewLayout& layout,
+                const Lights& lights, const ViewLayout& layout,
                 std::uint32_t firstView, std::uint32_t width,
                 std::uint32_t height, bool pushbroom, bool sky) const;
 
@@ -120,6 +136,8 @@ class VolumePass {
     const ShaderCompiler& compiler_;
     PipelineLayout layout_;
     mutable std::unique_ptr<ComputePipeline> pipelines_[2];
+    /// The light patterns each pipeline was compiled with.
+    mutable std::size_t pipelinePatterns_[2] = {};
     std::map<GridKey, LoadedGrid> grids_;
     bool poolStale_ = true;
     std::size_t poolBytes_ = 0;

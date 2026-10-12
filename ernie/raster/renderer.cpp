@@ -465,11 +465,24 @@ static_assert(kShadingStride == sizeof(ShadingUniforms),
 /// uniforms.
 VolumePass::ViewLayout VolumeLayout() {
     using Offset = std::uint32_t;
-    static_assert(offsetof(LightGpu, position) == 0 &&
-                      offsetof(LightGpu, axis) == 16 &&
+    // volume.slang mirrors LightGpu.
+    static_assert(offsetof(LightGpu, axis) == 16 &&
                       offsetof(LightGpu, cone) == 32 &&
-                      offsetof(LightGpu, shadow) == 48,
-                  "volume.slang reads a light's first four float4s");
+                      offsetof(LightGpu, shadow) == 48 &&
+                      offsetof(LightGpu, extentX) == 64 &&
+                      offsetof(LightGpu, extentY) == 80 &&
+                      offsetof(LightGpu, spectrum) == 96 &&
+                      offsetof(LightGpu, tinted) == 352 &&
+                      offsetof(LightGpu, beam) == 608 &&
+                      offsetof(LightGpu, beamExtra) == 624 &&
+                      offsetof(LightGpu, pattern) == 640 &&
+                      offsetof(LightGpu, patternExtent) == 656 &&
+                      offsetof(LightGpu, patternLayout) == 672 &&
+                      offsetof(LightGpu, patternParams) == 688 &&
+                      offsetof(LightGpu, map) == 752 &&
+                      offsetof(LightGpu, links) == 768 &&
+                      sizeof(LightGpu) == 784,
+                  "volume.slang's LightGpu must match");
     return {
         static_cast<Offset>(kShadingStride),
         static_cast<Offset>(offsetof(ShadingUniforms, invViewProj)),
@@ -477,9 +490,8 @@ VolumePass::ViewLayout VolumeLayout() {
         static_cast<Offset>(offsetof(ShadingUniforms, range)),
         static_cast<Offset>(offsetof(ShadingUniforms, size)),
         static_cast<Offset>(offsetof(ShadingUniforms, view)),
-        static_cast<Offset>(sizeof(LightGpu)),
-        static_cast<Offset>(offsetof(LightGpu, spectrum)),
-        static_cast<Offset>(offsetof(LightGpu, tinted))};
+        static_cast<Offset>(offsetof(ShadingUniforms, lightShadow)),
+        static_cast<Offset>(offsetof(ShadingUniforms, atmosphere))};
 }
 
 /// Samples per axis of the RGB-to-spectrum coefficient table.
@@ -4131,10 +4143,20 @@ void RasterRenderer::RecordViews(
         }
         Shade(commands, targets, first);
         if (volumes_->Active()) {
-            volumes_->Record(commands, targets, shadingUniforms_,
-                             lightTable_, VolumeLayout(), first,
-                             extent_.width, extent_.height,
-                             pushbroom_, sky_ != 0);
+            VolumePass::Lights lights;
+            lights.table = &lightTable_;
+            lights.shadowMaps = lightShadowMaps_.get();
+            lights.shadowSampler = &shadowSampler_;
+            lights.shadowViews = lightViewMatrices_.get();
+            lights.transmittance = &atmosphere_->Transmittance();
+            lights.tableSampler = &tableSampler_;
+            lights.patternNorms = &patternNorms_;
+            lights.timing = lightTiming_.get();
+            lights.patternData = patternData_.get();
+            lights.patterns = &lightPatterns_;
+            volumes_->Record(commands, targets, shadingUniforms_, lights,
+                             VolumeLayout(), first, extent_.width,
+                             extent_.height, pushbroom_, sky_ != 0);
             ShaderBarrier(commands);
         }
         if (subframes_ > 1) {

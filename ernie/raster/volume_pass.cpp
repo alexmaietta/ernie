@@ -4,6 +4,7 @@
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/render_targets.h"
+#include "ernie/scene/light_pattern.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/profile.h"
 
@@ -32,6 +33,15 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {11, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {13, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {14, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    // light_pattern's pattern data.
+    {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -439,28 +449,39 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
         return;
     }
 
-    // Each view's volumes: its world's and the shared ones, in its
-    // frustum.
+    // Each view's volumes: those it marches, its world's and the
+    // shared ones in its frustum; then those that shadow them, its
+    // world's and the shared ones wherever they are (a cloud above
+    // the frame shades the dust in it).
     std::vector<std::uint32_t> runs(
-        2 * std::max<std::size_t>(views_, 1), 0);
+        4 * std::max<std::size_t>(views_, 1), 0);
     std::vector<std::uint32_t> lists;
     for (std::uint32_t v = 0; v < views_; ++v) {
         const std::int32_t world = viewWorlds[v];
-        runs[2 * v] = static_cast<std::uint32_t>(lists.size());
+        const auto inWorld = [&](std::size_t i) {
+            return worlds[i] == -1 || world == -1 ||
+                   worlds[i] == world;
+        };
+        runs[4 * v] = static_cast<std::uint32_t>(lists.size());
         for (std::size_t i = 0; i < instances.size(); ++i) {
-            if (worlds[i] != -1 && world != -1 &&
-                worlds[i] != world) {
-                continue;
-            }
-            if (v < viewProjections.size() &&
-                !InFrustum(viewProjections[v], boxes[i].first,
-                           boxes[i].second)) {
+            if (!inWorld(i) ||
+                (v < viewProjections.size() &&
+                 !InFrustum(viewProjections[v], boxes[i].first,
+                            boxes[i].second))) {
                 continue;
             }
             lists.push_back(static_cast<std::uint32_t>(i));
         }
-        runs[2 * v + 1] =
-            static_cast<std::uint32_t>(lists.size()) - runs[2 * v];
+        runs[4 * v + 1] =
+            static_cast<std::uint32_t>(lists.size()) - runs[4 * v];
+        runs[4 * v + 2] = static_cast<std::uint32_t>(lists.size());
+        for (std::size_t i = 0; i < instances.size(); ++i) {
+            if (inWorld(i)) {
+                lists.push_back(static_cast<std::uint32_t>(i));
+            }
+        }
+        runs[4 * v + 3] = static_cast<std::uint32_t>(lists.size()) -
+                          runs[4 * v + 2];
     }
     if (lists.empty()) {
         lists.push_back(0);
@@ -479,7 +500,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
 void VolumePass::Record(VkCommandBuffer commands,
                         RenderTargets& targets,
                         const GpuBuffer& shadingUniforms,
-                        const GpuBuffer& lights,
+                        const Lights& lights,
                         const ViewLayout& layout,
                         std::uint32_t firstView, std::uint32_t width,
                         std::uint32_t height, bool pushbroom,
@@ -488,20 +509,31 @@ void VolumePass::Record(VkCommandBuffer commands,
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Volumes");
-    std::unique_ptr<ComputePipeline>& pipeline =
-        pipelines_[pushbroom ? 1 : 0];
-    if (pipeline == nullptr) {
-        const std::vector<ShaderModuleSource> modules{
-            {"projection", pushbroom
-                               ? shaders::kProjectionPushbroomSlang
-                               : shaders::kProjectionPinholeSlang},
-            {"brdf", shaders::kBrdfSlang},
-            {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
-                           shaders::kPNanoVdbHeader + "\n" +
-                           shaders::kVolumeSlang}};
+    const std::size_t slot = pushbroom ? 1 : 0;
+    std::unique_ptr<ComputePipeline>& pipeline = pipelines_[slot];
+    const std::size_t patterns = lights.patterns->Models().size();
+    if (pipeline == nullptr || pipelinePatterns_[slot] != patterns) {
+        // The light patterns as shading takes them (`lightPattern`),
+        // for lasers' beams in the medium.
+        std::vector<ShaderModuleSource> modules =
+            LightPatternModules(*lights.patterns);
+        modules.insert(
+            modules.end(),
+            {{"projection", pushbroom
+                                ? shaders::kProjectionPushbroomSlang
+                                : shaders::kProjectionPinholeSlang},
+             {"brdf", shaders::kBrdfSlang},
+             {"atmosphere", shaders::kAtmosphereSlang},
+             {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
+                            shaders::kPNanoVdbHeader + "\n" +
+                            shaders::kVolumeSlang}});
+        if (pipeline != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
         pipeline = std::make_unique<ComputePipeline>(
             context_, layout_,
             compiler_.CompileSpirv(modules, "volumeMain"));
+        pipelinePatterns_[slot] = patterns;
     }
     const auto sampled = [](const GpuImage& image) {
         return DescriptorResource::Of(
@@ -518,7 +550,15 @@ void VolumePass::Record(VkCommandBuffer commands,
         DescriptorResource::Of(*materials_),
         DescriptorResource::Of(*runs_),
         DescriptorResource::Of(*lists_),
-        DescriptorResource::Of(lights)};
+        DescriptorResource::Of(*lights.table),
+        DescriptorResource::Of(lights.shadowMaps->View()),
+        DescriptorResource::Of(*lights.shadowSampler),
+        DescriptorResource::Of(*lights.shadowViews),
+        sampled(*lights.transmittance),
+        DescriptorResource::Of(*lights.tableSampler),
+        DescriptorResource::Of(*lights.patternNorms),
+        DescriptorResource::Of(*lights.timing),
+        DescriptorResource::Of(*lights.patternData)};
     VolumeConstants constants{};
     constants.layout[0] = firstView;
     constants.layout[1] = layout.stride;
@@ -529,10 +569,9 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.offsets[2] = layout.range;
     constants.offsets[3] = layout.size;
     constants.flags[0] = sky ? 1u : 0u;
-    constants.lights[0] = layout.lightStride;
-    constants.lights[1] = layout.lightSpectrum;
-    constants.lights[2] = layout.lightTinted;
-    constants.lights[3] = layout.view;
+    constants.lights[0] = layout.view;
+    constants.lights[1] = layout.lightShadow;
+    constants.lights[2] = layout.atmosphere;
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       pipeline->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

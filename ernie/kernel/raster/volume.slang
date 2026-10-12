@@ -4,10 +4,15 @@
 // volumes' transmittance and what they emit is added: L = L_behind T + sum of T(t) j(t) dt, with
 // grey extinction (sigma_t, from the density field) and per-band emission j: the material's
 // emission times its field, what absorbs glowing at its temperature, sigma_a B_lambda(T)
-// (Kirchhoff's law), and the light of the view's distant and sphere lights scattered once towards
-// the eye, sigma_s p(g) E, each dimmed by the volume between it and the light (a short march
-// towards it; other volumes and geometry cast no shadow in it yet). Each step integrates its
-// emission exactly for constant coefficients, (1 - exp(-sigma_t dt)) / sigma_t.
+// (Kirchhoff's law), and the light of the view's lights scattered once towards the eye,
+// sigma_s p(g) E. Each light's E at a step is what shading would take there (light.slang's
+// conventions in shading.slang): distant lights dimmed through the atmosphere, sphere lights
+// with their cones, rect, disk and cylinder lights as sources of their projected area (small
+// beside their distance), and lasers by their beams and patterns, so beams show in the medium.
+// It is shadowed by geometry (one comparison in the light's shadow map, which the jitter between
+// pixels and frames softens) and by every volume the view sees between the step and the light (a
+// short march towards it). Each step integrates its emission exactly for constant coefficients,
+// (1 - exp(-sigma_t dt)) / sigma_t.
 //
 // The phase functions take the phase angle g, between the directions to the light and to the eye,
 // as the BRDFs' do (brdf.slang): Henyey-Greenstein, Hapke's double Henyey-Greenstein (the same b
@@ -21,9 +26,12 @@
 //
 // Bindings: 0 the shading uniforms (read at the byte offsets in `constants`, a block per view), 1
 // depth and 2 ids of the G-buffer, 3 the spectral radiance (a layer per view and band), 4 the
-// grids, 5 the volumes, 6 their materials, 7 each view's run of `viewVolumes` (offset, count), 8
-// the volumes each view sees, 9 the lights (the shading pass's table, read at the offsets in
-// `constants`).
+// grids, 5 the volumes, 6 their materials, 7 each view's runs of `viewVolumes` (offset and count
+// of those it marches, then of those that shadow them), 8 the volumes each view sees; then the
+// shading pass's: 9 the lights, 10 their shadow maps, 11 the
+// comparison sampler, 12 their shadow views, 13 the atmosphere's transmittance table, 14 its
+// sampler, 15 the light patterns' norms, 16 the lasers' timing, 29 the patterns' data
+// (light_pattern's binding).
 //
 // References:
 // - K. Museth, "NanoVDB: A GPU-Friendly and Portable VDB Data Structure For Real-Time Rendering
@@ -42,6 +50,9 @@
 
 import projection;
 import brdf;
+import atmosphere;
+import light_pattern;
+import light_patterns;
 
 static const uint kNoGrid = 0xFFFFFFFFu;
 static const uint kMaxIntervals = 8;
@@ -51,9 +62,15 @@ static const float kOpaque = 1e-3;
 // Steps of the march towards a light through the volume.
 static const uint kShadowSteps = 12;
 static const uint kMaxLights = 16;
-// Light types (`LightGpu::position.w`) the volumes take: distant and sphere lights.
-static const float kDistantLight = 0.0;
-static const float kSphereLight = 1.0;
+// Per view and light, the (sequence frame, weight) pairs a laser shows (shading.slang's).
+static const uint kMaxLit = 4;
+// Light types (`LightGpu::position.w`).
+static const uint kDistantLight = 0;
+static const uint kSphereLight = 1;
+static const uint kRectLight = 2;
+static const uint kDiskLight = 3;
+static const uint kCylinderLight = 4;
+static const uint kLaser = 5;
 // Phase functions (`VolumeMaterialGpu::phase.x`).
 static const uint kHenyeyGreenstein = 0;
 static const uint kDoubleHenyeyGreenstein = 1;
@@ -103,12 +120,36 @@ struct VolumeConstants {
     // (`range`) and the image size.
     uint4 offsets;
     // x: 1 when the background holds radiance (a sky); without one, this pass writes the
-    // background's, no radiance but what volumes emit, and the sensor reads it as held. yzw unused.
+    // background's, no radiance but what volumes emit, and the sensor reads it as held. y: the
+    // layers from a radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
+    // them). zw unused.
     uint4 flags;
-    // The lights: x the stride of `lights` in bytes, y and z where a light holds its spectrum and
-    // its tinted part (LightGpu), w where a view's block holds `view` (its light mask and first
-    // light); its `size.w` is the light count.
+    // Byte offsets in a block: x `view` (the lights it sees, a bit each; its world's slot in a
+    // batch's distant light maps; its first light), y `lightShadow` (z the maps' texels across), z
+    // `atmosphere` (two float4s: the planet's centre in km relative to the frame's origin and its
+    // radius; the atmosphere's top radius and 1 with one); w unused. Its `size.w` is the light
+    // count.
     uint4 lights;
+}
+
+// The shading pass's light (shading.slang's LightGpu, which the renderer checks this against).
+struct LightGpu {
+    float4 position;
+    float4 axis;
+    float4 cone;
+    float4 shadow;
+    float4 extentX;
+    float4 extentY;
+    float4 spectrum[16];
+    float4 tinted[16];
+    float4 beam;
+    float4 beamExtra;
+    float4 pattern;
+    float4 patternExtent;
+    uint4 patternLayout;
+    float4 patternParams[4];
+    float4 map;
+    uint4 links;
 }
 
 [[vk::binding(0, 0)]] ByteAddressBuffer shadingBlocks;
@@ -118,9 +159,16 @@ struct VolumeConstants {
 [[vk::binding(4, 0)]] StructuredBuffer<uint> grids;
 [[vk::binding(5, 0)]] StructuredBuffer<VolumeGpu> volumes;
 [[vk::binding(6, 0)]] StructuredBuffer<VolumeMaterialGpu> volumeMaterials;
-[[vk::binding(7, 0)]] StructuredBuffer<uint2> viewRuns;
+[[vk::binding(7, 0)]] StructuredBuffer<uint4> viewRuns;
 [[vk::binding(8, 0)]] StructuredBuffer<uint> viewVolumes;
-[[vk::binding(9, 0)]] ByteAddressBuffer lightTable;
+[[vk::binding(9, 0)]] StructuredBuffer<LightGpu> lights;
+[[vk::binding(10, 0)]] Texture2DArray<float> lightShadowMaps;
+[[vk::binding(11, 0)]] SamplerComparisonState lightShadowSampler;
+[[vk::binding(12, 0)]] StructuredBuffer<float4x4> lightViews;
+[[vk::binding(13, 0)]] Texture2DArray<float4> atmosphereTransmittance;
+[[vk::binding(14, 0)]] SamplerState tableSampler;
+[[vk::binding(15, 0)]] StructuredBuffer<float> patternNorms;
+[[vk::binding(16, 0)]] StructuredBuffer<float2> lightTiming;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 static const uint kBackground = 0xFFFFFFFF;
@@ -233,29 +281,210 @@ float phaseOf(VolumeMaterialGpu material, float cosG) {
     }
 }
 
-// The transmittance of `volume` from local point `local` towards the light along local direction
-// `towards` (a world unit vector mapped to the volume's frame), up to world distance `far`.
-float shadowOf(VolumeGpu volume, float3 local, float3 towards, float far,
-               inout pnanovdb_readaccessor_t accessor) {
-    let inverse = 1.0 / towards;
-    let t0 = (volume.boundsMin.xyz - local) * inverse;
-    let t1 = (volume.boundsMax.xyz - local) * inverse;
-    let exit = min(min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z)), far);
-    if (exit <= 0.0) {
-        return 1.0;
-    }
-    let dt = exit / float(kShadowSteps);
+// The transmittance from world point `world` towards a light along unit `towards`, up to world
+// distance `far`, through every volume of the view's run `run` (`kShadowSteps` through each one
+// the segment crosses).
+float volumesShadow(uint2 run, float3 world, float3 towards, float far) {
     float depth = 0.0;
-    for (uint i = 0; i < kShadowSteps; ++i) {
-        depth += max(sampleField(volume.density, local + towards * ((float(i) + 0.5) * dt),
-                                 accessor),
-                     0.0);
+    for (uint k = 0; k < run.y; ++k) {
+        let volume = volumes[viewVolumes[run.x + k]];
+        if (volume.density.grid.x == kNoGrid) {
+            continue;
+        }
+        let o = float3(dot(volume.toLocal[0], float4(world, 1.0)),
+                       dot(volume.toLocal[1], float4(world, 1.0)),
+                       dot(volume.toLocal[2], float4(world, 1.0)));
+        let d = float3(dot(volume.toLocal[0].xyz, towards), dot(volume.toLocal[1].xyz, towards),
+                       dot(volume.toLocal[2].xyz, towards));
+        let inverse = 1.0 / d;
+        let t0 = (volume.boundsMin.xyz - o) * inverse;
+        let t1 = (volume.boundsMax.xyz - o) * inverse;
+        let near = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), max(min(t0.z, t1.z), 0.0));
+        let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), min(max(t0.z, t1.z), far));
+        if (near >= exit) {
+            continue;
+        }
+        var accessor = accessorOf(volume.density);
+        let dt = (exit - near) / float(kShadowSteps);
+        float sum = 0.0;
+        for (uint i = 0; i < kShadowSteps; ++i) {
+            sum += max(sampleField(volume.density, o + d * (near + (float(i) + 0.5) * dt),
+                                   accessor),
+                       0.0);
+        }
+        depth += sum * volume.params.x * dt;
     }
-    return exp(-depth * volume.params.x * dt);
+    return exp(-depth);
 }
 
-float4 lightFloat4(uint light, uint offset) {
-    return asfloat(lightTable.Load4(light * constants.lights.x + offset));
+// The shadow view of `light`'s maps that sees `world`, as shading picks it (shading.slang's
+// `lightView`): a batch's distant light's world's, a distant light's finest cascade holding it,
+// a cube's face, or its only one.
+uint lightViewOf(LightGpu light, float3 world, uint worldSlot) {
+    let first = uint(light.cone.z);
+    let count = uint(light.cone.w);
+    if (light.map.y != 0.0) {
+        return first + min(worldSlot, count - 1);
+    }
+    if (light.position.w == 0.0 && count > 1) {
+        for (uint c = 0; c + 1 < count; ++c) {
+            let clip = mul(lightViews[first + c], float4(world, 1.0)).xyz;
+            if (all(abs(clip.xy) <= float2(1.0)) && clip.z >= 0.0 && clip.z <= 1.0) {
+                return first + c;
+            }
+        }
+        return first + count - 1;
+    }
+    if (count < 6) {
+        return first;
+    }
+    let d = world - light.position.xyz;
+    let a = abs(d);
+    if (a.x >= a.y && a.x >= a.z) {
+        return first + (d.x >= 0.0 ? 0 : 1);
+    }
+    if (a.y >= a.z) {
+        return first + (d.y >= 0.0 ? 2 : 3);
+    }
+    return first + (d.z >= 0.0 ? 4 : 5);
+}
+
+// Whether geometry hides `light` from `world`: one comparison in its shadow map, lit off the map
+// or without one. The maps hold standard depth, near 0.
+float geometryShadow(LightGpu light, float3 world, uint worldSlot, float mapTexels) {
+    if (light.cone.w <= 0.0) {
+        return 1.0;
+    }
+    let view = lightViewOf(light, world, worldSlot);
+    let clip = mul(lightViews[view], float4(world, 1.0));
+    if (clip.w <= 0.0) {
+        return 1.0;
+    }
+    let ndc = clip.xyz / clip.w;
+    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
+    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return 1.0;
+    }
+    // In the light's corner of the layer.
+    let corner = light.map.x / mapTexels;
+    let at = min(uv * corner, float2(corner - 0.5 / mapTexels));
+    return lightShadowMaps.SampleCmpLevelZero(lightShadowSampler, float3(at, float(view)),
+                                              min(ndc.z, 0.99999994));
+}
+
+// A laser's irradiance at `world` per unit of its spectrum, across a footprint of `footprint`
+// (world extents along two axes), at sequence frame `frame` (shading.slang's `laserIrradiance`).
+//
+// Reference: A. E. Siegman, Lasers, University Science Books, 1986, ch. 17.
+float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprint, uint frame) {
+    let offset = world - light.position.xyz;
+    let along = dot(offset, light.axis.xyz);
+    if (along <= 0.0) {
+        return 0.0;
+    }
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let z = along - light.beamExtra.x;
+    let zr = max(light.beam.zw, float2(1e-12));
+    let w = light.beam.xy * sqrt(1.0 + (z / zr) * (z / zr));
+    let spanX = abs(mul(x, footprint));
+    let spanY = abs(mul(y, footprint));
+    let width = float2(spanX.x + spanX.y, spanY.x + spanY.y);
+    let across = float2(dot(offset, x), dot(offset, y));
+    LightPatternInput input;
+    input.t = across / along;
+    input.footprint = width / along;
+    input.beam = w / along;
+    input.wavelength = light.pattern.y;
+    input.time = light.pattern.z;
+    input.frame = frame;
+    input.frames = max(uint(light.pattern.w), 1);
+    let slope = across * z / (z * z + zr * zr);
+    let beamOblique = sqrt(1.0 + dot(slope, slope));
+    let patternOblique = length(offset) / along;
+    var irradiance = light.beamExtra.w * beamOblique * beamlet(float2(0.0), input);
+    let efficiency = light.beamExtra.z;
+    let norm = patternNorms[slot];
+    if (efficiency > 0.0 && norm > 0.0) {
+        let extent = light.patternExtent.xy;
+        let bounded = extent > 0.0;
+        let cover = select(bounded,
+                           saturate((extent - abs(input.t)) / max(input.footprint, 1e-9) + 0.5),
+                           float2(1.0));
+        if (cover.x * cover.y > 0.0) {
+            input.t = select(bounded, clamp(input.t, -extent, extent), input.t);
+            LightPatternParams p;
+            p.values = light.patternParams;
+            p.layout = light.patternLayout;
+            let emission = max(lightPattern(uint(light.pattern.x), input, p), 0.0);
+            let oblique = light.beamExtra.y > 0.5 ? patternOblique : beamOblique;
+            irradiance += oblique * efficiency * cover.x * cover.y * emission / norm;
+        }
+    }
+    return irradiance / (along * along);
+}
+
+// How a light reaches a point of the medium: towards it, how far it is, the factor on its
+// `spectrum` (focus included) and on its `tinted` part, before shadows and the air.
+struct LightReach {
+    float3 towards;
+    float far;
+    float scale;
+    float focus;
+}
+
+// Light `light` (the view's slot `slot` of view `view`) at world point `world`, a footprint
+// `footprint` across: shading's irradiance per unit spectrum, an area light as a source of its
+// projected area times its radiance (small beside its distance); `scale` 0 when it does not
+// light the medium (a dome's direction, which stands for its diffuse light).
+LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 footprint) {
+    LightReach reach;
+    reach.towards = light.position.xyz;
+    reach.far = 1e30;
+    reach.scale = 1.0;
+    reach.focus = 1.0;
+    let type = uint(light.position.w);
+    let offset = light.position.xyz - world;
+    let distance = length(offset);
+    if (type != kDistantLight && type != kLaser) {
+        reach.towards = offset / max(distance, 1e-9);
+        reach.far = distance;
+    }
+    if (type == kDistantLight) {
+        reach.scale = light.shadow.y < 0.5 ? 1.0 : 0.0;
+    } else if (type == kSphereLight) {
+        reach.scale = 1.0 / max(distance * distance, light.axis.w * light.axis.w);
+        if (light.cone.x > -1.5) {
+            reach.scale *= smoothstep(light.cone.x, max(light.cone.y, light.cone.x + 1e-6),
+                                      dot(-reach.towards, light.axis.xyz));
+        }
+    } else if (type == kRectLight || type == kDiskLight) {
+        let area = (type == kRectLight ? 4.0 : PI) * length(light.extentX.xyz) *
+                   length(light.extentY.xyz);
+        let facing = dot(-reach.towards, light.axis.xyz);
+        reach.scale = facing > 0.0 ? area * facing / max(distance * distance, area) : 0.0;
+    } else if (type == kCylinderLight) {
+        let half = length(light.extentX.xyz);
+        let along = light.extentX.xyz / max(half, 1e-9);
+        let side = 4.0 * light.axis.w * half;
+        let sine = length(cross(reach.towards, along));
+        reach.scale = side * sine / max(distance * distance, side);
+    } else if (type == kLaser) {
+        reach.scale = 0.0;
+        for (uint s = 0; s < kMaxLit; ++s) {
+            let lit = lightTiming[(view * kMaxLights + slot) * kMaxLit + s];
+            if (lit.y > 0.0) {
+                reach.scale += lit.y * laserIrradiance(light, slot, world, footprint, uint(lit.x));
+            }
+        }
+        reach.towards = light.beamExtra.y > 0.5 ? offset / max(distance, 1e-9) : -light.axis.xyz;
+        reach.far = light.beamExtra.y > 0.5 ? distance : max(dot(-offset, light.axis.xyz), 0.0);
+    }
+    if (type != kDistantLight && light.shadow.z > 0.0) {
+        // UsdLux's focus, by the direction from the light's centre.
+        reach.focus = pow(abs(dot(-reach.towards, light.axis.xyz)), light.shadow.z);
+    }
+    return reach;
 }
 
 [shader("compute")]
@@ -273,11 +502,13 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     let background = gIds.Load(pixel).x == kBackground;
     // A background shading left unwritten: no radiance behind the volumes.
     let unwritten = background && constants.flags.x == 0;
-    let run = viewRuns[constants.layout.x + id.z];
+    let runs = viewRuns[constants.layout.x + id.z];
+    let run = runs.xy;
+    let shadowRun = runs.zw;
     if (run.y == 0) {
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
-                spectral[int3(id.xy, id.z * bands + b)] = 0.0;
+                writeNoRadiance(id, id.z * bands + b);
             }
         }
         return;
@@ -335,15 +566,30 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     if (count == 0) {
         if (unwritten) {
             for (uint b = 0; b < bands; ++b) {
-                spectral[int3(id.xy, id.z * bands + b)] = 0.0;
+                writeNoRadiance(id, id.z * bands + b);
             }
         }
         return;
     }
 
-    // The view's lights: those of its world (a bit each) from its first.
-    let viewLights = shadingBlocks.Load4(block + constants.lights.w);
+    // The view's lights: those of its world (a bit each) from its first; its shadow maps' size;
+    // the atmosphere.
+    let view = constants.layout.x + id.z;
+    let viewLights = shadingBlocks.Load4(block + constants.lights.x);
     let lightCount = min(size.w, kMaxLights);
+    let mapTexels = asfloat(shadingBlocks.Load4(block + constants.lights.y)).z;
+    float4 air[2];
+    air[0] = asfloat(shadingBlocks.Load4(block + constants.lights.z));
+    air[1] = asfloat(shadingBlocks.Load4(block + constants.lights.z + 16));
+    // The pixel's extent per unit distance along the ray, to its neighbours' rays.
+    float3 neighbour;
+    float3 toNeighbour;
+    cameraRayThrough(invViewProj, strip, ndc + float2(2.0 / float(size.x), 0.0), neighbour,
+                     toNeighbour);
+    let footprintX = normalize(toNeighbour) - direction;
+    cameraRayThrough(invViewProj, strip, ndc - float2(0.0, 2.0 / float(size.y)), neighbour,
+                     toNeighbour);
+    let footprintY = normalize(toNeighbour) - direction;
 
     // Per band, what the volumes add towards the eye, each step's integrated with the
     // transmittance up to it.
@@ -373,7 +619,6 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         let kelvinBase = volume.params.y;
         let glows = material.params.y > 0.0 && (hasTemperature || kelvinBase > 0.0);
         var densityAccessor = accessorOf(volume.density);
-        var shadowAccessor = accessorOf(volume.density);
         var temperatureAccessor = accessorOf(volume.temperature);
         var emissionAccessor = accessorOf(volume.emission);
         for (uint i = 0; i < steps && transmittance > kOpaque; ++i) {
@@ -411,56 +656,39 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
             }
             if (scatters && sigma > 0.0) {
                 let world = origin + direction * t;
+                // The pixel's footprint this far along the ray, for lasers' patterns.
+                let footprint = float3x2(float2(footprintX.x, footprintY.x) * t,
+                                         float2(footprintX.y, footprintY.y) * t,
+                                         float2(footprintX.z, footprintY.z) * t);
                 for (uint k = 0; k < lightCount; ++k) {
                     if ((viewLights.x & (1u << k)) == 0) {
                         continue;
                     }
-                    let light = viewLights.z + k;
-                    let position = lightFloat4(light, 0);
-                    float3 towards;
-                    float far;
-                    float falloff;
-                    // A focused light's spectrum scales by |cos|^focus off its axis.
-                    float focused = 1.0;
-                    if (position.w == kDistantLight) {
-                        towards = position.xyz;
-                        far = 1e30;
-                        falloff = 1.0;
-                    } else if (position.w == kSphereLight) {
-                        let offset = position.xyz - world;
-                        far = length(offset);
-                        towards = offset / max(far, 1e-6);
-                        falloff = 1.0 / max(far * far, 1e-6);
-                        let axis = lightFloat4(light, 16).xyz;
-                        let along = dot(-towards, axis);
-                        // A spot's cone (cos of its angle, cos where its falloff starts).
-                        let cone = lightFloat4(light, 32);
-                        if (cone.x > -1.5) {
-                            falloff *= smoothstep(cone.x, cone.y, along);
-                        }
-                        let focus = lightFloat4(light, 48).z;
-                        if (focus > 0.0) {
-                            focused = pow(abs(along), focus);
-                        }
-                    } else {
+                    let light = lights[viewLights.z + k];
+                    let reach = reachOf(light, k, view, world, footprint);
+                    if (reach.scale <= 0.0) {
                         continue;
                     }
-                    if (falloff <= 0.0) {
-                        continue;
-                    }
-                    let towardsLocal =
-                        float3(dot(volume.toLocal[0].xyz, towards),
-                               dot(volume.toLocal[1].xyz, towards),
-                               dot(volume.toLocal[2].xyz, towards));
-                    let lit = weight * sigma * phaseOf(material, dot(towards, -direction)) *
-                              falloff *
-                              shadowOf(volume, local, towardsLocal, far, shadowAccessor);
+                    let lit = weight * sigma *
+                              phaseOf(material, dot(reach.towards, -direction)) * reach.scale *
+                              geometryShadow(light, world, viewLights.y, mapTexels) *
+                              volumesShadow(shadowRun, world, reach.towards, reach.far);
                     if (lit <= 0.0) {
                         continue;
                     }
+                    // A distant light through the air (not refracted, nor eclipsed).
+                    let throughAir =
+                        uint(light.position.w) == kDistantLight && air[1].y != 0.0;
+                    let tangent = light.extentY.w;
+                    let sunSine = tangent * rsqrt(1.0 + tangent * tangent);
                     for (uint g = 0; g < groups; ++g) {
-                        let spectrum = lightFloat4(light, constants.lights.y + 16 * g) * focused +
-                                       lightFloat4(light, constants.lights.z + 16 * g);
+                        var spectrum = light.spectrum[g] * reach.focus + light.tinted[g];
+                        if (throughAir) {
+                            spectrum *= sunTransmittance(atmosphereTransmittance, tableSampler,
+                                                         world * 1e-3 - air[0].xyz,
+                                                         reach.towards, sunSine, g, air[0].w,
+                                                         air[1].x);
+                        }
                         emitted[g] += volumeMaterials[materialIndex].albedo[g] * lit * spectrum;
                     }
                 }
@@ -469,9 +697,28 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         }
     }
 
+    // Absorption dims the light behind as it is, its polarization too; what the volumes emit
+    // and scatter is unpolarized.
+    let stokes = constants.flags.y;
     for (uint b = 0; b < bands; ++b) {
         let layer = int3(id.xy, id.z * bands + b);
         let behind = unwritten ? 0.0 : spectral[layer];
         spectral[layer] = behind * transmittance + emitted[b / 4][b % 4];
+        if (stokes != 0) {
+            for (uint plane = 1; plane <= 2; ++plane) {
+                let at = int3(layer.xy, layer.z + int(plane * stokes));
+                spectral[at] = unwritten ? 0.0 : spectral[at] * transmittance;
+            }
+        }
+    }
+}
+
+// No radiance at layer `layer` of pixel `id`, its Stokes Q and U too with a polarizer.
+void writeNoRadiance(uint3 id, uint layer) {
+    spectral[int3(id.xy, layer)] = 0.0;
+    let stokes = constants.flags.y;
+    if (stokes != 0) {
+        spectral[int3(id.xy, stokes + layer)] = 0.0;
+        spectral[int3(id.xy, 2 * stokes + layer)] = 0.0;
     }
 }
