@@ -9,7 +9,9 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <stdexcept>
+#include <tuple>
 
 namespace ernie {
 
@@ -408,6 +410,350 @@ const NanoVdbGrid* FindNanoVdbGrid(std::span<const NanoVdbGrid> grids,
         }
     }
     return nullptr;
+}
+
+std::vector<std::uint8_t>
+DenseNanoVdbGrid(std::span<const float> values,
+                 const glm::ivec3& shape, double voxelSize,
+                 const glm::dvec3& origin, std::string_view name) {
+    if (glm::any(glm::lessThan(shape, glm::ivec3(0))) ||
+        values.size() != static_cast<std::size_t>(shape.x) *
+                             static_cast<std::size_t>(shape.y) *
+                             static_cast<std::size_t>(shape.z)) {
+        throw std::invalid_argument(
+            "DenseNanoVdbGrid: values do not fill the shape");
+    }
+    if (!(voxelSize > 0.0)) {
+        throw std::invalid_argument(
+            "DenseNanoVdbGrid: the voxel size must be positive");
+    }
+    constexpr pnanovdb_grid_type_t kType = PNANOVDB_GRID_TYPE_FLOAT;
+    const auto constant = [](auto member) {
+        return pnanovdb_grid_type_constants[kType].*member;
+    };
+    using Constants = pnanovdb_grid_type_constants_t;
+    const auto at = [&](int i, int j, int k) {
+        return values[(static_cast<std::size_t>(i) * shape.y + j) *
+                          shape.z +
+                      k];
+    };
+    // The leaves (8^3) holding active values, then the lower (128^3)
+    // and upper (4096^3) nodes above them, each keyed by its origin.
+    const auto originOf = [](const glm::ivec3& ijk, int size) {
+        return ijk & glm::ivec3(~(size - 1));
+    };
+    const auto less = [](const glm::ivec3& a, const glm::ivec3& b) {
+        return std::tie(a.x, a.y, a.z) < std::tie(b.x, b.y, b.z);
+    };
+    std::map<glm::ivec3, std::size_t, decltype(less)> leafIndex(less);
+    std::vector<glm::ivec3> leaves;
+    for (int x = 0; x < shape.x; x += 8) {
+        for (int y = 0; y < shape.y; y += 8) {
+            for (int z = 0; z < shape.z; z += 8) {
+                bool active = false;
+                for (int i = x;
+                     i < std::min(x + 8, shape.x) && !active; ++i) {
+                    for (int j = y;
+                         j < std::min(y + 8, shape.y) && !active;
+                         ++j) {
+                        for (int k = z; k < std::min(z + 8, shape.z);
+                             ++k) {
+                            if (at(i, j, k) != 0.0f) {
+                                active = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (active) {
+                    leafIndex.emplace(glm::ivec3(x, y, z),
+                                      leaves.size());
+                    leaves.emplace_back(x, y, z);
+                }
+            }
+        }
+    }
+    std::map<glm::ivec3, std::size_t, decltype(less)> lowerIndex(
+        less);
+    std::vector<glm::ivec3> lowers;
+    std::map<glm::ivec3, std::size_t, decltype(less)> upperIndex(
+        less);
+    std::vector<glm::ivec3> uppers;
+    for (const glm::ivec3& leaf : leaves) {
+        const glm::ivec3 lower = originOf(leaf, 128);
+        if (lowerIndex.emplace(lower, lowers.size()).second) {
+            lowers.push_back(lower);
+        }
+        const glm::ivec3 upper = originOf(leaf, 4096);
+        if (upperIndex.emplace(upper, uppers.size()).second) {
+            uppers.push_back(upper);
+        }
+    }
+
+    // The layout: grid, tree, root and its tiles, then the nodes by
+    // level, uppers first, each 32-byte aligned.
+    const std::uint64_t tree = PNANOVDB_GRID_SIZE;
+    const std::uint64_t root = tree + PNANOVDB_TREE_SIZE;
+    const std::uint64_t firstUpper =
+        root + constant(&Constants::root_size) +
+        uppers.size() * constant(&Constants::root_tile_size);
+    const std::uint64_t firstLower =
+        firstUpper + uppers.size() * constant(&Constants::upper_size);
+    const std::uint64_t firstLeaf =
+        firstLower + lowers.size() * constant(&Constants::lower_size);
+    const std::uint64_t size =
+        firstLeaf + leaves.size() * constant(&Constants::leaf_size);
+    std::vector<std::uint64_t> words(size / 8, 0);
+    const pnanovdb_buf_t buf = pnanovdb_make_buf(
+        reinterpret_cast<std::uint32_t*>(words.data()),
+        words.size() * 2);
+    const auto address = [](std::uint64_t offset) {
+        return pnanovdb_address_t{static_cast<std::uint32_t>(offset)};
+    };
+    const auto coord = [](const glm::ivec3& c) {
+        return pnanovdb_coord_t{c.x, c.y, c.z};
+    };
+
+    // Each node's active bounds and min and max, filled leaves up.
+    struct Stats {
+        glm::ivec3 low{std::numeric_limits<int>::max()};
+        glm::ivec3 high{std::numeric_limits<int>::min()};
+        float min = std::numeric_limits<float>::max();
+        float max = std::numeric_limits<float>::lowest();
+        void Add(const Stats& other) {
+            low = glm::min(low, other.low);
+            high = glm::max(high, other.high);
+            min = std::min(min, other.min);
+            max = std::max(max, other.max);
+        }
+    };
+    std::vector<Stats> lowerStats(lowers.size());
+    std::vector<Stats> upperStats(uppers.size());
+    Stats rootStats;
+    std::uint64_t voxels = 0;
+    for (std::size_t n = 0; n < leaves.size(); ++n) {
+        const glm::ivec3& origin8 = leaves[n];
+        const pnanovdb_leaf_handle_t leaf{
+            address(firstLeaf + n * constant(&Constants::leaf_size))};
+        Stats stats;
+        for (int i = 0; i < 8; ++i) {
+            for (int j = 0; j < 8; ++j) {
+                for (int k = 0; k < 8; ++k) {
+                    const glm::ivec3 ijk =
+                        origin8 + glm::ivec3(i, j, k);
+                    if (glm::any(glm::greaterThanEqual(ijk, shape))) {
+                        continue;
+                    }
+                    const float value = at(ijk.x, ijk.y, ijk.z);
+                    if (value == 0.0f) {
+                        continue;
+                    }
+                    const auto bit = static_cast<std::uint32_t>(
+                        (i << 6) | (j << 3) | k);
+                    pnanovdb_leaf_set_value_mask(buf, leaf, bit, 1);
+                    pnanovdb_write_float(
+                        buf,
+                        pnanovdb_leaf_get_table_address(kType, buf,
+                                                        leaf, bit),
+                        value);
+                    stats.low = glm::min(stats.low, ijk);
+                    stats.high = glm::max(stats.high, ijk);
+                    stats.min = std::min(stats.min, value);
+                    stats.max = std::max(stats.max, value);
+                    ++voxels;
+                }
+            }
+        }
+        const pnanovdb_coord_t low = coord(stats.low);
+        pnanovdb_leaf_set_bbox_min(buf, leaf, &low);
+        const glm::ivec3 dif = stats.high - stats.low;
+        pnanovdb_leaf_set_bbox_dif_and_flags(
+            buf, leaf,
+            static_cast<std::uint32_t>(dif.x | (dif.y << 8) |
+                                       (dif.z << 16)));
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                leaf.address, constant(&Constants::leaf_off_min)),
+            stats.min);
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                leaf.address, constant(&Constants::leaf_off_max)),
+            stats.max);
+        // Its lower node's child.
+        const std::size_t l = lowerIndex.at(originOf(origin8, 128));
+        const pnanovdb_lower_handle_t lower{address(
+            firstLower + l * constant(&Constants::lower_size))};
+        const pnanovdb_coord_t at8 = coord(origin8);
+        const std::uint32_t slot =
+            pnanovdb_lower_coord_to_offset(&at8);
+        pnanovdb_lower_set_child_mask(buf, lower, slot, 1);
+        pnanovdb_lower_set_child(kType, buf, lower, slot, leaf);
+        lowerStats[l].Add(stats);
+    }
+    for (std::size_t l = 0; l < lowers.size(); ++l) {
+        const pnanovdb_lower_handle_t lower{address(
+            firstLower + l * constant(&Constants::lower_size))};
+        const Stats& stats = lowerStats[l];
+        const pnanovdb_coord_t low = coord(stats.low);
+        const pnanovdb_coord_t high = coord(stats.high);
+        pnanovdb_lower_set_bbox_min(buf, lower, &low);
+        pnanovdb_lower_set_bbox_max(buf, lower, &high);
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                lower.address, constant(&Constants::lower_off_min)),
+            stats.min);
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                lower.address, constant(&Constants::lower_off_max)),
+            stats.max);
+        const std::size_t u =
+            upperIndex.at(originOf(lowers[l], 4096));
+        const pnanovdb_upper_handle_t upper{address(
+            firstUpper + u * constant(&Constants::upper_size))};
+        const pnanovdb_coord_t at128 = coord(lowers[l]);
+        const std::uint32_t slot =
+            pnanovdb_upper_coord_to_offset(&at128);
+        pnanovdb_upper_set_child_mask(buf, upper, slot, 1);
+        pnanovdb_upper_set_child(kType, buf, upper, slot, lower);
+        upperStats[u].Add(stats);
+    }
+    const pnanovdb_root_handle_t rootHandle{address(root)};
+    for (std::size_t u = 0; u < uppers.size(); ++u) {
+        const pnanovdb_upper_handle_t upper{address(
+            firstUpper + u * constant(&Constants::upper_size))};
+        const Stats& stats = upperStats[u];
+        const pnanovdb_coord_t low = coord(stats.low);
+        const pnanovdb_coord_t high = coord(stats.high);
+        pnanovdb_upper_set_bbox_min(buf, upper, &low);
+        pnanovdb_upper_set_bbox_max(buf, upper, &high);
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                upper.address, constant(&Constants::upper_off_min)),
+            stats.min);
+        pnanovdb_write_float(
+            buf,
+            pnanovdb_address_offset(
+                upper.address, constant(&Constants::upper_off_max)),
+            stats.max);
+        const pnanovdb_root_tile_handle_t tile{
+            address(root + constant(&Constants::root_size) +
+                    u * constant(&Constants::root_tile_size))};
+        const pnanovdb_coord_t at4096 = coord(uppers[u]);
+        pnanovdb_root_tile_set_key(buf, tile,
+                                   pnanovdb_coord_to_key(&at4096));
+        pnanovdb_root_set_child(kType, buf, rootHandle, tile, upper);
+        rootStats.Add(stats);
+    }
+
+    // The root, tree and grid headers.
+    if (!leaves.empty()) {
+        const pnanovdb_coord_t low = coord(rootStats.low);
+        const pnanovdb_coord_t high = coord(rootStats.high);
+        pnanovdb_root_set_bbox_min(buf, rootHandle, &low);
+        pnanovdb_root_set_bbox_max(buf, rootHandle, &high);
+        pnanovdb_write_float(buf,
+                             pnanovdb_address_offset(
+                                 rootHandle.address,
+                                 constant(&Constants::root_off_min)),
+                             rootStats.min);
+        pnanovdb_write_float(buf,
+                             pnanovdb_address_offset(
+                                 rootHandle.address,
+                                 constant(&Constants::root_off_max)),
+                             rootStats.max);
+    } else {
+        // No active values: an empty box, min past max.
+        const pnanovdb_coord_t low{1, 1, 1};
+        const pnanovdb_coord_t high{0, 0, 0};
+        pnanovdb_root_set_bbox_min(buf, rootHandle, &low);
+        pnanovdb_root_set_bbox_max(buf, rootHandle, &high);
+    }
+    pnanovdb_root_set_tile_count(
+        buf, rootHandle, static_cast<std::uint32_t>(uppers.size()));
+
+    const pnanovdb_tree_handle_t treeHandle{address(tree)};
+    pnanovdb_tree_set_node_offset_leaf(
+        buf, treeHandle, leaves.empty() ? 0 : firstLeaf - tree);
+    pnanovdb_tree_set_node_offset_lower(
+        buf, treeHandle, lowers.empty() ? 0 : firstLower - tree);
+    pnanovdb_tree_set_node_offset_upper(
+        buf, treeHandle, uppers.empty() ? 0 : firstUpper - tree);
+    pnanovdb_tree_set_node_offset_root(buf, treeHandle, root - tree);
+    pnanovdb_tree_set_node_count_leaf(
+        buf, treeHandle, static_cast<std::uint32_t>(leaves.size()));
+    pnanovdb_tree_set_node_count_lower(
+        buf, treeHandle, static_cast<std::uint32_t>(lowers.size()));
+    pnanovdb_tree_set_node_count_upper(
+        buf, treeHandle, static_cast<std::uint32_t>(uppers.size()));
+    pnanovdb_tree_set_voxel_count(buf, treeHandle, voxels);
+
+    const pnanovdb_grid_handle_t grid{address(0)};
+    pnanovdb_grid_set_magic(buf, grid, PNANOVDB_MAGIC_GRID);
+    pnanovdb_grid_set_version(
+        buf, grid,
+        pnanovdb_make_version(PNANOVDB_MAJOR_VERSION_NUMBER,
+                              PNANOVDB_MINOR_VERSION_NUMBER,
+                              PNANOVDB_PATCH_VERSION_NUMBER));
+    pnanovdb_grid_set_flags(buf, grid,
+                            PNANOVDB_GRID_FLAGS_HAS_BBOX |
+                                PNANOVDB_GRID_FLAGS_HAS_MIN_MAX |
+                                PNANOVDB_GRID_FLAGS_IS_BREADTH_FIRST);
+    pnanovdb_grid_set_grid_index(buf, grid, 0);
+    pnanovdb_grid_set_grid_count(buf, grid, 1);
+    pnanovdb_grid_set_grid_size(buf, grid, size);
+    char gridName[256] = {};
+    std::memcpy(gridName, name.data(),
+                std::min<std::size_t>(name.size(), 255));
+    for (std::uint32_t i = 0; i < 64; ++i) {
+        std::uint32_t word = 0;
+        std::memcpy(&word, gridName + 4 * i, 4);
+        pnanovdb_grid_set_grid_name(buf, grid, i, word);
+    }
+    const pnanovdb_map_handle_t map{address(PNANOVDB_GRID_OFF_MAP)};
+    for (std::uint32_t row = 0; row < 3; ++row) {
+        for (std::uint32_t column = 0; column < 3; ++column) {
+            const double scale = row == column ? voxelSize : 0.0;
+            const double inverse =
+                row == column ? 1.0 / voxelSize : 0.0;
+            pnanovdb_map_set_matf(buf, map, 3 * row + column,
+                                  static_cast<float>(scale));
+            pnanovdb_map_set_invmatf(buf, map, 3 * row + column,
+                                     static_cast<float>(inverse));
+            pnanovdb_map_set_matd(buf, map, 3 * row + column, scale);
+            pnanovdb_map_set_invmatd(buf, map, 3 * row + column,
+                                     inverse);
+        }
+        pnanovdb_map_set_vecf(buf, map, row,
+                              static_cast<float>(origin[row]));
+        pnanovdb_map_set_vecd(buf, map, row, origin[row]);
+    }
+    pnanovdb_map_set_taperf(buf, map, 0, 1.0f);
+    pnanovdb_map_set_taperd(buf, map, 0, 1.0);
+    if (!leaves.empty()) {
+        for (int a = 0; a < 3; ++a) {
+            pnanovdb_grid_set_world_bbox(
+                buf, grid, static_cast<std::uint32_t>(a),
+                origin[a] + voxelSize * rootStats.low[a]);
+            pnanovdb_grid_set_world_bbox(
+                buf, grid, static_cast<std::uint32_t>(a + 3),
+                origin[a] + voxelSize * (rootStats.high[a] + 1));
+        }
+    }
+    for (std::uint32_t a = 0; a < 3; ++a) {
+        pnanovdb_grid_set_voxel_size(buf, grid, a, voxelSize);
+    }
+    pnanovdb_grid_set_grid_class(buf, grid,
+                                 PNANOVDB_GRID_CLASS_FOG_VOLUME);
+    pnanovdb_grid_set_grid_type(buf, grid, kType);
+
+    std::vector<std::uint8_t> bytes(size);
+    std::memcpy(bytes.data(), words.data(), size);
+    return bytes;
 }
 
 }  // namespace ernie

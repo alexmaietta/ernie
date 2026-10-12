@@ -55,6 +55,16 @@ def test_nanovdb_field_holds_an_array():
     assert grids.field_name == "density"
 
 
+def test_dense_nanovdb_grid():
+    import numpy as np
+
+    values = np.zeros((8, 8, 8), dtype=np.float32)
+    values[2:6, 2:6, 2:6] = 1.0
+    grid = ernie.dense_nanovdb_grid(values, 0.1, (-0.4, -0.4, -0.4))
+    assert grid.dtype == np.uint8
+    assert bytes(grid[:8]) == b"NanoVDB1"
+
+
 def test_material_volume_inputs():
     scene = ernie.Scene()
     smoke = scene.define(

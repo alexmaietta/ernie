@@ -10,10 +10,12 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/image.h"
+#include "ernie/util/nanovdb.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/tensor.h"
 
 #include <nanobind/operators.h>
+#include <nanobind/stl/array.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
@@ -2139,6 +2141,29 @@ void BindScene(nb::module_& m) {
         "cols, 4) array: PNG and JPEG "
         "values decode as sRGB (srgb) or as linear data such as "
         "normal maps; EXR is linear.");
+    m.def(
+        "dense_nanovdb_grid",
+        [](nb::ndarray<const float, nb::ndim<3>, nb::c_contig,
+                       nb::device::cpu>
+               values,
+           double voxelSize, std::array<double, 3> origin,
+           const std::string& name) {
+            const std::vector<std::uint8_t> bytes = DenseNanoVdbGrid(
+                std::span(values.data(), values.size()),
+                glm::ivec3(static_cast<int>(values.shape(0)),
+                           static_cast<int>(values.shape(1)),
+                           static_cast<int>(values.shape(2))),
+                voxelSize, glm::dvec3(origin[0], origin[1], origin[2]),
+                name);
+            return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
+                bytes, {static_cast<std::int64_t>(bytes.size())}));
+        },
+        nb::arg("values"), nb::arg("voxel_size"),
+        nb::arg("origin") = std::array<double, 3>{0.0, 0.0, 0.0},
+        nb::arg("name") = "",
+        "A NanoVDB float grid of a dense float32 (x, y, z) array, "
+        "active where not 0, as uint8 bytes for a NanoVDBField's "
+        "buffer: index (i, j, k) at origin + voxel_size (i, j, k).");
     m.def("julian_date", &JulianDate, nb::arg("year"),
           nb::arg("month"), nb::arg("day"), nb::arg("hours") = 0.0,
           "The Julian date of `hours` UT past midnight of a "

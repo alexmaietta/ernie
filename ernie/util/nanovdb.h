@@ -123,4 +123,24 @@ const NanoVdbGrid* FindNanoVdbGrid(std::span<const NanoVdbGrid> grids,
                                    std::string_view name,
                                    int index = 0);
 
+/// A NanoVDB float grid (a fog volume) of dense `values`, `shape` x
+/// by y by z with z fastest (a C-order (x, y, z) array), active where
+/// not 0: as NanoVDB keeps a grid in memory, for a NanoVDBField's
+/// array. Index (i, j, k) holds `values[(i * shape.y + j) * shape.z +
+/// k]` at `origin` + `voxelSize` (i, j, k) in the grid's frame; it
+/// carries its values' bounds and min and max.
+///
+/// References:
+/// - K. Museth, "NanoVDB: A GPU-Friendly and Portable VDB Data
+///   Structure For Real-Time Rendering And Simulation", ACM SIGGRAPH
+///   2021 Talks. https://doi.org/10.1145/3450623.3464653
+/// - PNanoVDB.h, OpenVDB 13.0.0: the layout and its setters.
+/// @throws std::invalid_argument if `values` does not hold `shape`'s
+/// voxels or `voxelSize` is not positive.
+std::vector<std::uint8_t>
+DenseNanoVdbGrid(std::span<const float> values,
+                 const glm::ivec3& shape, double voxelSize,
+                 const glm::dvec3& origin,
+                 std::string_view name = "");
+
 }  // namespace ernie

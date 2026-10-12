@@ -690,3 +690,26 @@ TEST_F(RasterDelegateTest, AVolumeReadsItsGridFromADeviceArray) {
             << "band " << b;
     }
 }
+
+TEST_F(RasterDelegateTest, AGridBuiltFromDenseValuesShadesAsTheFile) {
+    // The cube's 16^3 ones built by Ernie (DenseNanoVdbGrid) rather
+    // than Warp: the same values at the same place.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::vector<double> fromFile =
+        CentreSpectrum(delegate, scene);
+    const std::vector<std::uint8_t> bytes = ernie::DenseNanoVdbGrid(
+        std::vector<float>(16 * 16 * 16, 1.0f), glm::ivec3(16), 0.1,
+        glm::dvec3(-0.75));
+    ernie::NanoVDBField::Define(scene, "/World/Cube/Grids")
+        .SetBuffer(Tensor::Copy<std::uint8_t>(
+            bytes, {static_cast<std::int64_t>(bytes.size())}));
+    ernie::Volume(scene, "/World/Cube")
+        .SetField("density", "/World/Cube/Grids");
+    const std::vector<double> built = CentreSpectrum(delegate, scene);
+    for (std::size_t b = 0; b < fromFile.size(); ++b) {
+        EXPECT_NEAR(built[b], fromFile[b], 1e-4 * fromFile[b])
+            << "band " << b;
+    }
+}
