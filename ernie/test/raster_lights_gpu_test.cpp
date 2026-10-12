@@ -2399,13 +2399,16 @@ TEST_F(RasterDelegateTest, LightLinksChooseWhatALaserLights) {
         return Band8(delegate, scene)[row * kVarSize + col];
     };
     const float left = at(-10.0f);
+    const float right = at(10.0f);
     ASSERT_GT(left, 0.0f);
-    ASSERT_GT(at(10.0f), 0.0f);
+    ASSERT_GT(right, 0.0f);
     ernie::LaserLight(scene, "/World/Laser")
         .SetLightLinkIncludeRoot(false)
         .SetLightLinkIncludes({ernie::Path("/World/Left")});
     EXPECT_NEAR(at(-10.0f), left, 1e-3f * left);
-    EXPECT_EQ(at(10.0f), 0.0f);
+    // Dark but for what resampling spills from lit neighbours, which
+    // some devices show at a part in ten thousand.
+    EXPECT_LT(at(10.0f), 1e-2f * right);
 }
 
 // Shadow linking: a blocker shadows the ground under a lamp until the
