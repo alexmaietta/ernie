@@ -249,7 +249,7 @@
 <li><strong>bands</strong> (<a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>, <a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>bits</strong> (<a href="../structernie_1_1Change/"><strong>ernie::Change</strong></a>)</li>
 <li><strong>binding</strong> (<a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>)</li>
-<li><strong>buffer</strong> (<a href="../structernie_1_1DescriptorResource/"><strong>ernie::DescriptorResource</strong></a>, <a href="../structernie_1_1FrameImages_1_1LinearVar/"><strong>ernie::FrameImages::LinearVar</strong></a>)</li>
+<li><strong>buffer</strong> (<a href="../structernie_1_1DescriptorResource/"><strong>ernie::DescriptorResource</strong></a>, <a href="../structernie_1_1FrameImages_1_1LinearVar/"><strong>ernie::FrameImages::LinearVar</strong></a>, <a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ernie::VulkanContext::ExportedBuffer</strong></a>)</li>
 <li><strong>bodies</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>)</li>
 <li><strong>buffer_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
 <li><strong>bytes_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
@@ -279,7 +279,7 @@
 <li><strong>cloudCover</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
 <li><strong>cloudTop</strong> (<a href="../structernie_1_1AtmosphereParams/"><strong>ernie::AtmosphereParams</strong></a>)</li>
 <li><strong>color</strong> (<a href="../structernie_1_1AttributeMeta/"><strong>ernie::AttributeMeta</strong></a>, <a href="../structernie_1_1OverlayItem/"><strong>ernie::OverlayItem</strong></a>, <a href="../structernie_1_1OverlayStyle/"><strong>ernie::OverlayStyle</strong></a>, <a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
-<li><strong>centre</strong> (<a href="../structernie_1_1BodyParams/"><strong>ernie::BodyParams</strong></a>)</li>
+<li><strong>centre</strong> (<a href="../structernie_1_1BodyParams/"><strong>ernie::BodyParams</strong></a>, <a href="../structernie_1_1PlanetSphere/"><strong>ernie::PlanetSphere</strong></a>)</li>
 <li><strong>c</strong> (<a href="../structernie_1_1CahvoreModel/"><strong>ernie::CahvoreModel</strong></a>)</li>
 <li><strong>camera</strong> (<a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ernie::CahvoreModel::ErnieCamera</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>ernie::IsdCameraModel::FrameView</strong></a>, <a href="../structernie_1_1IsdLineScanner_1_1Strip/"><strong>ernie::IsdLineScanner::Strip</strong></a>, <a href="../structernie_1_1IsdPushFrame_1_1Framelet/"><strong>ernie::IsdPushFrame::Framelet</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>, <a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>, <a href="../structernie_1_1app_1_1CreateContext/"><strong>ernie::app::CreateContext</strong></a>)</li>
 <li><strong>chunks_</strong> (<a href="../classernie_1_1ChunkedFrameImages/"><strong>ernie::ChunkedFrameImages</strong></a>)</li>
@@ -316,6 +316,7 @@
 <li><strong>cameras</strong> (<a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
 <li><strong>counters</strong> (<a href="../structernie_1_1RenderStats/"><strong>ernie::RenderStats</strong></a>)</li>
 <li><strong>clearColors</strong> (<a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
+<li><strong>clearDepth</strong> (<a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
 <li><strong>compare</strong> (<a href="../structernie_1_1SamplerDesc/"><strong>ernie::SamplerDesc</strong></a>)</li>
 <li><strong>commands_</strong> (<a href="../classernie_1_1ScopedGpuZone/"><strong>ernie::ScopedGpuZone</strong></a>)</li>
 <li><strong>cascades</strong> (<a href="../structernie_1_1ShadowSettings/"><strong>ernie::ShadowSettings</strong></a>)</li>
@@ -393,6 +394,7 @@
 <li><strong>exposureTime</strong> (<a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>eye</strong> (<a href="../structernie_1_1CameraView/"><strong>ernie::CameraView</strong></a>)</li>
 <li><strong>exposure</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
+<li><strong>exported_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>, <a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>exposureDuration</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>efficiency</strong> (<a href="../structernie_1_1LightParams_1_1Beam/"><strong>ernie::LightParams::Beam</strong></a>)</li>
 <li><strong>extent</strong> (<a href="../structernie_1_1LightParams_1_1Beam/"><strong>ernie::LightParams::Beam</strong></a>, <a href="../structernie_1_1LightPatternModel/"><strong>ernie::LightPatternModel</strong></a>, <a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
@@ -404,6 +406,7 @@
 <li><strong>extent_</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
 <li><strong>exportMemory_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>exportSemaphore_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
+<li><strong>exportedMutex_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>extra</strong> (<a href="../structernie_1_1app_1_1DemoOptions/"><strong>ernie::app::DemoOptions</strong></a>)</li>
 <li><strong>entries_</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
 <li><strong>error_</strong> (<a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
@@ -642,6 +645,8 @@
 <li><strong>minNm</strong> (<a href="../structernie_1_1SpectralBands/"><strong>ernie::SpectralBands</strong></a>)</li>
 <li><strong>magnitude</strong> (<a href="../structernie_1_1StarCatalogue/"><strong>ernie::StarCatalogue</strong></a>)</li>
 <li><strong>minImageCount_</strong> (<a href="../classernie_1_1Swapchain/"><strong>ernie::Swapchain</strong></a>)</li>
+<li><strong>memory</strong> (<a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ernie::VulkanContext::ExportedBuffer</strong></a>)</li>
+<li><strong>mutex</strong> (<a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ernie::VulkanContext::ExportedBuffer</strong></a>)</li>
 <li><strong>messagesMutex_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>messages_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>messenger_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
@@ -796,7 +801,7 @@
 <ul>
 <li><strong>read_</strong> (<a href="../classernie_1_1AttributeDef/"><strong>ernie::AttributeDef</strong></a>)</li>
 <li><strong>refractivity</strong> (<a href="../structernie_1_1BandedConstituent/"><strong>ernie::BandedConstituent</strong></a>, <a href="../structernie_1_1Constituent/"><strong>ernie::Constituent</strong></a>)</li>
-<li><strong>radius</strong> (<a href="../structernie_1_1BodyParams/"><strong>ernie::BodyParams</strong></a>, <a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>)</li>
+<li><strong>radius</strong> (<a href="../structernie_1_1BodyParams/"><strong>ernie::BodyParams</strong></a>, <a href="../structernie_1_1LightParams/"><strong>ernie::LightParams</strong></a>, <a href="../structernie_1_1PlanetSphere/"><strong>ernie::PlanetSphere</strong></a>)</li>
 <li><strong>references</strong> (<a href="../structernie_1_1BrdfModel/"><strong>ernie::BrdfModel</strong></a>, <a href="../structernie_1_1SensorFilterModel/"><strong>ernie::SensorFilterModel</strong></a>)</li>
 <li><strong>residualPixels</strong> (<a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ernie::CahvoreModel::ErnieCamera</strong></a>)</li>
 <li><strong>rowsReversed</strong> (<a href="../structernie_1_1CahvoreModel_1_1ErnieCamera/"><strong>ernie::CahvoreModel::ErnieCamera</strong></a>, <a href="../structernie_1_1IsdCameraModel_1_1FrameView/"><strong>ernie::IsdCameraModel::FrameView</strong></a>, <a href="../structernie_1_1IsdPushFrame_1_1Framelet/"><strong>ernie::IsdPushFrame::Framelet</strong></a>)</li>
@@ -953,6 +958,7 @@
 <li><strong>target</strong> (<a href="../classernie_1_1OrbitController/"><strong>ernie::OrbitController</strong></a>, <a href="../structernie_1_1app_1_1CreateContext/"><strong>ernie::app::CreateContext</strong></a>)</li>
 <li><strong>triangles_</strong> (<a href="../classernie_1_1Overlay/"><strong>ernie::Overlay</strong></a>)</li>
 <li><strong>text_</strong> (<a href="../classernie_1_1Path/"><strong>ernie::Path</strong></a>)</li>
+<li><strong>top</strong> (<a href="../structernie_1_1PlanetSphere/"><strong>ernie::PlanetSphere</strong></a>)</li>
 <li><strong>toRotation</strong> (<a href="../structernie_1_1PushbroomStrip/"><strong>ernie::PushbroomStrip</strong></a>)</li>
 <li><strong>time_</strong> (<a href="../classernie_1_1RenderDelegate/"><strong>ernie::RenderDelegate</strong></a>)</li>
 <li><strong>terrain</strong> (<a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>)</li>

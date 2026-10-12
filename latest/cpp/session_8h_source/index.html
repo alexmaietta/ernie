@@ -235,6 +235,11 @@ OrbitController ControllerFromTransform(const glm::dmat4&amp; world,
                                         double distance,
                                         float verticalFov);
 
+std::optional&lt;OrbitController&gt;
+OrbitAboutPlanet(const OrbitController&amp; controller,
+                 const glm::dvec3&amp; centre, double top, float deltaYaw,
+                 float deltaPitch);
+
 glm::dmat4 LocalFromWorld(const Scene&amp; scene, const Path&amp; path,
                           const glm::dmat4&amp; world);
 

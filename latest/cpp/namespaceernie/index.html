@@ -797,6 +797,10 @@
 <td style="text-align: left;"><a href="../classernie_1_1Plane/"><strong>Plane</strong></a> <br><em>A one-sided rectangle facing along its axis.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1PlanetSphere/"><strong>PlanetSphere</strong></a> <br><em>The planet an</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>wraps, in world space.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1PointBased/"><strong>PointBased</strong></a> <br><em>Geometry from an array of points: a mesh or a point cloud.</em></td>
 </tr>
@@ -1823,7 +1827,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="./#typedef-bounds3"><strong>Bounds3</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-localboundsof"><strong>LocalBoundsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; prim) <br><em>The prim's bounds in its own space: its</em> <code>extent</code> <em>if authored, else those of its geometry, a</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>'s CPU points or a UsdGeom primitive's shape (</em><code>PrimitiveMeshOf</code> <em>); none for other prims or geometry that cannot be read.</em></td>
+<td style="text-align: left;"><a href="#function-localboundsof"><strong>LocalBoundsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; prim) <br><em>The prim's bounds in its own space: its</em> <code>extent</code> <em>if authored, else those of its geometry, a</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>'s CPU points or a UsdGeom primitive's shape (</em><code>PrimitiveMeshOf</code> <em>), or an</em><a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>'s planet to the top of its air (</em><code>PlanetOf</code> <em>); none for other prims or geometry that cannot be read.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a></td>
@@ -1932,6 +1936,14 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
 <td style="text-align: left;"><a href="#function-planemesh"><strong>PlaneMesh</strong></a> (float width, float length, <a href="./#enum-axis"><strong>Axis</strong></a> axis=Axis::Z) <br><em>A one-sided rectangle facing +</em> <code>axis</code> <em>(UsdGeomPlane, default 2 x 2):</em><code>width</code> <em>along x and</em><code>length</code> <em>along y for Z, width along x and length along z for Y, width along z and length along y for X.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1PlanetSphere/"><strong>PlanetSphere</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-planetof"><strong>PlanetOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>The planet the</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>at</em><code>path</code> <em>wraps (</em><code>AtmosphereParamsOf</code> <em>, over the scene's first visible</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>), or none for another prim or one that cannot resolve.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1PlanetSphere/"><strong>PlanetSphere</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-planetof"><strong>PlanetOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>The planet of the scene's first visible</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>(</em><code>PlanetOf</code> <em>), or none.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -4054,7 +4066,7 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <hr>
 
 <h3 id="function-localboundsof">function LocalBoundsOf</h3>
-<p><em>The prim's bounds in its own space: its</em> <code>extent</code> <em>if authored, else those of its geometry, a</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>'s CPU points or a UsdGeom primitive's shape (</em><code>PrimitiveMeshOf</code> <em>); none for other prims or geometry that cannot be read.</em></p>
+<p><em>The prim's bounds in its own space: its</em> <code>extent</code> <em>if authored, else those of its geometry, a</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>'s CPU points or a UsdGeom primitive's shape (</em><code>PrimitiveMeshOf</code> <em>), or an</em><a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>'s planet to the top of its air (</em><code>PlanetOf</code> <em>); none for other prims or geometry that cannot be read.</em></p>
 <pre><code class="language-C++">std::optional&lt; Bounds3 &gt; ernie::LocalBoundsOf (
     const Scene &amp; scene,
     const Path &amp; prim
@@ -4380,6 +4392,23 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
     float width,
     float length,
     Axis axis=Axis::Z
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-planetof">function PlanetOf</h3>
+<p><em>The planet the</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>at</em><code>path</code> <em>wraps (</em><code>AtmosphereParamsOf</code> <em>, over the scene's first visible</em><a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>), or none for another prim or one that cannot resolve.</em></p>
+<pre><code class="language-C++">std::optional&lt; PlanetSphere &gt; ernie::PlanetOf (
+    const Scene &amp; scene,
+    const Path &amp; path
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-planetof_1">function PlanetOf</h3>
+<p><em>The planet of the scene's first visible</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>(</em><code>PlanetOf</code> <em>), or none.</em></p>
+<pre><code class="language-C++">std::optional&lt; PlanetSphere &gt; ernie::PlanetOf (
+    const Scene &amp; scene
 ) 
 </code></pre>
 <hr>

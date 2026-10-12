@@ -292,6 +292,14 @@ class VulkanContext {
         return alive_;
     }
 
+    struct ExportedBuffer {
+        std::mutex mutex;
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+    };
+
+    void TrackExported(std::weak_ptr&lt;ExportedBuffer&gt; exported) const;
+
     const std::string&amp; DeviceName() const {
         return deviceName_;
     }
@@ -420,6 +428,9 @@ class VulkanContext {
     std::unique_ptr&lt;std::function&lt;void(std::string)&gt;&gt; sink_;
     std::mutex messagesMutex_;
     std::vector&lt;std::string&gt; messages_;
+    mutable std::mutex exportedMutex_;
+    mutable std::vector&lt;std::weak_ptr&lt;ExportedBuffer&gt;&gt;
+        exported_;  
 };
 
 PFN_vkGetInstanceProcAddr LoadVulkanLoader();

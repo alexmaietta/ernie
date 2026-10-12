@@ -364,6 +364,17 @@ AtmosphereParams AtmosphereParamsOf(const Scene&amp; scene,
                                     const Path&amp; path,
                                     const Path&amp; terrain);
 
+struct PlanetSphere {
+    glm::dvec3 centre{0.0};
+    double radius = 0.0;  
+    double top = 0.0;     
+};
+
+std::optional&lt;PlanetSphere&gt; PlanetOf(const Scene&amp; scene,
+                                     const Path&amp; path);
+
+std::optional&lt;PlanetSphere&gt; PlanetOf(const Scene&amp; scene);
+
 BodyParams BodyParamsOf(const Scene&amp; scene, const Path&amp; path);
 
 double OverscanOf(const CameraParams&amp; camera);

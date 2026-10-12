@@ -366,6 +366,7 @@
 <li><strong>struct</strong> <a href="../structernie_1_1Pds3Label/"><strong>Pds3Label</strong></a> <em>A PDS3 label's keywords, by name; a keyword inside an OBJECT prefixed with the object's name and a dot (</em> <code>IMAGE.LINES</code> <em>).</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1PipelineLayout/"><strong>PipelineLayout</strong></a> <em>A pipeline layout with one push-descriptor set and an optional push-constant block shared by all stages.</em>     </li>
 <li><strong>class</strong> <a href="../classernie_1_1Plane/"><strong>Plane</strong></a> <em>A one-sided rectangle facing along its axis.</em> </li>
+<li><strong>struct</strong> <a href="../structernie_1_1PlanetSphere/"><strong>PlanetSphere</strong></a> <em>The planet an</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>wraps, in world space.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1PointBased/"><strong>PointBased</strong></a> <em>Geometry from an array of points: a mesh or a point cloud.</em> </li>
 <li><strong>class</strong> <a href="../classernie_1_1PointInstancer/"><strong>PointInstancer</strong></a> <em>Instances of its prototypes (the</em> <code>prototypes</code> <em>relationship's targets) at rows of positions, orientations and scales.</em></li>
 <li><strong>class</strong> <a href="../classernie_1_1Points/"><strong>Points</strong></a> <a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>drawn as spheres</em><code>widths</code> <em>across, coloured by their display colour.</em></li>
@@ -436,7 +437,10 @@
 <li><strong>struct</strong> <a href="../structernie_1_1TriangleCorners/"><strong>TriangleCorners</strong></a> <em>Where each corner of</em> <code>TriangulateFaces</code> <em>' triangles comes from: its face and its position in</em><code>faceVertexIndices</code> <em>, for primvars with uniform and faceVarying interpolation.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Value/"><strong>Value</strong></a> <em>A scene attribute value: one of the scalar, vector, matrix, token, relationship and small-array types Ernie's schemas use.</em>     </li>
 <li><strong>class</strong> <a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <em>A volume (UsdVol); Ernie does not draw volumes yet.</em> </li>
-<li><strong>class</strong> <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> <em>Owns a Vulkan instance, device, graphics and compute queue, and memory allocator.</em>     </li>
+<li><strong>class</strong> <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> <em>Owns a Vulkan instance, device, graphics and compute queue, and memory allocator.</em>     <ul>
+<li><strong>struct</strong> <a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ExportedBuffer</strong></a> <em>A</em> <code>Shared</code> <em>buffer's handles, which whichever goes first of the buffer and this context destroys (under</em><code>mutex</code> <em>), nulling them: an array a scene still holds over the buffer after its renderer is gone keeps the memory through CUDA's import of it.</em>    </li>
+</ul>
+</li>
 <li><strong>struct</strong> <a href="../structernie_1_1VulkanContextOptions/"><strong>VulkanContextOptions</strong></a> <em>Options for</em> <code>VulkanContext::Create</code> <em>.</em>    </li>
 <li><strong>class</strong> <a href="../classernie_1_1Xform/"><strong>Xform</strong></a> <em>A transform grouping its children.</em> </li>
 <li><strong>struct</strong> <a href="../structernie_1_1XformOps/"><strong>XformOps</strong></a> <em>A prim's local transform as translate, rotate (Euler angles or a quaternion) and scale, the ops of USD's UsdGeomXformCommonAPI.</em>     </li>

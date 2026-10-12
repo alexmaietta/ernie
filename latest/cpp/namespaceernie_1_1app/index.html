@@ -508,6 +508,10 @@
 <td style="text-align: left;"><a href="#function-mirrorsettings"><strong>MirrorSettings</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; session, const std::map&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a>, std::less&lt;&gt; &gt; &amp; overrides, std::map&lt; std::string, std::uint64_t &gt; &amp; versions) <br><em>Mirrors the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>source</code> <em>into the session's</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>session</code> <em>, defining it if needed: every value attribute of</em><code>source</code> <em>is copied, except those in</em><code>overrides</code> <em>, which take the given values; attributes neither has any more are cleared.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::optional&lt; <a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-orbitaboutplanet"><strong>OrbitAboutPlanet</strong></a> (const <a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a> &amp; controller, const glm::dvec3 &amp; centre, double top, float deltaYaw, float deltaPitch) <br><code>controller</code> <em>orbited by</em><code>deltaYaw</code> <em>and</em><code>deltaPitch</code> <em>(as</em><code>OrbitController::Orbit</code> <em>) about a planet's centre rather than its target, as globe viewers turn the view, when its eye is more than</em><code>top</code> <em>(the top of the planet's air) from</em><code>centre</code> <em>; none nearer.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1app_1_1DemoOptions/"><strong>DemoOptions</strong></a></td>
 <td style="text-align: left;"><a href="#function-parsedemooptions"><strong>ParseDemoOptions</strong></a> (std::span&lt; const std::string &gt; args) <br><em>Parses the shared options from</em> <code>args</code> <em>(the command line without the program name), leaving the others in</em><code>DemoOptions::extra</code> <em>.</em></td>
 </tr>
@@ -930,6 +934,19 @@ DemoInfo ernie::app::MakeDemoInfo (
 ) 
 </code></pre>
 <p>Only what changed is set: <code>versions</code> remembers what was copied, so pass the same map every frame. An empty <code>source</code> leaves only the overrides. </p>
+<hr>
+
+<h3 id="function-orbitaboutplanet">function OrbitAboutPlanet</h3>
+<p><code>controller</code> <em>orbited by</em><code>deltaYaw</code> <em>and</em><code>deltaPitch</code> <em>(as</em><code>OrbitController::Orbit</code> <em>) about a planet's centre rather than its target, as globe viewers turn the view, when its eye is more than</em><code>top</code> <em>(the top of the planet's air) from</em><code>centre</code> <em>; none nearer.</em></p>
+<pre><code class="language-C++">std::optional&lt; OrbitController &gt; ernie::app::OrbitAboutPlanet (
+    const OrbitController &amp; controller,
+    const glm::dvec3 &amp; centre,
+    double top,
+    float deltaYaw,
+    float deltaPitch
+) 
+</code></pre>
+<p>The view keeps its altitude and where it looks on the planet, so a drag never swings the eye into the ground. </p>
 <hr>
 
 <h3 id="function-parsedemooptions">function ParseDemoOptions</h3>

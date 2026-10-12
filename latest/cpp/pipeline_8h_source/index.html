@@ -353,6 +353,7 @@ struct RenderingTarget {
     std::vector&lt;VkImageView&gt; colors;
     std::vector&lt;VkClearColorValue&gt; clearColors;
     bool loadDepth = false;
+    float clearDepth = 1.0f;
     std::uint32_t layers = 1;
 };
 

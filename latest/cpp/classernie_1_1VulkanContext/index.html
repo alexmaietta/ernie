@@ -205,6 +205,21 @@
 <ul>
 <li><code>#include &lt;ernie/device/vulkan_context.h&gt;</code></li>
 </ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ExportedBuffer</strong></a> <br><em>A</em> <code>Shared</code> <em>buffer's handles, which whichever goes first of the buffer and this context destroys (under</em><code>mutex</code> <em>), nulling them: an array a scene still holds over the buffer after its renderer is gone keeps the memory through CUDA's import of it.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-functions">Public Functions</h2>
 <table>
 <thead>
@@ -321,6 +336,10 @@
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1GpuTimer/"><strong>GpuTimer</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-timer"><strong>Timer</strong></a> () const<br><em>The timer of</em> <code>ERNIE_GPU_ZONE</code> <em>s for Ernie's own profiler (</em><a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>); it times nothing on devices without timestamps or host query reset.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-trackexported"><strong>TrackExported</strong></a> (std::weak_ptr&lt; <a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ExportedBuffer</strong></a> &gt; exported) const<br><em>Registers</em> <code>exported</code> <em>for destruction with the device if its buffer outlives this context.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -566,6 +585,14 @@
 <h3 id="function-timer">function Timer</h3>
 <p><em>The timer of</em> <code>ERNIE_GPU_ZONE</code> <em>s for Ernie's own profiler (</em><a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>); it times nothing on devices without timestamps or host query reset.</em></p>
 <pre><code class="language-C++">inline GpuTimer &amp; ernie::VulkanContext::Timer () const
+</code></pre>
+<hr>
+
+<h3 id="function-trackexported">function TrackExported</h3>
+<p><em>Registers</em> <code>exported</code> <em>for destruction with the device if its buffer outlives this context.</em></p>
+<pre><code class="language-C++">void ernie::VulkanContext::TrackExported (
+    std::weak_ptr&lt; ExportedBuffer &gt; exported
+) const
 </code></pre>
 <hr>
 

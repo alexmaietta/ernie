@@ -276,6 +276,7 @@ class GpuBuffer {
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;
+    std::shared_ptr&lt;VulkanContext::ExportedBuffer&gt; exported_;
     VkDeviceSize allocationSize_ = 0;
     std::shared_ptr&lt;void&gt; attached_;
     std::shared_ptr&lt;const void&gt; lifetime_;
