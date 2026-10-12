@@ -76,6 +76,8 @@ configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py"
 configure_file(ernie/app.py "${ernie_package_dir}/app.py" COPYONLY)
 configure_file(ernie/batch.py "${ernie_package_dir}/batch.py"
                COPYONLY)
+configure_file(ernie/config.py "${ernie_package_dir}/config.py"
+               COPYONLY)
 configure_file(ernie/demo.py "${ernie_package_dir}/demo.py" COPYONLY)
 configure_file(ernie/schema.py "${ernie_package_dir}/schema.py"
                COPYONLY)
@@ -138,6 +140,7 @@ if(SKBUILD)
         FILES ernie/__init__.py
               ernie/app.py
               ernie/batch.py
+              ernie/config.py
               ernie/demo.py
               ernie/schema.py
               ernie/__main__.py

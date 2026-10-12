@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/shader_compiler.h"
 
+#include "ernie/util/log.h"
+
 #include <slang-com-ptr.h>
 #include <slang.h>
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -252,7 +255,16 @@ struct ShaderCompiler::Impl {
     }
 };
 
-ShaderCompiler::ShaderCompiler() : impl_(std::make_unique<Impl>()) {}
+ShaderCompiler::ShaderCompiler() : impl_(std::make_unique<Impl>()) {
+    // Under the banner (`VulkanContext::Create`), once a process.
+    static std::atomic<bool> announced{false};
+    if (!announced.exchange(true)) {
+        log::Info("   Shader cache: " +
+                  (impl_->cache
+                       ? impl_->cache->string()
+                       : std::string("off (ERNIE_SHADER_CACHE)")));
+    }
+}
 
 ShaderCompiler::~ShaderCompiler() = default;
 
@@ -260,6 +272,20 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
     std::span<const ShaderModuleSource> modules,
     const std::string& entryPoint) const {
     constexpr const char* kProfile = "spirv_1_6";
+    const auto start = std::chrono::steady_clock::now();
+    // As Warp's kernel cache lines: compiles always, cache hits when
+    // verbose.
+    const auto report = [&](const char* what, bool detail) {
+        char line[256];
+        std::snprintf(
+            line, sizeof(line), "Shader %s:%s %s in %.2f ms",
+            modules.empty() ? "" : modules.back().name.c_str(),
+            entryPoint.c_str(), what,
+            std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - start)
+                .count());
+        detail ? log::Detail(line) : log::Info(line);
+    };
     // From the cache when this Slang compiled the same sources for
     // the same entry point and target before.
     std::optional<fs::path> cached;
@@ -277,6 +303,7 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
         if (std::optional<std::vector<std::uint32_t>> words =
                 ReadCached(*cached)) {
             ++impl_->cacheHits;
+            report("loaded from cache", true);
             return std::move(*words);
         }
     }
@@ -289,6 +316,7 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
     if (cached) {
         WriteCached(*cached, words);
     }
+    report("compiled", false);
     return words;
 }
 

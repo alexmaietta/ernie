@@ -6,6 +6,7 @@ ernie_add_library(
     atmosphere.cpp
     ies.cpp
     image.cpp
+    log.cpp
     mapped_file.cpp
     nanovdb.cpp
     noise.cpp
@@ -30,3 +31,6 @@ ernie_add_library(
     ernie_basisu
     ernie_zstd
     ernie_bc7enc)
+# The banner's version (log.h).
+set_source_files_properties(
+    log.cpp PROPERTIES COMPILE_DEFINITIONS ERNIE_VERSION="${ERNIE_VERSION}")

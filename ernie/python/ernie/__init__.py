@@ -80,7 +80,7 @@ torch.from_dlpack(result) (or CuPy, JAX) makes the consumer's stream
 wait for the render on the GPU, so the host never blocks.
 """
 
-from . import schema
+from . import config, schema
 from ._ernie import (
     AttributeDef,
     AttributeKind,
