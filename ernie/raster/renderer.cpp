@@ -912,7 +912,6 @@ ShadingModules(const BrdfModel& brdf,
                     {"atmosphere", shaders::kAtmosphereSlang},
                     {"virtual_shadow", shaders::kVirtualShadowSlang},
                     {"laser_beams", shaders::kLaserBeamsSlang},
-                    {"laser_beams", shaders::kLaserBeamsSlang},
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
                                     brdf.typeName + ";\n" +
