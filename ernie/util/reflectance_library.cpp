@@ -8,8 +8,9 @@
 #include <vector>
 
 namespace ernie {
+namespace {
 
-std::span<const MeasuredReflectance> ReflectanceLibrary() {
+const std::vector<MeasuredReflectance>& Library() {
     static const std::vector<MeasuredReflectance> library = [] {
         std::vector<MeasuredReflectance> entries;
         for (const reflectance_table::Entry& entry :
@@ -32,8 +33,14 @@ std::span<const MeasuredReflectance> ReflectanceLibrary() {
     return library;
 }
 
+}  // namespace
+
+std::span<const MeasuredReflectance> ReflectanceLibrary() {
+    return Library();
+}
+
 const MeasuredReflectance* FindReflectance(std::string_view id) {
-    for (const MeasuredReflectance& entry : ReflectanceLibrary()) {
+    for (const MeasuredReflectance& entry : Library()) {
         if (entry.id == id) {
             return &entry;
         }
