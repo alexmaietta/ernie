@@ -14,7 +14,7 @@ namespace ernie::memory {
 /// One live allocation.
 struct Allocation {
     const char* category = "";  ///< A string literal.
-    std::string detail;  ///< Its extent and format, or its size.
+    std::string detail;  ///< An image's extent, a buffer's size.
     std::uint64_t bytes = 0;
     bool host =
         false;  ///< In host-visible memory (upload, readback).
