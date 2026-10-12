@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""LROC's Narrow Angle Camera line-scanning the flank of Tycho's central
-peak as it took image M1282557272RE, posed from that image's ISD on
-LROC's 2 m stereo terrain of the peak (a window of it fetched on the
-first run, 88 MB read for 13 MB kept).
+"""LROC's Narrow Angle Camera scanning Tycho's central peak as image
+M1282557272RE's ISD has it, on LROC's 2 m stereo terrain (fetched on
+the first run).
 
 References:
 - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera (LROC)
@@ -53,9 +52,8 @@ SUN_RADIUS = 6.957e8
 AU = 1.495978707e11
 SOLAR_CONSTANT = 1361.0
 
-# The NACs' published values (Robinson et al. 2010, Table 2; section
-# 3.1.2 for the KLI-5001G's QE): focal ratio, gain, detector noise and
-# full well. The ISD sets the geometry and line time.
+# The NACs' focal ratio, gain, noise and full well (Robinson et al.
+# 2010, Table 2).
 NAC_F_NUMBER = 3.577
 NAC_ELECTRONS_PER_DN = 90.5
 NAC_READ_NOISE = 101.0
@@ -78,9 +76,8 @@ def nac_compand(x):
 
 # ------------------------------------------------------------------ DTM
 
-# LROC's NAC DTM mosaic of the peak in the PDS: a GeoTIFF of 32-bit
-# reals, one row a strip, on an equirectangular grid true at 43.3 S (its
-# PDS3 label's values).
+# LROC's NAC DTM mosaic of the peak: a GeoTIFF of 32-bit reals, one row
+# a strip, as its PDS3 label gives it.
 DTM_URL = (
     "https://pds.mcp.nasa.gov/data/store/img/lunar_reconnaissance_"
     "orbiter/pds4/lroc/lro-l-lroc-5-rdr/LROLRC_2001/DATA/SDP/NAC_DTM/"
@@ -130,11 +127,9 @@ def row_offsets(url, first_row, rows):
 
 
 def fetch_dtm_window(latitude, longitude, half):
-    """Fetches the window of the DTM about a latitude and longitude
-    reaching `half` metres each way (its rows by HTTP range requests;
-    the DTM is 1.5 GB), and writes it to the cache as an image and a
-    PDS3 label of its own, which `ernie.read_cylindrical_dem` reads. As
-    demo_cameras_lroc_nac.cpp's `FetchDtmWindow`."""
+    """Fetches the DTM's window `half` metres about a point into the
+    cache, as an image and a PDS3 label `ernie.read_cylindrical_dem`
+    reads."""
     along = DTM_PIXELS_PER_DEGREE
     across = along * math.cos(math.radians(DTM_PARALLEL))
     degrees = math.degrees(half / MOON_RADIUS)
@@ -151,9 +146,8 @@ def fetch_dtm_window(latitude, longitude, half):
         raise RuntimeError("The window leaves the DTM")
     print(f"Fetching {rows} rows of {columns} samples from {DTM_URL}")
     offsets = row_offsets(DTM_URL, first_row, rows)
-    # Rows lie back to back in runs (the server serves one range a
-    # request): each run's whole rows at once, the window's columns cut
-    # from them.
+    # Each run of contiguous rows in one request (the server serves one
+    # range a request).
     row_bytes = 4 * DTM_SAMPLES
     data = bytearray()
     start = 0
@@ -388,10 +382,8 @@ class Demo(ernie.demo.Demo):
         return ernie.Camera.at(self.scene, "/World/Nac")
 
     def define_nac(self):
-        """The NAC as published, its geometry the ISD's: the
-        KLI-5001G's QE (> 60% over 400 to 760 nm, section 3.1.2), gain,
-        noise and full well, a 12-bit ADC, the even and odd channels,
-        the 12- to 8-bit table and photographic outputs to show."""
+        """The NAC's sensor and readout as published; the ISD sets its
+        geometry and line time."""
         self.scene.define(
             "/World/Nac",
             ernie.Camera,
@@ -507,10 +499,8 @@ class Demo(ernie.demo.Demo):
         return self.lola.height_at(*at) if math.isnan(h) else h
 
     def check_strips_see_the_ground_where_the_isd_puts_it(self):
-        """Balls on the ground (lifted 10 m up the pixels' rays, clear
-        of the terrain's cells) where the ISD's model puts three pixels'
-        rays on the terrain show on those pixels of their strips: the
-        ISD's geometry, as Ernie draws it in the local frame."""
+        """Balls where the ISD puts three pixels' rays on the terrain
+        show on those pixels."""
         samples = self.nac.samples
         pixels = [
             (FIRST_LINE + 100, 600),
@@ -564,10 +554,8 @@ class Demo(ernie.demo.Demo):
             ), "a marker should land on its pixel"
 
     def check_readout(self):
-        """Every pixel's 8-bit number is the table's of its 12-bit one,
-        its electrons over the gain (either side of a half DN, which the
-        GPU's floats may round either way); the daylit ground is exposed
-        within the ADC's range."""
+        """Every 8-bit number is the companding table's of its
+        electrons, and the daylit ground sits within the ADC's range."""
         out = self.render_strip(STRIPS // 2)
         electrons = np.minimum(
             out["Electrons"].ravel(), NAC_FULL_WELL

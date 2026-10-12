@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// LROC's Narrow Angle Camera line-scanning the flank of Tycho's
-// central peak as it took image M1282557272RE, posed from that
-// image's ISD on LROC's 2 m stereo terrain of the peak (a window of
-// it fetched on the first run, 88 MB read for 13 MB kept).
+// LROC's Narrow Angle Camera scanning Tycho's central peak as image
+// M1282557272RE's ISD has it, on LROC's 2 m stereo terrain (fetched
+// on the first run).
 //
 // References:
 // - M. S. Robinson et al., "Lunar Reconnaissance Orbiter Camera
@@ -74,9 +73,8 @@ constexpr double kSunRadius = 6.957e8;
 constexpr double kAu = 1.495978707e11;
 constexpr double kSolarConstant = 1361.0;
 
-/// The NACs' published values (Robinson et al. 2010, Table 2; section
-/// 3.1.2 for the KLI-5001G's QE): focal ratio, gain, detector noise
-/// and full well. The ISD sets the geometry and line time.
+/// The NACs' focal ratio, gain, noise and full well (Robinson et al.
+/// 2010, Table 2).
 constexpr double kNacFNumber = 3.577;
 constexpr double kNacElectronsPerDn = 90.5;
 constexpr double kNacReadNoise = 101.0;
@@ -95,9 +93,8 @@ double NacCompand(double x) {
 // ----------------------------------------------------------------
 // DTM
 
-/// LROC's NAC DTM mosaic of the peak in the PDS: a GeoTIFF of 32-bit
-/// reals, one row a strip, on an equirectangular grid true at 43.3 S
-/// (its PDS3 label's values).
+/// LROC's NAC DTM mosaic of the peak: a GeoTIFF of 32-bit reals, one
+/// row a strip, as its PDS3 label gives it.
 constexpr const char* kDtmUrl =
     "https://pds.mcp.nasa.gov/data/store/img/lunar_reconnaissance_"
     "orbiter/pds4/lroc/lro-l-lroc-5-rdr/LROLRC_2001/DATA/SDP/NAC_DTM/"
@@ -162,12 +159,8 @@ std::vector<std::uint64_t> RowOffsets(const std::string& url,
     throw std::runtime_error(url + " has no strip offsets");
 }
 
-/// Fetches the window of the DTM about latitude `latitudeDeg` and
-/// longitude `longitudeDeg` reaching `half` metres each way (its rows
-/// by HTTP range requests; the DTM is 1.5 GB), and writes it to the
-/// cache as an image and a PDS3 label of its own, which
-/// `ReadCylindricalDem` reads. As demo_cameras_lroc_nac.py's
-/// `fetch_dtm_window`.
+/// Fetches the DTM's window `half` metres about a point into the
+/// cache, as an image and a PDS3 label `ReadCylindricalDem` reads.
 void FetchDtmWindow(double latitudeDeg, double longitudeDeg,
                     double half) {
     const double along = kDtmPixelsPerDegree;
@@ -192,9 +185,8 @@ void FetchDtmWindow(double latitudeDeg, double longitudeDeg,
                 static_cast<unsigned long long>(columns), kDtmUrl);
     const std::vector<std::uint64_t> offsets =
         RowOffsets(kDtmUrl, firstRow, rows);
-    // Rows lie back to back in runs (the server serves one range a
-    // request): each run's whole rows at once, the window's columns
-    // cut from them.
+    // Each run of contiguous rows in one request (the server serves
+    // one range a request).
     const std::uint64_t rowBytes = 4 * kDtmSamples;
     std::string data;
     for (std::uint64_t start = 0; start < rows;) {
@@ -390,10 +382,8 @@ class LrocNacDemo : public app::Demo {
     }
 
   private:
-    /// The NAC as published, its geometry the ISD's: the KLI-5001G's
-    /// QE (> 60% over 400 to 760 nm, section 3.1.2), gain, noise and
-    /// full well, a 12-bit ADC, the even and odd channels, the
-    /// 12- to 8-bit table and photographic outputs to show.
+    /// The NAC's sensor and readout as published; the ISD sets its
+    /// geometry and line time.
     void DefineNac() {
         Scene& scene = GetScene();
         Camera::Define(scene, "/World/Nac")
@@ -496,10 +486,8 @@ class LrocNacDemo : public app::Demo {
         return std::isnan(h) ? lola_.HeightAt(at.x, at.y) : h;
     }
 
-    /// Balls on the ground (lifted 10 m up the pixels' rays, clear of
-    /// the terrain's cells) where the ISD's model puts three pixels'
-    /// rays on the terrain show on those pixels of their strips: the
-    /// ISD's geometry, as Ernie draws it in the local frame.
+    /// Balls where the ISD puts three pixels' rays on the terrain
+    /// show on those pixels.
     void CheckStripsSeeTheGroundWhereTheIsdPutsIt() {
         Scene& scene = GetScene();
         const std::uint32_t samples = nac_.Isd().samples;
@@ -557,10 +545,8 @@ class LrocNacDemo : public app::Demo {
         }
     }
 
-    /// Every pixel's 8-bit number is the table's of its 12-bit one,
-    /// its electrons over the gain (either side of a half DN, which
-    /// the GPU's floats may round either way); the daylit ground is
-    /// exposed within the ADC's range.
+    /// Every 8-bit number is the companding table's of its electrons,
+    /// and the daylit ground sits within the ADC's range.
     void CheckReadout() {
         RenderProductSetOutputs outputs = RenderStrip(kStrips / 2);
         const Tensor electrons =
