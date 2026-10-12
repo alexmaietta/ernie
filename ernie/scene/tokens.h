@@ -1021,6 +1021,14 @@ inline constexpr std::string_view kThermalTemperatureTexture =
 /// thermal solver's write-back, from the CPU or a CUDA device.
 inline constexpr std::string_view kThermalTemperatures =
     "ernie:thermal:temperatures";
+/// RenderSettings' texture loading (Ernie): kAuto (complete for a
+/// step, async for the viewport), kComplete (a frame waits for every
+/// texture its materials read) or kAsync (a frame draws pending
+/// textures' placeholders).
+inline constexpr std::string_view kTextureLoading =
+    "ernie:textureLoading";
+inline constexpr std::string_view kComplete = "complete";
+inline constexpr std::string_view kAsync = "async";
 /// RenderSettings' thermal emission (Ernie): whether materials glow
 /// at their temperatures (default off); the temperature in kelvin of
 /// materials without their own (default 0, none); and the

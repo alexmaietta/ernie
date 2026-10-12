@@ -13,6 +13,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/session/product_frame.h"
+#include "ernie/util/log.h"
 #include "ernie/util/profile.h"
 #include "ernie/util/texture_file.h"
 
@@ -20,6 +21,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <functional>
@@ -174,26 +176,27 @@ constexpr std::string_view kCompressedKey = "|gpu-bc7-1";
 /// An image file's texture for `slot` as `RasterDelegate::
 /// UploadPrepared` takes it: from `cache` (when given) under `key`
 /// (`UploadKey`), setting `cached`, else decoded and prepared. Any
-/// thread may call it.
-/// @throws as `TextureImageOf` and `PrepareMaterialTexture`.
-PreparedTexture LoadPrepared(const Scene& scene,
-                             MaterialTextureSlot slot,
+/// thread may call it; it reads no scene.
+/// @throws as `LoadImageFile` and `PrepareMaterialTexture`.
+PreparedTexture LoadPrepared(MaterialTextureSlot slot,
                              const TextureReader& reader,
                              const TextureCache* cache,
                              const std::string& key, bool& cached) {
+    ERNIE_ZONE("Load texture");
     if (cache != nullptr) {
         if (const std::optional<TextureData> stored =
                 cache->Read(key + std::string(kCompressedKey))) {
             if (std::optional<PreparedTexture> prepared =
                     PreparedOf(*stored)) {
                 cached = true;
+                log::Detail("Texture cache: " + reader.file);
                 return std::move(*prepared);
             }
         }
     }
     cached = false;
-    return PrepareMaterialTexture(slot, TextureImageOf(scene, reader),
-                                  reader);
+    return PrepareMaterialTexture(
+        slot, LoadImageFile(reader.file, EncodingOf(reader)), reader);
 }
 
 std::invalid_argument UploadError(const Path& path,
@@ -615,6 +618,8 @@ RenderStats RasterDelegate::Stats() const {
                                 meshes_.DrawCount(0));
     stats.counters.emplace_back(raster_stats::kMeshDrawCalls,
                                 meshes_.DrawCalls(0));
+    stats.counters.emplace_back(raster_stats::kTexturesLoading,
+                                loadingTextures_.size());
     return stats;
 }
 
@@ -648,8 +653,6 @@ void RasterDelegate::SyncMaterials(const Scene& scene) {
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
-    const std::vector<std::shared_ptr<const MaterialTexture>>
-        prefetched = PrefetchTextures(scene);
     for (const Path& path : scene.Prims(kMaterial)) {
         seen.insert(path);
         auto [it, added] = materials_.try_emplace(path);
@@ -703,15 +706,22 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             continue;
         }
         material.textures[slot] = key;
+        material.pending[slot].clear();
+        material.readers[slot] = reader.value_or(TextureReader());
         try {
             // The readers come in `MaterialTextureSlot`'s order.
             const auto textureSlot =
                 static_cast<MaterialTextureSlot>(slot);
-            gpu.SetTexture(
-                textureSlot,
-                reader ? SharedTexture(scene, textureSlot, *reader)
-                       : nullptr,
-                reader.value_or(TextureReader()));
+            std::shared_ptr<const MaterialTexture> texture =
+                reader ? SharedTexture(scene, textureSlot, *reader,
+                                       material.pending[slot])
+                       : nullptr;
+            // A texture still loading reads a placeholder meanwhile.
+            gpu.SetTexture(textureSlot,
+                           material.pending[slot].empty()
+                               ? std::move(texture)
+                               : LoadingTexture(textureSlot),
+                           material.readers[slot]);
         } catch (const std::exception& error) {
             throw UploadError(path, kInputs[slot], error.what());
         }
@@ -799,103 +809,10 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
     }
 }
 
-std::vector<std::shared_ptr<const MaterialTexture>>
-RasterDelegate::PrefetchTextures(const Scene& scene) {
-    ERNIE_ZONE("Prefetch textures");
-    struct Job {
-        MaterialTextureSlot slot;
-        TextureReader reader;
-        std::string key;
-    };
-    std::vector<Job> jobs;
-    std::set<std::string> keys;
-    for (const Path& path : scene.Prims(tokens::kMaterial)) {
-        MaterialSettings settings;
-        try {
-            settings =
-                MaterialSettingsOf(scene, path, renderer_.Brdfs());
-        } catch (const std::invalid_argument&) {
-            continue;  // SyncMaterial reports it.
-        }
-        const std::array<const std::optional<TextureReader>*, 5>
-            readers{&settings.albedoTexture, &settings.normalTexture,
-                    &settings.roughnessTexture,
-                    &settings.metallicTexture,
-                    &settings.opacityTexture};
-        for (std::size_t slot = 0; slot < readers.size(); ++slot) {
-            const std::optional<TextureReader>& reader =
-                *readers[slot];
-            // Image files only: DDS and KTX2 upload as stored.
-            if (!reader || !reader->image.empty() ||
-                IsTextureFile(reader->file)) {
-                continue;
-            }
-            const auto textureSlot =
-                static_cast<MaterialTextureSlot>(slot);
-            std::string key = UploadKey(scene, textureSlot, *reader);
-            if (const auto it = sharedTextures_.find(key);
-                (it != sharedTextures_.end() &&
-                 !it->second.expired()) ||
-                !keys.insert(key).second) {
-                continue;
-            }
-            jobs.push_back({textureSlot, *reader, std::move(key)});
-        }
-    }
-    // Decoded and their mips made a few at a time (a decoded 4k
-    // texture is 256 MB of floats), uploaded in order; a file that
-    // fails is left for SyncMaterial to report.
-    std::vector<std::shared_ptr<const MaterialTexture>> uploaded;
-    const std::size_t batch = std::clamp<std::size_t>(
-        std::thread::hardware_concurrency(), 1, 6);
-    const TextureCache* cache =
-        Encoder() != nullptr ? &textureCache_ : nullptr;
-    struct Loaded {
-        PreparedTexture prepared;
-        bool cached = false;
-    };
-    for (std::size_t first = 0; first < jobs.size(); first += batch) {
-        const std::size_t last = std::min(jobs.size(), first + batch);
-        std::vector<std::future<std::optional<Loaded>>> ready;
-        for (std::size_t i = first; i < last; ++i) {
-            ready.push_back(
-                std::async(std::launch::async,
-                           [&scene, &job = jobs[i],
-                            cache]() -> std::optional<Loaded> {
-                               try {
-                                   Loaded loaded;
-                                   loaded.prepared = LoadPrepared(
-                                       scene, job.slot, job.reader,
-                                       cache, job.key, loaded.cached);
-                                   return loaded;
-                               } catch (const std::exception&) {
-                                   return std::nullopt;
-                               }
-                           }));
-        }
-        for (std::size_t i = first; i < last; ++i) {
-            std::optional<Loaded> loaded = ready[i - first].get();
-            if (!loaded) {
-                continue;
-            }
-            try {
-                std::shared_ptr<const MaterialTexture> texture =
-                    UploadPrepared(std::move(loaded->prepared),
-                                   jobs[i].key, loaded->cached);
-                sharedTextures_[jobs[i].key] = texture;
-                uploaded.push_back(std::move(texture));
-            } catch (const std::exception&) {
-                // SyncMaterial reports it.
-            }
-        }
-    }
-    return uploaded;
-}
-
-std::shared_ptr<const MaterialTexture>
-RasterDelegate::SharedTexture(const Scene& scene,
-                              MaterialTextureSlot slot,
-                              const TextureReader& reader) {
+std::shared_ptr<const MaterialTexture> RasterDelegate::SharedTexture(
+    const Scene& scene, MaterialTextureSlot slot,
+    const TextureReader& reader, std::string& pending) {
+    pending.clear();
     const std::string key = UploadKey(scene, slot, reader);
     std::weak_ptr<const MaterialTexture>& shared =
         sharedTextures_[key];
@@ -908,19 +825,139 @@ RasterDelegate::SharedTexture(const Scene& scene,
         texture = UploadMaterialTexture(
             context_, slot, TextureImageOf(scene, reader), reader);
     } else if (IsTextureFile(reader.file)) {
-        // DDS and KTX2 files upload as stored.
+        // DDS and KTX2 files upload as stored, mapped (virtual
+        // textures read their tiles as they are seen).
         texture = UploadMaterialTexture(
             context_, slot, LoadTextureFile(reader.file), reader);
     } else {
-        bool cached = false;
-        PreparedTexture prepared = LoadPrepared(
-            scene, slot, reader,
-            Encoder() != nullptr ? &textureCache_ : nullptr, key,
-            cached);
-        texture = UploadPrepared(std::move(prepared), key, cached);
+        if (const auto failed = failedTextures_.find(key);
+            failed != failedTextures_.end()) {
+            throw std::invalid_argument(failed->second);
+        }
+        // Decoded and mipped off the main thread;
+        // `FinishTextureLoads` uploads it.
+        if (!loadingTextures_.contains(key)) {
+            const TextureCache* cache =
+                Encoder() != nullptr ? &textureCache_ : nullptr;
+            loadingTextures_.emplace(
+                key,
+                textureLoaders_.Submit([slot, reader, cache, key] {
+                    LoadedTexture loaded;
+                    loaded.prepared = LoadPrepared(
+                        slot, reader, cache, key, loaded.cached);
+                    return loaded;
+                }));
+        }
+        pending = key;
+        return nullptr;
     }
     shared = texture;
     return texture;
+}
+
+void RasterDelegate::FinishTextureLoads(bool wait) {
+    if (loadingTextures_.empty()) {
+        return;
+    }
+    ERNIE_ZONE("Finish texture loads");
+    using namespace tokens;
+    constexpr std::array<std::string_view, 5> kInputs{
+        kDiffuseColor, kNormalInput, kRoughness, kMetallic, kOpacity};
+    std::vector<std::string> errors;
+    for (auto it = loadingTextures_.begin();
+         it != loadingTextures_.end();) {
+        if (!wait && it->second.wait_for(std::chrono::seconds(0)) !=
+                         std::future_status::ready) {
+            ++it;
+            continue;
+        }
+        const std::string key = it->first;
+        std::shared_ptr<const MaterialTexture> texture;
+        std::string error;
+        try {
+            LoadedTexture loaded = it->second.get();
+            texture = UploadPrepared(std::move(loaded.prepared), key,
+                                     loaded.cached);
+            sharedTextures_[key] = texture;
+        } catch (const std::exception& failure) {
+            error = failure.what();
+            failedTextures_[key] = error;
+        }
+        it = loadingTextures_.erase(it);
+        for (auto& [path, material] : materials_) {
+            for (std::size_t slot = 0; slot < material.pending.size();
+                 ++slot) {
+                if (material.pending[slot] != key) {
+                    continue;
+                }
+                material.pending[slot].clear();
+                // A failed texture leaves the slot to the material's
+                // constant, as no texture would.
+                renderer_.Material(material.id)
+                    .SetTexture(
+                        static_cast<MaterialTextureSlot>(slot),
+                        texture, material.readers[slot]);
+                if (texture == nullptr) {
+                    errors.emplace_back(
+                        UploadError(path, kInputs[slot], error)
+                            .what());
+                }
+            }
+        }
+    }
+    if (errors.empty()) {
+        return;
+    }
+    if (wait) {
+        std::string message = errors.front();
+        for (std::size_t i = 1; i < errors.size(); ++i) {
+            message += "; " + errors[i];
+        }
+        throw std::invalid_argument(message);
+    }
+    for (const std::string& message : errors) {
+        log::Info(message);
+    }
+}
+
+std::shared_ptr<const MaterialTexture>
+RasterDelegate::LoadingTexture(MaterialTextureSlot slot) {
+    if (slot != MaterialTextureSlot::Albedo) {
+        return nullptr;
+    }
+    if (loadingAlbedo_ == nullptr) {
+        // 8 x 8 cells of 8 texels, light and mid grey.
+        constexpr std::uint32_t kSide = 64;
+        Image checker(kSide, kSide);
+        for (std::uint32_t y = 0; y < kSide; ++y) {
+            for (std::uint32_t x = 0; x < kSide; ++x) {
+                checker.At(x, y) = glm::vec4(
+                    glm::vec3((x / 8 + y / 8) % 2 == 0 ? 0.6f : 0.3f),
+                    1.0f);
+            }
+        }
+        loadingAlbedo_ = UploadMaterialTexture(
+            context_, slot, checker, TextureReader());
+    }
+    return loadingAlbedo_;
+}
+
+bool RasterDelegate::WaitsForTextures(const Scene& scene,
+                                      const Path& settings) const {
+    const std::string loading =
+        settings.IsEmpty()
+            ? std::string(tokens::kAuto)
+            : RenderSettings(scene, settings).GetTextureLoading();
+    if (loading == tokens::kAuto) {
+        return !viewportFrame_;
+    }
+    if (loading != tokens::kComplete && loading != tokens::kAsync) {
+        throw std::invalid_argument(
+            "'" + std::string(tokens::kTextureLoading) + "' of '" +
+            settings.String() +
+            "' must be \"auto\", \"complete\" or \"async\"");
+    }
+    return loading == tokens::kComplete;
 }
 
 BlockEncoder* RasterDelegate::Encoder() {
@@ -2963,6 +3000,9 @@ void RasterDelegate::UpdatePrims(
     std::optional<glm::vec3> minimalColor) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
+    // Textures that finished loading take their placeholders' places;
+    // a frame that waits for all of them waits here.
+    FinishTextureLoads(WaitsForTextures(scene, prims.settings));
     prims_ = prims;
     // Lights under prims posed on the GPU (a lamp on a robot's link):
     // posed there under their instances, the renderer fitting their

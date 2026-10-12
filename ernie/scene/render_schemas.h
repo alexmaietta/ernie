@@ -108,6 +108,15 @@
                                      "also lights the scene (through the DomeLight, whose map "    \
                                      "tints it, or a dome of its own); 0 none.",                   \
                               .group = "Thermal", .max = 5000.0}))                                 \
+    X(std::string, TextureLoading, ::ernie::tokens::kTextureLoading, ::ernie::tokens::kAuto,       \
+      (::ernie::AttributeMeta{.label = "Texture loading",                                          \
+                              .doc = "Whether a frame waits for every texture its materials "     \
+                                     "read (\"complete\") or draws a placeholder for those still " \
+                                     "loading (\"async\"); \"auto\" is complete for a step and "   \
+                                     "async for the viewport.",                                    \
+                              .group = "Image",                                                    \
+                              .options = {::ernie::tokens::kAuto, ::ernie::tokens::kComplete,      \
+                                          ::ernie::tokens::kAsync}}))                              \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = "Background", .doc = "Linear display colour of LdrColor's " \
                                                             "background.",                         \

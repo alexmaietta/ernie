@@ -1498,12 +1498,14 @@ TEST_F(RasterDelegateTest, IsARenderBackend) {
     for (const auto& [name, value] : stats.counters) {
         names.emplace_back(name);
     }
-    EXPECT_EQ(names,
-              (std::vector<std::string>{
-                  std::string(ernie::raster_stats::kTerrainPatches),
-                  std::string(ernie::raster_stats::kTerrainLodLevels),
-                  std::string(ernie::raster_stats::kMeshDraws),
-                  std::string(ernie::raster_stats::kMeshDrawCalls)}));
+    EXPECT_EQ(
+        names,
+        (std::vector<std::string>{
+            std::string(ernie::raster_stats::kTerrainPatches),
+            std::string(ernie::raster_stats::kTerrainLodLevels),
+            std::string(ernie::raster_stats::kMeshDraws),
+            std::string(ernie::raster_stats::kMeshDrawCalls),
+            std::string(ernie::raster_stats::kTexturesLoading)}));
     delegate->Step(scene);
     EXPECT_GT(delegate->Stats().triangles, 0u);
     EXPECT_GT(delegate->Stats().gpuBytes, stats.gpuBytes)

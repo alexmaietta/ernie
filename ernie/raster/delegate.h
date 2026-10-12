@@ -19,9 +19,12 @@
 #include "ernie/util/image.h"
 #include "ernie/util/tensor.h"
 #include "ernie/util/texture_cache.h"
+#include "ernie/util/worker_pool.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <future>
 #include <initializer_list>
 #include <map>
 #include <memory>
@@ -30,6 +33,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -48,6 +52,10 @@ inline constexpr std::string_view kMeshDraws = "mesh draws";
 /// Mesh draw calls the first view recorded last frame: one per mesh
 /// drawn directly, one per multi-draw of GPU-culled instances.
 inline constexpr std::string_view kMeshDrawCalls = "mesh draw calls";
+/// Image files' textures still loading, whose materials read a
+/// placeholder (`ernie:textureLoading` async).
+inline constexpr std::string_view kTexturesLoading =
+    "textures loading";
 }  // namespace raster_stats
 
 /// The ground plane's options from the GroundPlane prim at `ground`:
@@ -275,6 +283,19 @@ class RasterDelegate : public RenderDelegate {
         /// What the albedo texture, normal map, roughness, metallic
         /// and opacity textures were loaded from (`TextureKey`).
         std::array<std::string, 5> textures;
+        /// The upload keys (`UploadKey`) of those still loading
+        /// (`loadingTextures_`), whose slots read a placeholder
+        /// meanwhile; empty for the rest.
+        std::array<std::string, 5> pending;
+        /// How each slot reads its texture, for when it arrives.
+        std::array<TextureReader, 5> readers;
+    };
+
+    /// An image file's texture decoded and mipped off the main thread
+    /// (`LoadPrepared`), to upload.
+    struct LoadedTexture {
+        PreparedTexture prepared;
+        bool cached = false;
     };
 
     struct SyncedMesh {
@@ -392,10 +413,31 @@ class RasterDelegate : public RenderDelegate {
                       SyncedMaterial& material);
     /// The upload of what `reader` reads into `slot`, shared with
     /// every material reading it the same way: from `sharedTextures_`
-    /// while a material holds it, else loaded and uploaded.
+    /// while a material holds it, else loaded and uploaded. Image
+    /// files load off the main thread (`loadingTextures_`): null
+    /// then, with `pending` set to the upload key
+    /// `FinishTextureLoads` delivers it under.
+    /// @throws std::invalid_argument, or as the loaders throw, for a
+    /// texture that cannot load (one that failed before included).
     std::shared_ptr<const MaterialTexture>
     SharedTexture(const Scene& scene, MaterialTextureSlot slot,
-                  const TextureReader& reader);
+                  const TextureReader& reader, std::string& pending);
+    /// Uploads the image files' textures that finished loading (all,
+    /// waiting for them, with `wait`) and gives them to the materials
+    /// waiting (`SyncedMaterial::pending`).
+    /// @throws std::invalid_argument naming the materials of those
+    /// that failed, with `wait`; otherwise they are logged.
+    void FinishTextureLoads(bool wait);
+    /// What `slot` reads while its texture loads: a grey checker for
+    /// albedo, through the material's coordinates, as Omniverse shows
+    /// one; nothing (the material's constants) for the rest.
+    std::shared_ptr<const MaterialTexture>
+    LoadingTexture(MaterialTextureSlot slot);
+    /// Whether frames of `settings` wait for every texture
+    /// (`ernie:textureLoading`): complete, or auto outside the
+    /// viewport.
+    bool WaitsForTextures(const Scene& scene,
+                          const Path& settings) const;
     /// The GPU's BC7 encoder, made at first use; null on a device
     /// that cannot sample BC7 or make it.
     BlockEncoder* Encoder();
@@ -405,12 +447,6 @@ class RasterDelegate : public RenderDelegate {
     std::shared_ptr<const MaterialTexture>
     UploadPrepared(PreparedTexture prepared, const std::string& key,
                    bool cached);
-    /// Uploads the image files the materials read that are not
-    /// uploaded yet, decoding several at once, into
-    /// `sharedTextures_`; returns them, to hold until the materials
-    /// do.
-    std::vector<std::shared_ptr<const MaterialTexture>>
-    PrefetchTextures(const Scene& scene);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -654,6 +690,18 @@ class RasterDelegate : public RenderDelegate {
     /// Image files' textures as `UploadPrepared` compressed them,
     /// between runs.
     TextureCache textureCache_;
+    /// Image files' textures loading, by upload key, and the errors
+    /// of those that failed (reported again to materials reading
+    /// them later, never reloaded until the file changes).
+    std::map<std::string, std::future<LoadedTexture>>
+        loadingTextures_;
+    std::map<std::string, std::string> failedTextures_;
+    /// `LoadingTexture`'s checker, made at first use.
+    std::shared_ptr<const MaterialTexture> loadingAlbedo_;
+    /// Decodes and mips image files (`loadingTextures_`); after the
+    /// cache its jobs read, so it stops first.
+    WorkerPool textureLoaders_{
+        std::clamp(std::thread::hardware_concurrency(), 1u, 6u)};
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;

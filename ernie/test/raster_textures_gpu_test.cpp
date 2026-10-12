@@ -965,6 +965,57 @@ TEST_F(RasterDelegateTest, ImageFilesUploadAsBc7KeptBetweenRuns) {
 }
 
 TEST_F(RasterDelegateTest,
+       AsyncFramesDrawLoadingTexturesPlaceholders) {
+    // A red 2048 x 2048 PNG albedo, read with ernie:textureLoading
+    // async: the first frame, drawn before the file has loaded, shows
+    // the grey placeholder (r = g = b) with the texture counted as
+    // loading; a complete frame waits for it and shows red.
+    constexpr int kSide = 2048;
+    std::vector<std::uint8_t> texels;
+    for (int i = 0; i < kSide * kSide; ++i) {
+        texels.insert(texels.end(), {230, 20, 20, 255});
+    }
+    const std::string png = ::testing::TempDir() + "loading_red.png";
+    ASSERT_NE(stbi_write_png(png.c_str(), kSide, kSide, 4,
+                             texels.data(), kSide * 4),
+              0);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(png);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetTextureLoading(std::string(tokens::kAsync));
+    RasterDelegate delegate(*context_);
+    const auto loading = [&] {
+        for (const auto& [name, count] : delegate.Stats().counters) {
+            if (name == ernie::raster_stats::kTexturesLoading) {
+                return count;
+            }
+        }
+        return std::uint64_t{0};
+    };
+
+    const std::vector<float> placeholder = Quadrants(delegate, scene);
+    EXPECT_EQ(loading(), 1u);
+    for (std::size_t i = 0; i < placeholder.size(); i += 3) {
+        EXPECT_GT(placeholder[i], 0.0f);
+        EXPECT_NEAR(placeholder[i + 1], placeholder[i],
+                    0.02f * placeholder[i]);
+        EXPECT_NEAR(placeholder[i + 2], placeholder[i],
+                    0.02f * placeholder[i]);
+    }
+
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetTextureLoading(std::string(tokens::kComplete));
+    const std::vector<float> loaded = Quadrants(delegate, scene);
+    EXPECT_EQ(loading(), 0u);
+    for (std::size_t i = 0; i < loaded.size(); i += 3) {
+        EXPECT_GT(loaded[i], 3.0f * loaded[i + 1]);
+        EXPECT_GT(loaded[i], 3.0f * loaded[i + 2]);
+    }
+}
+
+TEST_F(RasterDelegateTest,
        TemperatureTexturesSetTheTemperatureAcrossAMesh) {
     // The quad's material at 250 K with a 2 x 1 temperature texture
     // of 0 (the material's) and 400 K: the Temperature var reads the
