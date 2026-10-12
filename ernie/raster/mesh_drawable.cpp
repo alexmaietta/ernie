@@ -36,6 +36,9 @@ constexpr std::uint32_t kHasInstanceColors = 64;
 constexpr std::uint32_t kThermal = 128;
 /// The mesh has temperatures per point (`SetTemperatures`).
 constexpr std::uint32_t kHasTemperatures = 256;
+/// The mesh has a thermal network's nodes and their temperatures
+/// (`SetNodeIds`, `SetNodeTemperatures`).
+constexpr std::uint32_t kHasNodes = 512;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -319,8 +322,12 @@ struct MeshResources {
     VkDeviceAddress activeCounts;
     /// Meshes' temperatures per point (`MeshDrawable::temperatures_`).
     VkDeviceAddress temperatures;
+    /// Their thermal networks' nodes per point and the nodes'
+    /// temperatures (`MeshDrawable::nodeIds_`, `nodeTemperatures_`).
+    VkDeviceAddress nodeIds;
+    VkDeviceAddress nodeTemperatures;
 };
-static_assert(sizeof(MeshResources) == 112,
+static_assert(sizeof(MeshResources) == 128,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -1013,6 +1020,72 @@ void MeshDrawable::SetTemperatures(std::uint32_t mesh, const Tensor& kelvin,
     activeMeshes_.insert(mesh);
 }
 
+void MeshDrawable::SetNodeIds(std::uint32_t mesh,
+                              std::span<const std::uint32_t> ids) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    if (!ids.empty() && ids.size() != target.data.points.size() / 3) {
+        throw std::invalid_argument("Mesh node ids need one per point");
+    }
+    target.nodeIds.assign(ids.begin(), ids.end());
+    target.nodeCount =
+        ids.empty() ? 0u : *std::max_element(ids.begin(), ids.end()) + 1;
+    // The pools take the ids and make room for the nodes.
+    geometryDirty_ = true;
+    drawsDirty_ = true;
+}
+
+void MeshDrawable::SetNodeTemperatures(std::uint32_t mesh,
+                                       std::span<const float> kelvin) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    if (!kelvin.empty() && kelvin.size() < target.nodeCount) {
+        throw std::invalid_argument(
+            "Mesh node temperatures need one per node, " +
+            std::to_string(target.nodeCount));
+    }
+    const bool has = !kelvin.empty();
+    drawsDirty_ = drawsDirty_ || has != target.hasNodeTemperatures;
+    target.hasNodeTemperatures = has;
+    target.nodeTemperatures.assign(
+        kelvin.begin(), kelvin.begin() + (has ? target.nodeCount : 0));
+    target.deviceNodeTemperatures = Tensor();
+    target.nodeTemperaturesDirty = has;
+    activeMeshes_.insert(mesh);
+}
+
+void MeshDrawable::SetNodeTemperatures(std::uint32_t mesh,
+                                       const Tensor& kelvin,
+                                       std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    CheckDeviceTensor(kelvin, 1, "Mesh node temperatures");
+    Mesh& target = it->second;
+    if (static_cast<std::size_t>(kelvin.Elements()) < target.nodeCount) {
+        throw std::invalid_argument(
+            "Mesh node temperatures need one per node, " +
+            std::to_string(target.nodeCount));
+    }
+    drawsDirty_ = drawsDirty_ || !target.hasNodeTemperatures;
+    target.hasNodeTemperatures = true;
+    target.nodeTemperatures.clear();
+    target.deviceNodeTemperatures = kelvin.Slice(0, target.nodeCount);
+    target.nodeTemperaturesStream = stream;
+    target.nodeTemperaturesDirty = true;
+    activeMeshes_.insert(mesh);
+}
+
 void MeshDrawable::SetIndices(std::uint32_t mesh,
                               const Tensor& indices,
                               std::uintptr_t stream) {
@@ -1472,6 +1545,15 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
                                mesh.temperaturesStream);
         mesh.temperaturesDirty = false;
     }
+    if (!mesh.deviceNodeTemperatures.Empty() &&
+        (all || mesh.nodeTemperaturesDirty)) {
+        compute_->CopyToBuffer(mesh.deviceNodeTemperatures,
+                               *nodeTemperatures_,
+                               VkDeviceSize{mesh.firstNode} *
+                                   sizeof(float),
+                               mesh.nodeTemperaturesStream);
+        mesh.nodeTemperaturesDirty = false;
+    }
     // The full mesh's triangles, first of its indices; written in
     // place (`MapIndices`), they are there already, and the frame
     // waits for their stream.
@@ -1897,7 +1979,8 @@ void MeshDrawable::SettleMotion() {
         mesh.pointsWritten = false;
         mesh.mappedPoints = {};
         const bool pending = mesh.pointsDirty || mesh.normalsDirty ||
-                             mesh.colorsDirty || mesh.temperaturesDirty;
+                             mesh.colorsDirty || mesh.temperaturesDirty ||
+                             mesh.nodeTemperaturesDirty;
         it = pending ? std::next(it) : activeMeshes_.erase(it);
     }
     for (auto& [handle, instancer] : instancers_) {
@@ -1944,6 +2027,8 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<float> normals;
     std::vector<float> colors;
     std::vector<float> temperatures;
+    std::vector<std::uint32_t> nodeIds;
+    std::vector<float> nodeTemperatures;
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
     std::vector<float> uvs;
@@ -2003,6 +2088,24 @@ void MeshDrawable::RebuildGeometry() {
                                 mesh.temperatures.end());
             mesh.temperaturesDirty = false;
         }
+        // Its nodes per point, and room for their temperatures (device
+        // ones copied in after).
+        if (mesh.nodeIds.empty()) {
+            nodeIds.resize(nodeIds.size() + count / 3, 0u);
+        } else {
+            nodeIds.insert(nodeIds.end(), mesh.nodeIds.begin(),
+                           mesh.nodeIds.end());
+        }
+        mesh.firstNode = static_cast<std::uint32_t>(nodeTemperatures.size());
+        if (mesh.nodeTemperatures.empty()) {
+            nodeTemperatures.resize(nodeTemperatures.size() + mesh.nodeCount,
+                                    0.0f);
+        } else {
+            nodeTemperatures.insert(nodeTemperatures.end(),
+                                    mesh.nodeTemperatures.begin(),
+                                    mesh.nodeTemperatures.end());
+            mesh.nodeTemperaturesDirty = false;
+        }
         indices.insert(indices.end(), mesh.data.indices.begin(),
                        mesh.data.indices.end());
         indices.insert(indices.end(), mesh.lodIndices.begin(),
@@ -2055,6 +2158,8 @@ void MeshDrawable::RebuildGeometry() {
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
     temperatures_ = Pool(std::as_bytes(std::span(temperatures)));
+    nodeIds_ = Pool(std::as_bytes(std::span(nodeIds)));
+    nodeTemperatures_ = Pool(std::as_bytes(std::span(nodeTemperatures)));
     // Shared, as triangles may be copied in from the compute device.
     indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
@@ -2547,6 +2652,14 @@ void MeshDrawable::Prepare(const FrameParams& params,
                     VkDeviceSize{mesh.firstVertex} * sizeof(float));
                 mesh.temperaturesDirty = false;
             }
+            if (mesh.nodeTemperaturesDirty &&
+                !mesh.nodeTemperatures.empty()) {
+                renderer_.Uploads().Write(
+                    *nodeTemperatures_,
+                    std::as_bytes(std::span(mesh.nodeTemperatures)),
+                    VkDeviceSize{mesh.firstNode} * sizeof(float));
+                mesh.nodeTemperaturesDirty = false;
+            }
             // Written ones are written in place each frame.
             if (!mesh.pointsDirty || mesh.writer) {
                 mesh.pointsDirty = false;
@@ -2705,10 +2818,14 @@ void MeshDrawable::WriteDraws() {
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
         flags |= thermal_ ? kThermal : 0u;
         flags |= mesh.hasTemperatures ? kHasTemperatures : 0u;
+        flags |= !mesh.nodeIds.empty() && mesh.hasNodeTemperatures
+                     ? kHasNodes
+                     : 0u;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
         draw.uv[2] =
             static_cast<std::uint32_t>(mesh.data.points.size() / 3);
+        draw.uv[3] = mesh.firstNode;
         if (item.instancer) {
             const Instancer& instancer =
                 instancers_.at(*item.instancer);
@@ -3085,7 +3202,9 @@ void MeshDrawable::WriteResources() {
             address(uvs_),
             address(instanceColors_),
             address(activeCounts_),
-            address(temperatures_)};
+            address(temperatures_),
+            address(nodeIds_),
+            address(nodeTemperatures_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);

@@ -1021,6 +1021,14 @@ inline constexpr std::string_view kThermalTemperatureTexture =
 /// thermal solver's write-back, from the CPU or a CUDA device.
 inline constexpr std::string_view kThermalTemperatures =
     "ernie:thermal:temperatures";
+/// A mesh's thermal nodes (Ernie): int32 (n,) the node of each point,
+/// a thermal network's (ESATAN, Thermal Desktop), its faces' own when
+/// their points are their own; and float32 (nodes,) kelvin per node,
+/// the solver's write-back, from the CPU or a CUDA device.
+inline constexpr std::string_view kThermalNodeIds =
+    "ernie:thermal:nodeIds";
+inline constexpr std::string_view kThermalNodeTemperatures =
+    "ernie:thermal:nodeTemperatures";
 /// RenderSettings' texture loading (Ernie): kAuto (complete for a
 /// step, async for the viewport), kComplete (a frame waits for every
 /// texture its materials read) or kAsync (a frame draws pending

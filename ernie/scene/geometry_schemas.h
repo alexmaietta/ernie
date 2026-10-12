@@ -109,6 +109,21 @@
                                      "with thermal emission on, in place of the prim's own and "   \
                                      "its material's, interpolated across its faces; 0 at a "      \
                                      "point for those.",                                           \
+                              .group = "Thermal", .dirty = ::ernie::Dirty::Points}))              \
+    X(::ernie::Tensor, ThermalNodeIds, ::ernie::tokens::kThermalNodeIds, nullptr,                  \
+      (::ernie::AttributeMeta{.label = "Node ids",                                                 \
+                              .doc = "int32 (n,), each point's node in a thermal network, whose "  \
+                                     "temperatures the node temperatures give; a face takes its "  \
+                                     "own node where its points are its own.",                     \
+                              .group = "Thermal", .integer = true,                                 \
+                              .dirty = ::ernie::Dirty::Points}))                                   \
+    X(::ernie::Tensor, ThermalNodeTemperatures, ::ernie::tokens::kThermalNodeTemperatures,         \
+      nullptr,                                                                                     \
+      (::ernie::AttributeMeta{.label = "Node temperatures",                                        \
+                              .doc = "float32 (nodes,) kelvin per node of the node ids, on the "   \
+                                     "CPU or a CUDA device, as a thermal network's solver writes " \
+                                     "them each step; the points' own temperatures, when given, "  \
+                                     "come first.",                                                \
                               .group = "Thermal", .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \

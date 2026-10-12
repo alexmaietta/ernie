@@ -303,8 +303,9 @@ class RasterDelegate : public RenderDelegate {
         Key key;
         /// Versions of its points, of its normals, colours and
         /// triangle indices when written on the GPU, of the points
-        /// and triangles in use, and of its temperatures.
-        std::array<std::uint64_t, 6> versions{};
+        /// and triangles in use, of its temperatures, and of its
+        /// thermal network's nodes and their temperatures.
+        std::array<std::uint64_t, 8> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
     };
@@ -569,6 +570,12 @@ class RasterDelegate : public RenderDelegate {
     /// (`tokens::kThermalTemperatures`), from the host or the GPU.
     void SetMeshTemperatures(const Scene& scene, const Path& path,
                              std::uint32_t handle);
+    /// Hands the mesh its thermal network: with `ids`, its nodes per
+    /// point (`tokens::kThermalNodeIds`), then their temperatures
+    /// (`tokens::kThermalNodeTemperatures`), from the host or the
+    /// GPU.
+    void SetMeshNodes(const Scene& scene, const Path& path,
+                      std::uint32_t handle, bool ids);
     /// Hands the mesh its triangle indices written on the GPU.
     void SetMeshIndices(const Scene& scene, const Path& path,
                         std::uint32_t handle);

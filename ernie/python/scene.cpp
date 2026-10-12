@@ -2888,6 +2888,8 @@ void BindScene(nb::module_& m) {
         {"POINTS", tokens::kPoints},
         {"NORMALS", tokens::kNormals},
         {"THERMAL_TEMPERATURES", tokens::kThermalTemperatures},
+        {"THERMAL_NODE_IDS", tokens::kThermalNodeIds},
+        {"THERMAL_NODE_TEMPERATURES", tokens::kThermalNodeTemperatures},
         {"WIDTHS", tokens::kWidths},
         {"FACE_VERTEX_COUNTS", tokens::kFaceVertexCounts},
         {"FACE_VERTEX_INDICES", tokens::kFaceVertexIndices},

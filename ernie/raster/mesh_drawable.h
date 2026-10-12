@@ -282,6 +282,31 @@ class MeshDrawable : public RasterDrawable {
     void SetTemperatures(std::uint32_t mesh, const Tensor& kelvin,
                          std::uintptr_t stream = 1);
 
+    /// Sets a mesh's thermal network nodes, the node of each point (a
+    /// face its own node where its points are its own), which take
+    /// their temperatures from `SetNodeTemperatures` where the points
+    /// have none of their own; empty removes them. The mesh is made
+    /// again (rarely: a network's layout, not its temperatures).
+    /// @throws std::invalid_argument for an unknown mesh, or not one
+    /// per point.
+    void SetNodeIds(std::uint32_t mesh, std::span<const std::uint32_t> ids);
+
+    /// Sets the temperatures of a mesh's nodes, kelvin, at least one
+    /// per node of its ids, as a thermal solver writes them each
+    /// step: from the host, staged into the frame's uploads (only
+    /// this mesh's range); empty removes them.
+    /// @throws std::invalid_argument for an unknown mesh, or fewer
+    /// than its nodes.
+    void SetNodeTemperatures(std::uint32_t mesh,
+                             std::span<const float> kelvin);
+
+    /// The same from a contiguous float32 tensor on the compute
+    /// device, copied as `SetNormals`.
+    /// @throws std::invalid_argument as the device `SetPoints`, or
+    /// fewer than its nodes.
+    void SetNodeTemperatures(std::uint32_t mesh, const Tensor& kelvin,
+                             std::uintptr_t stream = 1);
+
     /// Replaces a mesh's triangles with a contiguous int32 or uint32
     /// tensor on the compute device, three point indices per
     /// triangle, as many as the mesh was added with (zeros holding
@@ -653,6 +678,18 @@ class MeshDrawable : public RasterDrawable {
         std::uintptr_t temperaturesStream = 1;
         bool hasTemperatures = false;
         bool temperaturesDirty = false;
+        /// Its thermal network (`SetNodeIds`, `SetNodeTemperatures`):
+        /// each point's node, the nodes' count and first in the pool;
+        /// their temperatures from the host or on the device, whether
+        /// it has any and whether they wait to be uploaded or copied.
+        std::vector<std::uint32_t> nodeIds;
+        std::uint32_t nodeCount = 0;
+        std::uint32_t firstNode = 0;
+        std::vector<float> nodeTemperatures;
+        Tensor deviceNodeTemperatures;
+        std::uintptr_t nodeTemperaturesStream = 1;
+        bool hasNodeTemperatures = false;
+        bool nodeTemperaturesDirty = false;
         Tensor deviceIndices;  ///< Device triangle indices replacing
                                ///< `data.indices` (zeros), if any.
         std::uintptr_t indicesStream = 1;
@@ -1002,6 +1039,10 @@ class MeshDrawable : public RasterDrawable {
     std::shared_ptr<GpuBuffer> colors_;
     /// Meshes' temperatures, a float per point (`SetTemperatures`).
     std::shared_ptr<GpuBuffer> temperatures_;
+    /// Meshes' thermal networks: each point's node (`SetNodeIds`),
+    /// and every mesh's nodes' temperatures from its `firstNode`.
+    std::shared_ptr<GpuBuffer> nodeIds_;
+    std::shared_ptr<GpuBuffer> nodeTemperatures_;
     std::shared_ptr<GpuBuffer> indices_;
     std::unique_ptr<GpuBuffer>
         uvs_;  ///< Meshes' texture coordinates per corner

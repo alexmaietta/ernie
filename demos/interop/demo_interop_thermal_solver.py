@@ -5,7 +5,9 @@ turn, radiation from both faces to the cold surroundings), stepped every frame
 and seen through an 8 to 14 um camera. The solver runs in NumPy, whose host
 arrays the renderer uploads in place, or in Warp on the GPU, whose CUDA arrays
 it copies on the device with no trip through the host; switch between them
-as it runs.
+as it runs. Beside it an avionics box is a coarser network, a node a panel
+and one for its electronics: its points map to their panel's node once, and
+the solver then writes its seven nodes alone.
 
 References:
 - D. G. Gilmore (ed.), "Spacecraft Thermal Control Handbook", 2nd ed., The
@@ -51,6 +53,18 @@ STEP = DT / CAPACITY  # K per joule
 # The chips: their nodes' first row and column, size, and power in watts.
 CHIPS = [(14, 12, 8, 18.0), (36, 20, 10, 30.0), (20, 42, 6, 12.0)]
 PLATE = ernie.Path("/World/Plate")
+# The avionics box: six aluminium panels (+x, -x, +y, -y, +z, -z) and the
+# electronics inside, a lumped node each, each panel's points mapped to its.
+BOX = ernie.Path("/World/Box")
+BOX_SIDE = 0.2  # m
+BOX_CENTER = (0.45, 0.1, 0.25)
+FACES = 6
+PANEL_CAPACITY = 100.0  # J/K: 1 mm of aluminium
+INTERIOR_CAPACITY = 400.0  # J/K
+MOUNTING = 2.0  # W/K from the electronics to each panel
+BOX_RADIATING = EMISSIVITY * SIGMA * BOX_SIDE * BOX_SIDE  # W/K^4 a panel
+ELECTRONICS = 80.0  # W
+SUNLIGHT = 20.0  # W the top panel absorbs
 
 
 def heaters(time, on=True):
@@ -82,7 +96,55 @@ def step_cpu(kelvin, power):
     return (kelvin + np.float32(STEP) * flow).astype(np.float32)
 
 
+def box_power(on=True):
+    """Watts into the box's nodes: sunlight on its top panel, and its
+    electronics' when on."""
+    power = np.zeros(FACES + 1, dtype=np.float32)
+    power[4] = SUNLIGHT
+    power[FACES] = ELECTRONICS if on else 0.0
+    return power
+
+
+def box_step_cpu(kelvin, power):
+    """One explicit step of the box's network: the panels conduct to the
+    electronics and radiate away."""
+    panels = kelvin[:FACES]
+    mounted = np.float32(MOUNTING) * (kelvin[FACES] - panels)
+    flow = np.empty_like(kelvin)
+    flow[:FACES] = (
+        mounted
+        + power[:FACES]
+        - np.float32(BOX_RADIATING) * (panels**4 - np.float32(SINK4))
+    )
+    flow[FACES] = power[FACES] - mounted.sum()
+    capacity = np.array([PANEL_CAPACITY] * FACES + [INTERIOR_CAPACITY], np.float32)
+    return (kelvin + np.float32(DT) * flow / capacity).astype(np.float32)
+
+
 if wp is not None:
+
+    @wp.kernel
+    @no_type_check
+    def box_step_gpu(
+        kelvin: wp.array(dtype=float),
+        power: wp.array(dtype=float),
+        out: wp.array(dtype=float),
+    ):
+        """`box_step_cpu`, a thread a node."""
+        i = wp.tid()
+        t = kelvin[i]
+        if i < FACES:
+            flow = (
+                float(MOUNTING) * (kelvin[FACES] - t)
+                + power[i]
+                - float(BOX_RADIATING) * (t * t * t * t - float(SINK4))
+            )
+            out[i] = t + float(DT) * flow / float(PANEL_CAPACITY)
+        else:
+            heat = power[i]
+            for k in range(FACES):
+                heat -= float(MOUNTING) * (t - kelvin[k])
+            out[i] = t + float(DT) * heat / float(INTERIOR_CAPACITY)
 
     @wp.kernel
     @no_type_check
@@ -121,6 +183,25 @@ def plate_mesh():
     return points, quads
 
 
+def box_mesh():
+    """The box's six panels, four points each of their own, and each point's
+    node: its panel's."""
+    half = 0.5 * BOX_SIDE
+    points, ids = [], []
+    for axis in range(3):
+        normal = np.eye(3)[axis]
+        u, v = np.eye(3)[(axis + 1) % 3], np.eye(3)[(axis + 2) % 3]
+        for sign in (1.0, -1.0):
+            if sign < 0.0:  # counter-clockwise seen from outside
+                u, v = v, u
+            for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                points.append(
+                    np.array(BOX_CENTER) + half * (sign * normal + a * u + b * v)
+                )
+                ids.append(2 * axis + (0 if sign > 0.0 else 1))
+    return np.array(points), np.arange(4 * FACES), np.array(ids, dtype=np.int32)
+
+
 class Demo(ernie.demo.Demo):
     num_frames = 40
     fixed_dt = 1.0 / 30.0
@@ -131,11 +212,9 @@ class Demo(ernie.demo.Demo):
         self.heating = True
         self.time = 0.0
         self.kelvin = np.full((N, N), START, dtype=np.float32)
+        self.box = np.full(FACES + 1, START, dtype=np.float32)
         if self.gpu:
-            self.device = "cuda:0"
-            with wp.ScopedDevice(self.device):
-                self.state = [wp.array(self.kelvin), wp.zeros((N, N), dtype=float)]
-                self.power = wp.zeros((N, N), dtype=float)
+            self.upload()
         scene = self.scene
         world = scene.define("/World", ernie.Xform)
         looks = world.define("Looks", ernie.Xform)
@@ -167,6 +246,26 @@ class Demo(ernie.demo.Demo):
             translate=(0.0, 0.0, 0.15),
             scale=(0.3, 0.1, 0.3),
         )
+        # The box on a plinth beside it, its panels' points mapped to their
+        # nodes once; the solver then writes the nodes alone.
+        points, indices, ids = box_mesh()
+        scene.define(
+            BOX,
+            ernie.Mesh,
+            points=points,
+            face_vertex_counts=np.full(FACES, 4),
+            face_vertex_indices=indices,
+            material_binding=paint.path,
+        )
+        scene.write(BOX, tokens.THERMAL_NODE_IDS, ids)
+        world.define(
+            "Plinth",
+            ernie.Cube,
+            size=1.0,
+            material_binding=concrete.path,
+            translate=(BOX_CENTER[0], BOX_CENTER[1], 0.075),
+            scale=(0.16, 0.16, 0.15),
+        )
         camera = world.define(
             "Camera",
             ernie.Camera,
@@ -184,7 +283,7 @@ class Demo(ernie.demo.Demo):
         ).set(
             tokens.TRANSFORM,
             ernie.look_at_transform(
-                (0.25, -0.95, 0.7), (0.0, 0.0, 0.52), (0.0, 0.0, 1.0)
+                (0.45, -1.15, 0.75), (0.12, 0.0, 0.45), (0.0, 0.0, 1.0)
             ),
         )
         variables = []
@@ -216,16 +315,10 @@ class Demo(ernie.demo.Demo):
             if gpu and wp is None:
                 return
             if gpu != self.gpu:
-                self.kelvin = self.read()
+                self.kelvin, self.box = self.read()
                 self.gpu = gpu
                 if gpu:
-                    self.device = "cuda:0"
-                    with wp.ScopedDevice(self.device):
-                        self.state = [
-                            wp.array(self.kelvin),
-                            wp.zeros((N, N), dtype=float),
-                        ]
-                        self.power = wp.zeros((N, N), dtype=float)
+                    self.upload()
 
         self.widgets.combo(
             "Solver",
@@ -244,39 +337,69 @@ class Demo(ernie.demo.Demo):
         wp.init()
         return wp.is_cuda_available()
 
+    def upload(self):
+        """Moves both networks' state to the GPU."""
+        self.device = "cuda:0"
+        with wp.ScopedDevice(self.device):
+            self.state = [wp.array(self.kelvin), wp.zeros((N, N), dtype=float)]
+            self.power = wp.zeros((N, N), dtype=float)
+            self.box_state = [wp.array(self.box), wp.zeros(FACES + 1, dtype=float)]
+            self.box_heat = wp.zeros(FACES + 1, dtype=float)
+
     def read(self):
-        """The nodes' temperatures, on the host."""
-        return self.state[0].numpy() if self.gpu else self.kelvin
+        """The plate's and the box's node temperatures, on the host."""
+        if self.gpu:
+            return self.state[0].numpy(), self.box_state[0].numpy()
+        return self.kelvin, self.box
 
     def publish(self):
-        """Writes the nodes' temperatures back to the plate's points: a
-        host array, or the CUDA array as it is on its stream."""
+        """Writes the nodes' temperatures back: the plate's to its points,
+        the box's to its nodes, which its points map to. Host arrays, or the
+        CUDA arrays as they are on their stream."""
         if self.gpu:
+            stream = wp.get_stream(self.device)
             self.scene.write(
                 PLATE,
                 tokens.THERMAL_TEMPERATURES,
                 self.state[0].flatten(),
-                stream=wp.get_stream(self.device),
+                stream=stream,
+            )
+            self.scene.write(
+                BOX,
+                tokens.THERMAL_NODE_TEMPERATURES,
+                self.box_state[0],
+                stream=stream,
             )
         else:
             self.scene.write(
                 PLATE, tokens.THERMAL_TEMPERATURES, self.kelvin.ravel()
             )
+            self.scene.write(BOX, tokens.THERMAL_NODE_TEMPERATURES, self.box)
 
     def step(self):
+        box_heat = box_power(self.heating)
         for _ in range(SUBSTEPS):
             power = heaters(self.time, self.heating)
             if self.gpu:
                 self.power.assign(power)
+                self.box_heat.assign(box_heat)
                 wp.launch(
                     step_gpu,
                     dim=(N, N),
                     inputs=[self.state[0], self.power, self.state[1]],
                     device=self.device,
                 )
+                wp.launch(
+                    box_step_gpu,
+                    dim=FACES + 1,
+                    inputs=[self.box_state[0], self.box_heat, self.box_state[1]],
+                    device=self.device,
+                )
                 self.state.reverse()
+                self.box_state.reverse()
             else:
                 self.kelvin = step_cpu(self.kelvin, power)
+                self.box = box_step_cpu(self.box, box_heat)
             self.time += DT
         self.publish()
 
@@ -303,16 +426,20 @@ class Demo(ernie.demo.Demo):
         )
 
     def test_final(self):
-        nodes = self.read()
+        nodes, box = self.read()
         print(
             f"after {self.time:.0f} s: nodes {nodes.min():.1f} to "
-            f"{nodes.max():.1f} K"
+            f"{nodes.max():.1f} K; box panels {np.round(box[:FACES], 1)}, "
+            f"electronics {box[FACES]:.1f} K"
         )
         assert nodes.max() > START + 20.0, "the chips should heat the plate"
         assert nodes.min() < START, "the plate's far corners should cool"
+        assert box[4] > box[:4].max() + 2.0, "the sunlit top should be warmest"
+        assert box[:4].min() > START + 10.0, "the electronics should heat it"
         # The two solvers agree, a step from the same state.
         power = heaters(self.time)
         cpu = step_cpu(nodes, power)
+        box_cpu = box_step_cpu(box, box_power())
         if wp is not None and self._cuda():
             with wp.ScopedDevice("cuda:0"):
                 out = wp.zeros((N, N), dtype=float)
@@ -323,6 +450,15 @@ class Demo(ernie.demo.Demo):
                 )
                 assert np.allclose(out.numpy(), cpu, atol=1e-3), (
                     "the CPU and GPU solvers should agree"
+                )
+                box_out = wp.zeros(FACES + 1, dtype=float)
+                wp.launch(
+                    box_step_gpu,
+                    dim=FACES + 1,
+                    inputs=[wp.array(box), wp.array(box_power()), box_out],
+                )
+                assert np.allclose(box_out.numpy(), box_cpu, atol=1e-3), (
+                    "the CPU and GPU box networks should agree"
                 )
         # What the renderer shows is what the solver wrote.
         ldr, kelvin = self.render_all()
@@ -339,6 +475,11 @@ class Demo(ernie.demo.Demo):
         assert brightness[hottest] > np.median(brightness) + 20.0, (
             "the hot spot should glow at 8 to 14 um"
         )
+        # The box's top and front panels each read their node, flat.
+        for face in (4, 3):
+            panel = np.count_nonzero(np.abs(kelvin - box[face]) < 0.05)
+            print(f"panel {face}: {panel} pixels at {box[face]:.2f} K")
+            assert panel > 200, "a panel's pixels should read its node"
 
 
 if __name__ == "__main__":
