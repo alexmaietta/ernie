@@ -1,25 +1,24 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Perseverance's Navcam, Hazcam and Mastcam-Z stereo pairs on a patch
-of Mars, as published, each binned to 320 x 240.
+"""Perseverance's Navcam, Hazcam and Mastcam-Z stereo pairs on a patch of
+Mars, their detectors as their datasheets give them.
 
 References:
 - J. N. Maki et al., "The Mars 2020 Engineering Cameras and Microphone
-  on the Perseverance Rover: A Next-Generation Imaging System for Mars
-  Exploration", Space Science Reviews 216:137, 2020,
-  https://doi.org/10.1007/s11214-020-00765-9: Table 2 and the sections
-  on the detector and flight software.
+  on the Perseverance Rover", Space Science Reviews 216:137, 2020:
+  Tables 2 and 3 and the detector section.
 - J. F. Bell III et al., "The Mars 2020 Perseverance Rover Mast Camera
   Zoom (Mastcam-Z) Multispectral, Stereoscopic Imaging Investigation",
-  Space Science Reviews 217:24, 2021,
-  https://doi.org/10.1007/s11214-020-00755-x: Tables 3 and 5 and the
-  focal plane section.
+  Space Science Reviews 217:24, 2021: Tables 3 and 5.
+- ams OSRAM, "CMV20000 20MP CMOS Machine Vision Image Sensor", datasheet
+  DS000440 v3-00, 2026: Table 5 and Figure 4.
+- onsemi, "KAI-2020 Image Sensor", datasheet KAI-2020/D: Table 7 and
+  Figure 12 (Gen1 colour).
 - J. F. Bell III et al., "Mineralogic and compositional properties of
-  Martian soil and dust: Results from Mars Pathfinder", Journal of
-  Geophysical Research 105(E1):1721-1755, 2000 (soil reflectance, dark
-  in the blue and about 0.3 in the red and near infrared).
+  Martian soil and dust: Results from Mars Pathfinder", JGR
+  105(E1):1721-1755, 2000 (soil reflectance, roughly).
 - J. Kannala and S. S. Brandt, "A Generic Camera Model and Calibration
   Method for Conventional, Wide-Angle, and Fish-Eye Lenses", IEEE TPAMI
-  28(8):1335-1340, 2006 (the f-theta lens's k1).
+  28(8):1335-1340, 2006.
 """
 
 import math
@@ -31,41 +30,92 @@ import ernie.demo
 from ernie import tokens
 from ernie.demo import mean_linear_rgb, side_by_side, write_png
 
-# The Sun's irradiance at Mars's mean distance, 1.5237 au, and its
-# angular diameter there, degrees.
+# The Sun's irradiance and angular diameter at Mars's mean distance.
 MARS_IRRADIANCE = 1361.0 / 1.5237**2
 SUN_ANGLE = 0.35
 
-# Every product's size: the detectors binned.
-WIDTH = 320
-HEIGHT = 240
-
 EYES = ("Left", "Right")
 
-# ------------------------------------------------- engineering cameras
 
-# The Navcams' and Hazcams' CMV-20000 (Maki et al. 2020, Table 2): 5120
-# x 3840 pixels of 6.4 um, 0.24 DN per electron, 8 e- dark noise, a
-# 15000 e- full well and a 12-bit ADC.
+def curve(values, first, step, nm):
+    """`values` at `nm`, linear between wavelengths `first` + k `step`,
+    zero outside them."""
+    x = (nm - first) / step
+    if x < 0.0 or x > len(values) - 1:
+        return 0.0
+    i = min(int(x), len(values) - 2)
+    return values[i] + (x - i) * (values[i + 1] - values[i])
+
+
+def pass_band(nm, low, high):
+    """A trapezoid passband over [low, high], ramped over 20 nm."""
+    return min(max(min(nm - low, high - nm) / 20.0 + 0.5, 0.0), 1.0)
+
+
+def sampled(first, last, f):
+    """(nm, value) pairs of `f` every 5 nm over [first, last]."""
+    pairs = []
+    nm = first
+    while nm <= last + 1e-9:
+        pairs += [nm, f(nm)]
+        nm += 5.0
+    return pairs
+
+
+# -------------------------------------------------- engineering cameras
+
+# The CMV20000 (DS000440, Table 5): 6.4 um pixels, 0.25 DN/e-, 8 e-
+# noise, 15000 e- full well, 125 e-/s dark current, 10 e-/s DSNU, 1%
+# PRNU.
 CMV_PIXEL_UM = 6.4
 CMV_WIDTH = 5120
 CMV_HEIGHT = 3840
-CMV_ELECTRONS_PER_DN = 1.0 / 0.24
-CMV_DARK_NOISE = 8.0
-CMV_FULL_WELL = 15000.0
 
-# Each engineering camera's optics (Table 2): name, focal length (mm),
-# f-number, best focus (m), stereo baseline (m) and fields of view
-# (horizontal, vertical, diagonal; degrees).
+# Figure 4's Bayer QE, read every 25 nm from 350 nm.
+CMV_BLUE = (
+    .05, .06, .20, .27, .32, .35, .27, .10, .05, .04, .03, .03, .03, .04,
+    .05, .05, .05, .05, .19, .21, .21, .16, .13, .10, .06, .04, .03, .02,
+    .015, .01, .005,
+)  # fmt: skip
+CMV_GREEN = (
+    .04, .05, .05, .06, .07, .10, .25, .42, .44, .30, .12, .06, .05, .08,
+    .13, .13, .17, .15, .20, .21, .21, .16, .13, .10, .06, .04, .03, .02,
+    .015, .01, .005,
+)  # fmt: skip
+CMV_RED = (
+    .05, .08, .07, .03, .02, .02, .02, .02, .03, .03, .44, .40, .38, .37,
+    .34, .32, .32, .25, .27, .22, .20, .16, .13, .10, .06, .04, .03, .02,
+    .015, .01, .005,
+)  # fmt: skip
+
+# Maki's 8 x 8 panchromatic mode (640 x 480): each pixel the mean of 64
+# behind a Bayer cell's mean response and the UV and IR blocking filter
+# (its edges unpublished; 400 and 700 nm assumed).
+ECAM_SUM = 8
+ECAM_WIDTH = CMV_WIDTH // ECAM_SUM
+ECAM_HEIGHT = CMV_HEIGHT // ECAM_SUM
+ECAM_EXPOSURE = 1e-3
+
+
+def ecam_qe(nm):
+    cell = 0.25 * (
+        curve(CMV_RED, 350.0, 25.0, nm)
+        + 2.0 * curve(CMV_GREEN, 350.0, 25.0, nm)
+        + curve(CMV_BLUE, 350.0, 25.0, nm)
+    )
+    return cell * pass_band(nm, 400.0, 700.0)
+
+
+# An engineering camera's optics (Maki Table 2): name, focal length
+# (mm), f-number, best focus (m), baseline (m) and fields of view
+# (degrees).
 NAVCAM = ("Navcam", 19.1, 12.0, 3.5, 0.424, (96.0, 73.0, 120.0))
 HAZCAM = ("Hazcam", 14.0, 12.0, 0.9, 0.248, (136.0, 102.0, 172.0))
-# The rear Hazcams: the front pair's optics, 93.4 cm apart.
 REAR_HAZCAM = ("RearHazcam", 14.0, 12.0, 0.9, 0.934, HAZCAM[5])
 
 
 def cmv_reaches():
-    """The half widths the fields reach on the detector, mm: across,
-    down and to the corner."""
+    """The detector's half width, half height and half diagonal, mm."""
     half_width = 0.5e-3 * CMV_PIXEL_UM * CMV_WIDTH
     half_height = 0.5e-3 * CMV_PIXEL_UM * CMV_HEIGHT
     return (
@@ -76,11 +126,7 @@ def cmv_reaches():
 
 
 def f_theta_k1(optics):
-    """The f-theta lens's Kannala-Brandt k1 for the published fields:
-    the least squares of theta (1 + k1 theta^2) = r / f over the three,
-    theta each field's half angle and r the half width it reaches. The
-    paper gives the calibrated model only as CAHVORE, without its
-    coefficients."""
+    """The f-theta lens's k1 fitted to the published fields."""
     numerator = 0.0
     denominator = 0.0
     for field, reach in zip(optics[5], cmv_reaches()):
@@ -93,8 +139,7 @@ def f_theta_k1(optics):
 
 
 def f_theta_angle(r, k1):
-    """The angle off axis (radians) that lands `r` focal lengths out
-    through the f-theta lens: theta (1 + k1 theta^2) = r, by Newton."""
+    """The angle off axis landing `r` focal lengths out, by Newton."""
     theta = r
     for _ in range(20):
         f = theta * (1.0 + k1 * theta * theta) - r
@@ -102,11 +147,11 @@ def f_theta_angle(r, k1):
     return theta
 
 
-# ----------------------------------------------------------- Mastcam-Z
+# ------------------------------------------------------------ Mastcam-Z
 
-# The KAI-2020CM (Bell et al. 2021, Table 5): 1600 x 1200 pixels of 7.4
-# um, 15.6 e-/DN and an 11-bit ADC; each camera's full well and read
-# noise.
+# The KAI-2020CM (Bell Table 5; datasheet Table 7): 1600 x 1200 pixels
+# of 7.4 um, 15.6 e-/DN, 11 bits, 40 e-/s dark current and 2.5% rms
+# PRNU.
 KAI_PIXEL_UM = 7.4
 KAI_WIDTH = 1600
 KAI_HEIGHT = 1200
@@ -114,21 +159,37 @@ KAI_ELECTRONS_PER_DN = 15.6
 KAI_FULL_WELL = (21826.0, 21818.0)
 KAI_READ_NOISE = (22.0, 21.0)
 
-# The zoom (26 mm at f/6.7 to 110 mm at f/9.5), the cameras' 24.4 cm
-# baseline and each one's 1.15 degree toe-in (2.3 between them), and the
-# detector's ~40% peak QE through its Bayer microlenses.
+# Exposures through the colour filter and the narrow bands.
+MASTCAM_EXPOSURE = 2e-3
+NARROW_EXPOSURE = 2e-2
+
+# Figure 12's Gen1 colour QE, read every 20 nm from 380 nm.
+KAI_BLUE = (
+    .02, .20, .33, .40, .46, .40, .25, .08, .02, .01, .005, .005, .005,
+    .005, .005, .01, .01, .01, .01, .01, .03, .06, .08, .07, .06, .045,
+    .035, .03, .025, .02, .015, .012, .01, .008, .006, .004, .002,
+)  # fmt: skip
+KAI_GREEN = (
+    .01, .01, .015, .02, .03, .05, .12, .25, .41, .33, .12, .02, .01,
+    .01, .01, .02, .03, .04, .04, .05, .06, .07, .08, .07, .06, .045,
+    .035, .03, .025, .02, .015, .012, .01, .008, .006, .004, .002,
+)  # fmt: skip
+KAI_RED = (
+    .01, .01, .01, .01, .005, .005, .005, .005, .005, .01, .05, .25, .33,
+    .30, .27, .25, .22, .19, .16, .14, .12, .10, .085, .07, .06, .045,
+    .035, .03, .025, .02, .015, .012, .01, .008, .006, .004, .002,
+)  # fmt: skip
+
+# Zoom, baseline and toe-in (Bell Table 5).
 SHORTEST_FOCAL_MM = 26.0
 LONGEST_FOCAL_MM = 110.0
 WIDEST_F_NUMBER = 6.7
 NARROWEST_F_NUMBER = 9.5
 MASTCAM_BASELINE_M = 0.244
 TOE_IN_DEG = 1.15
-PEAK_QE = 0.40
 
 
 def f_number_at(focal_mm):
-    """The f-number at focal length `focal_mm`, linearly between the
-    zoom's ends (the paper gives only those)."""
     t = (focal_mm - SHORTEST_FOCAL_MM) / (
         LONGEST_FOCAL_MM - SHORTEST_FOCAL_MM
     )
@@ -137,10 +198,8 @@ def f_number_at(focal_mm):
     )
 
 
-# Each camera's filter wheel (Table 3): effective wavelength and half
-# width at half maximum (nm) and neutral density; 0 the Bayer RGB's
-# near-IR cut-off (by its green channel), 1 to 6 narrow bands, 7 the
-# solar filter; the left's visible, the right's reaching 1022 nm.
+# Each filter's effective wavelength, half width at half maximum (nm)
+# and neutral density (Bell Table 3).
 FILTERS = (
     (
         (544.0, 41.0, 0.0),
@@ -164,33 +223,18 @@ FILTERS = (
     ),
 )
 
-# Filter 0's red, green and blue Bayer channels (Table 3).
-BAYER = (
-    ((630.0, 43.0), (544.0, 41.0), (480.0, 46.0)),
-    ((631.0, 43.0), (544.0, 42.0), (480.0, 46.0)),
-)
+# Filter 0's infrared cut-off: the red channel's upper half maximum in
+# Table 3, 631 + 43 nm.
+IR_CUT_NM = 674.0
 
-# A generic front-illuminated silicon response (Ernie's mono sensor's),
-# for the detector behind the narrow bands: the paper publishes no
-# curve.
-SILICON_NM = (350, 400, 500, 600, 700, 800, 900, 1000, 1100)
-SILICON_QE = (0.15, 0.35, 0.55, 0.62, 0.55, 0.40, 0.22, 0.06, 0.0)
+# ------------------------------------------------------------ the scene
 
-
-def silicon(nm):
-    return float(np.interp(nm, SILICON_NM, SILICON_QE))
-
-
-# ----------------------------------------------------------- the scene
-
-# Mars soil's reflectance, roughly (Bell et al. 2000): dark in the blue,
-# rising to about 0.3 by 750 nm and flat into the near infrared; and
-# darker rock.
+# Mars soil and darker rock's reflectance, roughly (Bell 2000).
 SOIL = [350.0, 0.05, 450.0, 0.08, 550.0, 0.14, 650.0, 0.25]
 SOIL += [750.0, 0.30, 1100.0, 0.30]
 ROCK = [350.0, 0.06, 550.0, 0.09, 750.0, 0.14, 1100.0, 0.15]
 
-# Rocks on the ground ahead of the rover: x, y and radius, m.
+# Rocks ahead of the rover: x, y and radius, m.
 ROCKS = (
     (-1.2, 3.0, 0.25),
     (0.9, 4.5, 0.4),
@@ -200,11 +244,7 @@ ROCKS = (
     (-0.6, 2.2, 0.18),
 )
 
-# The rigs, each looking down its -z with +y up, a heading (degrees
-# clockwise from north, +y) and a tilt down: the mast's Navcams and
-# Mastcam-Z about 2 m up looking 15 degrees down ahead (north), the
-# front Hazcams 0.7 m up and 30 degrees down ahead, the rear ones behind
-# the rover looking back. Path, eye, degrees down and heading.
+# Stereo rigs: path, eye, tilt down and heading (degrees from north).
 NAVCAM_RIG = ("/World/Rover/Navcam", (0.0, 0.0, 2.0), 15.0, 0.0)
 HAZCAM_RIG = ("/World/Rover/Hazcam", (0.0, 0.6, 0.7), 30.0, 0.0)
 REAR_HAZCAM_RIG = (
@@ -215,7 +255,7 @@ REAR_HAZCAM_RIG = (
 )
 MASTCAM_RIG = ("/World/Rover/MastcamZ", (0.3, 0.0, 2.0), 15.0, 0.0)
 
-# The cameras the viewer can show: name and camera (a pair's left eye).
+# The cameras the viewer can show.
 VIEWS = (
     ("Overview", "/World/View"),
     ("Navcam", "/World/Rover/Navcam/Left"),
@@ -226,8 +266,7 @@ VIEWS = (
 
 
 def filter_name(e, number):
-    """Filter `number` of eye `e`'s wheel, as Table 3 names it: L0 to
-    L7, R0 to R7."""
+    """Filter `number` of eye `e`'s wheel as Table 3 names it."""
     effective, _, density = FILTERS[e][number]
     name = f"{'L' if e == 0 else 'R'}{number} "
     if number == 0:
@@ -257,8 +296,8 @@ def rig_transform(rig):
 
 
 def eye_pose(x, yaw):
-    """Rig-local pose of an eye `x` along the rig's x, turned `yaw`
-    (radians) about its +y."""
+    """An eye `x` along its rig, turned `yaw` radians about the rig's
+    +y."""
     c, s = math.cos(yaw), math.sin(yaw)
     return np.array(
         [
@@ -268,6 +307,13 @@ def eye_pose(x, yaw):
             [0.0, 0.0, 0.0, 1.0],
         ]
     )
+
+
+def centre(image, width, height):
+    """The central `width` x `height` of an image."""
+    top = (image.shape[0] - height) // 2
+    left = (image.shape[1] - width) // 2
+    return image[top : top + height, left : left + width]
 
 
 class Demo(ernie.demo.Demo):
@@ -286,8 +332,7 @@ class Demo(ernie.demo.Demo):
             dust_optical_depth=0.5,
             ground_albedo=0.25,
         )
-        # The Sun's measured spectrum at Mars's distance, 40 degrees up
-        # in the south-east.
+        # The Sun, 40 degrees up in the south-east.
         up, azimuth = math.radians(40.0), math.radians(135.0)
         scene.define(
             "/World/Sun",
@@ -331,7 +376,7 @@ class Demo(ernie.demo.Demo):
         self.define_engineering_pair(REAR_HAZCAM_RIG, REAR_HAZCAM)
         self.define_mastcam_pair()
 
-        # The viewer's own view: the rover's patch from behind.
+        # The viewer's own view of the rover's patch.
         view = scene.define(
             "/World/View",
             ernie.Camera,
@@ -355,8 +400,6 @@ class Demo(ernie.demo.Demo):
         if viewer is not None:
             viewer.active_camera = view.path
 
-        # The camera the viewer shows (a pair's left eye), Mastcam-Z's
-        # zoom and each eye's filter wheel.
         def show(index):
             if viewer is not None:
                 viewer.active_camera = VIEWS[index][1]
@@ -394,8 +437,8 @@ class Demo(ernie.demo.Demo):
             )
 
     def save_output(self, path):
-        """The left Navcam, Hazcam and Mastcam-Z images and the right
-        Navcam's, side by side, as the rover sends them."""
+        """The left Navcam, the right Navcam, the left Hazcam and the
+        middle of the left Mastcam-Z, as the rover sends them."""
         products = [
             "/Render/NavcamLeft",
             "/Render/NavcamRight",
@@ -404,6 +447,7 @@ class Demo(ernie.demo.Demo):
         ]
         outputs = self.render_vars(products, "LdrColor")
         images = [outputs[p] for p in products]
+        images[-1] = centre(images[-1], ECAM_WIDTH, ECAM_HEIGHT)
         write_png(path, side_by_side(images)[..., :3])
 
     def test_final(self):
@@ -431,8 +475,7 @@ class Demo(ernie.demo.Demo):
         return ernie.Camera.at(self.scene, path)
 
     def render_vars(self, products, var):
-        """Var `var` of each of `products`, rendered now, by
-        product."""
+        """Var `var` of each of `products`, rendered now."""
         outputs = self.renderer.step(
             self.scene, render_products=products
         )
@@ -444,10 +487,10 @@ class Demo(ernie.demo.Demo):
         }
 
     def define_product(
-        self, product, camera, types, photographic=True
+        self, product, camera, width, height, types, photographic=True
     ):
-        """Product `product` of `camera` at the binned size, with its
-        readout chain of SensorFilter prims of `types` under it."""
+        """Product `product` of `camera`, with a readout chain of
+        `types`."""
         names = ["RawDN", "Electrons", "PrimId"]
         if photographic:
             names.append("LdrColor")
@@ -471,28 +514,22 @@ class Demo(ernie.demo.Demo):
             product,
             ernie.RenderProduct,
             camera=camera,
-            resolution=(WIDTH, HEIGHT),
+            resolution=(width, height),
         ).set(tokens.ORDERED_VARS, paths).set(
             tokens.FILTERS, [ernie.Path(f.path) for f in filters]
         )
         return filters
 
     def define_engineering_pair(self, rig, optics):
-        """A Navcam or Hazcam pair (Maki et al. 2020, Table 2) on its
-        rig, the baseline apart along the rig's x, parallel: the
-        f-theta lens over the full frame, focused at its best focus, on
-        the CMV-20000; its readout qe, bayer (RGGB; the paper does not
-        give the layout), noise, adc, demosaic (RawDN the 12-bit
-        numbers), then cie, exposure and jpeg at quality 85 for the
-        8-bit images the rover sends (the paper gives the quality as
-        selectable). The detector's QE is published only as 64.5% at
-        550 nm, monochrome, so the channels keep Ernie's generic RGB
-        curves."""
+        """A Navcam or Hazcam pair in the 8 x 8 mode: the f-theta lens on
+        the CMV20000, its sums of 64 pixels scaled as means, sent as
+        JPEG."""
         name, focal, f_number, focus, baseline, _ = optics
         self.scene.define(rig[0], ernie.Xform).set(
             tokens.TRANSFORM, rig_transform(rig)
         )
         k1 = f_theta_k1(optics)
+        n = ECAM_SUM * ECAM_SUM
         for e, eye in enumerate(EYES):
             camera = self.scene.define(
                 f"{rig[0]}/{eye}",
@@ -506,13 +543,19 @@ class Demo(ernie.demo.Demo):
                 f_stop=f_number,
                 focus_distance=focus,
                 exposure_f_stop=f_number,
-                exposure_time=4e-5,
+                exposure_time=ECAM_EXPOSURE,
                 exposure_mode="auto",  # the 8-bit images
                 exposure_iso=100.0,  # the gain is the ADC's
-                sensor_type="rgb",
-                sensor_electrons_per_dn=CMV_ELECTRONS_PER_DN,
-                sensor_read_noise=CMV_DARK_NOISE,
-                sensor_full_well=CMV_FULL_WELL,
+                sensor_type="mono",
+                sensor_qe_mono=sampled(350.0, 1100.0, ecam_qe),
+                spectral_range=(380.0, 720.0),
+                spectral_bands=16,
+                sensor_electrons_per_dn=4.0 * n,
+                sensor_read_noise=8.0 * ECAM_SUM,
+                sensor_full_well=15000.0 * n,
+                sensor_dark_current=125.0 * n,
+                sensor_dsnu=10.0 * ECAM_EXPOSURE * ECAM_SUM,
+                sensor_prnu=0.01 / ECAM_SUM,
                 sensor_adc_bits=12,
                 sensor_black_level=0.0,
                 sensor_noise=True,
@@ -524,31 +567,22 @@ class Demo(ernie.demo.Demo):
             filters = self.define_product(
                 f"/Render/{name}{eye}",
                 camera.path,
-                [
-                    "qe",
-                    "bayer",
-                    "noise",
-                    "adc",
-                    "demosaic",
-                    "cie",
-                    "exposure",
-                    "jpeg",
-                ],
+                ECAM_WIDTH,
+                ECAM_HEIGHT,
+                ["qe", "noise", "adc", "cie", "exposure", "jpeg"],
             )
-            filters[7].set("inputs:quality", 85.0)
+            filters[5].set("inputs:quality", 85.0)
 
     def define_mastcam_pair(self):
-        """Mastcam-Z's pair (Bell et al. 2021, Table 5) on its rig at
-        the widest zoom, 24.4 cm apart, each toed in 1.15 degrees,
-        through filter 0."""
+        """Mastcam-Z's pair at the widest zoom, toed in, through filter
+        0."""
         self.scene.define(MASTCAM_RIG[0], ernie.Xform).set(
             tokens.TRANSFORM, rig_transform(MASTCAM_RIG)
         )
-        for e, eye in enumerate(EYES):
+        for e in range(2):
             camera = self.scene.define(
-                f"{MASTCAM_RIG[0]}/{eye}", ernie.Camera
+                self.mastcam_camera(e), ernie.Camera
             )
-            # The left turns towards +x, the right towards -x.
             camera.set(
                 tokens.TRANSFORM,
                 eye_pose(
@@ -563,15 +597,15 @@ class Demo(ernie.demo.Demo):
         return f"{MASTCAM_RIG[0]}/{EYES[e]}"
 
     def set_mastcam_filter(self, e, number):
-        """Mastcam-Z eye `e` through filter `number`, with its readout:
-        qe, bayer, noise, adc and demosaic for filter 0's colour, qe,
-        noise and adc for a narrow band; then cie and exposure for the
-        image to show."""
+        """Mastcam-Z eye `e` through filter `number`, with its
+        readout."""
         self.filters[e] = number
         self.use_mastcam_filter(self.mastcam_camera(e), e, number)
         self.define_product(
             f"/Render/MastcamZ{EYES[e]}",
             self.mastcam_camera(e),
+            KAI_WIDTH,
+            KAI_HEIGHT,
             [
                 "qe",
                 "bayer",
@@ -586,13 +620,9 @@ class Demo(ernie.demo.Demo):
         )
 
     def use_mastcam_filter(self, path, e, number):
-        """Mastcam-Z camera `path` (eye `e`) through filter `number` at
-        the zoom's focal length: filter 0 an RGB sensor whose channels are
-        Gaussians at Table 3's Bayer effective wavelengths and half
-        widths peaking at ~40%; 1 to 7 one channel, the filter's
-        passband (2 x HWHM about its effective wavelength, ramped over
-        2 nm about the half maxima, times 10^-ND) on silicon scaled to
-        the ~40% peak, the spectral range narrowed to it."""
+        """Mastcam-Z camera `path` through filter `number`: Gen1 colour
+        under the IR cut-off for filter 0, else the passband on the
+        Bayer cell's mean response."""
         camera = self.camera(path)
         camera.set(
             focal_length=self.focal_mm,
@@ -600,65 +630,65 @@ class Demo(ernie.demo.Demo):
             vertical_aperture=1e-3 * KAI_PIXEL_UM * KAI_HEIGHT,
             clipping_range=(0.05, 1e4),
             exposure_f_stop=f_number_at(self.focal_mm),
-            exposure_time=2e-5,
+            exposure_time=MASTCAM_EXPOSURE
+            if number == 0
+            else NARROW_EXPOSURE,
             exposure_mode="auto",  # the 8-bit images
             exposure_iso=100.0,  # the gain is the ADC's
             sensor_electrons_per_dn=KAI_ELECTRONS_PER_DN,
             sensor_read_noise=KAI_READ_NOISE[e],
             sensor_full_well=KAI_FULL_WELL[e],
+            sensor_dark_current=40.0,
+            sensor_dsnu=0.0,
+            sensor_prnu=0.025,
             sensor_adc_bits=11,
             sensor_black_level=0.0,
             sensor_noise=True,
         )
+
+        def kai(values):
+            def qe(nm):
+                return curve(values, 380.0, 20.0, nm) * pass_band(
+                    nm, 330.0, IR_CUT_NM
+                )
+
+            return qe
+
         if number == 0:
-            curves = []
-            for effective, hwhm in BAYER[e]:
-                sigma = hwhm / math.sqrt(2.0 * math.log(2.0))
-                curve = []
-                for w in range(380, 781, 5):
-                    x = (w - effective) / sigma
-                    curve += [
-                        float(w),
-                        PEAK_QE * math.exp(-0.5 * x * x),
-                    ]
-                curves.append(curve)
             camera.set(
                 sensor_type="rgb",
-                sensor_qe_r=curves[0],
-                sensor_qe_g=curves[1],
-                sensor_qe_b=curves[2],
+                sensor_qe_r=sampled(380.0, 780.0, kai(KAI_RED)),
+                sensor_qe_g=sampled(380.0, 780.0, kai(KAI_GREEN)),
+                sensor_qe_b=sampled(380.0, 780.0, kai(KAI_BLUE)),
                 spectral_range=(380.0, 780.0),
                 spectral_bands=16,
             )
             return
         effective, hwhm, density = FILTERS[e][number]
         transmission = 10.0**-density
-        peak = max(SILICON_QE)
         low, high = effective - hwhm, effective + hwhm
-        curve = []
 
-        def add(w, in_band):
-            curve.extend(
-                [
-                    w,
-                    in_band
-                    * transmission
-                    * PEAK_QE
-                    * silicon(w)
-                    / peak,
-                ]
+        def qe(nm):
+            # The passband's edges ramped over 2 nm about its half
+            # maxima.
+            in_band = min(
+                max(min(nm - low, high - nm) / 2.0 + 0.5, 0.0), 1.0
             )
+            cell = 0.25 * (
+                curve(KAI_RED, 380.0, 20.0, nm)
+                + 2.0 * curve(KAI_GREEN, 380.0, 20.0, nm)
+                + curve(KAI_BLUE, 380.0, 20.0, nm)
+            )
+            return in_band * transmission * cell
 
-        add(low - 1.0, 0.0)
-        step = max(1.0, (high - low - 2.0) / 8.0)
-        nm = low + 1.0
-        while nm <= high - 1.0 + 1e-9:
-            add(nm, 1.0)
-            nm += step
-        add(high + 1.0, 0.0)
+        pairs = []
+        nm = low - 1.0
+        while nm <= high + 1.0 + 1e-9:
+            pairs += [nm, qe(nm)]
+            nm += 0.5
         camera.set(
             sensor_type="mono",
-            sensor_qe_mono=curve,
+            sensor_qe_mono=pairs,
             spectral_range=(low - 1.0, high + 1.0),
             spectral_bands=4,
         )
@@ -666,9 +696,7 @@ class Demo(ernie.demo.Demo):
     # --------------------------------------------------------- checks
 
     def check_fields_of_view(self, optics, rig, tolerance):
-        """The f-theta lens sees the published fields of view: each
-        field's half width on the detector over the focal length,
-        through the authored k1, within `tolerance` degrees."""
+        """The f-theta lens sees the published fields of view."""
         k1 = float(self.camera(f"{rig[0]}/Left").lens_fisheye[0])
         for i, (field, reach) in enumerate(
             zip(optics[5], cmv_reaches())
@@ -684,12 +712,8 @@ class Demo(ernie.demo.Demo):
             )
 
     def check_stereo(self, optics, rig, depth, radius):
-        """A ball of `radius` on the rig's axis `depth` metres out sits
-        further right in the left eye's image than the right's, by the
-        baseline's disparity through the f-theta lens: 2 f theta (1 +
-        k1 theta^2) pixels, theta = atan(baseline / 2 depth). The
-        numbers stay within the 12-bit ADC's range, most exposed within
-        it."""
+        """A ball `depth` m out on the rig's axis shows the baseline's
+        disparity through the f-theta lens, the numbers 12-bit."""
         name, focal, _, _, baseline, _ = optics
         target = (
             rig_transform(rig) @ np.array([0.0, 0.0, -depth, 1.0])
@@ -703,7 +727,9 @@ class Demo(ernie.demo.Demo):
         raws = self.render_vars(products, "RawDN")
         columns = []
         for product in products:
-            image = ids[product].reshape(HEIGHT, WIDTH, -1)[..., 0]
+            image = ids[product].reshape(ECAM_HEIGHT, ECAM_WIDTH, -1)[
+                ..., 0
+            ]
             hits = [
                 col + 0.5
                 for row, col in zip(*np.nonzero(image))
@@ -715,12 +741,14 @@ class Demo(ernie.demo.Demo):
             raw = raws[product].ravel()
             assert raw.max() <= 4095, "the numbers should be 12-bit"
             between = int(np.count_nonzero((raw > 0) & (raw < 4095)))
-            assert between > raw.size // 2, (
+            assert between > raw.size // 8, (
                 "the image should be exposed within the ADC's range"
             )
         self.scene.remove(ernie.Path(ball))
         k1 = f_theta_k1(optics)
-        pixels = focal / (1e-3 * CMV_PIXEL_UM * CMV_WIDTH / WIDTH)
+        pixels = focal / (
+            1e-3 * CMV_PIXEL_UM * CMV_WIDTH / ECAM_WIDTH
+        )
         theta = math.atan(0.5 * baseline / depth)
         expected = 2.0 * pixels * theta * (1.0 + k1 * theta * theta)
         disparity = columns[0] - columns[1]
@@ -733,15 +761,14 @@ class Demo(ernie.demo.Demo):
         )
 
     def check_mastcam_rig(self):
-        """Mastcam-Z's eyes 24.4 cm apart, looking 2.3 degrees apart,
-        each turned in."""
+        """Mastcam-Z's eyes are 24.4 cm apart and toed in 2.3 degrees."""
         poses = [
             np.asarray(
-                self.camera(f"{MASTCAM_RIG[0]}/{eye}").get(
+                self.camera(self.mastcam_camera(e)).get(
                     tokens.TRANSFORM
                 )
             )
-            for eye in EYES
+            for e in range(2)
         ]
         baseline = float(
             np.linalg.norm(poses[1][:3, 3] - poses[0][:3, 3])
@@ -762,8 +789,7 @@ class Demo(ernie.demo.Demo):
         ), "Mastcam-Z's eyes should be toed in as published"
 
     def check_soil_is_red(self):
-        """Mastcam-Z's colour image of the ground: redder than it is
-        blue, as Mars's soil."""
+        """Mastcam-Z sees Mars's soil redder than it is blue."""
         product = "/Render/MastcamZLeft"
         rgb = mean_linear_rgb(
             self.render_vars([product], "LdrColor")[product]
@@ -774,30 +800,26 @@ class Demo(ernie.demo.Demo):
         assert rgb[0] > 1.5 * rgb[2], "the soil should look red"
 
     def check_near_infrared(self):
-        """Through the right camera's R1 (800 +/- 9 nm) and R6 (1022 +/-
-        19 nm) on a camera of their own at the right eye: both see the
-        lit ground, R6 the dimmer, silicon nearly blind at 1 um despite
-        its band twice as wide."""
+        """R6 (1022 nm) sees under half of R1's (800 nm) light: silicon
+        is nearly blind at 1 um."""
         camera = f"{MASTCAM_RIG[0]}/Narrow"
         product = "/Render/MastcamZNarrow"
         self.scene.define(camera, ernie.Camera).set(
             tokens.TRANSFORM,
-            self.camera(f"{MASTCAM_RIG[0]}/Right").get(
-                tokens.TRANSFORM
-            ),
+            self.camera(self.mastcam_camera(1)).get(tokens.TRANSFORM),
         )
         self.define_product(
             product,
             camera,
+            KAI_WIDTH,
+            KAI_HEIGHT,
             ["qe", "noise", "adc"],
             photographic=False,
         )
         means = []
         for number in (1, 6):
             self.use_mastcam_filter(camera, 1, number)
-            self.camera(camera).set(
-                sensor_noise=False, exposure_time=1e-3
-            )
+            self.camera(camera).sensor_noise = False
             electrons = self.render_vars([product], "Electrons")[
                 product
             ]
@@ -815,9 +837,7 @@ class Demo(ernie.demo.Demo):
         )
 
     def check_every_filter_and_zoom(self):
-        """Every filter of both wheels renders an image to show and, but
-        for the solar filters, collects light; at the long end of the
-        zoom the camera closes to f/9.5. Back to filter 0 at 26 mm."""
+        """Every filter renders, and the zoom's long end is f/9.5."""
         for e, eye in enumerate(EYES):
             product = f"/Render/MastcamZ{eye}"
             for number in range(1, 8):

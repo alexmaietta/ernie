@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Perseverance's Navcam, Hazcam and Mastcam-Z stereo pairs on a patch
-// of Mars, as published, each binned to 320 x 240.
+// of Mars, their detectors as their datasheets give them.
 //
 // References:
 // - J. N. Maki et al., "The Mars 2020 Engineering Cameras and
-//   Microphone on the Perseverance Rover: A Next-Generation Imaging
-//   System for Mars Exploration", Space Science Reviews 216:137,
-//   2020, https://doi.org/10.1007/s11214-020-00765-9: Table 2 and the
-//   sections on the detector and flight software.
+//   Microphone on the Perseverance Rover", Space Science Reviews
+//   216:137, 2020: Tables 2 and 3 and the detector section.
 // - J. F. Bell III et al., "The Mars 2020 Perseverance Rover Mast
 //   Camera Zoom (Mastcam-Z) Multispectral, Stereoscopic Imaging
-//   Investigation", Space Science Reviews 217:24, 2021,
-//   https://doi.org/10.1007/s11214-020-00755-x: Tables 3 and 5 and
-//   the focal plane section.
+//   Investigation", Space Science Reviews 217:24, 2021: Tables 3
+//   and 5.
+// - ams OSRAM, "CMV20000 20MP CMOS Machine Vision Image Sensor",
+//   datasheet DS000440 v3-00, 2026: Table 5 and Figure 4.
+// - onsemi, "KAI-2020 Image Sensor", datasheet KAI-2020/D: Table 7
+// and
+//   Figure 12 (Gen1 colour).
 // - J. F. Bell III et al., "Mineralogic and compositional properties
-//   of Martian soil and dust: Results from Mars Pathfinder", Journal
-//   of Geophysical Research 105(E1):1721-1755, 2000 (soil
-//   reflectance, dark in the blue and about 0.3 in the red and near
-//   infrared).
+//   of Martian soil and dust: Results from Mars Pathfinder", JGR
+//   105(E1):1721-1755, 2000 (soil reflectance, roughly).
 // - J. Kannala and S. S. Brandt, "A Generic Camera Model and
 //   Calibration Method for Conventional, Wide-Angle, and Fish-Eye
-//   Lenses", IEEE TPAMI 28(8):1335-1340, 2006 (the f-theta lens's
-//   k1).
+//   Lenses", IEEE TPAMI 28(8):1335-1340, 2006.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
@@ -43,6 +42,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -55,31 +55,83 @@ using demos::Check;
 constexpr double kPi = std::numbers::pi;
 constexpr double kDegree = kPi / 180.0;
 
-/// The Sun's irradiance at Mars's mean distance, 1.5237 au, and its
-/// angular diameter there, degrees.
+/// The Sun's irradiance and angular diameter at Mars's mean distance.
 constexpr double kMarsIrradiance = 1361.0 / (1.5237 * 1.5237);
 constexpr double kSunAngle = 0.35;
 
-/// Every product's size: the detectors binned.
-constexpr int kWidth = 320;
-constexpr int kHeight = 240;
+/// `values` at `nm`, linear between the `grid` wavelengths (from 350
+/// nm every `step`), zero outside them.
+template <std::size_t N>
+double Curve(const std::array<double, N>& values, double first,
+             double step, double nm) {
+    const double x = (nm - first) / step;
+    if (x < 0.0 || x > double(N - 1)) {
+        return 0.0;
+    }
+    const auto i = std::min<std::size_t>(std::size_t(x), N - 2);
+    return values[i] + (x - double(i)) * (values[i + 1] - values[i]);
+}
+
+/// A trapezoid passband over [low, high], ramped over 20 nm.
+double Pass(double nm, double low, double high) {
+    return std::clamp(std::min(nm - low, high - nm) / 20.0 + 0.5, 0.0,
+                      1.0);
+}
+
+/// (nm, value) pairs of `f` every 5 nm over [first, last].
+template <typename F>
+std::vector<float> Sampled(double first, double last, const F& f) {
+    std::vector<float> pairs;
+    for (double nm = first; nm <= last + 1e-9; nm += 5.0) {
+        pairs.push_back(static_cast<float>(nm));
+        pairs.push_back(static_cast<float>(f(nm)));
+    }
+    return pairs;
+}
 
 // ------------------------------------------------- engineering
 // cameras
 
-/// The Navcams' and Hazcams' CMV-20000 (Maki et al. 2020, Table 2):
-/// 5120 x 3840 pixels of 6.4 um, 0.24 DN per electron, 8 e- dark
-/// noise, a 15000 e- full well and a 12-bit ADC.
+/// The CMV20000 (DS000440, Table 5): 6.4 um pixels, 0.25 DN/e-, 8 e-
+/// noise, 15000 e- full well, 125 e-/s dark current, 10 e-/s DSNU, 1%
+/// PRNU.
 constexpr double kCmvPixelUm = 6.4;
 constexpr int kCmvWidth = 5120;
 constexpr int kCmvHeight = 3840;
-constexpr double kCmvElectronsPerDn = 1.0 / 0.24;
-constexpr double kCmvDarkNoise = 8.0;
-constexpr double kCmvFullWell = 15000.0;
 
-/// An engineering camera's optics (Table 2): focal length (mm),
-/// f-number, best focus (m), stereo baseline (m) and fields of view
-/// (horizontal, vertical, diagonal; degrees).
+/// Figure 4's Bayer QE, read every 25 nm from 350 nm.
+constexpr std::array<double, 31> kCmvBlue = {
+    .05, .06, .20, .27, .32, .35, .27,  .10, .05, .04, .03,
+    .03, .03, .04, .05, .05, .05, .05,  .19, .21, .21, .16,
+    .13, .10, .06, .04, .03, .02, .015, .01, .005};
+constexpr std::array<double, 31> kCmvGreen = {
+    .04, .05, .05, .06, .07, .10, .25,  .42, .44, .30, .12,
+    .06, .05, .08, .13, .13, .17, .15,  .20, .21, .21, .16,
+    .13, .10, .06, .04, .03, .02, .015, .01, .005};
+constexpr std::array<double, 31> kCmvRed = {
+    .05, .08, .07, .03, .02, .02, .02,  .02, .03, .03, .44,
+    .40, .38, .37, .34, .32, .32, .25,  .27, .22, .20, .16,
+    .13, .10, .06, .04, .03, .02, .015, .01, .005};
+
+/// Maki's 8 x 8 panchromatic mode (640 x 480): each pixel the mean of
+/// 64 behind a Bayer cell's mean response and the UV and IR blocking
+/// filter (its edges unpublished; 400 and 700 nm assumed).
+constexpr int kEcamSum = 8;
+constexpr int kEcamWidth = kCmvWidth / kEcamSum;
+constexpr int kEcamHeight = kCmvHeight / kEcamSum;
+constexpr double kEcamExposure = 1e-3;
+
+double EcamQe(double nm) {
+    const double cell =
+        0.25 * (Curve(kCmvRed, 350.0, 25.0, nm) +
+                2.0 * Curve(kCmvGreen, 350.0, 25.0, nm) +
+                Curve(kCmvBlue, 350.0, 25.0, nm));
+    return cell * Pass(nm, 400.0, 700.0);
+}
+
+/// An engineering camera's optics (Maki Table 2): focal length (mm),
+/// f-number, best focus (m), baseline (m) and fields of view
+/// (degrees).
 struct Optics {
     const char* name;
     double focalMm;
@@ -93,23 +145,17 @@ constexpr Optics kNavcam{"Navcam", 19.1,  12.0,
                          3.5,      0.424, {96.0, 73.0, 120.0}};
 constexpr Optics kHazcam{"Hazcam", 14.0,  12.0,
                          0.9,      0.248, {136.0, 102.0, 172.0}};
-/// The rear Hazcams: the front pair's optics, 93.4 cm apart.
 constexpr Optics kRearHazcam{
     "RearHazcam", 14.0, 12.0, 0.9, 0.934, {136.0, 102.0, 172.0}};
 
-/// The half widths the fields reach on the detector, mm: across,
-/// down and to the corner.
+/// The detector's half width, half height and half diagonal, mm.
 std::array<double, 3> CmvReaches() {
     const double halfWidth = 0.5e-3 * kCmvPixelUm * kCmvWidth;
     const double halfHeight = 0.5e-3 * kCmvPixelUm * kCmvHeight;
     return {halfWidth, halfHeight, std::hypot(halfWidth, halfHeight)};
 }
 
-/// The f-theta lens's Kannala-Brandt k1 for the published fields: the
-/// least squares of theta (1 + k1 theta^2) = r / f over the three,
-/// theta each field's half angle and r the half width it reaches.
-/// The paper gives the calibrated model only as CAHVORE, without its
-/// coefficients.
+/// The f-theta lens's k1 fitted to the published fields.
 double FThetaK1(const Optics& optics) {
     const std::array<double, 3> reaches = CmvReaches();
     double numerator = 0.0;
@@ -124,8 +170,7 @@ double FThetaK1(const Optics& optics) {
     return numerator / denominator;
 }
 
-/// The angle off axis (radians) that lands `r` focal lengths out
-/// through the f-theta lens: theta (1 + k1 theta^2) = r, by Newton.
+/// The angle off axis landing `r` focal lengths out, by Newton.
 double FThetaAngle(double r, double k1) {
     double theta = r;
     for (int i = 0; i < 20; ++i) {
@@ -135,49 +180,61 @@ double FThetaAngle(double r, double k1) {
     return theta;
 }
 
-// ------------------------------------------------------------
+// -----------------------------------------------------------
 // Mastcam-Z
 
-/// The KAI-2020CM (Bell et al. 2021, Table 5): 1600 x 1200 pixels of
-/// 7.4 um, 15.6 e-/DN and an 11-bit ADC; each camera's full well and
-/// read noise.
+/// The KAI-2020CM (Bell Table 5; datasheet Table 7): 1600 x 1200
+/// pixels of 7.4 um, 15.6 e-/DN, 11 bits, 40 e-/s dark current and
+/// 2.5% rms PRNU.
 constexpr double kKaiPixelUm = 7.4;
 constexpr int kKaiWidth = 1600;
 constexpr int kKaiHeight = 1200;
 constexpr double kKaiElectronsPerDn = 15.6;
 constexpr double kKaiFullWell[2] = {21826.0, 21818.0};
 constexpr double kKaiReadNoise[2] = {22.0, 21.0};
+/// Exposures through the colour filter and the narrow bands.
+constexpr double kMastcamExposure = 2e-3;
+constexpr double kNarrowExposure = 2e-2;
 
-/// The zoom (26 mm at f/6.7 to 110 mm at f/9.5), the cameras' 24.4 cm
-/// baseline and each one's 1.15 degree toe-in (2.3 between them), and
-/// the detector's ~40% peak QE through its Bayer microlenses.
+/// Figure 12's Gen1 colour QE, read every 20 nm from 380 nm.
+constexpr std::array<double, 37> kKaiBlue = {
+    .02,  .20,  .33,  .40,  .46,  .40,  .25,  .08, .02,  .01,
+    .005, .005, .005, .005, .005, .01,  .01,  .01, .01,  .01,
+    .03,  .06,  .08,  .07,  .06,  .045, .035, .03, .025, .02,
+    .015, .012, .01,  .008, .006, .004, .002};
+constexpr std::array<double, 37> kKaiGreen = {
+    .01,  .01,  .015, .02,  .03,  .05,  .12,  .25, .41,  .33,
+    .12,  .02,  .01,  .01,  .01,  .02,  .03,  .04, .04,  .05,
+    .06,  .07,  .08,  .07,  .06,  .045, .035, .03, .025, .02,
+    .015, .012, .01,  .008, .006, .004, .002};
+constexpr std::array<double, 37> kKaiRed = {
+    .01,  .01,  .01,  .01,  .005, .005, .005, .005, .005, .01,
+    .05,  .25,  .33,  .30,  .27,  .25,  .22,  .19,  .16,  .14,
+    .12,  .10,  .085, .07,  .06,  .045, .035, .03,  .025, .02,
+    .015, .012, .01,  .008, .006, .004, .002};
+
+/// Zoom, baseline and toe-in (Bell Table 5).
 constexpr double kShortestFocalMm = 26.0;
 constexpr double kLongestFocalMm = 110.0;
 constexpr double kWidestFNumber = 6.7;
 constexpr double kNarrowestFNumber = 9.5;
 constexpr double kMastcamBaselineM = 0.244;
 constexpr double kToeInDeg = 1.15;
-constexpr double kPeakQe = 0.40;
 
-/// The f-number at focal length `focalMm`, linearly between the
-/// zoom's ends (the paper gives only those).
 double FNumberAt(double focalMm) {
     const double t = (focalMm - kShortestFocalMm) /
                      (kLongestFocalMm - kShortestFocalMm);
     return kWidestFNumber + t * (kNarrowestFNumber - kWidestFNumber);
 }
 
-/// A filter's Table 3 effective wavelength and half width at half
-/// maximum, nm, and its neutral density.
+/// A filter's effective wavelength, half width at half maximum (nm)
+/// and neutral density (Bell Table 3).
 struct Filter {
     double effectiveNm;
     double hwhmNm;
     double neutralDensity;
 };
 
-/// Each camera's filter wheel (Table 3): 0 the Bayer RGB's near-IR
-/// cut-off (by its green channel), 1 to 6 narrow bands, 7 the solar
-/// filter; the left's visible, the right's reaching 1022 nm.
 constexpr Filter kFilters[2][8] = {{{544.0, 41.0, 0.0},
                                     {800.0, 9.0, 0.0},
                                     {754.0, 10.0, 0.0},
@@ -195,47 +252,21 @@ constexpr Filter kFilters[2][8] = {{{544.0, 41.0, 0.0},
                                     {1022.0, 19.0, 0.0},
                                     {880.0, 10.0, 5.0}}};
 
-/// Filter 0's red, green and blue Bayer channels (Table 3).
-constexpr Filter kBayer[2][3] = {
-    {{630.0, 43.0, 0.0}, {544.0, 41.0, 0.0}, {480.0, 46.0, 0.0}},
-    {{631.0, 43.0, 0.0}, {544.0, 42.0, 0.0}, {480.0, 46.0, 0.0}}};
+/// Filter 0's infrared cut-off: the red channel's upper half maximum
+/// in Table 3, 631 + 43 nm.
+constexpr double kIrCutNm = 674.0;
 
-/// A generic front-illuminated silicon response (Ernie's mono
-/// sensor's), for the detector behind the narrow bands: the paper
-/// publishes no curve.
-constexpr std::array<double, 9> kSiliconNm = {
-    350.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1100.0};
-constexpr std::array<double, 9> kSiliconQe = {
-    0.15, 0.35, 0.55, 0.62, 0.55, 0.40, 0.22, 0.06, 0.0};
-
-double Silicon(double nm) {
-    if (nm <= kSiliconNm.front()) {
-        return kSiliconQe.front();
-    }
-    for (std::size_t i = 1; i < kSiliconNm.size(); ++i) {
-        if (nm <= kSiliconNm[i]) {
-            const double t = (nm - kSiliconNm[i - 1]) /
-                             (kSiliconNm[i] - kSiliconNm[i - 1]);
-            return kSiliconQe[i - 1] +
-                   t * (kSiliconQe[i] - kSiliconQe[i - 1]);
-        }
-    }
-    return kSiliconQe.back();
-}
-
-// ---------------------------------------------------------- the
+// ----------------------------------------------------------- the
 // scene
 
-/// Mars soil's reflectance, roughly (Bell et al. 2000): dark in the
-/// blue, rising to about 0.3 by 750 nm and flat into the near
-/// infrared; and darker rock.
+/// Mars soil and darker rock's reflectance, roughly (Bell 2000).
 const std::vector<float> kSoil{350.0f, 0.05f, 450.0f,  0.08f,
                                550.0f, 0.14f, 650.0f,  0.25f,
                                750.0f, 0.30f, 1100.0f, 0.30f};
 const std::vector<float> kRock{350.0f, 0.06f, 550.0f,  0.09f,
                                750.0f, 0.14f, 1100.0f, 0.15f};
 
-/// Rocks on the ground ahead of the rover: x, y and radius, m.
+/// Rocks ahead of the rover: x, y and radius, m.
 constexpr std::array<std::array<double, 3>, 6> kRocks = {{
     {-1.2, 3.0, 0.25},
     {0.9, 4.5, 0.4},
@@ -245,11 +276,7 @@ constexpr std::array<std::array<double, 3>, 6> kRocks = {{
     {-0.6, 2.2, 0.18},
 }};
 
-/// The rigs, each looking down its -z with +y up, a heading
-/// (degrees clockwise from north, +y) and a tilt down: the mast's
-/// Navcams and Mastcam-Z about 2 m up looking 15 degrees down ahead
-/// (north), the front Hazcams 0.7 m up and 30 degrees down ahead, the
-/// rear ones behind the rover looking back.
+/// A stereo rig: its eye, tilt down and heading (degrees from north).
 struct Rig {
     const char* path;
     glm::dvec3 eye;
@@ -275,8 +302,7 @@ glm::dmat4 RigTransform(const Rig& rig) {
                            {0.0, 0.0, 1.0});
 }
 
-/// Rig-local pose of an eye `x` along the rig's x, turned `yaw`
-/// (radians) about its +y.
+/// An eye `x` along its rig, turned `yaw` radians about the rig's +y.
 glm::dmat4 EyePose(double x, double yaw) {
     glm::dmat4 pose =
         glm::rotate(glm::dmat4(1.0), yaw, glm::dvec3(0.0, 1.0, 0.0));
@@ -284,7 +310,6 @@ glm::dmat4 EyePose(double x, double yaw) {
     return pose;
 }
 
-/// Product `product`'s var `var` on the host.
 Tensor Var(RenderProductSetOutputs& outputs, const Path& product,
            const char* var) {
     return outputs.at(product)
@@ -295,8 +320,7 @@ Tensor Var(RenderProductSetOutputs& outputs, const Path& product,
 
 constexpr const char* kEyes[2] = {"Left", "Right"};
 
-/// The cameras the viewer can show: name and camera (a pair's left
-/// eye).
+/// The cameras the viewer can show.
 const std::array<std::pair<const char*, const char*>, 5> kViews = {{
     {"Overview", "/World/View"},
     {"Navcam", "/World/Rover/Navcam/Left"},
@@ -305,8 +329,7 @@ const std::array<std::pair<const char*, const char*>, 5> kViews = {{
     {"Mastcam-Z", "/World/Rover/MastcamZ/Left"},
 }};
 
-/// Filter `filter` of eye `e`'s wheel, as Table 3 names it: L0 to
-/// L7, R0 to R7.
+/// Filter `filter` of eye `e`'s wheel as Table 3 names it.
 std::string FilterName(int e, int filter) {
     const Filter& band = kFilters[e][filter];
     std::string name = std::string(e == 0 ? "L" : "R") +
@@ -336,8 +359,7 @@ class Mars2020Demo : public app::Demo {
             .SetPreset(std::string(tokens::kMars))
             .SetDustOpticalDepth(0.5)
             .SetGroundAlbedo(0.25);
-        // The Sun's measured spectrum at Mars's distance, 40 degrees
-        // up in the south-east.
+        // The Sun, 40 degrees up in the south-east.
         DistantLight::Define(scene, "/World/Sun")
             .SetIrradiance(kMarsIrradiance)
             .SetPhysicalIlluminant(std::string(tokens::kSun))
@@ -372,7 +394,7 @@ class Mars2020Demo : public app::Demo {
         DefineEngineeringPair(kRearHazcamRig, kRearHazcam);
         DefineMastcamPair();
 
-        // The viewer's own view: the rover's patch from behind.
+        // The viewer's own view of the rover's patch.
         Camera::Define(scene, "/World/View")
             .SetFocalLength(18.0)
             .SetSensorNoise(false)
@@ -388,8 +410,6 @@ class Mars2020Demo : public app::Demo {
             viewer->SetActiveCamera("/World/View");
         }
 
-        // The camera the viewer shows (a pair's left eye),
-        // Mastcam-Z's zoom and each eye's filter wheel.
         std::vector<std::string> cameras;
         for (const auto& [name, path] : kViews) {
             cameras.emplace_back(name);
@@ -424,8 +444,8 @@ class Mars2020Demo : public app::Demo {
         }
     }
 
-    /// The left Navcam, Hazcam and Mastcam-Z images and the right
-    /// Navcam's, side by side, as the rover sends them.
+    /// The left Navcam, the right Navcam, the left Hazcam and the
+    /// middle of the left Mastcam-Z, as the rover sends them.
     void SaveOutput(const std::filesystem::path& path) override {
         const Path products[] = {
             "/Render/NavcamLeft", "/Render/NavcamRight",
@@ -436,6 +456,8 @@ class Mars2020Demo : public app::Demo {
         for (const Path& product : products) {
             images.push_back(Var(outputs, product, "LdrColor"));
         }
+        images.back() =
+            Centre(images.back(), kEcamWidth, kEcamHeight);
         app::WritePng(path, demos::SideBySide(images));
     }
 
@@ -461,11 +483,33 @@ class Mars2020Demo : public app::Demo {
     }
 
   private:
-    /// Product `product` of `camera` at the binned size, with its
-    /// readout chain of SensorFilter prims of `types` under it.
+    /// The central `width` x `height` of a uint8 image.
+    static Tensor Centre(const Tensor& image, int width, int height) {
+        const std::int64_t rows = image.Shape()[0];
+        const std::int64_t cols = image.Shape()[1];
+        const std::int64_t channels = image.Shape()[2];
+        const std::int64_t top = (rows - height) / 2;
+        const std::int64_t left = (cols - width) / 2;
+        std::vector<std::uint8_t> pixels(std::size_t(width) *
+                                         std::size_t(height) *
+                                         std::size_t(channels));
+        const auto* from =
+            static_cast<const std::uint8_t*>(image.Data());
+        for (int r = 0; r < height; ++r) {
+            std::memcpy(&pixels[std::size_t(r) * std::size_t(width) *
+                                std::size_t(channels)],
+                        from + ((top + r) * cols + left) * channels,
+                        std::size_t(width * channels));
+        }
+        return Tensor::Copy<std::uint8_t>(pixels,
+                                          {height, width, channels});
+    }
+
+    /// Product `product` of `camera`, with a readout chain of
+    /// `types`.
     std::vector<Path>
-    DefineProduct(const Path& product, const Path& camera,
-                  const std::vector<std::string>& types,
+    DefineProduct(const Path& product, const Path& camera, int width,
+                  int height, const std::vector<std::string>& types,
                   bool photographic = true) {
         Scene& scene = GetScene();
         std::vector<std::string> names = {"RawDN", "Electrons",
@@ -492,27 +536,21 @@ class Mars2020Demo : public app::Demo {
         }
         RenderProduct::Define(scene, product)
             .SetCamera(camera)
-            .SetResolution(glm::dvec2(kWidth, kHeight))
+            .SetResolution(glm::dvec2(width, height))
             .SetOrderedVars(vars)
             .SetFilters(filters);
         return filters;
     }
 
-    /// A Navcam or Hazcam pair (Maki et al. 2020, Table 2) on its
-    /// rig, `optics.baselineM` apart along the rig's x, parallel: the
-    /// f-theta lens over the full frame, focused at its best focus,
-    /// on the CMV-20000; its readout qe, bayer (RGGB; the paper does
-    /// not give the layout), noise, adc, demosaic (RawDN the 12-bit
-    /// numbers), then cie, exposure and jpeg at quality 85 for the
-    /// 8-bit images the rover sends (the paper gives the quality as
-    /// selectable). The detector's QE is published only as 64.5% at
-    /// 550 nm, monochrome, so the channels keep Ernie's generic RGB
-    /// curves.
+    /// A Navcam or Hazcam pair in the 8 x 8 mode: the f-theta lens on
+    /// the CMV20000, its sums of 64 pixels scaled as means, sent as
+    /// JPEG.
     void DefineEngineeringPair(const Rig& rig, const Optics& optics) {
         Scene& scene = GetScene();
         Xform::Define(scene, rig.path);
         scene.Set(rig.path, tokens::kTransform, RigTransform(rig));
         const double k1 = FThetaK1(optics);
+        const double n = kEcamSum * kEcamSum;
         for (int e = 0; e < 2; ++e) {
             const Path camera = Path(rig.path).Child(kEyes[e]);
             Camera::Define(scene, camera)
@@ -526,13 +564,19 @@ class Mars2020Demo : public app::Demo {
                 .SetFStop(optics.fNumber)
                 .SetFocusDistance(optics.focusM)
                 .SetExposureFStop(optics.fNumber)
-                .SetExposureTime(4e-5)
+                .SetExposureTime(kEcamExposure)
                 .SetExposureMode("auto")  // the 8-bit images
                 .SetExposureIso(100.0)    // the gain is the ADC's
-                .SetSensorType("rgb")
-                .SetSensorElectronsPerDn(kCmvElectronsPerDn)
-                .SetSensorReadNoise(kCmvDarkNoise)
-                .SetSensorFullWell(kCmvFullWell)
+                .SetSensorType("mono")
+                .SetSensorQeMono(Sampled(350.0, 1100.0, EcamQe))
+                .SetSpectralRange(glm::dvec2(380.0, 720.0))
+                .SetSpectralBands(16)
+                .SetSensorElectronsPerDn(4.0 * n)
+                .SetSensorReadNoise(8.0 * kEcamSum)
+                .SetSensorFullWell(15000.0 * n)
+                .SetSensorDarkCurrent(125.0 * n)
+                .SetSensorDsnu(10.0 * kEcamExposure * kEcamSum)
+                .SetSensorPrnu(0.01 / kEcamSum)
                 .SetSensorAdcBits(12)
                 .SetSensorBlackLevel(0.0)
                 .SetSensorNoise(true);
@@ -543,26 +587,22 @@ class Mars2020Demo : public app::Demo {
             const std::vector<Path> filters = DefineProduct(
                 Path(std::string("/Render/") + optics.name +
                      kEyes[e]),
-                camera,
-                {"qe", "bayer", "noise", "adc", "demosaic", "cie",
-                 "exposure", "jpeg"});
-            scene.Set(filters[7], "inputs:quality", 85.0);
+                camera, kEcamWidth, kEcamHeight,
+                {"qe", "noise", "adc", "cie", "exposure", "jpeg"});
+            scene.Set(filters[5], "inputs:quality", 85.0);
         }
     }
 
-    /// Mastcam-Z's pair (Bell et al. 2021, Table 5) on its rig at the
-    /// widest zoom, 24.4 cm apart, each toed in 1.15 degrees, through
-    /// filter 0.
+    /// Mastcam-Z's pair at the widest zoom, toed in, through filter
+    /// 0.
     void DefineMastcamPair() {
         Scene& scene = GetScene();
         Xform::Define(scene, kMastcamRig.path);
         scene.Set(kMastcamRig.path, tokens::kTransform,
                   RigTransform(kMastcamRig));
         for (int e = 0; e < 2; ++e) {
-            const Path camera =
-                Path(kMastcamRig.path).Child(kEyes[e]);
+            const Path camera = MastcamCamera(e);
             Camera::Define(scene, camera);
-            // The left turns towards +x, the right towards -x.
             scene.Set(
                 camera, tokens::kTransform,
                 EyePose((e == 0 ? -0.5 : 0.5) * kMastcamBaselineM,
@@ -575,16 +615,13 @@ class Mars2020Demo : public app::Demo {
         return Path(kMastcamRig.path).Child(kEyes[e]);
     }
 
-    /// Mastcam-Z eye `e` through filter `filter`, with its readout:
-    /// qe, bayer, noise, adc and demosaic for filter 0's colour, qe,
-    /// noise and adc for a narrow band; then cie and exposure for the
-    /// image to show.
+    /// Mastcam-Z eye `e` through filter `filter`, with its readout.
     void SetMastcamFilter(int e, int filter) {
         filters_[e] = filter;
         UseMastcamFilter(MastcamCamera(e), e, filter);
         DefineProduct(
             Path(std::string("/Render/MastcamZ") + kEyes[e]),
-            MastcamCamera(e),
+            MastcamCamera(e), kKaiWidth, kKaiHeight,
             filter == 0
                 ? std::vector<std::string>{"qe", "bayer", "noise",
                                            "adc", "demosaic", "cie",
@@ -593,13 +630,9 @@ class Mars2020Demo : public app::Demo {
                                            "cie", "exposure"});
     }
 
-    /// Mastcam-Z camera `camera` (eye `e`) through filter `filter` at
-    /// the zoom's focal length: filter 0 an RGB sensor whose channels
-    /// are Gaussians at Table 3's Bayer effective wavelengths and
-    /// half widths peaking at ~40%; 1 to 7 one channel, the filter's
-    /// passband (2 x HWHM about its effective wavelength, ramped over
-    /// 2 nm about the half maxima, times 10^-ND) on silicon scaled to
-    /// the ~40% peak, the spectral range narrowed to it.
+    /// Mastcam-Z camera `camera` through filter `filter`: Gen1 colour
+    /// under the IR cut-off for filter 0, else the passband on the
+    /// Bayer cell's mean response.
     void UseMastcamFilter(const Path& camera, int e, int filter) {
         Camera prim(GetScene(), camera);
         prim.SetFocalLength(focalMm_)
@@ -607,33 +640,30 @@ class Mars2020Demo : public app::Demo {
             .SetVerticalAperture(1e-3 * kKaiPixelUm * kKaiHeight)
             .SetClippingRange(glm::dvec2(0.05, 1e4))
             .SetExposureFStop(FNumberAt(focalMm_))
-            .SetExposureTime(2e-5)
+            .SetExposureTime(filter == 0 ? kMastcamExposure
+                                         : kNarrowExposure)
             .SetExposureMode("auto")  // the 8-bit images
             .SetExposureIso(100.0)    // the gain is the ADC's
             .SetSensorElectronsPerDn(kKaiElectronsPerDn)
             .SetSensorReadNoise(kKaiReadNoise[e])
             .SetSensorFullWell(kKaiFullWell[e])
+            .SetSensorDarkCurrent(40.0)
+            .SetSensorDsnu(0.0)
+            .SetSensorPrnu(0.025)
             .SetSensorAdcBits(11)
             .SetSensorBlackLevel(0.0)
             .SetSensorNoise(true);
+        const auto kai = [](const std::array<double, 37>& curve) {
+            return [&curve](double nm) {
+                return Curve(curve, 380.0, 20.0, nm) *
+                       Pass(nm, 330.0, kIrCutNm);
+            };
+        };
         if (filter == 0) {
-            std::array<std::vector<float>, 3> curves;
-            for (std::size_t c = 0; c < 3; ++c) {
-                const Filter& channel = kBayer[e][c];
-                const double sigma =
-                    channel.hwhmNm / std::sqrt(2.0 * std::log(2.0));
-                for (int w = 380; w <= 780; w += 5) {
-                    const double x =
-                        (w - channel.effectiveNm) / sigma;
-                    curves[c].push_back(static_cast<float>(w));
-                    curves[c].push_back(static_cast<float>(
-                        kPeakQe * std::exp(-0.5 * x * x)));
-                }
-            }
             prim.SetSensorType("rgb")
-                .SetSensorQeR(curves[0])
-                .SetSensorQeG(curves[1])
-                .SetSensorQeB(curves[2])
+                .SetSensorQeR(Sampled(380.0, 780.0, kai(kKaiRed)))
+                .SetSensorQeG(Sampled(380.0, 780.0, kai(kKaiGreen)))
+                .SetSensorQeB(Sampled(380.0, 780.0, kai(kKaiBlue)))
                 .SetSpectralRange(glm::dvec2(380.0, 780.0))
                 .SetSpectralBands(16);
             return;
@@ -641,32 +671,32 @@ class Mars2020Demo : public app::Demo {
         const Filter& band = kFilters[e][filter];
         const double transmission =
             std::pow(10.0, -band.neutralDensity);
-        const double peak =
-            *std::max_element(kSiliconQe.begin(), kSiliconQe.end());
         const double low = band.effectiveNm - band.hwhmNm;
         const double high = band.effectiveNm + band.hwhmNm;
-        std::vector<float> curve;
-        const auto add = [&](double w, double inBand) {
-            curve.push_back(static_cast<float>(w));
-            curve.push_back(static_cast<float>(
-                inBand * transmission * kPeakQe * Silicon(w) / peak));
+        // The passband's edges ramped over 2 nm about its half
+        // maxima.
+        const auto qe = [&](double nm) {
+            const double inBand = std::clamp(
+                std::min(nm - low, high - nm) / 2.0 + 0.5, 0.0, 1.0);
+            const double cell =
+                0.25 * (Curve(kKaiRed, 380.0, 20.0, nm) +
+                        2.0 * Curve(kKaiGreen, 380.0, 20.0, nm) +
+                        Curve(kKaiBlue, 380.0, 20.0, nm));
+            return inBand * transmission * cell;
         };
-        add(low - 1.0, 0.0);
-        const double step = std::max(1.0, (high - low - 2.0) / 8.0);
-        for (double w = low + 1.0; w <= high - 1.0 + 1e-9;
-             w += step) {
-            add(w, 1.0);
+        std::vector<float> curve;
+        for (double nm = low - 1.0; nm <= high + 1.0 + 1e-9;
+             nm += 0.5) {
+            curve.push_back(static_cast<float>(nm));
+            curve.push_back(static_cast<float>(qe(nm)));
         }
-        add(high + 1.0, 0.0);
         prim.SetSensorType("mono")
             .SetSensorQeMono(curve)
             .SetSpectralRange(glm::dvec2(low - 1.0, high + 1.0))
             .SetSpectralBands(4);
     }
 
-    /// The f-theta lens sees the published fields of view: each
-    /// field's half width on the detector over the focal length,
-    /// through the authored k1, within `tolerance` degrees.
+    /// The f-theta lens sees the published fields of view.
     void CheckFieldsOfView(const Optics& optics, const Rig& rig,
                            double tolerance) {
         const std::vector<float> fisheye =
@@ -686,12 +716,8 @@ class Mars2020Demo : public app::Demo {
         }
     }
 
-    /// A ball of `radius` on the rig's axis `depth` metres out sits
-    /// further right in the left eye's image than the right's, by the
-    /// baseline's disparity through the f-theta lens: 2 f theta (1 +
-    /// k1 theta^2) pixels, theta = atan(baseline / 2 depth). The
-    /// numbers stay within the 12-bit ADC's range, most exposed
-    /// within it.
+    /// A ball `depth` m out on the rig's axis shows the baseline's
+    /// disparity through the f-theta lens, the numbers 12-bit.
     void CheckStereo(const Optics& optics, const Rig& rig,
                      double depth, double radius) {
         Scene& scene = GetScene();
@@ -711,10 +737,10 @@ class Mars2020Demo : public app::Demo {
             const Tensor raw = Var(outputs, products[e], "RawDN");
             double sum = 0.0;
             int hits = 0;
-            for (int row = 0; row < kHeight; ++row) {
-                for (int col = 0; col < kWidth; ++col) {
+            for (int row = 0; row < kEcamHeight; ++row) {
+                for (int col = 0; col < kEcamWidth; ++col) {
                     if (GetRenderer().PrimPath(
-                            ids.As<std::uint32_t>()[row * kWidth +
+                            ids.As<std::uint32_t>()[row * kEcamWidth +
                                                     col]) == ball) {
                         sum += col + 0.5;
                         ++hits;
@@ -730,13 +756,14 @@ class Mars2020Demo : public app::Demo {
                 between += dn > 0 && dn < 4095 ? 1 : 0;
             }
             Check(
-                between > raw.Elements() / 2,
+                between > raw.Elements() / 8,
                 "the image should be exposed within the ADC's range");
         }
         scene.Remove(ball);
         const double k1 = FThetaK1(optics);
-        const double pixels = optics.focalMm / (1e-3 * kCmvPixelUm *
-                                                kCmvWidth / kWidth);
+        const double pixels =
+            optics.focalMm /
+            (1e-3 * kCmvPixelUm * kCmvWidth / kEcamWidth);
         const double theta =
             std::atan(0.5 * optics.baselineM / depth);
         const double expected =
@@ -748,16 +775,15 @@ class Mars2020Demo : public app::Demo {
               "the pair should see the baseline's disparity");
     }
 
-    /// Mastcam-Z's eyes 24.4 cm apart, looking 2.3 degrees apart,
-    /// each turned in.
+    /// Mastcam-Z's eyes are 24.4 cm apart and toed in 2.3 degrees.
     void CheckMastcamRig() {
         Scene& scene = GetScene();
         glm::dvec3 positions[2];
         glm::dvec3 looks[2];
         for (int e = 0; e < 2; ++e) {
             const glm::dmat4 pose = scene.Get<glm::dmat4>(
-                Path(kMastcamRig.path).Child(kEyes[e]),
-                tokens::kTransform, glm::dmat4(1.0));
+                MastcamCamera(e), tokens::kTransform,
+                glm::dmat4(1.0));
             positions[e] = glm::dvec3(pose[3]);
             looks[e] = -glm::dvec3(pose[2]);
         }
@@ -773,8 +799,7 @@ class Mars2020Demo : public app::Demo {
               "Mastcam-Z's eyes should be toed in as published");
     }
 
-    /// Mastcam-Z's colour image of the ground: redder than it is
-    /// blue, as Mars's soil.
+    /// Mastcam-Z sees Mars's soil redder than it is blue.
     void CheckSoilIsRed() {
         const Path products[] = {"/Render/MastcamZLeft"};
         RenderProductSetOutputs outputs =
@@ -786,26 +811,23 @@ class Mars2020Demo : public app::Demo {
         Check(rgb.r > 1.5 * rgb.b, "the soil should look red");
     }
 
-    /// Through the right camera's R1 (800 +/- 9 nm) and R6 (1022 +/-
-    /// 19 nm) on a camera of their own at the right eye: both see the
-    /// lit ground, R6 the dimmer, silicon nearly blind at 1 um
-    /// despite its band twice as wide.
+    /// R6 (1022 nm) sees under half of R1's (800 nm) light: silicon
+    /// is nearly blind at 1 um.
     void CheckNearInfrared() {
         Scene& scene = GetScene();
         const Path camera = "/World/Rover/MastcamZ/Narrow";
         const Path product = "/Render/MastcamZNarrow";
         Camera::Define(scene, camera);
         scene.Set(camera, tokens::kTransform,
-                  scene.Get<glm::dmat4>(
-                      Path(kMastcamRig.path).Child("Right"),
-                      tokens::kTransform, glm::dmat4(1.0)));
-        DefineProduct(product, camera, {"qe", "noise", "adc"}, false);
+                  scene.Get<glm::dmat4>(MastcamCamera(1),
+                                        tokens::kTransform,
+                                        glm::dmat4(1.0)));
+        DefineProduct(product, camera, kKaiWidth, kKaiHeight,
+                      {"qe", "noise", "adc"}, false);
         double means[2] = {0.0, 0.0};
         for (int i = 0; i < 2; ++i) {
             UseMastcamFilter(camera, 1, i == 0 ? 1 : 6);
-            Camera(scene, camera)
-                .SetSensorNoise(false)
-                .SetExposureTime(1e-3);
+            Camera(scene, camera).SetSensorNoise(false);
             const Path products[] = {product};
             RenderProductSetOutputs outputs =
                 GetRenderer().Step(scene, products);
@@ -831,9 +853,7 @@ class Mars2020Demo : public app::Demo {
               "R6 should see less than half of R1's light");
     }
 
-    /// Every filter of both wheels renders an image to show and, but
-    /// for the solar filters, collects light; at the long end of the
-    /// zoom the camera closes to f/9.5. Back to filter 0 at 26 mm.
+    /// Every filter renders, and the zoom's long end is f/9.5.
     void CheckEveryFilterAndZoom() {
         Scene& scene = GetScene();
         for (int e = 0; e < 2; ++e) {
