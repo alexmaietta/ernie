@@ -33,6 +33,10 @@ Theme LightTheme() {
     theme.header = {0.863f, 0.867f, 0.875f, 1.0f};
     theme.field = {0.980f, 0.980f, 0.984f, 1.0f};
     theme.fieldHovered = {1.0f, 1.0f, 1.0f, 1.0f};
+    theme.button = {0.890f, 0.894f, 0.902f, 1.0f};
+    theme.buttonLit = {0.667f, 0.675f, 0.690f, 1.0f};
+    theme.accent = {0.0f, 0.475f, 0.722f, 1.0f};
+    theme.overlayBorder = {0.769f, 0.773f, 0.784f, 1.0f};
     theme.separator = {0.769f, 0.773f, 0.784f, 1.0f};
     theme.text = {0.133f, 0.141f, 0.153f, 1.0f};
     theme.textMuted = {0.427f, 0.439f, 0.459f, 1.0f};
@@ -80,7 +84,8 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_TextDisabled, theme.textMuted);
     set(ImGuiCol_WindowBg, theme.panel);
     set(ImGuiCol_ChildBg, WithAlpha(theme.panel, 0.0f));
-    set(ImGuiCol_PopupBg, theme.panel);
+    // Menus and combos' lists as Kit's, a shade off the panels.
+    set(ImGuiCol_PopupBg, WithAlpha(theme.overlay, 1.0f));
     set(ImGuiCol_Border, theme.separator);
     set(ImGuiCol_BorderShadow, glm::vec4(0.0f));
     set(ImGuiCol_FrameBg, theme.field);
@@ -94,18 +99,22 @@ void ApplyTheme(const Theme& theme, float contentScale,
     set(ImGuiCol_ScrollbarGrab, theme.fieldHovered);
     set(ImGuiCol_ScrollbarGrabHovered, theme.textMuted);
     set(ImGuiCol_ScrollbarGrabActive, theme.accent);
-    set(ImGuiCol_CheckMark, theme.accent);
-    set(ImGuiCol_SliderGrab, theme.accent);
-    set(ImGuiCol_SliderGrabActive, theme.accent);
-    set(ImGuiCol_Button, theme.field);
+    // Kit's checkboxes: grey when checked, with a dark check; menus
+    // mark their items in the accent instead (menu.h, TextLink).
+    set(ImGuiCol_CheckMark, theme.panel);
+    set(ImGuiCol_CheckboxSelectedBg, theme.textMuted);
+    // Kit's sliders fill in grey rather than showing a grab.
+    set(ImGuiCol_SliderGrab, theme.buttonLit);
+    set(ImGuiCol_SliderGrabActive, theme.text);
+    set(ImGuiCol_Button, theme.button);
     set(ImGuiCol_ButtonHovered, theme.fieldHovered);
-    set(ImGuiCol_ButtonActive, accentDim);
+    set(ImGuiCol_ButtonActive, theme.buttonLit);
     // Headers: section bars (drawn with `header` by the panels), and
-    // selected rows of trees and lists, which take the selection
-    // colour.
+    // selected and hovered rows of trees, lists and menus, which take
+    // Kit's blue-teal.
     set(ImGuiCol_Header, theme.selection);
-    set(ImGuiCol_HeaderHovered, WithAlpha(theme.fieldHovered, 0.8f));
-    set(ImGuiCol_HeaderActive, WithAlpha(theme.selection, 0.9f));
+    set(ImGuiCol_HeaderHovered, WithAlpha(theme.selection, 0.85f));
+    set(ImGuiCol_HeaderActive, theme.selection);
     set(ImGuiCol_Separator, theme.separator);
     set(ImGuiCol_SeparatorHovered, accentDim);
     set(ImGuiCol_SeparatorActive, theme.accent);

@@ -554,6 +554,17 @@ class Viewer {
     std::optional<Wireframe> GetWireframe() const;
     void SetWireframe(std::optional<Wireframe> mode);
 
+    /// Whether the viewport shades minimally (`ernie:minimal:mode`,
+    /// Kit's "RTX - Minimal"): true for the surfaces' diffuse
+    /// colours, false for full shading, overriding the render
+    /// settings in the viewport only; or none (the default) to follow
+    /// them.
+    std::optional<bool> GetMinimal() const;
+    void SetMinimal(std::optional<bool> minimal);
+    /// Whether the viewport shades minimally now, by `GetMinimal` or
+    /// else the render settings.
+    bool MinimalShown() const;
+
     /// What the viewport draws over the scene and its heads-up
     /// display lists.
     const ViewportDisplay& GetViewportDisplay() const;

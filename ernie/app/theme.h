@@ -9,38 +9,47 @@ namespace ernie::app {
 
 /// Colours (sRGB-encoded with alpha, as written to the screen) and
 /// metrics of the viewer's UI. The defaults follow NVIDIA Omniverse
-/// Kit's dark look: a near-black tab bar and docking area, charcoal
-/// panels, darker input fields, grey labels with light values,
-/// section headers as lighter bars, a steel-blue accent for selection
-/// and changed values, and dark translucent pills over the viewport.
+/// Kit's dark look (colours read from USD Composer), a shade darker
+/// behind the docks: near-black tab bars and docking area, charcoal
+/// panels and fields (Kit's #1F2123), section headers as lighter bars
+/// (#323434), menus and the viewport's pills in #25282A, a blue-teal
+/// hover (#284D5B) and Kit's bright blue (#33C2F9) for the chosen and
+/// checked items, and segmented buttons lit in grey (#777777).
 struct Theme {
     glm::vec4 background{
-        0.090f, 0.094f, 0.098f,
+        0.071f, 0.075f, 0.078f,
         1.0f};  ///< Tab bar, menu bar, behind the docks.
     glm::vec4 panel{0.122f, 0.129f, 0.137f,
                     1.0f};  ///< Panel bodies (Kit's #1F2123).
     glm::vec4 header{0.196f, 0.204f, 0.204f,
                      1.0f};  ///< Section bars, table headers.
-    glm::vec4 field{0.165f, 0.173f, 0.184f,
-                    1.0f};  ///< Input fields, combos, sliders.
-    glm::vec4 fieldHovered{0.224f, 0.235f, 0.247f, 1.0f};
-    glm::vec4 separator{0.071f, 0.075f, 0.078f,
+    glm::vec4 field{0.090f, 0.098f, 0.102f,
+                    1.0f};  ///< Input fields and combos.
+    glm::vec4 fieldHovered{0.169f, 0.180f, 0.188f, 1.0f};
+    glm::vec4 button{0.173f, 0.180f, 0.188f,
+                     1.0f};  ///< Buttons, a step off the panels.
+    glm::vec4 buttonLit{0.467f, 0.467f, 0.467f,
+                        1.0f};  ///< A chosen segment (#777777).
+    glm::vec4 separator{0.055f, 0.059f, 0.063f,
                         1.0f};  ///< One-pixel lines between areas.
-    glm::vec4 text{0.800f, 0.804f, 0.808f, 1.0f};
-    glm::vec4 textMuted{0.557f, 0.573f, 0.580f,
+    glm::vec4 text{0.835f, 0.835f, 0.835f, 1.0f};
+    glm::vec4 textMuted{0.580f, 0.592f, 0.600f,
                         1.0f};  ///< Labels, types and disabled text.
     glm::vec4 selection{
-        0.176f, 0.220f, 0.247f,
-        1.0f};  ///< Selected rows (Kit's subtle blue-grey).
+        0.157f, 0.302f, 0.357f,
+        1.0f};  ///< Selected and hovered rows (Kit's #284D5B).
     glm::vec4 accent{
-        0.290f, 0.522f, 0.678f,
-        1.0f};  ///< Changed values, active tools, sliders.
+        0.200f, 0.761f, 0.976f,
+        1.0f};  ///< Chosen items, checks, active tools (#33C2F9).
     glm::vec4 outline{1.0f, 0.62f, 0.16f,
                       1.0f};  ///< The viewport's selection outline.
     glm::vec4 warning{0.910f, 0.698f, 0.235f, 1.0f};
     glm::vec4 error{0.886f, 0.341f, 0.318f, 1.0f};
-    glm::vec4 overlay{0.141f, 0.157f, 0.169f,
-                      0.88f};  ///< Viewport toolbar pills and HUD.
+    glm::vec4 overlay{
+        0.145f, 0.157f, 0.165f,
+        0.94f};  ///< Viewport pills, menus, HUD (#25282A).
+    glm::vec4 overlayBorder{0.247f, 0.255f, 0.259f,
+                            1.0f};  ///< The pills' edge (#3F4142).
 
     float fontSize =
         14.0f;  ///< Text size in pixels at a content scale of 1.

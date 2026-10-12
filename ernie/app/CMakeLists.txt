@@ -9,6 +9,7 @@ ernie_add_library(
     file_dialog.cpp
     log_panel.cpp
     logs.cpp
+    menu.cpp
     panel.cpp
     prim_icons.cpp
     prim_schemas.cpp

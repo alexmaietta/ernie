@@ -648,6 +648,14 @@ void BindApp(nb::module_& parent) {
                      "The viewport's Wireframe mode, overriding the "
                      "render settings' own; None "
                      "follows them.")
+        .def_prop_rw(
+            "minimal", &Viewer::GetMinimal, &Viewer::SetMinimal,
+            nb::for_setter(nb::arg("minimal").none()),
+            "Whether the viewport shades minimally (Kit's "
+            "RTX - Minimal), overriding the render settings' "
+            "ernie:minimal:mode; None follows them.")
+        .def_prop_ro("minimal_shown", &Viewer::MinimalShown,
+                     "Whether the viewport shades minimally now.")
         .def_prop_rw("settings", &Viewer::Settings,
                      &Viewer::SetSettings)
         .def(
