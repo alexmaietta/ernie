@@ -738,6 +738,12 @@ class RasterRenderer {
     void RecordLights(
         VkCommandBuffer commands,
         std::span<const RasterDrawable* const> drawables) const;
+    /// Dispatches the light pass into the light table's copy from
+    /// light `tableOffset` on (a sub-frame's), each pose `share` of
+    /// the way from the last frame's when `blend`, then a barrier.
+    void DispatchLights(VkCommandBuffer commands,
+                        std::uint32_t tableOffset, float share,
+                        bool blend) const;
     /// Records `PatchViews` of the renderer's own per-view uniforms
     /// and every drawable's.
     void RecordViewPoses(
@@ -1168,6 +1174,15 @@ class RasterRenderer {
     std::unique_ptr<GpuBuffer> lightPoses_;
     std::unique_ptr<GpuBuffer> lightRecords_;
     std::uint32_t gpuLights_ = 0;
+    /// With motion blur, the last frame's poses, copied before the
+    /// prepass writes this frame's, the origin they were relative to,
+    /// and whether each sub-frame's light pass blends from them (the
+    /// same lights in buffers kept); and each sub-frame's share of
+    /// the way from the last frame to this one.
+    std::unique_ptr<GpuBuffer> lightPosesPrevious_;
+    glm::dvec3 lastPoseOrigin_{0.0};
+    bool blendGpuLights_ = false;
+    std::vector<float> subframeShares_;
     glm::vec4 lightBoundsLow_{0.0f};
     glm::vec4 lightBoundsHigh_{0.0f};
     PipelineLayout lightsLayout_;

@@ -10,8 +10,11 @@
 // shortest Rayleigh range and waist distance), 1 the poses (row-major 4x4 per light, relative to the
 // frame's origin), 2 the light table (LightGpu, `constants.x` float4s each), 3 the shadow views'
 // matrices (glm columns), 4 the shadow views' Shadows blocks (frame.slang; the first matrix of
-// each, `constants.z` float4s apart). The scene's bounds, relative to the frame's origin, come
-// in `low` and `high`.
+// each, `constants.z` float4s apart), 8 the poses at the last frame. The scene's bounds, relative
+// to the frame's origin, come in `low` and `high`. With motion blur it runs once per sub-frame,
+// each light's pose blended `motion.x` of the way from the last frame's to this one's (each
+// axis and the position linearly, close for the small turns of a frame), into the sub-frame's
+// copy of the table (`layout.w` lights on) and over the views' matrices.
 //
 // `cullViewsMain`, one thread per cull view (`constants.layout.x` of them). Bindings: 5 the
 // shadow views' matrices, 6 per cull view its matrix and slot, 7 the cull views (cull.slang, 12
@@ -26,13 +29,18 @@
 //   https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
 
 struct LightConstants {
-    uint4 layout;  // lights, LightGpu stride and Shadows block stride (float4s), unused
+    // Lights, LightGpu stride and Shadows block stride (float4s), and the first light of the
+    // table's copy to write (a sub-frame's).
+    uint4 layout;
     float4 low;
     float4 high;
+    // x: the share of the way from the last frame's poses to this one's; y: 1 to blend them.
+    float4 motion;
 }
 
 [[vk::binding(0, 0)]] StructuredBuffer<float4> records;
 [[vk::binding(1, 0)]] StructuredBuffer<float> poses;
+[[vk::binding(8, 0)]] StructuredBuffer<float> previousPoses;
 [[vk::binding(2, 0)]] RWStructuredBuffer<float4> lights;
 [[vk::binding(3, 0)]] RWStructuredBuffer<float4> matrices;
 [[vk::binding(4, 0)]] RWStructuredBuffer<float4> blocks;
@@ -48,9 +56,17 @@ static const uint kAxis = 1;
 static const uint kExtentX = 4;
 static const uint kExtentY = 5;
 
+// Column `column` of light `light`'s pose, blended from the last frame's by `motion` (its axes
+// then normalised where they are used).
 float3 poseColumn(uint light, uint column) {
     let first = 16 * light;
-    return float3(poses[first + column], poses[first + 4 + column], poses[first + 8 + column]);
+    let now = float3(poses[first + column], poses[first + 4 + column], poses[first + 8 + column]);
+    if (constants.motion.y < 0.5) {
+        return now;
+    }
+    let was = float3(previousPoses[first + column], previousPoses[first + 4 + column],
+                     previousPoses[first + 8 + column]);
+    return lerp(was, now, constants.motion.x);
 }
 
 // glm's UpFor: an up vector not along `d`.
@@ -104,7 +120,7 @@ void lightsMain(uint3 id : SV_DispatchThreadID) {
     let firstView = record.y;
     let views = record.z;
     let kind = record.w;
-    let entry = constants.layout.y * index;
+    let entry = constants.layout.y * (index + constants.layout.w);
     let low = constants.low.xyz;
     let high = constants.high.xyz;
     let centre = 0.5 * (low + high);

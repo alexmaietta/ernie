@@ -205,9 +205,11 @@ glm::dvec3 TurnedDirection(const LightParams& light, double s) {
 /// sub-frame, `RasterRenderer::kMaxLights` apart: each light that
 /// moved since the last frame (`LightParams::previous`) posed where
 /// it is at the sub-frame's time, as the views are
-/// (`FrameParams::Subframes`). Empty when none moved, when one is
-/// posed on the GPU (the light pass poses the frame's copy alone) or
-/// past `RasterRenderer::kMaxLightSubframes`. Distant lights turn
+/// (`FrameParams::Subframes`); lights posed on the GPU copied as
+/// they are, for the light pass to pose each sub-frame's
+/// (`RecordShadowMaps`). Empty when none moved and none is posed on
+/// the GPU, or past `RasterRenderer::kMaxLightSubframes`. Distant
+/// lights turn
 /// along the great circle between their directions
 /// (`TurnedDirection`); moving lights' shadow views follow them
 /// (`RasterRenderer::subframeLightViews_`).
@@ -224,8 +226,8 @@ SubframeLights(const FrameParams& params,
     };
     if (subframes < 2 ||
         subframes > RasterRenderer::kMaxLightSubframes ||
-        std::none_of(lights.begin(), lights.end(), moves) ||
-        std::any_of(lights.begin(), lights.end(), onGpu)) {
+        (std::none_of(lights.begin(), lights.end(), moves) &&
+         std::none_of(lights.begin(), lights.end(), onGpu))) {
         return {};
     }
     std::vector<LightGpu> copies(subframes *
@@ -917,6 +919,9 @@ constexpr DescriptorBinding kLightsBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
     {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
+    // The poses at the last frame, for motion blur.
+    {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
 /// minimal_resolve.slang: the attachments, the views' uniforms, and
@@ -1445,7 +1450,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       lightShadowBlocks_(
           context, kMaxLightShadowViews * kLightShadowBlockStride,
           kViewUniformUsage, BufferMemory::Device),
-      lightsLayout_(context, kLightsBindings, 48),
+      lightsLayout_(context, kLightsBindings, 64),
       depthRangeLayout_(context, kDepthRangeBindings,
                         sizeof(DepthRangeConstants)),
       meterLayout_(context, kMeterBindings, sizeof(MeterConstants)),
@@ -2359,6 +2364,14 @@ void RasterRenderer::WriteLights(
                                 lightViews_.size() + v);
                     }
                 }
+                // Posed on the GPU per sub-frame with motion blur
+                // (`RecordShadowMaps`): nothing culls by the frame's
+                // pose.
+                if (light.posedOnGpu && subframes_ > 1) {
+                    for (ShadowCascade& view : views) {
+                        view.moving = true;
+                    }
+                }
                 // Terrain and planets cull each by the host's
                 // estimate, the GPU's fit but for the depths seen:
                 // drawing them whole into a cascade shadows flat
@@ -2812,7 +2825,15 @@ void RasterRenderer::WriteLights(
             CreateLightShadowMaps(widest, layers);
         }
     }
+    const std::uint32_t lastGpuLights = gpuLights_;
     gpuLights_ = static_cast<std::uint32_t>(lightRecords.size() / 2);
+    // With motion blur, the light pass blends each sub-frame's poses
+    // from the last frame's, which `lightPoses_` still holds when the
+    // frame starts recording: the same lights, in buffers kept and
+    // relative to the same origin (`lightPosesPrevious_`).
+    bool keptPoses = gpuLights_ > 0 && gpuLights_ == lastGpuLights &&
+                     params.origin == lastPoseOrigin_;
+    lastPoseOrigin_ = params.origin;
     if (gpuLights_ > 0) {
         // Grown only once no frame still reads them.
         const VkDeviceSize recordBytes =
@@ -2832,6 +2853,11 @@ void RasterRenderer::WriteLights(
                 context_, poseBytes,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 BufferMemory::Device);
+            lightPosesPrevious_ = std::make_unique<GpuBuffer>(
+                context_, poseBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            keptPoses = false;
         }
         uploads_.Write(*lightRecords_,
                        std::as_bytes(std::span(lightRecords)));
@@ -2840,6 +2866,43 @@ void RasterRenderer::WriteLights(
         lightBoundsHigh_ = bounds ? glm::vec4(bounds->second, 0.0f)
                                   : glm::vec4(0.0f);
     }
+    blendGpuLights_ = keptPoses && lightSubframes_;
+}
+
+void RasterRenderer::DispatchLights(VkCommandBuffer commands,
+                                    std::uint32_t tableOffset,
+                                    float share, bool blend) const {
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      lightsPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*lightRecords_),
+        DescriptorResource::Of(*lightPoses_),
+        DescriptorResource::Of(lightTable_),
+        DescriptorResource::Of(*lightViewMatrices_),
+        DescriptorResource::Of(lightShadowBlocks_),
+        DescriptorResource::Of(lightPosesPrevious_ != nullptr
+                                   ? *lightPosesPrevious_
+                                   : *lightPoses_)};
+    lightsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                       resources);
+    struct {
+        std::uint32_t layout[4];
+        glm::vec4 low;
+        glm::vec4 high;
+        glm::vec4 motion;
+    } constants{{gpuLights_,
+                 static_cast<std::uint32_t>(sizeof(LightGpu) /
+                                            sizeof(glm::vec4)),
+                 static_cast<std::uint32_t>(kLightShadowBlockStride /
+                                            sizeof(glm::vec4)),
+                 tableOffset},
+                lightBoundsLow_,
+                lightBoundsHigh_,
+                glm::vec4(share, blend ? 1.0f : 0.0f, 0.0f, 0.0f)};
+    lightsLayout_.PushConstants(commands, &constants,
+                                sizeof(constants));
+    vkCmdDispatch(commands, (gpuLights_ + 63) / 64, 1, 1);
+    ShaderBarrier(commands);
 }
 
 void RasterRenderer::RecordLights(
@@ -2860,32 +2923,9 @@ void RasterRenderer::RecordLights(
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Lights posed on the GPU");
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      lightsPipeline_->Handle());
-    const DescriptorResource resources[] = {
-        DescriptorResource::Of(*lightRecords_),
-        DescriptorResource::Of(*lightPoses_),
-        DescriptorResource::Of(lightTable_),
-        DescriptorResource::Of(*lightViewMatrices_),
-        DescriptorResource::Of(lightShadowBlocks_)};
-    lightsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                       resources);
-    struct {
-        std::uint32_t layout[4];
-        glm::vec4 low;
-        glm::vec4 high;
-    } constants{{gpuLights_,
-                 static_cast<std::uint32_t>(sizeof(LightGpu) /
-                                            sizeof(glm::vec4)),
-                 static_cast<std::uint32_t>(kLightShadowBlockStride /
-                                            sizeof(glm::vec4)),
-                 0u},
-                lightBoundsLow_,
-                lightBoundsHigh_};
-    lightsLayout_.PushConstants(commands, &constants,
-                                sizeof(constants));
-    vkCmdDispatch(commands, (gpuLights_ + 63) / 64, 1, 1);
-    ShaderBarrier(commands);
+    // The frame's poses into the light table and the views; with
+    // motion blur, each sub-frame's again (`RecordShadowMaps`).
+    DispatchLights(commands, 0, 1.0f, false);
     // The views' cull views follow their fitted matrices.
     for (const RasterDrawable* drawable : drawables) {
         ERNIE_GPU_ZONE_NAMED(context_, commands,
@@ -2908,6 +2948,12 @@ void RasterRenderer::Update(
     // and the sensor reads their sum.
     frame.camera.Check();
     subframes_ = static_cast<std::uint32_t>(frame.camera.Subframes());
+    subframeShares_.clear();
+    for (std::uint32_t k = 0; k < subframes_; ++k) {
+        // The last frame is at time -1, this one at 0.
+        subframeShares_.push_back(static_cast<float>(
+            1.0 + frame.camera.SubframeTime(static_cast<int>(k))));
+    }
     if (subframes_ > 1 && frame.posesOnGpu) {
         throw std::invalid_argument(
             "Motion blur needs the views' poses on the host");
@@ -4470,6 +4516,39 @@ void RasterRenderer::RecordShadows(
         // The atmosphere's tables, when it or the bands changed,
         // before any view shades with them.
         atmosphere_->Record(commands);
+        if (blendGpuLights_) {
+            // The last frame's poses of the lights posed on the GPU,
+            // which the sub-frames' light passes blend from, before
+            // the prepass writes this frame's over them.
+            VkMemoryBarrier2 before{
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+            before.srcStageMask =
+                VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            before.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
+                                   VK_ACCESS_2_SHADER_WRITE_BIT;
+            before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            before.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT |
+                                   VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            VkDependencyInfo dependency{
+                VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            dependency.memoryBarrierCount = 1;
+            dependency.pMemoryBarriers = &before;
+            vkCmdPipelineBarrier2(commands, &dependency);
+            const VkBufferCopy copy{
+                0, 0, VkDeviceSize{gpuLights_} * sizeof(glm::mat4)};
+            vkCmdCopyBuffer(commands, lightPoses_->Handle(),
+                            lightPosesPrevious_->Handle(), 1, &copy);
+            VkMemoryBarrier2 after{
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+            after.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            after.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT |
+                                  VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            after.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            after.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
+                                  VK_ACCESS_2_SHADER_WRITE_BIT;
+            dependency.pMemoryBarriers = &after;
+            vkCmdPipelineBarrier2(commands, &dependency);
+        }
         {
             ERNIE_GPU_ZONE(context_, commands, "Prepass");
             // Poses composed on the GPU, and views posed under them,
@@ -4542,6 +4621,15 @@ void RasterRenderer::RecordShadowMaps(
     std::vector<glm::mat4> matrices;
     for (const ShadowCascade& view : lightViews_) {
         matrices.push_back(view.lightViewProjection);
+    }
+    // Lights posed on the GPU, posed at the sub-frame's time into its
+    // copy of the table and over their views' matrices, once the last
+    // sub-frame's draws and shading have read them.
+    if (lightSubframes_ && gpuLights_ > 0 &&
+        subframe < subframeShares_.size()) {
+        ShaderBarrier(commands);
+        DispatchLights(commands, subframe * kMaxLights,
+                       subframeShares_[subframe], blendGpuLights_);
     }
     if (subframe < subframeLightViews_.size() &&
         !subframeLightViews_[subframe].empty()) {

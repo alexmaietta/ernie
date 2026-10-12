@@ -147,3 +147,76 @@ def test_lamps_follow_their_links_step_by_step(cuda_renderer):
                 "the light moved with the links"
             )
         previous = gpu
+
+
+def test_lamps_posed_on_the_gpu_move_across_the_shutter(
+    cuda_renderer,
+):
+    # Lamps on links sliding 1.5 m along x over a frame: blurred, the
+    # frame is the shutter's weighting of sharp frames along the way,
+    # each sub-frame posed on the GPU from the last frame's poses.
+    scene, levels = lamp_scene()
+    camera = ernie.Camera.at(scene, "/World/Camera")
+    hdr = scene.define("/Render/Out/HdrColor", ernie.RenderVar)
+    hdr.source_name = "HdrColor"
+    scene.define(
+        "/Render/Out",
+        ernie.RenderProduct,
+        camera=camera,
+        resolution=(96, 64),
+        ordered_vars=[hdr.path],
+    )
+    rows = link_arrays(3, seed=20)
+
+    def move(s):
+        translate = rows[tokens.TRANSLATE].copy()
+        translate[:, 0] += 1.5 * s
+        scene.write(
+            levels[0],
+            tokens.TRANSLATE,
+            cuda_renderer.cuda_upload(translate),
+        )
+        scene.write(
+            levels[0],
+            tokens.ORIENT,
+            cuda_renderer.cuda_upload(rows[tokens.ORIENT]),
+        )
+
+    def step():
+        outputs = cuda_renderer.step(
+            scene,
+            render_products=["/Render/Out"],
+            delta_time=1.0 / 30.0,
+        )
+        return np.array(
+            outputs["/Render/Out"]
+            .frames[0]
+            .render_vars["/Render/Out/HdrColor"]
+            .map()
+        )[..., :3].astype(np.float64)
+
+    def shutter(opening, samples=5):
+        camera.set(
+            shutter_open=opening,
+            shutter_close=0.0,
+            shutter_samples=samples,
+        )
+
+    samples = 5
+    weights = np.full(samples, 1.0 / (samples - 1))
+    weights[[0, -1]] *= 0.5
+    shutter(0.0)
+    expected = 0.0
+    for k in range(samples):
+        move(k / (samples - 1))
+        step()  # the poses' last frame, for the next
+        expected = expected + weights[k] * step()
+    sharp = step()
+    shutter(-1.0)
+    move(0.0)
+    step()
+    move(1.0)
+    blurred = step()
+    peak = expected.max()
+    assert np.abs(blurred - expected).max() < 0.01 * peak
+    assert np.abs(blurred - sharp).max() > 0.05 * peak, "blurred"

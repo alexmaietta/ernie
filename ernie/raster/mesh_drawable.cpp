@@ -536,7 +536,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
       activeDrawsLayout_(renderer.Context(), kActiveDrawsBindings,
                          16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
-      lightCullLayout_(renderer.Context(), kLightCullBindings, 48),
+      lightCullLayout_(renderer.Context(), kLightCullBindings, 64),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
     const std::vector<ShaderModuleSource> normals{
         {"mesh_normals", shaders::kMeshNormalsSlang}};
@@ -3377,8 +3377,9 @@ void MeshDrawable::Cull(const FrameParams& params,
     gpuShadowSlots_.clear();
     for (const ShadowCascade& cascade : cascades) {
         // Views the GPU fits cull there only, their blocks patched
-        // (`RecordShadowViews`).
-        if (cascade.gpuFitted) {
+        // (`RecordShadowViews`); those moving across the shutter cull
+        // nothing.
+        if (cascade.gpuFitted && !cascade.moving) {
             gpuShadowSlots_.emplace_back(
                 cascade.gpuMatrix,
                 static_cast<std::uint32_t>(views.size() /
@@ -3656,7 +3657,8 @@ void MeshDrawable::RecordShadowViews(VkCommandBuffer commands) const {
         DescriptorResource::Of(*cullViewBuffer_)};
     lightCullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           resources);
-    const std::uint32_t constants[12] = {
+    // light_views.slang's LightConstants, its count alone read.
+    const std::uint32_t constants[16] = {
         static_cast<std::uint32_t>(gpuShadowSlots_.size())};
     lightCullLayout_.PushConstants(commands, constants,
                                    sizeof(constants));
