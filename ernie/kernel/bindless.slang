@@ -14,3 +14,5 @@
 [[vk::binding(1, 1)]] public Texture2DArray<float4> heapTextureArrays[];
 [[vk::binding(2, 1)]] public SamplerState heapSamplers[];
 [[vk::binding(3, 1)]] public SamplerComparisonState heapComparisonSamplers[];
+// Unsigned-integer array views (ids, such as the G-buffer's).
+[[vk::binding(4, 1)]] public Texture2DArray<uint4> heapUintTextureArrays[];

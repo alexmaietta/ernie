@@ -31,12 +31,13 @@ class BindlessHeap {
   public:
     /// The heap's arrays, in bindless.slang's bindings.
     enum class Kind : std::uint32_t {
-        Texture2D = 0,          ///< Texture2D<float4>
-        Texture2DArray = 1,     ///< Texture2DArray<float4>
-        Sampler = 2,            ///< SamplerState
-        ComparisonSampler = 3,  ///< SamplerComparisonState
+        Texture2D = 0,           ///< Texture2D<float4>
+        Texture2DArray = 1,      ///< Texture2DArray<float4>
+        Sampler = 2,             ///< SamplerState
+        ComparisonSampler = 3,   ///< SamplerComparisonState
+        UintTexture2DArray = 4,  ///< Texture2DArray<uint4>
     };
-    static constexpr std::uint32_t kKinds = 4;
+    static constexpr std::uint32_t kKinds = 5;
     static constexpr std::uint32_t kTextures = 4096;
     static constexpr std::uint32_t kSamplers = 256;
     /// Frames a freed slot waits before reuse.

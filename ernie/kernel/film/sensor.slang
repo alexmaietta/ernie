@@ -15,19 +15,19 @@
 // layer `z` (a group of `bands` layers of the spectral images) with the uniforms of view
 // `firstView + z`.
 //
-// Bindings: 0 the SensorUniforms, shared then per view (`sensorData`); inputs 1 spectral radiance
-// (raster pixels), 3 G-buffer ids; outputs 2 DegreeOfLinearPolarization, 4
+// Bindings, the kernel's outputs alone: 2 DegreeOfLinearPolarization, 4
 // AngleOfLinearPolarization, 5 SpectralRadiance (sensor pixels, one layer per band), 6 Electrons,
 // 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane, 11 DistanceToCamera, 12 Normal,
 // 13 PrimId, 14 InstanceId, 15 LinearStokes, every image one layer per view; for spatial
-// filters, the images between kernels:
-// 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
-// 18 and 19 those it writes for the next; 20 to 27 the AOV slots; 28 and 29 the temporal filters'
-// state from the previous frame and for the next (17 is sampled linearly for pyramids); 30 the
-// MotionVector var; 31 per raster pixel, its motion (xy) and motion blur's coverage (z). The
-// G-buffer normal and depth come from the bindless heap (bindless.slang), and the custom
-// filters' parameters through their address, both in the push constants: devices push at most
-// 32 descriptors.
+// filters, 18 and 19 the spectrum and the channels (a layer per channel domain per view) it
+// writes for the next kernel; 20 to 27 the AOV slots; 29 the temporal filters' state for the
+// next frame (28 that from the previous); 30 the MotionVector var; 31 per raster pixel, its
+// motion (xy) and motion blur's coverage (z). 0, 1, 3, 16 and 17 are free. Its inputs come
+// through the push constants (`SensorConstants`): the uniforms (SensorUniforms, shared then per
+// view) and the custom filters' parameters by address, and from the bindless heap
+// (bindless.slang) the raster spectral radiance, the G-buffer's ids, normal and depth, and the
+// spectrum and channels the kernel reads, the channels sampled linearly for pyramids: devices
+// push at most 32 descriptors.
 //
 // The lens head's projection comes from module `lensProjection`, which the renderer generates for
 // the camera's lens (`SensorPlan::lens`) from lens.slang's projections.
@@ -126,6 +126,10 @@ public struct SensorShared {
     public float4 sourceRadiance[16 * kStraySources];
 }
 
+// The sensor's uniforms (`SensorConstants::sensor`), the shared ones as element 0: reading a field
+// through it reads that field alone.
+#define sensorShared (pass.sensor)
+
 // A view's uniforms, as the filters take them: `SensorShared`'s fields without its per-band
 // arrays (read those from `sensorShared`), and the view's own camera and frame seed. Small
 // enough to keep in registers.
@@ -175,6 +179,21 @@ public struct SensorConstants {
     public uint depthSlot;
     // The render vars the frame also holds as linear buffers (`stokes.y`'s kHolds* bits).
     public SensorLinear* linear;
+    // The uniforms every view shares, a SensorUniforms whose per-view fields are unused, then each
+    // view's block (renderer.cpp's SensorView): its inverse view-projection and camera-to-world
+    // pose (glm's column-major order), eye, forward, distortion (a pushbroom's line differs per
+    // view) and frame seed (x).
+    public SensorShared* sensor;
+    // Heap slots: the raster radiance (`heapTextureArrays`), the G-buffer ids
+    // (`heapUintTextureArrays`), the spectrum and channel images the kernel reads
+    // (`heapTextureArrays`), and the linear sampler for the channel images' pyramids
+    // (`heapSamplers`).
+    public uint radianceSlot;
+    public uint idsSlot;
+    public uint spectrumSlot;
+    public uint channelsSlot;
+    public uint channelsSampler;
+    uint padding;
 }
 
 // The render vars (kHolds* bits 0 to 13) and AOV slots a frame also holds as linear buffers over
@@ -187,25 +206,26 @@ public struct SensorLinear {
     public uint* aovs[8];
 }
 
-// Binding 0 holds the uniforms every view shares, a SensorUniforms whose per-view fields are
-// unused, then each view's block (renderer.cpp's SensorView): its inverse view-projection and
-// camera-to-world pose (glm's column-major order), eye, forward, distortion (a pushbroom's line
-// differs per view) and frame seed (x).
-[[vk::binding(0, 0)]] ByteAddressBuffer sensorData;
-// The same buffer, its shared uniforms as element 0: reading a field through it reads that field
-// alone.
-[[vk::binding(0, 0)]] StructuredBuffer<SensorShared> sensorShared;
 [[vk::push_constant]] ConstantBuffer<SensorConstants> pass;
 
 static const uint kSensorSharedBytes = 4352;
 static const uint kSensorViewBytes = 192;
 
+// The word and the four words at byte `address` of the sensor's uniforms.
+uint sensorLoad(uint address) {
+    return ((uint*)pass.sensor)[address / 4];
+}
+uint4 sensorLoad4(uint address) {
+    let words = (uint*)pass.sensor + address / 4;
+    return uint4(words[0], words[1], words[2], words[3]);
+}
+
 // The column-major matrix at `address` of the sensor's buffer.
 float4x4 loadMatrix(uint address) {
-    return transpose(float4x4(asfloat(sensorData.Load4(address)),
-                              asfloat(sensorData.Load4(address + 16)),
-                              asfloat(sensorData.Load4(address + 32)),
-                              asfloat(sensorData.Load4(address + 48))));
+    return transpose(float4x4(asfloat(sensorLoad4(address)),
+                              asfloat(sensorLoad4(address + 16)),
+                              asfloat(sensorLoad4(address + 32)),
+                              asfloat(sensorLoad4(address + 48))));
 }
 
 // The uniforms every view shares.
@@ -244,10 +264,10 @@ SensorUniforms viewUniforms(uint view) {
     var cam = sharedUniforms();
     let base = viewBlock(view);
     cam.invViewProj = loadMatrix(base);
-    cam.eye = asfloat(sensorData.Load4(base + 128));
-    cam.forward = asfloat(sensorData.Load4(base + 144));
-    cam.distortion = asfloat(sensorData.Load4(base + 160));
-    cam.noise.z = sensorData.Load(base + 176);
+    cam.eye = asfloat(sensorLoad4(base + 128));
+    cam.forward = asfloat(sensorLoad4(base + 144));
+    cam.distortion = asfloat(sensorLoad4(base + 160));
+    cam.noise.z = sensorLoad(base + 176);
     return cam;
 }
 
@@ -287,9 +307,12 @@ uint linearTexel(uint3 id, uint layer = 0, uint layers = 1) {
     return (((pass.view.x + id.z) * layers + layer) * size.y + id.y) * size.x + id.x;
 }
 
-[[vk::binding(1, 0)]] Texture2DArray<float> rasterRadiance;
+// The raster radiance and the G-buffer ids, from the bindless heap.
+float rasterRadianceAt(int4 at) {
+    return heapTextureArrays[pass.radianceSlot].Load(at).x;
+}
+#define gIds (heapUintTextureArrays[pass.idsSlot])
 [[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;
-[[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
 [[vk::image_format("r32f")]] [[vk::binding(4, 0)]] RWTexture2DArray<float> angleOfPolarization;
 [[vk::image_format("r32f")]] [[vk::binding(5, 0)]] RWTexture2DArray<float> spectralRadiance;
 [[vk::image_format("rgba32f")]] [[vk::binding(6, 0)]] RWTexture2DArray<float4> electrons;
@@ -318,9 +341,15 @@ public float filterParam(uint i) {
 // Between the kernels a spatial filter splits a chain into: each band at each sensor pixel (a
 // group of `bands` layers per view), and each channel domain's values (`kChannel*` layers per
 // view), as one kernel left them for the spatial filters heading the next.
-[[vk::binding(16, 0)]] Texture2DArray<float> spectrumIn;
-// With linear filtering for reading the channel images' pyramids (`SpatialImage.valuesAt`).
-[[vk::binding(17, 0)]] Sampler2DArray<float4> channelsIn;
+// Both from the bindless heap; the channel images with linear filtering for reading their pyramids
+// (`SpatialImage.valuesAt`).
+float spectrumInAt(int4 at) {
+    return heapTextureArrays[pass.spectrumSlot].Load(at).x;
+}
+#define channelsIn (heapTextureArrays[pass.channelsSlot])
+float4 channelsInSample(float3 at, float level) {
+    return channelsIn.SampleLevel(heapSamplers[pass.channelsSampler], at, level);
+}
 [[vk::image_format("r32f")]] [[vk::binding(18, 0)]] RWTexture2DArray<float> spectrumOut;
 [[vk::image_format("rgba32f")]] [[vk::binding(19, 0)]] RWTexture2DArray<float4> channelsOut;
 // The product's AOV slots (`kAovSlotNames`), one layer per view, which filters write with
@@ -484,7 +513,7 @@ public struct PixelContext {
     // A uniform number in (0, 1] for this pixel and `salt`, new every frame (from the frame
     // seed, which also differs per view): for temporal noise.
     public float random(uint salt) {
-        let frame = sensorData.Load(viewBlock(view) + 176);
+        let frame = sensorLoad(viewBlock(view) + 176);
         return uniform01(
             pcg3d(uint3(id.x ^ (frame * 9781u), id.y + frame * 6271u, salt * 2654435761u + 977u))
                 .x);
@@ -563,7 +592,7 @@ public struct SpatialImage {
     // Band `band` of the spectrum at sensor pixel `at`.
     public float band(PixelContext pixel, int2 at, uint band) {
         let p = clamp(at, int2(0), size(pixel) - 1);
-        return spectrumIn.Load(int4(p, pixel.slice(band), 0));
+        return spectrumInAt(int4(p, pixel.slice(band), 0));
     }
 
     // The domain's values at sensor pixel `at`: electrons, digital numbers (as floats), linear
@@ -578,8 +607,8 @@ public struct SpatialImage {
     // the size, each texel the mean of what it covers; fractional levels blend two), clamped at
     // the edges. Level k is a box blur of about 2^k pixels, so wide kernels take a few taps.
     public float4 valuesAt(PixelContext pixel, float2 uv, float level) {
-        return channelsIn.SampleLevel(float3(uv, float(pixel.id.z * kChannelDomains + channel)),
-                                      level);
+        return channelsInSample(float3(uv, float(pixel.id.z * kChannelDomains + channel)),
+                                level);
     }
 
     // The pyramid's levels (1 without one).
@@ -976,10 +1005,10 @@ public struct Lens : ISpatialSource {
 
     // Layer `slice` of the raster radiance, bilinearly between the four held texels of `at`.
     float resampled(int slice) {
-        let a = lit.x ? rasterRadiance.Load(int4(base.x, base.y, slice, 0)) : 0.0;
-        let b = lit.y ? rasterRadiance.Load(int4(next.x, base.y, slice, 0)) : 0.0;
-        let c = lit.z ? rasterRadiance.Load(int4(base.x, next.y, slice, 0)) : 0.0;
-        let d = lit.w ? rasterRadiance.Load(int4(next.x, next.y, slice, 0)) : 0.0;
+        let a = lit.x ? rasterRadianceAt(int4(base.x, base.y, slice, 0)) : 0.0;
+        let b = lit.y ? rasterRadianceAt(int4(next.x, base.y, slice, 0)) : 0.0;
+        let c = lit.z ? rasterRadianceAt(int4(base.x, next.y, slice, 0)) : 0.0;
+        let d = lit.w ? rasterRadianceAt(int4(next.x, next.y, slice, 0)) : 0.0;
         return lerp(lerp(a, b, weight.x), lerp(c, d, weight.x), weight.y);
     }
 
@@ -1056,7 +1085,7 @@ public struct Lens : ISpatialSource {
     // background without a sky, which shading leaves unwritten.
     static float heldRadiance(int2 texel, int layer, int slice, bool sky) {
         let held = sky || gIds.Load(int4(texel, layer, 0)).x != kBackground;
-        return held ? rasterRadiance.Load(int4(texel, slice, 0)) : 0.0;
+        return held ? rasterRadianceAt(int4(texel, slice, 0)) : 0.0;
     }
 
     // Writes the geometry vars of `holds` (kHolds* bits) and marks the background.

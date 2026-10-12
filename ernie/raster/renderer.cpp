@@ -694,21 +694,32 @@ struct SensorConstants {
     /// (sensor.slang's `SensorLinear`), those held so a bit each in
     /// `stokes[1]` and `stokes[2]`.
     VkDeviceAddress linear;
+    /// The sensor's uniforms (`sensorUniforms_`), shared then per
+    /// view.
+    VkDeviceAddress sensor;
+    /// Bindless heap slots: the raster radiance, the G-buffer's ids,
+    /// the spectrum and channel images a kernel reads, and the linear
+    /// sampler for the channels' pyramids.
+    std::uint32_t radianceSlot;
+    std::uint32_t idsSlot;
+    std::uint32_t spectrumSlot;
+    std::uint32_t channelsSlot;
+    std::uint32_t channelsSampler;
+    std::uint32_t padding;
 };
 /// `RenderTargets::LinearVars::written`'s var bits, below its AOV
 /// slots'.
 constexpr std::uint32_t kLinearVarBits =
     (1u << RenderTargets::LinearVars::kVars) - 1u;
-static_assert(sizeof(SensorConstants) == 72,
+static_assert(sizeof(SensorConstants) == 104,
               "SensorConstants must match sensor.slang");
 
+// The sensor kernels push their outputs alone: their uniforms come by
+// address and their input images from the bindless heap, through
+// `SensorConstants`.
 constexpr DescriptorBinding kFilterBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    // DegreeOfLinearPolarization; the G-buffer's normal and depth
-    // come from the bindless heap.
+    // DegreeOfLinearPolarization.
     {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     // AngleOfLinearPolarization.
     {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
@@ -721,12 +732,9 @@ constexpr DescriptorBinding kFilterBindings[] = {
     {12, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {13, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    // LinearStokes; the filters' parameters are read through their
-    // address.
+    // LinearStokes.
     {15, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {16, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-    // Sampled linearly for the channel images' pyramids.
-    {17, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kCompute},
+    // The spectrum and channel images the next kernel reads.
     {18, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // The AOV slots.
@@ -744,7 +752,7 @@ constexpr DescriptorBinding kFilterBindings[] = {
     // The MotionVector var.
     {30, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // Per raster pixel, its motion (xy) and motion blur's coverage
-    // (z): `RenderTargets::Raster`. 32 descriptors in all, as many as
+    // (z): `RenderTargets::Raster`. 27 descriptors in all, of the 32
     // devices push at least.
     {31, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
@@ -910,12 +918,10 @@ constexpr DescriptorBinding kHzbBindings[] = {
 /// motion.slang: the sub-frame's radiance, the sum, its ids and the
 /// coverage. motion_vectors.slang: the depth, the raster image
 /// written and the views' MotionUniforms. sensor.slang's
-/// `overlayLensMain`: the sensor's uniforms, LdrColor and parameters
-/// (a lens of rays' table), and a cube camera's faces' overlays over
-/// black and over white.
+/// `overlayLensMain`: LdrColor and a cube camera's faces' overlays
+/// over black and over white; the sensor's uniforms and parameters (a
+/// lens of rays' table) by address in its constants.
 constexpr DescriptorBinding kOverlayLensBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
     {9, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
      VK_SHADER_STAGE_COMPUTE_BIT},
     {32, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
@@ -956,12 +962,10 @@ constexpr DescriptorBinding kMotionBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
-/// sensor.slang's `faceRowsClearMain` and `faceRowsMain`: the
-/// sensor's uniforms and parameters (a lens of rays' table), and a
-/// cube camera's faces' sensor rows.
+/// sensor.slang's `faceRowsClearMain` and `faceRowsMain`: a cube
+/// camera's faces' sensor rows; the sensor's uniforms and parameters
+/// (a lens of rays' table) by address in its constants.
 constexpr DescriptorBinding kFaceRowsBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
     {34, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
      VK_SHADER_STAGE_COMPUTE_BIT},
 };
@@ -1672,6 +1676,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     volumes_ = std::make_unique<VolumePass>(context_, compiler_);
     tableSamplerSlot_ =
         context_.Bindless().AddSampler(tableSampler_.Handle());
+    clampSamplerSlot_ =
+        context_.Bindless().AddSampler(clampSampler_.Handle());
     shadowSamplerSlot_ =
         context_.Bindless().AddSampler(shadowSampler_.Handle(), true);
     shadingResources_ = std::make_unique<GpuBuffer>(
@@ -4086,8 +4092,8 @@ void RasterRenderer::WriteMaterialTable() {
                     high > low ? emitted.Average(low, high) *
                                      (high - low) / bands_.Width()
                                : 0.0;
-                entry.emission[b] =
-                    static_cast<float>(visible * peak * perNit);
+                entry.emission[b] = static_cast<float>(
+                    visible * static_cast<double>(peak) * perNit);
             }
         }
         // Thermal emission, when the frame has it on: its emissivity,
@@ -5878,10 +5884,8 @@ void RasterRenderer::RecordFaceRows(VkCommandBuffer commands,
                       false, true});
     }
     faceRows_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    const DescriptorResource resources[] = {
-        DescriptorResource::Of(sensorUniforms_),
-        DescriptorResource::Of(faceRows_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL)};
+    const DescriptorResource resources[] = {DescriptorResource::Of(
+        faceRows_->View(), VK_IMAGE_LAYOUT_GENERAL)};
     const SensorConstants constants{
         {firstView, 0u, 0u, 0u},
         {sensorPasses_.front().tableOffset, lensTable_[1],
@@ -5964,7 +5968,6 @@ void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       pipeline.Handle());
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(sensorUniforms_),
         DescriptorResource::Of(color.View(), VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(
             faceOverlays_[0]->View(),
@@ -6564,10 +6567,6 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands,
 void RasterRenderer::Filter(VkCommandBuffer commands,
                             RenderTargets& targets,
                             std::uint32_t firstView) const {
-    const auto sampled = [](const GpuImage& image) {
-        return DescriptorResource::Of(
-            image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    };
     const auto general = [](const GpuImage& image) {
         return DescriptorResource::Of(image.View(),
                                       VK_IMAGE_LAYOUT_GENERAL);
@@ -6580,11 +6579,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
     raster.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     ERNIE_GPU_ZONE(context_, commands, "Sensor filters");
     std::vector<DescriptorResource> filters{
-        DescriptorResource::Of(sensorUniforms_),
-        general(targets.RasterRadiance()),
         general(
             targets.Bound(render_vars::kDegreeOfLinearPolarization)),
-        sampled(targets.GBuffer(2)),
         general(
             targets.Bound(render_vars::kAngleOfLinearPolarization))};
     // Bindings 5 to 14, the vars before MotionVector, which binds at
@@ -6595,16 +6591,30 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
         }
         filters.push_back(general(targets.Bound(name)));
     }
-    // The G-buffer's normal and depth from the bindless heap, in
-    // fresh slots: the last recording's retire, so nothing in flight
-    // sees them change.
+    // The kernels' inputs from the bindless heap, in fresh slots: the
+    // last recording's retire, so nothing in flight sees them change.
+    // The G-buffer's normal, depth and ids, and the raster radiance.
     BindlessHeap& heap = context_.Bindless();
+    using Kind = BindlessHeap::Kind;
     sensorSlots_.clear();
-    sensorSlots_.push_back(
-        heap.AddImage(BindlessHeap::Kind::Texture2DArray,
-                      targets.GBuffer(0).View()));
-    sensorSlots_.push_back(heap.AddImage(
-        BindlessHeap::Kind::Texture2DArray, targets.Depth().View()));
+    const auto slot = [&](Kind kind, const GpuImage& image,
+                          VkImageLayout layout) {
+        sensorSlots_.push_back(
+            heap.AddImage(kind, image.View(), layout));
+        return sensorSlots_.back().Index();
+    };
+    const std::uint32_t normalSlot =
+        slot(Kind::Texture2DArray, targets.GBuffer(0),
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::uint32_t depthSlot =
+        slot(Kind::Texture2DArray, targets.Depth(),
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::uint32_t idsSlot =
+        slot(Kind::UintTexture2DArray, targets.GBuffer(2),
+             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::uint32_t radianceSlot =
+        slot(Kind::Texture2DArray, targets.RasterRadiance(),
+             VK_IMAGE_LAYOUT_GENERAL);
     // Each chain's kernels in turn over the one raster image, each
     // writing its own vars.
     for (const SensorPass& pass : sensorPasses_) {
@@ -6641,10 +6651,12 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
         // its Stokes Q and on to U (0 without them); the parameters'
         // address, and the normal's and depth's heap slots.
         // And the vars written to linear buffers too, with their
-        // addresses (`RenderTargets::LinearVars`).
+        // addresses (`RenderTargets::LinearVars`); the uniforms'
+        // address, and the other inputs' heap slots (the spectrum and
+        // channels each segment's own).
         const RenderTargets::LinearVars* linear =
             targets.GetLinearVars();
-        const SensorConstants constants{
+        SensorConstants constants{
             {firstView, plan.aovs, state && pass.history ? 1u : 0u,
              state ? plan.states : 0u},
             {pass.tableOffset, lensTable_[1], lensTable_[2],
@@ -6657,17 +6669,27 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
                  : 0u,
              0u},
             pass.params->Address(),
-            sensorSlots_[0].Index(),
-            sensorSlots_[1].Index(),
-            linear != nullptr ? linear->table->Address() : 0u};
+            normalSlot,
+            depthSlot,
+            linear != nullptr ? linear->table->Address() : 0u,
+            sensorUniforms_.Address(),
+            radianceSlot,
+            idsSlot,
+            0u,
+            0u,
+            clampSamplerSlot_.Index(),
+            0u};
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {
+            // What the segment before stored, the channels read
+            // through a linear sampler too, for pyramids.
+            constants.spectrumSlot =
+                slot(Kind::Texture2DArray, image(true, segment + 1),
+                     VK_IMAGE_LAYOUT_GENERAL);
+            constants.channelsSlot =
+                slot(Kind::Texture2DArray, image(false, segment + 1),
+                     VK_IMAGE_LAYOUT_GENERAL);
             std::vector<DescriptorResource> resources = bound;
-            resources.push_back(general(image(true, segment + 1)));
-            // Read through a linear sampler too, for pyramids.
-            resources.push_back(DescriptorResource::Of(
-                image(false, segment + 1).View(),
-                VK_IMAGE_LAYOUT_GENERAL, clampSampler_));
             resources.push_back(general(image(true, segment)));
             resources.push_back(general(image(false, segment)));
             for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {

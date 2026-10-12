@@ -2325,6 +2325,7 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
         .SetSensorType("mono")
         .SetSensorQeMono({7900.0f, 0.6f, 14100.0f, 0.6f})
         .SetSensorDarkCurrent(0.0)
+        .SetSensorFullWell(1e12)  // FlatScene's pixels are 0.3 mm
         .SetExposureTime(1e-6);
     {
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
@@ -2342,7 +2343,7 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
                     .As<float>()[(b * kVarSize + c) * kVarSize + c];
         }
         ASSERT_GT(expected, 100.0);
-        ASSERT_LT(expected, 1e4) << "below the full well";
+        ASSERT_LT(expected, 1e11) << "below the full well";
         EXPECT_NEAR(At<float>(vars.at("Electrons"), c, c, 0),
                     expected, 2e-3 * expected);
     }
