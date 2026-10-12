@@ -4,6 +4,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -88,6 +92,63 @@ TEST(ShaderCompiler, ReportsErrorsWithSlangDiagnostics) {
                  std::invalid_argument);
     EXPECT_THROW(compiler.CompileWgsl({}, "main"),
                  std::invalid_argument);
+}
+
+TEST(ShaderCompiler, CachesSpirvOnDiskUntilTheSourcesChange) {
+    namespace fs = std::filesystem;
+    const fs::path cache =
+        fs::temp_directory_path() /
+        ("ernie_shader_cache_" +
+         std::to_string(
+             ::testing::UnitTest::GetInstance()->random_seed()));
+    fs::remove_all(cache);
+    const char* previous = std::getenv("ERNIE_SHADER_CACHE");
+    const std::string saved = previous != nullptr ? previous : "";
+    setenv("ERNIE_SHADER_CACHE", cache.string().c_str(), 1);
+    std::vector<ShaderModuleSource> modules = {{"cached", R"(
+[[vk::binding(0, 0)]] RWStructuredBuffer<float> values;
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main() { values[0] = 1.0; })"}};
+    {
+        const ShaderCompiler compiler;
+        const std::vector<std::uint32_t> first =
+            compiler.CompileSpirv(modules, "main");
+        EXPECT_EQ(compiler.CacheHits(), 0u);
+        ASSERT_EQ(std::distance(fs::directory_iterator(cache),
+                                fs::directory_iterator()),
+                  1);
+        const ShaderCompiler again;
+        EXPECT_EQ(again.CompileSpirv(modules, "main"), first);
+        EXPECT_EQ(again.CacheHits(), 1u) << "a new compiler reads it";
+
+        modules[0].source += "\n// changed";
+        again.CompileSpirv(modules, "main");
+        EXPECT_EQ(again.CacheHits(), 1u) << "a changed source misses";
+
+        // A damaged entry compiles afresh.
+        for (const fs::directory_entry& entry :
+             fs::directory_iterator(cache)) {
+            std::ofstream(entry.path(), std::ios::trunc) << "junk";
+        }
+        const ShaderCompiler damaged;
+        modules[0].source.resize(modules[0].source.size() - 11);
+        EXPECT_EQ(damaged.CompileSpirv(modules, "main"), first);
+        EXPECT_EQ(damaged.CacheHits(), 0u);
+    }
+    setenv("ERNIE_SHADER_CACHE", "0", 1);
+    {
+        const ShaderCompiler off;
+        off.CompileSpirv(modules, "main");
+        off.CompileSpirv(modules, "main");
+        EXPECT_EQ(off.CacheHits(), 0u);
+    }
+    if (previous != nullptr) {
+        setenv("ERNIE_SHADER_CACHE", saved.c_str(), 1);
+    } else {
+        unsetenv("ERNIE_SHADER_CACHE");
+    }
+    fs::remove_all(cache);
 }
 
 TEST(ShaderCompiler, CompilesCustomModelsAgainstTheSharedModule) {

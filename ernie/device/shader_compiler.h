@@ -26,19 +26,29 @@ namespace ernie {
 /// https://doi.org/10.1145/3197517.3201380
 class ShaderCompiler {
   public:
-    /// @throws std::runtime_error if the Slang compiler cannot be
-    /// initialised.
+    /// Slang itself starts at the first compile the disk cache does
+    /// not answer, which throws std::runtime_error if it cannot.
     ShaderCompiler();
     ~ShaderCompiler();
     ShaderCompiler(const ShaderCompiler&) = delete;
     ShaderCompiler& operator=(const ShaderCompiler&) = delete;
 
     /// SPIR-V for `entryPoint` in the last module of `modules`.
+    ///
+    /// Compiled SPIR-V is kept on disk between runs, keyed by a hash
+    /// of the Slang version, the target, the entry point and every
+    /// module's name and source, so a program compiles once until
+    /// its sources change: in `ERNIE_SHADER_CACHE` (empty or "0"
+    /// keeps none), else the user's cache folder
+    /// (`$XDG_CACHE_HOME/ernie/shaders`, `~/.cache/ernie/shaders`).
     /// @throws std::invalid_argument with Slang's diagnostics if a
     /// module fails to compile or the entry point is missing.
     std::vector<std::uint32_t>
     CompileSpirv(std::span<const ShaderModuleSource> modules,
                  const std::string& entryPoint) const;
+
+    /// How many `CompileSpirv` calls the disk cache answered.
+    std::size_t CacheHits() const;
 
     /// WGSL source for `entryPoint` in the last module of `modules`.
     /// @throws std::invalid_argument as `CompileSpirv`.
