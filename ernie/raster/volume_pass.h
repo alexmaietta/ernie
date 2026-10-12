@@ -203,7 +203,7 @@ class VolumePass {
     void CopyDeviceGrid(LoadedGrid& loaded);
     /// Queues the dense grids due a scatter: their values copied on
     /// the device into `staging_`, for `Prepare` to scatter.
-    void StageDenseGrids();
+    void StageDenseGrids(FrameUploads& uploads);
 
     /// A dense grid's scatter from `staging_` into the pool, in
     /// 4-byte words: where its values start in `staging_`, its first

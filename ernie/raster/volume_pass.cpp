@@ -363,21 +363,14 @@ VolumePass::Load(const VolumeFieldParams& field,
             loaded.dense = true;
             loaded.voxelSize = field.voxelSize;
             loaded.shape = shape;
-            if (!written &&
-                field.buffer.Location().kind == DeviceKind::Cpu) {
-                const Tensor values = field.buffer.Contiguous();
-                loaded.grid =
-                    NanoVdbGridsOf(
-                        DenseNanoVdbGrid(
-                            std::span(values.As<float>(),
-                                      static_cast<std::size_t>(
-                                          values.Elements())),
-                            glm::ivec3(shape), field.voxelSize,
-                            glm::dvec3(0.0)))
-                        .front();
-                poolStale_ = true;
-            } else {
-                if (!written && compute_ == nullptr) {
+            // On the CPU, on a device or from a writer alike: a grid
+            // of every voxel of the shape, kept while it is, which
+            // the GPU fills from the values (uploaded, copied or
+            // written).
+            {
+                if (!written &&
+                    field.buffer.Location().kind != DeviceKind::Cpu &&
+                    compute_ == nullptr) {
                     throw std::runtime_error("Volume " + prim + ": " +
                                              field.array +
                                              " is on a device, which "
@@ -623,7 +616,7 @@ void VolumePass::RebuildPool() {
     poolStale_ = false;
 }
 
-void VolumePass::StageDenseGrids() {
+void VolumePass::StageDenseGrids(FrameUploads& uploads) {
     scatters_.clear();
     std::uint64_t floats = 0;
     // Shared with the compute device when it copies values in.
@@ -632,7 +625,9 @@ void VolumePass::StageDenseGrids() {
         if (loaded.scatter) {
             floats += static_cast<std::uint64_t>(loaded.shape.x) *
                       loaded.shape.y * loaded.shape.z;
-            shared = shared || loaded.writer.empty();
+            shared = shared || (loaded.writer.empty() &&
+                                loaded.device.Location().kind !=
+                                    DeviceKind::Cpu);
         }
     }
     if (floats == 0) {
@@ -657,11 +652,20 @@ void VolumePass::StageDenseGrids() {
             continue;
         }
         Scatter scatter;
-        if (loaded.writer.empty()) {
+        if (!loaded.writer.empty()) {
+            scatter.writer = writers_.at(loaded.writer).second;
+        } else if (loaded.device.Location().kind == DeviceKind::Cpu) {
+            // Uploaded with the frame's other uploads.
+            const Tensor values = loaded.device.Contiguous();
+            uploads.Write(
+                *staging_,
+                std::as_bytes(std::span(
+                    values.As<float>(),
+                    static_cast<std::size_t>(values.Elements()))),
+                4 * at);
+        } else {
             compute_->CopyToBuffer(loaded.device, *staging_, 4 * at,
                                    loaded.stream);
-        } else {
-            scatter.writer = writers_.at(loaded.writer).second;
         }
         scatter.values = static_cast<std::uint32_t>(at);
         scatter.firstLeaf = static_cast<std::uint32_t>(
@@ -746,7 +750,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             CopyDeviceGrid(loaded);
         }
     }
-    StageDenseGrids();
+    StageDenseGrids(uploads);
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
