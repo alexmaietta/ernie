@@ -1747,6 +1747,14 @@ Beam beamOf(LightGpu light) {
     return beam;
 }
 
+// The transmittance of the air between `a` and `b` (km from the planet's centre) in band group
+// `group` (atmosphere.slang's `transmittanceBetween`).
+float4 airThrough(float3 a, float3 b, uint group) {
+    return transmittanceBetween(atmosphereMedium, atmosphereDensities, atmosphereTransmittance,
+                                tableSampler, a, b, group, sh.atmosphere[0].w,
+                                sh.atmosphere[1].x);
+}
+
 // The fraction of `light` reaching `point` in the air past its shadow map: one comparison, the
 // point lying in the air rather than on a surface.
 float airShadow(LightGpu light, float3 point) {
@@ -1821,10 +1829,42 @@ bool coneSpan(float3 apex, float3 axis, float cosine, float3 origin, float3 d, i
 // The farthest along a ray the air is lit by a lamp, metres.
 static const float kAirLampReach = 1e5;
 
-// The light a point, sphere or spot light scatters towards the eye from the air along the ray
-// from `origin` along unit `direction` short of `far`, added to pixel `id`'s radiance: the
-// lamp's intensity as surfaces take it (its cone, focus and IES profile, its pulses, its shadow
-// map, which cuts shafts through it), over the square of the distance, times the air's
+// A lamp's intensity towards unit `outwards` over its spectrum: a point's, a sphere's or a spot's
+// spectrum is its intensity already (1); a rect's, a disk's or a cylinder's is its radiance, so
+// its intensity is that times its area seen from there (a rect's and a disk's from the front
+// alone, a cylinder's side's across its axis), as a point at its centre.
+float lampArea(LightGpu light, float3 outwards) {
+    let type = uint(light.position.w);
+    if (type == 2 || type == 3) {
+        let area = (type == 2 ? 4.0 : PI) * length(light.extentX.xyz) * length(light.extentY.xyz);
+        return area * max(dot(outwards, light.axis.xyz), 0.0);
+    }
+    if (type == 4) {
+        let half = length(light.extentX.xyz);
+        let c = dot(outwards, light.extentX.xyz) / max(half, 1e-12);
+        return 4.0 * light.axis.w * half * sqrt(max(1.0 - c * c, 0.0));
+    }
+    return 1.0;
+}
+
+// A lamp's size, within which the air near it is lit no brighter: a sphere's radius, an area
+// light's half extent.
+float lampSize(LightGpu light) {
+    let type = uint(light.position.w);
+    if (type == 2 || type == 3) {
+        return max(length(light.extentX.xyz), length(light.extentY.xyz));
+    }
+    if (type == 4) {
+        return max(length(light.extentX.xyz), light.axis.w);
+    }
+    return light.axis.w;
+}
+
+// The light a point, sphere, spot, rect, disk or cylinder light scatters towards the eye from
+// the air along the ray from `origin` along unit `direction` short of `far`, added to pixel
+// `id`'s radiance: the lamp's intensity as surfaces take it (its cone, its area as seen
+// (`lampArea`), focus and IES profile, its pulses, its shadow map, which cuts shafts through
+// it), over the square of the distance, times the air's
 // scattering at the angle between the light and the ray, dimmed through the air from the lamp
 // (`aperture`, km from the planet's centre) and on to the eye (`eye`). The ray, clipped to the
 // cone, is sampled equiangularly from the lamp, which takes the 1/r^2 exactly, at 16 points
@@ -1839,13 +1879,29 @@ void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 directio
     float start = 0.0;
     float end = min(far, kAirLampReach);
     let apex = light.position.xyz;
-    if (light.cone.x > 0.0 &&
+    let type = uint(light.position.w);
+    if (type == 1 && light.cone.x > 0.0 &&
         !coneSpan(apex, light.axis.xyz, light.cone.x, origin, direction, start, end)) {
         return;
     }
+    if (type == 2 || type == 3) {
+        // In front of a rect or a disk.
+        let facing = dot(direction, light.axis.xyz);
+        let height = dot(origin - apex, light.axis.xyz);
+        if (abs(facing) < 1e-9) {
+            if (height <= 0.0) {
+                return;
+            }
+        } else if (facing > 0.0) {
+            start = max(start, -height / facing);
+        } else {
+            end = min(end, -height / facing);
+        }
+    }
+    let size = lampSize(light);
     // The angles from the lamp's foot on the ray, seen from the lamp, the span covers.
     let along = dot(apex - origin, direction);
-    let closest = max(length(apex - (origin + direction * along)), max(light.axis.w, 1e-3));
+    let closest = max(length(apex - (origin + direction * along)), max(size, 1e-3));
     let first = atan((start - along) / closest);
     let last = atan((end - along) / closest);
     if (!(last > first)) {
@@ -1871,9 +1927,9 @@ void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 directio
             let fromLamp = origin + direction * t - apex;
             let distance2 = max(dot(fromLamp, fromLamp), 1e-12);
             let outwards = fromLamp * rsqrt(distance2);
-            // Its intensity there, the 1/r^2 aside (within its radius, no brighter).
-            var intensity = distance2 / max(distance2, light.axis.w * light.axis.w);
-            if (light.cone.x > -1.5) {
+            // Its intensity there, the 1/r^2 aside (within its size, no brighter).
+            var intensity = distance2 / max(distance2, size * size) * lampArea(light, outwards);
+            if (type == 1 && light.cone.x > -1.5) {
                 intensity *= smoothstep(light.cone.x, max(light.cone.y, light.cone.x + 1e-6),
                                         dot(outwards, light.axis.xyz));
             }
@@ -1901,10 +1957,8 @@ void addAirLamp(uint3 id, uint k, LightGpu light, float3 origin, float3 directio
                 share * weight * 1e-3 *
                 scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
                              length(point) - bottom, group, nu) *
-                transmittanceBetween(atmosphereTransmittance, tableSampler, eye, point, group,
-                                     bottom, sh.atmosphere[1].x) *
-                transmittanceBetween(atmosphereTransmittance, tableSampler, aperture, point,
-                                     group, bottom, sh.atmosphere[1].x) *
+                airThrough(eye, point, group) *
+                airThrough(aperture, point, group) *
                 (light.spectrum[group] + light.tinted[group]);
             for (uint b = 0; b < 4 && group * 4 + b < bands; ++b) {
                 let layer = int3(id.xy, id.z * bands + group * 4 + b);
@@ -1947,7 +2001,7 @@ void addAirLight(uint3 id, float2 ndc, float3 surface, bool hit) {
         }
         let light = lights[shv.view.z + k];
         let aperture = aboveGround(light.position.xyz * 1e-3 - centre, bottom);
-        if (uint(light.position.w) == 1) {
+        if (uint(light.position.w) >= 1 && uint(light.position.w) <= 4) {
             addAirLamp(id, k, light, origin, direction, far, eye, aperture, bands, centre,
                        bottom);
             continue;
@@ -1962,10 +2016,10 @@ void addAirLight(uint3 id, float2 ndc, float3 surface, bool hit) {
         let norm = patternNorms[k];
         let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
         let beam = beamOf(light);
-        let pieces = beamPieces(beam);
-        for (uint i = 0; i < pieces; ++i) {
-            let crossing = beamPiece(beam, i, shown * light.beamExtra.w, shown * efficiency,
-                                     origin, direction, footprintX, footprintY);
+        var walk = beamWalk(beam, origin, direction, far);
+        BeamCrossing crossing;
+        while (nextCrossing(walk, beam, shown * light.beamExtra.w, shown * efficiency, origin,
+                            direction, footprintX, footprintY, crossing)) {
             if (!(crossing.value > 0.0) || crossing.t >= far) {
                 continue;
             }
@@ -1992,10 +2046,8 @@ void addAirLight(uint3 id, float2 ndc, float3 surface, bool hit) {
                     (1e-3 * scatteringAt(atmosphereMedium, atmosphereDensities, atmospherePhases,
                                          altitude, group, nu) +
                      sodium) *
-                    transmittanceBetween(atmosphereTransmittance, tableSampler, eye, point, group,
-                                         bottom, sh.atmosphere[1].x) *
-                    transmittanceBetween(atmosphereTransmittance, tableSampler, aperture, point,
-                                         group, bottom, sh.atmosphere[1].x) *
+                    airThrough(eye, point, group) *
+                    airThrough(aperture, point, group) *
                     (light.spectrum[group] + light.tinted[group]);
                 for (uint b = 0; b < 4 && group * 4 + b < bands; ++b) {
                     let layer = int3(id.xy, id.z * bands + group * 4 + b);

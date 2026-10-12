@@ -1074,12 +1074,11 @@ BeamCrossings beamCrossingsOf(uint4 viewLights, uint lightCount, uint view, floa
         let norm = patternNorms[k];
         let efficiency = norm > 0.0 ? light.beamExtra.z / norm : 0.0;
         let beam = beamOf(light);
-        let pieces = beamPieces(beam);
-        for (uint i = 0; i < pieces; ++i) {
-            insertCrossing(crossings,
-                           beamPiece(beam, i, shown * light.beamExtra.w, shown * efficiency,
-                                     origin, direction, footprintX, footprintY),
-                           k);
+        var walk = beamWalk(beam, origin, direction, 1e30);
+        BeamCrossing crossing;
+        while (nextCrossing(walk, beam, shown * light.beamExtra.w, shown * efficiency, origin,
+                            direction, footprintX, footprintY, crossing)) {
+            insertCrossing(crossings, crossing, k);
         }
     }
     return crossings;

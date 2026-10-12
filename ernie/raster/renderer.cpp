@@ -2768,7 +2768,7 @@ void RasterRenderer::WriteLights(
                       entry.patternParams);
             // Beams volumes integrate across rays (volume.slang's
             // `BeamCrossings`): a spot's, a grid's of at most 64
-            // beamlets, a line's sheet, or a scan's sheets.
+            // beamlets, a line's sheet, a scan's sheets, or dots.
             const bool smallGrid = beam.pattern == "grid" &&
                                    values.size() >= 2 &&
                                    values[0] * values[1] <= 64.0f;
@@ -2776,6 +2776,7 @@ void RasterRenderer::WriteLights(
                                      : smallGrid              ? 2.0f
                                      : beam.pattern == "line" ? 3.0f
                                      : beam.pattern == "scan" ? 4.0f
+                                     : beam.pattern == "dots" ? 5.0f
                                                               : 0.0f;
             // Its integral to compute (`patternNormMain`), unless
             // it is 1.

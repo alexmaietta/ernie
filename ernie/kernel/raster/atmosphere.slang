@@ -389,7 +389,8 @@ public float sodiumScattering(float altitude, float wavelength, float linewidth,
 //
 // Reference: E. Bruneton and F. Neyret, "Precomputed Atmospheric Scattering", Computer Graphics
 // Forum 27(4):1079-1086, 2008, section 4 (the transmittance between two points from the table).
-public float4 transmittanceBetween(Texture2DArray<float4> table, SamplerState linear, float3 a,
+public float4 transmittanceBetween(float4* medium, float* densities,
+                                   Texture2DArray<float4> table, SamplerState linear, float3 a,
                                    float3 b, uint group, float bottom, float top) {
     let span = length(b - a);
     if (span <= 0.0) {
@@ -398,6 +399,16 @@ public float4 transmittanceBetween(Texture2DArray<float4> table, SamplerState li
     let d = (b - a) / span;
     let ra = length(a);
     let rb = length(b);
+    // Over less than 300 m of height the table's ratio is ill-conditioned (near the horizon both
+    // lookups are small, their errors differing by band) and the air nearly uniform: its
+    // extinction at the path's middle along it.
+    if (abs(ra - rb) < 0.3) {
+        float4 scattering;
+        float4 extinction;
+        mediumAt(medium, densities, length(0.5 * (a + b)) - bottom, group, scattering,
+                 extinction);
+        return exp(-extinction * span);
+    }
     let muA = dot(a, d) / ra;
     let muB = dot(b, d) / rb;
     let forwards = !hitsGround(ra, muA, bottom);
