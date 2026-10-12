@@ -78,6 +78,9 @@ class GroundDrawable : public RasterDrawable {
         return true;
     }
 
+    const char* ProfileName() const override {
+        return "Ground";
+    }
     std::optional<Bounds3> Bounds() const override {
         return std::nullopt;
     }

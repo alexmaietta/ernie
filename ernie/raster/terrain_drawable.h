@@ -257,6 +257,9 @@ class TerrainDrawable : public RasterDrawable {
 
     /// Bounds at the current exaggeration; none without a
     /// heightfield.
+    const char* ProfileName() const override {
+        return "Terrain";
+    }
     std::optional<Bounds3> Bounds() const override;
 
     /// Writes the terrain uniforms of every view and selects the LOD

@@ -428,6 +428,9 @@ class MeshDrawable : public RasterDrawable {
 
     /// World bounds of the current draws, or none without any.
     void SetOrigin(const glm::dvec3& origin) override;
+    const char* ProfileName() const override {
+        return "Meshes";
+    }
     std::optional<Bounds3> Bounds() const override;
 
     bool DrawsMinimal() const override {

@@ -101,6 +101,10 @@ class RasterDrawable {
   public:
     virtual ~RasterDrawable() = default;
 
+    /// The name of the drawable's GPU zones in each pass the renderer
+    /// records it in (`ERNIE_GPU_ZONE_NAMED`), such as "Meshes".
+    virtual const char* ProfileName() const = 0;
+
     /// Moves the origin the drawable's coordinates are relative to
     /// (`FrameParams::origin`): every position it gives the GPU and
     /// every bound it reports is world minus `origin`. The renderer

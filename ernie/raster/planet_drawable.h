@@ -122,6 +122,9 @@ class PlanetDrawable : public RasterDrawable {
 
     /// The bounding box of the body at the current exaggeration,
     /// relative to the origin; none without heights.
+    const char* ProfileName() const override {
+        return "Planets";
+    }
     std::optional<Bounds3> Bounds() const override;
 
     /// Writes the planet uniforms of every view and selects the LOD

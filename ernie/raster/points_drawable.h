@@ -168,6 +168,9 @@ class PointsDrawable : public RasterDrawable {
     void SetOrigin(const glm::dvec3& origin) override {
         origin_ = origin;
     }
+    const char* ProfileName() const override {
+        return "Points";
+    }
     std::optional<Bounds3> Bounds() const override;
     std::map<std::int32_t, Bounds3> WorldsBounds() const override;
     void Prepare(const FrameParams& params,

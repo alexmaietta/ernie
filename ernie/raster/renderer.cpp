@@ -2491,6 +2491,8 @@ void RasterRenderer::RecordLights(
     ShaderBarrier(commands);
     // The views' cull views follow their fitted matrices.
     for (const RasterDrawable* drawable : drawables) {
+        ERNIE_GPU_ZONE_NAMED(context_, commands,
+                             drawable->ProfileName());
         drawable->RecordShadowViews(commands);
     }
     ShaderBarrier(commands);
@@ -3985,6 +3987,8 @@ void RasterRenderer::RecordShadows(
             // Poses composed on the GPU, and views posed under them,
             // before anything reads them.
             for (const RasterDrawable* drawable : drawables) {
+                ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                     drawable->ProfileName());
                 drawable->RecordPrepass(commands);
             }
             // The pattern arrays' mip levels, then the light
@@ -4006,6 +4010,8 @@ void RasterRenderer::RecordShadows(
             // Culling and other compute the draws read, once for
             // every view and shadow view.
             for (const RasterDrawable* drawable : drawables) {
+                ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                     drawable->ProfileName());
                 drawable->RecordCull(commands);
             }
             ShaderBarrier(commands);
@@ -4015,11 +4021,17 @@ void RasterRenderer::RecordShadows(
     // The first sub-frame's (the frame's own without motion blur);
     // `RecordViews` the others'.
     RecordShadowMaps(commands, drawables, Frame(0));
+    // The volumes' shadow maps, the light views now known.
+    volumes_->Prepare(commands, lightTable_, *lightViewMatrices_,
+                      lightCount_, lightPatterns_, *patternData_,
+                      static_cast<std::uint32_t>(lightViews_.size()));
     {
         ERNIE_GPU_ZONE(context_, commands, "After shadows");
         // What reads the shadow maps before the views draw, such as
         // the terrain's horizon over what stands on it.
         for (const RasterDrawable* drawable : drawables) {
+            ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                 drawable->ProfileName());
             drawable->RecordAfterShadows(commands);
         }
         ShaderBarrier(commands);
@@ -4058,6 +4070,8 @@ void RasterRenderer::RecordShadowMaps(
                 sizeof(ShadowUniforms));
             own.shadowFromFrame = true;
             for (const RasterDrawable* drawable : drawables) {
+                ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                     drawable->ProfileName());
                 drawable->RecordShadow(
                     commands, own, v,
                     lightViews_[v].lightViewProjection,
@@ -4105,7 +4119,10 @@ void RasterRenderer::RecordLayeredLightShadows(
         }
         vkCmdEndRendering(commands);
     };
-    record(false);
+    {
+        ERNIE_GPU_ZONE(context_, commands, "Layered light maps");
+        record(false);
+    }
     std::vector<VkImageCopy> copies;
     for (std::size_t p = 0; p < layeredPasses_.size(); ++p) {
         if (layeredPasses_[p].fromBase) {
@@ -4120,15 +4137,21 @@ void RasterRenderer::RecordLayeredLightShadows(
         }
     }
     if (!copies.empty()) {
-        lightShadowMaps_->Transition(commands,
-                                     VK_IMAGE_LAYOUT_GENERAL);
-        vkCmdCopyImage(
-            commands, lightShadowMaps_->Handle(),
-            VK_IMAGE_LAYOUT_GENERAL, lightShadowMaps_->Handle(),
-            VK_IMAGE_LAYOUT_GENERAL,
-            static_cast<std::uint32_t>(copies.size()), copies.data());
-        lightShadowMaps_->Transition(
-            commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Layered map copies");
+            lightShadowMaps_->Transition(commands,
+                                         VK_IMAGE_LAYOUT_GENERAL);
+            vkCmdCopyImage(commands, lightShadowMaps_->Handle(),
+                           VK_IMAGE_LAYOUT_GENERAL,
+                           lightShadowMaps_->Handle(),
+                           VK_IMAGE_LAYOUT_GENERAL,
+                           static_cast<std::uint32_t>(copies.size()),
+                           copies.data());
+            lightShadowMaps_->Transition(
+                commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        }
+        ERNIE_GPU_ZONE(context_, commands,
+                       "Layered maps over copies");
         record(true);
     }
 }
@@ -4210,6 +4233,8 @@ void RasterRenderer::RecordViews(
                 frames.push_back(Frame(first + v));
             }
             for (const RasterDrawable* drawable : drawables) {
+                ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                     drawable->ProfileName());
                 drawable->RecordColorViews(commands, frames, first,
                                            phase);
             }
@@ -4229,6 +4254,8 @@ void RasterRenderer::RecordViews(
                                "Hi-Z and occlusion cull");
                 BuildHzb(commands, targets);
                 for (const RasterDrawable* drawable : drawables) {
+                    ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                         drawable->ProfileName());
                     drawable->RecordOcclusionCull(
                         commands, targets.Hzb(), first, layers);
                 }
@@ -4310,6 +4337,8 @@ void RasterRenderer::RecordMinimal(
             }
             for (const RasterDrawable* drawable : drawables) {
                 if (drawable->DrawsMinimal()) {
+                    ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                         drawable->ProfileName());
                     drawable->RecordColorViews(commands, frames,
                                                first, DrawPhase::All);
                 }
@@ -4911,6 +4940,8 @@ void RasterRenderer::RecordViewPoses(
     PatchViews(commands, *poseHistory_[uploads_.Slot()], 0,
                sizeof(glm::mat4), history);
     for (const RasterDrawable* drawable : drawables) {
+        ERNIE_GPU_ZONE_NAMED(context_, commands,
+                             drawable->ProfileName());
         drawable->RecordViewPoses(commands);
     }
     ShaderBarrier(commands);
@@ -4919,6 +4950,7 @@ void RasterRenderer::RecordViewPoses(
 void RasterRenderer::BuildHzb(VkCommandBuffer commands,
                               RenderTargets& targets) const {
     ERNIE_ZONE("Record Hi-Z");
+    ERNIE_GPU_ZONE(context_, commands, "Depth pyramid");
     GpuImage& depth = targets.Depth();
     GpuImage& hzb = targets.Hzb();
     depth.Transition(commands,
