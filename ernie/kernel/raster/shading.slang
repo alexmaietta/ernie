@@ -1268,8 +1268,9 @@ SkyLights skyLights(uint group) {
             continue;
         }
         let tangent = lights[k].extentY.w;
-        sky.towards[sky.count] =
-            float4(lights[k].position.xyz, tangent * rsqrt(1.0 + tangent * tangent));
+        // Towards it as the view's sub-frame has it, where lights move across the shutter.
+        sky.towards[sky.count] = float4(lights[sh.view.z + k].position.xyz,
+                                        tangent * rsqrt(1.0 + tangent * tangent));
         sky.irradiance[sky.count] = lights[k].spectrum[group] + lights[k].tinted[group];
         ++sky.count;
     }
@@ -1682,7 +1683,7 @@ float distantLightThrough(uint k, float3 world, float3 apparent, uint band) {
     }
     if (anyBodies()) {
         through *= eclipseVisibility(bodiesEclipse(band / 4, float3(0.0)), world * 1e-3,
-                                     lights[k].position.xyz, sine)[band % 4];
+                                     lights[sh.view.z + k].position.xyz, sine)[band % 4];
     }
     return through;
 }
@@ -2120,7 +2121,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float3 apparentLights[kMaxLights];
     for (uint k = 0; k < lightCount; ++k) {
         apparentLights[k] = throughAir && lightScales[k] > 0.0 && isSkyLight(k)
-                                ? apparentDirection(world, lights[k].position.xyz)
+                                ? apparentDirection(world, lights[sh.view.z + k].position.xyz)
                                 : float3(0.0);
     }
     for (uint first = 0; first < bands; first += 3) {

@@ -443,6 +443,29 @@ TEST_F(RasterDelegateTest,
         5);
 }
 
+TEST_F(RasterDelegateTest, DistantLightsTurnAcrossTheShutter) {
+    RasterDelegate delegate(*context_);
+    Scene scene = MotionScene();
+    // The raised quad's shadow on the ground under a sun swinging
+    // over the sky from 40 degrees east of the zenith to 40 west,
+    // along the great circle the sub-frames turn it on.
+    ernie::GroundPlane::Define(scene, "/World/Ground")
+        .SetHeight(-6.0);
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetShadowEnable(true)
+        .SetAngle(0.0);
+    scene.Remove("/World/Rocks");
+    ExpectMotionBlur(
+        delegate, scene,
+        [&](double s) {
+            const double angle = glm::radians(-40.0 + 80.0 * s);
+            scene.Set("/World/Sun", tokens::kTransform,
+                      ernie::DistantLightTransform(
+                          {std::sin(angle), 0.0, std::cos(angle)}));
+        },
+        5);
+}
+
 TEST_F(RasterDelegateTest,
        CameraMotionBlurAveragesTheViewsAcrossTheShutter) {
     RasterDelegate delegate(*context_);

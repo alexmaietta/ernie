@@ -160,14 +160,42 @@ struct LightGpu {
 static_assert(sizeof(LightGpu) == 800,
               "LightGpu must match shading.slang");
 
+/// `v` turned by `angle` radians about unit `axis` (Rodrigues'
+/// rotation formula).
+glm::dvec3 Rotated(const glm::dvec3& v, const glm::dvec3& axis,
+                   double angle) {
+    const double c = std::cos(angle);
+    return v * c + glm::cross(axis, v) * std::sin(angle) +
+           axis * glm::dot(axis, v) * (1.0 - c);
+}
+
+/// A distant light's direction `s` of the way along the great circle
+/// from its last frame's (`LightParams::previous`) to this frame's.
+glm::dvec3 TurnedDirection(const LightParams& light, double s) {
+    const glm::dvec3 to = glm::normalize(glm::dvec3(light.direction));
+    if (!light.previous) {
+        return to;
+    }
+    const glm::dvec3 from =
+        glm::normalize(glm::dvec3(light.previous->direction));
+    const glm::dvec3 across = glm::cross(from, to);
+    const double sine = glm::length(across);
+    if (!(sine > 1e-12)) {
+        return to;
+    }
+    return Rotated(from, across / sine,
+                   s * std::atan2(sine, glm::dot(from, to)));
+}
+
 /// With `subframes` above 1, a copy of `table` (`params`' lights) per
 /// sub-frame, `RasterRenderer::kMaxLights` apart: each light that
 /// moved since the last frame (`LightParams::previous`) posed where
 /// it is at the sub-frame's time, as the views are
 /// (`FrameParams::Subframes`). Empty when none moved, when one is
 /// posed on the GPU (the light pass poses the frame's copy alone) or
-/// past `RasterRenderer::kMaxLightSubframes`. Distant lights stay
-/// put; moving lights' shadow views follow them
+/// past `RasterRenderer::kMaxLightSubframes`. Distant lights turn
+/// along the great circle between their directions
+/// (`TurnedDirection`); moving lights' shadow views follow them
 /// (`RasterRenderer::subframeLightViews_`).
 std::vector<LightGpu>
 SubframeLights(const FrameParams& params,
@@ -175,7 +203,7 @@ SubframeLights(const FrameParams& params,
                std::uint32_t subframes) {
     const std::vector<LightParams>& lights = params.lights;
     const auto moves = [](const LightParams& light) {
-        return light.previous && light.type != LightType::Distant;
+        return light.previous.has_value();
     };
     const auto onGpu = [](const LightParams& light) {
         return light.posedOnGpu;
@@ -195,7 +223,32 @@ SubframeLights(const FrameParams& params,
         for (std::size_t i = 0; i < table.size(); ++i) {
             LightGpu entry = table[i];
             const LightParams& light = lights[i];
-            if (moves(light)) {
+            if (moves(light) && light.type == LightType::Distant) {
+                // Turned along the great circle from its last
+                // direction to this one, short of it by the
+                // sub-frame's share: its direction, axis and field.
+                const glm::dvec3 from = glm::normalize(
+                    glm::dvec3(light.previous->direction));
+                const glm::dvec3 to =
+                    glm::normalize(glm::dvec3(light.direction));
+                const glm::dvec3 across = glm::cross(from, to);
+                const double sine = glm::length(across);
+                if (sine > 1e-12) {
+                    const double back =
+                        -(1.0 - s) *
+                        std::atan2(sine, glm::dot(from, to));
+                    for (float* vector : {entry.position, entry.axis,
+                                          entry.polarization}) {
+                        const glm::dvec3 turned =
+                            Rotated(glm::dvec3(vector[0], vector[1],
+                                               vector[2]),
+                                    across / sine, back);
+                        vector[0] = static_cast<float>(turned.x);
+                        vector[1] = static_cast<float>(turned.y);
+                        vector[2] = static_cast<float>(turned.z);
+                    }
+                }
+            } else if (moves(light)) {
                 const glm::dmat4 now =
                     LightParams::Pose{light.position, light.direction,
                                       light.tangent}
@@ -2201,6 +2254,7 @@ void RasterRenderer::WriteLights(
                     ? worldMaps_->resolution
                     : std::numeric_limits<std::uint32_t>::max());
             std::vector<ShadowCascade> views;
+            bool cascaded = false;
             if (distant && light.shadows && !light.posedOnGpu &&
                 !light.domeDiffuse && cascadeFit_ && axis.z > 0.0f) {
                 views = FitViewCascades(axis, own);
@@ -2208,6 +2262,7 @@ void RasterRenderer::WriteLights(
                     kMaxLightShadowViews) {
                     views.clear();
                 }
+                cascaded = !views.empty();
             }
             if (views.empty()) {
                 views = FitLightShadowViews(
@@ -2236,8 +2291,8 @@ void RasterRenderer::WriteLights(
                 // again at each sub-frame's pose (`SubframeLights`),
                 // which that sub-frame's shadows draw from
                 // (`RecordShadowMaps`).
-                if (subframes_ > 1 && light.previous && !distant &&
-                    !light.posedOnGpu) {
+                if (subframes_ > 1 && light.previous &&
+                    !light.posedOnGpu && !light.domeDiffuse) {
                     for (ShadowCascade& view : views) {
                         view.moving = true;
                     }
@@ -2247,21 +2302,33 @@ void RasterRenderer::WriteLights(
                                           light.tangent}
                             .Matrix();
                     for (std::uint32_t k = 0; k < subframes_; ++k) {
-                        const glm::dmat4 then = InterpolatePose(
-                            light.previous->Matrix(), now,
+                        const double s =
                             1.0 + params.camera.SubframeTime(
-                                      static_cast<int>(k)));
+                                      static_cast<int>(k));
                         LightParams posed = light;
-                        posed.position = glm::dvec3(then[3]);
-                        posed.direction = glm::vec3(
-                            -glm::normalize(glm::dvec3(then[2])));
-                        posed.tangent = glm::vec3(
-                            glm::normalize(glm::dvec3(then[0])));
+                        if (distant) {
+                            posed.direction =
+                                glm::vec3(TurnedDirection(light, s));
+                        } else {
+                            const glm::dmat4 then = InterpolatePose(
+                                light.previous->Matrix(), now, s);
+                            posed.position = glm::dvec3(then[3]);
+                            posed.direction = glm::vec3(
+                                -glm::normalize(glm::dvec3(then[2])));
+                            posed.tangent = glm::vec3(
+                                glm::normalize(glm::dvec3(then[0])));
+                        }
+                        // As the frame's were fitted: cascades over
+                        // the view, or one map over the scene.
                         const std::vector<ShadowCascade> moved =
-                            FitLightShadowViews(
-                                posed,
-                                params.Relative(posed.position),
-                                bounds->first, bounds->second, own);
+                            cascaded
+                                ? FitViewCascades(posed.direction,
+                                                  own)
+                                : FitLightShadowViews(
+                                      posed,
+                                      params.Relative(posed.position),
+                                      bounds->first, bounds->second,
+                                      own);
                         for (std::size_t v = 0;
                              v < moved.size() && v < views.size();
                              ++v) {
