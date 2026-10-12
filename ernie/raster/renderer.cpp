@@ -2959,12 +2959,27 @@ void RasterRenderer::WriteLights(
         }
     }
     if (virtualLight_ >= 0) {
+        // The pool the settings ask for, grown to what an earlier
+        // frame wanted when it overflowed (its counter counts every
+        // page asked for), up to `kVirtualMaxPages`, rather than
+        // leave pages unbacked from frame to frame.
+        if (virtualShadow_ != nullptr) {
+            std::uint32_t wanted = 0;
+            virtualShadow_->Counter().Read(
+                std::as_writable_bytes(std::span(&wanted, 1)));
+            if (wanted > virtualShadow_->Pages()) {
+                virtualGrownPages_ =
+                    std::min(std::bit_ceil(wanted), kVirtualMaxPages);
+            }
+        }
+        const std::uint32_t pages =
+            std::max(params.shadows.virtualPages, virtualGrownPages_);
         if (virtualShadow_ == nullptr ||
-            virtualShadow_->Pages() != params.shadows.virtualPages) {
+            virtualShadow_->Pages() != pages) {
             vkDeviceWaitIdle(context_.Device());
             virtualShadow_ = std::make_unique<VirtualShadowMap>(
                 context_, compiler_, kVirtualFirstLevel,
-                kVirtualLastLevel, params.shadows.virtualPages);
+                kVirtualLastLevel, pages);
         }
         const LightGpu& entry =
             table[static_cast<std::size_t>(virtualLight_)];

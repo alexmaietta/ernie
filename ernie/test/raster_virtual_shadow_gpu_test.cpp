@@ -309,7 +309,8 @@ TEST_F(VirtualShadowMapTest,
         RenderSettings::Define(scene, "/Render/Settings");
     settings.SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(64.0, 64.0))
-        .SetAmbient(0.0);
+        .SetAmbient(0.0)
+        .SetShadowVirtual(false);
     RasterDelegate delegate(*context_);
     const std::size_t cascades = DarkPixels(delegate.Render(scene));
     ASSERT_GT(cascades, 20u);
@@ -317,6 +318,16 @@ TEST_F(VirtualShadowMapTest,
     const std::size_t virtualMap = DarkPixels(delegate.Render(scene));
     EXPECT_GT(virtualMap, cascades / 2);
     EXPECT_LT(virtualMap, cascades * 2);
+
+    // A pool of 8 pages, fewer than the frame asks for, grows to hold
+    // them by the next frame, which shadows as with room to spare.
+    settings.SetShadowVirtualPages(8);
+    RasterDelegate small(*context_);
+    small.Render(scene);
+    const std::size_t grown = DarkPixels(small.Render(scene));
+    ASSERT_NE(small.Renderer().VirtualShadow(), nullptr);
+    EXPECT_GT(small.Renderer().VirtualShadow()->Pages(), 8u);
+    EXPECT_EQ(grown, virtualMap);
 }
 
 // As on a floor, on an Earth-sized planet Terrain, which casts into
@@ -350,7 +361,8 @@ TEST_F(VirtualShadowMapTest, ASphereCastsItsShadowOnAPlanet) {
         RenderSettings::Define(scene, "/Render/Settings");
     settings.SetCamera("/World/Camera")
         .SetResolution(glm::dvec2(64.0, 64.0))
-        .SetAmbient(0.0);
+        .SetAmbient(0.0)
+        .SetShadowVirtual(false);
     RasterDelegate delegate(*context_);
     const std::size_t cascades = DarkPixels(delegate.Render(scene));
     ASSERT_GT(cascades, 20u);

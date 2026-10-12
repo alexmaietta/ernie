@@ -1061,6 +1061,23 @@ float3x2 pixelFootprint(int2 pixel, uint layer, float3 world) {
     return float3x2(steps[0].x, steps[1].x, steps[0].y, steps[1].y, steps[0].z, steps[1].z);
 }
 
+// The surface's geometric normal at pixel `pixel` (its point `world`): across its footprint's
+// steps to its neighbours (`pixelFootprint`), the facet the rasterizer drew, without a normal
+// map's bumps or smooth shading's interpolation; turned to the side of the shading normal
+// `shading`, which stands in where the pixel has no neighbours on its surface.
+float3 geometricNormal(int2 pixel, uint layer, float3 world, float3 shading) {
+    let footprint = pixelFootprint(pixel, layer, world);
+    let across = float3(footprint[0][0], footprint[1][0], footprint[2][0]);
+    let down = float3(footprint[0][1], footprint[1][1], footprint[2][1]);
+    let c = cross(across, down);
+    let size = length(c);
+    if (!(size > 1e-30)) {
+        return shading;
+    }
+    let g = c / size;
+    return dot(g, shading) < 0.0 ? -g : g;
+}
+
 // A laser's irradiance at `world` per watt of its power, across the light's ray, m^-2: its pattern
 // (`LightParams::Beam`, an `ILightPattern` in light slot `slot`), averaged over the pixel's
 // `footprint` (`pixelFootprint`) as it spans the beam's x and y, so a feature smaller than a pixel
@@ -2396,11 +2413,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // Back along the pixel's ray: towards the eye, along the view when orthographic, towards the
     // row's pose for a pushbroom.
     let v = viewVector(ndc.xy, world);
-    // The surface's normal, which shadows offset and compare along, and the one shading uses, bent
-    // to face the viewer: at grazing views the two part, and the bent one would lift the receiver
-    // sideways rather than off the surface.
+    // The normal shading uses, bent to face the viewer, and the one shadows offset and compare
+    // along: the surface's own, as the shadow maps drew it, across the pixel's neighbours' points
+    // (`geometricNormal`), not the bent one, which at grazing views would lift the receiver
+    // sideways, nor a normal map's, whose bumps the maps never saw.
     let surfaceNormal = normalize(gNormal.Load(pixel).xyz);
     let n = facingNormal(surfaceNormal, v);
+    let shadowNormal = geometricNormal(int2(id.xy), id.z, world, surfaceNormal);
     // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
     // layers on to Q, as many more to U): the image's +x and +y across the light reaching the eye.
     let stokes = kShadePolarization ? pass.model.z : 0u;
@@ -2586,12 +2605,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            let surfaceDotL = dot(surfaceNormal, toLight);
+            let shadowDotL = dot(shadowNormal, toLight);
             let visibility =
                 k == resources.virtualLight
-                    ? virtualVisibility(light, shadowPoint, surfaceNormal, surfaceDotL,
+                    ? virtualVisibility(light, shadowPoint, shadowNormal, shadowDotL,
                                         float2(id.xy))
-                    : lightVisibility(light, shadowPoint, surfaceNormal, surfaceDotL,
+                    : lightVisibility(light, shadowPoint, shadowNormal, shadowDotL,
                                       float2(id.xy));
             scale *= visibility * volumeTransmittance(light, shadowPoint);
         }

@@ -1091,6 +1091,10 @@ class RasterRenderer {
     static constexpr std::int32_t kVirtualLastLevel = 22;
     /// The narrowest image width the levels are chosen for.
     static constexpr std::uint32_t kVirtualMinWidth = 1024;
+    /// The most physical pages the pool grows to when frames overflow
+    /// it (256 MB), and what it has grown to.
+    static constexpr std::uint32_t kVirtualMaxPages = 4096;
+    std::uint32_t virtualGrownPages_ = 0;
     /// A per-world map's pass: its casters, and whether it starts as
     /// a copy of its light's shared map at layer `base`.
     struct LayeredPass {
