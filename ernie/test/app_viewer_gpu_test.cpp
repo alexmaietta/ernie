@@ -959,7 +959,7 @@ TEST_F(ViewerTest,
     EXPECT_EQ(viewer_->Settings(), Viewer::SessionSettings());
 }
 
-TEST_F(ViewerTest, HidesItsViewportUiButKeepsTheHud) {
+TEST_F(ViewerTest, HidesItsViewportUi) {
     ViewportDisplay display = viewer_->GetViewportDisplay();
     EXPECT_TRUE(display.ui);
     display.ui = false;

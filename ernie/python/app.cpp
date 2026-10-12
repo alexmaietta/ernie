@@ -231,10 +231,10 @@ void BindApp(nb::module_& parent) {
                 "scene.")
         .def_rw(
             "ui", &ViewportDisplay::ui,
-            "The viewport's own UI (toolbar and menus, tool strip, "
-            "axis indicator, gizmo); off, as the H key toggles, "
-            "only the image, the scene's overlays and the heads-up "
-            "display show.")
+            "The viewport's own UI (toolbar and menus, heads-up "
+            "display, tool strip, axis indicator, gizmo); off, as the "
+            "H key toggles, only the image and the scene's overlays "
+            "show.")
         .def(nb::self == nb::self);
 
     nb::class_<WidgetPanel>(m, "WidgetPanel",

@@ -1460,10 +1460,6 @@ struct Viewer::State {
             DrawToolbar(origin, size);
             DrawToolStrip(origin);
             DrawAxisIndicator(origin, size);
-        } else {
-            // Only the heads-up display, in the top right corner.
-            const float pad = 8.0f * contentScale;
-            DrawHud(ImVec2(origin.x + size.x - pad, origin.y + pad));
         }
         if (!renderError.empty()) {
             // At the bottom left, beside the axis indicator.
@@ -3018,7 +3014,7 @@ struct Viewer::State {
                         {"Z", "Cycle wireframe: off, overlay, hidden "
                               "line"},
                         {"H", "Hide or show the viewport's toolbar, "
-                              "menus and gizmos"},
+                              "menus, heads-up display and gizmos"},
                         {"Del", "Delete the selection"},
                         {"Ctrl+D", "Duplicate the selection"},
                         {"F2", "Rename the selected prim (Stage)"},
