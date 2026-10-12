@@ -370,6 +370,7 @@ class ViewerErnie(ViewerGL):
         self.render_scale = render_scale
         self.pipelined = pipelined
         self._shading = "full"  # the settings' default until set
+        self._mode = "off"  # the minimal mode the settings hold
         # The render under way, and the image last shown, kept until
         # the next is.
         self._pending: Any = None
@@ -395,9 +396,27 @@ class ViewerErnie(ViewerGL):
                 f"shading must be one of {', '.join(_SHADING)}, not {shading!r}"
             )
         self._shading = shading
-        self._settings.set("ernie:minimal:mode", _SHADING[shading])
+        self._apply_shading()
+
+    def _apply_shading(self) -> None:
+        """Shades the frame as asked, but fully while the scene holds
+        what minimal shading does not draw yet (point clouds such as
+        Newton's particles, terrain or planets)."""
+        mode = _SHADING[self._shading]
+        if mode != "off":
+            scene = self.ernie_scene
+            visible = any(
+                self._visible.get(str(path), True)
+                for path in scene.prims("Points")
+            )
+            if visible or scene.prims("Terrain"):
+                mode = "off"
+        if mode == self._mode:
+            return
+        self._mode = mode
+        self._settings.set("ernie:minimal:mode", mode)
         if self._own_lighting:
-            minimal = shading == "minimal"
+            minimal = mode != "off"
             self._settings.ambient = (
                 _MINIMAL_AMBIENT_LUMINANCE
                 if minimal
@@ -516,6 +535,7 @@ class ViewerErnie(ViewerGL):
         """The image to show: with `pipelined`, the last frame's
         render, once this frame's has started; else this frame's."""
         self._aim_view()
+        self._apply_shading()
         operation = self.ernie_renderer.step_async(
             self.ernie_scene, settings=self._settings.path
         )
