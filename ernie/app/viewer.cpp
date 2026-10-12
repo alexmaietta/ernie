@@ -3120,18 +3120,6 @@ struct Viewer::State {
             ImGui::SameLine();
             DrawCameraBar();
         }
-        // A screenshot, at the end of the bar.
-        ImGui::SameLine();
-        if (ImGui::Button((std::string(icons::kScan) +
-                           "  Capture##barScreenshot")
-                              .c_str())) {
-            self.Screenshot();
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Capture a screenshot (F10); the Capture "
-                "panel sets where and what");
-        }
 
         // The lighting in the top right corner, as Kit's "Stage
         // Lights", and the heads-up display below it.
@@ -3158,23 +3146,27 @@ struct Viewer::State {
             }
             ImGui::EndCombo();
         }
-        // The screenshot button, left of the lighting.
+        // Capture, left of the lighting.
         const float lightWidth =
             display.toolbarLighting
                 ? ImGui::CalcTextSize(lightLabel.c_str()).x +
                       2.0f * style.FramePadding.x +
                       style.ItemSpacing.x
                 : 0.0f;
-        const float shotWidth = ImGui::CalcTextSize(icons::kScan).x +
-                                2.0f * style.FramePadding.x;
+        const std::string shotLabel =
+            std::string(icons::kDownload) + "  Capture";
+        const float shotWidth =
+            ImGui::CalcTextSize(shotLabel.c_str()).x +
+            2.0f * style.FramePadding.x;
         ImGui::SetCursorScreenPos(
             ImVec2(right - lightWidth - shotWidth, origin.y + pad));
-        if (ImGui::Button((std::string(icons::kScan) + "##screenshot")
-                              .c_str())) {
+        if (ImGui::Button((shotLabel + "##screenshot").c_str())) {
             self.Screenshot();
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Capture a screenshot (F10)");
+            ImGui::SetTooltip(
+                "Capture a screenshot (F10); the Capture "
+                "panel sets where and what");
         }
         ImGui::PopStyleVar(4);
         ImGui::PopStyleColor(5);

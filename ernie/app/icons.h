@@ -52,8 +52,8 @@ inline constexpr const char* kStepForward =
     "\xee\x8f\xaa";                                     ///< U+E3EA
 inline constexpr const char* kRepeat = "\xee\x85\x86";  ///< U+E146
 inline constexpr const char* kVideo = "\xee\x86\xa5";   ///< U+E1A5
-inline constexpr const char* kScan =
-    "\xee\x89\x97";  ///< U+E257, a screenshot's frame (captures)
+inline constexpr const char* kDownload =
+    "\xee\x82\xb2";  ///< U+E0B2, saving (captures)
 
 /// First and last codepoints of the icon font, for loading its
 /// glyphs.
