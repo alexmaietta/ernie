@@ -97,7 +97,8 @@ struct ShadingUniforms {
     float domeLighting[4];
     /// The atmosphere (km): the planet's centre relative to the
     /// frame's origin and the bottom radius; the top radius, 1 with
-    /// an atmosphere, the sine of the sun's angular radius.
+    /// an atmosphere, unused, and the sky's greatest degree of
+    /// polarization.
     float atmosphere[2][4];
     /// The scene's ambient light's colour, linear RGB over its
     /// luminance (its luminance is `sun[3]`'s); w unused.
@@ -3345,6 +3346,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         shading.atmosphere[1][0] = static_cast<float>(
             (banded.bottomRadius + banded.topAltitude) * 1e-3);
         shading.atmosphere[1][1] = 1.0f;
+        shading.atmosphere[1][3] =
+            static_cast<float>(atmosphere_->Params().polarization);
     }
     // Bodies in kilometres likewise, the Moon's 384,000 km away.
     for (std::size_t i = 0;

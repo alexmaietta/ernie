@@ -101,8 +101,8 @@ struct ShadingUniforms {
     // radius in pixels.
     float4 domeLighting;
     // The atmosphere (atmosphere.slang), in km: xyz the planet's centre relative to the frame's
-    // origin and w its radius; then x the atmosphere's top radius, y 1 with an atmosphere; zw
-    // unused.
+    // origin and w its radius; then x the atmosphere's top radius, y 1 with an atmosphere, z
+    // unused, w the sky's greatest degree of linear polarization (`skyPolarization`).
     float4 atmosphere[2];
     // xyz: the scene's ambient light's colour, linear RGB over its luminance (`sun.w` its
     // radiance); w unused.
@@ -1319,6 +1319,9 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
 // lights for the air and the ground (`eclipseVisibility`).
 void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                    float pixelSolidAngle) {
+    for (uint band = 0; band < kMaxBands; ++band) {
+        skyScattered[band] = 0.0;
+    }
     if ((sh.sky.x & kSkyAtmosphere) == 0 || sh.atmosphere[1].y == 0.0) {
         return;
     }
@@ -1435,7 +1438,54 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                 }
             }
             radiance[band] = behind * transmittance[k] + scattered[k];
+            skyScattered[band] = scattered[k];
         }
+    }
+}
+
+// The light the air scattered into the last `atmosphereSky` per band, which `skyPolarization`
+// polarizes; the rest of the sky's light is unpolarized.
+static float skyScattered[kMaxBands];
+
+// Light the sky's lights scatter towards the eye along view direction `d`, as each band of
+// `group`'s Stokes Q and U over I in the frame (`frameX`, `frameY`) across it: each light's
+// single-scattering Rayleigh pattern, sin^2 g / (1 + cos^2 g) at scattering angle g, its field
+// across the plane of the light and the line of sight, scaled by the sky's greatest degree
+// (`sh.atmosphere[1].w`, which multiple scattering and haze keep below 1) and weighted by the
+// light's share of the lights' irradiance.
+//
+// References:
+// - S. Chandrasekhar, "Radiative Transfer", Oxford, 1950 (Rayleigh scattering's polarization).
+// - K. L. Coulson, "Polarization and Intensity of Light in the Atmosphere", A. Deepak, 1988
+//   (the clear sky's greatest degree, about 0.75 to 0.85).
+void skyPolarization(uint group, float3 d, float3 frameX, float3 frameY, out float4 q,
+                     out float4 u) {
+    q = float4(0.0);
+    u = float4(0.0);
+    let greatest = sh.atmosphere[1].w;
+    if (greatest <= 0.0 || sh.atmosphere[1].y == 0.0) {
+        return;
+    }
+    let sources = skyLights(group);
+    var total = float4(0.0);
+    for (uint i = 0; i < sources.count; ++i) {
+        total += sources.irradiance[i];
+    }
+    for (uint i = 0; i < sources.count; ++i) {
+        let towards = sources.towards[i].xyz;
+        let across = cross(d, towards);
+        if (dot(across, across) < 1e-12) {
+            continue;
+        }
+        let cosG = dot(d, towards);
+        let degree = greatest * (1.0 - cosG * cosG) / (1.0 + cosG * cosG);
+        let field = normalize(across);
+        let x = dot(field, frameX);
+        let y = dot(field, frameY);
+        let seen = max(x * x + y * y, 1e-12);
+        let share = sources.irradiance[i] / max(total, float4(1e-30));
+        q += share * degree * (x * x - y * y) / seen;
+        u += share * degree * 2.0 * x * y / seen;
     }
 }
 
@@ -1687,15 +1737,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float3 frameX = float3(0.0);
     float3 frameY = float3(0.0);
     if (stokes != 0) {
-        let step = 2.0 / float2(sh.size.xy);
-        let across = cameraPoint(sh.invViewProj, sh.strip, ndc.xy + float2(step.x, 0.0), ndc.z) -
-                     world;
-        let up = cameraPoint(sh.invViewProj, sh.strip, ndc.xy + float2(0.0, step.y), ndc.z) -
-                 world;
-        frameX = normalize(across - dot(across, v) * v + 1e-12 * n);
-        let upAcross = up - dot(up, v) * v - dot(up, frameX) * frameX;
-        frameY = normalize(upAcross + 1e-12 * cross(v, frameX));
+        pixelFrame(ndc.xy, ndc.z, v, frameX, frameY);
     }
+    // The air's polarization of the light it scatters between the surface and the eye, per
+    // group of four bands as `skyPolarization` finds it.
+    var airGroup = 0xFFFFFFFFu;
+    var airQ = float4(0.0);
+    var airU = float4(0.0);
     let albedo = gAlbedo.Load(pixel);
     let modulation = max(albedo.yzw, float3(0.0));
     let scale = max(modulation.x, max(modulation.y, modulation.z));
@@ -1990,8 +2038,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             spectral[int3(id.xy, layer)] =
                 radiance[k] * aerialTransmittance[band] + aerialScattered[band];
             if (stokes != 0) {
-                spectral[int3(id.xy, stokes + layer)] = q[k] * aerialTransmittance[band];
-                spectral[int3(id.xy, 2 * stokes + layer)] = u[k] * aerialTransmittance[band];
+                if (band / 4 != airGroup) {
+                    airGroup = band / 4;
+                    skyPolarization(airGroup, -v, frameX, frameY, airQ, airU);
+                }
+                spectral[int3(id.xy, stokes + layer)] =
+                    q[k] * aerialTransmittance[band] + aerialScattered[band] * airQ[band % 4];
+                spectral[int3(id.xy, 2 * stokes + layer)] =
+                    u[k] * aerialTransmittance[band] + aerialScattered[band] * airU[band % 4];
             }
         }
     }
@@ -2230,9 +2284,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         bodiesSky(radiance, origin, d, 0.5 * detector);
         atmosphereSky(radiance, origin, d,
                       detector * detector * offAxis * offAxis * offAxis);
-        for (uint band = 0; band < bands; ++band) {
-            writeSky(id, id.z * bands + band, radiance[band]);
-        }
+        writeSky(id, radiance, ndc, d);
         return;
     }
     if (sh.range.w != 0.0) {
@@ -2252,9 +2304,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         }
         // Each pixel's ray starts on the near plane.
         atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
-        for (uint band = 0; band < bands; ++band) {
-            writeSky(id, id.z * bands + band, radiance[band]);
-        }
+        writeSky(id, radiance, ndc, d);
         return;
     }
     let ray = c + ndc.x * a + ndc.y * b;
@@ -2290,18 +2340,47 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     }
     bodiesSky(radiance, sh.eye.xyz, d, 0.5 * pixelAngle);
     atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
-    for (uint band = 0; band < bands; ++band) {
-        writeSky(id, id.z * bands + band, radiance[band]);
+    writeSky(id, radiance, ndc, d);
+}
+
+// Writes the sky's radiance per band to pixel `id`, at `ndc` looking along `d`, and with a
+// polarizer its Stokes Q and U: the light the air scattered into it (`skyScattered`) polarized
+// as `skyPolarization` gives, the rest unpolarized.
+void writeSky(uint3 id, float radiance[kMaxBands], float2 ndc, float3 d) {
+    let bands = uint(sh.range.z);
+    let stokes = pass.model.z;
+    float3 frameX = float3(0.0);
+    float3 frameY = float3(0.0);
+    if (stokes != 0) {
+        pixelFrame(ndc, 0.5, d, frameX, frameY);
+    }
+    for (uint group = 0; group * 4 < bands; ++group) {
+        float4 q = float4(0.0);
+        float4 u = float4(0.0);
+        if (stokes != 0) {
+            skyPolarization(group, d, frameX, frameY, q, u);
+        }
+        for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
+            let band = group * 4 + k;
+            let layer = id.z * bands + band;
+            spectral[int3(id.xy, layer)] = radiance[band];
+            if (stokes != 0) {
+                spectral[int3(id.xy, stokes + layer)] = skyScattered[band] * q[k];
+                spectral[int3(id.xy, 2 * stokes + layer)] = skyScattered[band] * u[k];
+            }
+        }
     }
 }
 
-// Writes the sky's radiance `value` to layer `layer` of pixel `id`, and with a polarizer its
-// Stokes Q and U: none, the sky's light unpolarized.
-void writeSky(uint3 id, uint layer, float value) {
-    spectral[int3(id.xy, layer)] = value;
-    let stokes = pass.model.z;
-    if (stokes != 0) {
-        spectral[int3(id.xy, stokes + layer)] = 0.0;
-        spectral[int3(id.xy, 2 * stokes + layer)] = 0.0;
-    }
+// The frame a pixel's linear Stokes Q and U are measured in: the image's +x and +y across the
+// direction `d` it sees along, from the points a pixel over at depth `depth` from its own at
+// `ndc`.
+void pixelFrame(float2 ndc, float depth, float3 d, out float3 frameX, out float3 frameY) {
+    let step = 2.0 / float2(sh.size.xy);
+    let here = cameraPoint(sh.invViewProj, sh.strip, ndc, depth);
+    let across = cameraPoint(sh.invViewProj, sh.strip, ndc + float2(step.x, 0.0), depth) - here;
+    let up = cameraPoint(sh.invViewProj, sh.strip, ndc + float2(0.0, step.y), depth) - here;
+    frameX = normalize(across - dot(across, d) * d + 1e-12 * float3(1.0, 0.0, 0.0));
+    let upAcross = up - dot(up, d) * d - dot(up, frameX) * frameX;
+    frameY = normalize(upAcross + 1e-12 * cross(d, frameX));
 }

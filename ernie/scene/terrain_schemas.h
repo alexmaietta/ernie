@@ -120,6 +120,13 @@
     X(double, CloudCover, ::ernie::tokens::kAtmosphereCloudCover, 0.5,                             \
       (::ernie::AttributeMeta{.doc = "The fraction of the planet's limb the clouds cover.",        \
                               .group = "Atmosphere", .max = 1.0}))                                 \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.75,                      \
+      (::ernie::AttributeMeta{.label = "Sky polarization",                                         \
+                              .doc = "The sky's greatest degree of linear polarization, 90 "       \
+                                     "degrees from the sun: Rayleigh scattering's 1, lowered by "  \
+                                     "multiple scattering and haze (a clear sky about 0.75, a "    \
+                                     "dusty one far less).",                                       \
+                              .group = "Atmosphere", .max = 1.0}))                                 \
     X(std::string, Anchor, ::ernie::tokens::kAtmosphereAnchor, ::ernie::tokens::kAnchorGround,     \
       (::ernie::AttributeMeta{.doc = "ground: its origin is on the planet's surface, the centre "  \
                                      "a radius below along its -z; centre: its origin is the "     \

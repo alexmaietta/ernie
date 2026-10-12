@@ -2542,6 +2542,8 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
         std::max(prim.GetDustOpticalDepth(), 0.0);
     params.cloudTop = std::max(prim.GetCloudTop(), 0.0);
     params.cloudCover = std::clamp(prim.GetCloudCover(), 0.0, 1.0);
+    params.polarization =
+        std::clamp(prim.GetPolarizationDegree(), 0.0, 1.0);
     return params;
 }
 

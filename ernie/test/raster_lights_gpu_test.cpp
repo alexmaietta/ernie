@@ -1147,6 +1147,46 @@ TEST_F(RasterDelegateTest,
         << "30 degrees";
 }
 
+TEST_F(RasterDelegateTest, TheSkyIsPolarizedAcrossTheSunsPlane) {
+    // Earth's air under the sun at the zenith, the camera on the
+    // ground looking 20 degrees up: the light scattered there, 70
+    // degrees from the sun, polarized horizontally (along the
+    // image's x) by Rayleigh's sin^2 g / (1 + cos^2 g) times the
+    // sky's greatest degree, 0.75.
+    Scene scene = FlatScene();
+    ernie::Atmosphere::Define(scene, "/World/Air");
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetIrradiance(1361.0)
+        .SetPhysicalIlluminant(std::string(tokens::kSun));
+    const double up = glm::radians(20.0);
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform(
+                  {0.0, 0.0, 2.0},
+                  {0.0, std::cos(up), 2.0 + std::sin(up)},
+                  {0.0, 0.0, 1.0}));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    ernie::Camera camera(scene, "/World/Camera");
+    const auto through = [&](double degrees) {
+        camera.SetPolarizerType("linear")
+            .SetPolarizerExtinction(10.0)
+            .SetPolarizerTransmission(0.8)
+            .SetPolarizerAngle(degrees);
+        return static_cast<double>(
+            Band8(delegate, scene)[c * kVarSize + c]);
+    };
+    const double along = through(0.0);
+    const double across = through(90.0);
+    ASSERT_GT(across, 0.0);
+    const double g = M_PI / 2.0 - up;
+    const double expected = 0.75 * std::sin(g) * std::sin(g) /
+                            (1.0 + std::cos(g) * std::cos(g));
+    EXPECT_NEAR((along - across) / (along + across) * (0.88 / 0.72),
+                expected, 0.02);
+    // Diagonal polarizers see the same half of it.
+    EXPECT_NEAR(through(45.0), through(135.0), 0.01 * along);
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;
