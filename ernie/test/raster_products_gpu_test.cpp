@@ -347,7 +347,9 @@ TEST_F(RasterDelegateTest, RenderVarsMeasureTheScene) {
     RasterDelegate delegate(*context_);
     ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
     const auto vars = MapVars(outputs);
-    ASSERT_EQ(vars.size(), ernie::RenderTargets::VarNames().size());
+    // Every var but the three polarization vars.
+    ASSERT_EQ(vars.size(),
+              ernie::RenderTargets::VarNames().size() - 3);
     const std::size_t c = kVarSize / 2;
 
     const Tensor& spectral = vars.at("SpectralRadiance");

@@ -135,6 +135,10 @@ class Demo(ernie.demo.Demo):
             spectral_bands=6,
             sensor_noise=False,
             polarizer_type="mosaic",
+            # Sunny 16 opened a stop, as the polarizers pass about half.
+            exposure_f_stop=11.0,
+            exposure_time=1.0 / 125.0,
+            exposure_iso=125.0,
             clipping_range=(0.05, 1e5),
         ).set(
             tokens.TRANSFORM,

@@ -30,18 +30,17 @@ namespace ernie {
 namespace {
 
 /// The vars the view holds for a chain writing `aovs` AOVs, with
-/// MotionVector when `motion` (it is shown): every var (empty)
+/// opt-in var `optIn` (it is shown) unless empty: every var (empty)
 /// without either, else every var and the first `aovs` AOV slots.
 std::vector<std::string_view> ViewHeldVars(std::size_t aovs,
-                                           bool motion) {
-    if (aovs == 0 && !motion) {
+                                           std::string_view optIn) {
+    if (aovs == 0 && optIn.empty()) {
         return {};
     }
-    // Every var (the opt-in MotionVector aside unless shown) and the
-    // slots.
+    // Every var (the opt-in ones aside unless shown) and the slots.
     std::vector<std::string_view> vars = RequiredVars({});
-    if (motion) {
-        vars.push_back(render_vars::kMotionVector);
+    if (!optIn.empty()) {
+        vars.push_back(optIn);
     }
     vars.insert(vars.end(), kAovSlotNames.begin(),
                 kAovSlotNames.begin() +
@@ -2362,7 +2361,7 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
     UpdatePrims(scene, prims, extent,
                 NextFrame(scene, prims.settings, prims.settings),
                 prims.settings, filters, {}, {},
-                ViewHeldVars(viewAovs_.size(), viewMotion_));
+                ViewHeldVars(viewAovs_.size(), viewOptIn_));
     ReadPatternArrays();
     SettleMotion();
 }
@@ -2743,8 +2742,7 @@ void RasterDelegate::Record(VkCommandBuffer commands,
         viewTargets_->Bands() != renderer_.Bands().count ||
         viewTargets_->AovNames() != viewAovs_ ||
         viewTargets_->Faces() != renderer_.Faces() ||
-        (viewTargets_->Var(render_vars::kMotionVector) != nullptr) !=
-            viewMotion_) {
+        viewTargetsOptIn_ != viewOptIn_) {
         if (extent.width == 0 || extent.height == 0) {
             BeginRendering(commands, target);
             vkCmdEndRendering(commands);
@@ -2752,10 +2750,11 @@ void RasterDelegate::Record(VkCommandBuffer commands,
         }
         vkDeviceWaitIdle(context_.Device());
         const std::vector<std::string_view> vars =
-            ViewHeldVars(viewAovs_.size(), viewMotion_);
+            ViewHeldVars(viewAovs_.size(), viewOptIn_);
         viewTargets_ = std::make_unique<RenderTargets>(
             context_, extent, renderer_.Bands().count, false, 1, vars,
             viewAovs_, renderer_.Faces());
+        viewTargetsOptIn_ = viewOptIn_;
     }
     const RasterDrawable* drawables[] = {
         &terrain_, &planet_, &meshes_, &ground_, &points_};

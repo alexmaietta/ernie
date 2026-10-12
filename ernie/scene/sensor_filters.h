@@ -44,11 +44,25 @@ inline constexpr std::string_view kInstanceId =
 /// camera's first frame and for pushbroom cameras. Opt-in: "every
 /// var" leaves it out, as it costs extra passes.
 inline constexpr std::string_view kMotionVector = "MotionVector";
+/// float32 in [0, 1]: the degree of linear polarization of the light
+/// reaching each sensor pixel, before the camera's polarizer, over
+/// the bands: sqrt(S1^2 + S2^2) / S0. Opt-in, as the polarization
+/// vars make the raster carry Stokes Q and U.
+inline constexpr std::string_view kDegreeOfLinearPolarization =
+    "DegreeOfLinearPolarization";
+/// float32 in [0, pi): its angle of linear polarization, from the
+/// image's +x towards +y (down), atan2(S2, S1) / 2. Opt-in.
+inline constexpr std::string_view kAngleOfLinearPolarization =
+    "AngleOfLinearPolarization";
+/// float32 (S0, S1, S2, 0): its linear Stokes vector summed over the
+/// bands, W m^-2 sr^-1 nm^-1, S1 and S2 from the image's +x towards
+/// +y. Opt-in.
+inline constexpr std::string_view kLinearStokes = "LinearStokes";
 }  // namespace render_vars
 
 /// Every render var name, in the order the rasterizer binds their
 /// images.
-inline constexpr std::array<std::string_view, 11> kRenderVarNames{
+inline constexpr std::array<std::string_view, 14> kRenderVarNames{
     render_vars::kSpectralRadiance,
     render_vars::kElectrons,
     render_vars::kRawDn,
@@ -59,7 +73,10 @@ inline constexpr std::array<std::string_view, 11> kRenderVarNames{
     render_vars::kNormal,
     render_vars::kPrimId,
     render_vars::kInstanceId,
-    render_vars::kMotionVector};
+    render_vars::kMotionVector,
+    render_vars::kDegreeOfLinearPolarization,
+    render_vars::kAngleOfLinearPolarization,
+    render_vars::kLinearStokes};
 
 /// The built-in sensor filters a render product runs in order on its
 /// spectral radiance, as Chrono::Sensor's filter lists; the
@@ -394,7 +411,8 @@ AovOutputsOf(std::span<const SensorFilterStep> chain,
 /// `kRenderVarNames` order, as the sensor keeps what they are made
 /// from (SpectralRadiance, Electrons, HdrColor) in registers, then
 /// the AOV slots (`kAovSlotNames`) requested. Empty `requested` means
-/// every render var but the opt-in MotionVector.
+/// every render var but the opt-in MotionVector and polarization
+/// vars.
 std::vector<std::string_view>
 RequiredVars(std::span<const std::string_view> requested);
 

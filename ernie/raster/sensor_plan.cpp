@@ -491,15 +491,15 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
                  stage.custom->params) {
                 if (param.size == 1 || param.table) {
                     params += "    " + var + "." + param.name +
-                              " = filterParams[" +
-                              std::to_string(offset) + "];\n";
+                              " = filterParam(" +
+                              std::to_string(offset) + ");\n";
                 } else {
                     params += "    for (uint i = 0; i < " +
                               std::to_string(param.size) +
                               "; ++i) {\n        " + var + "." +
-                              param.name + "[i] = filterParams[" +
+                              param.name + "[i] = filterParam(" +
                               std::to_string(offset) +
-                              " + i];\n    }\n";
+                              " + i);\n    }\n";
                 }
                 offset += param.table ? 1 + param.size : param.size;
             }

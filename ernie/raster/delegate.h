@@ -167,7 +167,16 @@ class RasterDelegate : public RenderDelegate {
     }
 
     void SetViewVar(std::string_view var) override {
-        viewMotion_ = var == render_vars::kMotionVector;
+        viewOptIn_ = {};
+        for (const std::string_view optIn :
+             {render_vars::kMotionVector,
+              render_vars::kDegreeOfLinearPolarization,
+              render_vars::kAngleOfLinearPolarization,
+              render_vars::kLinearStokes}) {
+            if (var == optIn) {
+                viewOptIn_ = optIn;
+            }
+        }
     }
 
     void SetHighlight(std::span<const Path> paths,
@@ -461,9 +470,11 @@ class RasterDelegate : public RenderDelegate {
     /// The AOVs the view's chain writes, in slot order, as of the
     /// last `Update`.
     std::vector<std::string> viewAovs_;
-    // Whether the view holds the opt-in MotionVector, which it
-    // renders only while shown.
-    bool viewMotion_ = false;
+    // The opt-in var the view shows (MotionVector or a polarization
+    // var), which it holds only while shown, or empty; and the one
+    // its targets hold.
+    std::string_view viewOptIn_;
+    std::string_view viewTargetsOptIn_;
     /// Per product (or the settings for the view), its views' camera
     /// poses at its last frame, for motion blur.
     std::map<Path, std::vector<glm::dmat4>> lastPoses_;

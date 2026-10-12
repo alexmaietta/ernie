@@ -24,6 +24,15 @@ static const uint kShowId = 5;         // Integer id as a hashed colour, black f
 static const uint kShowLinearUint = 6; // Integer rgb over range.z.
 static const uint kShowMotion = 8;     // Motion (xy pixels): hue its direction, brightness its
                                        // length, full at 8 pixels.
+static const uint kShowDegree = 9;     // A degree of polarization in [0, 1] as grey.
+static const uint kShowAngle = 10;     // An angle of polarization in [0, pi) as hue.
+static const uint kShowStokes = 11;    // Linear Stokes: hue its angle, brightness its degree.
+
+// A hue for polarization angle `angle`, periodic in pi.
+float3 angleHue(float angle) {
+    let hue = frac(angle / 3.14159265);
+    return saturate(abs(frac(hue + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
+}
 
 // Unknown formats, so one declaration reads vars of any channel count and width.
 [[vk::binding(0, 0)]] [[vk::image_format("unknown")]] Texture2D<float4> floatVar;
@@ -91,6 +100,14 @@ float4 presentFloat(VertexOutput in) : SV_Target {
         let hue = (atan2(-value.y, value.x) / 6.2831853 + 1.0) % 1.0;
         let rgb = saturate(abs(frac(hue + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
         return display(rgb * saturate(length(value.xy) / 8.0));
+    }
+    case kShowDegree:
+        return display(float3(value.x));
+    case kShowAngle:
+        return display(angleHue(value.x));
+    case kShowStokes: {
+        let degree = value.x > 0.0 ? length(value.yz) / value.x : 0.0;
+        return display(angleHue(0.5 * atan2(value.z, value.y)) * saturate(degree));
     }
     default:
         return display(value.rgb);

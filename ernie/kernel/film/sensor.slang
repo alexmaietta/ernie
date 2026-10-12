@@ -15,15 +15,19 @@
 // layer `z` (a group of `bands` layers of the spectral images) with the uniforms of view
 // `firstView + z`.
 //
-// Bindings: 0 the SensorUniforms, shared then per view (`sensorData`); inputs 1 spectral radiance (raster pixels),
-// 2 G-buffer normal, 3 G-buffer ids, 4 depth; outputs 5 SpectralRadiance (sensor pixels, one layer
-// per band), 6 Electrons, 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane,
-// 11 DistanceToCamera, 12 Normal, 13 PrimId, 14 InstanceId, every image one layer per view;
-// 15 the custom filters' parameters; for spatial filters, the images between kernels:
+// Bindings: 0 the SensorUniforms, shared then per view (`sensorData`); inputs 1 spectral radiance
+// (raster pixels), 3 G-buffer ids; outputs 2 DegreeOfLinearPolarization, 4
+// AngleOfLinearPolarization, 5 SpectralRadiance (sensor pixels, one layer per band), 6 Electrons,
+// 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane, 11 DistanceToCamera, 12 Normal,
+// 13 PrimId, 14 InstanceId, 15 LinearStokes, every image one layer per view; for spatial
+// filters, the images between kernels:
 // 16 and 17 the spectrum and the channels (a layer per channel domain per view) a kernel reads,
 // 18 and 19 those it writes for the next; 20 to 27 the AOV slots; 28 and 29 the temporal filters'
 // state from the previous frame and for the next (17 is sampled linearly for pyramids); 30 the
-// MotionVector var; 31 per raster pixel, its motion (xy) and motion blur's coverage (z).
+// MotionVector var; 31 per raster pixel, its motion (xy) and motion blur's coverage (z). The
+// G-buffer normal and depth come from the bindless heap (bindless.slang), and the custom
+// filters' parameters through their address, both in the push constants: devices push at most
+// 32 descriptors.
 //
 // The lens head's projection comes from module `lensProjection`, which the renderer generates for
 // the camera's lens (`SensorPlan::lens`) from lens.slang's projections.
@@ -40,6 +44,7 @@
 
 module sensor;
 
+import bindless;
 import cube_faces;
 import lens;
 import lensProjection;
@@ -155,12 +160,18 @@ public struct SensorConstants {
     // x: the first view's uniforms, y: the AOV slots held (a bit each), z: 1 when the state holds
     // the product's previous frame, w: state slots per view.
     public uint4 view;
-    // A lens of rays (`kLensTable`): x their first float in `filterParams`, y the pixels between
+    // A lens of rays (`kLensTable`): x their first float in `params`, y the pixels between
     // them, z and w their columns and rows.
     public uint4 table;
     // x: the layers from a raster radiance layer to its Stokes Q, and on to U, for a polarizer
     // (0 without them); yzw unused.
     public uint4 stokes;
+    // The custom filters' parameters, packed in chain order (`SensorPlan::params`), then a lens
+    // of rays' table.
+    public float* params;
+    // The G-buffer normal's and depth's slots in the bindless heap's `heapTextureArrays`.
+    public uint normalSlot;
+    public uint depthSlot;
 }
 
 // Binding 0 holds the uniforms every view shares, a SensorUniforms whose per-view fields are
@@ -227,9 +238,9 @@ SensorUniforms viewUniforms(uint view) {
     return cam;
 }
 [[vk::binding(1, 0)]] Texture2DArray<float> rasterRadiance;
-[[vk::binding(2, 0)]] Texture2DArray<float4> gNormal;
+[[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;
 [[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
-[[vk::binding(4, 0)]] Texture2DArray<float> gDepth;
+[[vk::image_format("r32f")]] [[vk::binding(4, 0)]] RWTexture2DArray<float> angleOfPolarization;
 [[vk::image_format("r32f")]] [[vk::binding(5, 0)]] RWTexture2DArray<float> spectralRadiance;
 [[vk::image_format("rgba32f")]] [[vk::binding(6, 0)]] RWTexture2DArray<float4> electrons;
 [[vk::image_format("rgba16ui")]] [[vk::binding(7, 0)]] RWTexture2DArray<uint4> rawDn;
@@ -240,8 +251,20 @@ SensorUniforms viewUniforms(uint view) {
 [[vk::image_format("rgba32f")]] [[vk::binding(12, 0)]] RWTexture2DArray<float4> normalOut;
 [[vk::image_format("r32ui")]] [[vk::binding(13, 0)]] RWTexture2DArray<uint> primId;
 [[vk::image_format("r32ui")]] [[vk::binding(14, 0)]] RWTexture2DArray<uint> instanceId;
-// The custom filters' parameters, packed in chain order (`SensorPlan::params`).
-[[vk::binding(15, 0)]] public StructuredBuffer<float> filterParams;
+[[vk::image_format("rgba32f")]] [[vk::binding(15, 0)]] RWTexture2DArray<float4> linearStokes;
+
+// The G-buffer's normal and depth at texel `texel` of layer `layer`.
+float4 gNormalAt(int2 texel, int layer) {
+    return heapTextureArrays[pass.normalSlot].Load(int4(texel, layer, 0));
+}
+float gDepthAt(int2 texel, int layer) {
+    return heapTextureArrays[pass.depthSlot].Load(int4(texel, layer, 0)).x;
+}
+
+// Custom filters' parameter `i` (`SensorConstants::params`).
+public float filterParam(uint i) {
+    return pass.params[i];
+}
 // Between the kernels a spatial filter splits a chain into: each band at each sensor pixel (a
 // group of `bands` layers per view), and each channel domain's values (`kChannel*` layers per
 // view), as one kernel left them for the spatial filters heading the next.
@@ -291,6 +314,11 @@ public static const uint kHoldsNormal = 1u << 7;
 public static const uint kHoldsPrimId = 1u << 8;
 public static const uint kHoldsInstanceId = 1u << 9;
 public static const uint kHoldsMotionVector = 1u << 10;
+public static const uint kHoldsDegreeOfLinearPolarization = 1u << 11;
+public static const uint kHoldsAngleOfLinearPolarization = 1u << 12;
+public static const uint kHoldsLinearStokes = 1u << 13;
+static const uint kHoldsPolarization =
+    kHoldsDegreeOfLinearPolarization | kHoldsAngleOfLinearPolarization | kHoldsLinearStokes;
 
 // One sensor pixel of one view: where it is, and the view's uniforms.
 public struct PixelContext {
@@ -565,7 +593,7 @@ struct RasterTap {
 }
 
 // A lens of rays' ray at sensor position `pixel` (pixels from the top left corner): the table's
-// rays (`pass.table`, in `filterParams`) interpolated bilinearly, normalised.
+// rays (`pass.table`, in `pass.params`) interpolated bilinearly, normalised.
 float3 tableRayAt(float2 pixel) {
     let columns = pass.table.z;
     let rows = pass.table.w;
@@ -577,7 +605,7 @@ float3 tableRayAt(float2 pixel) {
     [unroll]
     for (uint i = 0; i < 4; ++i) {
         let index = pass.table.x + 3 * ((y0 + i / 2) * columns + x0 + i % 2);
-        corner[i] = float3(filterParams[index], filterParams[index + 1], filterParams[index + 2]);
+        corner[i] = float3(pass.params[index], pass.params[index + 1], pass.params[index + 2]);
     }
     return normalize(lerp(lerp(corner[0], corner[1], t.x), lerp(corner[2], corner[3], t.x), t.y));
 }
@@ -640,7 +668,7 @@ RasterTap retimed(SensorUniforms cam, RasterTap tap, float row) {
         // Background at the far plane, depth 0 in reverse-Z.
         let depth = gIds.Load(int4(texel, tap.layer, 0)).x == kBackground
                         ? 0.0
-                        : gDepth.Load(int4(texel, tap.layer, 0));
+                        : gDepthAt(texel, tap.layer);
         let ndc = float2((float(texel.x) + 0.5) / size.x * 2.0 - 1.0,
                          1.0 - (float(texel.y) + 0.5) / size.y * 2.0);
         let seen = cameraPoint(cam.invViewProj, strip, ndc, depth);
@@ -730,7 +758,7 @@ void distancesOf(SensorUniforms cam, RasterTap tap, int2 nearest, out float imag
     let size = float2(cam.size.xy);
     let ndc = float3((float(nearest.x) + 0.5) / size.x * 2.0 - 1.0,
                      1.0 - (float(nearest.y) + 0.5) / size.y * 2.0,
-                     gDepth.Load(int4(nearest, tap.layer, 0)));
+                     gDepthAt(nearest, tap.layer));
     if (kLensCube) {
         // From the face's own frame, at the camera: along the ray, and along the view's axis
         // (negative behind the image plane, for rays past 90 degrees).
@@ -871,7 +899,7 @@ public struct Lens : ISpatialSource {
             return lens;  // the sky's radiance, at infinity with no prim
         }
         distancesOf(cam, tap, nearest, lens.imagePlane, lens.camera);
-        lens.normal = float4(normalize(gNormal.Load(int4(nearest, layer, 0)).xyz), 0.0);
+        lens.normal = float4(normalize(gNormalAt(nearest, layer).xyz), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;
         return lens;
@@ -1011,6 +1039,39 @@ public struct Lens : ISpatialSource {
                                    ? faceMotionToSensor(cam, float2(id.xy) + 0.5, int(id.z), raster)
                                    : raster * cam.intrinsics.w;
         }
+        if ((holds & kHoldsPolarization) != 0) {
+            writePolarization(pixel, holds);
+        }
+    }
+
+    // Writes the polarization vars of `holds`: the light reaching the pixel before the camera's
+    // polarizer, its linear Stokes summed over the bands, resampled at the reference band's tap
+    // (lateral colour aside), and its degree sqrt(S1^2 + S2^2) / S0 and angle atan2(S2, S1) / 2
+    // from the image's +x towards +y.
+    //
+    // Reference: E. Collett, "Field Guide to Polarization", SPIE FG05, 2005.
+    void writePolarization(PixelContext pixel, uint holds) {
+        var stokes = float3(0.0);
+        let offset = int(pass.stokes.x);
+        if (!dark && offset != 0) {
+            for (uint band = 0; band < pixel.bands(); ++band) {
+                let slice = int(uint(base.z) * pixel.bands() + band);
+                stokes += float3(resampled(slice), resampled(slice + offset),
+                                 resampled(slice + 2 * offset));
+            }
+            stokes *= falloff;
+        }
+        let id = pixel.id;
+        if ((holds & kHoldsDegreeOfLinearPolarization) != 0) {
+            degreeOfPolarization[id] = stokes.x > 0.0 ? saturate(length(stokes.yz) / stokes.x) : 0.0;
+        }
+        if ((holds & kHoldsAngleOfLinearPolarization) != 0) {
+            let angle = 0.5 * atan2(stokes.z, stokes.y);
+            angleOfPolarization[id] = angle < 0.0 ? angle + 3.14159265 : angle;
+        }
+        if ((holds & kHoldsLinearStokes) != 0) {
+            linearStokes[id] = float4(stokes, 0.0);
+        }
     }
 }
 
@@ -1046,7 +1107,7 @@ public void writeState(PixelContext pixel, uint slot, float4 value) {
 // Value `i` of a table parameter (`SensorFilterParam::table`) whose
 // Params field is `start`.
 public float paramTable(float start, uint i) {
-    return filterParams[uint(start) + i];
+    return pass.params[uint(start) + i];
 }
 
 public float curveAt<let N : int>(float values[N], float t) {
@@ -1261,7 +1322,8 @@ public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
 // and resampled through the lens onto LdrColor. Over black they give their colour, already
 // weighted by their opacity; the difference over white gives what of the image below shows
 // through, so LdrColor blends as when they draw onto it directly. A pass of its own, without a
-// sensor plan: bindings 0, 9 and 15 (for a lens of rays) as the sensor kernels', 32 and 33.
+// sensor plan: bindings 0 and 9 as the sensor kernels', 32 and 33, and their constants (a lens
+// of rays reads `params`).
 // With `pass.view.y` 1 it stores the two at 9 instead (colour over black, and what shows through
 // as alpha), for the present pass to blend over another var (`RasterRenderer::Record`).
 [[vk::binding(32, 0)]] Texture2DArray<float4> overlayOverBlack;
@@ -1309,7 +1371,7 @@ void overlayLensMain(uint3 id : SV_DispatchThreadID) {
 // motion.slang to time the texel by. The rows of the sensor pixels whose lens taps read the
 // texel, the least of them, as float bits (which order as uints for non-negative floats);
 // 0xFFFFFFFF where none reads it. A layer per face, the same for every view. Passes of their
-// own, as `overlayLensMain`: bindings 0 and 15 as the sensor kernels', 34.
+// own, as `overlayLensMain`: binding 0 as the sensor kernels', 34.
 [[vk::image_format("r32ui")]] [[vk::binding(34, 0)]] RWTexture2DArray<uint> faceRows;
 
 [shader("compute")]

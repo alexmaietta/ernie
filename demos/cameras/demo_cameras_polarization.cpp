@@ -132,6 +132,11 @@ class PolarizationDemo : public app::Demo {
             .SetSpectralBands(6)
             .SetSensorNoise(false)
             .SetPolarizerType(std::string(tokens::kMosaic))
+            // Sunny 16 opened a stop, as the polarizers pass about
+            // half.
+            .SetExposureFStop(11.0)
+            .SetExposureTime(1.0 / 125.0)
+            .SetExposureIso(125.0)
             .SetClippingRange({0.05, 1e5})
             .SetTransform(LookAtTransform({0.0, 0.0, kHeight},
                                           {0.0, 1.0, kHeight},

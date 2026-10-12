@@ -1092,6 +1092,88 @@ TEST_F(RasterDelegateTest, PolarizersPassPolarizedLightByItsAngle) {
 }
 
 TEST_F(RasterDelegateTest,
+       PolarizationVarsMeasureTheLightBeforeAnyPolarizer) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    Scene scene = LaserScene(20.0, &bandWidth);
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPolarizationDegree(1.0).SetPolarizationAngle(0.0);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(1.0);
+    const auto [row, col] = PixelOf(scene, 0.0f, 0.0f);
+    const float open = Band8(delegate, scene)[row * kVarSize + col];
+    ASSERT_GT(open, 0.0f);
+    std::vector<ernie::Path> vars =
+        scene.Get(ernie::Path("/Render/Product"),
+                  tokens::kOrderedVars, std::vector<ernie::Path>{});
+    for (const std::string_view name :
+         {ernie::render_vars::kDegreeOfLinearPolarization,
+          ernie::render_vars::kAngleOfLinearPolarization,
+          ernie::render_vars::kLinearStokes}) {
+        const ernie::Path var =
+            ernie::Path("/Render/Vars").Child(std::string(name));
+        ernie::RenderVar::Define(scene, var).SetSourceName(name);
+        vars.push_back(var);
+    }
+    scene.Set("/Render/Product", tokens::kOrderedVars, vars);
+    struct Measured {
+        float degree;
+        float angle;
+        glm::vec4 stokes;
+    };
+    const auto measure = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        auto& held = outputs.at("/Render/Product").vars;
+        const auto value = [&](std::string_view name, std::size_t k,
+                               std::size_t channels) {
+            const Tensor tensor = held.at(std::string(name))
+                                      .Map(ernie::MapDevice::Cpu)
+                                      .tensor;
+            return static_cast<const float*>(
+                tensor.Data())[(row * kVarSize + col) * channels + k];
+        };
+        Measured m{};
+        m.degree = value("DegreeOfLinearPolarization", 0, 1);
+        m.angle = value("AngleOfLinearPolarization", 0, 1);
+        for (std::size_t k = 0; k < 4; ++k) {
+            m.stokes[static_cast<int>(k)] =
+                value("LinearStokes", k, 4);
+        }
+        return m;
+    };
+
+    // Along the image's +x: S1 = S0, all of it in band 8.
+    Measured along = measure();
+    EXPECT_NEAR(along.degree, 1.0f, 0.02f);
+    EXPECT_LT(std::min(along.angle, glm::pi<float>() - along.angle),
+              0.02f);
+    EXPECT_NEAR(along.stokes.x, open, 0.01f * open);
+    EXPECT_NEAR(along.stokes.y, open, 0.02f * open);
+    EXPECT_NEAR(along.stokes.z, 0.0f, 0.02f * open);
+
+    // Across it: S1 = -S0, at 90 degrees.
+    laser.SetPolarizationAngle(90.0);
+    Measured across = measure();
+    EXPECT_NEAR(across.degree, 1.0f, 0.02f);
+    EXPECT_NEAR(across.angle, 0.5f * glm::pi<float>(), 0.02f);
+    EXPECT_NEAR(across.stokes.y, -open, 0.02f * open);
+
+    // A polarizer in front changes none of them.
+    ernie::Camera(scene, "/World/Camera")
+        .SetPolarizerType("linear")
+        .SetPolarizerAngle(0.0);
+    Measured filtered = measure();
+    EXPECT_NEAR(filtered.degree, across.degree, 1e-3f);
+    EXPECT_NEAR(filtered.stokes.x, across.stokes.x,
+                1e-3f * across.stokes.x);
+
+    // A floor that scatters it unpolarized.
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(0.0);
+    EXPECT_LT(measure().degree, 0.02f);
+}
+
+TEST_F(RasterDelegateTest,
        SpecularReflectionPolarizesByFresnelsLaws) {
     // FlatScene's floor as black glass (index 1.5), mirroring the sun
     // into the camera in the x-z plane: its light comes off polarized

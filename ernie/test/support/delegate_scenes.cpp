@@ -140,6 +140,13 @@ Scene FlatScene() {
                               {0.0, 1.0, 0.0}));
     std::vector<Path> vars;
     for (const std::string_view name : RenderTargets::VarNames()) {
+        // Not the polarization vars, which make the raster carry
+        // Stokes Q and U and need a camera drawn in one view.
+        if (name == render_vars::kDegreeOfLinearPolarization ||
+            name == render_vars::kAngleOfLinearPolarization ||
+            name == render_vars::kLinearStokes) {
+            continue;
+        }
         const Path var =
             Path("/Render/Vars").Child(std::string(name));
         RenderVar::Define(scene, var).SetSourceName(name);

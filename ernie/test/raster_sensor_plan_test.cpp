@@ -118,7 +118,7 @@ TEST(PlanSensor, CallsCustomFiltersWithTheirStepsInputs) {
     const std::string source = plan.Source();
     EXPECT_NE(source.find("import filter_hotPixels;"),
               std::string::npos);
-    EXPECT_NE(source.find("params2.electrons = filterParams[1];"),
+    EXPECT_NE(source.find("params2.electrons = filterParam(1);"),
               std::string::npos);
     EXPECT_LT(source.find("HotPixels.apply(value, pixel, params2)"),
               source.find("Noise.apply"));

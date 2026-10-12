@@ -192,15 +192,18 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
     };
     for (const std::string& var : vars) {
         const auto [centre, corner] = sample(var);
-        // The cube is no instance (id 0) and stands still (no
-        // motion): black.
-        if (var != "InstanceId" && var != "MotionVector") {
+        // The cube is no instance (id 0), stands still (no motion)
+        // and reflects its light unpolarized: black.
+        if (var != "InstanceId" && var != "MotionVector" &&
+            var != "DegreeOfLinearPolarization" &&
+            var != "LinearStokes") {
             EXPECT_GT(sum(centre), 0) << var << " shows the cube";
         }
-        // Colour shows the clear colour, and sensor vars the
-        // background's noise.
+        // Colour shows the clear colour, sensor vars the
+        // background's noise, and an angle of polarization 0 a hue.
         if (var != "LdrColor" && var != "HdrColor" &&
-            var != "Electrons" && var != "RawDN") {
+            var != "Electrons" && var != "RawDN" &&
+            var != "AngleOfLinearPolarization") {
             EXPECT_EQ(sum(corner), 0)
                 << var << " shows the background black";
         }
