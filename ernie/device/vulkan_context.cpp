@@ -210,8 +210,30 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     const std::vector<VkExtensionProperties> available =
         InstanceExtensions();
     std::vector<const char*> extensions;
+    const auto add = [&extensions](const char* name) {
+        if (std::none_of(extensions.begin(), extensions.end(),
+                         [name](const char* added) {
+                             return std::strcmp(added, name) == 0;
+                         })) {
+            extensions.push_back(name);
+        }
+    };
     for (const std::string& extension : options.instanceExtensions) {
-        extensions.push_back(extension.c_str());
+        add(extension.c_str());
+    }
+    // Every instance enables the loader's surface and debug
+    // extensions it has, so each reload of the shared function table
+    // (`volkLoadInstance` below) keeps the functions other contexts
+    // use: a headless renderer's instance otherwise nulls a window's
+    // vkDestroySurfaceKHR.
+    for (const char* shared :
+         {"VK_KHR_surface", "VK_KHR_wayland_surface",
+          "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
+          "VK_KHR_win32_surface", "VK_EXT_metal_surface",
+          VK_EXT_DEBUG_UTILS_EXTENSION_NAME}) {
+        if (Has(available, shared)) {
+            add(shared);
+        }
     }
     VkInstanceCreateFlags flags = 0;
     if (Has(available,
@@ -226,7 +248,7 @@ VulkanContext::Create(const VulkanContextOptions& options) {
                     Has(available, VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     if (c.validation_) {
         layers.push_back(kValidationLayer);
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
