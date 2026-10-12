@@ -377,7 +377,7 @@ void BeginRendering(VkCommandBuffer commands,
     depth.loadOp = target.loadDepth ? VK_ATTACHMENT_LOAD_OP_LOAD
                                     : VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depth.clearValue.depthStencil = {1.0f, 0};
+    depth.clearValue.depthStencil = {target.clearDepth, 0};
     VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
     info.renderArea = {{0, 0}, target.extent};
     info.layerCount = target.layers;

@@ -192,8 +192,10 @@ struct RenderingTarget {
     std::vector<VkImageView> colors;
     std::vector<VkClearColorValue> clearColors;
     /// Keep the depth attachment's contents instead of clearing it to
-    /// 1.
+    /// `clearDepth`: 1, the far plane, for standard depth; 0 for
+    /// reverse-Z, where depth falls away from the camera.
     bool loadDepth = false;
+    float clearDepth = 1.0f;
     /// Layers rendered at once, by attachments that view as many:
     /// layered rendering, where each primitive picks its layer
     /// (`SV_RenderTargetArrayIndex`).
