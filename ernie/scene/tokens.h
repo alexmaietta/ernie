@@ -1031,6 +1031,10 @@ inline constexpr std::string_view kShaderBias = "inputs:bias";
 /// "sRGB".
 inline constexpr std::string_view kSourceColorSpace =
     "inputs:sourceColorSpace";
+/// "auto" (default: albedo textures over 8192 texels a side), "on" or
+/// "off": whether a UsdUVTexture's texture is virtual.
+inline constexpr std::string_view kVirtualTexture =
+    "ernie:virtualTexture";
 inline constexpr std::string_view kVarname =
     "inputs:varname";  ///< Primvar reader: e.g. "st".
 /// UsdTransform2d: `in` scaled, then rotated (degrees,

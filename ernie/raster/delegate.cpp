@@ -116,7 +116,9 @@ std::string UploadKey(const Scene& scene, MaterialTextureSlot slot,
                std::to_string(reader.bias[c]);
     };
     if (slot == MaterialTextureSlot::Albedo) {
-        key += "|albedo";
+        key +=
+            "|albedo" +
+            std::to_string(static_cast<int>(reader.virtualTexture));
     } else if (slot == MaterialTextureSlot::Normal) {
         key += "|normal";
         for (int c = 0; c < 3; ++c) {
@@ -536,7 +538,9 @@ RenderStats RasterDelegate::Stats() const {
     // Material textures once each, however many materials share them.
     for (const auto& [key, cached] : sharedTextures_) {
         if (const auto texture = cached.lock()) {
-            stats.gpuBytes += texture->image->Bytes();
+            stats.gpuBytes += texture->image != nullptr
+                                  ? texture->image->Bytes()
+                                  : texture->virtualTexture->Bytes();
         }
     }
     for (const auto& [product, frames] : frames_) {

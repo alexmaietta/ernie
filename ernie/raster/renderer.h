@@ -463,7 +463,8 @@ class RasterRenderer {
     /// previous frame must have finished on the device; the frame's
     /// host data then reaches the device with its commands
     /// (`Uploads`), so earlier frames may still be running while it
-    /// is prepared.
+    /// is prepared. Materials' virtual textures serve the tiles the
+    /// slot's last frame asked for (`RasterMaterial::BeginFrame`).
     void BeginFrame(std::uint32_t slot);
 
     /// Host data for the renderer's and the drawables' buffers,
@@ -952,6 +953,7 @@ class RasterRenderer {
         materials_;
     std::uint32_t nextMaterial_ = 1;
     std::uint64_t materialSetVersion_ = 0;
+    std::uint64_t frames_ = 0;         ///< `BeginFrame`s so far.
     glm::dvec3 materialsOrigin_{0.0};  ///< The origin the materials'
                                        ///< uniforms are relative to.
 

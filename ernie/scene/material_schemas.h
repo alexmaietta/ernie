@@ -280,6 +280,13 @@
       (::ernie::AttributeMeta{.label = "Colour space",                                             \
                               .doc = "auto: sRGB for 8-bit images, raw otherwise.",                \
                               .group = "Texture", .options = {"auto", "raw", "sRGB"}}))            \
+    X(std::string, VirtualTexture, ::ernie::tokens::kVirtualTexture, "auto",                       \
+      (::ernie::AttributeMeta{.label = "Virtual",                                                  \
+                              .doc = "Only the tiles in view resident, for textures past device "  \
+                                     "memory or image size (DDS or KTX2 with every mip, devices "  \
+                                     "with sparse residency). auto: albedo textures over 8192 "    \
+                                     "texels a side.",                                             \
+                              .group = "Texture", .options = {"auto", "on", "off"}}))              \
     X(glm::dvec4, Bias, ::ernie::tokens::kShaderBias, glm::dvec4(0.0),                             \
       (::ernie::AttributeMeta{.doc = "Added to the texture's linear values after its scale.",      \
                               .group = "Texture"}))                                                \

@@ -43,6 +43,14 @@ enum class TextureColorSpace {
     Srgb,
 };
 
+/// Whether a texture is virtual, only the tiles in view resident
+/// (`ernie:virtualTexture`).
+enum class TextureVirtual {
+    Auto,  ///< Albedo textures over 8192 texels a side.
+    On,
+    Off,
+};
+
 /// A texture read through mesh texture coordinates: a UsdUVTexture
 /// with the primvar reader and UsdTransform2d feeding it, which is
 /// also glTF's textureInfo with KHR_texture_transform and MaterialX's
@@ -59,6 +67,7 @@ struct TextureReader {
     TextureWrap wrapS = TextureWrap::Repeat;
     TextureWrap wrapT = TextureWrap::Repeat;
     TextureColorSpace colorSpace = TextureColorSpace::Auto;
+    TextureVirtual virtualTexture = TextureVirtual::Auto;
     glm::vec4 scale{1.0f};  ///< Applied to the texture's linear
                             ///< values, then `bias` added.
     glm::vec4 bias{0.0f};

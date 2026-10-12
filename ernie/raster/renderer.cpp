@@ -4392,7 +4392,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         // Earth's mesospheric sodium, for lasers tuned to it.
         shading.atmosphere[1][2] =
             atmosphere_->Params().preset == tokens::kEarth
-                ? static_cast<float>(atmosphere_->Params().sodiumColumn)
+                ? static_cast<float>(
+                      atmosphere_->Params().sodiumColumn)
                 : 0.0f;
         shading.atmosphere[1][3] =
             static_cast<float>(atmosphere_->Params().polarization);
@@ -6247,6 +6248,10 @@ void RasterRenderer::PresentFaceOverlays(
 
 void RasterRenderer::BeginFrame(std::uint32_t slot) {
     uploads_.Begin(slot);
+    ++frames_;
+    for (auto& [id, material] : materials_) {
+        material->BeginFrame(slot, frames_);
+    }
 }
 
 void RasterRenderer::WritePoseCamera(const FrameParams& params,

@@ -6,6 +6,7 @@
 #include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
+#include "ernie/raster/virtual_texture.h"
 #include "ernie/scene/material.h"
 #include "ernie/util/image.h"
 #include "ernie/util/raster_view.h"
@@ -40,7 +41,11 @@ inline constexpr std::size_t kMaterialTextureSlots = 5;
 /// material reading the same source the same way can share
 /// (`RasterDelegate` keeps a cache of them).
 struct MaterialTexture {
+    /// The texture; null when it is virtual.
     std::unique_ptr<GpuImage> image;
+    /// A virtual texture (`TextureReader::virtualTexture`): only the
+    /// tiles in view resident.
+    std::shared_ptr<VirtualTexture> virtualTexture;
     /// For normal maps, how mesh.slang decodes it
     /// (`Surface::textures.y`): 1 n * 127 + 128 with the slope
     /// deviation in alpha (uploaded from an `Image`), 2 n / 2 + 1/2
@@ -72,13 +77,25 @@ UploadMaterialTexture(const VulkanContext& context,
 /// / 2 + 1/2 under the usual scale 2 and bias -1, in three channels
 /// or in two (BC5), the shader rebuilding z; they carry no slope
 /// deviation for roughness, as `MipFilter::NormalSlopes` adds.
+///
+/// Albedo textures become virtual (`VirtualTexture`, keeping
+/// `texture`) when the reader says so, or by default when a side is
+/// over `kVirtualTextureSide` texels, on devices with sparse
+/// residency; they then need every mip.
 /// @throws std::invalid_argument for a texture larger than the device
 /// allows, a block-compressed one without
 /// `VulkanContext::SupportsTextureCompressionBc`, a scale or bias
-/// other than those, or a normal map of one channel.
-std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
-    const VulkanContext& context, MaterialTextureSlot slot,
-    const TextureData& texture, const TextureReader& reader);
+/// other than those, a normal map of one channel, or a virtual
+/// texture without every mip; std::runtime_error for a virtual
+/// texture the device cannot make.
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot, TextureData texture,
+                      const TextureReader& reader);
+
+/// Albedo textures with a side over this many texels are virtual
+/// unless their reader says otherwise.
+inline constexpr std::uint32_t kVirtualTextureSide = 8192;
 
 /// A material's GPU resources: the material uniform, an optional
 /// albedo map and optional tileable detail albedo and normal
@@ -190,6 +207,12 @@ class RasterMaterial {
     /// detail tiling's phase follow, so both stay fixed to the world.
     void SetOrigin(const glm::dvec3& origin);
 
+    /// Begins frame `frame` in frame slot `slot` for its virtual
+    /// textures: serves the tiles their last frame in the slot asked
+    /// for (`VirtualTexture::BeginFrame`) and points the uniform at
+    /// the slot's request flags. Nothing without virtual textures.
+    void BeginFrame(std::uint32_t slot, std::uint64_t frame);
+
     /// The settings of the last `Update`.
     const MaterialSettings& Settings() const {
         return settings_;
@@ -254,6 +277,7 @@ class RasterMaterial {
     glm::dvec4 albedoGrid_{
         0.0};  ///< Origin x, origin y, pixel size, unused.
     glm::dvec3 origin_{0.0};  ///< The frame's origin (`SetOrigin`).
+    std::uint32_t frameSlot_ = 0;  ///< The last `BeginFrame`'s slot.
     glm::uvec2 albedoSize_{1u, 1u};
 };
 

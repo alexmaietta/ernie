@@ -97,6 +97,7 @@ ernie_add_test_suite(
     raster_terrain_drawable_test.cpp
     raster_textures_gpu_test.cpp
     raster_virtual_shadow_gpu_test.cpp
+    raster_virtual_texture_gpu_test.cpp
     raster_volumes_gpu_test.cpp
     raster_zero_copy_gpu_test.cpp
     scene_brdf_vulkan_test.cpp

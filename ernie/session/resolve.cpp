@@ -3069,6 +3069,19 @@ TextureReader TextureReaderOf(const Scene& scene,
                                     " is '" + space +
                                     "', not auto, raw or sRGB");
     }
+    const std::string virtualTexture = shader.GetVirtualTexture();
+    if (virtualTexture == "auto") {
+        reader.virtualTexture = TextureVirtual::Auto;
+    } else if (virtualTexture == "on") {
+        reader.virtualTexture = TextureVirtual::On;
+    } else if (virtualTexture == "off") {
+        reader.virtualTexture = TextureVirtual::Off;
+    } else {
+        throw std::invalid_argument("'" + texture.String() + "' " +
+                                    std::string(kVirtualTexture) +
+                                    " is '" + virtualTexture +
+                                    "', not auto, on or off");
+    }
     // UsdUVTexture's 4-vector scale, undeclared as it shares its name
     // with UsdTransform2d's.
     reader.scale = Vec4Of(scene, texture, kShaderScale, reader.scale);

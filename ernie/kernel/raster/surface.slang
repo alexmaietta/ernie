@@ -51,8 +51,15 @@ public struct Surface {
     public float4 emission;
     // Slots in the bindless heap (`surfaceSlot`): 0 the albedo map, 1 the detail albedo and 2
     // the detail normal textures (`heapTextures`), 3 the detail sampler (`heapSamplers`); 4 to 8
-    // the mesh textures' images and 9 to 13 their samplers, by `MaterialTextureSlot`.
+    // the mesh textures' images and 9 to 13 their samplers, by `MaterialTextureSlot`; 14 a virtual
+    // albedo texture's min-LOD map.
     public uint4 heap[4];
+    // A virtual albedo texture (`VirtualTexture`, `virtualTexture`): its first tail mip, mips (0
+    // for none), width and height; texels across and down a tile; this frame slot's request
+    // flags, one per tile of each mip above the tail.
+    public uint4 virtualAlbedo;
+    public uint2 virtualTile;
+    public uint* virtualRequests;
 }
 
 [[vk::binding(5, 0)]] public ConstantBuffer<Surface> surface;
@@ -77,10 +84,51 @@ SamplerState detailSampler() {
     return heapSamplers[surfaceSlot(3)];
 }
 
+// Tiles across and down mip `mip` of a virtual texture `size` texels across and down.
+uint2 virtualTiles(uint2 size, uint mip) {
+    let tile = surface.virtualTile;
+    return (max(size >> mip, uint2(1)) + tile - 1) / tile;
+}
+
+// The virtual albedo texture at `uv`: marks the tile its footprint's mip wants in the request
+// flags (`VirtualTexture::BeginFrame` loads it, with its coarser tiles, for later frames), then
+// samples no finer than the min-LOD map says is resident around it, so filtering spans tiles in
+// hardware and never reads an unbound one.
+float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv) {
+    let tail = surface.virtualAlbedo.x;
+    let size = surface.virtualAlbedo.zw;
+    let wrapped = uv - floor(uv);
+    let lod = texture.CalculateLevelOfDetailUnclamped(filter, uv);
+    let mip = uint(clamp(floor(lod), 0.0, 31.0));
+    if (mip < tail) {
+        uint first = 0;
+        for (uint m = 0; m < mip; ++m) {
+            let tiles = virtualTiles(size, m);
+            first += tiles.x * tiles.y;
+        }
+        let tiles = virtualTiles(size, mip);
+        let tile = min(uint2(wrapped * float2(max(size >> mip, uint2(1)))) / surface.virtualTile,
+                       tiles - 1);
+        let flag = surface.virtualRequests + first + tile.y * tiles.x + tile.x;
+        if (*flag == 0) {
+            *flag = 1;
+        }
+    }
+    let tiles0 = virtualTiles(size, 0);
+    let tile0 = min(uint2(wrapped * float2(size)) / surface.virtualTile, tiles0 - 1);
+    let minLod = heapTextures[surfaceSlot(14)].Load(int3(int2(tile0), 0)).r;
+    return texture.Sample(filter, uv, int2(0, 0), minLod);
+}
+
 // Mesh texture `slot` (0 albedo, 1 normal, 2 roughness, 3 metallic, 4 opacity) at `uv`, with its
 // own sampler; in fragment shaders.
 public float4 materialTexture(uint slot, float2 uv) {
-    return heapTextures[surfaceSlot(4 + slot)].Sample(heapSamplers[surfaceSlot(9 + slot)], uv);
+    let texture = heapTextures[surfaceSlot(4 + slot)];
+    let filter = heapSamplers[surfaceSlot(9 + slot)];
+    if (slot == 0 && surface.virtualAlbedo.y > 0) {
+        return virtualTexture(texture, filter, uv);
+    }
+    return texture.Sample(filter, uv);
 }
 
 // Luminance albedo at a world position, which scales the material's reflectance spectrum

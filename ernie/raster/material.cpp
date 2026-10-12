@@ -48,8 +48,14 @@ struct SurfaceUniforms {
     /// normal textures, the detail sampler; the mesh textures'
     /// images, then their samplers, by `MaterialTextureSlot`.
     std::uint32_t heap[16];
+    /// A virtual albedo texture (`VirtualTexture`): its first tail
+    /// mip, mips (0 for none), width and height; texels across and
+    /// down a tile; the address of its frame slot's request flags.
+    std::uint32_t virtualAlbedo[4];
+    std::uint32_t virtualTile[2];
+    std::uint64_t virtualRequests;
 };
-static_assert(sizeof(SurfaceUniforms) == 528,
+static_assert(sizeof(SurfaceUniforms) == 560,
               "SurfaceUniforms must match Surface in surface.slang");
 
 /// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate
@@ -234,13 +240,13 @@ std::unique_ptr<GpuImage> UploadMips(const VulkanContext& context,
     return texture;
 }
 
-/// The first layer's mips of a stored texture, in its format or that
-/// format's sRGB or plain variant per `reader`, viewed through
-/// `components`.
-std::unique_ptr<GpuImage>
-UploadStored(const VulkanContext& context, const TextureData& texture,
-             const TextureReader& reader,
-             VkComponentMapping components) {
+/// A stored texture's format as the device holds it: its own, or its
+/// sRGB or plain variant per `reader`.
+/// @throws std::invalid_argument for BC blocks the device cannot
+/// sample.
+VkFormat StoredFormat(const VulkanContext& context,
+                      const TextureData& texture,
+                      const TextureReader& reader) {
     TextureFormat format = texture.format;
     if (reader.colorSpace != TextureColorSpace::Auto) {
         format = WithSrgb(format, reader.colorSpace ==
@@ -251,18 +257,26 @@ UploadStored(const VulkanContext& context, const TextureData& texture,
         throw std::invalid_argument(
             "The device cannot sample BC-compressed textures");
     }
+    return VkFormatOf(format);
+}
+
+/// The first layer's mips of a stored texture, in its format or that
+/// format's sRGB or plain variant per `reader`, viewed through
+/// `components`.
+std::unique_ptr<GpuImage>
+UploadStored(const VulkanContext& context, const TextureData& texture,
+             const TextureReader& reader,
+             VkComponentMapping components) {
+    const VkFormat format = StoredFormat(context, texture, reader);
     const std::uint32_t maxSize =
         context.Limits().maxImageDimension2D;
     if (texture.width > maxSize || texture.height > maxSize) {
         throw std::invalid_argument(
             "Texture exceeds the device's maximum texture size");
     }
-    ImageDesc desc{texture.width,
-                   texture.height,
-                   1,
-                   texture.mips,
-                   VkFormatOf(format),
-                   VK_IMAGE_USAGE_SAMPLED_BIT};
+    ImageDesc desc{
+        texture.width, texture.height, 1,
+        texture.mips,  format,         VK_IMAGE_USAGE_SAMPLED_BIT};
     desc.components = components;
     auto image = std::make_unique<GpuImage>(context, desc);
     std::vector<std::span<const std::byte>> mips;
@@ -339,9 +353,10 @@ UploadMaterialTexture(const VulkanContext& context,
     return texture;
 }
 
-std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
-    const VulkanContext& context, MaterialTextureSlot slot,
-    const TextureData& stored, const TextureReader& reader) {
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot, TextureData stored,
+                      const TextureReader& reader) {
     auto texture = std::make_shared<MaterialTexture>();
     const std::uint32_t channels = InfoOf(stored.format).channels;
     if (slot == MaterialTextureSlot::Albedo) {
@@ -354,8 +369,23 @@ std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
                           channels == 2 ? VK_COMPONENT_SWIZZLE_G
                                         : VK_COMPONENT_SWIZZLE_ONE};
         }
-        texture->image =
-            UploadStored(context, stored, reader, components);
+        const bool large = std::max(stored.width, stored.height) >
+                           kVirtualTextureSide;
+        if (reader.virtualTexture == TextureVirtual::On ||
+            (reader.virtualTexture == TextureVirtual::Auto && large &&
+             context.SupportsSparseResidency())) {
+            const VkFormat format =
+                StoredFormat(context, stored, reader);
+            texture->virtualTexture =
+                std::make_shared<VirtualTexture>(
+                    context,
+                    std::make_shared<const TextureData>(
+                        std::move(stored)),
+                    format, components);
+        } else {
+            texture->image =
+                UploadStored(context, stored, reader, components);
+        }
     } else if (slot == MaterialTextureSlot::Normal) {
         if (channels < 2) {
             throw std::invalid_argument(
@@ -688,7 +718,37 @@ void RasterMaterial::WriteUniform() {
                                      : fallbacks_[slot].get());
         u.heap[9 + slot] = sampler(samplers_[slot].get());
     }
+    // A virtual albedo texture: its sparse image, min-LOD map (slot
+    // 14) and this frame slot's request flags.
+    const MaterialTexture* albedoTexture = textures_[0].get();
+    if (albedoTexture != nullptr && albedoTexture->virtualTexture) {
+        const VirtualTexture& texture =
+            *albedoTexture->virtualTexture;
+        const SparseImage& sparse = texture.Image();
+        heapSlots_.push_back(heap.AddImage(
+            BindlessHeap::Kind::Texture2D, sparse.View()));
+        u.heap[4] = heapSlots_.back().Index();
+        u.heap[14] = image(&texture.MinLodMap());
+        u.virtualAlbedo[0] = sparse.TailMip();
+        u.virtualAlbedo[1] = sparse.Desc().mips;
+        u.virtualAlbedo[2] = sparse.Desc().width;
+        u.virtualAlbedo[3] = sparse.Desc().height;
+        u.virtualTile[0] = sparse.TileTexels().width;
+        u.virtualTile[1] = sparse.TileTexels().height;
+        u.virtualRequests = texture.RequestAddress(frameSlot_);
+    }
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
+}
+
+void RasterMaterial::BeginFrame(std::uint32_t slot,
+                                std::uint64_t frame) {
+    const MaterialTexture* albedoTexture = textures_[0].get();
+    if (albedoTexture == nullptr || !albedoTexture->virtualTexture) {
+        return;
+    }
+    albedoTexture->virtualTexture->BeginFrame(slot, frame);
+    frameSlot_ = slot;
+    WriteUniform();
 }
 
 std::uint64_t RasterMaterial::GpuBytes() const {

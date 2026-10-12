@@ -125,19 +125,21 @@ float GreenAt(const Scene& scene, const Tensor& hdr, float x,
     return hdr.As<float>()[4 * (row * kSize + col) + 1];
 }
 
-/// A DDS file of `width` x `height` with one mip: `fourCc`'s blocks,
-/// or with no FourCC 32-bit RGBA texels, then `payload`; written to
-/// the test's temporary directory as `name`.
+/// A DDS file of `width` x `height` with `mips` mips: `fourCc`'s
+/// blocks, or with no FourCC 32-bit RGBA texels, then `payload` (the
+/// mips one after another); written to the test's temporary directory
+/// as `name`.
 std::string WriteDds(const std::string& name, std::uint32_t width,
                      std::uint32_t height, std::string_view fourCc,
-                     std::span<const std::uint8_t> payload) {
+                     std::span<const std::uint8_t> payload,
+                     std::uint32_t mips = 1) {
     std::array<std::uint32_t, 32> header{};
     std::memcpy(&header[0], "DDS ", 4);
     header[1] = 124;
-    header[2] = 0x1007;
+    header[2] = 0x1007 | (mips > 1 ? 0x20000u : 0u);
     header[3] = height;
     header[4] = width;
-    header[7] = 1;
+    header[7] = mips;
     header[19] = 32;
     if (!fourCc.empty()) {
         header[20] = 0x4;
@@ -640,4 +642,85 @@ TEST_F(RasterDelegateTest,
                     0.03f)
             << name;
     }
+}
+
+TEST_F(RasterDelegateTest, VirtualAlbedoTexturesLoadTheTilesInView) {
+    // A 1024 x 1024 quadrant texture with every mip, forced virtual:
+    // the first frames sample the mip tail, the tiles the view asks
+    // for load over the next ones (GPU memory grows), and the picture
+    // ends as the texture uploaded whole draws it.
+    if (!context_->SupportsSparseResidency()) {
+        GTEST_SKIP() << "no sparse image residency";
+    }
+    constexpr std::uint32_t kSide = 1024;
+    std::vector<std::uint8_t> texels;
+    std::uint32_t mips = 0;
+    for (std::uint32_t side = kSide; side >= 1; side /= 2, ++mips) {
+        for (std::uint32_t y = 0; y < side; ++y) {
+            for (std::uint32_t x = 0; x < side; ++x) {
+                const bool right = side > 1 && x >= side / 2;
+                const bool bottom = side > 1 && y >= side / 2;
+                const std::array<std::uint8_t, 4> colour =
+                    side == 1 ? std::array<std::uint8_t, 4>{128, 128,
+                                                            128, 255}
+                    : !bottom
+                        ? (right
+                               ? std::array<std::uint8_t, 4>{0, 255,
+                                                             0, 255}
+                               : std::array<std::uint8_t, 4>{255, 0,
+                                                             0, 255})
+                        : (right
+                               ? std::array<std::uint8_t, 4>{255, 255,
+                                                             255, 255}
+                               : std::array<std::uint8_t, 4>{
+                                     0, 0, 255, 255});
+                texels.insert(texels.end(), colour.begin(),
+                              colour.end());
+            }
+        }
+    }
+    const std::string file = WriteDds("virtual_quadrants.dds", kSide,
+                                      kSide, "", texels, mips);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp")
+        .SetFile(file);
+    RasterDelegate whole(*context_);
+    scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
+              std::string("off"));
+    const std::vector<float> reference = Quadrants(whole, scene);
+
+    scene.Set("/Looks/M/Tex", tokens::kVirtualTexture,
+              std::string("on"));
+    RasterDelegate delegate(*context_);
+    std::vector<float> last;
+    for (int frame = 0; frame < 3; ++frame) {
+        last = Quadrants(delegate, scene);
+    }
+    for (std::size_t i = 0; i < last.size(); ++i) {
+        EXPECT_NEAR(last[i], reference[i],
+                    0.01f * reference[i] + 1e-4f)
+            << "value " << i;
+    }
+    // At 48 pixels the quad asks for no finer mip than the tail's.
+    // Closer and at 256 pixels it asks for finer ones, whose tiles
+    // load over the next frames.
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetResolution(glm::dvec2(256.0));
+    ernie::RenderProduct(scene, "/Render/Out")
+        .SetResolution(glm::dvec2(256.0));
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 20.0},
+                                     {0.0, 0.0, 0.0},
+                                     {0.0, 1.0, 0.0}));
+    Render(delegate, scene, "HdrColor");
+    const std::uint64_t before = delegate.Stats().gpuBytes;
+    for (int frame = 0; frame < 4; ++frame) {
+        Render(delegate, scene, "HdrColor");
+    }
+    EXPECT_GT(delegate.Stats().gpuBytes, before)
+        << "tiles were loaded";
 }
