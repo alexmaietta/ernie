@@ -494,6 +494,11 @@ struct VolumeMaterialParams {
     double density = 1.0;
     glm::dvec3 albedo{0.0};
     double anisotropy = 0.0;
+    /// `inputs:phaseFunction`, and the double Henyey-Greenstein lobe
+    /// width and backscatter weight (Hapke's `inputs:b`, `inputs:c`).
+    std::string phase = "henyeyGreenstein";
+    double b = 0.25;
+    double c = 0.5;
     glm::dvec3 emission{0.0};  ///< cd/m^2 per world unit for white.
     double blackbody = 1.0;
     double temperature = 0.0;  ///< Kelvin, without a field.

@@ -4,6 +4,7 @@
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/prim_type.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/session/resolve.h"
@@ -56,6 +57,10 @@ VolumeMaterialParams MaterialOf(const Scene& scene,
     params.density = material.GetDensity();
     params.albedo = material.GetVolumeAlbedo();
     params.anisotropy = material.GetAnisotropy();
+    params.phase = material.GetPhaseFunction();
+    // Hapke's b and c, as its BRDF reads them (with its defaults).
+    params.b = GetNumber(scene, bound, tokens::kPhaseB, params.b);
+    params.c = GetNumber(scene, bound, tokens::kPhaseC, params.c);
     params.emission =
         material.GetEmissionColor() * material.GetEmissionStrength();
     params.blackbody = material.GetBlackbody();

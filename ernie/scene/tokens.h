@@ -109,6 +109,22 @@ inline constexpr std::string_view kVolumeTemperatureField =
     "inputs:temperatureField";
 inline constexpr std::string_view kVolumeTemperatureScale =
     "inputs:temperatureScale";
+/// token: how what scatters spreads its light: henyeyGreenstein (by
+/// `inputs:anisotropy`), doubleHenyeyGreenstein (Hapke's, by the
+/// `inputs:b` and `inputs:c` a Hapke surface reads), rayleigh or
+/// isotropic.
+inline constexpr std::string_view kVolumePhaseFunction =
+    "inputs:phaseFunction";
+inline constexpr std::string_view kHenyeyGreenstein =
+    "henyeyGreenstein";
+inline constexpr std::string_view kDoubleHenyeyGreenstein =
+    "doubleHenyeyGreenstein";
+inline constexpr std::string_view kRayleigh = "rayleigh";
+inline constexpr std::string_view kIsotropic = "isotropic";
+/// Hapke's double Henyey-Greenstein lobe width b and backscatter
+/// weight c (`brdf.cpp`'s hapke model's parameters).
+inline constexpr std::string_view kPhaseB = "inputs:b";
+inline constexpr std::string_view kPhaseC = "inputs:c";
 inline constexpr std::string_view kCamera = "Camera";
 inline constexpr std::string_view kDistantLight = "DistantLight";
 inline constexpr std::string_view kSphereLight = "SphereLight";

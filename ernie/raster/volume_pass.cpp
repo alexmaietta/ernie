@@ -4,6 +4,7 @@
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/render_targets.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -30,6 +31,7 @@ constexpr DescriptorBinding kBindings[] = {
     {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -59,15 +61,31 @@ struct VolumeMaterialGpu {
     float albedo[SpectralBands::kMaxBands];
     float emission[SpectralBands::kMaxBands];
     float params[4];
+    float phase[4];
 };
-static_assert(sizeof(VolumeMaterialGpu) == 528,
+static_assert(sizeof(VolumeMaterialGpu) == 544,
               "VolumeMaterialGpu must match volume.slang");
 
 struct VolumeConstants {
     std::uint32_t layout[4];
     std::uint32_t offsets[4];
     std::uint32_t flags[4];
+    std::uint32_t lights[4];
 };
+
+// volume.slang's phase functions.
+float PhaseOf(const std::string& phase) {
+    if (phase == tokens::kDoubleHenyeyGreenstein) {
+        return 1.0f;
+    }
+    if (phase == tokens::kRayleigh) {
+        return 2.0f;
+    }
+    if (phase == tokens::kIsotropic) {
+        return 3.0f;
+    }
+    return 0.0f;
+}
 
 std::uint32_t Groups(std::uint32_t size) {
     return (size + 7) / 8;
@@ -160,6 +178,15 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
     material.params[1] =
         static_cast<float>(std::max(params.blackbody, 0.0));
     material.params[2] = peak > 0.0 ? 1.0f : 0.0f;
+    material.params[3] = std::any_of(albedo.begin(), albedo.end(),
+                                     [](float a) { return a > 0.0f; })
+                             ? 1.0f
+                             : 0.0f;
+    material.phase[0] = PhaseOf(params.phase);
+    material.phase[1] =
+        static_cast<float>(std::clamp(params.b, 0.0, 0.99));
+    material.phase[2] =
+        static_cast<float>(std::clamp(params.c, -1.0, 1.0));
     return material;
 }
 
@@ -452,6 +479,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
 void VolumePass::Record(VkCommandBuffer commands,
                         RenderTargets& targets,
                         const GpuBuffer& shadingUniforms,
+                        const GpuBuffer& lights,
                         const ViewLayout& layout,
                         std::uint32_t firstView, std::uint32_t width,
                         std::uint32_t height, bool pushbroom,
@@ -467,6 +495,7 @@ void VolumePass::Record(VkCommandBuffer commands,
             {"projection", pushbroom
                                ? shaders::kProjectionPushbroomSlang
                                : shaders::kProjectionPinholeSlang},
+            {"brdf", shaders::kBrdfSlang},
             {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
                            shaders::kPNanoVdbHeader + "\n" +
                            shaders::kVolumeSlang}};
@@ -488,7 +517,8 @@ void VolumePass::Record(VkCommandBuffer commands,
         DescriptorResource::Of(*volumes_),
         DescriptorResource::Of(*materials_),
         DescriptorResource::Of(*runs_),
-        DescriptorResource::Of(*lists_)};
+        DescriptorResource::Of(*lists_),
+        DescriptorResource::Of(lights)};
     VolumeConstants constants{};
     constants.layout[0] = firstView;
     constants.layout[1] = layout.stride;
@@ -499,6 +529,10 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.offsets[2] = layout.range;
     constants.offsets[3] = layout.size;
     constants.flags[0] = sky ? 1u : 0u;
+    constants.lights[0] = layout.lightStride;
+    constants.lights[1] = layout.lightSpectrum;
+    constants.lights[2] = layout.lightTinted;
+    constants.lights[3] = layout.view;
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       pipeline->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);

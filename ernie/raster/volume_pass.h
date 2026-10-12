@@ -37,13 +37,20 @@ class RenderTargets;
 class VolumePass {
   public:
     /// Where the views' blocks of the shading uniforms hold what the
-    /// pass reads, in bytes.
+    /// pass reads, and the lights' table theirs, in bytes. A light
+    /// holds its position, axis, cone and shadow (focus in z) as its
+    /// first four float4s.
     struct ViewLayout {
         std::uint32_t stride = 0;
         std::uint32_t invViewProj = 0;
         std::uint32_t strip = 0;
         std::uint32_t range = 0;
-        std::uint32_t size = 0;
+        std::uint32_t size = 0;  ///< Its w the light count.
+        std::uint32_t view =
+            0;  ///< Light mask in x, first light in z.
+        std::uint32_t lightStride = 0;
+        std::uint32_t lightSpectrum = 0;
+        std::uint32_t lightTinted = 0;
     };
 
     /// The most steps a ray takes through one volume.
@@ -79,9 +86,9 @@ class VolumePass {
     /// The caller adds the barrier after it.
     void Record(VkCommandBuffer commands, RenderTargets& targets,
                 const GpuBuffer& shadingUniforms,
-                const ViewLayout& layout, std::uint32_t firstView,
-                std::uint32_t width, std::uint32_t height,
-                bool pushbroom, bool sky) const;
+                const GpuBuffer& lights, const ViewLayout& layout,
+                std::uint32_t firstView, std::uint32_t width,
+                std::uint32_t height, bool pushbroom, bool sky) const;
 
     /// The grids held, for tests: their count and bytes.
     std::size_t GridCount() const {

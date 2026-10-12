@@ -3,9 +3,16 @@
 // surface behind it or on to infinity, after shading. The radiance behind is dimmed by the
 // volumes' transmittance and what they emit is added: L = L_behind T + sum of T(t) j(t) dt, with
 // grey extinction (sigma_t, from the density field) and per-band emission j: the material's
-// emission times its field, and what absorbs glowing at its temperature, sigma_a B_lambda(T)
-// (Kirchhoff's law). Each step integrates its emission exactly for constant coefficients,
-// (1 - exp(-sigma_t dt)) / sigma_t.
+// emission times its field, what absorbs glowing at its temperature, sigma_a B_lambda(T)
+// (Kirchhoff's law), and the light of the view's distant and sphere lights scattered once towards
+// the eye, sigma_s p(g) E, each dimmed by the volume between it and the light (a short march
+// towards it; other volumes and geometry cast no shadow in it yet). Each step integrates its
+// emission exactly for constant coefficients, (1 - exp(-sigma_t dt)) / sigma_t.
+//
+// The phase functions take the phase angle g, between the directions to the light and to the eye,
+// as the BRDFs' do (brdf.slang): Henyey-Greenstein, Hapke's double Henyey-Greenstein (the same b
+// and c a Hapke surface reads, so lofted dust and the regolith it rose from scatter alike),
+// Rayleigh or isotropic, each over 4 pi steradians.
 //
 // The fields are NanoVDB grids in one buffer, which PNanoVDB walks in place; this module is
 // compiled after pnanovdb_prelude.slang and PNanoVDB.h. A volume's fields each map its local
@@ -15,7 +22,8 @@
 // Bindings: 0 the shading uniforms (read at the byte offsets in `constants`, a block per view), 1
 // depth and 2 ids of the G-buffer, 3 the spectral radiance (a layer per view and band), 4 the
 // grids, 5 the volumes, 6 their materials, 7 each view's run of `viewVolumes` (offset, count), 8
-// the volumes each view sees.
+// the volumes each view sees, 9 the lights (the shading pass's table, read at the offsets in
+// `constants`).
 //
 // References:
 // - K. Museth, "NanoVDB: A GPU-Friendly and Portable VDB Data Structure For Real-Time Rendering
@@ -27,14 +35,30 @@
 //   Advances in Real-Time Rendering, 2015 (the energy-conserving step integration).
 // - M. Planck, "Ueber das Gesetz der Energieverteilung im Normalspectrum", Annalen der Physik
 //   309(3), 553-563, 1901; radiation constants from CODATA 2018.
+// - L. G. Henyey and J. L. Greenstein, "Diffuse radiation in the Galaxy", Astrophysical Journal
+//   93, 70-83, 1941.
+// - B. Hapke, "Theory of Reflectance and Emittance Spectroscopy", 2nd ed., Cambridge University
+//   Press 2012, section 6.4.2 (the double Henyey-Greenstein function).
 
 import projection;
+import brdf;
 
 static const uint kNoGrid = 0xFFFFFFFFu;
 static const uint kMaxIntervals = 8;
 static const uint kMaxGroups = 16;
 // The transmittance below which a ray is opaque.
 static const float kOpaque = 1e-3;
+// Steps of the march towards a light through the volume.
+static const uint kShadowSteps = 12;
+static const uint kMaxLights = 16;
+// Light types (`LightGpu::position.w`) the volumes take: distant and sphere lights.
+static const float kDistantLight = 0.0;
+static const float kSphereLight = 1.0;
+// Phase functions (`VolumeMaterialGpu::phase.x`).
+static const uint kHenyeyGreenstein = 0;
+static const uint kDoubleHenyeyGreenstein = 1;
+static const uint kRayleigh = 2;
+static const uint kIsotropic = 3;
 
 // One field of a volume: rows of the affine map from the volume's local frame to the grid's index
 // space, and the grid: its byte offset in `grids` (kNoGrid for none) and PNANOVDB_GRID_TYPE_*.
@@ -65,8 +89,10 @@ struct VolumeMaterialGpu {
     float4 albedo[16];
     // Emitted spectral radiance per world unit per unit field (W m^-2 sr^-1 nm^-1 per unit).
     float4 emission[16];
-    // x: Henyey-Greenstein g; y: black-body scale; z: 1 when it emits; w unused.
+    // x: Henyey-Greenstein g; y: black-body scale; z: 1 when it emits; w: 1 when it scatters.
     float4 params;
+    // x: its phase function (k*), y: double Henyey-Greenstein b, z: its c; w unused.
+    float4 phase;
 }
 
 struct VolumeConstants {
@@ -79,6 +105,10 @@ struct VolumeConstants {
     // x: 1 when the background holds radiance (a sky); without one, this pass writes the
     // background's, no radiance but what volumes emit, and the sensor reads it as held. yzw unused.
     uint4 flags;
+    // The lights: x the stride of `lights` in bytes, y and z where a light holds its spectrum and
+    // its tinted part (LightGpu), w where a view's block holds `view` (its light mask and first
+    // light); its `size.w` is the light count.
+    uint4 lights;
 }
 
 [[vk::binding(0, 0)]] ByteAddressBuffer shadingBlocks;
@@ -90,6 +120,7 @@ struct VolumeConstants {
 [[vk::binding(6, 0)]] StructuredBuffer<VolumeMaterialGpu> volumeMaterials;
 [[vk::binding(7, 0)]] StructuredBuffer<uint2> viewRuns;
 [[vk::binding(8, 0)]] StructuredBuffer<uint> viewVolumes;
+[[vk::binding(9, 0)]] ByteAddressBuffer lightTable;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 static const uint kBackground = 0xFFFFFFFF;
@@ -186,6 +217,47 @@ float hash(uint3 p) {
     return float(v.x >> 8) / 16777216.0;
 }
 
+// The material's phase function at phase angle cosine `cosG` (towards the light and towards the
+// eye), per steradian.
+float phaseOf(VolumeMaterialGpu material, float cosG) {
+    switch (uint(material.phase.x)) {
+    case kDoubleHenyeyGreenstein:
+        return doubleHenyeyGreenstein(material.phase.y, material.phase.z, cosG) / (4.0 * PI);
+    case kRayleigh:
+        return 3.0 / (16.0 * PI) * (1.0 + cosG * cosG);
+    case kIsotropic:
+        return 1.0 / (4.0 * PI);
+    default:
+        // Forward scattering (g > 0) is towards the light's far side: phase angle near pi.
+        return henyeyGreenstein(material.params.x, cosG) / (4.0 * PI);
+    }
+}
+
+// The transmittance of `volume` from local point `local` towards the light along local direction
+// `towards` (a world unit vector mapped to the volume's frame), up to world distance `far`.
+float shadowOf(VolumeGpu volume, float3 local, float3 towards, float far,
+               inout pnanovdb_readaccessor_t accessor) {
+    let inverse = 1.0 / towards;
+    let t0 = (volume.boundsMin.xyz - local) * inverse;
+    let t1 = (volume.boundsMax.xyz - local) * inverse;
+    let exit = min(min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z)), far);
+    if (exit <= 0.0) {
+        return 1.0;
+    }
+    let dt = exit / float(kShadowSteps);
+    float depth = 0.0;
+    for (uint i = 0; i < kShadowSteps; ++i) {
+        depth += max(sampleField(volume.density, local + towards * ((float(i) + 0.5) * dt),
+                                 accessor),
+                     0.0);
+    }
+    return exp(-depth * volume.params.x * dt);
+}
+
+float4 lightFloat4(uint light, uint offset) {
+    return asfloat(lightTable.Load4(light * constants.lights.x + offset));
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void volumeMain(uint3 id : SV_DispatchThreadID) {
@@ -269,9 +341,12 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         return;
     }
 
-    // Per band: the emission field's and the black-body glow's, each integrated with the
-    // transmittance up to it, the albedo applied at the end (both constant per volume, so per
-    // run of samples).
+    // The view's lights: those of its world (a bit each) from its first.
+    let viewLights = shadingBlocks.Load4(block + constants.lights.w);
+    let lightCount = min(size.w, kMaxLights);
+
+    // Per band, what the volumes add towards the eye, each step's integrated with the
+    // transmittance up to it.
     float4 emitted[kMaxGroups];
     for (uint g = 0; g < groups; ++g) {
         emitted[g] = float4(0.0);
@@ -280,7 +355,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     let jitter = hash(uint3(id.xy, constants.layout.w ^ (id.z * 7919u)));
     for (uint s = 0; s < count && transmittance > kOpaque; ++s) {
         let volume = volumes[which[s]];
-        let material = volumeMaterials[volume.info.x];
+        let materialIndex = volume.info.x;
+        let material = volumeMaterials[materialIndex];
         let o = float3(dot(volume.toLocal[0], float4(origin, 1.0)),
                        dot(volume.toLocal[1], float4(origin, 1.0)),
                        dot(volume.toLocal[2], float4(origin, 1.0)));
@@ -293,20 +369,16 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         let hasTemperature = volume.temperature.grid.x != kNoGrid;
         let hasEmission = volume.emission.grid.x != kNoGrid;
         let emits = material.params.z != 0.0;
+        let scatters = material.params.w != 0.0 && hasDensity;
         let kelvinBase = volume.params.y;
         let glows = material.params.y > 0.0 && (hasTemperature || kelvinBase > 0.0);
         var densityAccessor = accessorOf(volume.density);
+        var shadowAccessor = accessorOf(volume.density);
         var temperatureAccessor = accessorOf(volume.temperature);
         var emissionAccessor = accessorOf(volume.emission);
-        // Integrated with the transmittance: the emission field, and per band sigma_t B(T).
-        float emissionSum = 0.0;
-        float4 glow[kMaxGroups];
-        for (uint g = 0; g < groups; ++g) {
-            glow[g] = float4(0.0);
-        }
-        let start = transmittance;
         for (uint i = 0; i < steps && transmittance > kOpaque; ++i) {
-            let local = o + d * (span.x + (float(i) + jitter) * dt);
+            let t = span.x + (float(i) + jitter) * dt;
+            let local = o + d * t;
             let rho = hasDensity ? max(sampleField(volume.density, local, densityAccessor), 0.0)
                                  : 0.0;
             let sigma = rho * volume.params.x;
@@ -317,7 +389,9 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                 let field = hasEmission
                                 ? max(sampleField(volume.emission, local, emissionAccessor), 0.0)
                                 : rho;
-                emissionSum += weight * field;
+                for (uint g = 0; g < groups; ++g) {
+                    emitted[g] += volumeMaterials[materialIndex].emission[g] * (weight * field);
+                }
             }
             if (glows && sigma > 0.0) {
                 let kelvin =
@@ -326,19 +400,72 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                               volume.params.z
                         : kelvinBase;
                 if (kelvin > 0.0) {
+                    let scale = weight * sigma * material.params.y;
                     for (uint g = 0; g < groups; ++g) {
-                        let lambda = range.x + (float4(g * 4) + float4(0.5, 1.5, 2.5, 3.5)) * range.y;
-                        glow[g] += weight * sigma * planck(lambda, kelvin);
+                        let lambda =
+                            range.x + (float4(g * 4) + float4(0.5, 1.5, 2.5, 3.5)) * range.y;
+                        emitted[g] += (1.0 - volumeMaterials[materialIndex].albedo[g]) * scale *
+                                      planck(lambda, kelvin);
+                    }
+                }
+            }
+            if (scatters && sigma > 0.0) {
+                let world = origin + direction * t;
+                for (uint k = 0; k < lightCount; ++k) {
+                    if ((viewLights.x & (1u << k)) == 0) {
+                        continue;
+                    }
+                    let light = viewLights.z + k;
+                    let position = lightFloat4(light, 0);
+                    float3 towards;
+                    float far;
+                    float falloff;
+                    // A focused light's spectrum scales by |cos|^focus off its axis.
+                    float focused = 1.0;
+                    if (position.w == kDistantLight) {
+                        towards = position.xyz;
+                        far = 1e30;
+                        falloff = 1.0;
+                    } else if (position.w == kSphereLight) {
+                        let offset = position.xyz - world;
+                        far = length(offset);
+                        towards = offset / max(far, 1e-6);
+                        falloff = 1.0 / max(far * far, 1e-6);
+                        let axis = lightFloat4(light, 16).xyz;
+                        let along = dot(-towards, axis);
+                        // A spot's cone (cos of its angle, cos where its falloff starts).
+                        let cone = lightFloat4(light, 32);
+                        if (cone.x > -1.5) {
+                            falloff *= smoothstep(cone.x, cone.y, along);
+                        }
+                        let focus = lightFloat4(light, 48).z;
+                        if (focus > 0.0) {
+                            focused = pow(abs(along), focus);
+                        }
+                    } else {
+                        continue;
+                    }
+                    if (falloff <= 0.0) {
+                        continue;
+                    }
+                    let towardsLocal =
+                        float3(dot(volume.toLocal[0].xyz, towards),
+                               dot(volume.toLocal[1].xyz, towards),
+                               dot(volume.toLocal[2].xyz, towards));
+                    let lit = weight * sigma * phaseOf(material, dot(towards, -direction)) *
+                              falloff *
+                              shadowOf(volume, local, towardsLocal, far, shadowAccessor);
+                    if (lit <= 0.0) {
+                        continue;
+                    }
+                    for (uint g = 0; g < groups; ++g) {
+                        let spectrum = lightFloat4(light, constants.lights.y + 16 * g) * focused +
+                                       lightFloat4(light, constants.lights.z + 16 * g);
+                        emitted[g] += volumeMaterials[materialIndex].albedo[g] * lit * spectrum;
                     }
                 }
             }
             transmittance *= 1.0 - opacity;
-        }
-        if (start > transmittance || emissionSum > 0.0) {
-            for (uint g = 0; g < groups; ++g) {
-                emitted[g] += material.emission[g] * emissionSum +
-                              (1.0 - material.albedo[g]) * material.params.y * glow[g];
-            }
         }
     }
 

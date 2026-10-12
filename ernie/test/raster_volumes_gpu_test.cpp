@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <numbers>
 #include <string>
 #include <vector>
 
@@ -137,5 +138,81 @@ TEST_F(RasterDelegateTest, AViewSeesOnlyItsWorldsVolumes) {
         EXPECT_NEAR(other[b], bare[b], 1e-6 * bare[b])
             << "band " << b;
         EXPECT_LT(own[b], 0.05 * bare[b]) << "band " << b;
+    }
+}
+
+namespace {
+
+// The sun overhead scattered once towards a camera straight above:
+// the light and the view cross the same column, so whatever its
+// density, L = p E (1 - exp(-2 tau)) / 2 for a white albedo, phase
+// p at phase angle 0 and the sun's irradiance E. E comes from the
+// ground without the cube (Lambertian, albedo 0.5: L = 0.5 E / pi);
+// the scattering is seen against the empty background.
+std::vector<double> ScatteredOverEach(RasterDelegate& delegate,
+                                      Scene scene, double sigma,
+                                      double phase) {
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> ground =
+        CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInherited));
+    scene.Remove("/World/Terrain");
+    const std::vector<double> scattered =
+        CentreSpectrum(delegate, scene);
+    const double fraction =
+        phase * (1.0 - std::exp(-2.0 * sigma * kDepth)) / 2.0;
+    std::vector<double> ratio;
+    for (std::size_t b = 0; b < ground.size(); ++b) {
+        const double irradiance = ground[b] * std::numbers::pi / 0.5;
+        ratio.push_back(scattered[b] / (fraction * irradiance));
+    }
+    return ratio;
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, AVolumeScattersTheSun) {
+    constexpr double kSigma = 1.0;
+    constexpr double kFourPi = 4.0 * std::numbers::pi;
+    struct Case {
+        std::string phase;
+        double anisotropy;
+        double phaseAtZero;  // p(g = 0) times 4 pi
+    };
+    // Henyey-Greenstein at phase angle 0, scattering straight back:
+    // (1 - g^2) / (1 + g)^3; Hapke's double lobe with b = 0.3 and
+    // c = 0.4 weighs its backward lobe (1 + c) / 2.
+    constexpr double b = 0.3;
+    constexpr double c = 0.4;
+    const Case cases[] = {
+        {std::string(tokens::kIsotropic), 0.0, 1.0},
+        {std::string(tokens::kHenyeyGreenstein), 0.5,
+         0.75 / (1.5 * 1.5 * 1.5)},
+        {std::string(tokens::kHenyeyGreenstein), -0.5,
+         0.75 / (0.5 * 0.5 * 0.5)},
+        {std::string(tokens::kDoubleHenyeyGreenstein), 0.0,
+         0.5 * (1.0 + c) * (1.0 - b * b) / std::pow(1.0 - b, 3.0) +
+             0.5 * (1.0 - c) * (1.0 - b * b) /
+                 std::pow(1.0 + b, 3.0)},
+        {std::string(tokens::kRayleigh), 0.0, 1.5},
+    };
+    RasterDelegate delegate(*context_);
+    for (const Case& test : cases) {
+        Scene scene = VolumeScene(kSigma, 0.0);
+        ernie::Material(scene, "/Looks/Gas")
+            .SetVolumeAlbedo(glm::dvec3(1.0))
+            .SetPhaseFunction(test.phase)
+            .SetAnisotropy(test.anisotropy);
+        scene.Set("/Looks/Gas", tokens::kPhaseB, b);
+        scene.Set("/Looks/Gas", tokens::kPhaseC, c);
+        const std::vector<double> ratio = ScatteredOverEach(
+            delegate, scene, kSigma, test.phaseAtZero / kFourPi);
+        for (std::size_t band = 0; band < ratio.size(); ++band) {
+            EXPECT_NEAR(ratio[band], 1.0, 0.03)
+                << test.phase << " g " << test.anisotropy << ", band "
+                << band;
+        }
     }
 }

@@ -449,12 +449,21 @@ static_assert(
 /// uniforms.
 VolumePass::ViewLayout VolumeLayout() {
     using Offset = std::uint32_t;
+    static_assert(offsetof(LightGpu, position) == 0 &&
+                      offsetof(LightGpu, axis) == 16 &&
+                      offsetof(LightGpu, cone) == 32 &&
+                      offsetof(LightGpu, shadow) == 48,
+                  "volume.slang reads a light's first four float4s");
     return {
         static_cast<Offset>(kShadingStride),
         static_cast<Offset>(offsetof(ShadingUniforms, invViewProj)),
         static_cast<Offset>(offsetof(ShadingUniforms, strip)),
         static_cast<Offset>(offsetof(ShadingUniforms, range)),
-        static_cast<Offset>(offsetof(ShadingUniforms, size))};
+        static_cast<Offset>(offsetof(ShadingUniforms, size)),
+        static_cast<Offset>(offsetof(ShadingUniforms, view)),
+        static_cast<Offset>(sizeof(LightGpu)),
+        static_cast<Offset>(offsetof(LightGpu, spectrum)),
+        static_cast<Offset>(offsetof(LightGpu, tinted))};
 }
 
 /// Samples per axis of the RGB-to-spectrum coefficient table.
@@ -4074,8 +4083,9 @@ void RasterRenderer::RecordViews(
         Shade(commands, targets, first);
         if (volumes_->Active()) {
             volumes_->Record(commands, targets, shadingUniforms_,
-                             VolumeLayout(), first, extent_.width,
-                             extent_.height, pushbroom_, sky_ != 0);
+                             lightTable_, VolumeLayout(), first,
+                             extent_.width, extent_.height,
+                             pushbroom_, sky_ != 0);
             ShaderBarrier(commands);
         }
         if (subframes_ > 1) {

@@ -128,6 +128,19 @@
                               .doc = "Linear RGB share of the extinction that scatters; the rest " \
                                      "absorbs. 0, smoke that only absorbs.",                       \
                               .group = "Volume", .color = true}))                                  \
+    X(std::string, PhaseFunction, ::ernie::tokens::kVolumePhaseFunction,                           \
+      ::ernie::tokens::kHenyeyGreenstein,                                                          \
+      (::ernie::AttributeMeta{.label = "Phase function",                                           \
+                              .doc = "How what scatters spreads its light: Henyey-Greenstein by "  \
+                                     "the anisotropy; Hapke's double Henyey-Greenstein by the b "  \
+                                     "and c a Hapke surface reads (inputs:b, inputs:c), so dust "  \
+                                     "and the regolith it rose from scatter alike; Rayleigh; or "  \
+                                     "isotropic.",                                                 \
+                              .group = "Volume",                                                   \
+                              .options = {::ernie::tokens::kHenyeyGreenstein,                      \
+                                          ::ernie::tokens::kDoubleHenyeyGreenstein,                \
+                                          ::ernie::tokens::kRayleigh,                              \
+                                          ::ernie::tokens::kIsotropic}}))                          \
     X(double, Anisotropy, ::ernie::tokens::kVolumeAnisotropy, 0.0,                                 \
       (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
                                      "backwards.",                                                 \

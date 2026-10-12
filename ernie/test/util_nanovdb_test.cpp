@@ -47,16 +47,18 @@ TEST(NanoVdb, ReadsWarpsFile) {
     EXPECT_FALSE(grid.Empty());
     EXPECT_EQ(grid.buffer.size() % 8, 0u);
 
-    // Index (i, j, k) sits at -0.75 + 0.1 (i, j, k) m.
+    // Index (i, j, k) sits at -0.75 + 0.1 (i, j, k) m, to the float
+    // precision Warp writes its map in.
+    constexpr double kFloat = 1e-7;
     const glm::dvec3 origin(grid.indexToGrid *
                             glm::dvec4(0, 0, 0, 1));
     const glm::dvec3 step(grid.indexToGrid * glm::dvec4(2, 4, 6, 1));
-    EXPECT_NEAR(origin.x, -0.75, 1e-12);
-    EXPECT_NEAR(origin.z, -0.75, 1e-12);
-    EXPECT_NEAR(step.x, -0.55, 1e-12);
-    EXPECT_NEAR(step.y, -0.35, 1e-12);
-    EXPECT_NEAR(step.z, -0.15, 1e-12);
-    EXPECT_NEAR(grid.voxelSize.y, 0.1, 1e-12);
+    EXPECT_NEAR(origin.x, -0.75, kFloat);
+    EXPECT_NEAR(origin.z, -0.75, kFloat);
+    EXPECT_NEAR(step.x, -0.55, kFloat);
+    EXPECT_NEAR(step.y, -0.35, kFloat);
+    EXPECT_NEAR(step.z, -0.15, kFloat);
+    EXPECT_NEAR(grid.voxelSize.y, 0.1, kFloat);
 
     EXPECT_EQ(grid.indexMin, glm::ivec3(0));
     EXPECT_EQ(grid.indexMax, glm::ivec3(15));
@@ -68,8 +70,8 @@ TEST(NanoVdb, ReadsWarpsFile) {
     glm::dvec3 min;
     glm::dvec3 max;
     grid.GridBounds(min, max);
-    EXPECT_NEAR(min.x, -0.85, 1e-12);
-    EXPECT_NEAR(max.y, 0.85, 1e-12);
+    EXPECT_NEAR(min.x, -0.85, kFloat);
+    EXPECT_NEAR(max.y, 0.85, kFloat);
 }
 
 TEST(NanoVdb, RawBufferMatchesTheFile) {
