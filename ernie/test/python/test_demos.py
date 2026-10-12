@@ -87,39 +87,68 @@ def run(command, cwd=None):
     return result
 
 
-@pytest.mark.parametrize(
-    "entry", python_demos(), ids=lambda entry: entry.id
-)
-def test_python_demo_runs_its_checks_without_a_viewer(
-    entry, renderer
-):
-    run(
-        [
-            sys.executable,
-            entry.path,
-            "--viewer",
-            "null",
-            "--test",
-            *SMALL_BATCHES.get(entry.id, []),
-        ],
-        cwd=os.path.dirname(entry.path),
+def demo_ids():
+    """Every demo, in either language, or only ERNIE_TEST_DEMO's when
+    it is set (ctest runs each demo as a test of its own)."""
+    ids = sorted(
+        set(cpp_demos()) | {entry.id for entry in python_demos()}
     )
+    only = os.environ.get("ERNIE_TEST_DEMO")
+    return [demo for demo in ids if only in (None, "", demo)]
 
 
-@pytest.mark.parametrize("demo", cpp_demos())
-def test_cpp_demo_runs_its_checks_without_a_viewer(demo, renderer):
-    run(
-        [
-            sys.executable,
-            "-m",
-            "ernie",
-            "--demo",
-            demo,
-            "--viewer",
-            "null",
-            "--test",
-            *SMALL_BATCHES.get(demo, []),
-        ]
+@pytest.mark.parametrize("demo", demo_ids())
+def test_demo_passes_its_checks_and_twins_render_the_same(
+    demo, renderer, tmp_path
+):
+    """Each language's demo runs once without a viewer: its checks
+    (--test), and its last frame written to compare with its twin's."""
+    common = [
+        "--viewer",
+        "null",
+        "--test",
+        *SMALL_BATCHES.get(demo, []),
+    ]
+    outputs = []
+    if demo in cpp_demos():
+        output = tmp_path / "cpp.png"
+        run(
+            [
+                sys.executable,
+                "-m",
+                "ernie",
+                "--demo",
+                demo,
+                *common,
+                "--output",
+                str(output),
+            ]
+        )
+        outputs.append(output)
+    entry = next((e for e in python_demos() if e.id == demo), None)
+    if entry is not None:
+        output = tmp_path / "python.png"
+        run(
+            [
+                sys.executable,
+                entry.path,
+                *common,
+                "--output",
+                str(output),
+            ],
+            cwd=os.path.dirname(entry.path),
+        )
+        outputs.append(output)
+    if len(outputs) < 2:
+        return
+    pillow = pytest.importorskip("PIL.Image")
+    cpp, python = (
+        np.asarray(pillow.open(path))[..., :3].astype(int)
+        for path in outputs
+    )
+    assert cpp.shape == python.shape
+    assert np.abs(cpp - python).mean() < 1.0, (
+        "the twins should render the same image"
     )
 
 
@@ -134,53 +163,6 @@ def test_every_demo_has_a_twin_in_the_other_language():
     assert python == cpp, (
         f"Python only: {sorted(python - cpp)}; "
         f"C++ only: {sorted(cpp - python)}"
-    )
-
-
-@pytest.mark.parametrize("demo", cpp_demos())
-def test_twins_render_the_same_output(demo, renderer, tmp_path):
-    pillow = pytest.importorskip("PIL.Image")
-    entry = next((e for e in python_demos() if e.id == demo), None)
-    if entry is None:
-        pytest.skip("no Python twin")
-    common = [
-        "--viewer",
-        "null",
-        "--num-frames",
-        "1",
-        *SMALL_BATCHES.get(demo, []),
-    ]
-    run(
-        [
-            sys.executable,
-            "-m",
-            "ernie",
-            "--demo",
-            demo,
-            *common,
-            "--output",
-            str(tmp_path / "cpp.png"),
-        ]
-    )
-    run(
-        [
-            sys.executable,
-            entry.path,
-            *common,
-            "--output",
-            str(tmp_path / "python.png"),
-        ],
-        cwd=os.path.dirname(entry.path),
-    )
-    cpp = np.asarray(pillow.open(tmp_path / "cpp.png"))[
-        ..., :3
-    ].astype(int)
-    python = np.asarray(pillow.open(tmp_path / "python.png"))[
-        ..., :3
-    ].astype(int)
-    assert cpp.shape == python.shape
-    assert np.abs(cpp - python).mean() < 1.0, (
-        "the twins should render the same image"
     )
 
 

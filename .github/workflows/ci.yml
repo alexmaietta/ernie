@@ -155,6 +155,13 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 30
+      # The data the demos fetch (LOLA's terrain and the like) into their
+      # cache, kept between runs rather than downloaded by each.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ernie
+          key: demo-data-${{ hashFiles('demos/**') }}
+          restore-keys: demo-data-
       - name: Test on lavapipe
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)

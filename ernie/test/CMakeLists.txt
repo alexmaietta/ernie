@@ -107,16 +107,63 @@ if(TARGET _ernie)
                 "pytest or numpy not found for ${Python_EXECUTABLE}; skipping Ernie's "
                 "Python tests")
     else()
-        add_test(
-            NAME ernie.python.pytest
-            COMMAND
-                "${Python_EXECUTABLE}" -m pytest -q -p
-                no:cacheprovider "${CMAKE_CURRENT_SOURCE_DIR}/python")
-        set_tests_properties(
-            ernie.python.pytest
-            PROPERTIES ENVIRONMENT
-                       "PYTHONPATH=${CMAKE_BINARY_DIR}/python" LABELS
-                       "gpu;python")
+        # A ctest test per test file, and per demo for the demos', so
+        # ctest runs them side by side and CI's parts share them out.
+        # Each has its own temporary directory, as pytest's shared one
+        # is pruned by whichever run starts next; --durations reports
+        # the slowest tests.
+        function(ernie_add_pytest name)
+            cmake_parse_arguments(ARG "" "" "ARGS;ENVIRONMENT"
+                                  ${ARGN})
+            add_test(
+                NAME ernie.python.${name}
+                COMMAND
+                    "${Python_EXECUTABLE}" -m pytest -q -p
+                    no:cacheprovider --durations=10
+                    "--basetemp=${CMAKE_CURRENT_BINARY_DIR}/pytest/${name}"
+                    ${ARG_ARGS})
+            set(environment "PYTHONPATH=${CMAKE_BINARY_DIR}/python"
+                            ${ARG_ENVIRONMENT})
+            set_tests_properties(
+                ernie.python.${name}
+                PROPERTIES ENVIRONMENT "${environment}" LABELS
+                           "gpu;python")
+        endfunction()
+        set(python_tests "${CMAKE_CURRENT_SOURCE_DIR}/python")
+        file(GLOB ernie_python_test_files CONFIGURE_DEPENDS
+             "${python_tests}/test_*.py")
+        foreach(file ${ernie_python_test_files})
+            get_filename_component(stem "${file}" NAME_WE)
+            if(NOT stem STREQUAL "test_demos")
+                ernie_add_pytest(${stem} ARGS "${file}")
+            endif()
+        endforeach()
+        # The demos (demos/<category>/demo_<category>_<name>.{cpp,py},
+        # whose id is the file's stem), each in both languages.
+        file(GLOB ernie_demo_files CONFIGURE_DEPENDS
+             "${PROJECT_SOURCE_DIR}/demos/*/demo_*.cpp"
+             "${PROJECT_SOURCE_DIR}/demos/*/demo_*.py")
+        set(ernie_demo_ids)
+        foreach(file ${ernie_demo_files})
+            get_filename_component(id "${file}" NAME_WE)
+            list(APPEND ernie_demo_ids ${id})
+        endforeach()
+        list(REMOVE_DUPLICATES ernie_demo_ids)
+        set(demo_test
+            test_demo_passes_its_checks_and_twins_render_the_same)
+        foreach(id ${ernie_demo_ids})
+            ernie_add_pytest(
+                ${id}
+                ARGS
+                "${python_tests}/test_demos.py"
+                -k
+                "${demo_test}"
+                ENVIRONMENT
+                "ERNIE_TEST_DEMO=${id}")
+        endforeach()
+        ernie_add_pytest(
+            test_demos ARGS "${python_tests}/test_demos.py" -k
+            "not ${demo_test}")
     endif()
 endif()
 
