@@ -7,6 +7,7 @@
 #include "ernie/geometry/mesh_data.h"
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/renderer.h"
+#include "ernie/session/delegate.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -294,6 +295,17 @@ class MeshDrawable : public RasterDrawable {
     /// `SetComputeInterop`.
     void SetActiveCounts(std::uint32_t mesh, const Tensor& counts,
                          std::uintptr_t stream = 1);
+
+    /// Has `writer` write the mesh on the GPU each frame
+    /// (`RenderDelegate::SetMeshWriter`): recorded at the start of
+    /// the prepass, between barriers, into its points (the half
+    /// drawn, which no longer alternates), normals, indices and a
+    /// slot of counts in use of its own. Without `bounds` the points
+    /// in use are measured on the GPU (`RecordBounds`). Null stops
+    /// it.
+    /// @throws std::invalid_argument for an unknown mesh.
+    void SetWriter(std::uint32_t mesh, MeshWriter writer,
+                   std::optional<Bounds3> bounds = {});
 
     /// Maps a mesh's points for writing in place on the compute
     /// device: a float32 (points, 3) tensor over the drawable's own
@@ -623,6 +635,8 @@ class MeshDrawable : public RasterDrawable {
         std::optional<Bounds3> lastGpuPoints;
         bool pointsBounded =
             false;  ///< Device points set with bounds.
+        /// Writes it on the GPU each frame (`SetWriter`).
+        MeshWriter writer;
         /// Whether its normals follow its device points, recomputed
         /// on the GPU when they move: a mesh with normals whose
         /// points, but not normals, come from the device.
@@ -710,6 +724,11 @@ class MeshDrawable : public RasterDrawable {
     /// Measures the bounds of the chosen instancers' positions into
     /// the upload slot's readback buffer (instance_bounds.slang).
     void RecordBounds(VkCommandBuffer commands) const;
+    /// Records the meshes' writers (`SetWriter`).
+    void RecordWriters(VkCommandBuffer commands) const;
+    /// Whether the GPU measures the mesh's points (`RecordBounds`):
+    /// device or written points without bounds.
+    static bool MeasuresPoints(const Mesh& mesh);
 
     /// The G-buffer pipeline for a frame camera's views, or a
     /// pushbroom's.
@@ -1002,6 +1021,8 @@ class MeshDrawable : public RasterDrawable {
     /// Meshes' points and triangles in use (int32 pairs), by
     /// `Mesh::countSlot`; read by the vertex and bounds shaders.
     std::shared_ptr<GpuBuffer> activeCounts_;
+    /// Meshes with writers (`SetWriter`).
+    std::set<std::uint32_t> writers_;
     std::unique_ptr<GpuBuffer> instanceIds_;
     /// Per indirect draw of GPU culling: its draw, instance offset
     /// and index offset, read by draw index in batched draws

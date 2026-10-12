@@ -129,6 +129,10 @@ class RasterDelegate : public RenderDelegate {
                     std::string_view attribute,
                     std::uintptr_t stream = 1) override;
 
+    /// As `RenderDelegate::SetMeshWriter`.
+    void SetMeshWriter(const Path& path, MeshWriter writer,
+                       std::optional<Bounds3> bounds = {}) override;
+
     /// As `RenderDelegate::MapArray` of a PrimSet: transform op
     /// `attribute` (`xformOp:*`) of prims posed on the GPU as one
     /// group, rows of one array written to exactly `prims` in row
@@ -264,6 +268,12 @@ class RasterDelegate : public RenderDelegate {
         std::array<std::uint64_t, 5> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
+    };
+
+    /// A mesh's writer and bounds (`SetMeshWriter`).
+    struct WrittenMesh {
+        MeshWriter writer;
+        std::optional<Bounds3> bounds;
     };
 
     struct SyncedInstancer {
@@ -468,6 +478,8 @@ class RasterDelegate : public RenderDelegate {
 
     const VulkanContext& context_;
     std::unique_ptr<ComputeInterop> compute_;
+    /// Meshes written on the GPU, by path (`SetMeshWriter`).
+    std::map<Path, WrittenMesh> meshWriters_;
     bool computeTried_ = false;
     std::string computeWhy_;
     bool meshesOnGpu_ = false;

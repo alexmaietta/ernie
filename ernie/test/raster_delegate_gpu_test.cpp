@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/offscreen_target.h"
+#include "ernie/device/pipeline.h"
+#include "ernie/device/shader_compiler.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
@@ -706,6 +708,99 @@ TEST_F(RasterDelegateTest,
     const Tensor image = delegate.Render(scene);
     EXPECT_GT(TexelAt(scene, image, {-12, 0, 0})[0], 200)
         << "still drawn";
+}
+
+/// A compute shader writing MeshScene's quad, the fan's first
+/// `triangles` triangles in use, through a mesh writer's pointers.
+constexpr const char* kQuadWriterSlang = R"(
+struct Push {
+    float* points;
+    uint* indices;
+    int* counts;
+    int triangles;
+}
+[[vk::push_constant]] ConstantBuffer<Push> push;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main() {
+    let corners = float2[4](float2(-10, -10), float2(10, -10), float2(10, 10), float2(-10, 10));
+    for (int i = 0; i < 4; ++i) {
+        push.points[3 * i] = corners[i].x;
+        push.points[3 * i + 1] = corners[i].y;
+        push.points[3 * i + 2] = 0.0;
+    }
+    let fan = uint[6](0, 1, 2, 0, 2, 3);
+    for (int i = 0; i < 6; ++i) {
+        push.indices[i] = fan[i];
+    }
+    push.counts[0] = 4;
+    push.counts[1] = push.triangles;
+}
+)";
+
+TEST_F(RasterDelegateTest, MeshWritersDrawWhatTheyWrite) {
+    const ernie::ShaderCompiler compiler;
+    const std::array<ernie::ShaderModuleSource, 1> modules{
+        {{"quad_writer", kQuadWriterSlang}}};
+    const std::vector<std::uint32_t> spirv =
+        compiler.CompileSpirv(modules, "main");
+    const ernie::PipelineLayout layout(*context_, {}, 32);
+    const ernie::ComputePipeline pipeline(*context_, layout, spirv);
+
+    // The quad as placeholders: room for 8 points and 4 triangles.
+    Scene scene = MeshScene();
+    const std::vector<float> points(24, 0.0f);
+    const std::vector<std::int32_t> counts(4, 3);
+    const std::vector<std::int32_t> indices(12, 0);
+    ernie::Mesh(scene, "/World/Quad")
+        .SetPoints(Tensor::Copy<float>(points, {8, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {4}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {12}));
+    RasterDelegate delegate(*context_);
+    int triangles = 2;
+    ernie::MeshWriteTarget written;
+    delegate.SetMeshWriter(
+        "/World/Quad", [&](VkCommandBuffer commands,
+                           const ernie::MeshWriteTarget& target) {
+            written = target;
+            vkCmdBindPipeline(commands,
+                              VK_PIPELINE_BIND_POINT_COMPUTE,
+                              pipeline.Handle());
+            struct {
+                VkDeviceAddress points, indices, counts;
+                std::int32_t triangles, pad;
+            } push{target.points, target.indices, target.counts,
+                   triangles, 0};
+            layout.PushConstants(commands, &push, sizeof(push));
+            vkCmdDispatch(commands, 1, 1, 1);
+        });
+    const auto red = [&](glm::vec3 p) {
+        return TexelAt(scene, delegate.Render(scene), p)[0];
+    };
+    EXPECT_GT(red({-11, -1, 0}), 200) << "the lower right half";
+    EXPECT_GT(red({-13, 1, 0}), 200) << "the upper left half";
+    EXPECT_EQ(written.pointCapacity, 8u);
+    EXPECT_EQ(written.triangleCapacity, 4u);
+    EXPECT_EQ(written.normals, 0u) << "the quad has no normals";
+
+    triangles = 1;
+    EXPECT_GT(red({-11, -1, 0}), 200);
+    EXPECT_EQ(red({-13, 1, 0}), 0) << "one triangle in use";
+
+    // The points written, measured on the GPU frames later.
+    for (int frame = 0; frame < 3; ++frame) {
+        delegate.Render(scene);
+    }
+    const std::optional<ernie::Bounds3> bounds =
+        delegate.Meshes().Bounds();
+    ASSERT_TRUE(bounds);
+    EXPECT_NEAR(bounds->first.x, -22.0f, 0.01f) << "the quad's left";
+
+    // Without the writer, the placeholders: nothing.
+    delegate.SetMeshWriter("/World/Quad", nullptr);
+    EXPECT_EQ(red({-11, -1, 0}), 0);
 }
 
 TEST_F(RasterDelegateTest,

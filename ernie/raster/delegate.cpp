@@ -1182,6 +1182,12 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             if (scene.Read(path, kActiveCounts) != nullptr) {
                 SetMeshActiveCounts(scene, path, synced.handle);
             }
+            if (const auto writer = meshWriters_.find(path);
+                writer != meshWriters_.end()) {
+                meshes_.SetWriter(synced.handle,
+                                  writer->second.writer,
+                                  writer->second.bounds);
+            }
             if (onGpu(kPoints)) {
                 SetMeshPoints(scene, path, synced.handle);
             }
@@ -1823,6 +1829,22 @@ bool RasterDelegate::RefreshGpuXforms(
         UploadGpuXformGroup(*group, pose, group->rows);
     }
     return true;
+}
+
+void RasterDelegate::SetMeshWriter(const Path& path,
+                                   MeshWriter writer,
+                                   std::optional<Bounds3> bounds) {
+    const auto synced = syncedMeshes_.find(path);
+    const std::uint32_t handle =
+        synced != syncedMeshes_.end() ? synced->second.handle : 0;
+    if (writer) {
+        meshWriters_[path] = {writer, bounds};
+    } else {
+        meshWriters_.erase(path);
+    }
+    if (handle != 0) {
+        meshes_.SetWriter(handle, std::move(writer), bounds);
+    }
 }
 
 Tensor RasterDelegate::MapArray(Scene& scene, const Path& path,

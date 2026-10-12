@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Ernie's demos, by category: demos/<category>/demo_<category>_<name>.cpp beside its .py, the
-# same demo in each language (interop/ is Python only), named by that stem. Each C++ demo
+# same demo in each language (most of interop/ is Python only), named by that stem. Each C++ demo
 # registers itself (ERNIE_REGISTER_DEMO), and their objects go into the `ernie` program and the
 # Python module, whose Demos panels list them. With ERNIE_BUILD_DEMOS each is also a program of
 # its own, named as its files.

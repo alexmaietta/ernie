@@ -84,6 +84,12 @@ Tensor RenderDelegate::MapArray(Scene&, const PrimSet&,
                                 " renderer maps no arrays");
 }
 
+void RenderDelegate::SetMeshWriter(const Path&, MeshWriter,
+                                   std::optional<Bounds3>) {
+    throw std::invalid_argument("The " + Info().name +
+                                " renderer has no mesh writers");
+}
+
 FrameId RenderDelegate::NextFrame(const Scene& scene,
                                   const Path& settings,
                                   const Path& product) {

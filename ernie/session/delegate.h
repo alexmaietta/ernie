@@ -12,6 +12,7 @@
 #include "ernie/util/tensor.h"
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -49,6 +50,29 @@ struct RenderStats {
     /// terrain patches.
     std::vector<std::pair<std::string, std::uint64_t>> counters;
 };
+
+/// Where a mesh's writer (`RenderDelegate::SetMeshWriter`) writes
+/// this frame: device addresses into the renderer's own buffers,
+/// which a shader reads and writes as pointers (Slang's `float*`).
+struct MeshWriteTarget {
+    /// Points, x, y and z floats each, `pointCapacity` of them.
+    VkDeviceAddress points = 0;
+    /// Normals as the points; 0 for a mesh without normals.
+    VkDeviceAddress normals = 0;
+    /// Triangle indices, three uint32 per triangle into the points,
+    /// `triangleCapacity` triangles.
+    VkDeviceAddress indices = 0;
+    /// The points and triangles in use, two int32: the rest are
+    /// neither drawn nor bounded.
+    VkDeviceAddress counts = 0;
+    std::uint32_t pointCapacity = 0;
+    std::uint32_t triangleCapacity = 0;
+};
+
+/// Records GPU work writing a mesh (`MeshWriteTarget`) into a frame's
+/// command buffer, such as compute dispatches that build its surface.
+using MeshWriter =
+    std::function<void(VkCommandBuffer, const MeshWriteTarget&)>;
 
 /// Where an image sits in the deterministic random streams of
 /// `sampling.h`.
@@ -162,6 +186,19 @@ class RenderDelegate {
     virtual Tensor MapArray(Scene& scene, const PrimSet& prims,
                             std::string_view attribute,
                             std::uintptr_t stream = 1);
+
+    /// Has `writer` write the Mesh at `path` on the GPU every frame,
+    /// recorded into the frame before anything reads the mesh: its
+    /// points, normals, triangles and the counts of them in use,
+    /// within the capacity its arrays in the scene hold (their values
+    /// there are placeholders). Topology may change from frame to
+    /// frame, so the mesh has no motion between frames. Without
+    /// `bounds` the points in use are measured on the GPU, frames
+    /// late; with them, they bound the mesh. A null writer stops
+    /// writing. The writer holds across re-uploads of the mesh.
+    /// @throws std::invalid_argument if the backend has no writers.
+    virtual void SetMeshWriter(const Path& path, MeshWriter writer,
+                               std::optional<Bounds3> bounds = {});
 
     /// The render vars `Record` can draw of the frame the last
     /// `Update` prepared: `Info().viewVars` and what that frame adds,

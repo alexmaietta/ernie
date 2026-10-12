@@ -1040,6 +1040,96 @@ void MeshDrawable::SetActiveCounts(std::uint32_t mesh,
     }
 }
 
+void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
+                             std::optional<Bounds3> bounds) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    // Gaining or losing one takes or frees a slot of counts.
+    geometryDirty_ = geometryDirty_ || !writer != !target.writer;
+    target.writer = std::move(writer);
+    target.gpuPoints.reset();
+    target.lastGpuPoints.reset();
+    target.pointsBounded = target.writer && bounds.has_value();
+    if (target.pointsBounded) {
+        std::tie(target.low, target.high) = *bounds;
+    }
+    if (target.writer) {
+        writers_.insert(mesh);
+        // Levels simplified from the placeholders mean nothing.
+        target.levelsPending = false;
+        if (target.levels.size() > 1 || target.recomputeNormals) {
+            target.levels.resize(1);
+            target.lodIndices.clear();
+            target.lodUvs.clear();
+            target.recomputeNormals = false;
+            target.adjacency.clear();
+            geometryDirty_ = true;
+        }
+    } else {
+        writers_.erase(mesh);
+    }
+    ForgetBounds();
+}
+
+bool MeshDrawable::MeasuresPoints(const Mesh& mesh) {
+    return (mesh.writer || !mesh.devicePoints.Empty()) &&
+           !mesh.pointsBounded && !mesh.data.points.empty();
+}
+
+void MeshDrawable::RecordWriters(VkCommandBuffer commands) const {
+    if (writers_.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Mesh writers");
+    const auto barrier = [commands](VkAccessFlags2 srcAccess) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        memory.srcAccessMask = srcAccess;
+        memory.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        memory.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT |
+                               VK_ACCESS_2_MEMORY_WRITE_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    // After the frames before, which may still read the meshes, and
+    // this frame's uploads.
+    barrier(VK_ACCESS_2_MEMORY_READ_BIT |
+            VK_ACCESS_2_MEMORY_WRITE_BIT);
+    for (const std::uint32_t handle : writers_) {
+        const Mesh& mesh = meshes_.at(handle);
+        MeshWriteTarget target;
+        target.points =
+            points_->Address() +
+            VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 *
+                sizeof(float);
+        if (!mesh.data.normals.empty()) {
+            target.normals =
+                normals_->Address() +
+                VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float);
+        }
+        target.indices =
+            indices_->Address() +
+            VkDeviceSize{mesh.firstIndex} * sizeof(std::uint32_t);
+        target.counts = activeCounts_->Address() +
+                        VkDeviceSize{mesh.countSlot - 1} * 2 *
+                            sizeof(std::int32_t);
+        target.pointCapacity =
+            static_cast<std::uint32_t>(mesh.data.points.size() / 3);
+        target.triangleCapacity =
+            static_cast<std::uint32_t>(mesh.data.indices.size() / 3);
+        mesh.writer(commands, target);
+    }
+    // Before anything reads them: bounds, culling and drawing.
+    barrier(VK_ACCESS_2_MEMORY_WRITE_BIT);
+}
+
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
     compute_->CopyToBuffer(
         mesh.devicePoints, *points_,
@@ -1280,6 +1370,7 @@ void MeshDrawable::RemoveMesh(std::uint32_t mesh) {
         return item.mesh == mesh;
     });
     activeMeshes_.erase(mesh);
+    writers_.erase(mesh);
     ForgetBounds();
     itemPipelines_.clear();
     geometryDirty_ = true;
@@ -1707,7 +1798,12 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<std::int32_t> counts;
     for (auto& [handle, mesh] : meshes_) {
         mesh.countSlot = 0;
-        if (!mesh.activeCounts.Empty()) {
+        if (mesh.writer) {
+            // Nothing in use until written.
+            mesh.countSlot =
+                static_cast<std::uint32_t>(counts.size() / 2 + 1);
+            counts.insert(counts.end(), {0, 0});
+        } else if (!mesh.activeCounts.Empty()) {
             mesh.countSlot =
                 static_cast<std::uint32_t>(counts.size() / 2 + 1);
             if (IsGpu(mesh.activeCounts.Location().kind)) {
@@ -2253,7 +2349,9 @@ void MeshDrawable::Prepare(const FrameParams& params,
             if (compute_ != nullptr) {
                 CopyDeviceAttributes(mesh, false);
             }
-            if (!mesh.pointsDirty) {
+            // Written ones are written in place each frame.
+            if (!mesh.pointsDirty || mesh.writer) {
+                mesh.pointsDirty = false;
                 continue;
             }
             // Into the other half, keeping the last frame's points
@@ -2508,9 +2606,7 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
         // motion as instancers'.
         for (std::size_t j = 0; j < jobs.size(); ++j) {
             const auto it = meshes_.find(jobs[j].first);
-            if (it == meshes_.end() ||
-                it->second.devicePoints.Empty() ||
-                it->second.pointsBounded ||
+            if (it == meshes_.end() || !MeasuresPoints(it->second) ||
                 it->second.data.points.size() / 3 != jobs[j].second) {
                 continue;
             }
@@ -2546,8 +2642,7 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
         }
     }
     for (const auto& [handle, mesh] : meshes_) {
-        if (!mesh.devicePoints.Empty() && !mesh.pointsBounded &&
-            !mesh.data.points.empty()) {
+        if (MeasuresPoints(mesh)) {
             jobs.emplace_back(handle, mesh.data.points.size() / 3);
         }
     }
@@ -3507,6 +3602,7 @@ void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records,
 }
 
 void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {
+    RecordWriters(commands);
     RecordCompose(commands);
     RecordBounds(commands);
     if (anchorViews_ != 0) {
