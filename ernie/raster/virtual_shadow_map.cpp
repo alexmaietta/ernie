@@ -18,13 +18,24 @@ constexpr VkShaderStageFlags kCompute = VK_SHADER_STAGE_COMPUTE_BIT;
 
 /// virtual_shadow.slang's bindings.
 constexpr DescriptorBinding kBindings[] = {
-    {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
-    {5, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
 };
+
+/// virtual_shadow.slang's `VirtualShadow`.
+struct BlockGpu {
+    VkDeviceAddress physical;
+    VkDeviceAddress pageTable;
+    VkDeviceAddress requests;
+    VkDeviceAddress counter;
+    VkDeviceAddress levels;
+    std::uint32_t pages;
+    std::uint32_t levelCount;
+    std::int32_t firstLevel;
+    float bias;
+};
+static_assert(sizeof(BlockGpu) == 56,
+              "BlockGpu must match virtual_shadow.slang");
 
 /// virtual_shadow.slang's `VirtualLevel`.
 struct LevelGpu {
@@ -68,58 +79,46 @@ VirtualShadowMap::VirtualShadowMap(const VulkanContext& context,
     if (lastLevel < firstLevel ||
         static_cast<std::uint32_t>(lastLevel - firstLevel + 1) >
             kMaxLevels ||
-        pages == 0) {
+        pages == 0 || pages > (1u << 20)) {
         throw std::invalid_argument("Virtual shadow maps need 1 to " +
                                     std::to_string(kMaxLevels) +
-                                    " levels and some pages");
+                                    " levels and 1 to 2^20 pages");
     }
     levelCount_ =
         static_cast<std::uint32_t>(lastLevel - firstLevel + 1);
-    // Rows as wide as the device allows, at most 128 pages (10 bits
-    // of a page table entry each way).
-    const std::uint32_t widest =
-        context.Limits().maxImageDimension2D / kPageTexels;
-    rowPages_ = std::min({kPagesAcross, widest, pages});
-    const std::uint32_t rows = (pages + rowPages_ - 1) / rowPages_;
-    if (rows > 1024 ||
-        rows * kPageTexels > context.Limits().maxImageDimension2D) {
-        throw std::invalid_argument(
-            "Too many virtual shadow pages for the device");
-    }
     pages_ = pages;
-    pool_ = std::make_unique<GpuImage>(
-        context,
-        ImageDesc{rowPages_ * kPageTexels, rows * kPageTexels, 1, 1,
-                  VK_FORMAT_R32_UINT,
-                  VK_IMAGE_USAGE_STORAGE_BIT |
-                      VK_IMAGE_USAGE_SAMPLED_BIT |
-                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                      VK_IMAGE_USAGE_TRANSFER_DST_BIT});
-    const ImageDesc table{kPagesAcross,
-                          kPagesAcross,
-                          levelCount_,
-                          1,
-                          VK_FORMAT_R32_UINT,
-                          VK_IMAGE_USAGE_STORAGE_BIT |
-                              VK_IMAGE_USAGE_SAMPLED_BIT |
-                              VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                              VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                          false,
-                          true};
-    pageTable_ = std::make_unique<GpuImage>(context, table);
-    requests_ = std::make_unique<GpuImage>(context, table);
-    levels_ = std::make_unique<GpuBuffer>(
-        context, levelCount_ * sizeof(LevelGpu),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
-    counter_ = std::make_unique<GpuBuffer>(
-        context, sizeof(std::uint32_t),
+    constexpr VkBufferUsageFlags kStorage =
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        BufferMemory::Readback);
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    const VkDeviceSize pageTexels = kPageTexels * kPageTexels;
+    const VkDeviceSize entries =
+        VkDeviceSize{kPagesAcross} * kPagesAcross * levelCount_;
+    pool_ = std::make_unique<GpuBuffer>(
+        context, pages * pageTexels * sizeof(std::uint32_t), kStorage,
+        BufferMemory::Device);
+    pageTable_ = std::make_unique<GpuBuffer>(
+        context, entries * sizeof(std::uint32_t), kStorage,
+        BufferMemory::Device);
+    requests_ = std::make_unique<GpuBuffer>(
+        context, entries * sizeof(std::uint32_t), kStorage,
+        BufferMemory::Device);
+    levels_ = std::make_unique<GpuBuffer>(
+        context, levelCount_ * sizeof(LevelGpu), kStorage,
+        BufferMemory::Upload);
+    counter_ =
+        std::make_unique<GpuBuffer>(context, sizeof(std::uint32_t),
+                                    kStorage, BufferMemory::Readback);
+    block_ = std::make_unique<GpuBuffer>(
+        context, sizeof(BlockGpu),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | kStorage,
+        BufferMemory::Upload);
     noDepth_ = std::make_unique<GpuImage>(
         context, ImageDesc{1, 1, 1, 1, VK_FORMAT_R32_SFLOAT,
                            VK_IMAGE_USAGE_SAMPLED_BIT});
-    cleared_ = false;
+    SetLevels(FitLevels(glm::dvec3(0.0, 0.0, 1.0), glm::dvec3(0.0),
+                        glm::dvec3(0.0), firstLevel, lastLevel),
+              0.0f);
 }
 
 std::vector<VirtualShadowLevel> VirtualShadowMap::FitLevels(
@@ -192,7 +191,16 @@ void VirtualShadowMap::SetLevels(
                        static_cast<float>(level.level), 0.0f)});
     }
     levels_->Write(std::as_bytes(std::span(gpu)));
-    bias_ = bias;
+    const BlockGpu block{pool_->Address(),
+                         pageTable_->Address(),
+                         requests_->Address(),
+                         counter_->Address(),
+                         levels_->Address(),
+                         pages_,
+                         levelCount_,
+                         firstLevel_,
+                         bias};
+    block_->Write(std::as_bytes(std::span(&block, 1)));
 }
 
 void VirtualShadowMap::CreatePipelines() const {
@@ -216,14 +224,7 @@ void VirtualShadowMap::Push(VkCommandBuffer commands,
                             VkImageView depth,
                             const Constants& constants) const {
     const DescriptorResource resources[] = {
-        DescriptorResource::Of(pool_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL),
-        DescriptorResource::Of(pageTable_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL),
-        DescriptorResource::Of(requests_->View(),
-                               VK_IMAGE_LAYOUT_GENERAL),
-        DescriptorResource::Of(*levels_),
-        DescriptorResource::Of(*counter_),
+        DescriptorResource::Of(*block_),
         DescriptorResource::Of(depth)};
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
     layout_.PushConstants(commands, &constants, sizeof(constants));
@@ -231,19 +232,12 @@ void VirtualShadowMap::Push(VkCommandBuffer commands,
 
 void VirtualShadowMap::Prepare(VkCommandBuffer commands) const {
     CreatePipelines();
-    pool_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    pageTable_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-    requests_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
     noDepth_->Transition(commands,
                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     // The flags start clear; `allocateMain` clears them after.
     if (!cleared_) {
-        const VkClearColorValue zero{};
-        const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT,
-                                            0, 1, 0, levelCount_};
-        vkCmdClearColorImage(commands, requests_->Handle(),
-                             VK_IMAGE_LAYOUT_GENERAL, &zero, 1,
-                             &range);
+        vkCmdFillBuffer(commands, requests_->Handle(), 0,
+                        VK_WHOLE_SIZE, 0);
         ComputeBarrier(commands);
         cleared_ = true;
     }
@@ -254,7 +248,7 @@ VirtualShadowMap::ConstantsOf(std::uint32_t width,
                               std::uint32_t height,
                               const glm::mat4& inverseViewProjection,
                               const glm::vec3& eye) const {
-    static_assert(sizeof(Constants) == 112,
+    static_assert(sizeof(Constants) == 96,
                   "Constants must match virtual_shadow.slang");
     Constants constants{};
     std::memcpy(constants.inverseViewProjection,
@@ -263,13 +257,8 @@ VirtualShadowMap::ConstantsOf(std::uint32_t width,
     constants.eye[0] = eye.x;
     constants.eye[1] = eye.y;
     constants.eye[2] = eye.z;
-    constants.eye[3] = bias_;
-    constants.sizes[0] = static_cast<std::int32_t>(width);
-    constants.sizes[1] = static_cast<std::int32_t>(height);
-    constants.sizes[2] = firstLevel_;
-    constants.sizes[3] = static_cast<std::int32_t>(levelCount_);
-    constants.pool[0] = pages_;
-    constants.pool[1] = rowPages_;
+    constants.sizes[0] = width;
+    constants.sizes[1] = height;
     return constants;
 }
 

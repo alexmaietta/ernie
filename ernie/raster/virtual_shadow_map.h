@@ -39,11 +39,14 @@ struct VirtualShadowLevel {
 /// pixel from centimetres to the horizon, where cascades spread a few
 /// thousand texels over kilometres.
 ///
-/// Layout (virtual_shadow.slang): the pool is one R32_UINT image 128
-/// pages wide holding reversed-Z depth as float bits (0 far), the
-/// page table and the request flags one R32_UINT 128² layer per
-/// level; a page table entry is the physical page's x in bits 0-9,
-/// its y in 10-19 and bit 31 set when backed.
+/// Layout (virtual_shadow.slang): buffers read through their
+/// addresses, gathered in one block (`Block`, the shaders'
+/// `VirtualShadow`) so casters and shading reach them through one
+/// pointer. The pool holds each physical page's 128² texels after
+/// the one before, reversed-Z depth as float bits (0 far); the page
+/// table and the request flags one uint per page, 128² per level; a
+/// page table entry is the physical page's index in bits 0-19 and
+/// bit 31 set when backed.
 ///
 /// Each frame: `RecordMark` flags the pages the depth buffer's points
 /// fall in, `RecordAllocate` backs them from the pool in order (no
@@ -120,16 +123,20 @@ class VirtualShadowMap {
     /// Clears the backed pages to the far depth, ready for casters.
     void RecordClear(VkCommandBuffer commands) const;
 
-    /// The pool, page table and levels for the casters' fragment
-    /// shaders and shading (virtual_shadow.slang).
-    const GpuImage& Pool() const {
+    /// The block of the buffers' addresses and the clipmap's shape
+    /// (virtual_shadow.slang's `VirtualShadow`), which casters'
+    /// fragment shaders and shading read through its address.
+    const GpuBuffer& Block() const {
+        return *block_;
+    }
+    /// The pool (`Pages()` pages of 128² texels, each after the one
+    /// before) and the page table (128² entries per level), for
+    /// tests and tools.
+    const GpuBuffer& Pool() const {
         return *pool_;
     }
-    const GpuImage& PageTable() const {
+    const GpuBuffer& PageTable() const {
         return *pageTable_;
-    }
-    const GpuBuffer& Levels() const {
-        return *levels_;
     }
     /// The physical pages the last allocation used (the count can
     /// exceed `Pages()` when the pool overflowed), read on the host
@@ -138,18 +145,12 @@ class VirtualShadowMap {
         return *counter_;
     }
 
-    /// Physical pages along each row of the pool.
-    std::uint32_t RowPages() const {
-        return rowPages_;
-    }
-
   private:
     /// virtual_shadow.slang's `VirtualConstants`.
     struct Constants {
         float inverseViewProjection[16];
         float eye[4];
-        std::int32_t sizes[4];
-        std::uint32_t pool[4];
+        std::uint32_t sizes[4];
     };
 
     const VulkanContext& context_;
@@ -157,23 +158,21 @@ class VirtualShadowMap {
     std::int32_t firstLevel_ = 0;
     std::uint32_t levelCount_ = 0;
     std::uint32_t pages_ = 0;
-    std::uint32_t rowPages_ = 0;
-    float bias_ = 0.0f;
     PipelineLayout layout_;
-    std::unique_ptr<GpuImage> pool_;
-    std::unique_ptr<GpuImage> pageTable_;
-    std::unique_ptr<GpuImage> requests_;
-    std::unique_ptr<GpuImage> noDepth_;
+    std::unique_ptr<GpuBuffer> pool_;
+    std::unique_ptr<GpuBuffer> pageTable_;
+    std::unique_ptr<GpuBuffer> requests_;
     std::unique_ptr<GpuBuffer> levels_;
     std::unique_ptr<GpuBuffer> counter_;
+    std::unique_ptr<GpuBuffer> block_;
+    std::unique_ptr<GpuImage> noDepth_;
     mutable bool cleared_ = false;
     mutable std::unique_ptr<ComputePipeline> markPipeline_;
     mutable std::unique_ptr<ComputePipeline> allocatePipeline_;
     mutable std::unique_ptr<ComputePipeline> clearPipeline_;
 
     void CreatePipelines() const;
-    /// Pipelines made, images in the general layout, flags cleared
-    /// once.
+    /// Pipelines made, the flags cleared once.
     void Prepare(VkCommandBuffer commands) const;
     void Push(VkCommandBuffer commands, VkImageView depth,
               const Constants& constants) const;

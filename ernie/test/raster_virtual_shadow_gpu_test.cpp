@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/raster/virtual_shadow_map.h"
 #include "support/vulkan_fixture.h"
@@ -18,31 +19,12 @@ namespace {
 
 class VirtualShadowMapTest : public VulkanTest {};
 
-/// Every texel of an R32_UINT image, layer after layer.
-std::vector<std::uint32_t>
-TexelsOf(const ernie::VulkanContext& context,
-         const GpuImage& source) {
-    auto& image = const_cast<GpuImage&>(source);  // only relaid out
-    const ernie::ImageDesc& desc = image.Desc();
-    const VkDeviceSize count =
-        VkDeviceSize{desc.width} * desc.height * desc.layers;
-    GpuBuffer buffer(context, count * sizeof(std::uint32_t),
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                     ernie::BufferMemory::Readback);
-    context.Submit([&](VkCommandBuffer commands) {
-        image.Transition(commands,
-                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-        VkBufferImageCopy region{};
-        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
-                                   desc.layers};
-        region.imageExtent = {desc.width, desc.height, 1};
-        vkCmdCopyImageToBuffer(commands, image.Handle(),
-                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                               buffer.Handle(), 1, &region);
-    });
-    std::vector<std::uint32_t> texels(count);
-    buffer.Read(std::as_writable_bytes(std::span(texels)));
-    return texels;
+/// Every uint of a buffer.
+std::vector<std::uint32_t> WordsOf(const GpuBuffer& buffer) {
+    std::vector<std::uint32_t> words(buffer.Size() /
+                                     sizeof(std::uint32_t));
+    buffer.Read(std::as_writable_bytes(std::span(words)));
+    return words;
 }
 
 /// A depth image of `depth` everywhere, ready to sample.
@@ -102,15 +84,9 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     const GpuImage depth = FlatDepth(*context_, 64, 48, 0.5f);
     // Junk in the pool, to see the clear.
     context_->Submit([&](VkCommandBuffer commands) {
-        auto& pool = const_cast<GpuImage&>(map.Pool());
-        pool.Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
-        VkClearColorValue junk{};
-        junk.uint32[0] = 7;
-        const VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT,
-                                            0, 1, 0, 1};
-        vkCmdClearColorImage(commands, pool.Handle(),
-                             VK_IMAGE_LAYOUT_GENERAL, &junk, 1,
-                             &range);
+        vkCmdFillBuffer(commands, map.Pool().Handle(), 0,
+                        VK_WHOLE_SIZE, 7);
+        ernie::ComputeBarrier(commands);
         map.RecordMark(commands, depth.View(), 64, 48, inverse,
                        glm::vec3(0.0f));
         map.RecordAllocate(commands);
@@ -118,8 +94,7 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     });
     std::uint32_t used = 0;
     map.Counter().Read(std::as_writable_bytes(std::span(&used, 1)));
-    const std::vector<std::uint32_t> table =
-        TexelsOf(*context_, map.PageTable());
+    const std::vector<std::uint32_t> table = WordsOf(map.PageTable());
     EXPECT_EQ(Backed(table), used);
     EXPECT_GT(used, 4u);
     EXPECT_LT(used, 256u);
@@ -142,26 +117,21 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     }
     // Distinct physical pages, each cleared; the rest keep the junk.
     std::vector<int> seen(256, 0);
-    const std::vector<std::uint32_t> pool =
-        TexelsOf(*context_, map.Pool());
-    const std::uint32_t width = map.RowPages() * 128;
+    const std::vector<std::uint32_t> pool = WordsOf(map.Pool());
     for (const std::uint32_t entry : table) {
         if ((entry >> 31) == 0) {
             continue;
         }
-        const std::uint32_t x = entry & 0x3ff;
-        const std::uint32_t y = (entry >> 10) & 0x3ff;
-        ++seen[y * map.RowPages() + x];
-        EXPECT_EQ(pool[(y * 128 + 5) * width + x * 128 + 9], 0u);
+        const std::uint32_t page = entry & 0xfffff;
+        ASSERT_LT(page, 256u);
+        ++seen[page];
+        EXPECT_EQ(pool[page * 128 * 128 + 5 * 128 + 9], 0u);
     }
     for (std::uint32_t p = 0; p < 256; ++p) {
         EXPECT_LE(seen[p], 1) << "page " << p;
     }
-    const std::uint32_t last = 255;
-    if (used <= last) {
-        EXPECT_EQ(pool[(last / map.RowPages() * 128) * width +
-                       last % map.RowPages() * 128],
-                  7u);
+    if (used < 256) {
+        EXPECT_EQ(pool[255 * 128 * 128], 7u);
     }
 }
 
@@ -188,5 +158,5 @@ TEST_F(VirtualShadowMapTest, AnOverflowingPoolBacksWhatItHolds) {
     std::uint32_t used = 0;
     map.Counter().Read(std::as_writable_bytes(std::span(&used, 1)));
     EXPECT_GT(used, 4u);
-    EXPECT_EQ(Backed(TexelsOf(*context_, map.PageTable())), 4u);
+    EXPECT_EQ(Backed(WordsOf(map.PageTable())), 4u);
 }
