@@ -244,6 +244,9 @@ class VolumePass {
     ComputeInterop* compute_ = nullptr;
     PipelineLayout layout_;
     mutable std::unique_ptr<ComputePipeline> pipelines_[2];
+    /// Temporal amortisation's clamp ranges (`clampRangesMain`), with
+    /// the march's layout, compiled as its first pipeline is.
+    mutable std::unique_ptr<ComputePipeline> rangesPipeline_;
     /// The light patterns each pipeline was compiled with.
     mutable std::size_t pipelinePatterns_[2] = {};
     /// The band groups each pipeline was compiled for, and the
@@ -342,6 +345,8 @@ class VolumePass {
     /// frame's holds for this one.
     struct History {
         std::unique_ptr<GpuBuffer> buffers[2];
+        /// Each block's range to clamp to (`clampRangesMain`).
+        std::unique_ptr<GpuBuffer> ranges;
         std::uint32_t now = 0;
         std::uint32_t width = 0;
         std::uint32_t height = 0;

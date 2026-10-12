@@ -159,6 +159,8 @@ struct VolumeConstants {
     // which it reads (`historyAt`).
     float* historyNow;
     float* historyLast;
+    // Each block's range of what this frame marched about it (`clampRangesMain`).
+    float* clampRanges;
 }
 
 // The shading pass's light (shading.slang's LightGpu, which the renderer checks this against).
@@ -1459,50 +1461,81 @@ bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmi
     return true;
 }
 
-// Where what the volumes show changed, pixel `id`'s reprojected `transmittance` and `added`
-// clamped, band by band, to the range of what this frame marched at the pixels of its block and
-// the blocks about it: what moved on leaves no trail.
+// Where block `blockAt` of view `view`'s range of channel `channel` (0 the transmittance, then
+// each band's) is in `constants.clampRanges`, its lowest then (`high`) its highest: a plane each
+// of every view's blocks, `blocks` of them across and down.
+uint clampRangeAt(uint channel, bool high, uint view, uint2 blockAt, uint2 blocks) {
+    let views = constants.lights.w;
+    return (((2 * channel + (high ? 1u : 0u)) * views + view) * blocks.y + blockAt.y) * blocks.x +
+           blockAt.x;
+}
+
+// Where what the volumes show changed, each block's range, channel by channel, of what this frame
+// marched at the pixels of the block and the blocks about it, for the block's other pixels to
+// clamp what they reproject to (`clampToMarched`): found once a block rather than at each pixel.
+// A thread a block (`id.xy`) of view `id.z`.
 //
 // Reference: B. Karis, "High-Quality Temporal Supersampling", SIGGRAPH Advances in Real-Time
 //   Rendering, 2014 (history clamped to the current frame's neighbourhood).
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void clampRangesMain(uint3 id: SV_DispatchThreadID) {
+    if (pass.rebuild[6] != 0 || pass.rebuild[7] == 0) {
+        return;
+    }
+    let size = viewLoad(constants.offsets.w).xy;
+    let block = temporalBlock();
+    let blocks = (size + block - 1) / block;
+    if (any(id.xy >= blocks)) {
+        return;
+    }
+    let bands = uint(asfloat(viewLoad(constants.offsets.z)).z);
+    let now = constants.historyNow;
+    for (uint channel = 0; channel <= bands; ++channel) {
+        float low = 1e30;
+        float high = -1e30;
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                let at = (int2(id.xy) + int2(dx, dy)) * int(block) + int2(marchedInBlock());
+                if (any(at < int2(0)) || any(at >= int2(size))) {
+                    continue;
+                }
+                let marched = uint2(at);
+                let t = now[historyAt(kHistoryTransmittance, id.z, marched, size)];
+                // Volumes not in view there: no light added, all let through.
+                let value =
+                    channel == 0
+                        ? (t >= 0.0 ? t : 1.0)
+                        : (t >= 0.0
+                               ? now[historyAt(kHistoryBands + channel - 1, id.z, marched, size)]
+                               : 0.0);
+                low = min(low, value);
+                high = max(high, value);
+            }
+        }
+        constants.clampRanges[clampRangeAt(channel, false, id.z, id.xy, blocks)] = low;
+        constants.clampRanges[clampRangeAt(channel, true, id.z, id.xy, blocks)] = high;
+    }
+}
+
+// Pixel `id`'s reprojected `transmittance` and `added` clamped, band by band, to its block's range
+// (`clampRangesMain`): what moved on leaves no trail.
 void clampToMarched(uint3 id, uint2 size, uint bands, inout float transmittance,
                     inout float4 added[kMaxGroups]) {
     let block = temporalBlock();
-    let now = constants.historyNow;
-    let centre = int2(id.xy / block);
-    float lowT = 1e30;
-    float highT = -1e30;
-    float4 low[kMaxGroups];
-    float4 high[kMaxGroups];
-    for (uint g = 0; g < kMaxGroups; ++g) {
-        low[g] = float4(1e30);
-        high[g] = float4(-1e30);
-    }
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            let at = (centre + int2(dx, dy)) * int(block) + int2(marchedInBlock());
-            if (any(at < int2(0)) || any(at >= int2(size))) {
-                continue;
-            }
-            let marched = uint2(at);
-            let t = now[historyAt(kHistoryTransmittance, id.z, marched, size)];
-            // Volumes not in view there: no light added, all let through.
-            let seen = t >= 0.0;
-            lowT = min(lowT, seen ? t : 1.0);
-            highT = max(highT, seen ? t : 1.0);
-            for (uint b = 0; b < bands; ++b) {
-                let value = seen ? now[historyAt(kHistoryBands + b, id.z, marched, size)] : 0.0;
-                low[b / 4][b % 4] = min(low[b / 4][b % 4], value);
-                high[b / 4][b % 4] = max(high[b / 4][b % 4], value);
-            }
-        }
-    }
+    let blocks = (size + block - 1) / block;
+    let blockAt = id.xy / block;
+    let ranges = constants.clampRanges;
+    let lowT = ranges[clampRangeAt(0, false, id.z, blockAt, blocks)];
+    let highT = ranges[clampRangeAt(0, true, id.z, blockAt, blocks)];
     if (lowT > highT) {
         return;
     }
     transmittance = clamp(transmittance, lowT, highT);
     for (uint b = 0; b < bands; ++b) {
-        added[b / 4][b % 4] = clamp(added[b / 4][b % 4], low[b / 4][b % 4], high[b / 4][b % 4]);
+        added[b / 4][b % 4] =
+            clamp(added[b / 4][b % 4], ranges[clampRangeAt(b + 1, false, id.z, blockAt, blocks)],
+                  ranges[clampRangeAt(b + 1, true, id.z, blockAt, blocks)]);
     }
 }
 
