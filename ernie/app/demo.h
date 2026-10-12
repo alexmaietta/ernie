@@ -7,6 +7,7 @@
 #include "ernie/util/tensor.h"
 
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -120,8 +121,15 @@ class Demo {
     virtual void Step();
 
     /// Draws a frame: the viewer's next, or without one the scene
-    /// through `GetRenderer` into `Image`.
+    /// through `GetRenderer` into `Image`. A benchmark without checks
+    /// renders asynchronously instead, frames overlapping on the GPU
+    /// and none read back (`Image` stays empty), until
+    /// `FinishFrames`.
     virtual void Render();
+
+    /// Waits for every frame `Render` left running; the extent of the
+    /// last one's LdrColor, (0, 0) if it rendered none so.
+    std::pair<std::uint32_t, std::uint32_t> FinishFrames();
 
     /// Writes `--output`: the viewport's next frame in a viewer, else
     /// the scene's LdrColor (`RenderImage`) as PNG.
@@ -250,6 +258,10 @@ class Demo {
     std::map<std::string, Tensor, std::less<>> loggedArrays_;
     std::map<std::string, Tensor, std::less<>> loggedImages_;
     Tensor image_;
+    /// A benchmark's frames still running, oldest first, and the
+    /// extent of the last.
+    std::deque<StepOperation> running_;
+    std::pair<std::uint32_t, std::uint32_t> lastExtent_{0, 0};
     bool untestedSteps_ = false;
     bool untestedFinal_ = false;
 };

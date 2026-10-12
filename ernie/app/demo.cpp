@@ -237,9 +237,34 @@ void Demo::Step() {}
 void Demo::Render() {
     if (viewer_ != nullptr) {
         viewer_->Step();
-    } else {
-        image_ = GetRenderer().Render(GetScene());
+        return;
     }
+    if (!options_.benchmark || options_.test) {
+        image_ = GetRenderer().Render(GetScene());
+        return;
+    }
+    // A benchmark measures rendering alone: frames in flight
+    // together, as a viewer keeps them, and none read back to the
+    // host.
+    constexpr std::size_t kInFlight = 2;
+    running_.push_back(GetRenderer().StepAsync(GetScene()));
+    for (const auto& [path, output] : running_.back().Outputs()) {
+        for (const auto& [name, var] : output.vars) {
+            lastExtent_ = {var.Width(), var.Height()};
+        }
+    }
+    while (running_.size() > kInFlight) {
+        running_.front().Wait();
+        running_.pop_front();
+    }
+}
+
+std::pair<std::uint32_t, std::uint32_t> Demo::FinishFrames() {
+    for (StepOperation& step : running_) {
+        step.Wait();
+    }
+    running_.clear();
+    return lastExtent_;
 }
 
 void Demo::SaveOutput(const std::filesystem::path& path) {
@@ -831,6 +856,14 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                 }
             }
         }
+        // A benchmark's frames still running finish before its clock
+        // stops.
+        std::pair<std::uint32_t, std::uint32_t> extent{0, 0};
+        Clock::time_point timerEnd = Clock::now();
+        if (demo) {
+            extent = demo->FinishFrames();
+            timerEnd = Clock::now();
+        }
 
         if (!o.output.empty() && demo) {
             demo->SaveOutput(o.output);
@@ -856,15 +889,20 @@ std::shared_ptr<Demo> DemoRunner::Run(std::shared_ptr<Demo> demo) {
                                 kBenchmarkWarmup));
             } else {
                 const double elapsed = std::chrono::duration<double>(
-                                           Clock::now() - *timerStart)
+                                           timerEnd - *timerStart)
                                            .count();
+                std::string size;
+                if (extent.first > 0) {
+                    size = ", " + std::to_string(extent.first) +
+                           " x " + std::to_string(extent.second);
+                }
                 std::printf(
-                    "Benchmark: %s FPS (%llu frames in %.2f s)\n",
+                    "Benchmark: %s FPS (%llu frames in %.2f s%s)\n",
                     FormatFps(static_cast<double>(timedFrames) /
                               std::max(elapsed, 1e-9))
                         .c_str(),
                     static_cast<unsigned long long>(timedFrames),
-                    elapsed);
+                    elapsed, size.c_str());
             }
         }
         std::fflush(stdout);

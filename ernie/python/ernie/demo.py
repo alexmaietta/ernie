@@ -92,9 +92,12 @@ class Demo(_app.Demo):
 
     def render(self):
         """Draws a frame: through the viewer, or with `renderer` into
-        `image` without one."""
+        `image` without one; a benchmark without checks renders
+        asynchronously, reading nothing back (`_app.Demo.render`)."""
         if self.viewer is not None:
             self.viewer.step()
+        elif self.args.benchmark is not False and not self.args.test:
+            _app.Demo.render(self)
         else:
             self.image = np.asarray(self.renderer.render(self.scene))
 
