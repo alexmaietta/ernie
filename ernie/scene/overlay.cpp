@@ -138,6 +138,8 @@ Overlay::Overlay() {
 OverlayItem Overlay::ItemOf(const OverlayStyle& style,
                             const glm::vec4& color) {
     OverlayItem item{color, style.depth, style.world};
+    item.id = style.id;
+    item.hover = style.hover;
     if (!style.anchor.IsEmpty()) {
         const auto found =
             std::find(anchors_.begin(), anchors_.end(), style.anchor);
@@ -813,6 +815,63 @@ Overlay& Overlay::Rect(const ScreenPlacement& placement,
          0,
          true});
     Touch();
+    return *this;
+}
+
+Overlay& Overlay::Button(const ScreenPlacement& placement,
+                         std::string_view label,
+                         const OverlayStyle& style,
+                         const glm::vec2& size) {
+    const glm::vec2 text = OverlayTextSize(label, style.size);
+    const glm::vec2 pad(0.6f * style.size, 0.4f * style.size);
+    const glm::vec2 box =
+        size.x > 0.0f && size.y > 0.0f ? size : text + 2.0f * pad;
+    const glm::vec2 corner =
+        placement.offset - placement.Align() * box;
+    OverlayStyle screen = style;
+    screen.depth = OverlayDepth::Always;
+    screen.anchor = Path();
+    // The box, taking the hover colour; then the label, centred.
+    sprites_.push_back(
+        {glm::dvec3(placement.at, 0.0),
+         {corner.x, corner.y, corner.x + box.x, corner.y + box.y},
+         MarkerShape::Square,
+         ItemOf(screen, screen.background),
+         0,
+         true});
+    OverlayStyle caption = screen;
+    caption.hover.reset();
+    caption.background.a = 0.0f;
+    AddText(glm::dvec3(placement.at, 0.0),
+            corner + 0.5f * (box - text), label, caption, true);
+    Touch();
+    return *this;
+}
+
+std::uint32_t Overlay::ScreenItemAt(const glm::vec2& pixel,
+                                    const glm::vec2& extent) const {
+    // The last drawn is on top.
+    for (auto it = sprites_.rbegin(); it != sprites_.rend(); ++it) {
+        if (!it->screen || it->item.id == 0) {
+            continue;
+        }
+        const glm::vec2 at =
+            glm::vec2(it->anchor.x, it->anchor.y) * extent;
+        if (pixel.x >= at.x + it->rect.x &&
+            pixel.x < at.x + it->rect.z &&
+            pixel.y >= at.y + it->rect.y &&
+            pixel.y < at.y + it->rect.w) {
+            return it->item.id;
+        }
+    }
+    return 0;
+}
+
+Overlay& Overlay::SetHovered(std::uint32_t id) {
+    if (id != hovered_) {
+        hovered_ = id;
+        Touch();
+    }
     return *this;
 }
 

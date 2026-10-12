@@ -117,9 +117,10 @@ struct ViewportDisplay {
         true;  ///< The camera the viewport looks through.
     bool toolbarLighting =
         true;  ///< How the viewport lights the scene.
-    /// The viewport's own UI: its toolbar and menus, heads-up display,
-    /// tool strip, axis indicator and transform gizmo. Off (the H key
-    /// toggles it), only the image and the scene's overlays show.
+    /// The viewport's own UI: its toolbar and menus, heads-up
+    /// display, tool strip, axis indicator and transform gizmo. Off
+    /// (the H key toggles it), only the image and the scene's
+    /// overlays show.
     bool ui = true;
 
     bool operator==(const ViewportDisplay&) const = default;
@@ -640,8 +641,22 @@ class Viewer {
         std::string label, std::function<void(Viewer&)> action,
         std::function<bool(const Viewer&)> checked = {});
 
-    /// Removes the viewport toggle, heads-up display item or viewport
-    /// menu item with id `id`; unknown ids are ignored.
+    /// Calls `clicked` with the overlay's name and the item's id when
+    /// a click in the viewport lands on a screen overlay item with an
+    /// id (`OverlayStyle::id`, such as a button's,
+    /// `Overlay::Button`), in place of picking the scene there. While
+    /// the pointer is over such an item, its overlay marks it hovered
+    /// (`Overlay::SetHovered`). Returns an id for
+    /// `RemoveViewportItem`.
+    /// @throws std::invalid_argument for no `clicked`.
+    std::uint64_t AddOverlayClickHandler(
+        std::function<void(Viewer&, const std::string&,
+                           std::uint32_t)>
+            clicked);
+
+    /// Removes the viewport toggle, heads-up display item, viewport
+    /// menu item or overlay click handler with id `id`; unknown ids
+    /// are ignored.
     void RemoveViewportItem(std::uint64_t id);
 
     /// The RenderSettings prim the viewport renders with: the scene's

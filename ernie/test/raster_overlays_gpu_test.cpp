@@ -310,6 +310,30 @@ TEST_F(RasterDelegateTest,
     }
 }
 
+TEST_F(RasterDelegateTest, HoveredButtonsTakeTheirHoverColour) {
+    RasterDelegate delegate(*context_);
+    Scene scene = OverlayScene();
+    OverlayStyle style;
+    style.id = 3;
+    style.background = {0.0f, 0.0f, 0.0f, 1.0f};
+    style.hover = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    ernie::ScreenPlacement at;
+    at.offset = {2.0f, 2.0f};
+    scene.GetOverlay("menu").Button(at, "", style, {20.0f, 12.0f});
+    const auto corner = [&] {
+        const std::vector<std::uint8_t> image =
+            Bytes(delegate.Render(scene));
+        const std::size_t texel = 4 * (4 * kSize + 4);
+        return glm::ivec3(image[texel], image[texel + 1],
+                          image[texel + 2]);
+    };
+    EXPECT_EQ(corner(), glm::ivec3(0)) << "its background";
+    scene.GetOverlay("menu").SetHovered(3);
+    EXPECT_EQ(corner(), glm::ivec3(255, 0, 0)) << "hovered";
+    scene.GetOverlay("menu").SetHovered(0);
+    EXPECT_EQ(corner(), glm::ivec3(0));
+}
+
 TEST_F(RasterDelegateTest, DashedLinesLeaveGaps) {
     // DrawCrossing's line dashed every 4 pixels, from the host and
     // from a batch: along it, about as many texels lit as not.

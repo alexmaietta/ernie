@@ -640,9 +640,56 @@ struct Viewer::State {
         std::function<bool(const Viewer&)> checked;
         std::uint64_t scope = 0;
     };
+    struct OverlayClick {
+        std::uint64_t id;
+        std::function<void(Viewer&, const std::string&,
+                           std::uint32_t)>
+            clicked;
+        std::uint64_t scope = 0;
+    };
     std::vector<ViewportToggle> viewportToggles;
     std::vector<HudItem> hudItems;
     std::vector<ViewportMenuItem> viewportMenuItems;
+    std::vector<OverlayClick> overlayClicks;
+    /// The overlay whose screen item the pointer is over, if any.
+    std::string hoveredOverlay;
+
+    /// The topmost screen item with an id under `pixel` of the
+    /// viewport's image of `extent` pixels, in the overlays it draws
+    /// (the last drawn on top): its overlay and id, or an id of 0.
+    std::pair<std::string, std::uint32_t>
+    ScreenItemAt(const glm::vec2& pixel,
+                 const glm::vec2& extent) const {
+        std::istringstream words(ShownOverlays(false));
+        std::vector<std::string> names(
+            std::istream_iterator<std::string>(words), {});
+        for (auto name = names.rbegin(); name != names.rend();
+             ++name) {
+            if (const Overlay* overlay = scene.FindOverlay(*name)) {
+                if (!overlay->IsVisible()) {
+                    continue;
+                }
+                if (const std::uint32_t id =
+                        overlay->ScreenItemAt(pixel, extent)) {
+                    return {*name, id};
+                }
+            }
+        }
+        return {"", 0};
+    }
+
+    /// Marks the screen item under the pointer hovered in its
+    /// overlay, and none in the overlay hovered before.
+    void HoverScreenItem(const std::string& name, std::uint32_t id) {
+        if (!hoveredOverlay.empty() && hoveredOverlay != name &&
+            scene.FindOverlay(hoveredOverlay) != nullptr) {
+            scene.GetOverlay(hoveredOverlay).SetHovered(0);
+        }
+        hoveredOverlay = name;
+        if (!name.empty()) {
+            scene.GetOverlay(name).SetHovered(id);
+        }
+    }
 
     /// The overlays the viewport draws: the session's selection and
     /// eye-menu overlays, those of applications' toggles while shown,
@@ -1439,18 +1486,33 @@ struct Viewer::State {
             hovered = ImGui::IsItemHovered();
             active = ImGui::IsItemActive();
             const ImGuiIO& io = ImGui::GetIO();
+            // The pointer in the render's pixels, and the screen
+            // overlay item it is over, which it hovers.
+            const glm::vec2 pixel((io.MousePos.x - imageMin.x) *
+                                      extent.x / imageSize.x,
+                                  (io.MousePos.y - imageMin.y) *
+                                      extent.y / imageSize.y);
+            const auto [overlay, item] =
+                hovered
+                    ? ScreenItemAt(pixel,
+                                   glm::vec2(extent.x, extent.y))
+                    : std::pair<std::string, std::uint32_t>{"", 0};
+            HoverScreenItem(overlay, item);
             if (ImGui::IsItemDeactivated() &&
                 ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
                 io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <=
                     kClickSlop * kClickSlop) {
-                // In the render's pixels; off the image picks none.
-                const float x = (io.MousePos.x - imageMin.x) *
-                                extent.x / imageSize.x;
-                const float y = (io.MousePos.y - imageMin.y) *
-                                extent.y / imageSize.y;
-                if (x >= 0.0f && y >= 0.0f && x < extent.x &&
-                    y < extent.y) {
-                    PickAt(x, y, io.KeyCtrl);
+                if (item != 0) {
+                    // An overlay item's click, not a pick; the
+                    // handlers may add or remove handlers.
+                    const auto handlers = overlayClicks;
+                    for (const OverlayClick& handler : handlers) {
+                        handler.clicked(self, overlay, item);
+                    }
+                } else if (pixel.x >= 0.0f && pixel.y >= 0.0f &&
+                           pixel.x < extent.x && pixel.y < extent.y) {
+                    // Off the image picks none.
+                    PickAt(pixel.x, pixel.y, io.KeyCtrl);
                 }
             }
         }
@@ -3809,6 +3871,7 @@ void Viewer::RemoveScope(std::uint64_t scope) {
     std::erase_if(s.viewportToggles, in);
     std::erase_if(s.hudItems, in);
     std::erase_if(s.viewportMenuItems, in);
+    std::erase_if(s.overlayClicks, in);
     s.logs->RemoveScope(scope);
     s.hudTime = -kHudRefresh;
     std::vector<std::string> titles;
@@ -4674,6 +4737,19 @@ std::uint64_t Viewer::AddViewportMenuItem(
     return id;
 }
 
+std::uint64_t Viewer::AddOverlayClickHandler(
+    std::function<void(Viewer&, const std::string&, std::uint32_t)>
+        clicked) {
+    if (!clicked) {
+        throw std::invalid_argument(
+            "Overlay click handlers need a function");
+    }
+    State& s = *state_;
+    const std::uint64_t id = s.nextCallback++;
+    s.overlayClicks.push_back({id, std::move(clicked), s.scope});
+    return id;
+}
+
 void Viewer::RemoveViewportItem(std::uint64_t id) {
     State& s = *state_;
     const auto matches = [id](const auto& item) {
@@ -4682,6 +4758,7 @@ void Viewer::RemoveViewportItem(std::uint64_t id) {
     std::erase_if(s.viewportToggles, matches);
     std::erase_if(s.hudItems, matches);
     std::erase_if(s.viewportMenuItems, matches);
+    std::erase_if(s.overlayClicks, matches);
     s.hudTime = -kHudRefresh;
 }
 

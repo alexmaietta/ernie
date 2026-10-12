@@ -232,11 +232,17 @@ OverlayStyle StyleFromPython(const nb::kwargs& kwargs) {
                 value.is_none() ? Path() : PathFromPython(value);
         } else if (name == "dash") {
             style.dash = nb::cast<float>(value);
+        } else if (name == "id") {
+            style.id = nb::cast<std::uint32_t>(value);
+        } else if (name == "hover") {
+            if (!value.is_none()) {
+                style.hover = ColorFromPython(value);
+            }
         } else {
             throw nb::type_error(("unknown overlay style '" + name +
                                   "'; expected color, width, dash, "
                                   "size, depth, world, "
-                                  "background or anchor")
+                                  "background, anchor, id or hover")
                                      .c_str());
         }
     }
@@ -251,7 +257,10 @@ constexpr const char* kStyleDoc =
     "(-1 for every view), "
     "background (labels' backing colour) and anchor (a prim the "
     "coordinates are in the space of, followed as it moves, on the "
-    "GPU too). Returns the overlay, for chaining.";
+    "GPU too), id (a number hit tests report, such as a button's) "
+    "and "
+    "hover (the colour items with that id take while hovered). "
+    "Returns the overlay, for chaining.";
 
 glm::vec2 Vec2FromPython(nb::handle object) {
     const auto values = nb::cast<std::vector<float>>(object);
@@ -835,6 +844,51 @@ void BindOverlay(nb::module_& m) {
                          "pixels on the image: a panel or a bar.") +
              kPlacementDoc + kStyleDoc)
                 .c_str())
+        .def(
+            "button",
+            [](Overlay& o, std::string_view label, nb::handle at,
+               nb::handle offset, nb::handle align, nb::handle box,
+               const nb::kwargs& style) -> Overlay& {
+                return o.Button(
+                    PlacementFromPython(at, offset, align), label,
+                    StyleFromPython(style),
+                    box.is_none() ? glm::vec2(0.0f)
+                                  : Vec2FromPython(box));
+            },
+            nb::arg("label"), nb::arg("at") = nb::make_tuple(0, 0),
+            nb::arg("offset") = nb::make_tuple(0, 0),
+            nb::arg("align") = nb::none(),
+            nb::arg("box") = nb::none(), nb::arg("style"),
+            nb::rv_policy::reference_internal,
+            (std::string(
+                 "A button on the image: a box `box` (width, height) "
+                 "pixels (fitted around `label` when None) in the "
+                 "style's "
+                 "`background`, or its `hover` colour while hovered, "
+                 "with `label` centred in its `color`. Give it an "
+                 "`id`: the viewer reports its clicks "
+                 "(`Viewer.add_overlay_click_handler`), and "
+                 "`screen_item_at` finds it under a pointer.") +
+             kPlacementDoc + kStyleDoc)
+                .c_str())
+        .def(
+            "screen_item_at",
+            [](const Overlay& o, nb::handle pixel,
+               nb::handle extent) {
+                return o.ScreenItemAt(Vec2FromPython(pixel),
+                                      Vec2FromPython(extent));
+            },
+            nb::arg("pixel"), nb::arg("extent"),
+            "The id of the topmost screen item with one covering "
+            "`pixel` (x, y down) of an image `extent` (width, "
+            "height) "
+            "pixels, or 0: what a click or pointer there hits.")
+        .def_prop_rw(
+            "hovered", &Overlay::Hovered,
+            [](Overlay& o, std::uint32_t id) { o.SetHovered(id); },
+            "The id whose items show their hover colour, 0 for none; "
+            "the viewer sets it under its pointer, and anything else "
+            "hit testing (a VR controller's ray) may.")
         .def(
             "numbers",
             [](Overlay& o, nb::handle values, nb::handle points,

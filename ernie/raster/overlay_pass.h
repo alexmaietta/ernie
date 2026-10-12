@@ -11,6 +11,7 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -117,7 +118,11 @@ class OverlayPass {
 
     /// Whether the last `Prepare` left nothing to draw.
     bool Empty() const {
-        return groups_.empty() && batchDraws_.empty();
+        return batchDraws_.empty() &&
+               std::ranges::all_of(layers_,
+                                   [](const HostLayer& layer) {
+                                       return layer.groups.empty();
+                                   });
     }
 
     /// Whether the last `Prepare` left screen items (`Overlay::Text`)
@@ -205,7 +210,6 @@ class OverlayPass {
     std::map<std::pair<VkFormat, bool>,
              std::array<std::unique_ptr<GraphicsPipeline>, 7>>
         pipelines_;
-    std::array<std::unique_ptr<GpuBuffer>, 3> buffers_;
     /// Host items of one primitive (0 segments, 1 triangles, 2
     /// sprites) of one world (-1 shared) on the screen or not: a run
     /// of that primitive's buffer.
@@ -216,10 +220,27 @@ class OverlayPass {
         std::uint32_t first = 0;
         std::uint32_t count = 0;
     };
-    /// In order of drawing: triangles, segments, sprites, and by
-    /// world within each.
-    std::vector<Group> groups_;
+    /// One overlay's host items: its segments, triangles and sprites,
+    /// in groups in order of drawing (triangles, segments, sprites,
+    /// and by world within each), uploaded again only when it
+    /// changes (or the frame's origin does). Its items' anchors count
+    /// from its first row of the anchor table, `anchorBase`, so other
+    /// overlays' changes leave them as they are.
+    struct HostLayer {
+        const Overlay* overlay = nullptr;
+        std::uint64_t version = 0;
+        std::array<std::unique_ptr<GpuBuffer>, 3> buffers;
+        std::vector<Group> groups;
+        std::uint32_t anchorBase = 0;
+    };
+    std::vector<HostLayer> layers_;
+    /// Bound for the item buffers when there are no layers.
+    std::unique_ptr<GpuBuffer> emptyItems_;
     bool hasScreen_ = false;
+
+    /// Builds `layer`'s host items from its overlay, relative to
+    /// `origin`, and uploads them.
+    void BuildLayer(HostLayer& layer, const glm::dvec3& origin);
     /// One draw of a batch: the batch, its primitive (0 segments, 1
     /// triangles, 2 sprites, 3 numbers) and vertex count; for a batch
     /// sorted by world, its draw arguments for the shared items (each

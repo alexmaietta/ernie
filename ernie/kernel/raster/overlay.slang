@@ -70,6 +70,9 @@ struct OverlayConstants {
     // sprite shaders draw; y: 1 when the draw takes one slot's items in world order
     // (`sortedItems`): z the slot, w the batch's slots.
     uint4 batch;
+    // x: the first row in the anchor table of the drawn layer's anchors, which its items' count
+    // from (0 for batches, whose items' are rows of the table).
+    uint4 layer;
 }
 
 // Many items of one kind read from arrays in `batchData` (`OverlayBatch`), expanded here into
@@ -183,11 +186,16 @@ struct VertexOutput {
 
 // Point `p` of an item with `info`, in its anchor's space if it has one, relative to the frame's
 // origin.
+// 1 + the row in the anchor table of an item's anchor: its layer's base on (`constants.layer`).
+uint anchorRow(uint4 info) {
+    return info.w + constants.layer.x;
+}
+
 float3 anchored(uint4 info, float3 p) {
     if (info.w == 0) {
         return p;
     }
-    let first = 4 * (info.w - 1);
+    let first = 4 * (anchorRow(info) - 1);
     let m = float4x4(anchors[first], anchors[first + 1], anchors[first + 2], anchors[first + 3]);
     return mul(m, float4(p, 1.0)).xyz;
 }
@@ -207,7 +215,7 @@ bool inWorld(uint4 info) {
     var world = int(info.z);
     // Without a world of its own, its anchor's.
     if (world < 0 && info.w != 0) {
-        world = anchorWorlds[info.w - 1];
+        world = anchorWorlds[anchorRow(info) - 1];
     }
     return world < 0 || constants.view.x < 0 || world == constants.view.x;
 }

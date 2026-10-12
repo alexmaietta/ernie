@@ -224,6 +224,38 @@ TEST(Overlay, ScreenTextSitsByItsPlacement) {
               glm::vec4(-20.0f, -10.0f, 20.0f, 10.0f));
 }
 
+TEST(Overlay, ButtonsAreHitWhereTheyAreDrawn) {
+    Overlay overlay;
+    OverlayStyle style;
+    style.id = 7;
+    style.hover = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f);
+    // 100 x 30 pixels from (20, 40) of a 640 x 480 image.
+    ernie::ScreenPlacement at;
+    at.offset = {20.0f, 40.0f};
+    overlay.Button(at, "Pause", style, {100.0f, 30.0f});
+    style.id = 8;
+    at.offset = {20.0f, 80.0f};
+    overlay.Button(at, "Reset", style);
+    const glm::vec2 extent(640.0f, 480.0f);
+    EXPECT_EQ(overlay.ScreenItemAt({21.0f, 41.0f}, extent), 7u);
+    EXPECT_EQ(overlay.ScreenItemAt({119.0f, 69.0f}, extent), 7u);
+    EXPECT_EQ(overlay.ScreenItemAt({121.0f, 50.0f}, extent), 0u)
+        << "past its right edge";
+    EXPECT_EQ(overlay.ScreenItemAt({30.0f, 90.0f}, extent), 8u)
+        << "fitted around its label";
+    EXPECT_EQ(overlay.ScreenItemAt({300.0f, 300.0f}, extent), 0u);
+    // Only the box takes the hover colour, not the label.
+    EXPECT_EQ(overlay.Sprites().front().item.hover, style.hover);
+    EXPECT_FALSE(overlay.Sprites()[1].item.hover.has_value());
+    const std::uint64_t version = overlay.Version();
+    overlay.SetHovered(7);
+    EXPECT_NE(overlay.Version(), version);
+    const std::uint64_t hovered = overlay.Version();
+    overlay.SetHovered(7);
+    EXPECT_EQ(overlay.Version(), hovered) << "unchanged";
+    EXPECT_EQ(overlay.Hovered(), 7u);
+}
+
 TEST(Overlay, AnchoredItemsShareTheirAnchors) {
     Overlay overlay;
     OverlayStyle style;

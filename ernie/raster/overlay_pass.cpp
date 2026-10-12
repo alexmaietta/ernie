@@ -46,8 +46,9 @@ struct OverlayConstants {
     std::int32_t view[4];
     float viewport[4];
     std::uint32_t batch[4];
+    std::uint32_t layer[4];
 };
-static_assert(sizeof(OverlayConstants) == 48,
+static_assert(sizeof(OverlayConstants) == 64,
               "OverlayConstants must match overlay.slang");
 
 /// One `OverlayBatch` as overlay.slang's `Batch` reads it.
@@ -270,11 +271,9 @@ OverlayPass::OverlayPass(const VulkanContext& context,
         context, sortLayout_,
         compiler.CompileSpirv(sort, "posesMain"));
     // Placeholders, so the bindings always have a buffer.
-    for (std::unique_ptr<GpuBuffer>& buffer : buffers_) {
-        buffer = std::make_unique<GpuBuffer>(
-            context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    emptyItems_ = std::make_unique<GpuBuffer>(
+        context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Device);
     batchData_ = std::make_shared<GpuBuffer>(
         context, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         BufferMemory::Device);
@@ -393,77 +392,135 @@ void OverlayPass::Prepare(std::span<const Overlay* const> overlays,
         return;
     }
     ERNIE_ZONE("Overlay prepare");
+    // Each overlay's host items again only if it changed (or the
+    // origin did, which they are relative to): a HUD redrawn every
+    // frame leaves the others' as they are.
+    const bool moved = origin != preparedOrigin_;
+    std::vector<HostLayer> layers;
+    for (const auto& [overlay, version] : wanted) {
+        const auto old = std::ranges::find_if(
+            layers_, [&](const HostLayer& layer) {
+                return layer.overlay == overlay;
+            });
+        if (old != layers_.end() && old->version == version &&
+            !moved) {
+            layers.push_back(std::move(*old));
+        } else {
+            HostLayer& layer = layers.emplace_back();
+            layer.overlay = overlay;
+            layer.version = version;
+            if (old != layers_.end()) {
+                layer.buffers = std::move(old->buffers);
+            }
+            BuildLayer(layer, origin);
+        }
+    }
+    // Layers dropped (hidden or removed) free buffers earlier frames
+    // may still read.
+    if (std::ranges::any_of(layers_, [](const HostLayer& layer) {
+            return layer.buffers[0] != nullptr;
+        })) {
+        vkDeviceWaitIdle(context_.Device());
+    }
+    layers_ = std::move(layers);
     prepared_ = std::move(wanted);
     preparedOrigin_ = origin;
     worlds_ = worlds;
+    // The anchor table: each layer's anchors, a run from its base,
+    // then the batches'.
     anchorPaths_.clear();
     anchorIndices_.clear();
-    groups_.clear();
+    hasScreen_ = false;
+    for (HostLayer& layer : layers_) {
+        layer.anchorBase =
+            static_cast<std::uint32_t>(anchorPaths_.size());
+        anchorPaths_.insert(anchorPaths_.end(),
+                            layer.overlay->Anchors().begin(),
+                            layer.overlay->Anchors().end());
+        hasScreen_ =
+            hasScreen_ ||
+            std::ranges::any_of(layer.groups, [](const Group& group) {
+                return group.screen;
+            });
+    }
+    PrepareBatches(origin);
+}
+
+void OverlayPass::BuildLayer(HostLayer& layer,
+                             const glm::dvec3& origin) {
+    const Overlay& overlay = *layer.overlay;
     std::vector<std::pair<GroupKey, GpuSegment>> segments;
     std::vector<std::pair<GroupKey, GpuTriangle>> triangles;
     std::vector<std::pair<GroupKey, GpuSprite>> sprites;
-    for (const auto& [overlay, version] : prepared_) {
-        // The overlay's anchors' indices in the table, plus 1.
-        std::vector<std::uint32_t> anchors;
-        for (const Path& path : overlay->Anchors()) {
-            anchors.push_back(AnchorIndex(path) + 1);
+    // Items posed under anchors are in their anchors' space, which
+    // count from the layer's base (`HostLayer::anchorBase`).
+    const auto originOf = [&](const OverlayItem& item) {
+        return item.anchor == 0 ? origin : glm::dvec3(0.0);
+    };
+    // An item in its hover colour while its id is hovered.
+    const auto shown = [&](const OverlayItem& item) {
+        OverlayItem drawn = item;
+        if (item.id != 0 && item.id == overlay.Hovered() &&
+            item.hover) {
+            drawn.color = *item.hover;
         }
-        const auto anchorOf = [&](const OverlayItem& item) {
-            return item.anchor == 0 ? 0u : anchors[item.anchor - 1];
-        };
-        // Items posed under anchors are in their anchors' space.
-        const auto originOf = [&](const OverlayItem& item) {
-            return item.anchor == 0 ? origin : glm::dvec3(0.0);
-        };
-        for (const OverlaySegment& segment : overlay->Segments()) {
-            GpuSegment gpu;
-            const glm::dvec3 from = originOf(segment.item);
-            Relative(gpu.a, segment.a, from, segment.width);
-            Relative(gpu.b, segment.b, from, segment.dash);
-            Info(gpu.info, segment.item, MarkerShape::Square,
-                 anchorOf(segment.item));
-            segments.emplace_back(GroupKey{false, segment.item.world},
-                                  gpu);
+        return drawn;
+    };
+    for (const OverlaySegment& segment : overlay.Segments()) {
+        GpuSegment gpu;
+        const glm::dvec3 from = originOf(segment.item);
+        Relative(gpu.a, segment.a, from, segment.width);
+        Relative(gpu.b, segment.b, from, segment.dash);
+        Info(gpu.info, shown(segment.item), MarkerShape::Square,
+             segment.item.anchor);
+        segments.emplace_back(GroupKey{false, segment.item.world},
+                              gpu);
+    }
+    for (const OverlayTriangle& triangle : overlay.Fills()) {
+        GpuTriangle gpu;
+        const glm::dvec3 from = originOf(triangle.item);
+        for (int k = 0; k < 3; ++k) {
+            Relative(gpu.p[k],
+                     triangle.points[static_cast<std::size_t>(k)],
+                     from);
         }
-        for (const OverlayTriangle& triangle : overlay->Fills()) {
-            GpuTriangle gpu;
-            const glm::dvec3 from = originOf(triangle.item);
-            for (int k = 0; k < 3; ++k) {
-                Relative(gpu.p[k],
-                         triangle.points[static_cast<std::size_t>(k)],
-                         from);
-            }
-            Info(gpu.info, triangle.item, MarkerShape::Square,
-                 anchorOf(triangle.item));
-            triangles.emplace_back(
-                GroupKey{false, triangle.item.world}, gpu);
-        }
-        for (const OverlaySprite& sprite : overlay->Sprites()) {
-            GpuSprite gpu;
-            Relative(gpu.anchor, sprite.anchor,
-                     sprite.screen ? glm::dvec3(0.0)
-                                   : originOf(sprite.item));
-            std::memcpy(gpu.rect, &sprite.rect[0], sizeof(gpu.rect));
-            Info(gpu.info, sprite.item, sprite.shape,
-                 sprite.screen ? 0u : anchorOf(sprite.item),
-                 sprite.glyph, sprite.screen);
-            sprites.emplace_back(
-                GroupKey{sprite.screen, sprite.item.world}, gpu);
-        }
+        Info(gpu.info, shown(triangle.item), MarkerShape::Square,
+             triangle.item.anchor);
+        triangles.emplace_back(GroupKey{false, triangle.item.world},
+                               gpu);
+    }
+    for (const OverlaySprite& sprite : overlay.Sprites()) {
+        GpuSprite gpu;
+        Relative(gpu.anchor, sprite.anchor,
+                 sprite.screen ? glm::dvec3(0.0)
+                               : originOf(sprite.item));
+        std::memcpy(gpu.rect, &sprite.rect[0], sizeof(gpu.rect));
+        Info(gpu.info, shown(sprite.item), sprite.shape,
+             sprite.screen ? 0u : sprite.item.anchor, sprite.glyph,
+             sprite.screen);
+        sprites.emplace_back(
+            GroupKey{sprite.screen, sprite.item.world}, gpu);
     }
     // Triangles first, so lines and markers on them stay visible.
+    layer.groups.clear();
     const std::vector<GpuTriangle> sortedTriangles =
-        Grouped(triangles, 1, groups_);
+        Grouped(triangles, 1, layer.groups);
     const std::vector<GpuSegment> sortedSegments =
-        Grouped(segments, 0, groups_);
+        Grouped(segments, 0, layer.groups);
     const std::vector<GpuSprite> sortedSprites =
-        Grouped(sprites, 2, groups_);
-    Upload(buffers_[0], std::as_bytes(std::span(sortedSegments)));
-    Upload(buffers_[1], std::as_bytes(std::span(sortedTriangles)));
-    Upload(buffers_[2], std::as_bytes(std::span(sortedSprites)));
-    hasScreen_ = std::ranges::any_of(
-        groups_, [](const Group& group) { return group.screen; });
-    PrepareBatches(origin);
+        Grouped(sprites, 2, layer.groups);
+    for (std::unique_ptr<GpuBuffer>& buffer : layer.buffers) {
+        if (buffer == nullptr) {
+            buffer = std::make_unique<GpuBuffer>(
+                context_, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+    }
+    Upload(layer.buffers[0],
+           std::as_bytes(std::span(sortedSegments)));
+    Upload(layer.buffers[1],
+           std::as_bytes(std::span(sortedTriangles)));
+    Upload(layer.buffers[2], std::as_bytes(std::span(sortedSprites)));
 }
 
 void OverlayPass::PrepareBatches(const glm::dvec3& origin) {
@@ -1090,20 +1147,27 @@ void OverlayPass::Record(VkCommandBuffer commands,
     rendering.extent = target.extent;
     rendering.loadColor = true;
     BeginRendering(commands, rendering);
-    const DescriptorResource resources[] = {
-        target.uniforms,
-        DescriptorResource::Of(target.depth),
-        DescriptorResource::Of(*buffers_[0]),
-        DescriptorResource::Of(*buffers_[1]),
-        DescriptorResource::Of(*buffers_[2]),
-        DescriptorResource::Of(*batchData_),
-        DescriptorResource::Of(*batchInfos_),
-        DescriptorResource::Of(*sortData_),
-        DescriptorResource::Of(*anchorMatrices_),
-        DescriptorResource::Of(*glyphs_),
-        DescriptorResource::Of(*anchorWorlds_)};
-    layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                 resources);
+    // The bindings with a layer's items (or none).
+    const auto bind = [&](const HostLayer* items) {
+        const auto of = [&](std::size_t k) {
+            return DescriptorResource::Of(
+                items != nullptr ? *items->buffers[k] : *emptyItems_);
+        };
+        const DescriptorResource resources[] = {
+            target.uniforms,
+            DescriptorResource::Of(target.depth),
+            of(0),
+            of(1),
+            of(2),
+            DescriptorResource::Of(*batchData_),
+            DescriptorResource::Of(*batchInfos_),
+            DescriptorResource::Of(*sortData_),
+            DescriptorResource::Of(*anchorMatrices_),
+            DescriptorResource::Of(*glyphs_),
+            DescriptorResource::Of(*anchorWorlds_)};
+        layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                     resources);
+    };
     const bool srgb = target.format == VK_FORMAT_R8G8B8A8_SRGB ||
                       target.format == VK_FORMAT_B8G8R8A8_SRGB;
     OverlayConstants constants{
@@ -1112,29 +1176,41 @@ void OverlayPass::Record(VkCommandBuffer commands,
         {static_cast<float>(target.extent.width),
          static_cast<float>(target.extent.height), target.nearPlane,
          target.farPlane},
+        {0, 0, 0, 0},
         {0, 0, 0, 0}};
-    // The host items: of a view of one world, the shared groups and
-    // its world's.
+    // Each layer's host items: of a view of one world, the shared
+    // groups and its world's, their anchors from the layer's base.
     constexpr std::array<std::uint32_t, 3> kVertices{6, 3, 6};
-    std::size_t bound = 3;
-    for (const Group& group : groups_) {
-        if (!drawn(group.screen) ||
-            (target.world >= 0 && group.world >= 0 &&
-             group.world != target.world)) {
+    for (const HostLayer& items : layers_) {
+        if (items.groups.empty()) {
             continue;
         }
-        if (bound != group.primitive) {
-            vkCmdBindPipeline(
-                commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                found->second[group.primitive]->Handle());
-            bound = group.primitive;
+        bind(&items);
+        constants.layer[0] = items.anchorBase;
+        std::size_t bound = 3;
+        for (const Group& group : items.groups) {
+            if (!drawn(group.screen) ||
+                (target.world >= 0 && group.world >= 0 &&
+                 group.world != target.world)) {
+                continue;
+            }
+            if (bound != group.primitive) {
+                vkCmdBindPipeline(
+                    commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    found->second[group.primitive]->Handle());
+                bound = group.primitive;
+            }
+            constants.batch[0] = group.first;
+            layout_.PushConstants(commands, &constants,
+                                  sizeof(constants));
+            vkCmdDraw(commands,
+                      group.count * kVertices[group.primitive], 1, 0,
+                      0);
         }
-        constants.batch[0] = group.first;
-        layout_.PushConstants(commands, &constants,
-                              sizeof(constants));
-        vkCmdDraw(commands, group.count * kVertices[group.primitive],
-                  1, 0, 0);
     }
+    // Batch items' anchors are rows of the table themselves.
+    bind(nullptr);
+    constants.layer[0] = 0;
     // Then the batches, each expanded from its arrays as it draws:
     // arrows' heads before their shafts. A view of one world draws a
     // sorted batch's shared items and its world's, in world order.
@@ -1184,8 +1260,11 @@ void OverlayPass::Record(VkCommandBuffer commands,
 
 std::uint64_t OverlayPass::GpuBytes() const {
     std::uint64_t bytes = 0;
-    for (const std::unique_ptr<GpuBuffer>& buffer : buffers_) {
-        bytes += buffer->Size();
+    for (const HostLayer& layer : layers_) {
+        for (const std::unique_ptr<GpuBuffer>& buffer :
+             layer.buffers) {
+            bytes += buffer->Size();
+        }
     }
     return bytes + batchData_->Size() + batchInfos_->Size() +
            sortData_->Size() + drawArgs_->Size() +

@@ -54,6 +54,13 @@ struct OverlayStyle {
     /// its space, and they follow it as it moves, on the GPU too
     /// (a prim posed there). Empty for world coordinates.
     Path anchor;
+    /// A number the application gives the items, which hit tests and
+    /// picks report (`Overlay::ScreenItemAt`), such as a button's; 0
+    /// for none.
+    std::uint32_t id = 0;
+    /// The colour items with `id` take while it is hovered
+    /// (`Overlay::SetHovered`); none keeps their colour.
+    std::optional<glm::vec4> hover;
 };
 
 /// Where a screen item (`Overlay::Text`, `Overlay::Rect`) sits on
@@ -91,6 +98,8 @@ struct OverlayItem {
     /// 1 + the overlay's anchor (`Overlay::Anchors`) its coordinates
     /// are relative to, 0 for none.
     std::uint32_t anchor = 0;
+    std::uint32_t id = 0;            ///< `OverlayStyle::id`.
+    std::optional<glm::vec4> hover;  ///< `OverlayStyle::hover`.
 };
 
 /// A line segment of `width` pixels, dashed every `dash` pixels
@@ -410,6 +419,30 @@ class Overlay {
                   const glm::vec2& size,
                   const OverlayStyle& style = {});
 
+    /// A button on the image, as `Text`: a box of `size` pixels (or
+    /// fitted around `label` when 0) in the style's `background`, or
+    /// its `hover` colour while hovered, with `label` centred in its
+    /// `color`. Give it the style's `id`, and hit test it
+    /// (`ScreenItemAt`) or let the viewer report its clicks.
+    Overlay& Button(const ScreenPlacement& placement,
+                    std::string_view label,
+                    const OverlayStyle& style = {},
+                    const glm::vec2& size = glm::vec2(0.0f));
+
+    /// The `id` of the topmost screen item with one covering `pixel`
+    /// (y down) of an image of `extent` pixels, or 0: what a click or
+    /// a pointer there would hit.
+    std::uint32_t ScreenItemAt(const glm::vec2& pixel,
+                               const glm::vec2& extent) const;
+
+    /// Marks the items of `id` hovered (0 for none), so those with a
+    /// `hover` colour take it; a new version only when it changes.
+    Overlay& SetHovered(std::uint32_t id);
+
+    std::uint32_t Hovered() const {
+        return hovered_;
+    }
+
     /// A marker of `style.size` pixels at `point`.
     Overlay& Marker(const glm::dvec3& point,
                     const OverlayStyle& style = {},
@@ -501,6 +534,7 @@ class Overlay {
     std::vector<OverlaySprite> sprites_;
     std::vector<OverlayBatch> batches_;
     std::vector<Path> anchors_;
+    std::uint32_t hovered_ = 0;
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };

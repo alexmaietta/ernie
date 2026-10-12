@@ -232,7 +232,8 @@ void BindApp(nb::module_& parent) {
         .def_rw(
             "ui", &ViewportDisplay::ui,
             "The viewport's own UI (toolbar and menus, heads-up "
-            "display, tool strip, axis indicator, gizmo); off, as the "
+            "display, tool strip, axis indicator, gizmo); off, as "
+            "the "
             "H key toggles, only the image and the scene's overlays "
             "show.")
         .def(nb::self == nb::self);
@@ -772,6 +773,24 @@ void BindApp(nb::module_& parent) {
             "in the viewport; "
             "changed(viewer, shown) is told when the user switches "
             "it. Returns an id.")
+        .def(
+            "add_overlay_click_handler",
+            [](Viewer& viewer, nb::callable clicked) {
+                const Callable call(std::move(clicked));
+                return viewer.AddOverlayClickHandler(
+                    [call](Viewer& v, const std::string& overlay,
+                           std::uint32_t id) {
+                        call(v, overlay, id);
+                    });
+            },
+            nb::arg("clicked"),
+            "Calls clicked(viewer, overlay, id) when a click in the "
+            "viewport lands on a screen overlay item with an id (a "
+            "button's, `Overlay.button`), in place of picking the "
+            "scene "
+            "there; the item under the pointer shows its hover "
+            "colour. "
+            "Returns an id for `remove_viewport_item`.")
         .def("viewport_toggle_shown", &Viewer::ViewportToggleShown,
              nb::arg("id"))
         .def("set_viewport_toggle_shown",
