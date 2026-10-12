@@ -758,9 +758,7 @@ class RasterRenderer {
                                         const PipelineLayout& layout);
     /// Compiles the sky pass for a frame camera, or a pushbroom,
     /// unless it has.
-    /// skyMain for part `part` (shading.slang's kSkyPart*), compiled
-    /// when first wanted.
-    void SkyPipeline(bool pushbroom, std::uint32_t part);
+    void SkyPipeline(bool pushbroom);
     /// Compiles `plan`'s fused sensor kernels, one per segment,
     /// unless already compiled.
     void SensorPipelines(const SensorPlan& plan);
@@ -1305,14 +1303,10 @@ class RasterRenderer {
     std::unique_ptr<GpuBuffer> starCells_;
     std::size_t starCount_ = 0;
     std::uint32_t sky_ = 0;
-    /// For frame cameras and, once one is seen, pushbrooms, a
-    /// pipeline per part of the sky.
-    std::array<std::array<std::unique_ptr<ComputePipeline>, 4>, 2>
-        skyPipelines_;
+    /// For frame cameras and, once one is seen, pushbrooms.
+    std::array<std::unique_ptr<ComputePipeline>, 2> skyPipelines_;
     std::vector<std::size_t> modelsInUse_;
     SpectralBands bands_;
-    /// The frame's thermal emission, for the material table.
-    ThermalSettings thermal_;
     std::vector<SensorFilter> filters_;
     VkExtent2D extent_{0, 0};
     std::unique_ptr<OverlayPass> overlays_;

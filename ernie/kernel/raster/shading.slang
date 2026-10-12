@@ -2623,8 +2623,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     if (gIds.Load(int4(id.xyz, 0)).x != kBackground) {
         return;
     }
-    // A pipeline per part (`kSkyPart`, from the variant's constants) holds that part's code alone.
-    let part = kSkyPart < 4 ? kSkyPart : pass.model.w;
+    let part = pass.model.w;
     let size = float2(sh.size.xy);
     let pixel = float2(id.xy) + 0.5;
     let ndc = float2(pixel.x / size.x * 2.0 - 1.0, 1.0 - pixel.y / size.y * 2.0);

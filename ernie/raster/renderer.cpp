@@ -806,9 +806,6 @@ constexpr std::uint32_t kShadeAir = 1;
 constexpr std::uint32_t kShadePolarization = 2;
 constexpr std::uint32_t kShadeLasers = 4;
 constexpr std::uint32_t kShadeLightsShift = 8;
-/// skyMain's part plus 1 (shading.slang's kSkyPart*), 0 for any, in
-/// bits 24 up: a pipeline per part holds that part's code alone.
-constexpr std::uint32_t kSkyPartShift = 24;
 constexpr std::uint32_t kFullShading =
     kShadeAir | kShadePolarization | kShadeLasers |
     (16u << kShadeLightsShift);
@@ -825,12 +822,7 @@ std::string ShadingVariantSource(std::uint32_t variant) {
            ";\nstatic const bool kShadeLasers = " +
            flag(kShadeLasers) +
            ";\nstatic const uint kShadeLights = " +
-           std::to_string((variant >> kShadeLightsShift) & 0xFFu) +
-           ";\nstatic const uint kSkyPart = " +
-           std::to_string((variant >> kSkyPartShift) != 0
-                              ? (variant >> kSkyPartShift) - 1
-                              : 4u) +
-           ";\n";
+           std::to_string(variant >> kShadeLightsShift) + ";\n";
 }
 
 /// The leanest shading variant `params` needs, with polarization when
@@ -1643,7 +1635,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
 
     SetDomeMap(nullptr);
     SetStars({});
-    SkyPipeline(false, 0);
+    SkyPipeline(false);
     noOcclusion_ = std::make_unique<GpuImage>(
         context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
                             VK_IMAGE_USAGE_STORAGE_BIT, false, true});
@@ -3896,6 +3888,7 @@ void RasterRenderer::Update(
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
     }
+    SkyPipeline(pushbroom_);
     sky_ = 0;
     if (params.dome && params.dome->visible) {
         sky_ |= kSkyDome | (hasDomeMap_ ? kSkyMap : 0u);
@@ -3908,17 +3901,6 @@ void RasterRenderer::Update(
     }
     if (!params.bodies.empty()) {
         sky_ |= kSkyBodies;
-    }
-    // The parts it draws (the dome always, clearing the pixels).
-    SkyPipeline(pushbroom_, 0);
-    if ((sky_ & kSkyStars) != 0) {
-        SkyPipeline(pushbroom_, 1);
-    }
-    if ((sky_ & kSkyBodies) != 0) {
-        SkyPipeline(pushbroom_, 2);
-    }
-    if ((sky_ & kSkyAtmosphere) != 0) {
-        SkyPipeline(pushbroom_, 3);
     }
     // The planet's shadow table takes the size of the brightest
     // distant light, the sun's for Earth, for every light.
@@ -4025,19 +4007,17 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
                 .first->second;
 }
 
-void RasterRenderer::SkyPipeline(bool pushbroom, std::uint32_t part) {
+void RasterRenderer::SkyPipeline(bool pushbroom) {
     std::unique_ptr<ComputePipeline>& sky =
-        skyPipelines_[pushbroom ? 1 : 0][part];
+        skyPipelines_[pushbroom ? 1 : 0];
     if (sky == nullptr) {
         // The sky pass shares shading's module, composed with the
-        // first model, which it ignores, and compiled for its part.
+        // first model, which it ignores.
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(
                 ShadingModules(brdfs_.Models().front(),
-                               lightPatterns_, pushbroom,
-                               kFullShading |
-                                   ((part + 1) << kSkyPartShift)),
+                               lightPatterns_, pushbroom),
                 "skyMain"));
     }
 }
@@ -6497,17 +6477,15 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
         // radiance.
         if (sky_ != 0) {
             ERNIE_GPU_ZONE(context_, commands, "Sky");
+            vkCmdBindPipeline(
+                commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                skyPipelines_[pushbroom_ ? 1 : 0]->Handle());
+            shadingLayout_.Push(
+                commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             // Its parts in turn (shading.slang's kSkyPart*), each
             // adding to what the one before stored: the dome, which
             // clears the pixels too, so it always runs.
             const auto part = [&](std::uint32_t index) {
-                vkCmdBindPipeline(
-                    commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                    skyPipelines_[pushbroom_ ? 1 : 0][index]
-                        ->Handle());
-                shadingLayout_.Push(commands,
-                                    VK_PIPELINE_BIND_POINT_COMPUTE,
-                                    shading);
                 ShadingConstants constants = constantsFor(0);
                 constants.model[3] = index;
                 shadingLayout_.PushConstants(commands, &constants,
