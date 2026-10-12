@@ -172,6 +172,7 @@ void GroundDrawable::Prepare(const FrameParams& params,
                           ? params_.material
                           : RasterRenderer::kDefaultMaterial;
     uniforms.ids[1] = params_.primId;
+    uniforms.ids[2] = params_.linkGroup;
     const VkDeviceSize bytes = params.Views() * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());

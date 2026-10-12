@@ -959,6 +959,7 @@ void TerrainDrawable::Prepare(
     }
     uniforms.ids[0] = material;
     uniforms.ids[1] = params_.primId;
+    uniforms.ids[2] = params_.linkGroup;
     const VkDeviceSize bytes = views * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());
@@ -1083,7 +1084,7 @@ void TerrainDrawable::RecordShadow(
     // there would read as relief that is not).
     const RasterRenderer::CastersView& view = renderer_.Casters();
     if (!prepared_ || cascade >= cascadeRanges_.size() ||
-        !casters.shared ||
+        !casters.shared || !casters.Casts(params_.linkGroup) ||
         (view.valid && cascade == view.shadowView)) {
         return;
     }

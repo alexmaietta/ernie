@@ -24,7 +24,7 @@ struct PointsDraw {
     // x: the half of the positions holding them now, y: at the last frame (points, not floats),
     // z: flags, w: the largest scale of `model`.
     uint4 info;
-    // Material, prim id.
+    // Material, prim id, light link group.
     uint4 ids;
 }
 
@@ -139,7 +139,7 @@ PointsOutput fragmentMain(VertexOutput in) {
     PointsOutput out;
     out.normal = float4(normal, 1.0);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
-    out.ids = uint4(d.ids.x, d.ids.y, in.point, 0u);
+    out.ids = uint4(d.ids.x, d.ids.y, in.point, packSurfaceFlags(linkGroupFlags(d.ids.z), 0.0));
     out.depth = saturate(clip.z / clip.w);
     return out;
 }

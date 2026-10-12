@@ -4412,11 +4412,14 @@ void RasterRenderer::RecordShadowMaps(
                 lightShadowBlocks_, v * kLightShadowBlockStride,
                 sizeof(ShadowUniforms));
             own.shadowFromFrame = true;
+            // Only the geometry its light's shadow link holds.
+            ShadowCasters casters = lightCasters_;
+            casters.linkGroups = lightViews_[v].shadowMask;
             for (const RasterDrawable* drawable : drawables) {
                 ERNIE_GPU_ZONE_NAMED(context_, commands,
                                      drawable->ProfileName());
                 drawable->RecordShadow(commands, own, v, matrices[v],
-                                       lightCasters_);
+                                       casters);
             }
             vkCmdEndRendering(commands);
         }
@@ -4452,10 +4455,12 @@ void RasterRenderer::RecordLayeredLightShadows(
             const std::size_t v = firstLayeredView_ + p;
             RasterFrame layered = frame;
             layered.shadowLayer = static_cast<std::uint32_t>(v);
+            ShadowCasters casters = pass.casters;
+            casters.linkGroups = lightViews_[v].shadowMask;
             for (const RasterDrawable* drawable : drawables) {
                 drawable->RecordShadow(
                     commands, layered, v,
-                    lightViews_[v].lightViewProjection, pass.casters);
+                    lightViews_[v].lightViewProjection, casters);
             }
         }
         vkCmdEndRendering(commands);

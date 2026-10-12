@@ -447,6 +447,7 @@ void PlanetDrawable::Prepare(
     }
     uniforms.ids[0] = material;
     uniforms.ids[1] = params_.primId;
+    uniforms.ids[2] = params_.linkGroup;
     const VkDeviceSize bytes = views * kUniformsStride;
     if (uniforms_.Size() < bytes) {
         vkDeviceWaitIdle(renderer_.Context().Device());
@@ -572,7 +573,7 @@ void PlanetDrawable::RecordShadow(
     std::size_t cascade, const glm::mat4& lightViewProjection,
     const ShadowCasters& casters) const {
     if (!prepared_ || cascade >= cascadeRanges_.size() ||
-        !casters.shared) {
+        !casters.shared || !casters.Casts(params_.linkGroup)) {
         return;
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,

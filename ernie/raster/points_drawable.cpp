@@ -669,6 +669,7 @@ void PointsDrawable::Prepare(const FrameParams& params,
         std::memcpy(&draw.info[3], &scale, sizeof(scale));
         draw.ids[0] = item.material;
         draw.ids[1] = item.primId;
+        draw.ids[2] = item.linkGroup;
     }
     const VkDeviceSize bytes = std::max<VkDeviceSize>(
         draws.size() * sizeof(GpuPointsDraw), 16);
@@ -811,7 +812,8 @@ void PointsDrawable::RecordShadow(
                       shadowPipeline_->Handle());
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const std::size_t count = clouds_.at(items_[i].points).count;
-        if (count == 0 || !casters.Draws(items_[i].world)) {
+        if (count == 0 || !casters.Draws(items_[i].world) ||
+            !casters.Casts(items_[i].linkGroup)) {
             continue;
         }
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,

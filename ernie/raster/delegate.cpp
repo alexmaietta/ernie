@@ -2658,6 +2658,9 @@ void RasterDelegate::UpdatePrims(
     terrain.material = MaterialOf(scene, prims_.terrain);
     terrain.primId =
         prims_.terrain.IsEmpty() ? 0u : PrimIdOf(prims_.terrain);
+    terrain.linkGroup = prims_.terrain.IsEmpty()
+                            ? 0u
+                            : links_.GroupOf(prims_.terrain);
     terrain_.SetParams(terrain);
     planet_.SetParams(terrain);
     ground_.SetEnabled(!prims_.ground.IsEmpty());
@@ -2665,6 +2668,7 @@ void RasterDelegate::UpdatePrims(
         GroundParams ground = GroundParamsOf(scene, prims_.ground);
         ground.material = MaterialOf(scene, prims_.ground);
         ground.primId = PrimIdOf(prims_.ground);
+        ground.linkGroup = links_.GroupOf(prims_.ground);
         ground_.SetParams(ground);
     }
     // The highlighted prims and everything under them, as the prim

@@ -68,12 +68,20 @@ struct ShadowCasters {
         true;  ///< Draw what every world shares, such as the terrain.
     std::int32_t world =
         kAllWorlds;  ///< The world whose casters to draw.
+    /// The light link groups whose geometry casts these shadows
+    /// (`LightParams::shadowMask`), a bit each.
+    std::uint32_t linkGroups = ~0u;
 
     /// Whether casters (or a view's draws) in world `of` (-1: shared)
     /// are drawn.
     bool Draws(std::int32_t of) const {
         return of == -1 ? shared
                         : (world == kAllWorlds || world == of);
+    }
+
+    /// Whether geometry of light link group `group` casts them.
+    bool Casts(std::uint32_t group) const {
+        return ((linkGroups >> (group & 31u)) & 1u) != 0;
     }
 };
 

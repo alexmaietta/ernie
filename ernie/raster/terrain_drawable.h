@@ -66,6 +66,9 @@ struct TerrainParams {
                                            ///< table.
     std::uint32_t primId =
         1;  ///< Written to the PrimId render var; 0 means background.
+    /// Its light link group (`LinkGroups`), which lights light it and
+    /// whose shadows it casts.
+    std::uint32_t linkGroup = 0;
     float hillshadeAzimuth =
         315.0f;  ///< Hillshade's light, degrees clockwise from north.
     float hillshadeAltitude =

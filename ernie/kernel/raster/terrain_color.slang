@@ -83,6 +83,7 @@ GBuffer fragmentMain(VertexOutput in) {
     out.normal = float4(shadingNormal, 1.0);
     let scale = flags == kUnlit ? 1.0 : surfaceAlbedoScale(in.world);
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
-    out.ids = uint4(t.ids.x, t.ids.y, 0, packSurfaceFlags(flags, detail.slopeVariance));
+    out.ids = uint4(t.ids.x, t.ids.y, 0,
+                    packSurfaceFlags(flags | linkGroupFlags(t.ids.z), detail.slopeVariance));
     return out;
 }

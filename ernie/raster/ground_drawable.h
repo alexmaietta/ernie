@@ -24,6 +24,8 @@ struct GroundParams {
                                            ///< table.
     std::uint32_t primId =
         1;  ///< Written to the PrimId render var; 0 means background.
+    /// Its light link group (`LinkGroups`), which lights light it.
+    std::uint32_t linkGroup = 0;
     bool checker = false;  ///< Modulate the material's albedo with a
                            ///< checkerboard.
     float checkerSize = 1.0f;  ///< World size of a checker square.

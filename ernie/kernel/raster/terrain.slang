@@ -19,7 +19,7 @@ public struct TerrainUniforms {
     public uint4 lodInfo;
     // Morph start distance and 1 / (morph end - morph start) per LOD level, two levels per float4.
     public float4 morph[8];
-    // Material, prim id.
+    // Material, prim id, light link group.
     public uint4 ids;
     // xyz: towards the hillshade's light (x east, y north, z up).
     public float4 hillshade;

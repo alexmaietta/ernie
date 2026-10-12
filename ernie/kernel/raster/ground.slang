@@ -25,7 +25,7 @@ struct GroundUniforms {
     float4 colour1;
     // Image width and height in pixels.
     float4 viewport;
-    // Material, prim id.
+    // Material, prim id, light link group.
     uint4 ids;
     float4 padding[6];  // to 256 bytes, the views' stride
 }
@@ -112,7 +112,8 @@ GroundOutput shadeGround(VertexOutput in) {
     GroundOutput out;
     out.normal = float4(normalize(float3(-detail.slope, 1.0)), 1.0);
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
-    out.ids = uint4(g.ids.x, g.ids.y, 0, packSurfaceFlags(0u, detail.slopeVariance));
+    out.ids = uint4(g.ids.x, g.ids.y, 0,
+                    packSurfaceFlags(linkGroupFlags(g.ids.z), detail.slopeVariance));
     // Reverse-Z: kept above the cleared 0 out to the horizon, past any far plane.
     out.depth = clamp(clip.z / clip.w, 1.17549435e-38, 1.0);
     return out;

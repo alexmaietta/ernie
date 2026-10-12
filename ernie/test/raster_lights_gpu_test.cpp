@@ -2600,6 +2600,30 @@ TEST_F(RasterDelegateTest, LightLinksChooseWhatALampLights) {
               1e-2f * bothRight);
 }
 
+// Terrain and the ground plane take light links as meshes do.
+TEST_F(RasterDelegateTest,
+       LightLinksChooseWhetherTerrainAndGroundAreLit) {
+    Scene scene = LampScene(20.0);
+    RasterDelegate delegate(*context_);
+    const float lit = RadianceAt(delegate, scene, 0.0f, 0.0f);
+    ASSERT_GT(lit, 0.0f);
+    ernie::SphereLight lamp(scene, "/World/Lamp");
+    lamp.SetLightLinkExcludes({ernie::Path("/World/Terrain")});
+    EXPECT_LT(RadianceAt(delegate, scene, 0.0f, 0.0f), 1e-2f * lit)
+        << "the terrain left out";
+    lamp.SetLightLinkExcludes({});
+    EXPECT_NEAR(RadianceAt(delegate, scene, 0.0f, 0.0f), lit,
+                1e-3f * lit);
+
+    scene.Remove("/World/Terrain");
+    ernie::GroundPlane::Define(scene, "/World/Ground");
+    const float ground = RadianceAt(delegate, scene, 0.0f, 0.0f);
+    ASSERT_GT(ground, 0.0f);
+    lamp.SetLightLinkExcludes({ernie::Path("/World/Ground")});
+    EXPECT_LT(RadianceAt(delegate, scene, 0.0f, 0.0f), 1e-2f * ground)
+        << "the ground plane left out";
+}
+
 TEST_F(RasterDelegateTest, LightLinksChooseWhatALaserLights) {
     // A beam 20 m across over two cubes, then linked to the left one.
     double bandWidth = 0.0;
