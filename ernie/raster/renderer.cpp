@@ -4949,7 +4949,7 @@ RasterRenderer::FitViewCascades(const glm::vec3& towards,
     }
     return FitCascades(view, shadowDistance, towards, low, high,
                        fit.count, fit.lambda, resolution, splitNear,
-                       fit.around);
+                       fit.around, context_.SupportsDepthClamp());
 }
 
 std::optional<std::pair<float, float>>

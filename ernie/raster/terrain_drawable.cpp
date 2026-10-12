@@ -233,6 +233,7 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     shadow.vertexSpirv = shadowVertex;
     shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
     shadow.depthBiasSlope = 1.5f;
+    shadow.depthClamp = true;
     shadowPipeline_ = std::make_unique<GraphicsPipeline>(
         renderer_.Context(), layout_, shadow);
     CreateGBufferPipeline(false);

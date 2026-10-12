@@ -255,6 +255,9 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context,
     raster.lineWidth = 1.0f;
     raster.depthBiasEnable =
         desc.depthBiasSlope != 0.0f ? VK_TRUE : VK_FALSE;
+    raster.depthClampEnable =
+        desc.depthClamp && context.SupportsDepthClamp() ? VK_TRUE
+                                                        : VK_FALSE;
     raster.depthBiasSlopeFactor = desc.depthBiasSlope;
     VkPipelineMultisampleStateCreateInfo multisample{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};

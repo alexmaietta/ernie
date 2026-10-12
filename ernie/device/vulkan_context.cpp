@@ -524,6 +524,10 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     c.anisotropy_ = supported.features.samplerAnisotropy == VK_TRUE;
     features.features.fillModeNonSolid =
         supported.features.fillModeNonSolid;
+    // For shadow maps that clamp casters in front of their near
+    // plane onto it.
+    features.features.depthClamp = supported.features.depthClamp;
+    c.depthClamp_ = supported.features.depthClamp == VK_TRUE;
     features.features.multiDrawIndirect =
         supported.features.multiDrawIndirect;
     c.multiDrawIndirect_ =

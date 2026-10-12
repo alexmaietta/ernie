@@ -578,6 +578,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     shadow.vertexSpirv = vertex;
     shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
     shadow.depthBiasSlope = 1.5f;
+    shadow.depthClamp = true;
     shadowPipeline_ =
         std::make_unique<GraphicsPipeline>(context_, layout_, shadow);
     RebuildGeometry();
@@ -650,6 +651,7 @@ void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
         shadow.fragmentSpirv = fragment;
         shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
         shadow.depthBiasSlope = 1.5f;
+        shadow.depthClamp = true;
         shadowCutoutPipeline_ = std::make_unique<GraphicsPipeline>(
             context_, layout_, shadow);
     }

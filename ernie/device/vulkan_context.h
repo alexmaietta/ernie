@@ -161,6 +161,12 @@ class VulkanContext {
         return rayQuery_;
     }
 
+    /// Whether pipelines can clamp depth (`GraphicsPipelineDesc::
+    /// depthClamp`).
+    bool SupportsDepthClamp() const {
+        return depthClamp_;
+    }
+
     bool SupportsAnisotropy() const {
         return anisotropy_;
     }
@@ -319,6 +325,7 @@ class VulkanContext {
     VkPhysicalDeviceLimits limits_{};
     bool rayQuery_ = false;
     bool anisotropy_ = false;
+    bool depthClamp_ = false;
     bool multiDrawIndirect_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;

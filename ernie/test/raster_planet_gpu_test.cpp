@@ -12,8 +12,10 @@
 #include "support/vulkan_fixture.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -217,6 +219,46 @@ TEST_F(RasterDelegateTest, APlanetRefinesBelowItsDataUnderTheEye) {
     }
     EXPECT_EQ(clear, 0u) << "holes in the ground below the horizon";
     EXPECT_GT(delegate.Planet().Lod().Refinement(), 0u);
+}
+
+// Sun shadows on an Earth-sized planet, cascades fitted to what a
+// frame saw: the cascades' depth spans only their slices, so the
+// sunlit ground does not shadow itself in speckles (acne).
+TEST_F(RasterDelegateTest, APlanetsSunlitGroundHasNoShadowAcne) {
+    constexpr double kEarth = 6371008.8;
+    Scene scene;
+    ernie::Terrain::Define(scene, "/World/Earth")
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(6 * 65 * 65, 0.0f), {6, 65, 65}))
+        .SetPlanetRadius(kEarth)
+        .SetMaterialBinding("/Looks/Ground");
+    scene.Set("/World/Earth", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 0.0, -kEarth)));
+    ernie::Material::Define(scene, "/Looks/Ground")
+        .SetAlbedo(glm::dvec3(0.5));
+    scene.Define("/World/Sun", tokens::kDistantLight)
+        .Set(tokens::kTransform,
+             ernie::DistantLightTransform({0.5, 0.0, 0.866}));
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kSize, kSize))
+        .SetShadowFit(std::string(tokens::kVisible));
+    PlaceCamera(scene, {-1.7, 5.2, 14.7}, {-25.0, 0.0, 1.0},
+                {0.0, 0.0, 1.0}, {1.0, 1e6});
+    RasterDelegate delegate(*context_);
+    delegate.Sync(scene);
+    for (int frame = 0; frame < 3; ++frame) {
+        const Tensor image = delegate.Render(scene);
+        const auto* pixels = image.As<std::uint8_t>();
+        int lowest = 255;
+        int highest = 0;
+        for (std::uint32_t i = 0; i < kSize * kSize; ++i) {
+            lowest = std::min<int>(lowest, pixels[i * 4 + 1]);
+            highest = std::max<int>(highest, pixels[i * 4 + 1]);
+        }
+        EXPECT_LE(highest - lowest, 8) << "frame " << frame;
+    }
 }
 
 TEST_F(RasterDelegateTest,

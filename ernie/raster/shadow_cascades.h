@@ -78,7 +78,11 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 /// does not change as the camera rotates, and snaps its position to
 /// whole shadow map texels, so shadow edges do not shimmer as the
 /// camera moves (Valient 2008). Light-space depth spans the whole
-/// scene box, so casters outside the view still cast into it.
+/// scene box, so casters outside the view still cast into it; with
+/// `clampCasters`, for maps whose pipelines clamp depth, only each
+/// cascade's own sphere within it, casters nearer the light landing
+/// on its near plane ("pancaking"), so a vast scene such as a planet
+/// keeps depth precision.
 ///
 /// References:
 /// - W. Engel, "Cascaded Shadow Maps", in ShaderX5, Charles River
@@ -96,11 +100,13 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 /// face's slice, which shading picks by the face's own view depth,
 /// with a sphere about the eye of radius the split's far depth along
 /// a face's corner ray.
+/// @param clampCasters Whether the maps' pipelines clamp depth
+/// (`GraphicsPipelineDesc::depthClamp`).
 std::vector<ShadowCascade>
 FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& toSun, const glm::vec3& sceneMin,
             const glm::vec3& sceneMax, int count, float lambda,
             std::uint32_t resolution, float splitNear = 0.0f,
-            float around = 0.0f);
+            float around = 0.0f, bool clampCasters = false);
 
 }  // namespace ernie

@@ -1175,6 +1175,22 @@ inline constexpr std::string_view kMerged = "merged";
 /// metres, default 1).
 inline constexpr std::string_view kShadowWorldFit =
     "ernie:shadows:worldFit";
+// RenderSettings' volume quality: steps through volumes and towards
+// lights, the sky and the air, multiple scattering and shadow maps.
+inline constexpr std::string_view kVolumeStepsPerVoxel =
+    "ernie:volumes:stepsPerVoxel";
+inline constexpr std::string_view kVolumeMaxSteps =
+    "ernie:volumes:maxSteps";
+inline constexpr std::string_view kVolumeShadowSteps =
+    "ernie:volumes:shadowSteps";
+inline constexpr std::string_view kVolumeSkyLightSteps =
+    "ernie:volumes:skyLightSteps";
+inline constexpr std::string_view kVolumeAirSteps =
+    "ernie:volumes:airSteps";
+inline constexpr std::string_view kVolumeMaxOctaves =
+    "ernie:volumes:maxOctaves";
+inline constexpr std::string_view kVolumeShadowResolution =
+    "ernie:volumes:shadowResolution";
 inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =
@@ -1183,8 +1199,7 @@ inline constexpr std::string_view kShadowWorldMargin =
 /// default: the casters and where their shadows land, the same every
 /// time a frame renders) or "visible" (sample distribution shadow
 /// maps: the depths a recent frame of the same product saw, tighter
-/// and sharper, but an image then depends on the frames before it;
-/// the viewer's choice).
+/// and sharper, but an image then depends on the frames before it).
 inline constexpr std::string_view kShadowFit = "ernie:shadows:fit";
 /// float, stops: exposure compensation on the photographic outputs
 /// (HdrColor's display, LdrColor), on top of the camera's own

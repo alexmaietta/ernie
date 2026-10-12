@@ -261,3 +261,36 @@ TEST(FitLightShadowViews, LasersLookAlongTheirBeam) {
     };
     EXPECT_LT(depth(halfway), depth(end));
 }
+
+// Maps that clamp depth span only each cascade's slice in depth, so a
+// planet-sized scene keeps depth precision: every slice corner lies
+// within the depth range, which is about the slice's size.
+TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
+    const CameraView camera = TestCamera();
+    const glm::vec3 toSun =
+        glm::normalize(glm::vec3(0.6f, -0.3f, 0.5f));
+    const glm::vec3 planetMin(-6.4e6f, -6.4e6f, -12.8e6f);
+    const glm::vec3 planetMax(6.4e6f, 6.4e6f, 40.0f);
+    const auto cascades =
+        FitCascades(camera, 1200.0f, toSun, planetMin, planetMax, 4,
+                    0.8f, kResolution, 0.0f, 0.0f, true);
+    ASSERT_EQ(cascades.size(), 4u);
+    for (std::size_t c = 0; c < cascades.size(); ++c) {
+        const ShadowCascade& cascade = cascades[c];
+        // The depth one unit of the map's range covers, in metres.
+        const glm::vec3 a =
+            Project(cascade.lightViewProjection, glm::vec3(0.0f));
+        const glm::vec3 b =
+            Project(cascade.lightViewProjection, toSun);
+        const float range = 1.0f / std::fabs(b.z - a.z);
+        EXPECT_LT(range, 4.0f * cascade.splitFar) << "cascade " << c;
+        for (const float depth :
+             {cascade.splitNear, cascade.splitFar}) {
+            for (int i = 0; i < 4; ++i) {
+                EXPECT_TRUE(
+                    Sees(cascade, SliceCorner(camera, depth, i)))
+                    << "cascade " << c;
+            }
+        }
+    }
+}

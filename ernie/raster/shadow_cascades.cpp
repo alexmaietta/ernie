@@ -91,7 +91,8 @@ std::vector<ShadowCascade>
 FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& toSun, const glm::vec3& sceneMin,
             const glm::vec3& sceneMax, int count, float lambda,
-            std::uint32_t resolution, float splitNear, float around) {
+            std::uint32_t resolution, float splitNear, float around,
+            bool clampCasters) {
     const glm::vec3 up = std::fabs(toSun.z) > 0.99f
                              ? glm::vec3(0.0f, 1.0f, 0.0f)
                              : glm::vec3(0.0f, 0.0f, 1.0f);
@@ -145,9 +146,20 @@ FitCascades(const CameraView& camera, float shadowDistance,
             glm::vec3(lightView * glm::vec4(center, 1.0f));
         const float x = std::floor(centerInLight.x / texel) * texel;
         const float y = std::floor(centerInLight.y / texel) * texel;
-        const glm::mat4 projection = glm::orthoRH_ZO(
-            x - radius, x + radius, y - radius, y + radius,
-            sceneNear - depthPadding, sceneFar + depthPadding);
+        // The cascade's receivers lie within its sphere; casters
+        // nearer the light clamp onto the near plane.
+        float zNear = sceneNear - depthPadding;
+        float zFar = sceneFar + depthPadding;
+        if (clampCasters) {
+            const float padding = 0.01f * radius + 1e-3f;
+            zNear =
+                std::max(zNear, -centerInLight.z - radius - padding);
+            zFar =
+                std::min(zFar, -centerInLight.z + radius + padding);
+        }
+        const glm::mat4 projection =
+            glm::orthoRH_ZO(x - radius, x + radius, y - radius,
+                            y + radius, zNear, zFar);
         cascade.lightViewProjection = projection * lightView;
         cascade.texelWorldSize = texel;
         cascades.push_back(cascade);

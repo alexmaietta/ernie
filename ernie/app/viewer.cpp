@@ -3036,18 +3036,13 @@ struct Viewer::State {
             if (minimal) {
                 overrides.emplace(tokens::kMinimalMode, *minimal);
             }
-            // The viewport favours sharp shadows over images that
-            // repeat exactly, and shows every overlay, unless the
-            // scene's settings choose.
+            // The viewport shows every overlay unless the scene's
+            // settings choose; otherwise it renders as they say.
             const auto authored = [&](std::string_view attribute) {
                 return !settingsSource.IsEmpty() &&
                        scene.Get(settingsSource, attribute) !=
                            nullptr;
             };
-            if (!authored(tokens::kShadowFit)) {
-                overrides.emplace(tokens::kShadowFit,
-                                  std::string(tokens::kVisible));
-            }
             // Exposure: metered every frame, for automatic exposure
             // and the meter.
             overrides.emplace(tokens::kExposureCompensation,

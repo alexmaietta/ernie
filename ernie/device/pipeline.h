@@ -155,6 +155,11 @@ struct GraphicsPipelineDesc {
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     float depthBiasSlope =
         0.0f;  ///< Slope-scaled depth bias, e.g. for shadow maps.
+    /// Clamp depth to the attachment's range rather than clip at the
+    /// near and far planes, where the device supports it
+    /// (`VulkanContext::SupportsDepthClamp`): a shadow map's casters
+    /// in front of its near plane land on it ("pancaking").
+    bool depthClamp = false;
     /// Blend colour over the attachment by its alpha (source over),
     /// keeping the attachment's alpha; otherwise replace it.
     bool alphaBlend = false;
