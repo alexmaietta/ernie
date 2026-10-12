@@ -43,6 +43,11 @@ struct Frame {
     std::vector<Zone> gpu;
 };
 
+/// The newest frames whose GPU zones may have arrived in part: the
+/// device still runs their commands, and a zone arrives once its own
+/// commands have run, before the zones around it end.
+inline constexpr std::size_t kFramesInFlight = 2;
+
 /// Starts or stops recording CPU and GPU zones both; stopping keeps
 /// the frames recorded so far. `Enabled` is whether either records.
 void SetEnabled(bool enabled);

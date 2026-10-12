@@ -103,7 +103,12 @@ class ProfilerPanel final : public Panel {
         profiler::SetCpuEnabled(cpu_ || capturing);
         profiler::SetGpuEnabled(gpu_ || capturing);
         if (!paused_) {
+            // Not the newest, whose GPU zones arrive in part while
+            // the device runs them.
             frames_ = profiler::Frames();
+            frames_.resize(
+                frames_.size() -
+                std::min(frames_.size(), profiler::kFramesInFlight));
         }
         if (capturing) {
             Capture(viewer);

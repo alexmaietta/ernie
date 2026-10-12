@@ -3902,7 +3902,10 @@ void RasterRenderer::Record(
     RecordViews(commands, targets, drawables, 0,
                 present == nullptr || lensOverlays);
     if (present != nullptr) {
-        Present(commands, targets, *present, var);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Present");
+            Present(commands, targets, *present, var);
+        }
         if (!overlays_->Empty() && faces_ > 1 && !lensOverlays) {
             ERNIE_GPU_ZONE(context_, commands, "Overlays");
             targets.Depth().Transition(
@@ -3929,45 +3932,51 @@ void RasterRenderer::RecordShadows(
         return;
     }
     ERNIE_ZONE("RecordShadows");
+    // GPU zones: the frame's setup, then its shadows, as the
+    // profiler's tree shows them.
     {
-        ERNIE_GPU_ZONE(context_, commands, "Uploads");
-        // The frame's host data first, after every earlier frame's
-        // use of the buffers it fills.
-        uploads_.Record(commands);
-    }
-    // The atmosphere's tables, when it or the bands changed, before
-    // any view shades with them.
-    atmosphere_->Record(commands);
-    {
-        ERNIE_GPU_ZONE(context_, commands, "Prepass");
-        // Poses composed on the GPU, and views posed under them,
-        // before anything reads them.
-        for (const RasterDrawable* drawable : drawables) {
-            drawable->RecordPrepass(commands);
+        ERNIE_GPU_ZONE(context_, commands, "Setup");
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Uploads");
+            // The frame's host data first, after every earlier
+            // frame's use of the buffers it fills.
+            uploads_.Record(commands);
         }
-        // The pattern arrays' mip levels, then the light patterns'
-        // integrals, which shading reads.
-        RecordPatternMips(commands);
-        if (!patternMipRegions_.empty()) {
+        // The atmosphere's tables, when it or the bands changed,
+        // before any view shades with them.
+        atmosphere_->Record(commands);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Prepass");
+            // Poses composed on the GPU, and views posed under them,
+            // before anything reads them.
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordPrepass(commands);
+            }
+            // The pattern arrays' mip levels, then the light
+            // patterns' integrals, which shading reads.
+            RecordPatternMips(commands);
+            if (!patternMipRegions_.empty()) {
+                ShaderBarrier(commands);
+            }
+            RecordPatternNorms(commands);
             ShaderBarrier(commands);
         }
-        RecordPatternNorms(commands);
-        ShaderBarrier(commands);
-    }
-    RecordLights(commands, drawables);
-    if (posesOnGpu_) {
-        ERNIE_GPU_ZONE(context_, commands, "View poses");
-        RecordViewPoses(commands, drawables);
-    }
-    {
-        ERNIE_GPU_ZONE(context_, commands, "Cull");
-        // Culling and other compute the draws read, once for every
-        // view and shadow view.
-        for (const RasterDrawable* drawable : drawables) {
-            drawable->RecordCull(commands);
+        RecordLights(commands, drawables);
+        if (posesOnGpu_) {
+            ERNIE_GPU_ZONE(context_, commands, "View poses");
+            RecordViewPoses(commands, drawables);
         }
-        ShaderBarrier(commands);
+        {
+            ERNIE_GPU_ZONE(context_, commands, "Cull");
+            // Culling and other compute the draws read, once for
+            // every view and shadow view.
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordCull(commands);
+            }
+            ShaderBarrier(commands);
+        }
     }
+    ERNIE_GPU_ZONE(context_, commands, "Shadows");
     // The first sub-frame's (the frame's own without motion blur);
     // `RecordViews` the others'.
     RecordShadowMaps(commands, drawables, Frame(0));
@@ -4131,6 +4140,7 @@ void RasterRenderer::RecordViews(
                         return drawable->CullsOcclusion();
                     });
     ERNIE_ZONE("RecordViews");
+    ERNIE_GPU_ZONE(context_, commands, "Views");
     // Each sub-frame in turn draws and shades its views into the one
     // set of targets; with motion blur their radiance sums into what
     // each row's exposure sees, which the sensor filters. A cube
@@ -4251,6 +4261,7 @@ void RasterRenderer::RecordMinimal(
             "frame's views");
     }
     ERNIE_ZONE("RecordMinimal");
+    ERNIE_GPU_ZONE(context_, commands, "Minimal");
     const float clear[3] = {minimalClear_.r, minimalClear_.g,
                             minimalClear_.b};
     const auto sampled = [](const GpuImage& image) {

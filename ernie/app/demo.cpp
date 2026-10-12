@@ -37,6 +37,9 @@ void ReportProfile(const DemoOptions& options) {
     if (frames.size() > kProfileWarmup) {
         frames.erase(frames.begin(), frames.begin() + kProfileWarmup);
     }
+    // Nor the newest, which the device may still be running.
+    frames.resize(frames.size() -
+                  std::min(frames.size(), profiler::kFramesInFlight));
     const std::vector<std::string> threads = profiler::ThreadNames();
     const profiler::Report report =
         profiler::Summarize(frames, threads);
