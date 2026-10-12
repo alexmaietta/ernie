@@ -152,7 +152,7 @@ class RenderDelegate {
     }
 
     /// Whether light pattern `id` is registered, built in or added.
-    virtual bool HasLightPattern(std::string_view id) const {
+    virtual bool HasLightPattern(std::string_view /*id*/) const {
         return false;
     }
 
