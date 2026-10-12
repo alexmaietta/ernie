@@ -341,7 +341,7 @@ std::uint64_t PlanetDrawable::GpuBytes() const {
     return bytes;
 }
 
-std::optional<Bounds3> PlanetDrawable::Bounds() const {
+std::optional<Bounds3> PlanetDrawable::BodyBounds() const {
     if (!HasHeights()) {
         return std::nullopt;
     }
@@ -351,6 +351,45 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
                                   maxHeight_ * params_.exaggeration));
     return Bounds3{glm::vec3(glm::dvec3(-r) - Offset()),
                    glm::vec3(glm::dvec3(r) - Offset())};
+}
+
+// From radius e the ground at radius `high` can be seen up to the
+// tangent to the lowest sphere, `low`, and beyond it as far again as
+// that ground rises over it: sqrt(e^2 - low^2) + sqrt(high^2 -
+// low^2).
+std::optional<Bounds3> PlanetDrawable::Bounds() const {
+    if (!HasHeights()) {
+        return std::nullopt;
+    }
+    const double h0 = static_cast<double>(
+        std::min(minHeight_ * params_.exaggeration,
+                 maxHeight_ * params_.exaggeration));
+    const double h1 = static_cast<double>(
+        std::max(minHeight_ * params_.exaggeration,
+                 maxHeight_ * params_.exaggeration));
+    const glm::dvec3& radii = lod_.Radii();
+    const double low =
+        std::max(0.0, std::min({radii.x, radii.y, radii.z}) +
+                          std::min(h0, 0.0));
+    const double high = lod_.Radius() + std::max(h1, 0.0);
+    // The origin follows the camera within `kRebaseReach`.
+    constexpr double kRebaseReach = 1024.0;
+    std::vector<glm::dvec3> eyes{Offset()};
+    eyes.insert(eyes.end(), lodEyes_.begin(), lodEyes_.end());
+    glm::dvec3 lowest(std::numeric_limits<double>::max());
+    glm::dvec3 highest(std::numeric_limits<double>::lowest());
+    for (const glm::dvec3& eye : eyes) {
+        const double e = glm::length(eye);
+        const double reach =
+            std::sqrt(std::max(0.0, e * e - low * low)) +
+            std::sqrt(high * high - low * low) + kRebaseReach;
+        lowest = glm::min(lowest, eye - reach);
+        highest = glm::max(highest, eye + reach);
+    }
+    lowest = glm::max(lowest, glm::dvec3(-high));
+    highest = glm::min(highest, glm::dvec3(high));
+    return Bounds3{glm::vec3(lowest - Offset()),
+                   glm::vec3(highest - Offset())};
 }
 
 void PlanetDrawable::Select(const glm::dvec3& eye,

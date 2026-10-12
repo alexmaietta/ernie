@@ -421,7 +421,7 @@ const RendererInfo& RasterDelegate::Info() const {
 std::optional<Bounds3> RasterDelegate::SceneBounds() const {
     std::optional<Bounds3> bounds;
     for (const std::optional<Bounds3>& drawable :
-         {terrain_.Bounds(), planet_.Bounds(), meshes_.Bounds(),
+         {terrain_.Bounds(), planet_.BodyBounds(), meshes_.Bounds(),
           points_.Bounds()}) {
         if (!drawable) {
             continue;

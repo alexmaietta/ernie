@@ -219,6 +219,13 @@ TEST_F(RasterDelegateTest, APlanetRefinesBelowItsDataUnderTheEye) {
     }
     EXPECT_EQ(clear, 0u) << "holes in the ground below the horizon";
     EXPECT_GT(delegate.Planet().Lod().Refinement(), 0u);
+    // Shadows fit to what can be seen of it from 2 m, past the
+    // horizon 5 km away and the origin's reach, not the planet.
+    const auto casting = delegate.Planet().Bounds();
+    const auto body = delegate.Planet().BodyBounds();
+    ASSERT_TRUE(casting && body);
+    EXPECT_LT(glm::length(casting->second - casting->first), 30e3f);
+    EXPECT_GT(glm::length(body->second - body->first), 2e7f);
 }
 
 // Sun shadows on an Earth-sized planet, cascades fitted to what a
@@ -295,14 +302,14 @@ TEST_F(RasterDelegateTest,
     EXPECT_THROW(planet.SetHeights(kMoon, faces),
                  std::invalid_argument);
     EXPECT_FALSE(planet.HasHeights());
-    EXPECT_FALSE(planet.Bounds().has_value());
+    EXPECT_FALSE(planet.BodyBounds().has_value());
 
     std::vector<float> enough(65 * 65, 1.0f);
     faces.fill(ernie::RasterView{enough.data(), 65, 65});
     planet.SetHeights(kMoon, faces);
     ASSERT_TRUE(planet.HasHeights());
     EXPECT_EQ(planet.Lod().Levels(), 1u);
-    const auto bounds = planet.Bounds();
+    const auto bounds = planet.BodyBounds();
     ASSERT_TRUE(bounds.has_value());
     EXPECT_NEAR(bounds->second.x, kMoon + 1.0, 1.0);
     EXPECT_GT(planet.GpuBytes(), 6u * 65u * 65u * 4u);

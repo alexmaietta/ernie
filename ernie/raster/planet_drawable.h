@@ -126,11 +126,21 @@ class PlanetDrawable : public RasterDrawable {
         return origin_ - params_.planetCentre;
     }
 
-    /// The bounding box of the body at the current exaggeration,
-    /// relative to the origin; none without heights.
     const char* ProfileName() const override {
         return "Planets";
     }
+
+    /// The bounding box of the whole body at the current
+    /// exaggeration, relative to the origin, for framing it; none
+    /// without heights.
+    std::optional<Bounds3> BodyBounds() const;
+
+    /// What of the body can cast the shadows a view sees, relative to
+    /// the origin, for fitting shadow cascades: within the distance
+    /// its highest ground can be seen from (past the horizon, over
+    /// the relief) of the origin and the last frame's LOD eyes, and
+    /// within `BodyBounds`. Near the ground that is kilometres, not
+    /// the planet; none without heights.
     std::optional<Bounds3> Bounds() const override;
 
     /// Writes the planet uniforms of every view and selects the LOD
