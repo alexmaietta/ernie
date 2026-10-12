@@ -132,7 +132,8 @@ struct LightGpu {
     std::uint32_t patternLayout[4];
     float patternParams[16];
     /// x: texels along each side of its shadow maps, in that corner
-    /// of their layers.
+    /// of their layers; y: 1 for a batch's distant light, whose maps
+    /// are the shared one then one per world.
     float map[4];
     std::uint32_t links[4];  ///< Unused: room for light linking.
 };
@@ -1078,9 +1079,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device)),
       patternMipLayout_(context, kPatternMipBindings,
                         sizeof(PatternMipStep)),
-      lightViewMatrices_(
+      lightViewMatrices_(std::make_unique<GpuBuffer>(
           context, kMaxLightShadowViews * sizeof(glm::mat4),
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device)),
       lightShadowBlocks_(
           context, kMaxLightShadowViews * kLightShadowBlockStride,
           kViewUniformUsage, BufferMemory::Device),
@@ -1702,6 +1703,8 @@ void RasterRenderer::WriteLights(
     const std::uint32_t distantResolution =
         std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
+    std::vector<std::size_t>
+        perWorld;  ///< Lights with per-world maps.
     std::vector<LightGpu> table(params.lights.size());
     std::vector<glm::vec4>
         lightRecords;  ///< The light pass's, for lights posed on the
@@ -1813,10 +1816,15 @@ void RasterRenderer::WriteLights(
                                          (1.0f - softness)))
                  : -1.0f;
         const bool laser = light.type == LightType::Laser;
-        // A laser's spot posed on the GPU has no shadows yet: the
-        // light pass fits perspective views only.
-        if (bounds &&
-            !(laser && light.posedOnGpu && light.beam.IsSpot())) {
+        // A batch's distant lights have maps per world, after the
+        // others'.
+        if (worldMaps_ && bounds && distant && light.shadows &&
+            !light.domeDiffuse && !light.posedOnGpu) {
+            perWorld.push_back(i);
+        } else if (bounds && !(laser && light.posedOnGpu &&
+                               light.beam.IsSpot())) {
+            // A laser's spot posed on the GPU has no shadows yet: the
+            // light pass fits perspective views only.
             // A distant light over a single view casts cascades over
             // it, as the sun does, when its maps have room for them;
             // otherwise one map over the whole scene, as a dome's
@@ -1825,9 +1833,14 @@ void RasterRenderer::WriteLights(
             // cascades' (`ShadowSettings::resolution`); others',
             // and a dome's many directions', are
             // `ShadowSettings::lightResolution` across.
-            const std::uint32_t own = distant && !light.domeDiffuse
-                                          ? distantResolution
-                                          : resolution;
+            // In a batch of per-world maps, every map is as fine as
+            // the worlds', so the layers stay that size.
+            const std::uint32_t own = std::min(
+                distant && !light.domeDiffuse ? distantResolution
+                                              : resolution,
+                worldMaps_
+                    ? worldMaps_->resolution
+                    : std::numeric_limits<std::uint32_t>::max());
             std::vector<ShadowCascade> views;
             if (distant && light.shadows && !light.posedOnGpu &&
                 !light.domeDiffuse && cascadeFit_ && axis.z > 0.0f) {
@@ -2032,9 +2045,6 @@ void RasterRenderer::WriteLights(
                 compiler_.CompileSpirv(modules, "patternNormMain"));
         }
     }
-    if (!table.empty()) {
-        uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
-    }
     // The casters' view over the terrain's grid, for its horizon map,
     // while the dome is shadowed: orthographic straight down from
     // above the scene, its x and y the world's.
@@ -2073,20 +2083,101 @@ void RasterRenderer::WriteLights(
         casters_.top != before.top || casters_.span != before.span) {
         castersChanged_ = true;
     }
+    // A batch's distant lights: each a map of what every world
+    // shares, then one per world of the batch's views, as many as the
+    // layers hold, starting as a copy of it with the world's casters
+    // drawn on top, or fitted to the world's own casters.
+    firstLayeredView_ = lightViews_.size();
+    layeredPasses_.clear();
+    worldSlots_.clear();
+    if (!perWorld.empty()) {
+        const WorldMaps& maps = *worldMaps_;
+        const std::size_t layers =
+            context_.Limits().maxImageArrayLayers;
+        const std::size_t each =
+            layers > lightViews_.size()
+                ? (layers - lightViews_.size()) / perWorld.size()
+                : 0;
+        const std::size_t slots =
+            std::min(maps.worlds.size(), each > 0 ? each - 1 : 0);
+        for (std::size_t s = 0; s < slots; ++s) {
+            worldSlots_[maps.worlds[s]] =
+                static_cast<std::uint32_t>(s + 1);
+        }
+        for (const std::size_t i : perWorld) {
+            const LightParams& light = params.lights[i];
+            const auto fit = [&](const glm::vec3& low,
+                                 const glm::vec3& high) {
+                ShadowCascade view =
+                    FitLightShadowViews(light, glm::vec3(0.0f), low,
+                                        high, maps.resolution)
+                        .front();
+                view.resolution = maps.resolution;
+                return view;
+            };
+            const auto base =
+                static_cast<std::uint32_t>(lightViews_.size());
+            lightViews_.push_back(fit(bounds->first, bounds->second));
+            layeredPasses_.push_back(
+                {ShadowCasters{true, ShadowCasters::kNoWorld}, base,
+                 false});
+            for (std::size_t s = 0; s < slots; ++s) {
+                const std::int32_t world = maps.worlds[s];
+                const auto fitted = maps.fitted.find(world);
+                if (fitted == maps.fitted.end()) {
+                    lightViews_.push_back(lightViews_[base]);
+                    layeredPasses_.push_back(
+                        {ShadowCasters{false, world}, base, true});
+                    continue;
+                }
+                const glm::vec3 margin(maps.margin);
+                ShadowCascade own =
+                    fit(fitted->second.first - margin,
+                        fitted->second.second + margin);
+                own.world = world;
+                lightViews_.push_back(own);
+                layeredPasses_.push_back(
+                    {ShadowCasters{true, world}, base, false});
+            }
+            LightGpu& entry = table[i];
+            entry.cone[2] = static_cast<float>(base);
+            entry.cone[3] = static_cast<float>(slots + 1);
+            entry.shadow[0] = lightViews_[base].texelWorldSize;
+            entry.map[0] = static_cast<float>(maps.resolution);
+            entry.map[1] = 1.0f;
+        }
+    }
+    if (!table.empty()) {
+        uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
+    }
     std::vector<glm::mat4> matrices;
-    std::vector<std::byte> blocks(lightViews_.size() *
+    std::vector<std::byte> blocks(firstLayeredView_ *
                                   kLightShadowBlockStride);
     for (std::size_t v = 0; v < lightViews_.size(); ++v) {
         matrices.push_back(lightViews_[v].lightViewProjection);
-        std::memcpy(
-            blocks.data() + v * kLightShadowBlockStride,
-            glm::value_ptr(lightViews_[v].lightViewProjection),
-            sizeof(glm::mat4));
+        if (v < firstLayeredView_) {
+            std::memcpy(
+                blocks.data() + v * kLightShadowBlockStride,
+                glm::value_ptr(lightViews_[v].lightViewProjection),
+                sizeof(glm::mat4));
+        }
     }
     if (!matrices.empty()) {
-        uploads_.Write(lightViewMatrices_,
+        const VkDeviceSize matrixBytes =
+            matrices.size() * sizeof(glm::mat4);
+        if (lightViewMatrices_->Size() < matrixBytes) {
+            // Grown only once no frame still reads it.
+            vkDeviceWaitIdle(context_.Device());
+            lightViewMatrices_ = std::make_unique<GpuBuffer>(
+                context_, matrixBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        uploads_.Write(*lightViewMatrices_,
                        std::as_bytes(std::span(matrices)));
-        uploads_.Write(lightShadowBlocks_, blocks);
+        if (!blocks.empty()) {
+            uploads_.Write(lightShadowBlocks_, blocks);
+        }
         // Layers as wide as the finest view's; coarser views draw in
         // a corner of theirs.
         const auto layers =
@@ -2143,7 +2234,7 @@ void RasterRenderer::RecordLights(
         DescriptorResource::Of(*lightRecords_),
         DescriptorResource::Of(*lightPoses_),
         DescriptorResource::Of(lightTable_),
-        DescriptorResource::Of(lightViewMatrices_),
+        DescriptorResource::Of(*lightViewMatrices_),
         DescriptorResource::Of(lightShadowBlocks_)};
     lightsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                        resources);
@@ -2516,6 +2607,48 @@ void RasterRenderer::Update(
                  false});
         }
         shadowLayers_ = static_cast<std::uint32_t>(cascades_.size());
+    }
+    // A batch's per-world maps of its distant lights, at the
+    // resolution of its worlds' maps: the worlds of its views, and
+    // the bounds of each world's casters for maps fitted to them.
+    worldMaps_.reset();
+    if (batch && bounds && shadows.enabled &&
+        shadows.worlds == WorldShadows::Separate) {
+        WorldMaps maps;
+        for (std::uint32_t v = 0; v < views_; ++v) {
+            maps.worlds.push_back(raster.ViewWorld(v));
+        }
+        std::sort(maps.worlds.begin(), maps.worlds.end());
+        maps.worlds.erase(
+            std::unique(maps.worlds.begin(), maps.worlds.end()),
+            maps.worlds.end());
+        if (maps.worlds != std::vector<std::int32_t>{-1}) {
+            maps.resolution =
+                shadows.worldResolution > 0
+                    ? shadows.worldResolution
+                    : ShadowSettings::AutoWorldResolution(
+                          params.camera.width, params.camera.height);
+            maps.margin = shadows.worldMargin;
+            if (shadows.worldFit == WorldShadowFit::World) {
+                for (const RasterDrawable* drawable : drawables) {
+                    for (const auto& [world, box] :
+                         drawable->WorldsBounds()) {
+                        if (world == -1) {
+                            continue;
+                        }
+                        const auto [it, added] =
+                            maps.fitted.try_emplace(world, box);
+                        if (!added) {
+                            it->second = Bounds3(
+                                glm::min(it->second.first, box.first),
+                                glm::max(it->second.second,
+                                         box.second));
+                        }
+                    }
+                }
+            }
+            worldMaps_ = std::move(maps);
+        }
     }
     // A metering frame counts its luminance for later frames; this
     // slot's last one has finished.
@@ -3120,6 +3253,10 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 shading.view[0] |= 1u << k;
             }
         }
+        // Its world's slot among the distant lights' per-world maps.
+        const auto slot = worldSlots_.find(world);
+        shading.view[1] =
+            slot != worldSlots_.end() ? slot->second : 0;
         viewShading.push_back(shading);
     }
     uploads_.Write(shadingUniforms_,
@@ -3732,7 +3869,7 @@ void RasterRenderer::RecordShadowMaps(
         ERNIE_GPU_ZONE(context_, commands, "Light shadows");
         lightShadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-        for (std::size_t v = 0; v < lightViews_.size(); ++v) {
+        for (std::size_t v = 0; v < firstLayeredView_; ++v) {
             RenderingTarget shadow;
             shadow.depth = lightShadowMaps_->LayerView(
                 static_cast<std::uint32_t>(v));
@@ -3758,8 +3895,71 @@ void RasterRenderer::RecordShadowMaps(
             }
             vkCmdEndRendering(commands);
         }
+        RecordLayeredLightShadows(commands, frame, drawables);
         lightShadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+}
+
+void RasterRenderer::RecordLayeredLightShadows(
+    VkCommandBuffer commands, const RasterFrame& frame,
+    std::span<const RasterDrawable* const> drawables) const {
+    if (layeredPasses_.empty()) {
+        return;
+    }
+    // As the batch's sun maps: one layered pass for the passes of a
+    // kind, each drawing into its layer (`RasterFrame::shadowLayer`),
+    // the worlds' copies of their light's shared map after the rest.
+    const std::uint32_t texels =
+        lightViews_[firstLayeredView_].resolution;
+    const auto record = [&](bool fromBase) {
+        RenderingTarget shadow;
+        shadow.depth = lightShadowMaps_->View();
+        shadow.extent = {texels, texels};
+        shadow.layers = lightShadowMaps_->Desc().layers;
+        shadow.loadDepth = fromBase;
+        BeginRendering(commands, shadow);
+        for (std::size_t p = 0; p < layeredPasses_.size(); ++p) {
+            const LayeredPass& pass = layeredPasses_[p];
+            if (pass.fromBase != fromBase) {
+                continue;
+            }
+            const std::size_t v = firstLayeredView_ + p;
+            RasterFrame layered = frame;
+            layered.shadowLayer = static_cast<std::uint32_t>(v);
+            for (const RasterDrawable* drawable : drawables) {
+                drawable->RecordShadow(
+                    commands, layered, cascades_.size() + v,
+                    lightViews_[v].lightViewProjection, pass.casters);
+            }
+        }
+        vkCmdEndRendering(commands);
+    };
+    record(false);
+    std::vector<VkImageCopy> copies;
+    for (std::size_t p = 0; p < layeredPasses_.size(); ++p) {
+        if (layeredPasses_[p].fromBase) {
+            VkImageCopy copy{};
+            copy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0,
+                                   layeredPasses_[p].base, 1};
+            copy.dstSubresource = {
+                VK_IMAGE_ASPECT_DEPTH_BIT, 0,
+                static_cast<std::uint32_t>(firstLayeredView_ + p), 1};
+            copy.extent = {texels, texels, 1};
+            copies.push_back(copy);
+        }
+    }
+    if (!copies.empty()) {
+        lightShadowMaps_->Transition(commands,
+                                     VK_IMAGE_LAYOUT_GENERAL);
+        vkCmdCopyImage(
+            commands, lightShadowMaps_->Handle(),
+            VK_IMAGE_LAYOUT_GENERAL, lightShadowMaps_->Handle(),
+            VK_IMAGE_LAYOUT_GENERAL,
+            static_cast<std::uint32_t>(copies.size()), copies.data());
+        lightShadowMaps_->Transition(
+            commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        record(true);
     }
 }
 
@@ -4655,7 +4855,7 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             DescriptorResource::Of(lightTable_),
             DescriptorResource::Of(lightShadowMaps_->View()),
             DescriptorResource::Of(shadowSampler_),
-            DescriptorResource::Of(lightViewMatrices_),
+            DescriptorResource::Of(*lightViewMatrices_),
             sampled(*domeMap_),
             DescriptorResource::Of(*stars_),
             DescriptorResource::Of(*starCells_),
@@ -5062,7 +5262,7 @@ std::uint64_t RasterRenderer::GpuBytes() const {
         uniforms_.Size() + shadowUniforms_.Size() +
         shadowMaps_->Bytes() + lightShadowMaps_->Bytes() +
         lightTable_.Size() + lightProfiles_.Size() +
-        lightViewMatrices_.Size() + sigmoidTable_.Bytes() +
+        lightViewMatrices_->Size() + sigmoidTable_.Bytes() +
         shadingUniforms_.Size() + sensorUniforms_.Size() +
         (materialTable_ != nullptr ? materialTable_->Size() : 0) +
         overlays_->GpuBytes() + domeMap_->Bytes() +

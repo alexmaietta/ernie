@@ -762,6 +762,43 @@ TEST_F(RasterDelegateTest,
            "fitted to world 0 keeps it";
 }
 
+TEST_F(RasterDelegateTest, EveryDistantLightCastsEachWorldsShadows) {
+    // The roof scenes with the sun set and a second distant light
+    // where it was: each world's roof shades only its own views, in
+    // maps over the scene or fitted to each world.
+    for (const bool farWorld : {false, true}) {
+        Scene scene = RoofScene(farWorld);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform({1.0, 0.0, -1.0}));
+        scene.Define("/World/Two", tokens::kDistantLight)
+            .Set(tokens::kTransform,
+                 ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+        ernie::RenderSettings settings(scene, "/Render/Settings");
+        if (farWorld) {
+            settings.SetShadowWorldResolution(64).SetShadowWorldFit(
+                tokens::kWorldFit);
+        }
+        RasterDelegate delegate(*context_);
+        const Path batchOnly[] = {"/Render/Batch"};
+        const Tensor images = delegate.Step(scene, batchOnly)
+                                  .at("/Render/Batch")
+                                  .vars.at("LdrColor")
+                                  .Map(ernie::MapDevice::Cpu)
+                                  .tensor;
+        EXPECT_LT(CentreOf(images, 0), CentreOf(images, 1) / 2)
+            << "world 0's roof shades the ground in its view, far "
+            << farWorld;
+        if (!farWorld) {
+            // Its map, over 2 km, misses the roof when far.
+            EXPECT_LT(CentreOf(images, 2), CentreOf(images, 1) / 2)
+                << "a view of every world sees every world's shadows";
+        }
+        EXPECT_GT(CentreOf(images, 1), 100)
+            << "world 1 has no roof, so its ground is lit, far "
+            << farWorld;
+    }
+}
+
 TEST(ShadowSettings, SizesWorldMapsToTheImageByDefault) {
     using ernie::ShadowSettings;
     EXPECT_EQ(ShadowSettings{}.worldResolution, 0u) << "automatic";

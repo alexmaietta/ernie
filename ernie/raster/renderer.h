@@ -526,7 +526,7 @@ class RasterRenderer {
     /// lights posed on the GPU, the light pass's
     /// (`ShadowCascade::gpuFitted`).
     const GpuBuffer& LightViewMatrices() const {
-        return lightViewMatrices_;
+        return *lightViewMatrices_;
     }
 
     /// The camera-to-world poses the last frame with poses on the GPU
@@ -673,6 +673,12 @@ class RasterRenderer {
                           std::span<RasterDrawable* const> drawables);
     void CreateLightShadowMaps(std::uint32_t resolution,
                                std::uint32_t layers);
+    /// Records the per-world light maps' passes
+    /// (`layeredPasses_`), with the light shadow maps attached for
+    /// depth.
+    void RecordLayeredLightShadows(
+        VkCommandBuffer commands, const RasterFrame& frame,
+        std::span<const RasterDrawable* const> drawables) const;
     void WriteLights(const FrameParams& params,
                      const std::optional<Bounds3>& bounds);
     const ComputePipeline& ShadingPipeline(std::size_t model,
@@ -925,6 +931,32 @@ class RasterRenderer {
         1;  ///< Layers the frame's sun maps take.
     ShadowCasters
         lightCasters_;  ///< Casters of the other lights' maps.
+    /// A batch's per-world maps of its distant lights
+    /// (`WorldShadows::Separate`): the worlds of its views, by slot
+    /// past the shared map's (0); the bounds of those fitted to their
+    /// own casters (`WorldShadowFit::World`), grown by `margin`; and
+    /// the maps' texels across.
+    struct WorldMaps {
+        std::vector<std::int32_t> worlds;
+        std::map<std::int32_t, Bounds3> fitted;
+        float margin = 0.0f;
+        std::uint32_t resolution = 0;
+    };
+    std::optional<WorldMaps> worldMaps_;
+    /// Each world's slot among a distant light's per-world maps this
+    /// frame; views of other worlds read the shared map (slot 0).
+    std::map<std::int32_t, std::uint32_t> worldSlots_;
+    /// Light views from this one on are per-world maps, drawn in
+    /// layered passes (`layeredPasses_`, one per view from it).
+    std::size_t firstLayeredView_ = 0;
+    /// A per-world map's pass: its casters, and whether it starts as
+    /// a copy of its light's shared map at layer `base`.
+    struct LayeredPass {
+        ShadowCasters casters;
+        std::uint32_t base = 0;
+        bool fromBase = false;
+    };
+    std::vector<LayeredPass> layeredPasses_;
     std::vector<std::string_view>
         requiredVars_;  ///< The vars the last `Update`'s frame needs.
 
@@ -1057,8 +1089,10 @@ class RasterRenderer {
     void WriteLightTiming(const FrameParams& frame,
                           const FrameParams& params,
                           std::uint32_t views);
-    GpuBuffer lightViewMatrices_;
-    /// Per light shadow view, a Shadows block (frame.slang) whose
+    /// Grown as a batch's per-world maps need.
+    std::unique_ptr<GpuBuffer> lightViewMatrices_;
+    /// Per light shadow view before the per-world maps
+    /// (`firstLayeredView_`), a Shadows block (frame.slang) whose
     /// first matrix its shadow pass draws with
     /// (`RasterFrame::shadowFromFrame`), `kLightShadowBlockStride`
     /// apart.

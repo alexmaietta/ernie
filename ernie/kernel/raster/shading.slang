@@ -80,7 +80,8 @@ struct ShadingUniforms {
     float4 domeSh[9];
     float4 dome[16];
     // x: the lights this view sees, a bit per light (a batch's views see their world's and the
-    // shared ones); yzw unused.
+    // shared ones); y: its world's slot among a distant light's per-world maps (0 the shared
+    // one); zw unused.
     uint4 view;
     // Rows of the rotation from world directions to the dome's frame, and to the star catalogue's.
     float4 toDome[3];
@@ -159,7 +160,8 @@ struct LightGpu {
     uint4 patternLayout;
     float4 patternParams[4];
     // x: texels along each side of its shadow maps, in that corner of their layers of the map
-    // array (`ShadingUniforms::lightShadow.z` texels across); yzw unused.
+    // array (`ShadingUniforms::lightShadow.z` texels across); y: 1 for a batch's distant light,
+    // whose maps are the shared one then one per world (`ShadingUniforms::view.y`); zw unused.
     float4 map;
     // Unused: room for its light and shadow links.
     uint4 links;
@@ -395,6 +397,10 @@ float interleavedGradientNoise(float2 pixel) {
 uint lightView(LightGpu light, float3 world) {
     let first = uint(light.cone.z);
     let count = uint(light.cone.w);
+    if (light.map.y != 0.0) {
+        // A batch's distant light: the map of the view's world.
+        return first + min(sh.view.y, count - 1);
+    }
     if (light.position.w == 0.0 && count > 1) {
         for (uint c = 0; c + 1 < count; ++c) {
             let clip = mul(lightViews[first + c], float4(world, 1.0)).xyz;
