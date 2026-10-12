@@ -147,6 +147,18 @@ constexpr DescriptorBinding kBoundsBindings[] = {
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// instance_bounds.slang's BoundsJob.
+struct GpuBoundsJob {
+    std::uint32_t first;
+    std::uint32_t count;
+    std::uint32_t flags;  ///< 1 scaled, 2 a mesh's points.
+    std::uint32_t out;
+    std::uint32_t countSlot;
+    std::uint32_t unused[3];
 };
 
 /// instance_anchors.slang's bindings: records, the pools, and what is
@@ -533,7 +545,7 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
                     sizeof(DrawConstants)),
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       composeLayout_(renderer.Context(), kComposeBindings, 32),
-      boundsLayout_(renderer.Context(), kBoundsBindings, 20),
+      boundsLayout_(renderer.Context(), kBoundsBindings, 16),
       activeDrawsLayout_(renderer.Context(), kActiveDrawsBindings,
                          16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
@@ -2542,6 +2554,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
         drawsDirty_ = false;
         drawsMaterials_ = renderer_.MaterialSetVersion();
     }
+    WriteBoundsJobs();
     Cull(params, cascades);
 }
 
@@ -2752,6 +2765,45 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
     }
 }
 
+void MeshDrawable::WriteBoundsJobs() {
+    const auto& jobs = boundsJobs_[boundsSlot_];
+    if (jobs.empty()) {
+        return;
+    }
+    std::vector<GpuBoundsJob> records(jobs.size());
+    std::size_t most = 1;
+    for (std::size_t j = 0; j < jobs.size(); ++j) {
+        GpuBoundsJob& record = records[j];
+        record = {};
+        record.out = static_cast<std::uint32_t>(8 * j);
+        if (const auto instancer = instancers_.find(jobs[j].first);
+            instancer != instancers_.end()) {
+            record.first = InstanceBase(instancer->second) +
+                           instancer->second.first;
+            record.count =
+                static_cast<std::uint32_t>(instancer->second.count);
+            record.flags =
+                instancer->second.device.scales.Empty() ? 0u : 1u;
+        } else {
+            const Mesh& mesh = meshes_.at(jobs[j].first);
+            record.first = PointBase(mesh) + mesh.firstVertex;
+            record.count = static_cast<std::uint32_t>(jobs[j].second);
+            record.flags = 2u;
+            record.countSlot = mesh.countSlot;
+        }
+        most = std::max<std::size_t>(most, record.count);
+    }
+    // A row of workgroups per job, as many as its largest needs, at
+    // most 1024: past that each thread takes several positions.
+    boundsGroups_ = static_cast<std::uint32_t>(
+        std::min<std::size_t>((most + 63) / 64, 1024));
+    Reserve(context_, boundsJobBuffer_,
+            records.size() * sizeof(GpuBoundsJob),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    renderer_.Uploads().Write(*boundsJobBuffer_,
+                              std::as_bytes(std::span(records)));
+}
+
 void MeshDrawable::RecordBounds(VkCommandBuffer commands) const {
     const auto& jobs = boundsJobs_[boundsSlot_];
     if (jobs.empty()) {
@@ -2771,65 +2823,31 @@ void MeshDrawable::RecordBounds(VkCommandBuffer commands) const {
         dependency.pMemoryBarriers = &memory;
         vkCmdPipelineBarrier2(commands, &dependency);
     };
-    // Instancers measure their positions, meshes their points.
-    const DescriptorResource instanceResources[] = {
+    const DescriptorResource resources[] = {
         DescriptorResource::Of(*positions_),
         DescriptorResource::Of(*scales_),
         DescriptorResource::Of(*boundsReadback_[boundsSlot_]),
-        DescriptorResource::Of(*activeCounts_)};
-    const DescriptorResource meshResources[] = {
+        DescriptorResource::Of(*activeCounts_),
         DescriptorResource::Of(*points_),
-        DescriptorResource::Of(*scales_),
-        DescriptorResource::Of(*boundsReadback_[boundsSlot_]),
-        DescriptorResource::Of(*activeCounts_)};
-    // Every job's words emptied, then each job's positions measured.
-    for (const ComputePipeline* pipeline :
-         {boundsClearPipeline_.get(), boundsPipeline_.get()}) {
-        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          pipeline->Handle());
-        std::optional<bool> bound;
-        for (std::size_t j = 0; j < jobs.size(); ++j) {
-            const auto instancer = instancers_.find(jobs[j].first);
-            const bool isInstancer = instancer != instancers_.end();
-            if (bound != isInstancer) {
-                boundsLayout_.Push(
-                    commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                    isInstancer ? std::span(instanceResources)
-                                : std::span(meshResources));
-                bound = isInstancer;
-            }
-            std::uint32_t constants[5] = {
-                0, 0, 0, static_cast<std::uint32_t>(8 * j), 0};
-            if (isInstancer) {
-                constants[0] = InstanceBase(instancer->second) +
-                               instancer->second.first;
-                constants[1] = static_cast<std::uint32_t>(
-                    instancer->second.count);
-                constants[2] =
-                    instancer->second.device.scales.Empty() ? 0u : 1u;
-            } else {
-                const Mesh& mesh = meshes_.at(jobs[j].first);
-                constants[0] = PointBase(mesh) + mesh.firstVertex;
-                constants[1] =
-                    static_cast<std::uint32_t>(jobs[j].second);
-                constants[4] = mesh.countSlot;
-            }
-            boundsLayout_.PushConstants(commands, constants,
-                                        sizeof(constants));
-            vkCmdDispatch(commands,
-                          pipeline == boundsPipeline_.get()
-                              ? (constants[1] + 63) / 64
-                              : 1,
-                          1, 1);
-        }
-        barrier(pipeline == boundsPipeline_.get()
-                    ? VK_PIPELINE_STAGE_2_HOST_BIT
-                    : VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                pipeline == boundsPipeline_.get()
-                    ? VK_ACCESS_2_HOST_READ_BIT
-                    : VK_ACCESS_2_SHADER_READ_BIT |
-                          VK_ACCESS_2_SHADER_WRITE_BIT);
-    }
+        DescriptorResource::Of(*boundsJobBuffer_)};
+    const auto count = static_cast<std::uint32_t>(jobs.size());
+    const std::uint32_t constants[4] = {count, boundsGroups_, 0, 0};
+    // Every job's words emptied, then every job measured: two
+    // dispatches however many jobs.
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      boundsClearPipeline_->Handle());
+    boundsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                       resources);
+    boundsLayout_.PushConstants(commands, constants,
+                                sizeof(constants));
+    vkCmdDispatch(commands, (8 * count + 63) / 64, 1, 1);
+    barrier(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT |
+                VK_ACCESS_2_SHADER_WRITE_BIT);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      boundsPipeline_->Handle());
+    vkCmdDispatch(commands, boundsGroups_, count, 1);
+    barrier(VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_HOST_READ_BIT);
 }
 
 std::optional<Bounds3> MeshDrawable::Bounds() const {

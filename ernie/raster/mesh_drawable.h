@@ -725,6 +725,9 @@ class MeshDrawable : public RasterDrawable {
     /// Measures the bounds of the chosen instancers' positions into
     /// the upload slot's readback buffer (instance_bounds.slang).
     void RecordBounds(VkCommandBuffer commands) const;
+    /// Writes this frame's bounds jobs (`boundsJobBuffer_`) from
+    /// `boundsJobs_`, where the pools hold their positions now.
+    void WriteBoundsJobs();
     /// Records the meshes' writers (`SetWriter`).
     void RecordWriters(VkCommandBuffer commands) const;
     /// Writes the draws of the meshes' triangles in use
@@ -972,6 +975,10 @@ class MeshDrawable : public RasterDrawable {
                FrameUploads::kSlots>
         boundsJobs_;
     std::uint32_t boundsSlot_ = 0;
+    /// This frame's bounds jobs as instance_bounds.slang reads them,
+    /// and the workgroups along x each job's row has.
+    std::unique_ptr<GpuBuffer> boundsJobBuffer_;
+    std::uint32_t boundsGroups_ = 1;
     PipelineLayout activeDrawsLayout_;
     /// active_draws.slang: meshes' indirect draws of their triangles
     /// in use.
