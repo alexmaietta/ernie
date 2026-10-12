@@ -1343,7 +1343,7 @@ uint2 marchedInBlock() {
 
 // A history's channels per pixel: the volumes' transmittance (-1 where none were in view), the
 // distance along the ray of what they hold back, the geometry's (`kNoSurface` for none), and what
-// they add towards the eye in each band.
+// they add towards the eye in each band, two bands a channel as halves (`historyBand`).
 static const uint kHistoryTransmittance = 0;
 static const uint kHistoryFront = 1;
 static const uint kHistorySurface = 2;
@@ -1356,6 +1356,36 @@ static const float kNoSurface = 1e30;
 uint historyAt(uint channel, uint view, uint2 xy, uint2 size) {
     let views = constants.lights.w;
     return 32 * views + ((channel * views + view) * size.y + xy.y) * size.x + xy.x;
+}
+
+// Band `b`'s light added of view `view`'s pixel `xy` in `history`: the pixel's largest band's,
+// then each band's share of it in 16 bits, two bands a channel, half the memory of a float each,
+// as what is added ends in an image of far fewer bits.
+float historyBand(float* history, uint b, uint view, uint2 xy, uint2 size) {
+    let largest = history[historyAt(kHistoryBands, view, xy, size)];
+    let word = ((uint*)history)[historyAt(kHistoryBands + 1 + b / 2, view, xy, size)];
+    let share = (b & 1u) != 0 ? word >> 16 : word & 0xFFFFu;
+    return largest * float(share) / 65535.0;
+}
+
+// Each band's light added of view `view`'s pixel `xy` into `history` (`historyBand`).
+void writeHistoryBands(float* history, uint bands, uint view, uint2 xy, uint2 size,
+                       float4 added[kMaxGroups]) {
+    float largest = 0.0;
+    for (uint b = 0; b < bands; ++b) {
+        largest = max(largest, added[b / 4][b % 4]);
+    }
+    history[historyAt(kHistoryBands, view, xy, size)] = largest;
+    let toShare = largest > 0.0 ? 65535.0 / largest : 0.0;
+    for (uint b = 0; b < bands; b += 2) {
+        let low = uint(clamp(round(added[b / 4][b % 4] * toShare), 0.0, 65535.0));
+        let high =
+            b + 1 < bands
+                ? uint(clamp(round(added[(b + 1) / 4][(b + 1) % 4] * toShare), 0.0, 65535.0))
+                : 0u;
+        ((uint*)history)[historyAt(kHistoryBands + 1 + b / 2, view, xy, size)] =
+            low | (high << 16);
+    }
 }
 
 // Row `row` of matrix `matrix` (0 the inverse view-projection, 1 the view-projection) of view
@@ -1434,7 +1464,7 @@ bool reproject(uint3 id, uint2 size, float3 origin, float3 direction, float tMax
     }
     front = last[historyAt(kHistoryFront, id.z, then, size)];
     for (uint b = 0; b < bands; ++b) {
-        added[b / 4][b % 4] = last[historyAt(kHistoryBands + b, id.z, then, size)];
+        added[b / 4][b % 4] = historyBand(last, b, id.z, then, size);
     }
     return true;
 }
@@ -1469,7 +1499,7 @@ bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmi
     }
     front = now[historyAt(kHistoryFront, id.z, marched, size)];
     for (uint b = 0; b < bands; ++b) {
-        added[b / 4][b % 4] = now[historyAt(kHistoryBands + b, id.z, marched, size)];
+        added[b / 4][b % 4] = historyBand(now, b, id.z, marched, size);
     }
     return true;
 }
@@ -1520,7 +1550,7 @@ void clampRangesMain(uint3 id: SV_DispatchThreadID) {
                     channel == 0
                         ? (t >= 0.0 ? t : 1.0)
                         : (t >= 0.0
-                               ? now[historyAt(kHistoryBands + channel - 1, id.z, marched, size)]
+                               ? historyBand(now, channel - 1, id.z, marched, size)
                                : 0.0);
                 low = min(low, value);
                 high = max(high, value);
@@ -1560,9 +1590,7 @@ void writeHistory(uint3 id, uint2 size, float transmittance, float front, float 
     now[historyAt(kHistoryTransmittance, id.z, id.xy, size)] = transmittance;
     now[historyAt(kHistoryFront, id.z, id.xy, size)] = front;
     now[historyAt(kHistorySurface, id.z, id.xy, size)] = tMax;
-    for (uint b = 0; b < bands; ++b) {
-        now[historyAt(kHistoryBands + b, id.z, id.xy, size)] = added[b / 4][b % 4];
-    }
+    writeHistoryBands(now, bands, id.z, id.xy, size, added);
 }
 
 // Pixel `id`'s radiance through the volumes: the light behind dimmed by their `transmittance`
@@ -2408,9 +2436,6 @@ float castersDepth(float3 world, float3 towards, float far, int viewWorld, uint 
         if (near >= exit) {
             continue;
         }
-        // The march's step is half a voxel by default (`params.w`).
-        let steps = clamp(uint(ceil((exit - near) / (2.0 * volume.params.w))), 1u, kMaxCacheSteps);
-        let dt = (exit - near) / float(steps);
         var accessor = accessorOf(volume.density);
         let indexOrigin = float3(dot(volume.density.toIndex[0], float4(o, 1.0)),
                                  dot(volume.density.toIndex[1], float4(o, 1.0)),
@@ -2418,6 +2443,10 @@ float castersDepth(float3 world, float3 towards, float far, int viewWorld, uint 
         let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
                                dot(volume.density.toIndex[1].xyz, d),
                                dot(volume.density.toIndex[2].xyz, d));
+        // A voxel of the density's grid a step along the way, whatever the march's steps.
+        let steps =
+            clamp(uint(ceil((exit - near) * length(indexStep))), 1u, kMaxCacheSteps);
+        let dt = (exit - near) / float(steps);
         float sum = 0.0;
         for (uint i = 0; i < steps; ++i) {
             let t = near + (float(i) + 0.5) * dt;

@@ -222,7 +222,7 @@
                               .group = "Shadows",                                                  \
                               .options = {::ernie::tokens::kOff, ::ernie::tokens::kLevels,        \
                                           ::ernie::tokens::kPages}}))                              \
-    X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 2.0,                     \
+    X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 1.0,                     \
       (::ernie::AttributeMeta{.label = "Steps per voxel",                                          \
                               .doc = "Steps through a volume per voxel of its densest field, "     \
                                      "fewer for speed.",                                           \

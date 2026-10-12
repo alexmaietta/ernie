@@ -549,7 +549,7 @@ struct ThermalSettings {
 /// none), the most orders of multiple scattering, and the texels
 /// across the volumes' shadow maps.
 struct VolumeSettings {
-    double stepsPerVoxel = 2.0;
+    double stepsPerVoxel = 1.0;
     std::uint32_t maxSteps = 256;
     std::uint32_t shadowSteps = 12;
     std::uint32_t skyLightSteps = 6;

@@ -1669,9 +1669,12 @@ void VolumePass::Record(VkCommandBuffer commands,
                 if (history.buffers[0] != nullptr) {
                     vkDeviceWaitIdle(context_.Device());
                 }
+                // The bands' largest, then their channels two bands
+                // each in 16 bits (volume.slang's `historyBand`).
                 const VkDeviceSize bytes =
                     4 * (32 * VkDeviceSize{views} +
-                         VkDeviceSize{kHistoryChannels + bandCount_} *
+                         VkDeviceSize{kHistoryChannels + 1 +
+                                      (bandCount_ + 1) / 2} *
                              views * width * height);
                 for (auto& buffer : history.buffers) {
                     buffer = std::make_unique<GpuBuffer>(
