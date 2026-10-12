@@ -178,14 +178,14 @@ jobs:
   # GPU tests on lavapipe (Mesa's own leaks are not Ernie's, so leak checks are off). On pushes to
   # main and release tags, not pull requests, as it is the slowest job.
   sanitize:
-    name: sanitize (part ${{ matrix.part }} of 3)
+    name: sanitize (part ${{ matrix.part }} of 4)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    # Every third test each, side by side, as the GCC tests run.
+    # Every fourth test each, side by side, as the GCC tests run.
     strategy:
       fail-fast: false
       matrix:
-        part: [1, 2, 3]
+        part: [1, 2, 3, 4]
     env:
       CC: clang
       CXX: clang++
@@ -235,7 +235,7 @@ jobs:
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           export VK_DRIVER_FILES
-          ctest --test-dir build --output-on-failure -j4 --timeout 1800 -I ${{ matrix.part }},,3
+          ctest --test-dir build --output-on-failure -j4 --timeout 1800 -I ${{ matrix.part }},,4
 
   # Windows (MSVC) and macOS (Apple Clang, MoltenVK) built through sccache, and their unit tests
   # run: the CPU tests, as those runners have no Vulkan driver of their own (the wheel-test job
