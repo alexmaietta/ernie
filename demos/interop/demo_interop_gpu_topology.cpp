@@ -404,7 +404,19 @@ class GpuTopologyDemo : public app::Demo {
     }
 
     void TestPostStep() override {
-        emitted_.insert(polygonisers_.front()->Emitted());
+        // The viewer's, which draws each step, else the demo's own.
+        emitted_.insert(polygonisers_.back()->Emitted());
+    }
+
+    /// Stops the writers and waits for the frames that use the
+    /// shaders' buffers before they go.
+    void Close() override {
+        for (const Written& written : written_) {
+            written.delegate->SetMeshWriter(kBlobs, nullptr);
+            vkDeviceWaitIdle(written.context->Device());
+        }
+        written_.clear();
+        polygonisers_.clear();
     }
 
     void TestFinal() override {
@@ -439,6 +451,7 @@ class GpuTopologyDemo : public app::Demo {
         polygonisers_.push_back(
             std::make_unique<Polygoniser>(context, state_));
         const Polygoniser* polygoniser = polygonisers_.back().get();
+        written_.push_back({&delegate, &context});
         delegate.SetMeshWriter(
             kBlobs, [polygoniser](VkCommandBuffer commands,
                                   const MeshWriteTarget& target) {
@@ -449,6 +462,12 @@ class GpuTopologyDemo : public app::Demo {
     BlobState state_;
     double speed_ = 1.0;
     std::vector<std::unique_ptr<Polygoniser>> polygonisers_;
+    /// The delegates writing the blobs, and their devices.
+    struct Written {
+        RenderDelegate* delegate;
+        const VulkanContext* context;
+    };
+    std::vector<Written> written_;
     std::set<std::array<std::int32_t, 2>> emitted_;
 };
 
