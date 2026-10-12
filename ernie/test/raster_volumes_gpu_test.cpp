@@ -2,6 +2,7 @@
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
@@ -15,6 +16,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -580,4 +582,39 @@ TEST_F(RasterDelegateTest, EachWorldOfABatchShadowsWithItsOwnVolumes) {
         << "a view of every world sees every world's shadows";
     EXPECT_GT(centre(1), 100)
         << "world 1 has no smoke, so its floor is lit";
+}
+
+TEST_F(RasterDelegateTest, APointInstancerPlacesVolumesInTheirWorlds) {
+    // The cube as an instancer's prototype, two instances where it
+    // stood, in worlds 1 and 0: the camera's world 0 sees one of
+    // them, and the prototype shows only through its instances.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    scene.Set("/World/Camera", tokens::kWorld, 0);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> bare = CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInherited));
+    const std::array<float, 6> positions{0, 0, 0, 0, 0, 0};
+    ernie::PointInstancer::Define(scene, "/World/Smoke")
+        .SetPositions(Tensor::Copy<float>(positions, {2, 3}));
+    scene.Set("/World/Smoke", tokens::kPrototypes,
+              std::vector<Path>{"/World/Cube"});
+    const auto worlds = [&](std::int32_t first, std::int32_t second) {
+        scene.Write("/World/Smoke", tokens::kWorlds,
+                    Tensor::Copy<std::int32_t>(
+                        std::vector<std::int32_t>{first, second}, {2}));
+        return CentreSpectrum(delegate, scene);
+    };
+    const std::vector<double> one = worlds(1, 0);
+    const std::vector<double> none = worlds(1, 1);
+    const double expected = std::exp(-kSigma * kDepth);
+    for (std::size_t b = 0; b < bare.size(); ++b) {
+        ASSERT_GT(bare[b], 0.0) << "band " << b;
+        EXPECT_NEAR(one[b] / bare[b], expected, 0.02 * expected)
+            << "band " << b;
+        EXPECT_NEAR(none[b], bare[b], 1e-6 * bare[b]) << "band " << b;
+    }
 }
