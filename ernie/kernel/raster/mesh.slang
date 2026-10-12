@@ -13,6 +13,8 @@ import frame;
 import surface;
 
 static const uint kHasNormals = 1;
+// The draw's light link group (`LinkGroups`) in the flags' top bits.
+static const uint kLinkGroupShift = 24;
 static const uint kHasColors = 2;
 static const uint kInstanced = 4;
 static const uint kHasOrientations = 8;
@@ -515,7 +517,8 @@ GBuffer meshGBuffer(VertexOutput in) {
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),
                         wireframe(modulation, in.barycentric));
     out.ids = uint4(d.points.y, d.points.z, in.instance,
-                    packSurfaceFlags(unlit ? kUnlit : 0u,
+                    packSurfaceFlags((unlit ? kUnlit : 0u) |
+                                         linkGroupFlags((d.offsets.w >> kLinkGroupShift) & 31u),
                                      textured.slopeVariance + detail.slopeVariance,
                                      textured.metallic));
     return out;

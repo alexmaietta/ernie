@@ -58,6 +58,8 @@ struct PointsItem {
                            ///< of their own.
     std::uint32_t primId = 1;  ///< Written to the PrimId render var;
                                ///< the point's index to InstanceId.
+    /// Its light link group (`LinkGroups`).
+    std::uint32_t linkGroup = 0;
     std::int32_t world =
         -1;  ///< The world it belongs to (`tokens::kWorld`), -1 for
              ///< every one.

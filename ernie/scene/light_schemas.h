@@ -43,6 +43,34 @@
                               .min = 1000.0, .max = 20000.0}))                                     \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Light"}))                              \
+    X(bool, LightLinkIncludeRoot, ::ernie::tokens::kLightLinkIncludeRoot, true,                    \
+      (::ernie::AttributeMeta{.label = "Lights everything", .doc = "Lights the whole scene "       \
+                                     "unless excluded; off, only what it includes.",               \
+                              .group = "Linking"}))                                                \
+    X(std::vector<::ernie::Path>, LightLinkIncludes, ::ernie::tokens::kLightLinkIncludes,          \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.label = "Lights", .doc = "Prims it lights, with their "             \
+                                     "descendants.",                                               \
+                              .group = "Linking"}))                                                \
+    X(std::vector<::ernie::Path>, LightLinkExcludes, ::ernie::tokens::kLightLinkExcludes,          \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.label = "Does not light", .doc = "Prims it leaves unlit, with "     \
+                                     "their descendants.",                                         \
+                              .group = "Linking"}))                                                \
+    X(bool, ShadowLinkIncludeRoot, ::ernie::tokens::kShadowLinkIncludeRoot, true,                  \
+      (::ernie::AttributeMeta{.label = "Everything shadows", .doc = "The whole scene casts its "    \
+                                     "shadows unless excluded; off, only what it includes.",       \
+                              .group = "Linking"}))                                                \
+    X(std::vector<::ernie::Path>, ShadowLinkIncludes, ::ernie::tokens::kShadowLinkIncludes,        \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.label = "Casters", .doc = "Prims that cast its shadows, with "      \
+                                     "their descendants.",                                         \
+                              .group = "Linking"}))                                                \
+    X(std::vector<::ernie::Path>, ShadowLinkExcludes, ::ernie::tokens::kShadowLinkExcludes,        \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.label = "Not casters", .doc = "Prims that cast none of its "        \
+                                     "shadows, with their descendants.",                           \
+                              .group = "Linking"}))                                                \
     X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
       (::ernie::AttributeMeta{.doc = "Divides the intensity by the light's size (its area, or a "  \
                                      "distant light's projected solid angle), so resizing it "     \

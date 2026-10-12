@@ -2128,10 +2128,31 @@ RasterDelegate::PointsItems(const Scene& scene) const {
         item.material = MaterialOf(scene, path);
         item.tint = ConstantDisplayColor(Gprim(scene, path));
         item.primId = PrimIdOf(path);
+        item.linkGroup = links_.GroupOf(path);
         item.world = WorldOf(scene, path);
         items.push_back(item);
     }
     return items;
+}
+
+void RasterDelegate::SyncLinks(const Scene& scene) {
+    const RenderPrims prims = ResolveRenderPrims(scene, {});
+    std::vector<Path> geometry;
+    for (const auto& [path, synced] : syncedMeshes_) {
+        geometry.push_back(path);
+    }
+    for (const auto& [path, synced] : instancers_) {
+        geometry.push_back(path);
+    }
+    for (const auto& [path, synced] : syncedPoints_) {
+        geometry.push_back(path);
+    }
+    for (const Path& path : {prims.terrain, prims.ground}) {
+        if (!path.IsEmpty()) {
+            geometry.push_back(path);
+        }
+    }
+    links_ = LinkGroupsOf(scene, prims.lights, geometry);
 }
 
 void RasterDelegate::Sync(const Scene& scene) {
@@ -2179,6 +2200,9 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] { SyncGpuXforms(scene); });
     attempt([&] { SyncInstancers(scene); });
     attempt([&] { SyncPoints(scene); });
+    // Light linking's groups of what is drawn, before the draws that
+    // carry them.
+    attempt([&] { SyncLinks(scene); });
     attempt([&] { points_.SetItems(PointsItems(scene)); });
     // The draws, so the meshes' bounds are known as soon as the scene
     // syncs.
@@ -2241,6 +2265,7 @@ RasterDelegate::Items(const Scene& scene) const {
             item.transform = scene.WorldTransform(path);
         }
         item.primId = PrimIdOf(path);
+        item.linkGroup = links_.GroupOf(path);
         item.world = WorldOf(scene, path);
         shade(path, synced, item);
         items.push_back(std::move(item));
@@ -2280,6 +2305,7 @@ RasterDelegate::Items(const Scene& scene) const {
                 glm::mat4(scene.LocalTransform(targets[k]));
             item.instancer = synced.handle;
             item.primId = PrimIdOf(path);
+            item.linkGroup = links_.GroupOf(path);
             // Instances sorted by world, so each view draws its
             // world's as one range.
             std::vector<std::uint32_t>& instances = lists[k];
@@ -2480,6 +2506,15 @@ void RasterDelegate::UpdatePrims(
     for (std::size_t i = 0;
          i < frame.lights.size() && i < anchoredLights.size(); ++i) {
         frame.lights[i].posedOnGpu = anchoredLights[i];
+    }
+    // Light linking: each light's masks over the groups `Sync` gave
+    // the geometry.
+    for (std::size_t i = 0;
+         i < frame.lights.size() && i < prims_.lights.size(); ++i) {
+        frame.lights[i].lightMask =
+            links_.LightMask(prims_.lights[i]);
+        frame.lights[i].shadowMask =
+            links_.ShadowMask(prims_.lights[i]);
     }
     // The lights' poses at the last frame of `stateKey`, for motion
     // blur: none for a light's first frame or one posed on the GPU.

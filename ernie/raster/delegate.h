@@ -12,6 +12,7 @@
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/scene/scene.h"
 #include "ernie/session/delegate.h"
+#include "ernie/session/light_links.h"
 #include "ernie/session/outputs.h"
 #include "ernie/session/resolve.h"
 #include "ernie/util/image.h"
@@ -383,6 +384,8 @@ class RasterDelegate : public RenderDelegate {
     /// Uploads the Points prims that changed: their arrays from the
     /// host or kept on the GPU.
     void SyncPoints(const Scene& scene);
+    /// Light linking's groups of the synced geometry (`links_`).
+    void SyncLinks(const Scene& scene);
     std::vector<PointsItem> PointsItems(const Scene& scene) const;
     std::uint32_t MaterialOf(const Scene& scene,
                              const Path& prim) const;
@@ -528,6 +531,9 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;
+    /// The drawn geometry's light link groups and the lights' masks
+    /// over them, as of the last `Sync`.
+    LinkGroups links_;
     std::map<GpuXformKey, GpuXformGroup> gpuXformGroups_;
     /// Whether the GPU poses of the product being updated are
     /// positions and quaternions (`PosesAreQuaternions`), for

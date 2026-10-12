@@ -4,6 +4,7 @@ ernie_add_library(
     SOURCES
     delegate.cpp
     frame_params.cpp
+    light_links.cpp
     outputs.cpp
     resolve.cpp
     volumes.cpp

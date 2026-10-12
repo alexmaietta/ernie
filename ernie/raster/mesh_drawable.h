@@ -155,6 +155,9 @@ struct MeshItem {
                            ///< colours are not used.
     std::uint32_t primId =
         1;  ///< Written to the PrimId render var; 0 means background.
+    /// Its light link group (`LinkGroups`): which lights light it and
+    /// whose shadows it casts.
+    std::uint32_t linkGroup = 0;
     bool vertexColors = true;  ///< Use the mesh's vertex colours, if
                                ///< it has any, as the tint.
 };

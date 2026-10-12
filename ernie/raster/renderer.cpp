@@ -147,7 +147,9 @@ struct LightGpu {
     /// of their layers; y: 1 for a batch's distant light, whose maps
     /// are the shared one then one per world.
     float map[4];
-    std::uint32_t links[4];  ///< Unused: room for light linking.
+    /// Light linking (`LinkGroups`): the groups it lights, then those
+    /// casting its shadows; the rest unused.
+    std::uint32_t links[4];
 };
 static_assert(sizeof(LightGpu) == 784,
               "LightGpu must match shading.slang");
@@ -1890,6 +1892,8 @@ void RasterRenderer::WriteLights(
         const LightParams& light =
             patterned.type == LightType::Laser ? patterned : given;
         LightGpu& entry = table[i];
+        entry.links[0] = light.lightMask;
+        entry.links[1] = light.shadowMask;
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
         const glm::vec3 where =

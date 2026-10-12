@@ -241,6 +241,12 @@ public DetailSample sampleDetail(DetailCoords c) {
 // metallicParam`), 0 without one, in the next 8 as 8-bit fixed point; and in the high 16 the
 // slopes' deviation sigma as sigma / (1 + sigma) in 16-bit fixed point (shading.slang unpacks
 // them).
+// The G-buffer flags' bits for light link group `group` (`LinkGroups`), bits 1 to 5: shading
+// lights a surface only with the lights whose masks hold its group.
+public uint linkGroupFlags(uint group) {
+    return (group & 31u) << 1;
+}
+
 public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 0.0) {
     let sigma = sqrt(max(slopeVariance, 0.0));
     let encoded = uint(round(sigma / (1.0 + sigma) * 65535.0));

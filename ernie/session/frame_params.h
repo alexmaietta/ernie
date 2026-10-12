@@ -350,6 +350,11 @@ struct LightParams {
     };
     Beam beam;
     bool shadows = true;
+    /// Light linking (`LinkGroups`): the link groups of the surfaces
+    /// it lights, and of the geometry that casts its shadows, a bit
+    /// each; every group by default.
+    std::uint32_t lightMask = ~0u;
+    std::uint32_t shadowMask = ~0u;
     /// A direction of a dome (`DomeLightMode::Directions`): it lights
     /// with the model's diffuse response to surrounding light
     /// (`IBrdf::environment`), as the dome's diffuse light would,

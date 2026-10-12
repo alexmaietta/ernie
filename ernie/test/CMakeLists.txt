@@ -42,6 +42,7 @@ ernie_add_test_suite(
     session_delegate_test.cpp
     session_frame_params_test.cpp
     session_gpu_xform_test.cpp
+    session_light_links_test.cpp
     session_lights_test.cpp
     session_resolve_test.cpp
     session_sampling_test.cpp

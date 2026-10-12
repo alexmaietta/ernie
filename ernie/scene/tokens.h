@@ -560,6 +560,24 @@ inline constexpr std::string_view kTextureFile =
     "inputs:texture:file";
 inline constexpr std::string_view kShadowEnable =
     "inputs:shadow:enable";
+/// UsdLuxLightAPI's light and shadow linking (UsdCollectionAPI, its
+/// prims expanded): the geometry a light lights, and the geometry
+/// that casts its shadows. bool: whether the whole scene is included
+/// unless excluded (default true); relationships: the prims, with
+/// their descendants, included or excluded, the nearest listed
+/// ancestor deciding.
+inline constexpr std::string_view kLightLinkIncludeRoot =
+    "collection:lightLink:includeRoot";
+inline constexpr std::string_view kLightLinkIncludes =
+    "collection:lightLink:includes";
+inline constexpr std::string_view kLightLinkExcludes =
+    "collection:lightLink:excludes";
+inline constexpr std::string_view kShadowLinkIncludeRoot =
+    "collection:shadowLink:includeRoot";
+inline constexpr std::string_view kShadowLinkIncludes =
+    "collection:shadowLink:includes";
+inline constexpr std::string_view kShadowLinkExcludes =
+    "collection:shadowLink:excludes";
 inline constexpr std::string_view kColorTemperature =
     "inputs:colorTemperature";  ///< Kelvin.
 inline constexpr std::string_view kEnableColorTemperature =

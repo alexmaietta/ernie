@@ -32,6 +32,9 @@ constexpr std::uint32_t kHasOrientations = 8;
 constexpr std::uint32_t kHasScales = 16;
 constexpr std::uint32_t kHasUvs = 32;
 constexpr std::uint32_t kHasInstanceColors = 64;
+/// The draw's light link group (`LinkGroups`), in the flags' high
+/// bits.
+constexpr std::uint32_t kLinkGroupShift = 24;
 
 /// One draw as `mesh.slang` reads it.
 struct GpuDraw {
@@ -2160,11 +2163,16 @@ void MeshDrawable::WriteDraws() {
     std::vector<GpuDraw> draws(items_.size());
     std::vector<std::uint32_t> instanceIds;
     itemPipelines_.clear();
+    itemMaterials_.clear();
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const MeshItem& item = items_[i];
         const Mesh& mesh = meshes_.at(item.mesh);
         itemPipelines_.push_back(
             gbufferPipelines_[pushbroom_ ? 1 : 0].get());
+        itemMaterials_.push_back(
+            renderer_.HasMaterial(item.material)
+                ? item.material
+                : RasterRenderer::kDefaultMaterial);
         GpuDraw& draw = draws[i];
         std::memcpy(draw.model, glm::value_ptr(transforms_[i]),
                     sizeof(draw.model));

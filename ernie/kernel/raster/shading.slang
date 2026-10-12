@@ -166,7 +166,8 @@ struct LightGpu {
     // array (`ShadingUniforms::lightShadow.z` texels across); y: 1 for a batch's distant light,
     // whose maps are the shared one then one per world (`ShadingUniforms::view.y`); zw unused.
     float4 map;
-    // Unused: room for its light and shadow links.
+    // Light linking (`LinkGroups`): x the link groups of the surfaces it lights, y those whose
+    // geometry casts its shadows, a bit each (surface.slang's `linkGroupFlags`); zw unused.
     uint4 links;
 }
 
@@ -1664,9 +1665,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float lightFocus[kMaxLights];  // |cos|^focus off a focused light's axis, else 1
     float3x2 footprint = float3x2(0.0);  // the pixel's, once a laser wants it
     bool footprinted = false;
+    // The surface's light link group: lights whose masks lack it leave it unlit.
+    let linkGroup = (ids.w >> 1) & 31u;
     for (uint k = 0; k < lightCount; ++k) {
         lightFocus[k] = 1.0;
-        if (((sh.view.x >> k) & 1u) == 0) {
+        if (((sh.view.x >> k) & 1u) == 0 ||
+            ((lights[sh.view.z + k].links.x >> linkGroup) & 1u) == 0) {
             lightDirections[k] = float3(0.0);
             lightScales[k] = 0.0;
             continue;

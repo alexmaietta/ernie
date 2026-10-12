@@ -2201,3 +2201,28 @@ TEST_F(RasterDelegateTest, PushbroomRowsSeeStarsFromTheirOwnPoses) {
     EXPECT_NEAR(total, expected, 0.03 * expected);
     EXPECT_LE(lit, 2u);
 }
+
+// Light linking: a lamp whose light link includes one cube lights it
+// alone, the other cube beside it left dark.
+TEST_F(RasterDelegateTest, LightLinksChooseWhatALampLights) {
+    Scene scene = LampScene(20.0);
+    scene.Remove("/World/Terrain");
+    for (const auto& [name, x] : {std::pair{"/World/Left", -5.0},
+                                  std::pair{"/World/Right", 5.0}}) {
+        ernie::Cube::Define(scene, name).SetSize(4.0);
+        scene.Set(name, tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(x, 0.0, -2.0)));
+    }
+    RasterDelegate delegate(*context_);
+    const float bothLeft = RadianceAt(delegate, scene, -5.0f, 0.0f);
+    const float bothRight = RadianceAt(delegate, scene, 5.0f, 0.0f);
+    ASSERT_GT(bothLeft, 0.0f);
+    ASSERT_GT(bothRight, 0.0f);
+    ernie::SphereLight(scene, "/World/Lamp")
+        .SetLightLinkIncludeRoot(false)
+        .SetLightLinkIncludes({ernie::Path("/World/Left")});
+    EXPECT_NEAR(RadianceAt(delegate, scene, -5.0f, 0.0f), bothLeft,
+                1e-3f * bothLeft);
+    EXPECT_EQ(RadianceAt(delegate, scene, 5.0f, 0.0f), 0.0f);
+}
