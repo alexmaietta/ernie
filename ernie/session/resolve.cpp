@@ -2821,6 +2821,7 @@ FrameParams FrameParamsOf(const Scene& scene,
         count(options.GetVolumeMaxOctaves(), 1, 8);
     volumeSettings.shadowResolution =
         count(options.GetVolumeShadowResolution(), 16, 2048);
+    volumeSettings.lightCache = options.GetVolumeLightCache();
     ShadowSettings& shadows = params.shadows;
     shadows.cascades = options.GetShadowCascades();
     shadows.resolution =

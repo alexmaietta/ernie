@@ -228,6 +228,10 @@ class VolumePass {
     mutable std::unique_ptr<ComputePipeline> pipelines_[2];
     /// The light patterns each pipeline was compiled with.
     mutable std::size_t pipelinePatterns_[2] = {};
+    /// The band groups each pipeline was compiled for, and the
+    /// frame's.
+    mutable std::uint32_t pipelineGroups_[2] = {};
+    std::uint32_t bandGroups_ = 16;
     std::map<GridKey, LoadedGrid> grids_;
     bool poolStale_ = true;
     std::size_t poolBytes_ = 0;
@@ -258,13 +262,22 @@ class VolumePass {
     PipelineLayout scatterLayout_;
     mutable std::unique_ptr<ComputePipeline> scatterPipeline_;
     mutable std::size_t scatterPipelinePatterns_ = 0;
+    /// The lighting caches (`lightCacheMain`): their cells, all and
+    /// the most of one instance, the buffer they fill, and its
+    /// pipeline.
+    std::optional<Bounds3> bounds_;
+    std::uint64_t cacheCells_ = 0;
+    std::uint64_t cacheLargest_ = 0;
+    mutable std::unique_ptr<GpuBuffer> cache_;
+    PipelineLayout cacheLayout_;
+    mutable std::unique_ptr<ComputePipeline> cachePipeline_;
+    mutable std::size_t cachePipelinePatterns_ = 0;
     mutable std::unique_ptr<GpuImage> shadowMap_;
     mutable std::uint32_t shadowViews_ = 0;
     std::uint32_t views_ = 0;
     std::uint32_t seed_ = 0;
     VolumeSettings settings_;
     bool active_ = false;
-    std::optional<Bounds3> bounds_;
 };
 
 }  // namespace ernie

@@ -1205,6 +1205,8 @@ inline constexpr std::string_view kVolumeMaxOctaves =
     "ernie:volumes:maxOctaves";
 inline constexpr std::string_view kVolumeShadowResolution =
     "ernie:volumes:shadowResolution";
+inline constexpr std::string_view kVolumeLightCache =
+    "ernie:volumes:lightCache";
 inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =

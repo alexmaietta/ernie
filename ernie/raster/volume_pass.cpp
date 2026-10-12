@@ -54,6 +54,13 @@ constexpr DescriptorBinding kScatterBindings[] = {
     {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+// The lighting caches' pass (volume.slang's `lightCacheMain`): the
+// grids and the pass's buffers.
+constexpr DescriptorBinding kCacheBindings[] = {
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
+};
+
 // volume.slang's VolumeResources.
 struct VolumeResources {
     VkDeviceAddress volumes;
@@ -63,15 +70,22 @@ struct VolumeResources {
     VkDeviceAddress lights;
     VkDeviceAddress lightViews;
     VkDeviceAddress lightViewWorlds;
+    VkDeviceAddress lightCache;
     std::uint32_t volumeCount;
     std::uint32_t shadowSize;
     std::uint32_t lightCount;
-    std::uint32_t unused;
+    std::uint32_t cacheSlots;
 };
-static_assert(sizeof(VolumeResources) == 72,
+static_assert(sizeof(VolumeResources) == 80,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
+// Volumes' lighting caches (volume.slang's `lightCacheMain`): none
+// for an instance, voxels of its densest field per cell along each
+// axis, and the most cells along one.
+constexpr std::uint32_t kNoCache = 0xFFFFFFFFu;
+constexpr double kCacheVoxels = 2.0;
+constexpr std::uint32_t kMaxCacheCells = 128;
 // NanoVDB grids start 32-byte aligned.
 constexpr std::uint64_t kGridAlignment = 32;
 
@@ -90,8 +104,10 @@ struct VolumeGpu {
     FieldGpu emission;
     float params[4];
     std::uint32_t info[4];
+    float toWorld[3][4];
+    std::uint32_t cache[4];
 };
-static_assert(sizeof(VolumeGpu) == 304,
+static_assert(sizeof(VolumeGpu) == 368,
               "VolumeGpu must match volume.slang");
 
 struct VolumeMaterialGpu {
@@ -259,9 +275,11 @@ std::unique_ptr<GpuBuffer> Grow(const VulkanContext& context,
 
 // volume.slang's modules, with the light patterns as shading takes
 // them (`lightPattern`), for lasers' beams in the medium, for a
-// pinhole or a pushbroom camera.
+// pinhole or a pushbroom camera, its march for `groups` band groups
+// (`VOLUME_GROUPS`; 0 for its default).
 std::vector<ShaderModuleSource>
-VolumeModules(const LightPatternRegistry& patterns, bool pushbroom) {
+VolumeModules(const LightPatternRegistry& patterns, bool pushbroom,
+              std::uint32_t groups = 0) {
     std::vector<ShaderModuleSource> modules =
         LightPatternModules(patterns);
     modules.insert(
@@ -271,7 +289,10 @@ VolumeModules(const LightPatternRegistry& patterns, bool pushbroom) {
          {"brdf", shaders::kBrdfSlang},
          {"bindless", shaders::kBindlessSlang},
          {"atmosphere", shaders::kAtmosphereSlang},
-         {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
+         {"volume", (groups > 0 ? "#define VOLUME_GROUPS " +
+                                      std::to_string(groups) + "\n"
+                                : std::string()) +
+                        shaders::kPNanoVdbPreludeSlang +
                         shaders::kPNanoVdbHeader + "\n" +
                         shaders::kVolumeSlang}});
     return modules;
@@ -294,7 +315,8 @@ VolumePass::VolumePass(const VulkanContext& context,
       layout_(context, kBindings, sizeof(VolumeConstants)),
       shadowLayout_(context, kShadowBindings),
       scatterLayout_(context, kScatterBindings,
-                     sizeof(VolumeConstants)) {
+                     sizeof(VolumeConstants)),
+      cacheLayout_(context, kCacheBindings) {
     pool_ = Grow(context_, nullptr, kGridAlignment);
     resources_ = std::make_unique<GpuBuffer>(
         context_, sizeof(VolumeResources),
@@ -675,6 +697,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                      std::uint64_t frame, FrameUploads& uploads) {
     ERNIE_ZONE("Volumes");
     seed_ = static_cast<std::uint32_t>(frame * 2654435761u);
+    bandGroups_ = static_cast<std::uint32_t>(
+        std::clamp<std::size_t>((bands.count + 3) / 4, 1, 16));
     settings_ = settings;
     views_ = static_cast<std::uint32_t>(viewWorlds.size());
     for (auto& [key, loaded] : grids_) {
@@ -729,6 +753,9 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     // Each instance's world and its bounds relative to the origin.
     std::vector<std::int32_t> worlds;
     std::vector<std::pair<glm::dvec3, glm::dvec3>> boxes;
+    // The lighting caches' cells, all and the most of one instance.
+    std::uint64_t cacheCells = 0;
+    std::uint64_t cacheLargest = 0;
     {
         ERNIE_ZONE("Volume instances");
         for (std::size_t i = 0; i < volumes.size(); ++i) {
@@ -829,6 +856,32 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     std::max(voxel, 1e-9) / settings_.stepsPerVoxel);
                 placed.info[1] = static_cast<std::uint32_t>(world);
                 placed.info[2] = volume.linkGroup;
+                Rows(glm::translate(glm::dmat4(1.0), -origin) *
+                         transform,
+                     placed.toWorld);
+                // Its lighting cache: a cell per `kCacheVoxels`
+                // voxels of its densest field across its bounds, its
+                // cells from `cacheCells`.
+                placed.cache[3] = kNoCache;
+                if (settings_.lightCache) {
+                    std::uint64_t cells = 1;
+                    for (int a = 0; a < 3; ++a) {
+                        const double extent = hi[a] - lo[a];
+                        const double size =
+                            glm::length(glm::dvec3(voxelToLocal[a]));
+                        const auto n =
+                            static_cast<std::uint32_t>(std::clamp(
+                                std::ceil(extent /
+                                          (size * kCacheVoxels)),
+                                2.0, double(kMaxCacheCells)));
+                        placed.cache[a] = n;
+                        cells *= n;
+                    }
+                    placed.cache[3] =
+                        static_cast<std::uint32_t>(cacheCells);
+                    cacheCells += cells;
+                    cacheLargest = std::max(cacheLargest, cells);
+                }
                 instances.push_back(placed);
                 worlds.push_back(world);
                 glm::dvec3 min = lo;
@@ -915,6 +968,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                   runs_->Address(), lists_->Address(),
                   lightViewWorlds_->Address()};
     volumeCount_ = static_cast<std::uint32_t>(instances.size());
+    cacheCells_ = cacheCells;
+    cacheLargest_ = cacheLargest;
 }
 
 void VolumePass::Prepare(VkCommandBuffer commands,
@@ -1025,6 +1080,24 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     resources.volumeCount = volumeCount_;
     resources.shadowSize = ShadowSize();
     resources.lightCount = lightCount;
+    // The lighting caches: per instance, a slot for each light and,
+    // with the sky's light, two for it from above and the ground's
+    // from below.
+    const std::uint32_t slots =
+        lightCount + (settings_.skyLightSteps > 0 ? 2 : 0);
+    if (cacheCells_ > 0) {
+        const VkDeviceSize bytes = 4 * cacheCells_ * slots;
+        if (cache_ == nullptr || cache_->Size() < bytes) {
+            if (cache_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            cache_ = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        resources.lightCache = cache_->Address();
+        resources.cacheSlots = slots;
+    }
     // After whatever read the last frame's, before the passes reading
     // these.
     VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -1045,6 +1118,39 @@ void VolumePass::Prepare(VkCommandBuffer commands,
     after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
     dependency.pMemoryBarriers = &after;
     vkCmdPipelineBarrier2(commands, &dependency);
+
+    if (cacheCells_ > 0) {
+        // Each cell's optical depth towards each light and up and
+        // down, once for every view and step to read.
+        ERNIE_ZONE("Record volume lighting caches");
+        ERNIE_GPU_ZONE(context_, commands, "Volume lighting caches");
+        if (cachePipeline_ == nullptr ||
+            cachePipelinePatterns_ != patterns.Models().size()) {
+            ERNIE_ZONE("Volume cache pipeline");
+            if (cachePipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            cachePipeline_ = std::make_unique<ComputePipeline>(
+                context_, cacheLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "lightCacheMain"));
+            cachePipelinePatterns_ = patterns.Models().size();
+        }
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*pool_),
+            DescriptorResource::Of(*resources_)};
+        cachePipeline_->Dispatch(
+            commands, buffers,
+            static_cast<std::uint32_t>((cacheLargest_ + 63) / 64),
+            slots, volumeCount_);
+        VkMemoryBarrier2 built{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        built.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        built.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+        dependency.pMemoryBarriers = &built;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
 
     shadowViews_ = shadowViews;
     if (shadowViews == 0) {
@@ -1107,30 +1213,22 @@ void VolumePass::Record(VkCommandBuffer commands,
     const std::size_t slot = pushbroom ? 1 : 0;
     std::unique_ptr<ComputePipeline>& pipeline = pipelines_[slot];
     const std::size_t patterns = shading.patterns->Models().size();
-    if (pipeline == nullptr || pipelinePatterns_[slot] != patterns) {
+    // Compiled for the frame's band groups, its arrays of them in
+    // registers.
+    if (pipeline == nullptr || pipelinePatterns_[slot] != patterns ||
+        pipelineGroups_[slot] != bandGroups_) {
         ERNIE_ZONE("Volume pipeline");
-        // The light patterns as shading takes them (`lightPattern`),
-        // for lasers' beams in the medium.
-        std::vector<ShaderModuleSource> modules =
-            LightPatternModules(*shading.patterns);
-        modules.insert(
-            modules.end(),
-            {{"projection", pushbroom
-                                ? shaders::kProjectionPushbroomSlang
-                                : shaders::kProjectionPinholeSlang},
-             {"brdf", shaders::kBrdfSlang},
-             {"bindless", shaders::kBindlessSlang},
-             {"atmosphere", shaders::kAtmosphereSlang},
-             {"volume", std::string(shaders::kPNanoVdbPreludeSlang) +
-                            shaders::kPNanoVdbHeader + "\n" +
-                            shaders::kVolumeSlang}});
         if (pipeline != nullptr) {
             vkDeviceWaitIdle(context_.Device());
         }
         pipeline = std::make_unique<ComputePipeline>(
             context_, layout_,
-            compiler_.CompileSpirv(modules, "volumeMain"));
+            compiler_.CompileSpirv(VolumeModules(*shading.patterns,
+                                                 pushbroom,
+                                                 bandGroups_),
+                                   "volumeMain"));
         pipelinePatterns_[slot] = patterns;
+        pipelineGroups_[slot] = bandGroups_;
     }
     const auto sampled = [](const GpuImage& image) {
         return DescriptorResource::Of(

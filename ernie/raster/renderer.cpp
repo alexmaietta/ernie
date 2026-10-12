@@ -3705,15 +3705,20 @@ void RasterRenderer::Update(
             }
         }
         // Each light shadow view's volumes cast as its geometry does.
-        std::vector<std::int32_t> lightViewWorlds(
-            lightViews_.size(), lightCasters_.world);
+        std::vector<std::int32_t> lightViewWorlds(lightViews_.size(),
+                                                  lightCasters_.world);
         for (std::size_t k = 0; k < layeredPasses_.size(); ++k) {
             lightViewWorlds[firstLayeredView_ + k] =
                 layeredPasses_[k].casters.world;
         }
+        // No sky's light, nor its steps, without an atmosphere.
+        VolumeSettings volumeSettings = params.volumeSettings;
+        if (!params.atmosphere) {
+            volumeSettings.skyLightSteps = 0;
+        }
         volumes_->Set(raster.volumes, raster.origin, bands_,
                       viewWorlds_, viewProjections, lightViewWorlds,
-                      params.volumeSettings, params.frame, uploads_);
+                      volumeSettings, params.frame, uploads_);
     }
     WriteCascadeJobs();
     // A cube camera's motion is its faces', which the sensor maps

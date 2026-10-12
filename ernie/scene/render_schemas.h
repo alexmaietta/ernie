@@ -214,6 +214,13 @@
                               .doc = "Texels along each side of the volumes' shadow map of each "  \
                                      "light shadow view, which surfaces read.",                    \
                               .group = "Volumes", .min = 16.0, .max = 2048.0}))                    \
+    X(bool, VolumeLightCache, ::ernie::tokens::kVolumeLightCache, true,                            \
+      (::ernie::AttributeMeta{.label = "Lighting cache",                                           \
+                              .doc = "Light volumes from their optical depth to the lights, the "  \
+                                     "sky and the ground, found once a frame at a cell per two "   \
+                                     "voxels, rather than marched to at every step; off, for "     \
+                                     "reference images.",                                          \
+                              .group = "Volumes"}))                                                \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, "approximate",                  \
       (::ernie::AttributeMeta{.label = "Mode",                                                     \
                               .doc = "approximate: unoccluded; full: also shadowed; directions: "  \

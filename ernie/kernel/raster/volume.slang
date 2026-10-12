@@ -57,7 +57,12 @@ import light_patterns;
 
 static const uint kNoGrid = 0xFFFFFFFFu;
 static const uint kMaxIntervals = 8;
-static const uint kMaxGroups = 16;
+// The band groups (four bands each) the march holds: the frame's, compiled in (`VOLUME_GROUPS`), so
+// that its arrays of them stay in registers and its loops over them unroll; 16 (64 bands) without.
+#ifndef VOLUME_GROUPS
+#define VOLUME_GROUPS 16
+#endif
+static const uint kMaxGroups = VOLUME_GROUPS;
 // The transmittance below which a ray is opaque.
 static const float kOpaque = 1e-3;
 static const uint kMaxLights = 16;
@@ -102,7 +107,15 @@ struct VolumeGpu {
     float4 params;
     // x: its material, y: its world, z: its light linking group (`LinkGroups`); w unused.
     uint4 info;
+    // Rows of the affine map from its local frame to world coordinates (relative to the frame's
+    // origin).
+    float4 toWorld[3];
+    // Its lighting cache (`lightCacheMain`): its cells along x, y and z across its bounds, and its
+    // first cell of all instances' (`kNoCache` for none); each slot's cells follow the last's.
+    uint4 cache;
 }
+
+static const uint kNoCache = 0xFFFFFFFFu;
 
 struct VolumeMaterialGpu {
     // Single-scattering albedo per band, four per float4.
@@ -206,10 +219,13 @@ struct VolumeResources {
     LightGpu* shadowLights;
     float4x4* shadowViews;
     int* shadowWorlds;
+    // The volumes' lighting caches, optical depths: an instance's slot s (light s, then up and down
+    // for the sky's and the ground's light) cell n at (cache.w `cacheSlots` + s cells + n).
+    float* lightCache;
     uint volumeCount;
     uint shadowSize;
     uint lightCount;
-    uint unused;
+    uint cacheSlots;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -296,6 +312,30 @@ float sampleField(FieldGpu field, float3 local, inout pnanovdb_readaccessor_t ac
     let f = index - base;
     let i = int3(base);
     float corners[8];
+    // Exactly as below, faster: when the eight corners lie in one leaf (8^3 voxels), it is found
+    // once and its float values read where they lie; when they lie in one tile above the leaves,
+    // they all hold its value.
+    if (field.grid.y == PNANOVDB_GRID_TYPE_FLOAT && all((i & 7) != 7)) {
+        pnanovdb_coord_t ijk;
+        ijk.x = i.x;
+        ijk.y = i.y;
+        ijk.z = i.z;
+        uint level = 0;
+        let address = pnanovdb_readaccessor_get_value_address_and_level(
+            PNANOVDB_GRID_TYPE_FLOAT, grids, accessor, ijk, level);
+        if (level != 0) {
+            return pnanovdb_read_float(grids, address);
+        }
+        for (int c = 0; c < 8; ++c) {
+            let offset = ((c & 1) << 6) | (((c >> 1) & 1) << 3) | ((c >> 2) & 1);
+            corners[c] = pnanovdb_read_float(grids, pnanovdb_address_offset(address, 4u * uint(offset)));
+        }
+        let x00 = lerp(corners[0], corners[1], f.x);
+        let x10 = lerp(corners[2], corners[3], f.x);
+        let x01 = lerp(corners[4], corners[5], f.x);
+        let x11 = lerp(corners[6], corners[7], f.x);
+        return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
+    }
     for (int c = 0; c < 8; ++c) {
         pnanovdb_coord_t ijk;
         ijk.x = i.x + (c & 1);
@@ -709,6 +749,13 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
         }
         reach.towards = light.beamExtra.y > 0.5 ? offset / max(distance, 1e-9) : -light.axis.xyz;
         reach.far = light.beamExtra.y > 0.5 ? distance : max(dot(-offset, light.axis.xyz), 0.0);
+    } else if (light.links.w != 0) {
+        // A strobe or flash: its light over the view's span of the sensor clock (shading.slang's).
+        var weight = 0.0;
+        for (uint s = 0; s < kMaxLit; ++s) {
+            weight += lightTiming[(view * kMaxLights + slot) * kMaxLit + s].y;
+        }
+        reach.scale *= weight;
     }
     if (type != kDistantLight && light.shadow.z > 0.0) {
         // UsdLux's focus, by the direction from the light's centre.
@@ -737,15 +784,22 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
 void emitSkyLight(inout float4 emitted[kMaxGroups], uint materialIndex, float3 world,
                   uint2 shadowRun, uint4 viewLights, uint lightCount, uint linkGroup,
                   float4 air[2],
-                  uint groups, float scale) {
+                  uint groups, float scale, float2 visible) {
     let bottom = air[0].w;
     let top = air[1].x;
     let p = world * 1e-3 - air[0].xyz;
     let r = max(length(p), bottom);
     let up = normalize(p);
+    // What the volumes let through from above and below: `visible` (from a lighting cache), else
+    // marched.
     let steps = skyLightSteps();
-    let above = steps > 0 ? exp(-volumesDepth(shadowRun, world, up, 1e30, ~0u, steps)) : 1.0;
-    let below = steps > 0 ? exp(-volumesDepth(shadowRun, world, -up, 1e30, ~0u, steps)) : 1.0;
+    let marched = visible.x < 0.0 && steps > 0;
+    let above = visible.x >= 0.0 ? visible.x
+                : marched ? exp(-volumesDepth(shadowRun, world, up, 1e30, ~0u, steps))
+                          : 1.0;
+    let below = visible.x >= 0.0 ? visible.y
+                : marched ? exp(-volumesDepth(shadowRun, world, -up, 1e30, ~0u, steps))
+                          : 1.0;
     for (uint k = 0; k < lightCount; ++k) {
         let light = shading.lights[viewLights.z + k];
         if ((viewLights.x & (1u << k)) == 0 || uint(light.position.w) != kDistantLight ||
@@ -801,7 +855,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     }
     let range = asfloat(viewLoad(constants.offsets.z));
     let bands = uint(range.z);
-    let groups = (bands + 3) / 4;
+    // The frame's band groups, (bands + 3) / 4, compiled in.
+    let groups = kMaxGroups;
     let pixel = int4(id.xyz, 0);
     let background = gIds.Load(pixel).x == kBackground;
     // A background shading left unwritten: no radiance behind the volumes.
@@ -967,10 +1022,11 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                 }
             }
             if (glows && sigma > 0.0) {
+                // The field's value scaled, from the material's temperature (what its 0 is).
                 let kelvin =
                     hasTemperature
-                        ? sampleField(volume.temperature, local, temperatureAccessor) *
-                              volume.params.z
+                        ? kelvinBase + sampleField(volume.temperature, local, temperatureAccessor) *
+                                           volume.params.z
                         : kelvinBase;
                 if (kelvin > 0.0) {
                     let scale = weight * sigma * material.params.y;
@@ -1001,10 +1057,13 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     if (reach.scale <= 0.0) {
                         continue;
                     }
-                    let depth = light.links.z != 0
-                                    ? volumesDepth(shadowRun, world, reach.towards, reach.far,
-                                                   light.links.y, shadowSteps())
-                                    : 0.0;
+                    // From the instance's lighting cache, or marched.
+                    let slot = viewLights.z + k;
+                    let depth = light.links.z == 0 ? 0.0
+                                : hasCache(volume, slot)
+                                    ? cachedDepth(volume, slot, local)
+                                    : volumesDepth(shadowRun, world, reach.towards, reach.far,
+                                                   light.links.y, shadowSteps());
                     let lit = weight * sigma *
                               octavesOf(material, dot(reach.towards, -direction), depth) *
                               reach.scale * geometryShadow(light, world, viewLights.y, mapTexels);
@@ -1028,8 +1087,16 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     }
                 }
                 if (skyLit) {
+                    // How much of the sky above and the ground below the volumes let through:
+                    // from the lighting cache's slots past the lights, else marched.
+                    float2 visible = float2(-1.0);
+                    if (hasCache(volume, pass.lightCount + 1)) {
+                        visible = float2(exp(-cachedDepth(volume, pass.lightCount, local)),
+                                         exp(-cachedDepth(volume, pass.lightCount + 1, local)));
+                    }
                     emitSkyLight(emitted, materialIndex, world, shadowRun, viewLights, lightCount,
-                                 volume.info.z, air, groups, weight * sigma * material.phase.w);
+                                 volume.info.z, air, groups, weight * sigma * material.phase.w,
+                                 visible);
                 }
             }
             frontSum += transmittance * opacity * t;
@@ -1252,4 +1319,140 @@ void denseScatterMain(uint3 id : SV_DispatchThreadID) {
     let inLeaf = ((id.x & 7u) << 6) | ((id.y & 7u) << 3) | (id.z & 7u);
     gridsOut[constants.offsets.x + leaf * constants.offsets.y + constants.offsets.z + inLeaf] =
         asuint(value);
+}
+
+// The most steps a lighting cache's cell takes through one volume (`lightCacheMain`).
+static const uint kMaxCacheSteps = 256;
+
+// The optical depth from world point `world` (relative to the frame's origin) along unit `towards`,
+// up to world distance `far`, through every volume that casts into world `viewWorld` for shadow
+// group `casters` (`castsInto`): about a voxel a step in each, the steps in empty tiles skipped.
+float castersDepth(float3 world, float3 towards, float far, int viewWorld, uint casters) {
+    float depth = 0.0;
+    for (uint v = 0; v < pass.volumeCount; ++v) {
+        let volume = volumes[v];
+        if (!castsInto(volume, viewWorld, casters)) {
+            continue;
+        }
+        let o = float3(dot(volume.toLocal[0], float4(world, 1.0)),
+                       dot(volume.toLocal[1], float4(world, 1.0)),
+                       dot(volume.toLocal[2], float4(world, 1.0)));
+        let d = float3(dot(volume.toLocal[0].xyz, towards), dot(volume.toLocal[1].xyz, towards),
+                       dot(volume.toLocal[2].xyz, towards));
+        let inverse = 1.0 / d;
+        let t0 = (volume.boundsMin.xyz - o) * inverse;
+        let t1 = (volume.boundsMax.xyz - o) * inverse;
+        let near = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), max(min(t0.z, t1.z), 0.0));
+        let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), min(max(t0.z, t1.z), far));
+        if (near >= exit) {
+            continue;
+        }
+        // The march's step is half a voxel by default (`params.w`).
+        let steps = clamp(uint(ceil((exit - near) / (2.0 * volume.params.w))), 1u, kMaxCacheSteps);
+        let dt = (exit - near) / float(steps);
+        var accessor = accessorOf(volume.density);
+        let indexOrigin = float3(dot(volume.density.toIndex[0], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[1], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[2], float4(o, 1.0)));
+        let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
+                               dot(volume.density.toIndex[1].xyz, d),
+                               dot(volume.density.toIndex[2].xyz, d));
+        float sum = 0.0;
+        for (uint i = 0; i < steps; ++i) {
+            let t = near + (float(i) + 0.5) * dt;
+            let next = stepAfterEmptyTile(volume.density, indexOrigin + indexStep * t, indexOrigin,
+                                          indexStep, near, dt, 0.5, accessor);
+            if (next > i) {
+                i = next - 1;
+                continue;
+            }
+            sum += max(sampleField(volume.density, o + d * t, accessor), 0.0);
+        }
+        depth += sum * volume.params.x * dt;
+    }
+    return depth;
+}
+
+// The volumes' lighting caches, once a frame for every view and step that reads them: for
+// instance `id.z`'s cell `id.x` (a cell per two voxels across its bounds, z fastest), its optical
+// depth towards light `id.y` through the volumes that cast its shadows (those of the instance's
+// world and the shared ones), or for the two slots past the lights, straight up and straight down
+// through them all, for the sky's light and the ground's.
+//
+// References:
+// - T. Lokovic and E. Veach, "Deep Shadow Maps", SIGGRAPH 2000 (transmittance cached once for every
+//   lookup).
+// - NVIDIA Flow's self-shadow grid (flow/source/nvflowext/shaders/ShadowUpdateCS.hlsl) and Unreal
+//   Engine's heterogeneous volumes' lighting cache (HeterogeneousVolumesLiveShadingPipeline.usf).
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void lightCacheMain(uint3 id: SV_DispatchThreadID) {
+    if (id.z >= pass.volumeCount || id.y >= pass.cacheSlots) {
+        return;
+    }
+    let volume = volumes[id.z];
+    let dims = volume.cache.xyz;
+    let cells = dims.x * dims.y * dims.z;
+    if (volume.cache.w == kNoCache || id.x >= cells) {
+        return;
+    }
+    let cell = uint3(id.x / (dims.y * dims.z), (id.x / dims.z) % dims.y, id.x % dims.z);
+    let local =
+        lerp(volume.boundsMin.xyz, volume.boundsMax.xyz, (float3(cell) + 0.5) / float3(dims));
+    let world = float3(dot(volume.toWorld[0], float4(local, 1.0)),
+                       dot(volume.toWorld[1], float4(local, 1.0)),
+                       dot(volume.toWorld[2], float4(local, 1.0)));
+    // A world's instance is shadowed by its world's volumes and the shared ones; a shared one by
+    // the shared ones.
+    let world_ = int(volume.info.y);
+    let viewWorld = world_ == -1 ? kNoWorld : world_;
+    float depth = 0.0;
+    if (id.y < pass.lightCount) {
+        let light = pass.shadowLights[id.y];
+        if (light.links.z != 0 && ((light.links.x >> volume.info.z) & 1u) != 0) {
+            if (uint(light.position.w) == kDistantLight) {
+                depth = castersDepth(world, light.position.xyz, 1e30, viewWorld, light.links.y);
+            } else {
+                let to = light.position.xyz - world;
+                let far = length(to);
+                depth = castersDepth(world, to / max(far, 1e-6), far, viewWorld, light.links.y);
+            }
+        }
+    } else {
+        // Up, the world's z; down, against it.
+        let up = float3(0.0, 0.0, id.y == pass.lightCount ? 1.0 : -1.0);
+        depth = castersDepth(world, up, 1e30, viewWorld, ~0u);
+    }
+    pass.lightCache[volume.cache.w * pass.cacheSlots + id.y * cells + id.x] = depth;
+}
+
+// Instance `volume`'s cached optical depth in slot `slot` at its local point `local`, trilinear
+// between its cells' centres (`lightCacheMain`).
+float cachedDepth(VolumeGpu volume, uint slot, float3 local) {
+    let dims = int3(volume.cache.xyz);
+    let cells = uint(dims.x * dims.y * dims.z);
+    let p = (local - volume.boundsMin.xyz) / (volume.boundsMax.xyz - volume.boundsMin.xyz) *
+                float3(dims) -
+            0.5;
+    let c0 = clamp(int3(floor(p)), int3(0), dims - 1);
+    let c1 = min(c0 + 1, dims - 1);
+    let f = saturate(p - float3(c0));
+    let base = volume.cache.w * pass.cacheSlots + slot * cells;
+    float corners[8];
+    for (int c = 0; c < 8; ++c) {
+        let x = (c & 1) != 0 ? c1.x : c0.x;
+        let y = (c & 2) != 0 ? c1.y : c0.y;
+        let z = (c & 4) != 0 ? c1.z : c0.z;
+        corners[c] = pass.lightCache[base + uint((x * dims.y + y) * dims.z + z)];
+    }
+    let x00 = lerp(corners[0], corners[1], f.x);
+    let x10 = lerp(corners[2], corners[3], f.x);
+    let x01 = lerp(corners[4], corners[5], f.x);
+    let x11 = lerp(corners[6], corners[7], f.x);
+    return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
+}
+
+// Whether instance `volume` has a lighting cache with slot `slot`.
+bool hasCache(VolumeGpu volume, uint slot) {
+    return volume.cache.w != kNoCache && slot < pass.cacheSlots;
 }

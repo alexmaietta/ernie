@@ -192,7 +192,8 @@
                               .group = "Volume", .max = 1e3}))                                     \
     X(double, Temperature, ::ernie::tokens::kVolumeTemperature, 0.0,                               \
       (::ernie::AttributeMeta{.doc = "Kelvin, of the whole volume when it has no temperature "     \
-                                     "field; 0, no glow.",                                         \
+                                     "field, or what the field's 0 is with one (the ambient "      \
+                                     "air's); 0, no glow without a field.",                        \
                               .group = "Volume", .max = 1e5}))                                     \
     X(std::string, TemperatureField, ::ernie::tokens::kVolumeTemperatureField, "temperature",      \
       (::ernie::AttributeMeta{.doc = "The Volume's field of temperature in kelvin, times the "     \
