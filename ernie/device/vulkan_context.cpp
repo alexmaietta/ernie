@@ -637,6 +637,27 @@ void VulkanContext::CollectGpuProfile(
 VulkanContext::~VulkanContext() {
     if (device_ != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device_);
+        // Shared buffers still alive go with the device, their memory
+        // kept by CUDA's imports of it.
+        {
+            const std::lock_guard lock(exportedMutex_);
+            for (const std::weak_ptr<ExportedBuffer>& weak :
+                 exported_) {
+                const std::shared_ptr<ExportedBuffer> exported =
+                    weak.lock();
+                if (exported == nullptr) {
+                    continue;
+                }
+                const std::lock_guard held(exported->mutex);
+                if (exported->buffer != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(device_, exported->buffer,
+                                    nullptr);
+                    vkFreeMemory(device_, exported->memory, nullptr);
+                    exported->buffer = VK_NULL_HANDLE;
+                    exported->memory = VK_NULL_HANDLE;
+                }
+            }
+        }
         timer_.reset();
 #if ERNIE_TRACY
         if (gpuProfiler_ != nullptr) {
@@ -656,6 +677,16 @@ VulkanContext::~VulkanContext() {
     if (instance_ != VK_NULL_HANDLE) {
         vkDestroyInstance(instance_, nullptr);
     }
+}
+
+void VulkanContext::TrackExported(
+    std::weak_ptr<ExportedBuffer> exported) const {
+    const std::lock_guard lock(exportedMutex_);
+    std::erase_if(exported_,
+                  [](const std::weak_ptr<ExportedBuffer>& weak) {
+                      return weak.expired();
+                  });
+    exported_.push_back(std::move(exported));
 }
 
 std::vector<std::string> VulkanContext::TakeValidationMessages() {

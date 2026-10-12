@@ -55,6 +55,10 @@ GpuBuffer::GpuBuffer(const VulkanContext& context, VkDeviceSize size,
         CheckVk(vkBindBufferMemory(context.Device(), buffer_,
                                    sharedMemory_, 0),
                 "vkBindBufferMemory");
+        exported_ = std::make_shared<VulkanContext::ExportedBuffer>();
+        exported_->buffer = buffer_;
+        exported_->memory = sharedMemory_;
+        context.TrackExported(exported_);
         return;
     }
     VmaAllocationCreateInfo allocation{};
@@ -85,6 +89,7 @@ GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept
       allocation_(std::exchange(other.allocation_, VK_NULL_HANDLE)),
       sharedMemory_(
           std::exchange(other.sharedMemory_, VK_NULL_HANDLE)),
+      exported_(std::move(other.exported_)),
       allocationSize_(std::exchange(other.allocationSize_, 0)),
       attached_(std::move(other.attached_)),
       lifetime_(std::move(other.lifetime_)),
@@ -101,6 +106,7 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
             std::exchange(other.allocation_, VK_NULL_HANDLE);
         sharedMemory_ =
             std::exchange(other.sharedMemory_, VK_NULL_HANDLE);
+        exported_ = std::move(other.exported_);
         allocationSize_ = std::exchange(other.allocationSize_, 0);
         attached_ = std::move(other.attached_);
         lifetime_ = std::move(other.lifetime_);
@@ -114,20 +120,31 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept {
 void GpuBuffer::Release() {
     attached_.reset();
     lifetime_.reset();
-    if (buffer_ != VK_NULL_HANDLE && contextAlive_.expired()) {
-        // The device went first, taking its memory with it, as when a
-        // scene still holds an array over the buffer after its
-        // renderer is gone: nothing left to destroy.
+    if (exported_ != nullptr) {
+        // Unless the context went first and destroyed them with its
+        // device, as when a scene held an array over the buffer after
+        // its renderer was gone.
+        {
+            const std::lock_guard lock(exported_->mutex);
+            if (exported_->buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(context_->Device(), exported_->buffer,
+                                nullptr);
+                vkFreeMemory(context_->Device(), exported_->memory,
+                             nullptr);
+                exported_->buffer = VK_NULL_HANDLE;
+                exported_->memory = VK_NULL_HANDLE;
+            }
+        }
+        exported_.reset();
         buffer_ = VK_NULL_HANDLE;
-        allocation_ = VK_NULL_HANDLE;
         sharedMemory_ = VK_NULL_HANDLE;
         return;
     }
-    if (sharedMemory_ != VK_NULL_HANDLE) {
-        vkDestroyBuffer(context_->Device(), buffer_, nullptr);
-        vkFreeMemory(context_->Device(), sharedMemory_, nullptr);
+    if (buffer_ != VK_NULL_HANDLE && contextAlive_.expired()) {
+        // The device went first, taking its memory with it: nothing
+        // left to destroy.
         buffer_ = VK_NULL_HANDLE;
-        sharedMemory_ = VK_NULL_HANDLE;
+        allocation_ = VK_NULL_HANDLE;
         return;
     }
     if (buffer_ != VK_NULL_HANDLE) {

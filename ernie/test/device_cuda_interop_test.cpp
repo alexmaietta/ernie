@@ -121,6 +121,38 @@ TEST_F(CudaInteropTest, VulkanWritesAreVisibleThroughCudaViews) {
                  std::invalid_argument);
 }
 
+TEST_F(CudaInteropTest, ViewsOutliveTheirContextCleanly) {
+    // A context of its own, gone while a view (as a scene's array
+    // after its renderer) still holds its buffer.
+    ernie::VulkanContextOptions options;
+    options.validation = true;
+    std::unique_ptr<ernie::VulkanContext> context =
+        ernie::VulkanContext::Create(options);
+    std::unique_ptr<CudaInterop> cuda = CudaInterop::Create(*context);
+    ASSERT_NE(cuda, nullptr);
+    auto buffer = std::make_shared<GpuBuffer>(
+        *context, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        BufferMemory::Shared);
+    const std::array<float, 8> values{1, 2, 3, 4, 5, 6, 7, 8};
+    buffer->Write(std::as_bytes(std::span(values)));
+    const Tensor view = cuda->View(buffer, DType::Float32, {8});
+    buffer.reset();
+
+    ::testing::internal::CaptureStderr();
+    cuda.reset();
+    context.reset();
+    const std::string reported =
+        ::testing::internal::GetCapturedStderr();
+    EXPECT_EQ(reported.find("has not been destroyed"),
+              std::string::npos)
+        << reported;
+    // The memory stays, through CUDA's import of it.
+    const Tensor host = cuda_->Download(view);
+    EXPECT_EQ(
+        std::vector<float>(host.As<float>(), host.As<float>() + 8),
+        std::vector<float>(values.begin(), values.end()));
+}
+
 TEST(CudaInteropAvailability, ExplainsWhyItIsUnavailable) {
     std::unique_ptr<ernie::VulkanContext> context;
     try {

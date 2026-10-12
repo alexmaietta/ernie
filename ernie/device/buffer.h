@@ -101,6 +101,9 @@ class GpuBuffer {
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;
+    /// For `Shared` buffers, `buffer_` and `sharedMemory_` as the
+    /// context also holds them (`VulkanContext::TrackExported`).
+    std::shared_ptr<VulkanContext::ExportedBuffer> exported_;
     VkDeviceSize allocationSize_ = 0;
     std::shared_ptr<void> attached_;
     std::shared_ptr<const void> lifetime_;

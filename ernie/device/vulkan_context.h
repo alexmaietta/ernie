@@ -127,6 +127,20 @@ class VulkanContext {
         return alive_;
     }
 
+    /// A `Shared` buffer's handles, which whichever goes first of the
+    /// buffer and this context destroys (under `mutex`), nulling
+    /// them: an array a scene still holds over the buffer after its
+    /// renderer is gone keeps the memory through CUDA's import of it.
+    struct ExportedBuffer {
+        std::mutex mutex;
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+    };
+
+    /// Registers `exported` for destruction with the device if its
+    /// buffer outlives this context.
+    void TrackExported(std::weak_ptr<ExportedBuffer> exported) const;
+
     /// Device name, e.g. "NVIDIA GeForce RTX 5070 Laptop GPU".
     const std::string& DeviceName() const {
         return deviceName_;
@@ -318,6 +332,9 @@ class VulkanContext {
     std::unique_ptr<std::function<void(std::string)>> sink_;
     std::mutex messagesMutex_;
     std::vector<std::string> messages_;
+    mutable std::mutex exportedMutex_;
+    mutable std::vector<std::weak_ptr<ExportedBuffer>>
+        exported_;  ///< See `TrackExported`.
 };
 
 /// Loads Vulkan (the system loader, or MoltenVK on macOS without one)
