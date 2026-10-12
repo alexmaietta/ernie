@@ -2572,9 +2572,10 @@ void MeshDrawable::Cull(const FrameParams& params,
         std::vector<VisibleRange> ranges;
         for (const auto [i, r] : candidates(seen)) {
             const WorldRange& range = itemRanges_[i][r];
+            const std::uint32_t group = items_[i].linkGroup & 31u;
             if (range.count == 0 ||
                 (seen != nullptr && !seen->Draws(range.world)) ||
-                ((linkMask >> (items_[i].linkGroup & 31u)) & 1u) == 0) {
+                ((linkMask >> group) & 1u) == 0) {
                 continue;
             }
             if (posed && culling_ != Culling::Off) {
