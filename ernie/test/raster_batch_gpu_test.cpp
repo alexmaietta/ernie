@@ -915,6 +915,95 @@ TEST_F(RasterDelegateTest, PosesOnTheGpuRenderAsPosesOnTheHost) {
     }
 }
 
+TEST_F(RasterDelegateTest,
+       GpuPosedViewsTakeStrayLightFromTheirPoses) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    // Four views looking 20 degrees up, each its own way, with the
+    // sun 30 degrees up: the stray light of each depends on its own
+    // pose, not the estimates the host has of it.
+    constexpr std::size_t kViews = 4;
+    Scene scene = PosedRowScene(kViews);
+    std::vector<float> poses;
+    for (std::size_t v = 0; v < kViews; ++v) {
+        const double heading =
+            glm::radians(90.0 * static_cast<double>(v));
+        const glm::dvec3 eye(0.0, 0.0, 2.0);
+        const glm::dvec3 forward(std::cos(heading), std::sin(heading),
+                                 std::tan(glm::radians(20.0)));
+        const glm::dmat4 pose = ernie::LookAtTransform(
+            eye, eye + forward, {0.0, 0.0, 1.0});
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                poses.push_back(static_cast<float>(pose[col][row]));
+            }
+        }
+    }
+    ernie::Camera camera(scene, "/World/Rig/Camera");
+    camera.SetPoses(Tensor::Copy<float>(
+        poses, {static_cast<std::int64_t>(kViews), 4, 4}));
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform(
+                  {std::cos(glm::radians(30.0)), 0.0,
+                   std::sin(glm::radians(30.0))}));
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(false);
+    ernie::RenderVar::Define(scene, "/Render/Vars/HdrColor")
+        .SetSourceName("HdrColor");
+    scene.Set("/Render/Posed", tokens::kOrderedVars,
+              std::vector<Path>{"/Render/Vars/HdrColor"});
+    const auto filters = [&](bool stray) {
+        std::vector<Path> chain;
+        if (stray) {
+            ernie::SensorFilterPrim::Define(scene, "/Render/Stray")
+                .SetFilterType("strayLight");
+            scene.Set("/Render/Stray", "inputs:strength", 1.0f);
+            scene.Set("/Render/Stray", "inputs:gradient", 0.0f);
+            chain.emplace_back("/Render/Stray");
+        }
+        ernie::SensorFilterPrim::Define(scene, "/Render/Cie")
+            .SetFilterType("cie");
+        chain.emplace_back("/Render/Cie");
+        scene.Set("/Render/Posed", tokens::kFilters, chain);
+    };
+    const Path posedOnly[] = {"/Render/Posed"};
+    const auto render = [&] {
+        const Tensor tensor = delegate.Step(scene, posedOnly)
+                                  .at("/Render/Posed")
+                                  .vars.at("HdrColor")
+                                  .Map(ernie::MapDevice::Cpu)
+                                  .tensor;
+        return std::vector<float>(tensor.As<float>(),
+                                  tensor.As<float>() +
+                                      tensor.Elements());
+    };
+    // The largest difference between two renders, relative to the
+    // brightest value.
+    const auto difference = [](const std::vector<float>& a,
+                               const std::vector<float>& b) {
+        float largest = 0.0f;
+        float brightest = 1e-30f;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            largest = std::max(largest, std::abs(a[i] - b[i]));
+            brightest = std::max(brightest, std::abs(b[i]));
+        }
+        return largest / brightest;
+    };
+    filters(false);
+    const std::vector<float> clear = render();
+    filters(true);
+    const std::vector<float> host = render();
+    ASSERT_GT(difference(host, clear), 0.01f) << "stray light shows";
+    camera.SetPoses(cuda->Upload(*camera.GetPoses()));
+    for (int step = 0; step < 2; ++step) {
+        EXPECT_LT(difference(render(), host), 1e-3f)
+            << "step " << step;
+    }
+}
+
 TEST_F(RasterDelegateTest, CubeFacedViewsPoseOnTheGpuAsOnTheHost) {
     // Fisheyes whose corners reach 100 and 150 degrees off axis, on
     // five and on all six cube faces: the GPU turns each view's pose

@@ -419,8 +419,23 @@ struct SensorUniforms {
     /// E 4 N^2 / (pi T), for stray light.
     float sourceRadiance[kStraySources][SpectralBands::kMaxBands];
 };
-static_assert(sizeof(SensorUniforms) == 4352,
+static_assert(sizeof(SensorUniforms) == 4352 &&
+                  offsetof(SensorUniforms, faceInvProj) == 2560,
               "SensorUniforms must match sensor.slang");
+
+/// A view's own sensor uniforms, after the shared SensorUniforms
+/// (whose per-view fields go unused) in the buffer sensor.slang reads
+/// (`sensorData`): what differs between the views of a batch.
+struct SensorView {
+    float invViewProj[16];
+    float pose[16];  ///< Camera to world, for stray light's sources.
+    float eye[4];
+    float forward[4];
+    float distortion[4];    ///< A pushbroom's line differs per view.
+    std::uint32_t seed[4];  ///< The frame seed; the rest unused.
+};
+static_assert(sizeof(SensorView) == 192,
+              "SensorView must match sensor.slang");
 
 /// Per-view uniforms sit in one buffer at multiples of this, the
 /// largest `minUniformBufferOffsetAlignment` Vulkan allows.
@@ -434,16 +449,15 @@ constexpr VkDeviceSize Aligned(VkDeviceSize bytes) {
 constexpr VkDeviceSize kUniformsStride = Aligned(sizeof(Uniforms));
 constexpr VkDeviceSize kShadingStride =
     Aligned(sizeof(ShadingUniforms));
-constexpr VkDeviceSize kSensorStride =
-    Aligned(sizeof(SensorUniforms));
+/// The sensor's shared uniforms, then every view's SensorView.
+constexpr VkDeviceSize kSensorShared = sizeof(SensorUniforms);
+constexpr VkDeviceSize kSensorStride = sizeof(SensorView);
 /// Light shadow views' Shadows blocks (`lightShadowBlocks_`), bound
 /// one at a time.
 constexpr VkDeviceSize kLightShadowBlockStride =
     Aligned(sizeof(ShadowUniforms));
-static_assert(
-    kShadingStride == sizeof(ShadingUniforms) &&
-        kSensorStride == sizeof(SensorUniforms),
-    "Shading and the filters index the views' uniforms as arrays");
+static_assert(kShadingStride == sizeof(ShadingUniforms),
+              "Shading indexes the views' uniforms as an array");
 
 /// Where the volume pass reads a view's block of the shading
 /// uniforms.
@@ -1177,8 +1191,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                                 1.0f, false}),
       shadingUniforms_(context, kShadingStride, kViewUniformUsage,
                        BufferMemory::Device),
-      sensorUniforms_(context, kSensorStride, kViewUniformUsage,
-                      BufferMemory::Device),
+      sensorUniforms_(context, kSensorShared + kSensorStride,
+                      kViewUniformUsage, BufferMemory::Device),
       lightTable_(
           context, kMaxLightSubframes * kMaxLights * sizeof(LightGpu),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
@@ -2559,8 +2573,8 @@ void RasterRenderer::Update(
                     : *box;
         }
     }
-    // The Distance display spans the near plane to the far, or with an
-    // infinite far plane to the scene's farthest corner.
+    // The Distance display spans the near plane to the far, or with
+    // an infinite far plane to the scene's farthest corner.
     if (!std::isfinite(presentRange_[1])) {
         const glm::vec3 eye(glm::dvec3(params.camera.transform[3]) -
                             params.origin);
@@ -2569,10 +2583,14 @@ void RasterRenderer::Update(
             farthest = 2.0f * presentRange_[0];
             for (int corner = 0; corner < 8; ++corner) {
                 const glm::vec3 point(
-                    (corner & 1) != 0 ? bounds->second.x : bounds->first.x,
-                    (corner & 2) != 0 ? bounds->second.y : bounds->first.y,
-                    (corner & 4) != 0 ? bounds->second.z : bounds->first.z);
-                farthest = std::max(farthest, glm::length(point - eye));
+                    (corner & 1) != 0 ? bounds->second.x
+                                      : bounds->first.x,
+                    (corner & 2) != 0 ? bounds->second.y
+                                      : bounds->first.y,
+                    (corner & 4) != 0 ? bounds->second.z
+                                      : bounds->first.z);
+                farthest =
+                    std::max(farthest, glm::length(point - eye));
             }
         }
         presentRange_[1] = farthest;
@@ -3578,55 +3596,71 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         CopyMatrix(sensor.faceInvProj,
                    glm::inverse(raster.View(0).projection));
     }
+    // Sources in the world's frame; the sensor turns them into each
+    // view's (`viewUniforms`).
+    for (std::size_t s = 0; s < sources.size(); ++s) {
+        const glm::vec3 direction = sources[s]->direction;
+        const glm::vec3 unit = glm::length(direction) > 0.0f
+                                   ? glm::normalize(direction)
+                                   : direction;
+        sensor.sources[s][0] = unit.x;
+        sensor.sources[s][1] = unit.y;
+        sensor.sources[s][2] = unit.z;
+    }
+    if (params.camera.pushbroom) {
+        // Its tangential terms (lens.slang's Pushbroom); its k1 to k3
+        // and line are each view's distortion.
+        sensor.pushbroom[0] = static_cast<float>(lens.p1);
+        sensor.pushbroom[1] = static_cast<float>(lens.p2);
+    }
     // The sensor filters the output views, reading the G-buffer of
     // their last sub-frame (`params` holds a view per sub-frame and
-    // output view). Every view's uniforms go up in one upload.
-    std::vector<SensorUniforms> sensors;
-    sensors.reserve(outputViews_);
+    // output view): the shared uniforms, then every view's block, in
+    // one upload. With the poses on the GPU, it writes the blocks'
+    // cameras (`RecordViewPoses`).
+    std::vector<SensorView> views(outputViews_);
     for (std::uint32_t v = 0; v < outputViews_; ++v) {
+        SensorView& block = views[v];
+        std::memcpy(block.distortion, sensor.distortion,
+                    sizeof(block.distortion));
+        // Every view of a batch has noise of its own; view 0's is the
+        // single view's.
+        block.seed[0] =
+            FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u),
+                      params.frame);
+        if (posesOnGpu_) {
+            continue;
+        }
         const std::uint32_t last =
             (subframes_ - 1) * outputViews_ + v;
         const CameraView view = params.View(last);
         if (params.camera.pushbroom) {
-            // Its strip; its distortion, the line and its tangential
-            // terms (lens.slang's Pushbroom).
+            // Its strip; its distortion, the line (lens.slang's
+            // Pushbroom).
             const PushbroomStrip strip = params.Strip(last);
-            CopyMatrix(sensor.invViewProj, strip.Packed());
-            sensor.distortion[0] = static_cast<float>(lens.k1);
-            sensor.distortion[1] = static_cast<float>(lens.k2);
-            sensor.distortion[2] = static_cast<float>(lens.k3);
-            sensor.distortion[3] = strip.line;
-            sensor.pushbroom[0] = static_cast<float>(lens.p1);
-            sensor.pushbroom[1] = static_cast<float>(lens.p2);
+            CopyMatrix(block.invViewProj, strip.Packed());
+            block.distortion[0] = static_cast<float>(lens.k1);
+            block.distortion[1] = static_cast<float>(lens.k2);
+            block.distortion[2] = static_cast<float>(lens.k3);
+            block.distortion[3] = strip.line;
         } else {
-            CopyMatrix(sensor.invViewProj,
+            CopyMatrix(block.invViewProj,
                        glm::inverse(view.ViewProjection()));
         }
-        sensor.eye[0] = view.eye.x;
-        sensor.eye[1] = view.eye.y;
-        sensor.eye[2] = view.eye.z;
-        sensor.forward[0] = view.forward.x;
-        sensor.forward[1] = view.forward.y;
-        sensor.forward[2] = view.forward.z;
-        for (std::size_t s = 0; s < sources.size(); ++s) {
-            const glm::vec3 source =
-                glm::mat3(view.view) * sources[s]->direction;
-            const glm::vec3 unit = glm::length(source) > 0.0f
-                                       ? glm::normalize(source)
-                                       : source;
-            sensor.sources[s][0] = unit.x;
-            sensor.sources[s][1] = unit.y;
-            sensor.sources[s][2] = unit.z;
-        }
-        // Every view of a batch has noise of its own; view 0's is the
-        // single view's.
-        sensor.noise[2] =
-            FrameSeed(model.seed, params.stream ^ (v * 0x9E3779B9u),
-                      params.frame);
-        sensors.push_back(sensor);
+        CopyMatrix(block.pose, glm::inverse(view.view));
+        block.eye[0] = view.eye.x;
+        block.eye[1] = view.eye.y;
+        block.eye[2] = view.eye.z;
+        block.forward[0] = view.forward.x;
+        block.forward[1] = view.forward.y;
+        block.forward[2] = view.forward.z;
     }
-    uploads_.Write(sensorUniforms_,
-                   std::as_bytes(std::span(sensors)));
+    std::vector<std::byte> bytes(kSensorShared +
+                                 views.size() * kSensorStride);
+    std::memcpy(bytes.data(), &sensor, kSensorShared);
+    std::memcpy(bytes.data() + kSensorShared, views.data(),
+                views.size() * kSensorStride);
+    uploads_.Write(sensorUniforms_, bytes);
 }
 
 void RasterRenderer::WriteMotion(const FrameParams& params,
@@ -3741,8 +3775,8 @@ void RasterRenderer::EnsureViewBuffers(std::uint32_t views) {
         GpuBuffer(context_, views * kShadingStride, kViewUniformUsage,
                   BufferMemory::Device);
     sensorUniforms_ =
-        GpuBuffer(context_, views * kSensorStride, kViewUniformUsage,
-                  BufferMemory::Device);
+        GpuBuffer(context_, kSensorShared + views * kSensorStride,
+                  kViewUniformUsage, BufferMemory::Device);
 }
 
 RasterFrame RasterRenderer::Frame(std::uint32_t view) const {
@@ -4734,12 +4768,13 @@ void RasterRenderer::RecordViewPoses(
     PatchViews(commands, shadingUniforms_, 0, kShadingStride,
                shading);
     ViewFields sensor;
-    sensor.inverseViewProjection =
-        offsetof(SensorUniforms, invViewProj);
-    sensor.eye = offsetof(SensorUniforms, eye);
-    sensor.forward = offsetof(SensorUniforms, forward);
+    sensor.inverseViewProjection = offsetof(SensorView, invViewProj);
+    sensor.eye = offsetof(SensorView, eye);
+    sensor.forward = offsetof(SensorView, forward);
+    sensor.pose = offsetof(SensorView, pose);
     sensor.outputViews = true;
-    PatchViews(commands, sensorUniforms_, 0, kSensorStride, sensor);
+    PatchViews(commands, sensorUniforms_, kSensorShared,
+               kSensorStride, sensor);
     // The poses rendered, for the CPU's estimates of the next
     // frame's.
     ViewFields history;
