@@ -233,7 +233,7 @@
                                      "most this many steps per pixel's width, the steps growing "  \
                                      "with distance; 0 keeps every step a volume's own.",          \
                               .group = "Volumes", .max = 16.0}))                                   \
-    X(double, VolumeThinOpticalDepth, ::ernie::tokens::kVolumeThinOpticalDepth, 0.02,              \
+    X(double, VolumeThinOpticalDepth, ::ernie::tokens::kVolumeThinOpticalDepth, 0.05,              \
       (::ernie::AttributeMeta{.label = "Thin optical depth",                                       \
                               .doc = "A brick of 8^3 voxels whose densest holds back less than "   \
                                      "this across it is stepped through as one step, lit once; "   \

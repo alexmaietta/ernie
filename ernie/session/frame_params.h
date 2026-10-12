@@ -577,7 +577,7 @@ struct VolumeSettings {
     double stepsPerPixel = 2.0;
     /// A brick of 8^3 voxels whose largest density holds back less
     /// than this across it has its steps taken as one; 0, never.
-    double thinOpticalDepth = 0.02;
+    double thinOpticalDepth = 0.05;
 
     bool operator==(const VolumeSettings&) const = default;
 };
