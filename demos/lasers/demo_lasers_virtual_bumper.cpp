@@ -12,6 +12,8 @@
 //   soils' spectra, read off the paper's Fig. 1).
 // - A. S. McEwen, "Photometric functions for photoclinometry and
 //   other applications", Icarus 92:298-311, 1991 (Lunar-Lambert).
+// - Osela Inc., "SL Streamline Laser" datasheet, 2020 (660 nm at 50
+//   or 100 mW).
 
 #include "ernie/app/demo.h"
 #include "ernie/app/viewer.h"
@@ -57,7 +59,7 @@ constexpr double kPower = 0.05;      // W, in all the beams
 // putting the dots at 90% of white on clear ground, as `Expose` finds
 // them.
 constexpr std::array<double, 3> kThreshold = {0.2, 0.675, 0.675};
-constexpr std::array<double, 3> kShutter = {6.4e-4, 5.1e-4, 5.1e-4};
+constexpr std::array<double, 3> kShutter = {8.2e-4, 6.1e-4, 6.0e-4};
 
 /// The ICX267's quantum efficiency (Fig. 4) behind a 100 nm wide
 /// Gaussian band-pass at 660 nm: their C(lambda) F(lambda), as (nm,
@@ -178,7 +180,9 @@ class VirtualBumperDemo : public app::Demo {
                 glm::normalize(glm::dvec3(0.5, -0.5, 0.707))));
         Atmosphere::Define(scene, "/World/Air")
             .SetPreset(std::string(tokens::kEarth));
-        // 50 mW of 660 nm in 11 beams 1.52 degrees apart.
+        // 660 nm in 11 beams 1.52 degrees apart: 50 mW, the
+        // Streamline's lowest 660 nm option (the paper gives none),
+        // 80% into the dots.
         LaserLight::Define(scene, "/World/Projector")
             .SetWavelength(660.0)
             .SetPower(kPower)
@@ -187,7 +191,7 @@ class VirtualBumperDemo : public app::Demo {
             .SetGridColumns(kDots)
             .SetGridRows(1)
             .SetGridPitch({kGamma, kGamma})
-            .SetEfficiency(1.0)
+            .SetEfficiency(0.8)
             .SetZeroOrder(0.0)
             .SetTransform(Rig(kBaseline));
         Camera::Define(scene, "/World/Camera")

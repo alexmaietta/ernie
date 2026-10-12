@@ -12,6 +12,8 @@ References:
   spectra, read off the paper's Fig. 1).
 - A. S. McEwen, "Photometric functions for photoclinometry and other
   applications", Icarus 92:298-311, 1991 (Lunar-Lambert).
+- Osela Inc., "SL Streamline Laser" datasheet, 2020 (660 nm at 50 or
+  100 mW).
 """
 
 import math
@@ -38,7 +40,7 @@ DISPARITY = 15  # pixels a dot moves before it is an obstacle
 THRESHOLD = {"night": 0.2, "Earth day": 0.675, "lunar day": 0.675}
 # Shutters (s) putting the dots at 90% of white on clear ground, as
 # `expose` finds them; the viewer starts each case with its own.
-SHUTTER = {"night": 6.4e-4, "Earth day": 5.1e-4, "lunar day": 5.1e-4}
+SHUTTER = {"night": 8.2e-4, "Earth day": 6.1e-4, "lunar day": 6.0e-4}
 
 # The ICX267's quantum efficiency (Fig. 4) behind a 100 nm wide
 # Gaussian band-pass at 660 nm: their C(lambda) F(lambda).
@@ -129,7 +131,8 @@ class Demo(ernie.demo.Demo):
         self.air = world.define(
             "Air", ernie.Atmosphere, preset=tokens.EARTH
         )
-        # 50 mW of 660 nm in 11 beams 1.52 degrees apart.
+        # 660 nm in 11 beams 1.52 degrees apart: 50 mW, the Streamline's
+        # lowest 660 nm option (the paper gives none), 80% into the dots.
         self.laser = world.define(
             "Projector",
             ernie.LaserLight,
@@ -140,7 +143,7 @@ class Demo(ernie.demo.Demo):
             grid_columns=DOTS,
             grid_rows=1,
             grid_pitch=(GAMMA, GAMMA),
-            efficiency=1.0,
+            efficiency=0.8,
             zero_order=0.0,
         ).set(tokens.TRANSFORM, rig(BASELINE))
         width = PIXEL * RESOLUTION[0]
