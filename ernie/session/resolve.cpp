@@ -2509,15 +2509,9 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
             "Atmosphere '" + path.String() + "' has no preset '" +
             params.preset + "'; use 'earth' or 'mars'");
     }
-    const double planetTerrain =
-        terrain.IsEmpty() ? 0.0
-                          : Terrain(scene, terrain).GetPlanetRadius();
-    const double radius = prim.GetPlanetRadius();
-    params.planetRadius = radius > 0.0          ? radius
-                          : planetTerrain > 0.0 ? planetTerrain
-                                                : presetRadius;
-    // A planet Terrain's at the world's origin; else where the
-    // Atmosphere's transform puts its anchor.
+    // Anchored on the ground, a planet Terrain's air, at the world's
+    // origin; anchored at the centre, its own planet's, wherever the
+    // Terrain is (the Earth's air seen from a Terrain Moon).
     const std::string anchor = prim.GetAnchor();
     if (anchor != tokens::kAnchorGround &&
         anchor != tokens::kAnchorCentre) {
@@ -2525,6 +2519,14 @@ AtmosphereParams AtmosphereParamsOf(const Scene& scene,
                                     "' has no anchor '" + anchor +
                                     "'; use 'ground' or 'centre'");
     }
+    const double planetTerrain =
+        terrain.IsEmpty() || anchor == tokens::kAnchorCentre
+            ? 0.0
+            : Terrain(scene, terrain).GetPlanetRadius();
+    const double radius = prim.GetPlanetRadius();
+    params.planetRadius = radius > 0.0          ? radius
+                          : planetTerrain > 0.0 ? planetTerrain
+                                                : presetRadius;
     const glm::dvec3 local =
         anchor == tokens::kAnchorCentre
             ? glm::dvec3(0.0)

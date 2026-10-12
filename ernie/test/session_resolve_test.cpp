@@ -989,6 +989,16 @@ TEST(AtmosphereParamsOf, ItsTransformPlacesItsPlanet) {
     air = ernie::AtmosphereParamsOf(scene, "/World/Earth/Air", {});
     EXPECT_DOUBLE_EQ(air.planetCentre.y, 384400e3);
     EXPECT_DOUBLE_EQ(air.planetCentre.z, -air.planetRadius);
+    // Anchored at the centre, its own planet's air though a planet
+    // Terrain (the Moon) is about the origin.
+    ernie::Terrain::Define(scene, "/World/Moon")
+        .SetPlanetRadius(1737.4e3);
+    ernie::Atmosphere(scene, "/World/Earth/Air")
+        .SetAnchor(std::string(tokens::kAnchorCentre));
+    air = ernie::AtmosphereParamsOf(scene, "/World/Earth/Air",
+                                    "/World/Moon");
+    EXPECT_EQ(air.planetCentre, glm::dvec3(0.0, 384400e3, 0.0));
+    EXPECT_DOUBLE_EQ(air.planetRadius, 6371.0088e3);
     ernie::Atmosphere(scene, "/World/Earth/Air").SetAnchor("pole");
     EXPECT_THROW(
         ernie::AtmosphereParamsOf(scene, "/World/Earth/Air", {}),

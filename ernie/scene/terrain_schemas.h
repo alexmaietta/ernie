@@ -130,8 +130,8 @@
     X(std::string, Anchor, ::ernie::tokens::kAtmosphereAnchor, ::ernie::tokens::kAnchorGround,     \
       (::ernie::AttributeMeta{.doc = "ground: its origin is on the planet's surface, the centre "  \
                                      "a radius below along its -z; centre: its origin is the "     \
-                                     "planet's centre. Its transform places it; a planet "         \
-                                     "Terrain's atmosphere is centred on the Terrain.",            \
+                                     "planet's centre. Its transform places it; anchored on "      \
+                                     "the ground, a planet Terrain's air, centred on it.",         \
                               .group = "Atmosphere",                                               \
                               .options = {::ernie::tokens::kAnchorGround,                          \
                                           ::ernie::tokens::kAnchorCentre}}))
