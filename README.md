@@ -66,6 +66,15 @@ sudo dnf install mesa-vulkan-drivers
 sudo dnf install ./ernie-*.rpm
 ```
 
+### Docker
+
+The `ernie` program is also published as a Docker image, `ghcr.io/alexmaietta/ernie`, with Mesa's Vulkan drivers. With the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/) and `--gpus all` it renders on your GPU; without them, drop `--gpus all` and it renders on lavapipe. To render a demo into the current directory:
+
+```sh
+docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie \
+  --demo demo_atmosphere_earth --viewer null --output /out/earth.png
+```
+
 ### Build from source
 
 Ernie needs CMake 3.24+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other dependencies (see [third_party/README.md](third_party/README.md)).
@@ -88,6 +97,7 @@ Run `ernie` to open the Ernie Viewer. Its Demos panel runs any of the built-in d
 ernie                               # the viewer, with the Demos panel
 ernie --list                        # every demo's name
 ernie --demo demo_atmosphere_earth  # run one demo
+ernie --help                        # every option
 ```
 
 `python -m ernie` opens the same viewer and takes the same options, and `python -m ernie.demos` runs the Python version of a demo:
