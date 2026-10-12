@@ -41,6 +41,7 @@ function(ernie_install_licenses destination component)
         glm
         openexr
         imath
+        basisu
         meshoptimizer
         nlohmann_json
         tracy
@@ -78,6 +79,7 @@ function(ernie_install_licenses destination component)
             "${openexr_SOURCE_DIR}/external/deflate/COPYING")
     license(zstd "${openexr_SOURCE_DIR}/external/zstd/LICENSE")
     license(openjph "${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE")
+    license(basis-universal "${basisu_SOURCE_DIR}/LICENSE")
     license(meshoptimizer "${meshoptimizer_SOURCE_DIR}/LICENSE.md")
     license(nlohmann-json "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT")
     if(APPLE)

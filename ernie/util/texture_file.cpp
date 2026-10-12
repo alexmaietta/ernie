@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/util/texture_file.h"
 
+#include <basisu_transcoder.h>
+#include <zstd.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -256,6 +260,86 @@ TextureFormat LegacyDdsFormat(std::span<const std::byte> file,
         "DDS file has an unsupported uncompressed layout");
 }
 
+/// A KTX2 file of Basis Universal's ETC1S or UASTC formats transcoded
+/// to BC blocks: two-channel data (normal maps' x and y) to BC5, HDR
+/// to BC6H, the rest to BC7, sRGB as the file's transfer function
+/// says.
+TextureData TranscodeBasis(std::span<const std::byte> file) {
+    static std::once_flag initialised;
+    std::call_once(initialised, basist::basisu_transcoder_init);
+    basist::ktx2_transcoder ktx2;
+    if (file.size() > UINT32_MAX ||
+        !ktx2.init(file.data(),
+                   static_cast<std::uint32_t>(file.size())) ||
+        !ktx2.start_transcoding()) {
+        throw std::runtime_error("KTX2 file holds no Basis Universal "
+                                 "data it can transcode");
+    }
+    TextureFormat format = TextureFormat::Bc7;
+    basist::transcoder_texture_format target =
+        basist::transcoder_texture_format::cTFBC7_RGBA;
+    // BC5 takes x from red and y from alpha unless told otherwise.
+    int first = -1;
+    int second = -1;
+    const auto channel0 = ktx2.get_dfd_channel_id0();
+    const bool twoChannels =
+        ktx2.is_etc1s()
+            ? channel0 == basist::KTX2_DF_CHANNEL_ETC1S_RRR &&
+                  ktx2.get_dfd_channel_id1() ==
+                      basist::KTX2_DF_CHANNEL_ETC1S_GGG
+            : channel0 == basist::KTX2_DF_CHANNEL_UASTC_RRRG ||
+                  channel0 == basist::KTX2_DF_CHANNEL_UASTC_RG;
+    if (ktx2.is_hdr()) {
+        format = TextureFormat::Bc6hUfloat;
+        target = basist::transcoder_texture_format::cTFBC6H;
+    } else if (twoChannels) {
+        format = TextureFormat::Bc5;
+        target = basist::transcoder_texture_format::cTFBC5_RG;
+        if (!ktx2.is_etc1s() &&
+            channel0 == basist::KTX2_DF_CHANNEL_UASTC_RG) {
+            first = 0;
+            second = 1;
+        }
+    } else if (ktx2.get_dfd_transfer_func() ==
+               basist::KTX2_KHR_DF_TRANSFER_SRGB) {
+        format = TextureFormat::Bc7Srgb;
+    }
+    const std::uint32_t faces = ktx2.get_faces();
+    const std::uint32_t layers = std::max(1u, ktx2.get_layers());
+    const std::uint32_t levels = std::max(1u, ktx2.get_levels());
+    if (layers > kMaxLayers / std::max(1u, faces)) {
+        throw std::runtime_error("KTX2 file has too many layers");
+    }
+    TextureData texture =
+        Shape(format, ktx2.get_width(), ktx2.get_height(),
+              layers * faces, levels);
+    texture.cube = faces == 6;
+    for (std::uint32_t level = 0; level < levels; ++level) {
+        const std::uint32_t width =
+            std::max(1u, texture.width >> level);
+        const std::uint32_t height =
+            std::max(1u, texture.height >> level);
+        const auto blocks = static_cast<std::uint32_t>(
+            ((width + 3) / 4) * ((height + 3) / 4));
+        for (std::uint32_t layer = 0; layer < layers; ++layer) {
+            for (std::uint32_t face = 0; face < faces; ++face) {
+                const std::size_t slot =
+                    (std::size_t{layer} * faces + face) * levels +
+                    level;
+                if (!ktx2.transcode_image_level(
+                        level, layer, face,
+                        texture.bytes.data() + texture.offsets[slot],
+                        blocks, target, 0, 0, 0, first, second)) {
+                    throw std::runtime_error("KTX2 file's level " +
+                                             std::to_string(level) +
+                                             " does not transcode");
+                }
+            }
+        }
+    }
+    return texture;
+}
+
 }  // namespace
 
 TextureFormatInfo InfoOf(TextureFormat format) {
@@ -433,17 +517,24 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
     const std::uint32_t faces = U32(file, 36);
     const std::uint32_t levels = std::max(1u, U32(file, 40));
     const std::uint32_t supercompression = U32(file, 44);
-    if (supercompression != 0 || vkFormat == 0) {
-        throw std::runtime_error(
-            "KTX2 file is supercompressed (Basis Universal or zstd), "
-            "which needs libktx, not yet linked");
-    }
     if (depth > 1) {
         throw std::runtime_error("KTX2 volume textures are not read");
     }
     if (faces != 1 && faces != 6) {
         throw std::runtime_error("KTX2 file has " +
                                  std::to_string(faces) + " faces");
+    }
+    // Basis Universal's formats (ETC1S, often
+    // BasisLZ-supercompressed, and UASTC) have no VkFormat.
+    if (vkFormat == 0) {
+        return TranscodeBasis(file);
+    }
+    constexpr std::uint32_t kZstd = 2;
+    if (supercompression != 0 && supercompression != kZstd) {
+        throw std::runtime_error(
+            "KTX2 file uses supercompression scheme " +
+            std::to_string(supercompression) +
+            ", which is not read (only zstd)");
     }
     const std::optional<TextureFormat> format =
         FromVkFormat(vkFormat);
@@ -459,21 +550,38 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
     TextureData texture =
         Shape(*format, width, height, arrays * faces, levels);
     texture.cube = faces == 6;
-    // The level index follows the 80-byte header: each level's offset
-    // and length, level 0 the largest. A level holds every layer's
-    // faces in turn.
+    // The level index follows the 80-byte header: each level's
+    // offset, stored length and uncompressed length, level 0 the
+    // largest. A level holds every layer's faces in turn.
+    std::vector<std::byte> decompressed;
     for (std::uint32_t level = 0; level < levels; ++level) {
         const std::size_t entry = 80 + std::size_t{level} * 24;
         const std::uint64_t offset = U64(file, entry);
         const std::uint64_t length = U64(file, entry + 8);
+        const std::uint64_t uncompressed = U64(file, entry + 16);
         const std::size_t image =
             ImageBytes(*format, std::max(1u, width >> level),
                        std::max(1u, height >> level));
-        if (length != std::uint64_t{image} * texture.layers ||
-            offset > file.size() || file.size() - offset < length) {
+        const std::size_t expected = image * texture.layers;
+        if (offset > file.size() || file.size() - offset < length ||
+            (supercompression == 0 ? length : uncompressed) !=
+                expected) {
             throw std::runtime_error(
                 "KTX2 file has a malformed level " +
                 std::to_string(level));
+        }
+        const std::byte* source = file.data() + offset;
+        if (supercompression == kZstd) {
+            decompressed.resize(expected);
+            const std::size_t size =
+                ZSTD_decompress(decompressed.data(), expected, source,
+                                static_cast<std::size_t>(length));
+            if (ZSTD_isError(size) != 0 || size != expected) {
+                throw std::runtime_error("KTX2 file's level " +
+                                         std::to_string(level) +
+                                         " does not decompress");
+            }
+            source = decompressed.data();
         }
         for (std::uint32_t layer = 0; layer < texture.layers;
              ++layer) {
@@ -481,8 +589,7 @@ TextureData ReadKtx2(std::span<const std::byte> file) {
                 texture.bytes.data() +
                     texture
                         .offsets[std::size_t{layer} * levels + level],
-                file.data() + offset + std::size_t{layer} * image,
-                image);
+                source + std::size_t{layer} * image, image);
         }
     }
     return texture;

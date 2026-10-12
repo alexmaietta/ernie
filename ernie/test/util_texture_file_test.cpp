@@ -2,6 +2,7 @@
 #include "ernie/util/texture_file.h"
 
 #include <gtest/gtest.h>
+#include <zstd.h>
 
 #include <array>
 #include <cstdint>
@@ -260,16 +261,73 @@ TEST(TextureFile, Ktx2ReadsLevelsByTheirIndex) {
               TextureFormat::Bc7Srgb);
 }
 
+TEST(TextureFile, Ktx2DecompressesZstdLevels) {
+    // RGBA8 2 x 2 and 1 x 1, each level a zstd frame, its
+    // uncompressed length in the level index.
+    const std::vector<Bytes> levels{Ramp(16, 1), Ramp(4, 100)};
+    std::vector<Bytes> frames;
+    for (const Bytes& level : levels) {
+        Bytes frame(ZSTD_compressBound(level.size()));
+        const std::size_t size =
+            ZSTD_compress(frame.data(), frame.size(), level.data(),
+                          level.size(), 3);
+        ASSERT_EQ(ZSTD_isError(size), 0u);
+        frame.resize(size);
+        frames.push_back(frame);
+    }
+    Bytes file = Ktx2(37, 2, 2, 0, frames, 2);
+    for (std::size_t level = 0; level < levels.size(); ++level) {
+        Put64(file, 80 + 24 * level + 16, levels[level].size());
+    }
+    const TextureData texture = ReadKtx2(file);
+    EXPECT_EQ(texture.format, TextureFormat::Rgba8);
+    EXPECT_EQ(Copy(texture.Mip(0, 0)), levels[0]);
+    EXPECT_EQ(Copy(texture.Mip(0, 1)), levels[1]);
+
+    // An uncompressed length other than the level's.
+    Put64(file, 80 + 16, 12);
+    EXPECT_THROW(ReadKtx2(file), std::runtime_error);
+}
+
+TEST(TextureFile, Ktx2TranscodesBasisUniversalToBc) {
+    // Fixtures encoded by Basis Universal's tool (fixtures/ktx2):
+    // colour to BC7 with every mip, normal maps' x and y to BC5.
+    const auto load = [](const char* name) {
+        return LoadTextureFile(
+            std::filesystem::path(ERNIE_TEST_FIXTURES) / "ktx2" /
+            name);
+    };
+    for (const char* name :
+         {"quadrants_etc1s.ktx2", "quadrants_uastc_zstd.ktx2"}) {
+        const TextureData colour = load(name);
+        EXPECT_EQ(colour.format, TextureFormat::Bc7) << name;
+        EXPECT_EQ(colour.width, 16u) << name;
+        EXPECT_EQ(colour.height, 16u) << name;
+        EXPECT_EQ(colour.mips, 5u) << name;
+        EXPECT_EQ(colour.Mip(0, 0).size(), 16u * 16u) << name;
+        EXPECT_EQ(colour.Mip(0, 4).size(), 16u) << name;
+    }
+    for (const char* name :
+         {"tilted_normal_etc1s.ktx2", "tilted_normal_uastc.ktx2"}) {
+        const TextureData normal = load(name);
+        EXPECT_EQ(normal.format, TextureFormat::Bc5) << name;
+        EXPECT_EQ(normal.mips, 1u) << name;
+    }
+}
+
 TEST(TextureFile, Ktx2RejectsWhatItCannotRead) {
-    // Basis Universal (no VkFormat) and zstd need libktx.
+    // No VkFormat but no Basis Universal data, then zstd levels that
+    // are not zstd, then zlib supercompression.
     try {
         ReadKtx2(Ktx2(0, 4, 4, 0, {Ramp(16)}, 1));
-        FAIL() << "read a supercompressed file";
+        FAIL() << "read Basis Universal data that is not";
     } catch (const std::runtime_error& error) {
-        EXPECT_NE(std::string(error.what()).find("libktx"),
+        EXPECT_NE(std::string(error.what()).find("Basis Universal"),
                   std::string::npos);
     }
     EXPECT_THROW(ReadKtx2(Ktx2(145, 4, 4, 0, {Ramp(16)}, 2)),
+                 std::runtime_error);
+    EXPECT_THROW(ReadKtx2(Ktx2(145, 4, 4, 0, {Ramp(16)}, 3)),
                  std::runtime_error);
     // A level of the wrong length, then an unknown VkFormat.
     EXPECT_THROW(ReadKtx2(Ktx2(37, 2, 2, 0, {Ramp(12)})),

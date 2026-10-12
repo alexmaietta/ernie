@@ -38,7 +38,8 @@ Everything else is fetched at configure time (`cmake/third_party/<name>.cmake`, 
 | [GLM](https://github.com/g-truc/glm) | `1.0.3` | MIT | Vector and matrix math |
 | [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) | `v3.5.2` | BSD-3-Clause | Reading EXR textures |
 | [Imath](https://github.com/AcademySoftwareFoundation/Imath) | with OpenEXR | BSD-3-Clause | OpenEXR's math |
-| [libdeflate](https://github.com/ebiggers/libdeflate), [zstd](https://github.com/facebook/zstd), [OpenJPH](https://github.com/aous72/OpenJPH) | vendored by OpenEXR | MIT, BSD-3-Clause, BSD-2-Clause | OpenEXR's compression |
+| [libdeflate](https://github.com/ebiggers/libdeflate), [zstd](https://github.com/facebook/zstd), [OpenJPH](https://github.com/aous72/OpenJPH) | vendored by OpenEXR | MIT, BSD-3-Clause, BSD-2-Clause | OpenEXR's compression; zstd also KTX2 supercompression |
+| [Basis Universal](https://github.com/BinomialLLC/basis_universal) | `v2_50` (transcoder only) | Apache-2.0 | Transcoding Basis (ETC1S) and UASTC KTX2 textures to BC; their zstd from OpenEXR's |
 | [meshoptimizer](https://github.com/zeux/meshoptimizer) | `v1.3` | MIT | Simplified levels of detail |
 | [nlohmann/json](https://github.com/nlohmann/json) | `v3.12.0` | MIT | Reading JSON |
 | [Dear ImGui](https://github.com/ocornut/imgui) | `v1.92.9b-docking` | MIT | The viewer's UI (app only) |

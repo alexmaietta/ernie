@@ -24,4 +24,6 @@ ernie_add_library(
     ernie_json
     ernie_stb
     ernie_nanovdb
-    ernie_openexr)
+    ernie_openexr
+    ernie_basisu
+    ernie_zstd)

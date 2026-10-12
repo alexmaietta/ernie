@@ -88,8 +88,11 @@ bool IsTextureFile(const std::filesystem::path& path);
 /// DDS: the DX10 header's DXGI formats, the legacy DXT1 to DXT5,
 /// ATI1, ATI2, BC4U/S and BC5U/S codes, and 32-bit RGBA or BGRA
 /// masks; 2D textures, arrays and cube maps, not volumes. KTX2: the
-/// formats above by their VkFormat, without supercompression (Basis
-/// Universal and zstd files need libktx, not yet linked).
+/// formats above by their VkFormat, stored or zstd-supercompressed;
+/// and Basis Universal's ETC1S (BasisLZ) and UASTC, transcoded to BC
+/// blocks: BC5 for two channels (a normal map's x and y, labelled
+/// ETC1S RRR and GGG or UASTC RRRG or RG, as `toktx --normal_mode`
+/// writes them), BC6H for HDR and BC7 otherwise.
 ///
 /// References:
 /// - Microsoft, "DDS programming guide" (DDS_HEADER,
@@ -97,6 +100,8 @@ bool IsTextureFile(const std::filesystem::path& path);
 ///   https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
 /// - Khronos, "KTX File Format Specification", version 2.0.
 ///   https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html
+/// - Binomial, "Basis Universal" (the transcoder).
+///   https://github.com/BinomialLLC/basis_universal
 /// @throws std::runtime_error if the file cannot be read, is
 /// malformed or truncated, or holds a format or layout it does not
 /// read.

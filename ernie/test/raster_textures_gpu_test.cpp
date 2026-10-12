@@ -14,15 +14,18 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using ernie::Path;
@@ -553,4 +556,88 @@ TEST_F(RasterDelegateTest, MaterialsReadingOneTextureShareItsUpload) {
 
     ernie::Shader(scene, "/Looks/N/Tex").SetFile(first);
     EXPECT_EQ(bytes(), shared);
+}
+
+TEST_F(RasterDelegateTest,
+       BasisUniversalTexturesRenderAsTheirSources) {
+    // The fixtures' 16 x 16 quadrants (fixtures/ktx2) as a tensor,
+    // and as ETC1S and UASTC KTX2 files transcoded to BC7: solid
+    // colours survive both codecs closely.
+    const auto fixture = [](const char* name) {
+        return (std::filesystem::path(ERNIE_TEST_FIXTURES) / "ktx2" /
+                name)
+            .string();
+    };
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp");
+    std::vector<std::uint8_t> texels(16 * 16 * 4);
+    for (std::size_t y = 0; y < 16; ++y) {
+        for (std::size_t x = 0; x < 16; ++x) {
+            const bool right = x >= 8;
+            const bool bottom = y >= 8;
+            const std::array<std::uint8_t, 4> colour =
+                !bottom
+                    ? (right ? std::array<std::uint8_t, 4>{0, 255, 0,
+                                                           255}
+                             : std::array<std::uint8_t, 4>{255, 0, 0,
+                                                           255})
+                    : (right ? std::array<std::uint8_t, 4>{255, 255,
+                                                           255, 255}
+                             : std::array<std::uint8_t, 4>{0, 0, 255,
+                                                           255});
+            std::copy(colour.begin(), colour.end(),
+                      texels.begin() + static_cast<std::ptrdiff_t>(
+                                           4 * (y * 16 + x)));
+        }
+    }
+    RasterDelegate delegate(*context_);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(texels, {16, 16, 4}));
+    const std::vector<float> decoded = Quadrants(delegate, scene);
+    scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+    // ETC1S quantises colour coarsely (saturated colours gain a
+    // little of the others); UASTC keeps them within a few percent.
+    const std::array<std::pair<const char*, bool>, 2> files{
+        {{"quadrants_etc1s.ktx2", true},
+         {"quadrants_uastc_zstd.ktx2", false}}};
+    for (const auto& [name, etc1s] : files) {
+        ernie::Shader(scene, "/Looks/M/Tex").SetFile(fixture(name));
+        const std::vector<float> transcoded =
+            Quadrants(delegate, scene);
+        for (std::size_t i = 0; i < transcoded.size(); ++i) {
+            EXPECT_NEAR(transcoded[i], decoded[i],
+                        etc1s ? 0.05f : 0.03f * decoded[i] + 1e-3f)
+                << name << " value " << i;
+        }
+    }
+
+    // The normal maps, transcoded to BC5, tilt the surface 30 degrees
+    // as NormalMapsTiltTheSurfaceAlongItsTextureCoordinates's does.
+    ernie::Material(scene, "/Looks/M").SetBrdf("lambert");
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    scene.Set("/Looks/M/Tex", tokens::kShaderScale,
+              glm::vec4(2.0f, 2.0f, 2.0f, 1.0f));
+    scene.Set("/Looks/M/Tex", tokens::kShaderBias,
+              glm::vec4(-1.0f, -1.0f, -1.0f, 0.0f));
+    scene.Clear("/Looks/M/Surface",
+                std::string(tokens::kDiffuseColor) +
+                    std::string(tokens::kConnectSuffix));
+    const float flat = CentreGreen(delegate, scene);
+    ASSERT_GT(flat, 0.0f);
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kNormalInput,
+                   "/Looks/M/Tex", "outputs:rgb");
+    for (const char* name :
+         {"tilted_normal_etc1s.ktx2", "tilted_normal_uastc.ktx2"}) {
+        ernie::Shader(scene, "/Looks/M/Tex").SetFile(fixture(name));
+        EXPECT_NEAR(CentreGreen(delegate, scene) / flat,
+                    std::cos(glm::radians(15.0f)) /
+                        std::cos(glm::radians(45.0f)),
+                    0.03f)
+            << name;
+    }
 }

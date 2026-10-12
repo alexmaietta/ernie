@@ -66,6 +66,7 @@ ernie_add_test_suite(
     ernie_json
     ernie_stb
     ernie_openexr
+    ernie_zstd
     DEFINITIONS
     ERNIE_TEST_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 ernie_add_test_suite(

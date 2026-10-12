@@ -42,3 +42,11 @@ set(BUILD_TESTING ${ERNIE_SAVED_BUILD_TESTING})
 
 add_library(ernie_openexr INTERFACE)
 target_link_libraries(ernie_openexr INTERFACE OpenEXR::OpenEXR)
+
+# zstd, the copy built into OpenEXRCore (OPENEXR_FORCE_INTERNAL_ZSTD), which exports its API: KTX2
+# textures' zstd supercompression is decoded with it rather than with a second copy of zstd.
+add_library(ernie_zstd INTERFACE)
+target_include_directories(
+    ernie_zstd SYSTEM
+    INTERFACE "${openexr_SOURCE_DIR}/external/zstd/lib")
+target_link_libraries(ernie_zstd INTERFACE OpenEXR::OpenEXRCore)
