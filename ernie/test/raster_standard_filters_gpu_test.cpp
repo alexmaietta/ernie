@@ -5,6 +5,7 @@
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
@@ -1764,4 +1765,146 @@ TEST_F(RasterDelegateTest,
     EXPECT_GT(seen.size(), 15u) << "many 12-bit values";
     EXPECT_LT(*seen.begin(), 32.0f) << "in the first segment";
     EXPECT_GT(*seen.rbegin(), 2207.0f) << "into the last segment";
+}
+
+TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
+    // MeshScene's quad alone, a black body at 320 K, through an 8 to
+    // 14 um bolometer, the ADC and a white-hot display from 300 to
+    // 340 K: the BrightnessTemperature var reads it back, the picture
+    // shows it half way; a lower emissivity reads colder; NETD shows
+    // as the spread; the time constant lags a step; automatic gain
+    // control takes the last frame's range.
+    Scene scene = MeshScene();
+    scene.Remove("/World/Sun");
+    scene.Remove("/World/Rocks");
+    ernie::Camera(scene, "/World/Camera")
+        .SetSpectralRange(glm::dvec2(7500.0, 14500.0))
+        .SetSpectralBands(14);
+    ernie::Material(scene, "/Looks/Red")
+        .SetThermalTemperature(320.0)
+        .SetThermalEmissivity(
+            std::vector<float>{7000.0f, 1.0f, 15000.0f, 1.0f});
+    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    const auto chain = [](std::map<std::string, float> bolometer,
+                          std::map<std::string, float> display) {
+        bolometer.try_emplace("netd", 0.0f);
+        bolometer.try_emplace("fpn", 0.0f);
+        bolometer.try_emplace("timeConstant", 0.0f);
+        display.try_emplace("automatic", 0.0f);
+        display.try_emplace("low", 300.0f);
+        display.try_emplace("high", 340.0f);
+        display.try_emplace("palette", 0.0f);
+        return Steps{{"bolometer", bolometer},
+                     {"adc", kNone},
+                     {"thermalDisplay", display},
+                     {"exposure", kNone}};
+    };
+    const std::vector<std::string> vars = {"BrightnessTemperature",
+                                           "LdrColor", "Electrons"};
+    RasterDelegate delegate(*context_);
+    auto values = VarsThrough(delegate, scene, vars, chain({}, {}));
+    const std::vector<float>& kelvin = values["BrightnessTemperature"];
+    const auto hottest = static_cast<std::size_t>(
+        std::max_element(kelvin.begin(), kelvin.end()) - kelvin.begin());
+    EXPECT_NEAR(kelvin[hottest], 320.0f, 0.5f);
+    EXPECT_NEAR(values["LdrColor"][4 * hottest], 128.0f, 4.0f)
+        << "white-hot, half way from 300 to 340 K";
+    EXPECT_GT(values["Electrons"][4 * hottest], 0.0f) << "its counts";
+
+    // Half the emissivity: half the signal of a 320 K black body, read
+    // as a colder one by a camera that assumes 1.
+    ernie::Material(scene, "/Looks/Red")
+        .SetThermalEmissivity(
+            std::vector<float>{7000.0f, 0.5f, 15000.0f, 0.5f});
+    values = VarsThrough(delegate, scene, vars, chain({}, {}));
+    EXPECT_LT(values["BrightnessTemperature"][hottest], 290.0f);
+    values = VarsThrough(delegate, scene, vars,
+                         chain({{"emissivity", 0.5f}, {"reflected", 3.0f}},
+                               {}));
+    EXPECT_NEAR(values["BrightnessTemperature"][hottest], 320.0f, 0.5f)
+        << "the object's emissivity given, its true temperature";
+    ernie::Material(scene, "/Looks/Red")
+        .SetThermalEmissivity(
+            std::vector<float>{7000.0f, 1.0f, 15000.0f, 1.0f});
+
+    // NETD: the spread over the quad's pixels, frame after frame.
+    double sum = 0.0;
+    double squares = 0.0;
+    int count = 0;
+    for (int frame = 0; frame < 8; ++frame) {
+        values =
+            VarsThrough(delegate, scene, vars, chain({{"netd", 1.0f}}, {}));
+        for (const float k : values["BrightnessTemperature"]) {
+            if (k > 300.0f && k < 340.0f) {
+                sum += k;
+                squares += static_cast<double>(k) * k;
+                ++count;
+            }
+        }
+    }
+    ASSERT_GT(count, 100);
+    const double mean = sum / count;
+    EXPECT_NEAR(mean, 320.0, 0.3);
+    EXPECT_NEAR(std::sqrt(squares / count - mean * mean), 1.0, 0.2);
+
+    // The time constant: a step from 320 to 340 K a time constant
+    // apart reaches 1 - 1/e of the way in signal.
+    {
+        RasterDelegate lagging(*context_);
+        Scene step = scene;
+        const Steps steps = chain({{"timeConstant", 0.01f}}, {});
+        const auto frame = [&](double dt) {
+            ernie::Camera(step, "/World/Camera").SetSensorNoise(false);
+            std::vector<Path> filters;
+            for (std::size_t i = 0; i < steps.size(); ++i) {
+                const Path path("/Render/Filters/F" + std::to_string(i));
+                step.Remove(path);
+                ernie::SensorFilterPrim::Define(step, path)
+                    .SetFilterType(steps[i].first);
+                for (const auto& [name, value] : steps[i].second) {
+                    step.Set(path, "inputs:" + name, value);
+                }
+                filters.push_back(path);
+            }
+            const Path var("/Render/Vars/BrightnessTemperature");
+            ernie::RenderVar::Define(step, var)
+                .SetSourceName("BrightnessTemperature");
+            ernie::RenderProduct::Define(step, "/Render/Out")
+                .SetCamera("/World/Camera")
+                .SetResolution(glm::dvec2(kSize, kSize));
+            step.Set("/Render/Out", tokens::kOrderedVars,
+                     std::vector<Path>{var});
+            step.Set("/Render/Out", tokens::kFilters, filters);
+            const Path product[] = {"/Render/Out"};
+            const Tensor tensor =
+                lagging.Step(step, product, Path(), dt)
+                    .at("/Render/Out")
+                    .vars.at("BrightnessTemperature")
+                    .Map(ernie::MapDevice::Cpu)
+                    .tensor;
+            return tensor.As<float>()[hottest];
+        };
+        EXPECT_NEAR(frame(0.0), 320.0f, 0.5f) << "settled at first";
+        ernie::Material(step, "/Looks/Red").SetThermalTemperature(340.0);
+        const float lagged = frame(0.01);
+        EXPECT_GT(lagged, 328.0f);
+        EXPECT_LT(lagged, 336.0f) << "about 1 - 1/e of the way";
+        EXPECT_NEAR(frame(0.0), 340.0f, 0.5f) << "a still settles";
+    }
+
+    // Automatic gain control: the first frame at the fixed range, the
+    // next over the last's, the quad alone at 320 K and the least span
+    // of 2 K about it: half way again, though the fixed range is far.
+    {
+        RasterDelegate automatic(*context_);
+        const auto shown = [&] {
+            return VarsThrough(automatic, scene, vars,
+                               chain({}, {{"automatic", 1.0f},
+                                          {"low", 330.0f},
+                                          {"high", 340.0f}}))["LdrColor"]
+                [4 * hottest];
+        };
+        EXPECT_EQ(shown(), 0.0f) << "below the fixed range";
+        EXPECT_NEAR(shown(), 128.0f, 4.0f) << "the last frame's range";
+    }
 }

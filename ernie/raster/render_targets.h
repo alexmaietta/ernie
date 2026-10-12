@@ -229,8 +229,8 @@ class RenderTargets : public FrameImages {
     /// nothing (`FrameImages::Linear`).
     struct LinearVars {
         /// The vars the sensor can write so: `VarNames` up to
-        /// Temperature (sensor.slang's `kLinearVars`).
-        static constexpr std::size_t kVars = 15;
+        /// BrightnessTemperature (sensor.slang's `kLinearVars`).
+        static constexpr std::size_t kVars = 16;
         /// Then the AOV slots.
         static constexpr std::size_t kEntries = kVars + kMaxAovs;
         /// Per var, then AOV slot, its buffer (shared memory), or

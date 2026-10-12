@@ -175,15 +175,34 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
     const auto forcedDomain = [&](FilterDomain domain) {
         return forcedDomains[IndexOf(domain)];
     };
-    const bool digital = holds(render_vars::kRawDn) ||
-                         forcedDomain(FilterDomain::Digital);
-    const bool electrons = holds(render_vars::kElectrons) ||
-                           digital ||
-                           forcedDomain(FilterDomain::Electrons);
     const bool display = holds(render_vars::kLdrColor) ||
                          forcedDomain(FilterDomain::Display);
     const bool colour = holds(render_vars::kHdrColor) || display ||
                         forcedDomain(FilterDomain::Rgb);
+    // Domains filters that run read besides their own
+    // (`SensorFilterModel::reads`).
+    std::array<bool, kDomains> read{};
+    for (const SensorFilterStep& step : steps) {
+        const SensorFilterModel* model =
+            step.Builtin() ? nullptr : registry.Find(step.type);
+        if (model == nullptr || !model->reads) {
+            continue;
+        }
+        const bool runs =
+            model->domain == FilterDomain::Display ? display
+            : model->domain == FilterDomain::Rgb   ? colour
+                                                   : false;
+        read[IndexOf(*model->reads)] =
+            read[IndexOf(*model->reads)] || runs;
+    }
+    const bool digital = holds(render_vars::kRawDn) ||
+                         forcedDomain(FilterDomain::Digital) ||
+                         read[IndexOf(FilterDomain::Digital)];
+    const bool electrons =
+        holds(render_vars::kElectrons) ||
+        holds(render_vars::kBrightnessTemperature) || digital ||
+        forcedDomain(FilterDomain::Electrons) ||
+        read[IndexOf(FilterDomain::Electrons)];
     const bool bands = electrons || colour ||
                        holds(render_vars::kSpectralRadiance) ||
                        forcedDomain(FilterDomain::Spectrum);
@@ -442,6 +461,8 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         }
     };
     writes(render_vars::kElectrons, FilterDomain::Electrons);
+    // A radiometric integrator's into electrons (`bolometer`) sets it.
+    writes(render_vars::kBrightnessTemperature, FilterDomain::Electrons);
     writes(render_vars::kRawDn, FilterDomain::Digital);
     writes(render_vars::kHdrColor, FilterDomain::Rgb);
     writes(render_vars::kLdrColor, FilterDomain::Display);
@@ -453,6 +474,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         segment == 0
             ? holds & ~(BitOf(render_vars::kSpectralRadiance) |
                         BitOf(render_vars::kElectrons) |
+                        BitOf(render_vars::kBrightnessTemperature) |
                         BitOf(render_vars::kRawDn) |
                         BitOf(render_vars::kHdrColor) |
                         BitOf(render_vars::kLdrColor))

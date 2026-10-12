@@ -2863,25 +2863,43 @@ std::vector<std::string> RasterDelegate::ViewVars() const {
 
 void RasterDelegate::PrepareSensorState(const Path& key,
                                         VkExtent2D extent,
-                                        std::uint32_t views) {
+                                        std::uint32_t views,
+                                        double time) {
     // Passes the frame no longer has keep no state.
     std::erase_if(sensorStates_, [&](const auto& entry) {
         return entry.first.first == key &&
                entry.first.second >= renderer_.SensorPasses();
     });
+    std::erase_if(sensorAgcs_, [&](const auto& entry) {
+        return entry.first.first == key &&
+               entry.first.second >= renderer_.SensorPasses();
+    });
     for (std::size_t pass = 0; pass < renderer_.SensorPasses();
          ++pass) {
-        PrepareSensorState(key, pass, extent, views);
+        PrepareSensorState(key, pass, extent, views, time);
     }
 }
 
 void RasterDelegate::PrepareSensorState(const Path& key,
                                         std::size_t pass,
                                         VkExtent2D extent,
-                                        std::uint32_t views) {
+                                        std::uint32_t views,
+                                        double time) {
+    // The automatic gain control's range, its halves taking turns:
+    // empty (zeros) until a frame records one.
+    SensorAgc& agc = sensorAgcs_[{key, pass}];
+    if (agc.buffer == nullptr) {
+        agc.buffer = std::make_unique<GpuBuffer>(
+            context_, 4 * sizeof(std::uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Upload);
+        const std::array<std::uint32_t, 4> empty{};
+        agc.buffer->Write(std::as_bytes(std::span(empty)));
+    }
+    renderer_.SetSensorAgc(pass, agc.buffer.get(), agc.flip);
+    agc.flip ^= 1u;
     const std::uint32_t slots = renderer_.SensorStateSlots(pass);
     if (slots == 0) {
-        renderer_.SetSensorState(pass, nullptr, nullptr, false);
+        renderer_.SetSensorState(pass, nullptr, nullptr, false, 0.0);
         sensorStates_.erase({key, pass});
         return;
     }
@@ -2918,9 +2936,14 @@ void RasterDelegate::PrepareSensorState(const Path& key,
         state.history = false;
         state.chain = chain;
     }
+    // The seconds since the history's frame: none without one, or as
+    // time stands still.
+    const double interval =
+        state.history ? std::max(time - state.time, 0.0) : 0.0;
+    state.time = time;
     renderer_.SetSensorState(pass, state.images[1 - state.next].get(),
                              state.images[state.next].get(),
-                             state.history);
+                             state.history, interval);
     // The next frame reads what this one writes. Frames run on the
     // device in submission order, and the sensor pass's barrier
     // orders this frame's writes before the next one's reads.
@@ -3159,7 +3182,7 @@ void RasterDelegate::UpdatePrims(
         &meshes_);
     renderer_.Update(frame, drawables, drawn);
     renderer_.Overlays().SetAnchorResolver({}, &meshes_);
-    PrepareSensorState(stateKey, extent, views);
+    PrepareSensorState(stateKey, extent, views, frame.time);
 }
 
 std::uint32_t RasterDelegate::PrimIdOf(const Path& path) const {

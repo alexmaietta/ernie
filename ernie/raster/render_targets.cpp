@@ -14,7 +14,7 @@ namespace {
 
 constexpr const auto& kVarNames = kRenderVarNames;
 
-constexpr std::array<VkFormat, 15> kVarFormats{
+constexpr std::array<VkFormat, 16> kVarFormats{
     VK_FORMAT_R32_SFLOAT,        VK_FORMAT_R32G32B32A32_SFLOAT,
     VK_FORMAT_R16G16B16A16_UINT, VK_FORMAT_R32G32B32A32_SFLOAT,
     VK_FORMAT_R8G8B8A8_UNORM,    VK_FORMAT_R32_SFLOAT,
@@ -22,7 +22,7 @@ constexpr std::array<VkFormat, 15> kVarFormats{
     VK_FORMAT_R32_UINT,          VK_FORMAT_R32_UINT,
     VK_FORMAT_R32G32_SFLOAT,     VK_FORMAT_R32_SFLOAT,
     VK_FORMAT_R32_SFLOAT,        VK_FORMAT_R32G32B32A32_SFLOAT,
-    VK_FORMAT_R32_SFLOAT};
+    VK_FORMAT_R32_SFLOAT,        VK_FORMAT_R32_SFLOAT};
 
 constexpr VkImageUsageFlags kStorage =
     VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;

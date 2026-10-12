@@ -73,7 +73,7 @@ def project(point):
 def sample(images, point, kelvin):
     """Mean brightness (0 to 1) of the visible and thermal pixels
     around `point` that read `kelvin`, and their count."""
-    visible, thermal, temperature = images
+    visible, thermal, temperature = images[:3]
     col, row = (int(v) for v in project(point))
     window = np.s_[row - 4 : row + 5, col - 4 : col + 5]
     mask = np.abs(temperature[window] - kelvin) <= 0.01
@@ -166,25 +166,40 @@ class Demo(ernie.demo.Demo):
         )  # fmt: skip
 
         # Visible light by the sunny 16 rule; the thermal camera a
-        # microbolometer's flat response over 8 to 14 um, exposed
-        # automatically.
+        # microbolometer over 8 to 14 um, its brightness temperature in
+        # the ironbow palette from 265 to 375 K.
         self.visible = self.define_camera(
             "Visible", VISIBLE_PRODUCT, (380.0, 720.0), 17, ["LdrColor"]
         )
         self.visible.exposure_f_stop = 16.0
         self.visible.exposure_time = 0.01
         self.visible.exposure_iso = 100.0
+        chain = []
+        for name, kind, inputs in (
+            ("Bolometer", "bolometer", {}),
+            (
+                "Display",
+                "thermalDisplay",
+                {"automatic": 0.0, "low": 265.0, "high": 375.0, "palette": 2.0},
+            ),
+            ("Exposure", "exposure", {}),
+        ):
+            prim = scene.define(
+                f"/Render/ThermalChain/{name}",
+                ernie.SensorFilter,
+                filter_type=kind,
+            )
+            for input_name, value in inputs.items():
+                prim.set(f"inputs:{input_name}", float(value))
+            chain.append(ernie.Path(prim.path))
         self.thermal = self.define_camera(
             "Thermal",
             THERMAL_PRODUCT,
             (8000.0, 14000.0),
             6,
-            ["LdrColor", "Temperature"],
+            ["LdrColor", "Temperature", "BrightnessTemperature"],
+            chain,
         )
-        self.thermal.sensor_type = "mono"
-        self.thermal.sensor_qe_mono = [8000.0, 0.8, 14000.0, 0.8]
-        self.thermal.sensor_full_well = 1e12
-        self.thermal.exposure_mode = tokens.AUTO
         scene.define(
             "/Render/Settings",
             ernie.RenderSettings,
@@ -202,7 +217,12 @@ class Demo(ernie.demo.Demo):
 
         self.widgets.combo(
             "View",
-            ["Visible", "Thermal infrared", "Temperature"],
+            [
+                "Visible",
+                "Thermal camera",
+                "Temperature",
+                "Brightness temperature",
+            ],
             1,
             on_change=self.show,
         )
@@ -211,7 +231,9 @@ class Demo(ernie.demo.Demo):
         )
         self.show(1)
 
-    def define_camera(self, name, product, spectral, bands, variables):
+    def define_camera(
+        self, name, product, spectral, bands, variables, filters=()
+    ):
         camera = self.scene.define(
             f"/World/{name}",
             ernie.Camera,
@@ -234,13 +256,15 @@ class Demo(ernie.demo.Demo):
             )
             render_var.source_name = var
             ordered.append(render_var.path)
-        self.scene.define(
+        prim = self.scene.define(
             product,
             ernie.RenderProduct,
             camera=camera,
             resolution=RESOLUTION,
             ordered_vars=ordered,
         )
+        if filters:
+            prim.set(tokens.FILTERS, list(filters))
         return camera
 
     def show(self, index):
@@ -248,11 +272,15 @@ class Demo(ernie.demo.Demo):
             return
         camera = self.visible if index == 0 else self.thermal
         self.viewer.active_camera = camera.path
-        self.viewer.view_var = "Temperature" if index == 2 else "LdrColor"
+        self.viewer.view_var = {
+            2: "Temperature",
+            3: "BrightnessTemperature",
+        }.get(index, "LdrColor")
 
     def render_all(self):
         """The visible and thermal LdrColor, uint8 (rows, cols, 4), and
-        the Temperature var in kelvin (rows, cols)."""
+        the Temperature and BrightnessTemperature vars in kelvin (rows,
+        cols)."""
         outputs = self.renderer.step(
             self.scene, render_products=[VISIBLE_PRODUCT, THERMAL_PRODUCT]
         )
@@ -267,12 +295,15 @@ class Demo(ernie.demo.Demo):
             var(THERMAL_PRODUCT, "Temperature").reshape(
                 RESOLUTION[1], RESOLUTION[0]
             ),
+            var(THERMAL_PRODUCT, "BrightnessTemperature").reshape(
+                RESOLUTION[1], RESOLUTION[0]
+            ),
         )
 
     def save_output(self, path):
-        """The visible, thermal and false-colour Temperature images
-        side by side."""
-        visible, thermal, temperature = self.render_all()
+        """The visible and thermal camera's images, and false-colour
+        Temperature and BrightnessTemperature, side by side."""
+        visible, thermal, temperature, brightness = self.render_all()
         write_png(
             path,
             side_by_side(
@@ -280,6 +311,7 @@ class Demo(ernie.demo.Demo):
                     visible[..., :3],
                     thermal[..., :3],
                     heatmap(temperature, RAMP[0], RAMP[-1]),
+                    heatmap(brightness, RAMP[0], RAMP[-1]),
                 ]
             ),
         )
@@ -334,8 +366,26 @@ class Demo(ernie.demo.Demo):
         assert spheres[-1][1] > 1.5 * spheres[0][1], (
             "370 K should far outshine 270 K"
         )
-        visible, thermal, temperature = images
+        visible, thermal, temperature, brightness = images
         assert temperature[0, 0] == 0.0, "the sky should have no temperature"
+        # What the camera reads, for an emissivity of 1: black paint
+        # near its 330 K, bare aluminium far colder.
+        def reads(point):
+            col, row = (int(v) for v in project(point))
+            return float(brightness[row, col])
+
+        paint_reads = reads(finish_centre(0))
+        aluminium_reads = reads(finish_centre(6))
+        print(
+            f"brightness temperature: black paint {paint_reads:.1f} K, "
+            f"bare aluminium {aluminium_reads:.1f} K"
+        )
+        assert abs(paint_reads - BLOCK_TEMPERATURE) < 6.0, (
+            "black paint should read near its temperature"
+        )
+        assert aluminium_reads < 300.0, (
+            "bare aluminium should read far colder than it is"
+        )
         assert thermal[0, :, :3].mean() / 255.0 < ground[1], (
             "the sky should be the coldest in the thermal image"
         )

@@ -54,6 +54,8 @@ extern const char kFilterFlareSlang[];
 extern const char kFilterGlareSlang[];
 extern const char kFilterLagSlang[];
 extern const char kFilterMeasuredQeSlang[];
+extern const char kFilterBolometerSlang[];
+extern const char kFilterThermalDisplaySlang[];
 extern const char kFilterPsfSlang[];
 extern const char kFilterReadoutTapsSlang[];
 extern const char kFilterReadoutTableSlang[];

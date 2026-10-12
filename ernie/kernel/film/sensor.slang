@@ -15,14 +15,15 @@
 // layer `z` (a group of `bands` layers of the spectral images) with the uniforms of view
 // `firstView + z`.
 //
-// Bindings, the kernel's outputs alone: 1 Temperature, 2 DegreeOfLinearPolarization, 4
+// Bindings, the kernel's outputs alone: 0 BrightnessTemperature, 1 Temperature, 2
+// DegreeOfLinearPolarization, 4
 // AngleOfLinearPolarization, 5 SpectralRadiance (sensor pixels, one layer per band), 6 Electrons,
 // 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane, 11 DistanceToCamera, 12 Normal,
 // 13 PrimId, 14 InstanceId, 15 LinearStokes, every image one layer per view; for spatial
 // filters, 18 and 19 the spectrum and the channels (a layer per channel domain per view) it
 // writes for the next kernel; 20 to 27 the AOV slots; 29 the temporal filters' state for the
 // next frame (28 that from the previous); 30 the MotionVector var; 31 per raster pixel, its
-// motion (xy) and motion blur's coverage (z). 0, 3, 16 and 17 are free. Its inputs come
+// motion (xy) and motion blur's coverage (z). 3, 16 and 17 are free. Its inputs come
 // through the push constants (`SensorConstants`): the uniforms (SensorUniforms, shared then per
 // view) and the custom filters' parameters by address, and from the bindless heap
 // (bindless.slang) the raster spectral radiance, the G-buffer's ids, normal and depth, and the
@@ -202,13 +203,21 @@ public struct SensorConstants {
     // Each material's temperature in kelvin, by G-buffer material id, for the Temperature var
     // (0 for none, or with thermal emission off).
     public float* temperatures;
+    // Seconds since the frame whose state `readState` reads (0 without one, or as time stands
+    // still), for filters that follow the scene in time.
+    public float interval;
+    // Automatic gain control's range (`agcLast`, `agcRecord`): four words, two halves of the least
+    // and most kelvin as float bits; `agcFlip` the half this frame records, the other the last
+    // frame's.
+    public uint agcFlip;
+    public Atomic<uint>* agc;
 }
 
-// The render vars (kHolds* bits 0 to 14) and AOV slots a frame also holds as linear buffers over
+// The render vars (kHolds* bits 0 to 15) and AOV slots a frame also holds as linear buffers over
 // all its views (`FrameImages::Linear`), a compute API viewing them in place: each one's address,
 // its texels in its image's format view after view (a band after a band within a view for
 // SpectralRadiance; float RGBA for the AOVs).
-public static const uint kLinearVars = 15;
+public static const uint kLinearVars = 16;
 public struct SensorLinear {
     public uint* vars[kLinearVars];
     public uint* aovs[8];
@@ -321,6 +330,7 @@ float rasterRadianceAt(int4 at) {
     return heapTextureArrays[pass.radianceSlot].Load(at).x * asfloat(pass.stokes.w);
 }
 #define gIds (heapUintTextureArrays[pass.idsSlot])
+[[vk::image_format("r32f")]] [[vk::binding(0, 0)]] RWTexture2DArray<float> brightnessOut;
 [[vk::image_format("r32f")]] [[vk::binding(1, 0)]] RWTexture2DArray<float> temperatureOut;
 [[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;
 [[vk::image_format("r32f")]] [[vk::binding(4, 0)]] RWTexture2DArray<float> angleOfPolarization;
@@ -407,6 +417,7 @@ public static const uint kHoldsDegreeOfLinearPolarization = 1u << 11;
 public static const uint kHoldsAngleOfLinearPolarization = 1u << 12;
 public static const uint kHoldsLinearStokes = 1u << 13;
 public static const uint kHoldsTemperature = 1u << 14;
+public static const uint kHoldsBrightnessTemperature = 1u << 15;
 static const uint kHoldsPolarization =
     kHoldsDegreeOfLinearPolarization | kHoldsAngleOfLinearPolarization | kHoldsLinearStokes;
 
@@ -441,6 +452,11 @@ public struct PixelContext {
     public float wavelength(uint band) {
         let range = sensorShared[0].range;
         return range.x + (float(band) + 0.5) * range.y;
+    }
+
+    // Each band's width, in nanometres.
+    public float bandWidth() {
+        return sensorShared[0].range.y;
     }
 
     // The camera's optics: the f-number diffraction takes (the lens's, else the exposure's),
@@ -500,6 +516,24 @@ public struct PixelContext {
     public uint frame() {
         return sensorShared[0].noise.w;
     }
+    // Seconds since the frame whose state `readState` reads: 0 without one, or as time stands
+    // still.
+    public float frameInterval() {
+        return pass.interval;
+    }
+
+    // Automatic gain control: the least and most kelvin the product's last frame recorded (x
+    // above y for none), and recording this pixel's into this frame's.
+    public float2 agcLast() {
+        let last = 2 * (1 - pass.agcFlip);
+        return float2(asfloat(pass.agc[last].load()), asfloat(pass.agc[last + 1].load()));
+    }
+    public void agcRecord(float kelvin) {
+        // Positive floats order as their bits do.
+        let bits = asuint(max(kelvin, 0.0));
+        pass.agc[2 * pass.agcFlip].min(bits);
+        pass.agc[2 * pass.agcFlip + 1].max(bits);
+    }
     public float exposureTime() {
         return sensorShared[0].lens.w;
     }
@@ -551,6 +585,10 @@ public struct SensorPixel {
     public bool background;   // no prim at the pixel (prim id 0), or its ray leaves the image
     // The share of the exposure a prim covered the pixel: 0 or 1, or between with motion blur.
     public float coverage;
+    // Its brightness temperature in kelvin, which a radiometric integrator (`bolometer`) sets for
+    // the BrightnessTemperature var and the display after it; 0 for none. It stays within a
+    // kernel: a spatial filter after it starts the next without it.
+    public float kelvin;
 }
 
 // A filter on each band's radiance before integration, such as a transmission filter; band
@@ -1438,6 +1476,11 @@ public struct Exposure {
 public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
     let id = pixel.id;
     let texel = linearTexel(id);
+    if ((holds & kHoldsBrightnessTemperature) != 0) {
+        brightnessOut[id] = value.kelvin;
+        storeLinear(firstbitlow(kHoldsBrightnessTemperature), texel,
+                    uint4(asuint(value.kelvin)), 1);
+    }
     if ((holds & kHoldsElectrons) != 0) {
         let held = min(value.electrons, float4(sensorShared[0].sensor.x));
         electrons[id] = held;

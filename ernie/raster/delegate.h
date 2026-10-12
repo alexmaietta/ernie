@@ -195,8 +195,8 @@ class RasterDelegate : public RenderDelegate {
              {render_vars::kMotionVector,
               render_vars::kDegreeOfLinearPolarization,
               render_vars::kAngleOfLinearPolarization,
-              render_vars::kLinearStokes,
-              render_vars::kTemperature}) {
+              render_vars::kLinearStokes, render_vars::kTemperature,
+              render_vars::kBrightnessTemperature}) {
             if (var == optIn) {
                 viewOptIn_ = optIn;
             }
@@ -501,12 +501,14 @@ class RasterDelegate : public RenderDelegate {
         std::optional<glm::vec3> minimalColor = std::nullopt);
     /// Hands the renderer the state images of `key` for the frame
     /// `Update` just prepared, made (and history dropped) when its
-    /// size, views or chain change, and swaps them for the next.
+    /// size, views or chain change, and swaps them for the next; and
+    /// the seconds since its last frame, from the frame's `time`.
     void PrepareSensorState(const Path& key, VkExtent2D extent,
-                            std::uint32_t views);
+                            std::uint32_t views, double time);
     /// The state of sensor pass `pass` (one chain of the frame).
     void PrepareSensorState(const Path& key, std::size_t pass,
-                            VkExtent2D extent, std::uint32_t views);
+                            VkExtent2D extent, std::uint32_t views,
+                            double time);
     /// Takes the next `FrameUploads` slot for a frame, once the frame
     /// that last used it has finished; returns it.
     std::uint32_t BeginFrame();
@@ -627,9 +629,18 @@ class RasterDelegate : public RenderDelegate {
             0;                 ///< Which image the next frame writes.
         bool history = false;  ///< Whether the other holds a frame.
         std::string chain;     ///< The plan key it was made for.
+        double time = 0.0;     ///< Its last frame's time, s.
     };
     std::map<std::pair<Path, std::size_t>, SensorState>
-        sensorStates_;          ///< By product, pass.
+        sensorStates_;  ///< By product, pass.
+    /// A product's automatic gain control range (`SetSensorAgc`): its
+    /// buffer and the half its next frame records.
+    struct SensorAgc {
+        std::unique_ptr<GpuBuffer> buffer;
+        std::uint32_t flip = 0;
+    };
+    std::map<std::pair<Path, std::size_t>, SensorAgc>
+        sensorAgcs_;            ///< By product, pass.
     std::optional<Key> stars_;  ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
     /// Material textures by what they were uploaded from and how

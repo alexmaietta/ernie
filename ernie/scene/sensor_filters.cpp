@@ -289,6 +289,57 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
           {"blue", 0.0f, "Blue QE", 48, gaussian(460.0, 30.0, 0.5)}},
          "MeasuredQe",
          shaders::kFilterMeasuredQeSlang},
+        {"bolometer",
+         "Microbolometer",
+         "An uncooled microbolometer: counts from the in-band radiance "
+         "between cut-on and cut-off, followed with its thermal time "
+         "constant, with NETD noise, a residual fixed pattern and "
+         "drift; and its brightness temperature for an object's "
+         "emissivity and reflected temperature (BrightnessTemperature, "
+         "thermalDisplay). An integrator into electrons, in place of "
+         "qe.",
+         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal Imaging\", "
+          "2nd ed., Wiley-VCH, 2018",
+          "P. W. Kruse, \"Uncooled Thermal Imaging: Arrays, Systems, and "
+          "Applications\", SPIE Press, 2001"},
+         Kind::Integrator,
+         Domain::Electrons,
+         {{"cutOn", 8000.0f, "Response's short edge, nm"},
+          {"cutOff", 14000.0f, "Response's long edge, nm"},
+          {"countsPerRadiance", 100.0f,
+           "Counts per W m^-2 sr^-1 in band"},
+          {"netd", 0.05f, "Temporal noise, K rms"},
+          {"fpn", 0.03f, "Fixed pattern after correction, K rms"},
+          {"drift", 0.0f, "Offset of every pixel, K"},
+          {"timeConstant", 0.01f, "Thermal time constant, s"},
+          {"emissivity", 1.0f, "The object's, for brightness temperature"},
+          {"reflected", 293.15f, "What the object reflects, K"}},
+         "Bolometer",
+         shaders::kFilterBolometerSlang,
+         {},
+         1},
+        {"thermalDisplay",
+         "Thermal display",
+         "A thermal camera's picture of the brightness temperature "
+         "(after bolometer): over a fixed kelvin range or its automatic "
+         "gain control's from the last frame, in a palette. An "
+         "integrator into colour, in place of cie.",
+         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal Imaging\", "
+          "2nd ed., Wiley-VCH, 2018"},
+         Kind::Integrator,
+         Domain::Rgb,
+         {{"automatic", 1.0f, "1: the last frame's range; 0: low to high"},
+          {"low", 270.0f, "Shown at the palette's start, K"},
+          {"high", 330.0f, "Shown at its end, K"},
+          {"span", 2.0f, "The automatic range's least, K"},
+          {"palette", 2.0f,
+           "0 white-hot, 1 black-hot, 2 ironbow, 3 rainbow"}},
+         "ThermalDisplay",
+         shaders::kFilterThermalDisplaySlang,
+         {},
+         0,
+         false,
+         Domain::Electrons},
         {"psf",
          "Point spread",
          "The lens's point-spread function: diffraction for the "
@@ -1077,7 +1128,8 @@ VarsWrittenBy(std::span<const SensorFilter> chain) {
                          render_vars::kDegreeOfLinearPolarization,
                          render_vars::kAngleOfLinearPolarization,
                          render_vars::kLinearStokes,
-                         render_vars::kTemperature});
+                         render_vars::kTemperature,
+                         render_vars::kBrightnessTemperature});
             break;
         case SensorFilter::Qe:
             vars.push_back(render_vars::kElectrons);
@@ -1107,7 +1159,8 @@ RequiredVars(std::span<const std::string_view> requested) {
     if (requested.empty()) {
         // Every var but the opt-in MotionVector, which costs passes
         // of its own, the polarization vars, which make the raster
-        // carry Stokes Q and U, and Temperature, for thermal frames.
+        // carry Stokes Q and U, and Temperature and
+        // BrightnessTemperature, for thermal frames.
         std::vector<std::string_view> every(kRenderVarNames.begin(),
                                             kRenderVarNames.end());
         std::erase(every, render_vars::kMotionVector);
@@ -1115,6 +1168,7 @@ RequiredVars(std::span<const std::string_view> requested) {
         std::erase(every, render_vars::kAngleOfLinearPolarization);
         std::erase(every, render_vars::kLinearStokes);
         std::erase(every, render_vars::kTemperature);
+        std::erase(every, render_vars::kBrightnessTemperature);
         return every;
     }
     // The sensor computes every var from the raster radiance in one

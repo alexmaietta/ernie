@@ -691,14 +691,31 @@ class RasterRenderer {
     /// The temporal filters' state of sensor pass `pass` for the next
     /// `Record`: images of `SensorStateSlots` layers per view,
     /// `previous` holding the last frame's (when `history`) and
-    /// `next` taking this one's; null for none. Call after `Update`;
+    /// `next` taking this one's; null for none; and the seconds since
+    /// that frame (0 without one, or as time stands still), for
+    /// filters that follow the scene in time. Call after `Update`;
     /// the images must outlive the frame's recording.
     void SetSensorState(std::size_t pass, GpuImage* previous,
-                        GpuImage* next, bool history) {
+                        GpuImage* next, bool history, double interval) {
         SensorPass& sensor = sensorPasses_.at(pass);
         sensor.statePrevious = previous;
         sensor.stateNext = next;
         sensor.history = history && previous != nullptr;
+        sensor.interval =
+            sensor.history ? static_cast<float>(interval) : 0.0f;
+    }
+
+    /// The automatic gain control's range of sensor pass `pass` for
+    /// the next `Record` (sensor.slang's `agcLast` and `agcRecord`):
+    /// four words, two halves of the least and most kelvin as float
+    /// bits, `flip` the half this frame records (emptied first) and
+    /// the other the last frame's; null for a placeholder. Call after
+    /// `Update`; the buffer must outlive the frame's recording.
+    void SetSensorAgc(std::size_t pass, GpuBuffer* agc,
+                      std::uint32_t flip) {
+        SensorPass& sensor = sensorPasses_.at(pass);
+        sensor.agc = agc;
+        sensor.agcFlip = flip & 1u;
     }
 
     /// The spectral bands and filter chain of the last `Update`.
@@ -1170,6 +1187,13 @@ class RasterRenderer {
         GpuImage* statePrevious = nullptr;
         GpuImage* stateNext = nullptr;
         bool history = false;
+        /// Seconds since the history's frame (`SetSensorState`).
+        float interval = 0.0f;
+        /// Automatic gain control's range (`SetSensorAgc`): its
+        /// buffer, null for a shared placeholder, and the half this
+        /// frame records.
+        GpuBuffer* agc = nullptr;
+        std::uint32_t agcFlip = 0;
     };
     /// A lens of rays' table, as sensor.slang's
     /// `SensorConstants::table` takes it: (0, step, columns, rows);
@@ -1312,6 +1336,9 @@ class RasterRenderer {
     /// Each material's temperature in kelvin, by material id, for the
     /// Temperature var (`WriteMaterialTable`).
     std::unique_ptr<GpuBuffer> materialTemperatures_;
+    /// The automatic gain control range of passes without their own
+    /// (`SetSensorAgc`), made by the first `Filter` that needs it.
+    mutable std::unique_ptr<GpuBuffer> agcFallback_;
     /// The coolest and hottest of them, the Temperature var's display
     /// range.
     std::array<float, 2> temperatureRange_{};

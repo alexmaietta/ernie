@@ -27,6 +27,8 @@ set(ernie_shaders
     film/filter_jpeg.slang=kFilterJpegSlang
     film/filter_lag.slang=kFilterLagSlang
     film/filter_measured_qe.slang=kFilterMeasuredQeSlang
+    film/filter_bolometer.slang=kFilterBolometerSlang
+    film/filter_thermal_display.slang=kFilterThermalDisplaySlang
     film/filter_psf.slang=kFilterPsfSlang
     film/filter_readout_taps.slang=kFilterReadoutTapsSlang
     film/filter_readout_table.slang=kFilterReadoutTableSlang

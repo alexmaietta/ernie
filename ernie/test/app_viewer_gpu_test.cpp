@@ -195,10 +195,11 @@ TEST_F(ViewerTest, ShowsEveryRenderVarTheBackendCanDraw) {
         const auto [centre, corner] = sample(var);
         // The cube is no instance (id 0), stands still (no motion),
         // reflects its light unpolarized and has no temperature
-        // (thermal emission off): black.
+        // (thermal emission off) nor a bolometer to read one: black.
         if (var != "InstanceId" && var != "MotionVector" &&
             var != "DegreeOfLinearPolarization" &&
-            var != "LinearStokes" && var != "Temperature") {
+            var != "LinearStokes" && var != "Temperature" &&
+            var != "BrightnessTemperature") {
             EXPECT_GT(sum(centre), 0) << var << " shows the cube";
         }
         // Colour shows the clear colour, sensor vars the

@@ -63,11 +63,18 @@ inline constexpr std::string_view kLinearStokes = "LinearStokes";
 /// `ernie:thermal:*`); 0 for the background, or with thermal emission
 /// off. Opt-in.
 inline constexpr std::string_view kTemperature = "Temperature";
+/// float32: the brightness temperature in kelvin a thermal camera
+/// reads at each pixel, from its radiometric integrator's signal
+/// (`bolometer`) for the object parameters it assumes; 0 without one.
+/// Beside Temperature, the gap is what emissivity and reflections
+/// make. Opt-in.
+inline constexpr std::string_view kBrightnessTemperature =
+    "BrightnessTemperature";
 }  // namespace render_vars
 
 /// Every render var name, in the order the rasterizer binds their
 /// images.
-inline constexpr std::array<std::string_view, 15> kRenderVarNames{
+inline constexpr std::array<std::string_view, 16> kRenderVarNames{
     render_vars::kSpectralRadiance,
     render_vars::kElectrons,
     render_vars::kRawDn,
@@ -82,7 +89,8 @@ inline constexpr std::array<std::string_view, 15> kRenderVarNames{
     render_vars::kDegreeOfLinearPolarization,
     render_vars::kAngleOfLinearPolarization,
     render_vars::kLinearStokes,
-    render_vars::kTemperature};
+    render_vars::kTemperature,
+    render_vars::kBrightnessTemperature};
 
 /// The built-in sensor filters a render product runs in order on its
 /// spectral radiance, as Chrono::Sensor's filter lists; the
@@ -266,6 +274,10 @@ struct SensorFilterModel {
     /// levels), for kernels too wide to sum pixel by pixel, such as
     /// glare; the renderer builds it before the filter's kernel.
     bool pyramid = false;
+    /// A domain before its own it reads, which runs whenever it does:
+    /// `thermalDisplay` reads the brightness temperature `bolometer`
+    /// sets with the electrons.
+    std::optional<FilterDomain> reads = std::nullopt;
 };
 
 /// Most state slots a product's chain keeps per pixel
@@ -328,6 +340,16 @@ class SensorFilterRegistry {
 ///   after `cie`.
 /// - `colorMatrix` (pixel, rgb): a 3 x 3 colour correction matrix
 ///   `m00`..`m22`; after `cie`.
+/// - `bolometer` (integrator, electrons; temporal): an uncooled
+///   microbolometer's counts from its in-band signal, with its time
+///   constant, NETD noise, residual fixed pattern and drift; and the
+///   brightness temperature for an object's emissivity and reflected
+///   temperature, the BrightnessTemperature var's; in place of `qe`.
+/// - `thermalDisplay` (integrator, rgb): a thermal camera's picture
+///   of the brightness temperature, over a fixed kelvin range or one
+///   its automatic gain control takes from the last frame, in a
+///   palette (white-hot, black-hot, ironbow, rainbow); in place of
+///   `cie`, after `bolometer`.
 /// - `compand` (pixel, digital): square-root companding from
 ///   `inputBits` to `outputBits`; after `adc`.
 /// - `toneCurve` (pixel, display): each channel through `curve` (33

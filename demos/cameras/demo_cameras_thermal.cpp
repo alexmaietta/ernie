@@ -117,22 +117,33 @@ class ThermalDemo : public app::Demo {
                 850.0f,  0.017f, 1100.0f, 0.0f,  20000.0f, 0.0f});
 
         // Visible light by the sunny 16 rule; the thermal camera a
-        // microbolometer's flat response over 8 to 14 um, exposed
-        // automatically.
+        // microbolometer over 8 to 14 um, its brightness temperature in
+        // the ironbow palette from 265 to 375 K.
         DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0},
                      17, {"LdrColor"});
         DefineCamera(kThermalCamera, kThermalProduct,
-                     {8000.0, 14000.0}, 6, {"LdrColor", "Temperature"});
+                     {8000.0, 14000.0}, 6,
+                     {"LdrColor", "Temperature", "BrightnessTemperature"});
         Camera(scene, kVisibleCamera)
             .SetExposureFStop(16.0)
             .SetExposureTime(0.01)
             .SetExposureIso(100.0);
-        Camera(scene, kThermalCamera)
-            .SetSensorType("mono")
-            .SetSensorQeMono(std::vector<float>{8000.0f, 0.8f,
-                                                14000.0f, 0.8f})
-            .SetSensorFullWell(1e12)
-            .SetExposureMode(std::string(tokens::kAuto));
+        const Path chain("/Render/ThermalChain");
+        SensorFilterPrim::Define(scene, chain.Child("Bolometer"))
+            .SetFilterType("bolometer");
+        SensorFilterPrim::Define(scene, chain.Child("Display"))
+            .SetFilterType("thermalDisplay");
+        for (const auto& [name, value] :
+             {std::pair{"automatic", 0.0f}, std::pair{"low", 265.0f},
+              std::pair{"high", 375.0f}, std::pair{"palette", 2.0f}}) {
+            scene.Set(chain.Child("Display"), "inputs:" + std::string(name),
+                      value);
+        }
+        SensorFilterPrim::Define(scene, chain.Child("Exposure"))
+            .SetFilterType("exposure");
+        RenderProduct(scene, kThermalProduct)
+            .SetFilters({chain.Child("Bolometer"), chain.Child("Display"),
+                         chain.Child("Exposure")});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(kVisibleCamera)
             .SetResolution(kResolution)
@@ -142,7 +153,8 @@ class ThermalDemo : public app::Demo {
             .SetThermalBackgroundTemperature(kSkyTemperature);
 
         Widgets().Combo("View",
-                        {"Visible", "Thermal infrared", "Temperature"},
+                        {"Visible", "Thermal camera", "Temperature",
+                         "Brightness temperature"},
                         1, [this](std::size_t index) { Show(index); });
         Widgets().Slider("Blocks (K)", 250.0, 400.0, kBlockTemperature,
                          [this](double kelvin) {
@@ -156,13 +168,15 @@ class ThermalDemo : public app::Demo {
         Show(1);
     }
 
-    /// The visible, thermal and false-colour Temperature images side
-    /// by side.
+    /// The visible and thermal camera's images, and false-colour
+    /// Temperature and BrightnessTemperature, side by side.
     void SaveOutput(const std::filesystem::path& path) override {
         const Images images = RenderAll();
-        const std::array<Tensor, 3> row = {
+        const std::array<Tensor, 4> row = {
             Rgb(images.visible), Rgb(images.thermal),
             demos::Heatmap(images.kelvin, Rows(), Cols(),
+                           kRamp.front(), kRamp.back()),
+            demos::Heatmap(images.brightness, Rows(), Cols(),
                            kRamp.front(), kRamp.back())};
         app::WritePng(path, demos::SideBySide(row));
     }
@@ -216,6 +230,23 @@ class ThermalDemo : public app::Demo {
               "370 K should far outshine 270 K");
         Check(images.kelvin.front() == 0.0,
               "the sky should have no temperature");
+        // What the camera reads, for an emissivity of 1: black paint
+        // near its 330 K, bare aluminium far colder.
+        const auto brightnessAt = [&](glm::dvec3 point) {
+            const glm::dvec2 pixel = Project(point);
+            return images.brightness[static_cast<std::size_t>(
+                static_cast<std::int64_t>(pixel.y) * Cols() +
+                static_cast<std::int64_t>(pixel.x))];
+        };
+        const double paintReads = brightnessAt(FinishCentre(0));
+        const double aluminiumReads = brightnessAt(FinishCentre(6));
+        std::printf("brightness temperature: black paint %.1f K, bare "
+                    "aluminium %.1f K\n",
+                    paintReads, aluminiumReads);
+        Check(std::abs(paintReads - kBlockTemperature) < 6.0,
+              "black paint should read near its temperature");
+        Check(aluminiumReads < 300.0,
+              "bare aluminium should read far colder than it is");
         Check(Sky(images.thermal) < ground.thermal,
               "the sky should be the coldest in the thermal image");
     }
@@ -227,9 +258,10 @@ class ThermalDemo : public app::Demo {
     static constexpr const char* kThermalProduct = "/Render/Thermal";
 
     struct Images {
-        Tensor visible;              // uint8 (rows, cols, 4)
-        Tensor thermal;              // uint8 (rows, cols, 4)
-        std::vector<double> kelvin;  // rows x cols
+        Tensor visible;                  // uint8 (rows, cols, 4)
+        Tensor thermal;                  // uint8 (rows, cols, 4)
+        std::vector<double> kelvin;      // rows x cols
+        std::vector<double> brightness;  // rows x cols
     };
 
     /// Mean brightness (0 to 1) of the pixels around a point that
@@ -272,7 +304,9 @@ class ThermalDemo : public app::Demo {
         }
         GetViewer()->SetActiveCamera(
             Path(index == 0 ? kVisibleCamera : kThermalCamera));
-        GetViewer()->SetViewVar(index == 2 ? "Temperature" : "LdrColor");
+        GetViewer()->SetViewVar(index == 2   ? "Temperature"
+                                : index == 3 ? "BrightnessTemperature"
+                                             : "LdrColor");
     }
 
     static std::int64_t Rows() {
@@ -295,10 +329,15 @@ class ThermalDemo : public app::Demo {
         };
         Images images{map(kVisibleProduct, "LdrColor"),
                       map(kThermalProduct, "LdrColor"),
+                      {},
                       {}};
         const Tensor kelvin = map(kThermalProduct, "Temperature");
         const auto* data = static_cast<const float*>(kelvin.Data());
         images.kelvin.assign(data, data + Rows() * Cols());
+        const Tensor brightness =
+            map(kThermalProduct, "BrightnessTemperature");
+        const auto* read = static_cast<const float*>(brightness.Data());
+        images.brightness.assign(read, read + Rows() * Cols());
         return images;
     }
 

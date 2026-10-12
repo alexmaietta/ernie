@@ -124,12 +124,16 @@ TEST(RequiredVars, HoldsJustTheRequestedVarsInBindingOrder) {
         (std::vector<std::string_view>{kSpectralRadiance, kRawDn}));
     const std::vector<std::string_view> every =
         ernie::RequiredVars({});
-    EXPECT_EQ(every.size(), ernie::kRenderVarNames.size() - 5)
-        << "empty is all but the opt-in five";
+    EXPECT_EQ(every.size(), ernie::kRenderVarNames.size() - 6)
+        << "empty is all but the opt-in six";
     EXPECT_EQ(std::count(every.begin(), every.end(),
                          ernie::render_vars::kTemperature),
               0)
         << "Temperature is opt-in";
+    EXPECT_EQ(std::count(every.begin(), every.end(),
+                         ernie::render_vars::kBrightnessTemperature),
+              0)
+        << "BrightnessTemperature is opt-in";
     EXPECT_EQ(std::count(every.begin(), every.end(),
                          ernie::render_vars::kMotionVector),
               0)

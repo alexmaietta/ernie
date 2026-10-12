@@ -732,13 +732,20 @@ struct SensorConstants {
     /// Each material's temperature, for the Temperature var
     /// (`materialTemperatures_`).
     VkDeviceAddress temperatures;
+    /// Seconds since the state's frame (`SensorPass::interval`).
+    float interval;
+    /// Automatic gain control's range (`SensorPass::agc`): the half
+    /// this frame records, and the buffer's address.
+    std::uint32_t agcFlip;
+    VkDeviceAddress agc;
 };
 /// `RenderTargets::LinearVars::written`'s var bits, below its AOV
 /// slots'.
 constexpr std::uint32_t kLinearVarBits =
     (1u << RenderTargets::LinearVars::kVars) - 1u;
-static_assert(sizeof(SensorConstants) == 112,
-              "SensorConstants must match sensor.slang");
+static_assert(sizeof(SensorConstants) == 128,
+              "SensorConstants must match sensor.slang, within the 128 "
+              "bytes of push constants every device has");
 
 // The sensor kernels push their outputs alone: their uniforms come by
 // address and their input images from the bindless heap, through
@@ -780,9 +787,10 @@ constexpr DescriptorBinding kFilterBindings[] = {
     // Per raster pixel, its motion (xy) and motion blur's coverage
     // (z): `RenderTargets::Raster`.
     {31, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
-    // The Temperature var. 28 descriptors in all, of the 32 devices
-    // push at least.
+    // The Temperature and BrightnessTemperature vars. 29 descriptors
+    // in all, of the 32 devices push at least.
     {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters
@@ -1231,7 +1239,7 @@ struct PresentMode {
     bool integer;
 };
 
-constexpr std::array<PresentMode, 15> kPresentModes{{
+constexpr std::array<PresentMode, 16> kPresentModes{{
     {render_vars::kSpectralRadiance, kShowSpectral, false},
     {render_vars::kLdrColor, 0, false},
     {render_vars::kHdrColor, 1, false},
@@ -1247,6 +1255,7 @@ constexpr std::array<PresentMode, 15> kPresentModes{{
     {render_vars::kAngleOfLinearPolarization, 10, false},
     {render_vars::kLinearStokes, 11, false},
     {render_vars::kTemperature, 12, false},
+    {render_vars::kBrightnessTemperature, 12, false},
 }};
 
 /// AOVs, as linear rgb over the electrons' white, the scale filters'
@@ -7019,7 +7028,33 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             0u,
             clampSamplerSlot_.Index(),
             volumeTemperatureSlot,
-            materialTemperatures_->Address()};
+            materialTemperatures_->Address(),
+            pass.interval,
+            pass.agcFlip,
+            0u};
+        // Automatic gain control's range (`thermalDisplay`): the half
+        // this frame records, emptied, the other the last frame's.
+        GpuBuffer* agc = pass.agc;
+        if (agc == nullptr) {
+            if (agcFallback_ == nullptr) {
+                agcFallback_ = std::make_unique<GpuBuffer>(
+                    context_, 4 * sizeof(std::uint32_t),
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                    BufferMemory::Upload);
+                const std::array<std::uint32_t, 4> empty{};
+                agcFallback_->Write(std::as_bytes(std::span(empty)));
+            }
+            agc = agcFallback_.get();
+        }
+        constants.agc = agc->Address();
+        const VkDeviceSize recording =
+            VkDeviceSize{pass.agcFlip} * 2 * sizeof(std::uint32_t);
+        vkCmdFillBuffer(commands, agc->Handle(), recording,
+                        sizeof(std::uint32_t), 0xFFFFFFFFu);
+        vkCmdFillBuffer(commands, agc->Handle(),
+                        recording + sizeof(std::uint32_t),
+                        sizeof(std::uint32_t), 0u);
+        ShaderBarrier(commands);
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {
             // What the segment before stored, the channels read
@@ -7043,6 +7078,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             resources.push_back(general(raster));
             resources.push_back(
                 general(targets.Bound(render_vars::kTemperature)));
+            resources.push_back(general(
+                targets.Bound(render_vars::kBrightnessTemperature)));
             // Each kernel's own time, in the order they run.
             ERNIE_GPU_ZONE(context_, commands, "Sensor kernel");
             vkCmdBindPipeline(
@@ -7137,7 +7174,8 @@ void RasterRenderer::Present(VkCommandBuffer commands,
     if (var == render_vars::kRawDn) {
         constants.range[2] = presentRange_[3];
     }
-    if (var == render_vars::kTemperature) {
+    if (var == render_vars::kTemperature ||
+        var == render_vars::kBrightnessTemperature) {
         constants.range[0] = temperatureRange_[0];
         constants.range[1] = temperatureRange_[1];
     }
