@@ -46,13 +46,62 @@ Future work:
 - Integrations into Newton Viewer, Chrono Sensor, and IsaacLab
 - Benchmark against RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality
 
-## Getting Started
+## Installation
 
-### Python
+The Python package is on PyPI as `ernie-renderer` (Python 3.12 or later, with a Vulkan 1.3 driver). It bundles everything else, the viewer and the native `ernie` program included:
 
 ```sh
 pip install ernie-renderer
 ```
+
+Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it in C++. Download it from the [latest release](https://github.com/alexmaietta/ernie/releases/latest) and install it with a Vulkan driver: Mesa's below, which includes the lavapipe software driver for machines without a GPU, or your GPU vendor's.
+
+```sh
+# Debian, Ubuntu
+sudo apt install mesa-vulkan-drivers
+sudo apt install ./ernie_*.deb
+
+# RHEL, Rocky, Fedora
+sudo dnf install mesa-vulkan-drivers
+sudo dnf install ./ernie-*.rpm
+```
+
+### Build from source
+
+Ernie needs CMake 3.24+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other dependencies (see [third_party/README.md](third_party/README.md)).
+
+```sh
+cmake -S . -B build -DERNIE_BUILD_TESTS=ON -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+cmake --build build
+ctest --test-dir build -j4              # C++, GPU and Python tests
+build/bin/ernie                         # the viewer
+cmake --install build --prefix ~/.local # libernie, headers and the CMake package
+```
+
+To build the Python wheel instead, run `uv build --wheel --out-dir dist .` and `uv pip install dist/ernie_renderer-*.whl`; for the Linux packages, `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a GPU on lavapipe, and benchmarks.
+
+## Quick Start
+
+Run `ernie` to open the Ernie Viewer. Its Demos panel runs any of the built-in demos, each written in both C++ and Python, covering cameras and sensors, lighting, atmospheres, terrain, lasers, batched rendering and the viewer; the two versions of a demo render the same image.
+
+```sh
+ernie                               # the viewer, with the Demos panel
+ernie --list                        # every demo's name
+ernie --demo demo_atmosphere_earth  # run one demo
+```
+
+`python -m ernie` opens the same viewer and takes the same options, and `python -m ernie.demos` runs the Python version of a demo:
+
+```sh
+python -m ernie.demos --list
+python -m ernie.demos demo_atmosphere_earth
+```
+
+Every demo takes common options, such as `--viewer null` to render without a window and `--output frame.png` to save the last frame; `--help` lists them.
+
+## Your First Render
+
+### Python
 
 ```python
 from PIL import Image
@@ -80,7 +129,7 @@ Image.fromarray(image).save("ernie.png")
 
 ### C++
 
-With Ernie installed (see Installation), find it with CMake:
+With the `ernie` package or your own build installed, find it with CMake:
 
 ```cmake
 find_package(Ernie REQUIRED)
@@ -117,67 +166,11 @@ int main() {
 }
 ```
 
-For the prim types and their attributes, transforms, relationships, arrays, validation, loading scenes from JSON and declaring your own types, see [Describing scenes](docs/guides/scenes.md).
+### Next steps
 
-### Examples
-
-Ernie ships with built-in demos, each written in both C++ and Python, covering cameras and sensors, lighting, atmospheres, terrain, lasers, batched rendering and the viewer. The two versions of a demo render the same image.
-
-Run the `ernie` program with no arguments to open the Ernie Viewer, whose Demos panel lists every demo to pick and run. From the command line, `--list` prints the demos' names and `--demo` runs one:
-
-```sh
-ernie                               # the viewer, with the Demos panel
-ernie --list                        # every demo's name
-ernie --demo demo_atmosphere_earth  # run one demo
-```
-
-With the Python package installed, `python -m ernie` opens the same viewer and takes the same options, and `python -m ernie.demos` runs the Python version of a demo:
-
-```sh
-python -m ernie --demo demo_atmosphere_earth
-python -m ernie.demos --list
-python -m ernie.demos demo_atmosphere_earth
-```
-
-Every demo takes common options, such as `--viewer null` to render without a window and `--output frame.png` to save the last frame; `--help` lists them. The sources are in [demos/](demos/), as `demos/<category>/demo_<category>_<name>.{cpp,py}`, and make a good starting point for your own: subclass `ernie.demo.Demo` in Python or `ernie::app::Demo` in C++.
-
-## Installation
-
-### Precompiled binaries
-
-The Python wheel is on PyPI as `ernie-renderer` (`pip install ernie-renderer`, then `import ernie`; Python 3.12+). It bundles everything, the viewer included, but a Vulkan driver.
-
-Each GitHub release also has an `ernie` package for Ubuntu 22.04+, Debian 12+ and RHEL 9+ (and a tarball for other distributions), with the library, the viewer, and the headers and CMake package for building against it.
-
-```sh
-sudo apt install ./ernie_*.deb    # Debian, Ubuntu
-sudo dnf install ./ernie-*.rpm    # RHEL, Rocky, Fedora
-```
-
-Both need a Vulkan 1.3 driver: your GPU vendor's, or Mesa's (`mesa-vulkan-drivers`, which includes the lavapipe software driver for machines without a GPU).
-
-### Build from source
-
-Ernie needs CMake 3.24+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other dependencies (see [third_party/README.md](third_party/README.md)).
-
-```sh
-cmake -S . -B build -DERNIE_BUILD_TESTS=ON -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
-cmake --build build
-ctest --test-dir build -j4              # C++, GPU and Python tests
-build/bin/ernie                         # the viewer
-cmake --install build --prefix ~/.local # libernie, headers and the CMake package
-```
-
-A Python wheel bundles the module with the Slang runtime it loads:
-
-```sh
-uv build --wheel --out-dir dist .
-uv pip install dist/ernie_renderer-*.whl
-```
-
-Packages are built with `cmake --preset package-deb` (or `package-rpm`), `cmake --build --preset package-deb` and `cpack --preset package-deb`.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the build options, testing without a GPU on lavapipe, and benchmarks.
+- [Describing scenes](docs/guides/scenes.md): the prim types and their attributes, transforms, relationships, arrays, validation, loading scenes from JSON and declaring your own types.
+- [The demos](demos/), as `demos/<category>/demo_<category>_<name>.{cpp,py}`: a good starting point for your own; subclass `ernie.demo.Demo` in Python or `ernie::app::Demo` in C++.
+- The [documentation](https://alexmaietta.github.io/ernie/) for every feature in depth.
 
 ## Citation
 
