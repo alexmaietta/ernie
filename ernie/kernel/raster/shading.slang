@@ -2765,7 +2765,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     addAirLight(id, ndc.xy, world, true);
 }
 
-static const uint kMaxBands = 64;
+// The bands per-band arrays hold: the frame's band count rounded up to a power of two
+// (`ERNIE_MAX_BANDS`, from the variant's constants).
+#ifndef ERNIE_MAX_BANDS
+#define ERNIE_MAX_BANDS 64
+#endif
+static const uint kMaxBands = ERNIE_MAX_BANDS;
 // Planck's second radiation constant, hc/k, in nm K.
 static const float kPlanckC2 = 1.4387769e7;
 
@@ -2952,7 +2957,8 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     if (gIds.Load(int4(id.xyz, 0)).x != kBackground) {
         return;
     }
-    let part = pass.model.w;
+    // The dome's own pipeline (`kSkyDomeOnly`, from the variant's constants) holds its code alone.
+    let part = kSkyDomeOnly ? kSkyPartDome : pass.model.w;
     let size = float2(sh.size.xy);
     let pixel = float2(id.xy) + 0.5;
     let ndc = float2(pixel.x / size.x * 2.0 - 1.0, 1.0 - pixel.y / size.y * 2.0);

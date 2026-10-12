@@ -771,9 +771,9 @@ class RasterRenderer {
     const ComputePipeline& LensPipeline(const std::string& lens,
                                         const std::string& entry,
                                         const PipelineLayout& layout);
-    /// Compiles the sky pass for a frame camera, or a pushbroom,
-    /// unless it has.
-    void SkyPipeline(bool pushbroom);
+    /// Compiles the sky pass for a frame camera, or a pushbroom, for
+    /// every part or the dome's alone, unless it has.
+    void SkyPipeline(bool pushbroom, bool domeOnly);
     /// The motion blur pass's pipeline, its radiance declared in the
     /// raster radiance's format (`halfRadiance_`).
     void MotionPipeline();
@@ -1010,9 +1010,10 @@ class RasterRenderer {
     /// The scale the raster radiance is stored at: a power of two
     /// near the display gain for 16-bit floats, else 1.
     float radianceScale_ = 1.0f;
-    /// Whether the frame's bands are RGB mode's
-    /// (`SpectralBands::rgb`), which the sky's pipelines follow.
-    bool rgbBands_ = false;
+    /// The sky pipelines' shading variant (renderer.cpp's kShade*
+    /// bits): every part, in the frame's radiance format, RGB mode
+    /// and bands.
+    std::uint32_t skyVariant_ = 0;
     /// Whether `lightTable_` holds a copy of the lights per
     /// sub-frame, each posed at its time (`LightParams::previous`),
     /// which its views read (`ShadingUniforms::view`).
@@ -1354,8 +1355,11 @@ class RasterRenderer {
     std::unique_ptr<GpuBuffer> starCells_;
     std::size_t starCount_ = 0;
     std::uint32_t sky_ = 0;
-    /// For frame cameras and, once one is seen, pushbrooms.
-    std::array<std::unique_ptr<ComputePipeline>, 2> skyPipelines_;
+    /// For frame cameras and, once one is seen, pushbrooms: every
+    /// part's, made once a frame shows stars, bodies or air, and the
+    /// dome's alone (`kSkyDomeOnly`), a third of the registers.
+    std::array<std::array<std::unique_ptr<ComputePipeline>, 2>, 2>
+        skyPipelines_;
     std::vector<std::size_t> modelsInUse_;
     SpectralBands bands_;
     /// The frame's thermal emission, for the material table.

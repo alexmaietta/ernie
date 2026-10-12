@@ -843,6 +843,17 @@ constexpr std::uint32_t kShadeHalfRadiance = 1u << 16;
 /// RGB mode's bands (`SpectralBands::rgb`): colours carried as linear
 /// sRGB channels rather than sampled from their sigmoid spectra.
 constexpr std::uint32_t kShadeRgb = 1u << 17;
+/// skyMain compiled for the dome alone (shading.slang's
+/// kSkyPartDome): without the other parts' code, 40 registers rather
+/// than every part's 255 and spilling.
+constexpr std::uint32_t kSkyDomeOnly = 1u << 18;
+/// The bands the kernel's per-band arrays hold, in bits 19 to 21: 64
+/// over two to their value (0 the most, 64, which variants without
+/// them keep), sized to the frame's (`BandCapacityBits`). With
+/// `kSkyDomeOnly`, a dome behind the scene (Newton's gradient, 16
+/// bands) adds about 0.5 ms to a frame rather than 2.8.
+constexpr std::uint32_t kShadeBandsShift = 19;
+constexpr std::uint32_t kShadeBandsMask = 7u << kShadeBandsShift;
 constexpr std::uint32_t kFullShading =
     kShadeAir | kShadePolarization | kShadeLasers |
     (16u << kShadeLightsShift);
@@ -852,6 +863,19 @@ constexpr std::uint32_t kFullShading =
 std::string RadianceFormatSource(bool half) {
     return std::string("#define ERNIE_RADIANCE_FORMAT \"") +
            (half ? "r16f" : "r32f") + "\"\n";
+}
+
+/// The variant bits (`kShadeBandsShift`) of arrays holding `bands`
+/// bands: the next power of two, at least 4.
+std::uint32_t BandCapacityBits(int bands) {
+    std::uint32_t capacity = 64;
+    std::uint32_t bits = 0;
+    while (bits < 4 && capacity / 2 >= static_cast<std::uint32_t>(
+                                           std::max(bands, 1))) {
+        capacity /= 2;
+        ++bits;
+    }
+    return bits << kShadeBandsShift;
 }
 
 /// `variant`'s constants for shading.slang, ahead of its source.
@@ -866,9 +890,14 @@ std::string ShadingVariantSource(std::uint32_t variant) {
            ";\nstatic const bool kShadeLasers = " +
            flag(kShadeLasers) +
            ";\nstatic const bool kShadeRgb = " + flag(kShadeRgb) +
+           ";\nstatic const bool kSkyDomeOnly = " +
+           flag(kSkyDomeOnly) +
            ";\nstatic const uint kShadeLights = " +
            std::to_string((variant >> kShadeLightsShift) & 0xFFu) +
-           ";\n" +
+           ";\n#define ERNIE_MAX_BANDS " +
+           std::to_string(64u >> ((variant & kShadeBandsMask) >>
+                                  kShadeBandsShift)) +
+           "\n" +
            RadianceFormatSource((variant & kShadeHalfRadiance) != 0);
 }
 
@@ -880,7 +909,8 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
                                bool half) {
     std::uint32_t variant =
         (half ? kShadeHalfRadiance : 0u) |
-        (params.camera.bands.rgb ? kShadeRgb : 0u);
+        (params.camera.bands.rgb ? kShadeRgb : 0u) |
+        BandCapacityBits(params.camera.bands.count);
     if (params.atmosphere || !params.bodies.empty()) {
         variant |= kShadeAir;
     }
@@ -1683,7 +1713,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
 
     SetDomeMap(nullptr);
     SetStars({});
-    SkyPipeline(false);
+    skyVariant_ = kFullShading | BandCapacityBits(16);
+    SkyPipeline(false, true);
     noOcclusion_ = std::make_unique<GpuImage>(
         context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT,
                             VK_IMAGE_USAGE_STORAGE_BIT, false, true});
@@ -3995,7 +4026,6 @@ void RasterRenderer::Update(
         // anew for it, once no frame in flight uses them.
         context_.WaitIdle();
         halfRadiance_ = half;
-        skyPipelines_ = {};
         MotionPipeline();
     }
     // 16-bit radiance is stored scaled to the exposure, a power of
@@ -4012,10 +4042,16 @@ void RasterRenderer::Update(
                 std::round(std::log2(gain)), -100.0, 100.0));
         }
     }
-    if (params.camera.bands.rgb != rgbBands_) {
-        // The sky's colours follow RGB mode too.
+    // The sky's kernel shades everything it may show, in the frame's
+    // radiance format, RGB mode and bands: made anew when they
+    // change, once no frame in flight uses it.
+    const std::uint32_t skyVariant =
+        kFullShading | (halfRadiance_ ? kShadeHalfRadiance : 0u) |
+        (params.camera.bands.rgb ? kShadeRgb : 0u) |
+        BandCapacityBits(params.camera.bands.count);
+    if (skyVariant != skyVariant_) {
         context_.WaitIdle();
-        rgbBands_ = params.camera.bands.rgb;
+        skyVariant_ = skyVariant;
         skyPipelines_ = {};
     }
     shadingVariant_ =
@@ -4023,7 +4059,6 @@ void RasterRenderer::Update(
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
     }
-    SkyPipeline(pushbroom_);
     sky_ = 0;
     if (params.dome && params.dome->visible) {
         sky_ |= kSkyDome | (hasDomeMap_ ? kSkyMap : 0u);
@@ -4036,6 +4071,10 @@ void RasterRenderer::Update(
     }
     if (!params.bodies.empty()) {
         sky_ |= kSkyBodies;
+    }
+    SkyPipeline(pushbroom_, true);
+    if ((sky_ & (kSkyStars | kSkyBodies | kSkyAtmosphere)) != 0) {
+        SkyPipeline(pushbroom_, false);
     }
     // The planet's shadow table takes the size of the brightest
     // distant light, the sun's for Earth, for every light.
@@ -4176,21 +4215,19 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
                 .first->second;
 }
 
-void RasterRenderer::SkyPipeline(bool pushbroom) {
+void RasterRenderer::SkyPipeline(bool pushbroom, bool domeOnly) {
     std::unique_ptr<ComputePipeline>& sky =
-        skyPipelines_[pushbroom ? 1 : 0];
+        skyPipelines_[pushbroom ? 1 : 0][domeOnly ? 1 : 0];
     if (sky == nullptr) {
         // The sky pass shares shading's module, composed with the
         // first model, which it ignores.
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(
-                ShadingModules(
-                    brdfs_.Models().front(), lightPatterns_,
-                    pushbroom,
-                    kFullShading |
-                        (halfRadiance_ ? kShadeHalfRadiance : 0u) |
-                        (rgbBands_ ? kShadeRgb : 0u)),
+                ShadingModules(brdfs_.Models().front(),
+                               lightPatterns_, pushbroom,
+                               skyVariant_ |
+                                   (domeOnly ? kSkyDomeOnly : 0u)),
                 "skyMain"));
     }
 }
@@ -6731,15 +6768,26 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
         // radiance.
         if (sky_ != 0) {
             ERNIE_GPU_ZONE(context_, commands, "Sky");
-            vkCmdBindPipeline(
-                commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                skyPipelines_[pushbroom_ ? 1 : 0]->Handle());
-            shadingLayout_.Push(
-                commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
             // Its parts in turn (shading.slang's kSkyPart*), each
             // adding to what the one before stored: the dome, which
-            // clears the pixels too, so it always runs.
+            // clears the pixels too, so it always runs, in its own
+            // pipeline; the others in that of every part.
+            const auto& pipelines = skyPipelines_[pushbroom_ ? 1 : 0];
+            const auto bind = [&](const ComputePipeline& pipeline) {
+                vkCmdBindPipeline(commands,
+                                  VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  pipeline.Handle());
+                shadingLayout_.Push(commands,
+                                    VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    shading);
+            };
+            bind(*pipelines[1]);
+            bool general = false;
             const auto part = [&](std::uint32_t index) {
+                if (index != 0 && !general) {
+                    bind(*pipelines[0]);
+                    general = true;
+                }
                 ShadingConstants constants = constantsFor(0);
                 constants.model[3] = index;
                 shadingLayout_.PushConstants(commands, &constants,
