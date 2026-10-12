@@ -16,9 +16,10 @@ from ernie import tokens
 OFFSETS = [(-6.0, 0.0, 0.0), (0.0, 0.0, 0.0), (6.0, 0.0, 0.0)]
 
 
-def lamp_scene(light=ernie.SphereLight, depth=1):
-    """A lamp (a light class) on a link per world over a ground, lit
-    by nothing else, under `depth` GPU-posed Xforms."""
+def lamp_scene(light=ernie.SphereLight, depth=1, lamp_args=None):
+    """A lamp (a light class, its attributes `lamp_args`) on a link
+    per world over a ground, lit by nothing else, under `depth`
+    GPU-posed Xforms."""
     scene = ernie.Scene()
     camera = scene.define(
         "/World/Camera", ernie.Camera, focal_length=35.0
@@ -56,7 +57,10 @@ def lamp_scene(light=ernie.SphereLight, depth=1):
             levels[level].append(str(link.path))
         link.define("Box", ernie.Cube, scale=(0.5, 0.5, 0.5))
         lamp = link.define(
-            "Lamp", light, translate=(1.0, 0.0, 2.0), intensity=40.0
+            "Lamp",
+            light,
+            translate=(1.0, 0.0, 2.0),
+            **(lamp_args or {"intensity": 40.0}),
         )
         if light is ernie.SphereLight:
             lamp.radius = 0.2
@@ -92,6 +96,29 @@ def test_lamps_on_posed_links_light_like_cpu_posed_ones(
     cpu, gpu = render_both(cuda_renderer, [link_arrays(3, seed=1)])
     assert_same_image(gpu, cpu)
     assert cuda_renderer.take_validation_messages() == []
+
+
+def test_laser_spots_on_posed_links_shadow_like_cpu_posed_ones(
+    cuda_renderer,
+):
+    # A beam a metre wide from beside the box, which shadows part of
+    # it: the light pass fits its view along the posed beam.
+    args = {
+        "light": ernie.LaserLight,
+        "lamp_args": {"power": 5.0, "waist_radius": (1.0, 1.0)},
+    }
+    cpu, gpu = render_both(
+        cuda_renderer, [link_arrays(3, seed=4)], **args
+    )
+    assert_same_image(gpu, cpu)
+    unshadowed, _ = render_both(
+        cuda_renderer,
+        [link_arrays(3, seed=4)],
+        light=ernie.LaserLight,
+        lamp_args={**args["lamp_args"], "shadow_enable": False},
+    )
+    difference = np.abs(cpu.astype(np.int32) - unshadowed)
+    assert difference.max() > 20, "the box shadows the beam"
 
 
 def test_lamps_two_posed_links_deep(cuda_renderer):

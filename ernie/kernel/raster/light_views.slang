@@ -5,8 +5,9 @@
 // views of those shadow views, for the meshes' GPU culling.
 //
 // `lightsMain`, one thread per light. Bindings: 0 per light two float4 records (light index,
-// first shadow view, shadow views, kind: 0 distant, 1 spot, 2 cube; then the spot's field of
-// view in radians and the light's radius), 1 the poses (row-major 4x4 per light, relative to the
+// first shadow view, shadow views, kind: 0 distant, 1 spot, 2 cube, 3 a laser's spot; then the
+// spot's field of view in radians and the light's radius, or the laser's widest waist radius,
+// shortest Rayleigh range and waist distance), 1 the poses (row-major 4x4 per light, relative to the
 // frame's origin), 2 the light table (LightGpu, `constants.x` float4s each), 3 the shadow views'
 // matrices (glm columns), 4 the shadow views' Shadows blocks (frame.slang; the first matrix of
 // each, `constants.z` float4s apart). The scene's bounds, relative to the frame's origin, come
@@ -39,6 +40,7 @@ struct LightConstants {
 
 static const uint kDistant = 0;
 static const uint kSpot = 1;
+static const uint kLaserSpot = 3;
 
 // LightGpu's fields, in float4s.
 static const uint kPosition = 0;
@@ -146,6 +148,19 @@ void lightsMain(uint3 id : SV_DispatchThreadID) {
     let near = max(shape.y, 1e-4 * far);
     if (kind == kSpot) {
         writeView(firstView, mul(perspective(shape.x, near, far),
+                                 lookAt(position, position + axis, upFor(axis))));
+        return;
+    }
+    if (kind == kLaserSpot) {
+        // Orthographic along the beam, as wide as the beam's widest (at the aperture or the
+        // scene's far side) out to 2.5 1/e^2 radii.
+        var widest = 0.0;
+        for (uint end = 0; end < 2; ++end) {
+            let z = (end == 0 ? 0.0 : far) - shape.z;
+            let t = z / max(shape.y, 1e-12);
+            widest = max(widest, shape.x * sqrt(1.0 + t * t));
+        }
+        writeView(firstView, mul(ortho(max(2.5 * widest, 1e-6), 0.0, far),
                                  lookAt(position, position + axis, upFor(axis))));
         return;
     }

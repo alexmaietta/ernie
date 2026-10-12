@@ -2139,11 +2139,7 @@ void RasterRenderer::WriteLights(
         if (worldMaps_ && bounds && distant && light.shadows &&
             !light.domeDiffuse && !light.posedOnGpu) {
             perWorld.push_back(i);
-        } else if (bounds && params.shadows.enabled &&
-                   !(laser && light.posedOnGpu &&
-                     light.beam.IsSpot())) {
-            // A laser's spot posed on the GPU has no shadows yet: the
-            // light pass fits perspective views only.
+        } else if (bounds && params.shadows.enabled) {
             // A distant light over a single view casts cascades over
             // it, as the sun does, when its maps have room for them;
             // otherwise one map over the whole scene, as a dome's
@@ -2351,8 +2347,10 @@ void RasterRenderer::WriteLights(
         if (light.posedOnGpu) {
             // The light pass poses it and fits its views as
             // `FitLightShadowViews` would.
+            const bool spot = laser && light.beam.IsSpot();
             const auto kind =
                 distant ? 0u
+                : spot  ? 3u
                 : light.coneAngle <= LightParams::kMaxSpotConeDegrees
                     ? 1u
                     : 2u;
@@ -2363,9 +2361,18 @@ void RasterRenderer::WriteLights(
             glm::vec4 bits;
             std::memcpy(&bits, record, sizeof(bits));
             lightRecords.push_back(bits);
-            lightRecords.emplace_back(
-                2.0f * glm::radians(std::max(light.coneAngle, 0.5f)),
-                light.radius, 0.0f, 0.0f);
+            // A laser's spot: its beam's widest waist radius,
+            // shortest Rayleigh range and waist distance, which size
+            // its view.
+            lightRecords.push_back(
+                spot ? glm::vec4(std::max(light.beam.waist.x,
+                                          light.beam.waist.y),
+                                 std::min(light.beam.rayleigh.x,
+                                          light.beam.rayleigh.y),
+                                 light.beam.waistDistance, 0.0f)
+                     : glm::vec4(2.0f * glm::radians(std::max(
+                                            light.coneAngle, 0.5f)),
+                                 light.radius, 0.0f, 0.0f));
         }
     }
     if (!patternNorms.empty()) {
