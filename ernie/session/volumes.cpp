@@ -92,6 +92,11 @@ VolumeMaterialParams MaterialOf(const Scene& scene,
     // Hapke's b and c, as its BRDF reads them (with its defaults).
     params.b = GetNumber(scene, bound, tokens::kPhaseB, params.b);
     params.c = GetNumber(scene, bound, tokens::kPhaseC, params.c);
+    params.octaves = material.GetScatteringOctaves();
+    params.octaveAttenuation = material.GetOctaveAttenuation();
+    params.octaveExtinction = material.GetOctaveExtinction();
+    params.octavePhase = material.GetOctavePhase();
+    params.skyLight = material.GetSkyLight();
     params.emission =
         material.GetEmissionColor() * material.GetEmissionStrength();
     params.blackbody = material.GetBlackbody();

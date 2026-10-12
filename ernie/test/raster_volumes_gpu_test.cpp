@@ -713,3 +713,104 @@ TEST_F(RasterDelegateTest, AGridBuiltFromDenseValuesShadesAsTheFile) {
             << "band " << b;
     }
 }
+
+TEST_F(RasterDelegateTest, OctavesAddLightScatteredManyTimes) {
+    // Wrenninge's octaves in the overhead column: order i scatters
+    // a^i of the light, attenuated b^i as much towards the sun, so an
+    // isotropic column of optical depth tau gives
+    // sum a^i (1 - exp(-(1 + b^i) tau)) / (1 + b^i) of what single
+    // scattering's (1 - exp(-2 tau)) / 2 normalizes.
+    constexpr double kSigma = 2.0;
+    constexpr int kOctaves = 4;
+    // a at most b, as energy allows (a larger a is clamped to b).
+    constexpr double a = 0.4;
+    constexpr double b = 0.6;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kIsotropic))
+        .SetScatteringOctaves(kOctaves)
+        .SetOctaveAttenuation(a)
+        .SetOctaveExtinction(b);
+    const std::vector<double> ratio = ScatteredOverEach(
+        delegate, scene, kSigma, 1.0 / (4.0 * std::numbers::pi));
+    const double tau = kSigma * kDepth;
+    double expected = 0.0;
+    for (int i = 0; i < kOctaves; ++i) {
+        const double bi = std::pow(b, i);
+        expected += std::pow(a, i) *
+                    (1.0 - std::exp(-(1.0 + bi) * tau)) / (1.0 + bi);
+    }
+    expected /= (1.0 - std::exp(-2.0 * tau)) / 2.0;
+    for (std::size_t band = 0; band < ratio.size(); ++band) {
+        EXPECT_NEAR(ratio[band], expected, 0.04 * expected)
+            << "band " << band;
+    }
+    EXPECT_GT(expected, 1.5) << "the octaves add light";
+}
+
+TEST_F(RasterDelegateTest,
+       TheSkyAndGroundLightAVolumeInAnAtmosphere) {
+    // Under Earth's air, a white scatterer takes the sky's and the
+    // ground's light besides the sun's; its sky light scale off, the
+    // sun's alone.
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(1.0, 0.0);
+    ernie::Atmosphere::Define(scene, "/World/Air")
+        .SetPreset(std::string(tokens::kEarth));
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kIsotropic));
+    scene.Remove("/World/Terrain");
+    const std::vector<double> lit = CentreSpectrum(delegate, scene);
+    ernie::Material(scene, "/Looks/Gas").SetSkyLight(0.0);
+    const std::vector<double> sunOnly =
+        CentreSpectrum(delegate, scene);
+    double litSum = 0.0;
+    double sunSum = 0.0;
+    for (std::size_t b = 0; b < lit.size(); ++b) {
+        litSum += lit[b];
+        sunSum += sunOnly[b];
+    }
+    ASSERT_GT(sunSum, 0.0);
+    // The overhead sun's sky gives about a sixth of its light, the
+    // ground (black here, no terrain: the atmosphere's albedo) more.
+    EXPECT_GT(litSum, 1.03 * sunSum);
+    EXPECT_LT(litSum, 1.6 * sunSum);
+}
+
+TEST_F(RasterDelegateTest, TheAirInFrontOfAVolumeShows) {
+    // A black wall of absorbing smoke 20 km off across a level view:
+    // the air between shows in front of it, rather than the wall
+    // blacking out the sky's air light along the whole ray.
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(0.01, 0.0);
+    ernie::Atmosphere::Define(scene, "/World/Air")
+        .SetPreset(std::string(tokens::kEarth));
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetTransform(ernie::DistantLightTransform({0.3, -1.0, 0.6}));
+    scene.Remove("/World/Terrain");
+    scene.GetPrim("/World/Cube")
+        .SetXform({.translate = glm::dvec3(0.0, 20000.0, 500.0),
+                   .scale = glm::dvec3(2000.0)});
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 500.0},
+                                     {0.0, 1.0, 500.0},
+                                     {0.0, 0.0, 1.0}));
+    const std::vector<double> walled =
+        CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> sky = CentreSpectrum(delegate, scene);
+    double walledSum = 0.0;
+    double skySum = 0.0;
+    for (std::size_t b = 0; b < sky.size(); ++b) {
+        walledSum += walled[b];
+        skySum += sky[b];
+    }
+    // 20 km of the 8 km scale height's air at 500 m: much of the
+    // horizon's light, but less than the sky's along the whole ray.
+    EXPECT_GT(walledSum, 0.3 * skySum);
+    EXPECT_LT(walledSum, 0.95 * skySum);
+}

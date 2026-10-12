@@ -100,6 +100,15 @@ inline constexpr std::string_view kVolumeAlbedo =
     "inputs:volumeAlbedo";
 inline constexpr std::string_view kVolumeAnisotropy =
     "inputs:anisotropy";
+inline constexpr std::string_view kVolumeScatteringOctaves =
+    "inputs:scatteringOctaves";
+inline constexpr std::string_view kVolumeOctaveAttenuation =
+    "inputs:octaveAttenuation";
+inline constexpr std::string_view kVolumeOctaveExtinction =
+    "inputs:octaveExtinction";
+inline constexpr std::string_view kVolumeOctavePhase =
+    "inputs:octavePhase";
+inline constexpr std::string_view kVolumeSkyLight = "inputs:skyLight";
 inline constexpr std::string_view kVolumeEmissionColor =
     "inputs:emissionColor";
 inline constexpr std::string_view kVolumeEmissionStrength =

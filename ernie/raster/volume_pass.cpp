@@ -92,8 +92,9 @@ struct VolumeMaterialGpu {
     float emission[SpectralBands::kMaxBands];
     float params[4];
     float phase[4];
+    float scattering[4];
 };
-static_assert(sizeof(VolumeMaterialGpu) == 544,
+static_assert(sizeof(VolumeMaterialGpu) == 560,
               "VolumeMaterialGpu must match volume.slang");
 
 struct VolumeConstants {
@@ -217,6 +218,19 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
         static_cast<float>(std::clamp(params.b, 0.0, 0.99));
     material.phase[2] =
         static_cast<float>(std::clamp(params.c, -1.0, 1.0));
+    material.phase[3] =
+        static_cast<float>(std::max(params.skyLight, 0.0));
+    // Wrenninge's octaves, a at most b so that each order carries no
+    // more energy than its extinction lets through.
+    const double extinction =
+        std::clamp(params.octaveExtinction, 0.0, 1.0);
+    material.scattering[0] =
+        static_cast<float>(std::clamp(params.octaves, 1, 8));
+    material.scattering[1] = static_cast<float>(
+        std::clamp(params.octaveAttenuation, 0.0, extinction));
+    material.scattering[2] = static_cast<float>(extinction);
+    material.scattering[3] =
+        static_cast<float>(std::clamp(params.octavePhase, 0.0, 1.0));
     return material;
 }
 

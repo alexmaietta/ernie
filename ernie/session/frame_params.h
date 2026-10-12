@@ -554,6 +554,14 @@ struct VolumeMaterialParams {
     std::string phase = "henyeyGreenstein";
     double b = 0.25;
     double c = 0.5;
+    /// Orders of scattering approximated, and each order's scattering,
+    /// extinction and anisotropy of the one before's (Wrenninge's a,
+    /// b and c).
+    int octaves = 1;
+    double octaveAttenuation = 0.5;
+    double octaveExtinction = 0.5;
+    double octavePhase = 0.5;
+    double skyLight = 1.0;  ///< Scales the sky's and ground's light.
     glm::dvec3 emission{0.0};  ///< cd/m^2 per world unit for white.
     double blackbody = 1.0;
     double temperature = 0.0;  ///< Kelvin, without a field.

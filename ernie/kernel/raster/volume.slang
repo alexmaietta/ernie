@@ -113,8 +113,12 @@ struct VolumeMaterialGpu {
     float4 emission[16];
     // x: Henyey-Greenstein g; y: black-body scale; z: 1 when it emits; w: 1 when it scatters.
     float4 params;
-    // x: its phase function (k*), y: double Henyey-Greenstein b, z: its c; w unused.
+    // x: its phase function (k*), y: double Henyey-Greenstein b, z: its c; w: the scale of the
+    // sky's and ground's light.
     float4 phase;
+    // Wrenninge's multiple-scattering octaves: x their count (1, single scattering), y each one's
+    // scattering of the one before's (a), z its extinction (b), w its anisotropy (c).
+    float4 scattering;
 }
 
 struct VolumeConstants {
@@ -171,9 +175,9 @@ struct ShadingResources {
     float2* lightTiming;
     uint* stars;
     uint* starCells;
-    uint* atmosphereMedium;
-    uint* atmosphereDensities;
-    uint* atmospherePhases;
+    float4* atmosphereMedium;
+    float* atmosphereDensities;
+    float* atmospherePhases;
     uint sigmoidTable;
     uint tableSampler;
     uint lightShadowMaps;
@@ -231,6 +235,11 @@ struct VolumeResources {
 #define lightShadowMaps (heapTextureArrays[shading.lightShadowMaps])
 #define lightShadowSampler (heapComparisonSamplers[shading.lightShadowSampler])
 #define atmosphereTransmittance (heapTextureArrays[shading.atmosphereTransmittance])
+#define atmosphereMultiple (heapTextureArrays[shading.atmosphereMultiple])
+#define atmosphereSkyIrradiance (heapTextureArrays[shading.atmosphereSkyIrradiance])
+#define atmosphereMedium (shading.atmosphereMedium)
+#define atmosphereDensities (shading.atmosphereDensities)
+#define atmospherePhases (shading.atmospherePhases)
 #define tableSampler (heapSamplers[shading.tableSampler])
 
 // 16 bytes of the views' uniforms at byte offset `offset` (a multiple of 16).
@@ -333,25 +342,49 @@ float hash(uint3 p) {
 }
 
 // The material's phase function at phase angle cosine `cosG` (towards the light and towards the
-// eye), per steradian.
-float phaseOf(VolumeMaterialGpu material, float cosG) {
+// eye), per steradian, its anisotropy scaled by `spread` (1 as it is, 0 isotropic).
+float phaseOf(VolumeMaterialGpu material, float cosG, float spread = 1.0) {
     switch (uint(material.phase.x)) {
     case kDoubleHenyeyGreenstein:
-        return doubleHenyeyGreenstein(material.phase.y, material.phase.z, cosG) / (4.0 * PI);
+        return doubleHenyeyGreenstein(material.phase.y * spread, material.phase.z, cosG) /
+               (4.0 * PI);
     case kRayleigh:
-        return 3.0 / (16.0 * PI) * (1.0 + cosG * cosG);
+        return lerp(1.0, 0.75 * (1.0 + cosG * cosG), spread) / (4.0 * PI);
     case kIsotropic:
         return 1.0 / (4.0 * PI);
     default:
         // Forward scattering (g > 0) is towards the light's far side: phase angle near pi.
-        return henyeyGreenstein(material.params.x, cosG) / (4.0 * PI);
+        return henyeyGreenstein(material.params.x * spread, cosG) / (4.0 * PI);
     }
 }
 
-// The transmittance from world point `world` towards a light along unit `towards`, up to world
+// The light a light scatters towards the eye per unit of what reaches the medium's surface, its
+// optical depth through the media `depth` on the way: single scattering, or Wrenninge's octaves
+// (each order of scattering a less, its extinction b less and its anisotropy c less than the
+// one before's).
+//
+// Reference: M. Wrenninge, C. Kulla and V. Lundqvist, "Oz: The Great and Volumetric", SIGGRAPH
+//   2013 Talks. https://doi.org/10.1145/2504459.2504518
+float octavesOf(VolumeMaterialGpu material, float cosG, float depth) {
+    let octaves = uint(material.scattering.x);
+    float sum = 0.0;
+    float a = 1.0;
+    float b = 1.0;
+    float c = 1.0;
+    for (uint i = 0; i < octaves; ++i) {
+        sum += a * exp(-b * depth) * phaseOf(material, cosG, c);
+        a *= material.scattering.y;
+        b *= material.scattering.z;
+        c *= material.scattering.w;
+    }
+    return sum;
+}
+
+// The optical depth from world point `world` towards a light along unit `towards`, up to world
 // distance `far`, through every volume of the view's run `run` whose link group the light's shadow
-// mask `casters` holds (`kShadowSteps` through each one the segment crosses).
-float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint casters) {
+// mask `casters` holds (`steps` through each one the segment crosses).
+float volumesDepth(uint2 run, float3 world, float3 towards, float far, uint casters,
+                   uint steps) {
     float depth = 0.0;
     for (uint k = 0; k < run.y; ++k) {
         let volume = volumes[viewVolumes[run.x + k]];
@@ -372,16 +405,21 @@ float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint cas
             continue;
         }
         var accessor = accessorOf(volume.density);
-        let dt = (exit - near) / float(kShadowSteps);
+        let dt = (exit - near) / float(steps);
         float sum = 0.0;
-        for (uint i = 0; i < kShadowSteps; ++i) {
+        for (uint i = 0; i < steps; ++i) {
             sum += max(sampleField(volume.density, o + d * (near + (float(i) + 0.5) * dt),
                                    accessor),
                        0.0);
         }
         depth += sum * volume.params.x * dt;
     }
-    return exp(-depth);
+    return depth;
+}
+
+// The transmittance of `volumesDepth`'s path, in `kShadowSteps` steps.
+float volumesShadow(uint2 run, float3 world, float3 towards, float far, uint casters) {
+    return exp(-volumesDepth(run, world, towards, far, casters, kShadowSteps));
 }
 
 // The inverse of `matrix` by cofactors, 0 for a singular one (views.slang's `invert`).
@@ -634,6 +672,80 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
     return reach;
 }
 
+// Steps of the march up and down through the volumes for the sky's and the ground's light.
+static const uint kSkyLightSteps = 6;
+
+// Adds to `emitted` the light of the sky and the ground around world point `world` (relative to
+// the frame's origin) that the medium there scatters towards the eye, `scale` its scattering
+// coefficient times the step's weight and the material's sky light scale. Each of the view's
+// distant lights the atmosphere carries (those of `viewLights` that light link group `linkGroup`)
+// lights the sky (the sky irradiance table) and, Lambertian with the atmosphere's ground albedo
+// with the sky, the ground; the medium sees the sky's irradiance on level ground over the upper
+// half of its surround and the ground's over the lower, isotropically, each dimmed by the
+// volumes above or below it.
+//
+// References:
+// - E. Bruneton, "Precomputed Atmospheric Scattering: a New Implementation", 2017,
+//   `GetSunAndSkyIrradiance`. https://ebruneton.github.io/precomputed_atmospheric_scattering/
+// - S. Hillaire, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", SIGGRAPH
+//   2016 Course: Physically Based Shading in Theory and Practice (ambient light on clouds).
+void emitSkyLight(inout float4 emitted[kMaxGroups], uint materialIndex, float3 world,
+                  uint2 shadowRun, uint4 viewLights, uint lightCount, uint linkGroup,
+                  float4 air[2],
+                  uint groups, float scale) {
+    let bottom = air[0].w;
+    let top = air[1].x;
+    let p = world * 1e-3 - air[0].xyz;
+    let r = max(length(p), bottom);
+    let up = normalize(p);
+    let above = exp(-volumesDepth(shadowRun, world, up, 1e30, ~0u, kSkyLightSteps));
+    let below = exp(-volumesDepth(shadowRun, world, -up, 1e30, ~0u, kSkyLightSteps));
+    for (uint k = 0; k < lightCount; ++k) {
+        let light = shading.lights[viewLights.z + k];
+        if ((viewLights.x & (1u << k)) == 0 || uint(light.position.w) != kDistantLight ||
+            light.shadow.y >= 0.5 || ((light.links.x >> linkGroup) & 1u) == 0) {
+            continue;
+        }
+        let towards = light.position.xyz;
+        let tangent = light.extentY.w;
+        let sine = tangent * rsqrt(1.0 + tangent * tangent);
+        let muSun = dot(up, towards);
+        for (uint g = 0; g < groups; ++g) {
+            let sky = skyIrradiance(atmosphereSkyIrradiance, tableSampler, r, muSun, g, bottom,
+                                    top);
+            let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, up * bottom,
+                                         towards, sine, g, bottom, top);
+            let ground = groundAlbedo(atmosphereMedium, g) * (toSun * max(muSun, 0.0) + sky);
+            let irradiance = light.spectrum[g] + light.tinted[g];
+            emitted[g] += volumeMaterials[materialIndex].albedo[g] * irradiance *
+                          (sky * above + ground * below) * (0.5 / PI * scale);
+        }
+    }
+}
+
+// Steps of the air's march from the eye to the volumes.
+static const uint kAirSteps = 32;
+
+// The distant lights the atmosphere carries (shading.slang's `skyLights`): those of `viewLights`
+// that are not a dome's directions, with their irradiance in band group `g`.
+SkyLights skyLightsOf(uint4 viewLights, uint lightCount, uint g) {
+    SkyLights sky;
+    sky.count = 0;
+    for (uint k = 0; k < lightCount && sky.count < kSkyLights; ++k) {
+        let light = shading.lights[viewLights.z + k];
+        if ((viewLights.x & (1u << k)) == 0 || uint(light.position.w) != kDistantLight ||
+            light.shadow.y >= 0.5) {
+            continue;
+        }
+        let tangent = light.extentY.w;
+        sky.towards[sky.count] =
+            float4(light.position.xyz, tangent * rsqrt(1.0 + tangent * tangent));
+        sky.irradiance[sky.count] = light.spectrum[g] + light.tinted[g];
+        ++sky.count;
+    }
+    return sky;
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void volumeMain(uint3 id : SV_DispatchThreadID) {
@@ -745,6 +857,9 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         emitted[g] = float4(0.0);
     }
     float transmittance = 1.0;
+    // The distance along the ray of what the volumes hold back, weighted by it: where the air in
+    // front of them ends.
+    float frontSum = 0.0;
     let jitter = hash(uint3(id.xy, constants.layout.w ^ (id.z * 7919u)));
     for (uint s = 0; s < count && transmittance > kOpaque; ++s) {
         let volume = volumes[which[s]];
@@ -763,6 +878,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         let hasEmission = volume.emission.grid.x != kNoGrid;
         let emits = material.params.z != 0.0;
         let scatters = material.params.w != 0.0 && hasDensity;
+        // The sky's and the ground's light, with an atmosphere.
+        let skyLit = material.phase.w > 0.0 && air[1].y != 0.0;
         let kelvinBase = volume.params.y;
         let glows = material.params.y > 0.0 && (hasTemperature || kelvinBase > 0.0);
         var densityAccessor = accessorOf(volume.density);
@@ -820,13 +937,13 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     if (reach.scale <= 0.0) {
                         continue;
                     }
+                    let depth = light.links.z != 0
+                                    ? volumesDepth(shadowRun, world, reach.towards, reach.far,
+                                                   light.links.y, kShadowSteps)
+                                    : 0.0;
                     let lit = weight * sigma *
-                              phaseOf(material, dot(reach.towards, -direction)) * reach.scale *
-                              geometryShadow(light, world, viewLights.y, mapTexels) *
-                              (light.links.z != 0 ? volumesShadow(shadowRun, world,
-                                                                  reach.towards, reach.far,
-                                                                  light.links.y)
-                                                  : 1.0);
+                              octavesOf(material, dot(reach.towards, -direction), depth) *
+                              reach.scale * geometryShadow(light, world, viewLights.y, mapTexels);
                     if (lit <= 0.0) {
                         continue;
                     }
@@ -846,8 +963,42 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                         emitted[g] += volumeMaterials[materialIndex].albedo[g] * lit * spectrum;
                     }
                 }
+                if (skyLit) {
+                    emitSkyLight(emitted, materialIndex, world, shadowRun, viewLights, lightCount,
+                                 volume.info.z, air, groups, weight * sigma * material.phase.w);
+                }
             }
+            frontSum += transmittance * opacity * t;
             transmittance *= 1.0 - opacity;
+        }
+    }
+
+    // The air in front of the volumes, as far as their mean depth: what reaches the eye from them
+    // dims across it, and the light it scatters shows in front of them. The light behind already
+    // holds the air all the way along (shading's aerial perspective, or the sky), the air in front
+    // of the volumes included, so of that air's light only the share the volumes hold back goes:
+    // behind T + T_air emitted + S_air (1 - T).
+    float4 airLight[kMaxGroups];
+    float4 airThrough[kMaxGroups];
+    for (uint g = 0; g < groups; ++g) {
+        airLight[g] = float4(0.0);
+        airThrough[g] = float4(1.0);
+    }
+    if (air[1].y != 0.0 && !unwritten && transmittance < 1.0) {
+        let front = frontSum / (1.0 - transmittance);
+        let bottom = air[0].w;
+        let top = air[1].x;
+        let p = aboveGround(origin * 1e-3 - air[0].xyz, bottom);
+        float start;
+        float end;
+        if (clipSegment(p, direction, front * 1e-3, top, start, end)) {
+            for (uint g = 0; g < groups; ++g) {
+                scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                   atmosphereTransmittance, atmosphereMultiple, tableSampler, p,
+                                   direction, max(start, 0.0), end,
+                                   skyLightsOf(viewLights, lightCount, g), noEclipse(), g,
+                                   kAirSteps, airLight[g], airThrough[g]);
+            }
         }
     }
 
@@ -857,7 +1008,8 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
     for (uint b = 0; b < bands; ++b) {
         let layer = int3(id.xy, id.z * bands + b);
         let behind = unwritten ? 0.0 : spectral[layer];
-        spectral[layer] = behind * transmittance + emitted[b / 4][b % 4];
+        spectral[layer] = behind * transmittance + airThrough[b / 4][b % 4] * emitted[b / 4][b % 4] +
+                          airLight[b / 4][b % 4] * (1.0 - transmittance);
         if (stokes != 0) {
             for (uint plane = 1; plane <= 2; ++plane) {
                 let at = int3(layer.xy, layer.z + int(plane * stokes));

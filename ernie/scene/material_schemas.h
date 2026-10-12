@@ -150,6 +150,30 @@
       (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
                                      "backwards.",                                                 \
                               .group = "Volume", .min = -0.99, .max = 0.99}))                      \
+    X(int, ScatteringOctaves, ::ernie::tokens::kVolumeScatteringOctaves, 1,                        \
+      (::ernie::AttributeMeta{.doc = "Orders of scattering approximated, after Wrenninge et al. "  \
+                                     "(2013): 1 is single scattering; dense media such as clouds " \
+                                     "want 4 to 8, which brighten their insides as light that "    \
+                                     "scattered many times does.",                                 \
+                              .group = "Volume", .min = 1.0, .max = 8.0}))                         \
+    X(double, OctaveAttenuation, ::ernie::tokens::kVolumeOctaveAttenuation, 0.5,                   \
+      (::ernie::AttributeMeta{.doc = "Each order's scattering, of the one before's (a); at most "  \
+                                     "the octave extinction, to conserve energy.",                 \
+                              .group = "Volume", .max = 1.0}))                                     \
+    X(double, OctaveExtinction, ::ernie::tokens::kVolumeOctaveExtinction, 0.5,                     \
+      (::ernie::AttributeMeta{.doc = "Each order's extinction towards the light, of the one "      \
+                                     "before's (b): light that scattered many times gets "         \
+                                     "deeper.",                                                    \
+                              .group = "Volume", .max = 1.0}))                                     \
+    X(double, OctavePhase, ::ernie::tokens::kVolumeOctavePhase, 0.5,                               \
+      (::ernie::AttributeMeta{.doc = "Each order's anisotropy, of the one before's (c): light "    \
+                                     "that scattered many times spreads more evenly.",             \
+                              .group = "Volume", .max = 1.0}))                                     \
+    X(double, SkyLight, ::ernie::tokens::kVolumeSkyLight, 1.0,                                     \
+      (::ernie::AttributeMeta{.doc = "Scales the light of the sky and the ground around the "      \
+                                     "medium, from the atmosphere's distant lights; 1 is "         \
+                                     "physical, 0 none.",                                          \
+                              .group = "Volume", .max = 10.0}))                                    \
     X(glm::dvec3, EmissionColor, ::ernie::tokens::kVolumeEmissionColor, glm::dvec3(1.0),           \
       (::ernie::AttributeMeta{.label = "Emission colour", .doc = "Linear RGB.", .group = "Volume", \
                               .color = true}))                                                     \
