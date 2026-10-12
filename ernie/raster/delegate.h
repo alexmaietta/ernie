@@ -193,7 +193,8 @@ class RasterDelegate : public RenderDelegate {
              {render_vars::kMotionVector,
               render_vars::kDegreeOfLinearPolarization,
               render_vars::kAngleOfLinearPolarization,
-              render_vars::kLinearStokes}) {
+              render_vars::kLinearStokes,
+              render_vars::kTemperature}) {
             if (var == optIn) {
                 viewOptIn_ = optIn;
             }

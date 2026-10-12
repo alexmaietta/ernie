@@ -58,11 +58,16 @@ inline constexpr std::string_view kAngleOfLinearPolarization =
 /// bands, W m^-2 sr^-1 nm^-1, S1 and S2 from the image's +x towards
 /// +y. Opt-in.
 inline constexpr std::string_view kLinearStokes = "LinearStokes";
+/// float32: the temperature in kelvin of what each sensor pixel sees,
+/// its material's own or the frame's default (RenderSettings'
+/// `ernie:thermal:*`); 0 for the background, or with thermal emission
+/// off. Opt-in.
+inline constexpr std::string_view kTemperature = "Temperature";
 }  // namespace render_vars
 
 /// Every render var name, in the order the rasterizer binds their
 /// images.
-inline constexpr std::array<std::string_view, 14> kRenderVarNames{
+inline constexpr std::array<std::string_view, 15> kRenderVarNames{
     render_vars::kSpectralRadiance,
     render_vars::kElectrons,
     render_vars::kRawDn,
@@ -76,7 +81,8 @@ inline constexpr std::array<std::string_view, 14> kRenderVarNames{
     render_vars::kMotionVector,
     render_vars::kDegreeOfLinearPolarization,
     render_vars::kAngleOfLinearPolarization,
-    render_vars::kLinearStokes};
+    render_vars::kLinearStokes,
+    render_vars::kTemperature};
 
 /// The built-in sensor filters a render product runs in order on its
 /// spectral radiance, as Chrono::Sensor's filter lists; the

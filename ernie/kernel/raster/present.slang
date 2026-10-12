@@ -32,6 +32,19 @@ static const uint kShowMotion = 8;     // Motion (xy pixels): hue its direction,
 static const uint kShowDegree = 9;     // A degree of polarization in [0, 1] as grey.
 static const uint kShowAngle = 10;     // An angle of polarization in [0, pi) as hue.
 static const uint kShowStokes = 11;    // Linear Stokes: hue its angle, brightness its degree.
+static const uint kShowTemperature = 12;  // Kelvin from range.x to range.y in the ironbow
+                                          // palette, black for 0 (none).
+
+// The ironbow palette of thermal cameras at `t` in [0, 1]: black through indigo, magenta, red
+// and orange to yellow and white.
+float3 ironbow(float t) {
+    static const float3 stops[6] = { float3(0.0, 0.0, 0.0),  float3(0.15, 0.0, 0.5),
+                                     float3(0.6, 0.0, 0.6),  float3(0.9, 0.25, 0.1),
+                                     float3(1.0, 0.75, 0.0), float3(1.0, 1.0, 0.9) };
+    let position = saturate(t) * 5.0;
+    let index = min(uint(position), 4u);
+    return lerp(stops[index], stops[index + 1], position - float(index));
+}
 
 // A hue for polarization angle `angle`, periodic in pi.
 float3 angleHue(float angle) {
@@ -113,6 +126,15 @@ float4 presentFloat(VertexOutput in) : SV_Target {
     case kShowStokes: {
         let degree = value.x > 0.0 ? length(value.yz) / value.x : 0.0;
         return display(angleHue(0.5 * atan2(value.z, value.y)) * saturate(degree));
+    }
+    case kShowTemperature: {
+        if (!(value.x > 0.0)) {
+            return display(float3(0.0));
+        }
+        let low = constants.range.x;
+        let high = max(constants.range.y, low + 1e-3);
+        // A floor of 0.05 keeps the coolest surface off the background's black.
+        return display(ironbow(0.05 + 0.95 * (value.x - low) / (high - low)));
     }
     default:
         return display(value.rgb);

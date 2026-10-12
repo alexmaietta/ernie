@@ -1304,6 +1304,12 @@ class RasterRenderer {
     PipelineLayout lightsLayout_;
     std::unique_ptr<ComputePipeline> lightsPipeline_;
     std::unique_ptr<GpuBuffer> materialTable_;
+    /// Each material's temperature in kelvin, by material id, for the
+    /// Temperature var (`WriteMaterialTable`).
+    std::unique_ptr<GpuBuffer> materialTemperatures_;
+    /// The coolest and hottest of them, the Temperature var's display
+    /// range.
+    std::array<float, 2> temperatureRange_{};
     /// What shows behind the scene: the dome's map (a white texel
     /// without one), the stars sorted by grid cell (`kStarColumns` by
     /// `kStarRows`), each cell's first star and count, and the last

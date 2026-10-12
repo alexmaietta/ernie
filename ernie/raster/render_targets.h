@@ -211,13 +211,13 @@ class RenderTargets : public FrameImages {
     }
 
     /// Render vars a frame also holds as linear buffers over all its
-    /// views, which the sensor writes beside the images
-    /// (sensor.slang's `SensorLinear`), so mapping them to a compute
-    /// API copies nothing (`FrameImages::Linear`).
+    /// views, which the sensor writes beside the images (sensor.slang's
+    /// `SensorLinear`), so mapping them to a compute API copies
+    /// nothing (`FrameImages::Linear`).
     struct LinearVars {
         /// The vars the sensor can write so: `VarNames` up to
-        /// LinearStokes (sensor.slang's `kLinearVars`).
-        static constexpr std::size_t kVars = 14;
+        /// Temperature (sensor.slang's `kLinearVars`).
+        static constexpr std::size_t kVars = 15;
         /// Then the AOV slots.
         static constexpr std::size_t kEntries = kVars + kMaxAovs;
         /// Per var, then AOV slot, its buffer (shared memory), or

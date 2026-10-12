@@ -2301,11 +2301,19 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
     for (const double value : bands()) {
         EXPECT_EQ(value, 0.0) << "thermal emission is off";
     }
+    // The Temperature var: the floor's material's, or the frame's
+    // default; 0 with thermal emission off.
+    const auto temperature = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return At<float>(MapVars(outputs).at("Temperature"), c, c, 0);
+    };
+    EXPECT_EQ(temperature(), 0.0f) << "thermal emission is off";
     ernie::RenderSettings settings(scene, "/Render/Settings");
     settings.SetThermalEnable(true);
     expect(0.8, 300.0);
     grey.SetThermalTemperature(350.0);
     expect(0.8, 350.0);
+    EXPECT_EQ(temperature(), 350.0f);
     // Unset, the emissivity is 1 minus the reflectance (Kirchhoff).
     scene.Set("/Looks/Grey", tokens::kThermalEmissivity,
               std::vector<float>{});
@@ -2316,6 +2324,7 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
     grey.SetThermalTemperature(0.0);
     settings.SetThermalDefaultTemperature(320.0);
     expect(0.7, 320.0);
+    EXPECT_EQ(temperature(), 320.0f);
     // A background at 250 K lights the floor as a uniform dome, which
     // reflects its radiance times the reflectance (0.3).
     settings.SetThermalBackgroundTemperature(250.0);

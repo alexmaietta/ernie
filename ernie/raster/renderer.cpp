@@ -723,12 +723,15 @@ struct SensorConstants {
     std::uint32_t channelsSlot;
     std::uint32_t channelsSampler;
     std::uint32_t padding;
+    /// Each material's temperature, for the Temperature var
+    /// (`materialTemperatures_`).
+    VkDeviceAddress temperatures;
 };
 /// `RenderTargets::LinearVars::written`'s var bits, below its AOV
 /// slots'.
 constexpr std::uint32_t kLinearVarBits =
     (1u << RenderTargets::LinearVars::kVars) - 1u;
-static_assert(sizeof(SensorConstants) == 104,
+static_assert(sizeof(SensorConstants) == 112,
               "SensorConstants must match sensor.slang");
 
 // The sensor kernels push their outputs alone: their uniforms come by
@@ -769,9 +772,11 @@ constexpr DescriptorBinding kFilterBindings[] = {
     // The MotionVector var.
     {30, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
     // Per raster pixel, its motion (xy) and motion blur's coverage
-    // (z): `RenderTargets::Raster`. 27 descriptors in all, of the 32
-    // devices push at least.
+    // (z): `RenderTargets::Raster`.
     {31, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
+    // The Temperature var. 28 descriptors in all, of the 32 devices
+    // push at least.
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kCompute},
 };
 
 /// A plan that runs custom filter `model`, with the built-in filters
@@ -1188,7 +1193,7 @@ struct PresentMode {
     bool integer;
 };
 
-constexpr std::array<PresentMode, 14> kPresentModes{{
+constexpr std::array<PresentMode, 15> kPresentModes{{
     {render_vars::kSpectralRadiance, kShowSpectral, false},
     {render_vars::kLdrColor, 0, false},
     {render_vars::kHdrColor, 1, false},
@@ -1203,6 +1208,7 @@ constexpr std::array<PresentMode, 14> kPresentModes{{
     {render_vars::kDegreeOfLinearPolarization, 9, false},
     {render_vars::kAngleOfLinearPolarization, 10, false},
     {render_vars::kLinearStokes, 11, false},
+    {render_vars::kTemperature, 12, false},
 }};
 
 /// AOVs, as linear rgb over the electrons' white, the scale filters'
@@ -4187,6 +4193,9 @@ void RasterRenderer::WriteMaterialTable() {
     ERNIE_ZONE("Material table");
     const std::uint32_t count = materials_.rbegin()->first + 1;
     std::vector<MaterialGpu> table(count, MaterialGpu{});
+    // Each material's temperature for the Temperature var: 0 with
+    // thermal emission off.
+    std::vector<float> temperatures(count, 0.0f);
     std::set<std::size_t> models;
     const std::span<const BrdfModel> registered = brdfs_.Models();
     for (const auto& [id, material] : materials_) {
@@ -4256,6 +4265,9 @@ void RasterRenderer::WriteMaterialTable() {
         const float temperature = settings.temperature > 0.0f
                                       ? settings.temperature
                                       : thermal_.defaultTemperature;
+        if (thermal_.enable) {
+            temperatures[id] = temperature;
+        }
         if (thermal_.enable && temperature > 0.0f) {
             entry.info[2] = 1;
             const Spectrum& reflectance = material->Reflectance();
@@ -4280,6 +4292,32 @@ void RasterRenderer::WriteMaterialTable() {
             BufferMemory::Device);
     }
     uploads_.Write(*materialTable_, std::as_bytes(std::span(table)));
+    const VkDeviceSize temperatureBytes =
+        temperatures.size() * sizeof(float);
+    if (materialTemperatures_ == nullptr ||
+        materialTemperatures_->Size() < temperatureBytes) {
+        vkDeviceWaitIdle(context_.Device());
+        materialTemperatures_ = std::make_unique<GpuBuffer>(
+            context_, temperatureBytes,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    }
+    uploads_.Write(*materialTemperatures_,
+                   std::as_bytes(std::span(temperatures)));
+    // Their display range, at least 10 K wide.
+    temperatureRange_ = {std::numeric_limits<float>::max(), 0.0f};
+    for (const float kelvin : temperatures) {
+        if (kelvin > 0.0f) {
+            temperatureRange_[0] = std::min(temperatureRange_[0], kelvin);
+            temperatureRange_[1] = std::max(temperatureRange_[1], kelvin);
+        }
+    }
+    if (temperatureRange_[1] == 0.0f) {
+        temperatureRange_ = {0.0f, 1.0f};
+    } else if (temperatureRange_[1] - temperatureRange_[0] < 10.0f) {
+        const float middle =
+            0.5f * (temperatureRange_[0] + temperatureRange_[1]);
+        temperatureRange_ = {middle - 5.0f, middle + 5.0f};
+    }
 }
 
 void RasterRenderer::WriteShading(const FrameParams& params) {
@@ -6874,7 +6912,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             0u,
             0u,
             clampSamplerSlot_.Index(),
-            0u};
+            0u,
+            materialTemperatures_->Address()};
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {
             // What the segment before stored, the channels read
@@ -6896,6 +6935,8 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             resources.push_back(
                 general(targets.Bound(render_vars::kMotionVector)));
             resources.push_back(general(raster));
+            resources.push_back(
+                general(targets.Bound(render_vars::kTemperature)));
             // Each kernel's own time, in the order they run.
             ERNIE_GPU_ZONE(context_, commands, "Sensor kernel");
             vkCmdBindPipeline(
@@ -6989,6 +7030,10 @@ void RasterRenderer::Present(VkCommandBuffer commands,
     }
     if (var == render_vars::kRawDn) {
         constants.range[2] = presentRange_[3];
+    }
+    if (var == render_vars::kTemperature) {
+        constants.range[0] = temperatureRange_[0];
+        constants.range[1] = temperatureRange_[1];
     }
     if (spectral) {
         constants.flags[2] =

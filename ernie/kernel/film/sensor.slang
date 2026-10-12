@@ -15,14 +15,14 @@
 // layer `z` (a group of `bands` layers of the spectral images) with the uniforms of view
 // `firstView + z`.
 //
-// Bindings, the kernel's outputs alone: 2 DegreeOfLinearPolarization, 4
+// Bindings, the kernel's outputs alone: 1 Temperature, 2 DegreeOfLinearPolarization, 4
 // AngleOfLinearPolarization, 5 SpectralRadiance (sensor pixels, one layer per band), 6 Electrons,
 // 7 RawDN, 8 HdrColor, 9 LdrColor, 10 DistanceToImagePlane, 11 DistanceToCamera, 12 Normal,
 // 13 PrimId, 14 InstanceId, 15 LinearStokes, every image one layer per view; for spatial
 // filters, 18 and 19 the spectrum and the channels (a layer per channel domain per view) it
 // writes for the next kernel; 20 to 27 the AOV slots; 29 the temporal filters' state for the
 // next frame (28 that from the previous); 30 the MotionVector var; 31 per raster pixel, its
-// motion (xy) and motion blur's coverage (z). 0, 1, 3, 16 and 17 are free. Its inputs come
+// motion (xy) and motion blur's coverage (z). 0, 3, 16 and 17 are free. Its inputs come
 // through the push constants (`SensorConstants`): the uniforms (SensorUniforms, shared then per
 // view) and the custom filters' parameters by address, and from the bindless heap
 // (bindless.slang) the raster spectral radiance, the G-buffer's ids, normal and depth, and the
@@ -195,13 +195,16 @@ public struct SensorConstants {
     public uint channelsSlot;
     public uint channelsSampler;
     uint padding;
+    // Each material's temperature in kelvin, by G-buffer material id, for the Temperature var
+    // (0 for none, or with thermal emission off).
+    public float* temperatures;
 }
 
-// The render vars (kHolds* bits 0 to 13) and AOV slots a frame also holds as linear buffers over
+// The render vars (kHolds* bits 0 to 14) and AOV slots a frame also holds as linear buffers over
 // all its views (`FrameImages::Linear`), a compute API viewing them in place: each one's address,
 // its texels in its image's format view after view (a band after a band within a view for
 // SpectralRadiance; float RGBA for the AOVs).
-public static const uint kLinearVars = 14;
+public static const uint kLinearVars = 15;
 public struct SensorLinear {
     public uint* vars[kLinearVars];
     public uint* aovs[8];
@@ -314,6 +317,7 @@ float rasterRadianceAt(int4 at) {
     return heapTextureArrays[pass.radianceSlot].Load(at).x * asfloat(pass.stokes.w);
 }
 #define gIds (heapUintTextureArrays[pass.idsSlot])
+[[vk::image_format("r32f")]] [[vk::binding(1, 0)]] RWTexture2DArray<float> temperatureOut;
 [[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;
 [[vk::image_format("r32f")]] [[vk::binding(4, 0)]] RWTexture2DArray<float> angleOfPolarization;
 [[vk::image_format("r32f")]] [[vk::binding(5, 0)]] RWTexture2DArray<float> spectralRadiance;
@@ -398,6 +402,7 @@ public static const uint kHoldsMotionVector = 1u << 10;
 public static const uint kHoldsDegreeOfLinearPolarization = 1u << 11;
 public static const uint kHoldsAngleOfLinearPolarization = 1u << 12;
 public static const uint kHoldsLinearStokes = 1u << 13;
+public static const uint kHoldsTemperature = 1u << 14;
 static const uint kHoldsPolarization =
     kHoldsDegreeOfLinearPolarization | kHoldsAngleOfLinearPolarization | kHoldsLinearStokes;
 
@@ -914,6 +919,7 @@ public struct Lens : ISpatialSource {
     float4 normal;
     uint prim;
     uint instance;
+    uint material;  // the G-buffer's material id, for Temperature
 
     public static Lens at(PixelContext pixel) {
         let cam = pixel.uniforms();
@@ -950,6 +956,7 @@ public struct Lens : ISpatialSource {
         lens.normal = float4(0.0);
         lens.prim = 0;
         lens.instance = 0;
+        lens.material = 0;
         if (lens.dark) {
             return lens;
         }
@@ -983,6 +990,7 @@ public struct Lens : ISpatialSource {
         lens.normal = float4(normalize(gNormalAt(nearest, layer).xyz), 0.0);
         lens.prim = ids.y;
         lens.instance = ids.z;
+        lens.material = ids.x;
         return lens;
     }
 
@@ -1116,6 +1124,11 @@ public struct Lens : ISpatialSource {
         if ((holds & kHoldsInstanceId) != 0) {
             instanceId[id] = instance;
             storeLinear(firstbitlow(kHoldsInstanceId), texel, uint4(instance), 1);
+        }
+        if ((holds & kHoldsTemperature) != 0) {
+            let kelvin = background ? 0.0 : pass.temperatures[material];
+            temperatureOut[id] = kelvin;
+            storeLinear(firstbitlow(kHoldsTemperature), texel, uint4(asuint(kelvin)), 1);
         }
         if ((holds & kHoldsMotionVector) != 0) {
             // Raster pixels to sensor pixels: the raster image is drawn `overscan` times wider,

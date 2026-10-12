@@ -1076,7 +1076,8 @@ VarsWrittenBy(std::span<const SensorFilter> chain) {
                          render_vars::kMotionVector,
                          render_vars::kDegreeOfLinearPolarization,
                          render_vars::kAngleOfLinearPolarization,
-                         render_vars::kLinearStokes});
+                         render_vars::kLinearStokes,
+                         render_vars::kTemperature});
             break;
         case SensorFilter::Qe:
             vars.push_back(render_vars::kElectrons);
@@ -1105,14 +1106,15 @@ std::vector<std::string_view>
 RequiredVars(std::span<const std::string_view> requested) {
     if (requested.empty()) {
         // Every var but the opt-in MotionVector, which costs passes
-        // of its own, and the polarization vars, which make the
-        // raster carry Stokes Q and U.
+        // of its own, the polarization vars, which make the raster
+        // carry Stokes Q and U, and Temperature, for thermal frames.
         std::vector<std::string_view> every(kRenderVarNames.begin(),
                                             kRenderVarNames.end());
         std::erase(every, render_vars::kMotionVector);
         std::erase(every, render_vars::kDegreeOfLinearPolarization);
         std::erase(every, render_vars::kAngleOfLinearPolarization);
         std::erase(every, render_vars::kLinearStokes);
+        std::erase(every, render_vars::kTemperature);
         return every;
     }
     // The sensor computes every var from the raster radiance in one
