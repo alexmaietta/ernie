@@ -50,6 +50,18 @@ public struct VirtualShadow {
     public float bias;
 }
 
+// The virtual texel at clip-space `clip` of a level, as its casters rasterize it: x right, y
+// down (`BeginRendering`'s viewport flips y).
+public float2 virtualTexelAt(float2 clip) {
+    return float2(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5) * float(kVirtualTexels);
+}
+
+// The map whose block is at `address` (low, high words), as a uniform block hands it over.
+public VirtualShadow* virtualShadowAt(uint2 address) {
+    // A bit cast of the two words, not 64-bit arithmetic, which would need shaderInt64.
+    return bit_cast<VirtualShadow*>(address);
+}
+
 // Page `page` of level `levelIndex` in the page table and the request flags.
 public uint virtualPageIndex(uint levelIndex, uint2 page) {
     return (levelIndex * kVirtualPagesAcross + page.y) * kVirtualPagesAcross + page.x;
@@ -93,8 +105,7 @@ public bool virtualShadowDepth(VirtualShadow* map, uint levelIndex, float3 world
         if (any(abs(clip.xy) > 1.0)) {
             continue;
         }
-        let texel = uint2(min((clip.xy * 0.5 + 0.5) * float(kVirtualTexels),
-                              float(kVirtualTexels - 1)));
+        let texel = uint2(min(virtualTexelAt(clip.xy), float(kVirtualTexels - 1)));
         uint physical;
         if (virtualPhysicalTexel(map, index, texel, physical)) {
             stored = asfloat(map.physical[physical]);
@@ -167,7 +178,7 @@ void markMain(uint3 id: SV_DispatchThreadID) {
     if (any(abs(clip.xy) > 1.0)) {
         return;
     }
-    markAround(index, (clip.xy * 0.5 + 0.5) * float(kVirtualTexels));
+    markAround(index, virtualTexelAt(clip.xy));
 }
 
 // One thread per page of every level: flagged pages take the next physical page, in order; the

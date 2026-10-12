@@ -167,6 +167,12 @@ class VulkanContext {
         return depthClamp_;
     }
 
+    /// Whether fragment shaders can write storage buffers and images
+    /// and use atomics there (virtual shadow maps' casters).
+    bool SupportsFragmentAtomics() const {
+        return fragmentAtomics_;
+    }
+
     bool SupportsAnisotropy() const {
         return anisotropy_;
     }
@@ -330,6 +336,7 @@ class VulkanContext {
     bool rayQuery_ = false;
     bool anisotropy_ = false;
     bool depthClamp_ = false;
+    bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;

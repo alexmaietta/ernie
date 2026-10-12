@@ -45,6 +45,7 @@ import brdf;
 import bindless;
 // The planet's atmosphere: the sun's transmittance through it (atmosphere.slang).
 import atmosphere;
+import virtual_shadow;
 import light_pattern;
 import light_patterns;
 // The camera's projection: a frame camera's matrices, or a pushbroom's strip
@@ -275,6 +276,11 @@ struct ShadingResources {
     uint volumeShadowSize;
     // Each view's own uniforms (`ShadingView`), after the shared ones.
     ShadingView* viewBlocks;
+    // The virtual shadow map (virtual_shadow.slang) and the light slot it shadows, ~0 for none.
+    VirtualShadow* virtualShadow;
+    uint virtualLight;
+    // Its debugging: 2 shows its pages, black where none backs a point (`virtualVisibility`).
+    uint virtualDebug;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -569,6 +575,62 @@ LightTap lightTap(LightGpu light, float3 point) {
 //
 // Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
 // https://doi.org/10.1145/1187112.1187153
+// The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
+// towards it): the level that suits the point's distance from the camera (about a texel a pixel),
+// a coarser one where its page is not backed; the receiver offset along its normal and filtered
+// over the light's Poisson disk as `lightVisibility` does, in that level's texels; lit past the
+// last level or off every backed page.
+float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
+    let map = resources.virtualShadow;
+    let level = virtualLevelFor(length(world - shv.eye.xyz), map.bias) - map.firstLevel;
+    if (level >= int(map.levelCount)) {
+        return 1.0;
+    }
+    let index = uint(max(level, 0));
+    if (resources.virtualDebug == 2) {
+        float stored;
+        float depth;
+        uint used;
+        return virtualShadowDepth(map, index, world, stored, depth, used) ? 1.0 : 0.0;
+    }
+    let texelWorld = map.levels[index].info.x;
+    let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
+    let receiver = world + offset;
+    let towards = light.position.xyz;
+    let across = normalize(cross(towards, abs(towards.z) < 0.9 ? float3(0.0, 0.0, 1.0)
+                                                               : float3(1.0, 0.0, 0.0)));
+    let across2 = cross(towards, across);
+    let angle = 6.28318530718 * interleavedGradientNoise(pixel);
+    let rotation = float2(cos(angle), sin(angle));
+    let radius = sh.lightShadow.x * texelWorld;
+    // How far the receiver's plane falls towards the light per world unit across it, and a
+    // texel and a half of it as bias.
+    let cosine = clamp(nDotL, 0.05, 1.0);
+    let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
+    var lit = 0.0;
+    for (uint i = 0; i < 16; ++i) {
+        let pair = sh.poisson[i / 2];
+        let disk = (i % 2 == 0) ? pair.xy : pair.zw;
+        let turned = float2(disk.x * rotation.x - disk.y * rotation.y,
+                            disk.x * rotation.y + disk.y * rotation.x) * radius;
+        let tap = receiver + across * turned.x + across2 * turned.y;
+        float stored;
+        float depth;
+        uint used;
+        if (!virtualShadowDepth(map, index, tap, stored, depth, used)) {
+            lit += 1.0;
+            continue;
+        }
+        // Reversed-Z depth per world unit towards the light in the level used, and the bias.
+        let level = map.levels[used];
+        let perWorld = 0.5 / (1000.0 * level.info.y);
+        let bias = (1.5 + tilt * length(turned) / level.info.x + 1.5 * tilt) * level.info.x *
+                   perWorld;
+        lit += stored <= depth + bias ? 1.0 : 0.0;
+    }
+    return lit / 16.0;
+}
+
 float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
     if (light.cone.w <= 0.0) {
         return 1.0;
@@ -2107,8 +2169,11 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            scale *= lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy)) *
-                     volumeTransmittance(light, shadowPoint);
+            let visibility =
+                k == resources.virtualLight
+                    ? virtualVisibility(light, shadowPoint, n, nDotL, float2(id.xy))
+                    : lightVisibility(light, shadowPoint, n, nDotL, float2(id.xy));
+            scale *= visibility * volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;
         lightScales[k] = scale;

@@ -67,6 +67,20 @@ std::uint32_t Groups(std::uint32_t size) {
     return (size + 7) / 8;
 }
 
+/// Fills before the compute that reads them.
+void TransferBarrier(VkCommandBuffer commands) {
+    VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    memory.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    memory.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    memory.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    memory.dstAccessMask =
+        VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &memory;
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
 }  // namespace
 
 VirtualShadowMap::VirtualShadowMap(const VulkanContext& context,
@@ -177,7 +191,8 @@ std::int32_t VirtualShadowMap::LevelFor(double distance,
 }
 
 void VirtualShadowMap::SetLevels(
-    std::span<const VirtualShadowLevel> levels, float bias) {
+    std::span<const VirtualShadowLevel> levels, float bias,
+    FrameUploads* uploads) {
     if (levels.size() != levelCount_) {
         throw std::invalid_argument(
             "Virtual shadow maps need one fit per level");
@@ -190,7 +205,15 @@ void VirtualShadowMap::SetLevels(
                        static_cast<float>(level.radius),
                        static_cast<float>(level.level), 0.0f)});
     }
-    levels_->Write(std::as_bytes(std::span(gpu)));
+    const auto write = [uploads](const GpuBuffer& buffer,
+                                 std::span<const std::byte> bytes) {
+        if (uploads != nullptr) {
+            uploads->Write(buffer, bytes);
+        } else {
+            const_cast<GpuBuffer&>(buffer).Write(bytes);
+        }
+    };
+    write(*levels_, std::as_bytes(std::span(gpu)));
     const BlockGpu block{pool_->Address(),
                          pageTable_->Address(),
                          requests_->Address(),
@@ -200,7 +223,7 @@ void VirtualShadowMap::SetLevels(
                          levelCount_,
                          firstLevel_,
                          bias};
-    block_->Write(std::as_bytes(std::span(&block, 1)));
+    write(*block_, std::as_bytes(std::span(&block, 1)));
 }
 
 void VirtualShadowMap::CreatePipelines() const {
@@ -238,7 +261,7 @@ void VirtualShadowMap::Prepare(VkCommandBuffer commands) const {
     if (!cleared_) {
         vkCmdFillBuffer(commands, requests_->Handle(), 0,
                         VK_WHOLE_SIZE, 0);
-        ComputeBarrier(commands);
+        TransferBarrier(commands);
         cleared_ = true;
     }
 }
@@ -283,7 +306,7 @@ void VirtualShadowMap::RecordAllocate(
     Prepare(commands);
     vkCmdFillBuffer(commands, counter_->Handle(), 0,
                     sizeof(std::uint32_t), 0);
-    ComputeBarrier(commands);
+    TransferBarrier(commands);
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       allocatePipeline_->Handle());
     Push(commands, noDepth_->View(),

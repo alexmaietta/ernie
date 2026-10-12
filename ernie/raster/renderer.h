@@ -13,6 +13,7 @@
 #include "ernie/raster/overlay_pass.h"
 #include "ernie/raster/render_targets.h"
 #include "ernie/raster/sensor_plan.h"
+#include "ernie/raster/virtual_shadow_map.h"
 #include "ernie/raster/volume_pass.h"
 #include "ernie/scene/brdf.h"
 #include "ernie/scene/light_pattern.h"
@@ -549,6 +550,12 @@ class RasterRenderer {
     /// (`LightShadowViews`, glm columns): the CPU's, and for views of
     /// lights posed on the GPU, the light pass's
     /// (`ShadowCascade::gpuFitted`).
+    /// The virtual shadow map of the last frame's shadowing distant
+    /// light (`ShadowSettings::virtualMaps`), or null without one.
+    const VirtualShadowMap* VirtualShadow() const {
+        return virtualLight_ >= 0 ? virtualShadow_.get() : nullptr;
+    }
+
     const GpuBuffer& LightViewMatrices() const {
         return *lightViewMatrices_;
     }
@@ -710,6 +717,17 @@ class RasterRenderer {
   private:
     void CreateLightShadowMaps(std::uint32_t resolution,
                                std::uint32_t layers);
+    /// Whether the device draws virtual shadow maps: fragment atomics
+    /// and 16384² viewports and attachment-less passes.
+    bool SupportsVirtualShadows() const;
+    /// The virtual shadow map's frame, between the G-buffer and
+    /// shading: its pages marked from the first view's depth,
+    /// backed and cleared, then each level drawn by the drawables
+    /// that draw them (`RasterDrawable::DrawsVirtualShadows`).
+    void RecordVirtualShadows(
+        VkCommandBuffer commands, RenderTargets& targets,
+        std::span<const RasterDrawable* const> drawables,
+        const RasterFrame& frame) const;
     /// Records the per-world light maps' passes
     /// (`layeredPasses_`), with the light shadow maps attached for
     /// depth.
@@ -1012,6 +1030,23 @@ class RasterRenderer {
     /// Light views from this one on are per-world maps, drawn in
     /// layered passes (`layeredPasses_`, one per view from it).
     std::size_t firstLayeredView_ = 0;
+    /// The virtual shadow map of the first shadowed distant light of
+    /// a single view (`ShadowSettings::virtualMaps`): the light's
+    /// slot
+    /// (-1 for none), its clipmap's levels as the light views from
+    /// `firstVirtualView_` on (after every other, with no layers of
+    /// the maps), and the camera the frame marks its pages from.
+    std::unique_ptr<VirtualShadowMap> virtualShadow_;
+    std::int32_t virtualLight_ = -1;
+    std::size_t firstVirtualView_ = 0;
+    glm::mat4 virtualInverse_{1.0f};
+    glm::vec3 virtualEye_{0.0f};
+    /// The level bias and debugging (`ShadowSettings::virtualDebug`).
+    float virtualBias_ = 0.0f;
+    std::uint32_t virtualDebug_ = 0;
+    /// The clipmap's levels: radii 1/8 m to about 8,400 km.
+    static constexpr std::int32_t kVirtualFirstLevel = -4;
+    static constexpr std::int32_t kVirtualLastLevel = 22;
     /// A per-world map's pass: its casters, and whether it starts as
     /// a copy of its light's shared map at layer `base`.
     struct LayeredPass {

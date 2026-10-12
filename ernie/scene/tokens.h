@@ -1211,6 +1211,27 @@ inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =
     "ernie:shadows:worldMargin";
+/// bool: the first shadowed distant light of a single view shadows
+/// through a virtual shadow map (`VirtualShadowMap`), about a texel a
+/// pixel from near to far, rather than its cascades; default off.
+inline constexpr std::string_view kShadowVirtual =
+    "ernie:shadows:virtual";
+/// int: the virtual shadow map's physical pages of 128² texels (64
+/// KiB each); default 1024.
+inline constexpr std::string_view kShadowVirtualPages =
+    "ernie:shadows:virtualPages";
+/// float: added to the level a virtual shadow map picks for a point
+/// (each level doubles its texels); default 0, about a texel a pixel.
+inline constexpr std::string_view kShadowVirtualBias =
+    "ernie:shadows:virtualBias";
+/// token: what the virtual shadow map's debugging shows: "off" (the
+/// default), "levels" (surfaces tinted by the clipmap level that
+/// shadows them) or "pages" (black where no page backs a point: past
+/// the pool, or not marked).
+inline constexpr std::string_view kShadowVirtualDebug =
+    "ernie:shadows:virtualDebug";
+inline constexpr std::string_view kLevels = "levels";
+inline constexpr std::string_view kPages = "pages";
 /// token: what bounds a single view's sun cascades: "scene" (the
 /// default: the casters and where their shadows land, the same every
 /// time a frame renders) or "visible" (sample distribution shadow

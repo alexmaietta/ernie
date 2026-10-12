@@ -121,6 +121,10 @@ public struct Shadows {
     public uint4 debug;
     // 16 Poisson disk samples in the unit disk, two per float4.
     public float4 poisson[8];
+    // A virtual shadow map's level being drawn (virtual_shadow.slang): xy its block's address
+    // (low, high), z the level, w 1; in the G-buffer pass with its levels shown (`cascadeTint`), x
+    // the level bias's bits, y the first level's, w 2; else 0.
+    public uint4 virtualMap;
 }
 
 // Every view's Uniforms, so a pass binds them once for all its views and each draw names its
@@ -178,8 +182,19 @@ public uint cascadeIndex(float depth) {
     return count;
 }
 
-// `color` tinted by shadow cascade when cascade debugging is on.
+// `color` tinted by shadow cascade when cascade debugging is on, or by the virtual shadow map's
+// clipmap level shadowing it when that debugging shows levels (`Shadows::virtualMap` w 2).
 public float3 cascadeTint(float3 color, float3 world) {
+    if (s.virtualMap.w == 2) {
+        // As virtual_shadow.slang's `virtualLevelFor`: x the bias's bits, y the first level's.
+        let level = int(floor(log2(max(length(world - u.eye.xyz), 1e-6)) +
+                              asfloat(s.virtualMap.x))) -
+                    asint(s.virtualMap.y);
+        let tints = float3[6](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
+                              float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5),
+                              float3(1.0, 0.55, 1.0), float3(0.55, 1.0, 1.0));
+        return color * tints[uint(max(level, 0)) % 6];
+    }
     if (s.debug.x == 1 && s.params.w > 0.0) {
         let tints = float3[5](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
                               float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5), float3(1.0, 1.0, 1.0));

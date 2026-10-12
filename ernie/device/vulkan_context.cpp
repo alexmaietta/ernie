@@ -549,6 +549,12 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     // For shadow maps that clamp casters in front of their near
     // plane onto it.
     features.features.depthClamp = supported.features.depthClamp;
+    // For virtual shadow maps, whose casters' fragments write their
+    // pages with atomics (`VirtualShadowMap`).
+    features.features.fragmentStoresAndAtomics =
+        supported.features.fragmentStoresAndAtomics;
+    c.fragmentAtomics_ =
+        supported.features.fragmentStoresAndAtomics == VK_TRUE;
     c.depthClamp_ = supported.features.depthClamp == VK_TRUE;
     features.features.multiDrawIndirect =
         supported.features.multiDrawIndirect;

@@ -472,6 +472,10 @@ class MeshDrawable : public RasterDrawable {
         return true;
     }
 
+    bool DrawsVirtualShadows() const override {
+        return true;
+    }
+
     /// World bounds of the current draws (and runs of instances) in
     /// world `world`.
     std::map<std::int32_t, Bounds3> WorldsBounds() const override;
@@ -898,6 +902,12 @@ class MeshDrawable : public RasterDrawable {
     /// time a frame draws a cutout material.
     std::array<std::unique_ptr<GraphicsPipeline>, 2> cutoutPipelines_;
     std::unique_ptr<GraphicsPipeline> shadowCutoutPipeline_;
+    /// A virtual shadow map's levels' (`RasterFrame::virtualShadow`):
+    /// plain and cut out, made the first time one draws.
+    mutable std::array<std::unique_ptr<GraphicsPipeline>, 2>
+        virtualShadowPipelines_;
+    /// The virtual shadow pipeline, cut out or not, made if new.
+    const GraphicsPipeline* VirtualShadowPipeline(bool cutout) const;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera
                               ///< is a pushbroom.
     /// The last `Prepare`'s minimal shading, and its pipelines

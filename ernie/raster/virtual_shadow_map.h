@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/device/buffer.h"
+#include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
@@ -103,9 +104,10 @@ class VirtualShadowMap {
     }
 
     /// Uploads `levels` (one per level of the clipmap) and the bias
-    /// that picks a receiver's level.
+    /// that picks a receiver's level: through `uploads`, ordered with
+    /// the frame's work, or written at once without.
     void SetLevels(std::span<const VirtualShadowLevel> levels,
-                   float bias);
+                   float bias, FrameUploads* uploads = nullptr);
 
     /// Flags the pages of every second pixel's point in `depth`
     /// (reversed-Z, 0 far; sampled as `VK_IMAGE_LAYOUT_SHADER_READ_

@@ -182,6 +182,23 @@
     X(double, ShadowWorldMargin, ::ernie::tokens::kShadowWorldMargin, 1.0,                         \
       (::ernie::AttributeMeta{.label = "World margin", .doc = "Metres past the world's casters.",  \
                               .group = "Shadows", .max = 100.0}))                                  \
+    X(bool, ShadowVirtual, ::ernie::tokens::kShadowVirtual, false,                                 \
+      (::ernie::AttributeMeta{.label = "Virtual", .doc = "The sun shadows through a virtual "      \
+                                     "shadow map: about a texel a pixel from near to far.",        \
+                              .group = "Shadows"}))                                                \
+    X(int, ShadowVirtualPages, ::ernie::tokens::kShadowVirtualPages, 1024,                         \
+      (::ernie::AttributeMeta{.label = "Virtual pages", .doc = "Physical pages of 128² texels.",  \
+                              .group = "Shadows", .min = 16.0, .max = 16384.0}))                   \
+    X(double, ShadowVirtualBias, ::ernie::tokens::kShadowVirtualBias, 0.0,                         \
+      (::ernie::AttributeMeta{.label = "Virtual bias", .doc = "Levels coarser (+) or finer (-) "   \
+                                     "than a texel a pixel.",                                      \
+                              .group = "Shadows", .min = -4.0, .max = 8.0}))                       \
+    X(std::string, ShadowVirtualDebug, ::ernie::tokens::kShadowVirtualDebug, ::ernie::tokens::kOff,\
+      (::ernie::AttributeMeta{.label = "Virtual debug", .doc = "levels: tint by the clipmap level "\
+                                     "shadowing a point; pages: black where no page backs it.",  \
+                              .group = "Shadows",                                                  \
+                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kLevels,        \
+                                          ::ernie::tokens::kPages}}))                              \
     X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 2.0,                     \
       (::ernie::AttributeMeta{.label = "Steps per voxel",                                          \
                               .doc = "Steps through a volume per voxel of its densest field, "     \

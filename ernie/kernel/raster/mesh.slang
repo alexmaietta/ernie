@@ -11,6 +11,7 @@
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
+import virtual_shadow_caster;
 
 static const uint kHasNormals = 1;
 // The draw's light link group (`LinkGroups`) in the flags' top bits.
@@ -510,6 +511,21 @@ void meshShadowCutoutFragment(ShadowCutoutOutput in) {
     if (surfaceOpacity(in.uv) < surface.opacity.y) {
         discard;
     }
+}
+
+// A virtual shadow map's level (`Shadows::virtualMap`): the fragment written through its pages.
+[shader("fragment")]
+void meshVirtualShadowFragment(float4 position : SV_Position) {
+    writeVirtualShadow(position);
+}
+
+// As `meshVirtualShadowFragment`, but cut out where the surface is transparent.
+[shader("fragment")]
+void meshVirtualShadowCutoutFragment(ShadowCutoutOutput in) {
+    if (surfaceOpacity(in.uv) < surface.opacity.y) {
+        discard;
+    }
+    writeVirtualShadow(in.position);
 }
 
 GBuffer meshGBuffer(VertexOutput in) {

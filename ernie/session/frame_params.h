@@ -138,6 +138,16 @@ struct ShadowSettings {
         WorldShadowFit::Scene;  ///< What each world's map covers.
     float worldMargin = 1.0f;   ///< Metres a world-fitted map reaches
                                 ///< past the world's casters.
+    /// The first shadowed distant light of a single view shadows
+    /// through a virtual shadow map (`VirtualShadowMap`) of
+    /// `virtualPages` physical pages, its levels `virtualBias`
+    /// coarser than a texel a pixel.
+    bool virtualMaps = false;
+    std::uint32_t virtualPages = 1024;
+    float virtualBias = 0.0f;
+    /// The virtual shadow map's debugging
+    /// (`tokens::kShadowVirtualDebug`): 0 off, 1 levels, 2 pages.
+    std::uint32_t virtualDebug = 0;
 };
 
 /// How the rasterizer draws triangle edges (`ernie:wireframe`).

@@ -1,12 +1,24 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/pipeline.h"
 #include "ernie/device/shader_compiler.h"
+#include "ernie/raster/delegate.h"
 #include "ernie/raster/virtual_shadow_map.h"
+#include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
+#include "ernie/scene/render_schemas.h"
+#include "ernie/scene/schema.h"
+#include "ernie/scene/terrain_schemas.h"
+#include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 #include "support/vulkan_fixture.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -159,4 +171,146 @@ TEST_F(VirtualShadowMapTest, AnOverflowingPoolBacksWhatItHolds) {
     map.Counter().Read(std::as_writable_bytes(std::span(&used, 1)));
     EXPECT_GT(used, 4u);
     EXPECT_EQ(Backed(WordsOf(map.PageTable())), 4u);
+}
+
+namespace {
+
+/// Pixels of `image` (RGBA8) darker than half its median green: the
+/// shadow on a bright floor.
+std::size_t DarkPixels(const ernie::Tensor& image) {
+    const auto* pixels = image.As<std::uint8_t>();
+    const auto count = static_cast<std::size_t>(image.Elements() / 4);
+    std::vector<int> green;
+    for (std::size_t i = 0; i < count; ++i) {
+        green.push_back(pixels[i * 4 + 1]);
+    }
+    std::vector<int> sorted = green;
+    std::nth_element(sorted.begin(), sorted.begin() + count / 2,
+                     sorted.end());
+    const int median = sorted[count / 2];
+    std::size_t dark = 0;
+    for (const int g : green) {
+        dark += g < median / 2 ? 1u : 0u;
+    }
+    return dark;
+}
+
+}  // namespace
+
+// A sphere on a floor under a sun 30 degrees off overhead, seen from
+// above: its shadow through the virtual shadow map about as large as
+// through the cascades.
+TEST_F(VirtualShadowMapTest,
+       ASphereCastsItsShadowThroughTheVirtualMap) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    Scene scene;
+    GroundPlane::Define(scene, "/World/Floor")
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    Sphere::Define(scene, "/World/Ball").SetRadius(2.0);
+    scene.Set(
+        "/World/Ball", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 2.0)));
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({0.5, 0.0, 0.866}));
+    Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({0.0, -8.0, 24.0}, {-1.0, 0.0, 0.0},
+                              {0.0, 0.0, 1.0}));
+    RenderSettings settings =
+        RenderSettings::Define(scene, "/Render/Settings");
+    settings.SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(64.0, 64.0))
+        .SetAmbient(0.0);
+    RasterDelegate delegate(*context_);
+    const std::size_t cascades = DarkPixels(delegate.Render(scene));
+    ASSERT_GT(cascades, 20u);
+    settings.SetShadowVirtual(true);
+    const std::size_t virtualMap = DarkPixels(delegate.Render(scene));
+    EXPECT_GT(virtualMap, cascades / 2);
+    EXPECT_LT(virtualMap, cascades * 2);
+}
+
+// As on a floor, on an Earth-sized planet Terrain, which casts into
+// the virtual map too.
+TEST_F(VirtualShadowMapTest, ASphereCastsItsShadowOnAPlanet) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    constexpr double kEarth = 6371008.8;
+    Scene scene;
+    Terrain::Define(scene, "/World/Earth")
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(6 * 65 * 65, 0.0f), {6, 65, 65}))
+        .SetPlanetRadius(kEarth)
+        .SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Earth", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 0.0, -kEarth)));
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    Sphere::Define(scene, "/World/Ball").SetRadius(2.0);
+    scene.Set(
+        "/World/Ball", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 2.0)));
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({0.5, 0.0, 0.866}));
+    Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({0.0, -8.0, 24.0}, {-1.0, 0.0, 0.0},
+                              {0.0, 0.0, 1.0}));
+    RenderSettings settings =
+        RenderSettings::Define(scene, "/Render/Settings");
+    settings.SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(64.0, 64.0))
+        .SetAmbient(0.0);
+    RasterDelegate delegate(*context_);
+    const std::size_t cascades = DarkPixels(delegate.Render(scene));
+    ASSERT_GT(cascades, 20u);
+    settings.SetShadowVirtual(true);
+    const std::size_t virtualMap = DarkPixels(delegate.Render(scene));
+    EXPECT_GT(virtualMap, cascades / 2);
+    EXPECT_LT(virtualMap, cascades * 2);
+}
+
+// The first frame picks its levels as every later one does: by the
+// camera's own width (a pixel's footprint), not one the renderer
+// learns later in the frame; a 1 m sphere's shadow on a planet the
+// same from the first frame on.
+TEST_F(VirtualShadowMapTest, TheFirstFrameShadowsAsTheNext) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    constexpr double kEarth = 6371008.8;
+    Scene scene;
+    Terrain::Define(scene, "/World/Earth")
+        .SetHeights(Tensor::Copy<float>(
+            std::vector<float>(6 * 65 * 65, 0.0f), {6, 65, 65}))
+        .SetPlanetRadius(kEarth)
+        .SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Earth", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(0.0, 0.0, -kEarth)));
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    Sphere::Define(scene, "/World/Ball").SetRadius(1.0);
+    scene.Set(
+        "/World/Ball", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(-12.0, 0.0, 1.0)));
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({0.5, 0.0, 0.866}));
+    Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({-12.6, 9.0, 4.0}, {-12.6, 0.0, 0.3},
+                              {0.0, 0.0, 1.0}));
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(160.0, 90.0))
+        .SetAmbient(0.0)
+        .SetShadowVirtual(true);
+    RasterDelegate delegate(*context_);
+    const std::size_t first = DarkPixels(delegate.Render(scene));
+    const std::size_t next = DarkPixels(delegate.Render(scene));
+    EXPECT_GT(first, 0u);
+    EXPECT_EQ(first, next);
 }

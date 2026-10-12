@@ -55,6 +55,11 @@ struct RasterFrame {
     /// go to (`DrawConstants::shadowLayer`), so one pass draws every
     /// world's map.
     std::uint32_t shadowLayer = 0;
+    /// Shadow passes: drawing a virtual shadow map's level
+    /// (`VirtualShadowMap`), named by `shadows`' `virtualMap`: no
+    /// depth attachment, the drawable's virtual-shadow pipeline,
+    /// whose fragments write through the map's pages.
+    bool virtualShadow = false;
 };
 
 /// The shadow casters a shadow pass draws: what every world shares
@@ -205,6 +210,14 @@ class RasterDrawable {
                               std::size_t cascade,
                               const glm::mat4& lightViewProjection,
                               const ShadowCasters& casters) const = 0;
+
+    /// Whether `RecordShadow` draws a virtual shadow map's levels
+    /// (`RasterFrame::virtualShadow`), with a pipeline writing
+    /// through its pages; those that do not cast no shadow in it.
+    /// None by default.
+    virtual bool DrawsVirtualShadows() const {
+        return false;
+    }
 
     /// Records colour draws of view `view` in `phase` into its open
     /// G-buffer rendering pass; `frame` holds that view's uniforms.

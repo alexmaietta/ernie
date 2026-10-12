@@ -64,8 +64,11 @@ struct ShadowUniforms {
     float minimal[4];
     std::uint32_t debug[4];
     float poisson[32];
+    /// A virtual shadow map's level being drawn: its block's address
+    /// (low, high), the level, 1.
+    std::uint32_t virtualMap[4];
 };
-static_assert(sizeof(ShadowUniforms) == 480,
+static_assert(sizeof(ShadowUniforms) == 496,
               "ShadowUniforms must match frame.slang");
 
 struct ShadingUniforms {
@@ -648,8 +651,13 @@ struct ShadingResources {
     /// Each view's own uniforms (`ShadingView`), after the shared
     /// ones at `views`.
     VkDeviceAddress viewBlocks;
+    /// The virtual shadow map (virtual_shadow.slang's
+    /// `VirtualShadow`) and the light slot it shadows, ~0 for none.
+    VkDeviceAddress virtualShadow;
+    std::uint32_t virtualLight;
+    std::uint32_t virtualDebug;
 };
-static_assert(sizeof(ShadingResources) == 160 &&
+static_assert(sizeof(ShadingResources) == 176 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
                   offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
@@ -796,6 +804,7 @@ ShadingModules(const BrdfModel& brdf,
                     ProjectionModule(pushbroom),
                     {"bindless", shaders::kBindlessSlang},
                     {"atmosphere", shaders::kAtmosphereSlang},
+                    {"virtual_shadow", shaders::kVirtualShadowSlang},
                     {"shading", "import " + BrdfModuleName(brdf) +
                                     ";\ntypealias ActiveBrdf = " +
                                     brdf.typeName + ";\n" +
@@ -1488,7 +1497,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
           context, kMaxLightShadowViews * sizeof(glm::mat4),
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device)),
       lightShadowBlocks_(
-          context, kMaxLightShadowViews * kLightShadowBlockStride,
+          context,
+          (kMaxLightShadowViews + VirtualShadowMap::kMaxLevels) *
+              kLightShadowBlockStride,
           kViewUniformUsage, BufferMemory::Device),
       lightsLayout_(context, kLightsBindings, 64),
       depthRangeLayout_(context, kDepthRangeBindings,
@@ -2784,6 +2795,79 @@ void RasterRenderer::WriteLights(
             entry.map[1] = 1.0f;
         }
     }
+    // The first shadowed distant light of a single view also shadows
+    // through a virtual shadow map: its clipmap's levels as light
+    // views after every other, with no layers of the maps
+    // (`RecordVirtualShadows`).
+    firstVirtualView_ = lightViews_.size();
+    virtualLight_ = -1;
+    virtualDebug_ = params.shadows.virtualDebug;
+    if (params.shadows.enabled && params.shadows.virtualMaps &&
+        outputViews_ == 1 && !posesOnGpu_ && faces_ == 1 &&
+        subframes_ == 1 && !params.camera.pushbroom &&
+        SupportsVirtualShadows()) {
+        for (std::size_t i = 0; i < params.lights.size(); ++i) {
+            const LightParams& light = params.lights[i];
+            if (light.type == LightType::Distant && light.shadows &&
+                !light.posedOnGpu && !light.domeDiffuse) {
+                virtualLight_ = static_cast<std::int32_t>(i);
+                break;
+            }
+        }
+    }
+    if (virtualLight_ >= 0) {
+        if (virtualShadow_ == nullptr ||
+            virtualShadow_->Pages() != params.shadows.virtualPages) {
+            vkDeviceWaitIdle(context_.Device());
+            virtualShadow_ = std::make_unique<VirtualShadowMap>(
+                context_, compiler_, kVirtualFirstLevel,
+                kVirtualLastLevel, params.shadows.virtualPages);
+        }
+        const LightGpu& entry =
+            table[static_cast<std::size_t>(virtualLight_)];
+        const glm::dvec3 toLight(entry.position[0], entry.position[1],
+                                 entry.position[2]);
+        const CameraView view = params.View(0);
+        const glm::mat4 viewProjection = view.ViewProjection();
+        virtualInverse_ = glm::inverse(viewProjection);
+        virtualEye_ = view.eye;
+        const std::vector<VirtualShadowLevel> levels =
+            VirtualShadowMap::FitLevels(
+                toLight, params.origin + glm::dvec3(view.eye),
+                params.origin, kVirtualFirstLevel, kVirtualLastLevel);
+        // About a texel a pixel: a level's texel, 2^(level - 11) m,
+        // matches a pixel's width 2 d tan(half field) / width at
+        // distance d when level = log2 d + log2(4096 tan / width).
+        const float tanHalf =
+            std::abs(viewProjection[0][0]) > 0.0f
+                ? 1.0f / std::abs(viewProjection[0][0])
+                : 1.0f;
+        const float bias = std::log2(4096.0f * tanHalf /
+                                     static_cast<float>(std::max(
+                                         params.camera.width, 1u))) +
+                           params.shadows.virtualBias;
+        virtualShadow_->SetLevels(levels, bias, &uploads_);
+        virtualBias_ = bias;
+        for (const VirtualShadowLevel& level : levels) {
+            ShadowCascade cascade;
+            cascade.lightViewProjection = level.viewProjection;
+            cascade.texelWorldSize =
+                static_cast<float>(level.texelWorldSize);
+            cascade.resolution = VirtualShadowMap::kVirtualTexels;
+            // Culled on the GPU from its matrix in
+            // `lightViewMatrices_` (meshes, points), as instances'
+            // bounds may be known only there; terrain and planets
+            // cull by the same matrix.
+            cascade.gpuFitted = true;
+            cascade.gpuMatrix =
+                static_cast<std::uint32_t>(lightViews_.size());
+            cascade.cullViewProjection = level.viewProjection;
+            cascade.shadowMask =
+                params.lights[static_cast<std::size_t>(virtualLight_)]
+                    .shadowMask;
+            lightViews_.push_back(cascade);
+        }
+    }
     // Shadow linking: each light's views draw only the geometry its
     // shadow link holds.
     for (std::size_t i = 0;
@@ -2870,13 +2954,44 @@ void RasterRenderer::WriteLights(
         if (!blocks.empty()) {
             uploads_.Write(lightShadowBlocks_, blocks);
         }
+        // The virtual shadow map's levels' blocks: each its matrix
+        // and the map's block with the level (`Shadows::virtualMap`).
+        if (virtualLight_ >= 0) {
+            const VkDeviceAddress address =
+                virtualShadow_->Block().Address();
+            std::vector<std::byte> levels(
+                (lightViews_.size() - firstVirtualView_) *
+                kLightShadowBlockStride);
+            for (std::size_t v = firstVirtualView_;
+                 v < lightViews_.size(); ++v) {
+                ShadowUniforms block{};
+                std::memcpy(block.lightViewProjection[0],
+                            glm::value_ptr(
+                                lightViews_[v].lightViewProjection),
+                            sizeof(glm::mat4));
+                block.virtualMap[0] =
+                    static_cast<std::uint32_t>(address);
+                block.virtualMap[1] =
+                    static_cast<std::uint32_t>(address >> 32);
+                block.virtualMap[2] =
+                    static_cast<std::uint32_t>(v - firstVirtualView_);
+                block.virtualMap[3] = 1;
+                std::memcpy(levels.data() +
+                                (v - firstVirtualView_) *
+                                    kLightShadowBlockStride,
+                            &block, sizeof(block));
+            }
+            uploads_.Write(lightShadowBlocks_, levels,
+                           firstVirtualView_ *
+                               kLightShadowBlockStride);
+        }
         // Layers as wide as the finest view's; coarser views draw in
-        // a corner of theirs.
-        const auto layers =
-            static_cast<std::uint32_t>(lightViews_.size());
+        // a corner of theirs. Virtual views have none.
+        const auto layers = static_cast<std::uint32_t>(
+            std::max<std::size_t>(firstVirtualView_, 1));
         std::uint32_t widest = 1;
-        for (const ShadowCascade& view : lightViews_) {
-            widest = std::max(widest, view.resolution);
+        for (std::size_t v = 0; v < firstVirtualView_; ++v) {
+            widest = std::max(widest, lightViews_[v].resolution);
         }
         if (widest != lightResolution_ ||
             layers > lightShadowMaps_->Desc().layers) {
@@ -3513,6 +3628,15 @@ void RasterRenderer::Update(
     shadowUniforms.params[2] = static_cast<float>(splits);
     shadowUniforms.params[3] = splits > 0 ? 1.0f : 0.0f;
     shadowUniforms.debug[0] = shadows.showCascades ? 1u : 0u;
+    // The virtual shadow map's levels shown in the G-buffer
+    // (`cascadeTint`): the level bias and first level.
+    if (virtualLight_ >= 0 && virtualDebug_ == 1) {
+        shadowUniforms.virtualMap[0] =
+            std::bit_cast<std::uint32_t>(virtualBias_);
+        shadowUniforms.virtualMap[1] =
+            std::bit_cast<std::uint32_t>(kVirtualFirstLevel);
+        shadowUniforms.virtualMap[3] = 2;
+    }
     for (std::size_t i = 0; i < poisson_.size(); ++i) {
         shadowUniforms.poisson[2 * i] = poisson_[i].x;
         shadowUniforms.poisson[2 * i + 1] = poisson_[i].y;
@@ -4800,6 +4924,66 @@ void RasterRenderer::RecordShadowMaps(
     }
 }
 
+bool RasterRenderer::SupportsVirtualShadows() const {
+    const VkPhysicalDeviceLimits& limits = context_.Limits();
+    const std::uint32_t texels = VirtualShadowMap::kVirtualTexels;
+    return context_.SupportsFragmentAtomics() &&
+           limits.maxViewportDimensions[0] >= texels &&
+           limits.maxViewportDimensions[1] >= texels &&
+           limits.maxFramebufferWidth >= texels &&
+           limits.maxFramebufferHeight >= texels;
+}
+
+void RasterRenderer::RecordVirtualShadows(
+    VkCommandBuffer commands, RenderTargets& targets,
+    std::span<const RasterDrawable* const> drawables,
+    const RasterFrame& given) const {
+    if (virtualLight_ < 0 || virtualShadow_ == nullptr) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Virtual shadows");
+    // The pages the first view's points need, from its depth.
+    GpuImage& depth = targets.Depth();
+    depth.Transition(commands,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    virtualShadow_->RecordMark(
+        commands, depth.LayerView(0), targets.Extent().width,
+        targets.Extent().height, virtualInverse_, virtualEye_);
+    virtualShadow_->RecordAllocate(commands);
+    virtualShadow_->RecordClear(commands);
+    ShaderBarrier(commands);
+    // Each level drawn into no attachment over its 16384² virtual
+    // map, the casters' fragments writing through its pages.
+    RenderingTarget target;
+    target.extent = {VirtualShadowMap::kVirtualTexels,
+                     VirtualShadowMap::kVirtualTexels};
+    ShadowCasters casters = lightCasters_;
+    for (std::size_t v = firstVirtualView_; v < lightViews_.size();
+         ++v) {
+        BeginRendering(commands, target);
+        RasterFrame own = given;
+        own.shadows = DescriptorResource::Of(
+            lightShadowBlocks_, v * kLightShadowBlockStride,
+            sizeof(ShadowUniforms));
+        own.shadowFromFrame = false;
+        own.shadowLayer = 0;
+        own.virtualShadow = true;
+        casters.linkGroups = lightViews_[v].shadowMask;
+        for (const RasterDrawable* drawable : drawables) {
+            if (!drawable->DrawsVirtualShadows()) {
+                continue;
+            }
+            ERNIE_GPU_ZONE_NAMED(context_, commands,
+                                 drawable->ProfileName());
+            drawable->RecordShadow(commands, own, v,
+                                   lightViews_[v].lightViewProjection,
+                                   casters);
+        }
+        vkCmdEndRendering(commands);
+    }
+    ShaderBarrier(commands);
+}
+
 void RasterRenderer::RecordLayeredLightShadows(
     VkCommandBuffer commands, const RasterFrame& frame,
     std::span<const RasterDrawable* const> drawables) const {
@@ -4981,6 +5165,10 @@ void RasterRenderer::RecordViews(
             }
             ERNIE_GPU_ZONE(context_, commands, "G-buffer occludees");
             draw(DrawPhase::Occludees, true);
+        }
+        if (subframe == 0 && firstView == 0) {
+            RecordVirtualShadows(commands, targets, drawables,
+                                 Frame(first));
         }
         Shade(commands, targets, first);
         if (volumes_->Active()) {
@@ -5946,6 +6134,12 @@ void RasterRenderer::WriteShadingResources(
     resources.materials = materialTable_->Address();
     resources.lights = lightTable_.Address();
     resources.lightViews = lightViewMatrices_->Address();
+    resources.virtualShadow =
+        virtualLight_ >= 0 ? virtualShadow_->Block().Address() : 0;
+    resources.virtualLight =
+        virtualLight_ >= 0 ? static_cast<std::uint32_t>(virtualLight_)
+                           : ~0u;
+    resources.virtualDebug = virtualDebug_;
     resources.lightProfiles = lightProfiles_.Address();
     resources.patternNorms = patternNorms_.Address();
     resources.lightTiming = lightTiming_->Address();
