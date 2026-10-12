@@ -74,7 +74,7 @@ class CapturePanel final : public Panel {
     static void Screenshot(Viewer& viewer) {
         Row("Screenshot");
         if (ImGui::Button(
-                (std::string(icons::kCamera) + "  Capture (F10)")
+                (std::string(icons::kScan) + "  Capture (F10)")
                     .c_str())) {
             viewer.Screenshot();
         }

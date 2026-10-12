@@ -3122,7 +3122,7 @@ struct Viewer::State {
         }
         // A screenshot, at the end of the bar.
         ImGui::SameLine();
-        if (ImGui::Button((std::string(icons::kCamera) +
+        if (ImGui::Button((std::string(icons::kScan) +
                            "  Capture##barScreenshot")
                               .c_str())) {
             self.Screenshot();
@@ -3165,14 +3165,12 @@ struct Viewer::State {
                       2.0f * style.FramePadding.x +
                       style.ItemSpacing.x
                 : 0.0f;
-        const float shotWidth =
-            ImGui::CalcTextSize(icons::kCamera).x +
-            2.0f * style.FramePadding.x;
+        const float shotWidth = ImGui::CalcTextSize(icons::kScan).x +
+                                2.0f * style.FramePadding.x;
         ImGui::SetCursorScreenPos(
             ImVec2(right - lightWidth - shotWidth, origin.y + pad));
-        if (ImGui::Button(
-                (std::string(icons::kCamera) + "##screenshot")
-                    .c_str())) {
+        if (ImGui::Button((std::string(icons::kScan) + "##screenshot")
+                              .c_str())) {
             self.Screenshot();
         }
         if (ImGui::IsItemHovered()) {
