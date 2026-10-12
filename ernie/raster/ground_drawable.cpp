@@ -93,6 +93,7 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
+    desc.depthCompare = RenderTargets::kDepthCompare;
     pipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(renderer_.Context(),
                                            layout_, desc);
@@ -113,6 +114,7 @@ void GroundDrawable::CreatePipeline(bool pushbroom) {
                 MinimalTargets::kColorFormats.begin(),
                 MinimalTargets::kColorFormats.end());
             minimal.depthFormat = MinimalTargets::kDepthFormat;
+            minimal.depthCompare = RenderTargets::kDepthCompare;
             minimalPipelines_[i] = std::make_unique<GraphicsPipeline>(
                 renderer_.Context(), layout_, minimal);
         }

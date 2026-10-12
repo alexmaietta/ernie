@@ -535,8 +535,9 @@ RasterTap retimed(SensorUniforms cam, RasterTap tap, float row) {
     var raster = tap.raster;
     for (int i = 0; i < 3; ++i) {
         let texel = int2(clamp(floor(raster + 0.5), float2(0.0), size - 1.0));
+        // Background at the far plane, depth 0 in reverse-Z.
         let depth = gIds.Load(int4(texel, tap.layer, 0)).x == kBackground
-                        ? 1.0
+                        ? 0.0
                         : gDepth.Load(int4(texel, tap.layer, 0));
         let ndc = float2((float(texel.x) + 0.5) / size.x * 2.0 - 1.0,
                          1.0 - (float(texel.y) + 0.5) / size.y * 2.0);

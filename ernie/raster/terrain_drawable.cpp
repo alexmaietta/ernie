@@ -257,6 +257,7 @@ void TerrainDrawable::CreateGBufferPipeline(bool pushbroom) {
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
+    desc.depthCompare = RenderTargets::kDepthCompare;
     gbufferPipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(renderer_.Context(),
                                            layout_, desc);

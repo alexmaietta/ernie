@@ -259,22 +259,47 @@ CameraView CameraParams::RasterView(const glm::dmat4& pose,
         // axis.
         const double size = OrthographicPixelSize();
         view.verticalFov = 0.0f;
-        view.projection = glm::mat4(
-            glm::orthoRH_ZO(-centre.x * size, (w - centre.x) * size,
-                            -(h - centre.y) * size, centre.y * size,
-                            nearPlane, farPlane));
+        view.projection = ReversedOrthographic(
+            -centre.x * size, (w - centre.x) * size,
+            -(h - centre.y) * size, centre.y * size, nearPlane,
+            farPlane);
         return view;
     }
     const double focal = FocalLengthPixels() / overscan;
     view.verticalFov =
         static_cast<float>(2.0 * std::atan(0.5 * h / focal));
-    view.projection = glm::perspectiveRH_ZO(
+    view.projection = ReversedPerspective(
         view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
     view.projection[2][0] =
         static_cast<float>(1.0 - 2.0 * centre.x / w);
     view.projection[2][1] =
         static_cast<float>(2.0 * centre.y / h - 1.0);
     return view;
+}
+
+glm::mat4 ReversedPerspective(float verticalFov, float aspect,
+                              float nearPlane, float farPlane) {
+    if (std::isfinite(farPlane)) {
+        // glm's, its planes swapped: near to 1, far to 0.
+        return glm::perspectiveRH_ZO(verticalFov, aspect, farPlane,
+                                     nearPlane);
+    }
+    const float focal = 1.0f / std::tan(0.5f * verticalFov);
+    glm::mat4 projection(0.0f);
+    projection[0][0] = focal / aspect;
+    projection[1][1] = focal;
+    projection[2][3] = -1.0f;
+    projection[3][2] = nearPlane;
+    return projection;
+}
+
+glm::mat4 ReversedOrthographic(double left, double right,
+                               double bottom, double top,
+                               double nearPlane, double farPlane) {
+    const double far =
+        std::isfinite(farPlane) ? farPlane : nearPlane + 1e12;
+    return glm::mat4(
+        glm::orthoRH_ZO(left, right, bottom, top, far, nearPlane));
 }
 
 void CameraParams::Check() const {

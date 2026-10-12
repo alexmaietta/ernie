@@ -179,12 +179,13 @@ void viewsMain(uint3 id : SV_DispatchThreadID) {
     }
     let more = constants.more;
     if (more.x != kNone) {
-        // Gribb and Hartmann's planes, with [0, 1] depth's near plane z_clip >= 0
-        // (`Frustum::FromMatrix`).
+        // Gribb and Hartmann's planes for [0, 1] depth (`Frustum::FromMatrix`); an infinite far
+        // plane's is (0, 0, 0, near), which everything is inside.
         let m = viewProjection;
         float4 planes[6] = {m[3] + m[0], m[3] - m[0], m[3] + m[1], m[3] - m[1], m[2], m[3] - m[2]};
         for (uint p = 0; p < 6; ++p) {
-            let plane = planes[p] / max(length(planes[p].xyz), 1e-30);
+            let size = length(planes[p].xyz);
+            let plane = size > 1e-30 ? planes[p] / size : float4(0.0, 0.0, 0.0, 1.0);
             blocks.Store4(address + more.x + 16 * p, asuint(plane));
         }
     }

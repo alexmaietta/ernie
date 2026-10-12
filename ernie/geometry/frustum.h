@@ -21,8 +21,10 @@ namespace ernie {
 ///   Rendering", 4th ed., CRC Press, 2018, section 22.10.1 (plane/box
 ///   test with the box's positive vertex).
 struct Frustum {
-    std::array<glm::vec4, 6>
-        planes{};  ///< Left, right, bottom, top, near, far.
+    /// Left, right, bottom, top, then depth 0's and depth 1's: the
+    /// near and far planes, or for reverse-Z (`CameraView`) the far
+    /// and near.
+    std::array<glm::vec4, 6> planes{};
 
     /// Extracts the planes of `viewProjection`, which may be
     /// perspective or orthographic.

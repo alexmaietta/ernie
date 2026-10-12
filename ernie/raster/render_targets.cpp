@@ -231,6 +231,7 @@ RenderingTarget RenderTargets::GBufferTarget(bool load) const {
     target.clearColors = {VkClearColorValue{}, VkClearColorValue{},
                           background};
     target.depth = depth_->View();
+    target.clearDepth = kDepthClear;
     target.extent = extent_;
     target.layers = RasterLayers();
     return target;

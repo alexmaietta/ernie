@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Hierarchical depth (Hi-Z) for occlusion culling: one level of a depth pyramid of a batch of
 // views (one layer each) from the level before, or level 0 from the depth buffer. Each texel
-// keeps the farthest depth of the source texels it covers (depth grows away from the camera), so
-// a box whose nearest depth lies beyond the farthest depth below its footprint is hidden.
+// keeps the farthest depth of the source texels it covers, their least (reverse-Z: depth falls
+// away from the camera), so a box whose nearest depth lies beyond the farthest depth below its
+// footprint is hidden.
 // Sources need not be twice the size: each texel takes every source texel it overlaps.
 //
 // Bindings: 0 the source level (all layers), 1 the destination level.
@@ -36,10 +37,10 @@ void hzbMain(uint3 id : SV_DispatchThreadID) {
     let last = min(uint2(((id.x + 1) * size.x + size.z - 1) / size.z,
                          ((id.y + 1) * size.y + size.w - 1) / size.w),
                    size.xy);
-    var farthest = 0.0;
+    var farthest = 1.0;
     for (uint y = first.y; y < last.y; ++y) {
         for (uint x = first.x; x < last.x; ++x) {
-            farthest = max(farthest, source.Load(int4(int(x), int(y), int(id.z), 0)));
+            farthest = min(farthest, source.Load(int4(int(x), int(y), int(id.z), 0)));
         }
     }
     destination[id] = farthest;

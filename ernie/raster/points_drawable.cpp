@@ -191,6 +191,7 @@ void PointsDrawable::CreateGBufferPipeline(bool pushbroom) {
         RenderTargets::kGBufferFormats.begin(),
         RenderTargets::kGBufferFormats.end());
     gbuffer.depthFormat = RenderTargets::kDepthFormat;
+    gbuffer.depthCompare = RenderTargets::kDepthCompare;
     gbufferPipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(context_, layout_,
                                            gbuffer);
@@ -776,7 +777,7 @@ void PointsDrawable::RecordMotion(
             desc.depthFormat = RenderTargets::kDepthFormat;
             // The same depths as the colour pass's: only the surfaces
             // it kept.
-            desc.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
+            desc.depthCompare = RenderTargets::kDepthCompareEqual;
             desc.depthWrite = false;
             motionPipeline_ = std::make_unique<GraphicsPipeline>(
                 context_, motionLayout_, desc);

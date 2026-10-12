@@ -18,6 +18,19 @@ namespace ernie {
 /// The raster view of a camera for one frame, derived from a
 /// `CameraParams` by `CameraParams::RasterView`: what the
 /// rasterizer's passes need.
+///
+/// Its projection is reverse-Z: depth 1 at the near plane falling to
+/// 0 at the far plane, so float depth keeps its precision far away;
+/// an infinite far plane (`ReversedPerspective`) gives depth
+/// near / distance, 0 only at infinity.
+///
+/// References:
+/// - E. Persson, "Creating Vast Game Worlds: Experiences from
+///   Avalanche Studios", SIGGRAPH 2012 Advances in Real-Time
+///   Rendering course (reversed float depth).
+/// - N. Reed, "Depth Precision Visualized", NVIDIA Developer Blog,
+///   2015.
+///   https://developer.nvidia.com/content/depth-precision-visualized
 struct CameraView {
     glm::mat4 view{1.0f};
     glm::mat4 projection{1.0f};
@@ -38,6 +51,21 @@ struct CameraView {
         return projection[3][3] == 1.0f;
     }
 };
+
+/// A right-handed reverse-Z perspective projection to depth [0, 1]:
+/// 1 at `nearPlane`, 0 at `farPlane`, or with an infinite far plane
+/// near / distance. Shaders linearise its depth d as B / (A + d) with
+/// A = projection[2][2] and B = projection[3][2].
+glm::mat4 ReversedPerspective(float verticalFov, float aspect,
+                              float nearPlane, float farPlane);
+
+/// A right-handed reverse-Z orthographic projection of the box
+/// `left` to `right`, `bottom` to `top`: depth 1 at `nearPlane` and 0
+/// at `farPlane`, which an infinite one replaces with 10^12 beyond
+/// the near plane. Shaders linearise its depth d as (B - d) / A.
+glm::mat4 ReversedOrthographic(double left, double right,
+                               double bottom, double top,
+                               double nearPlane, double farPlane);
 
 /// How a lens maps the field angle of a ray to its place in the
 /// image.

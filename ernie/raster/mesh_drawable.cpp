@@ -583,6 +583,7 @@ void MeshDrawable::CreateGBufferPipeline(bool pushbroom) {
     desc.colorFormats.assign(RenderTargets::kGBufferFormats.begin(),
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
+    desc.depthCompare = RenderTargets::kDepthCompare;
     gbufferPipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(context_, layout_, desc);
 }
@@ -606,6 +607,7 @@ void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
             RenderTargets::kGBufferFormats.begin(),
             RenderTargets::kGBufferFormats.end());
         desc.depthFormat = RenderTargets::kDepthFormat;
+        desc.depthCompare = RenderTargets::kDepthCompare;
         gbuffer = std::make_unique<GraphicsPipeline>(context_,
                                                      layout_, desc);
     }
@@ -650,6 +652,7 @@ void MeshDrawable::CreateMinimalPipelines() {
             MinimalTargets::kColorFormats.begin(),
             MinimalTargets::kColorFormats.end());
         desc.depthFormat = MinimalTargets::kDepthFormat;
+        desc.depthCompare = RenderTargets::kDepthCompare;
         minimalPipelines_[i] = std::make_unique<GraphicsPipeline>(
             context_, layout_, desc);
     }
@@ -2534,9 +2537,12 @@ void MeshDrawable::Cull(const FrameParams& params,
                               const glm::mat4& viewProjection,
                               float pixelsPerUnit, bool pyramid) {
         for (const glm::vec4& plane : frustum.planes) {
-            views.push_back(
-                plane /
-                std::max(glm::length(glm::vec3(plane)), 1e-30f));
+            // An infinite far plane's is (0, 0, 0, near): everything
+            // is inside it.
+            const float length = glm::length(glm::vec3(plane));
+            views.push_back(length > 1e-30f
+                                ? plane / length
+                                : glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         }
         for (int column = 0; column < 4; ++column) {
             views.push_back(viewProjection[column]);
@@ -3437,7 +3443,7 @@ void MeshDrawable::RecordMotion(
         desc.depthFormat = RenderTargets::kDepthFormat;
         // The same depths as the colour pass's: only the surfaces it
         // kept.
-        desc.depthCompare = VK_COMPARE_OP_LESS_OR_EQUAL;
+        desc.depthCompare = RenderTargets::kDepthCompareEqual;
         desc.depthWrite = false;
         motionPipeline_ = std::make_unique<GraphicsPipeline>(
             context_, motionLayout_, desc);

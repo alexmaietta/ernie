@@ -370,6 +370,25 @@ class OverlaysPanel final : public Panel {
     }
 };
 
+/// `view`'s projection with standard [0, 1] depth and a finite far
+/// plane (an infinite one a million near planes out), for ImGuizmo,
+/// which unprojects the mouse at depths 0 and 1: the camera's own is
+/// reverse-Z, maybe without a far plane (`CameraView`).
+glm::mat4 GizmoProjection(const CameraView& view) {
+    glm::mat4 projection = view.projection;
+    const float near = view.nearPlane;
+    const float far =
+        std::isfinite(view.farPlane) ? view.farPlane : 1e6f * near;
+    if (view.IsOrthographic()) {
+        projection[2][2] = -1.0f / (far - near);
+        projection[3][2] = -near / (far - near);
+    } else {
+        projection[2][2] = far / (near - far);
+        projection[3][2] = -far * near / (far - near);
+    }
+    return projection;
+}
+
 }  // namespace
 
 struct Viewer::State {
@@ -1462,7 +1481,8 @@ struct Viewer::State {
         glm::dmat4 orientation = camera.transform;
         orientation[3] = glm::dvec4(0.0, 0.0, 0.0, 1.0);
         const glm::mat4 view(glm::inverse(orientation));
-        const glm::mat4 projection = camera.RasterView().projection;
+        const glm::mat4 projection =
+            GizmoProjection(camera.RasterView());
         glm::dmat4 world = scene.WorldTransform(path);
         world[3] -= glm::dvec4(eye, 0.0);
         glm::mat4 model(world);

@@ -140,7 +140,7 @@ PointsOutput fragmentMain(VertexOutput in) {
     out.normal = float4(normal, 1.0);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, 0u);
-    out.depth = clip.z / clip.w;
+    out.depth = saturate(clip.z / clip.w);
     return out;
 }
 
@@ -167,7 +167,7 @@ MotionOutput motionFragment(VertexOutput in) {
     out.motion = float4(
         pixelMotion(motionView, in.position.xy, mul(motionView.previousViewProj, float4(before, 1.0))),
         0.0, 0.0);
-    out.depth = clip.z / clip.w;
+    out.depth = saturate(clip.z / clip.w);
     return out;
 }
 

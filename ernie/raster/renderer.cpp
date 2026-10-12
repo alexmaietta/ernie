@@ -2550,6 +2550,24 @@ void RasterRenderer::Update(
                     : *box;
         }
     }
+    // The Distance display spans the near plane to the far, or with an
+    // infinite far plane to the scene's farthest corner.
+    if (!std::isfinite(presentRange_[1])) {
+        const glm::vec3 eye(glm::dvec3(params.camera.transform[3]) -
+                            params.origin);
+        float farthest = 1e3f * presentRange_[0];
+        if (bounds) {
+            farthest = 2.0f * presentRange_[0];
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 point(
+                    (corner & 1) != 0 ? bounds->second.x : bounds->first.x,
+                    (corner & 2) != 0 ? bounds->second.y : bounds->first.y,
+                    (corner & 4) != 0 ? bounds->second.z : bounds->first.z);
+                farthest = std::max(farthest, glm::length(point - eye));
+            }
+        }
+        presentRange_[1] = farthest;
+    }
     const ShadowSettings& shadows = params.shadows;
     // The lights' maps hold what a single view sees, or in a batch
     // what every world shares (every world's casters when merged; a

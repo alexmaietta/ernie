@@ -211,7 +211,8 @@ bool inFrustum(Placed placed, uint view) {
 
 // Whether the view's depth pyramid (layer `layer`) hides the sphere: the nearest depth of the
 // corners of its bounding box lies beyond the farthest depth below their screen rectangle, read
-// from the level where the rectangle spans at most two texels each way.
+// from the level where the rectangle spans at most two texels each way. Depth is reverse-Z, so
+// the nearest is the greatest and the farthest the least.
 bool occluded(Placed placed, uint view, uint layer) {
     let pyramid = views[view + 11];
     let mips = uint(pyramid.z);
@@ -220,7 +221,7 @@ bool occluded(Placed placed, uint view, uint layer) {
     }
     float2 low = float2(1.0);
     float2 high = float2(0.0);
-    float nearest = 1.0;
+    float nearest = 0.0;
     for (uint corner = 0; corner < 8; ++corner) {
         let offset = float3((corner & 1) != 0 ? 1.0 : -1.0, (corner & 2) != 0 ? 1.0 : -1.0,
                             (corner & 4) != 0 ? 1.0 : -1.0);
@@ -233,7 +234,7 @@ bool occluded(Placed placed, uint view, uint layer) {
         let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
         low = min(low, uv);
         high = max(high, uv);
-        nearest = min(nearest, ndc.z);
+        nearest = max(nearest, ndc.z);
     }
     let size = float2(pyramid.x, pyramid.y);
     if (isStrip(view)) {
@@ -249,7 +250,7 @@ bool occluded(Placed placed, uint view, uint layer) {
         if (depth <= near) {
             return false;
         }
-        nearest = min(nearest, far * (depth - near) / ((far - near) * depth));
+        nearest = max(nearest, near * (far - depth) / ((far - near) * depth));
     }
     low = saturate(low);
     high = saturate(high);
@@ -258,13 +259,13 @@ bool occluded(Placed placed, uint view, uint layer) {
     let levelSize = max(uint2(size) >> level, uint2(1));
     let first = min(uint2(low * float2(levelSize)), levelSize - 1);
     let last = min(uint2(high * float2(levelSize)), levelSize - 1);
-    var farthest = 0.0;
+    var farthest = 1.0;
     for (uint y = first.y; y <= min(last.y, first.y + 2); ++y) {
         for (uint x = first.x; x <= min(last.x, first.x + 2); ++x) {
-            farthest = max(farthest, hzb.Load(int4(int(x), int(y), int(layer), int(level))));
+            farthest = min(farthest, hzb.Load(int4(int(x), int(y), int(layer), int(level))));
         }
     }
-    return nearest > farthest;
+    return nearest < farthest;
 }
 
 // The coarsest level whose error, at the sphere's nearest depth, spans at most the view's error

@@ -113,7 +113,8 @@ GroundOutput shadeGround(VertexOutput in) {
     out.normal = float4(normalize(float3(-detail.slope, 1.0)), 1.0);
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
     out.ids = uint4(g.ids.x, g.ids.y, 0, packSurfaceFlags(0u, detail.slopeVariance));
-    out.depth = min(clip.z / clip.w, 0.99999994);
+    // Reverse-Z: kept above the cleared 0 out to the horizon, past any far plane.
+    out.depth = clamp(clip.z / clip.w, 1.17549435e-38, 1.0);
     return out;
 }
 
@@ -147,7 +148,8 @@ GroundMinimalOutput idsFragmentMain(VertexOutput in) {
     GroundMinimalOutput out;
     out.color = float4(0.0, 0.0, 0.0, 1.0);
     out.ids = uint4(g.ids.y, 0u, packOctahedral(float3(0.0, 0.0, 1.0)), 0u);
-    out.depth = min(clip.z / clip.w, 0.99999994);
+    // Reverse-Z: kept above the cleared 0 out to the horizon, past any far plane.
+    out.depth = clamp(clip.z / clip.w, 1.17549435e-38, 1.0);
     return out;
 }
 

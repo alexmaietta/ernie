@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/minimal_targets.h"
 
+#include "ernie/raster/render_targets.h"
 #include "ernie/scene/sensor_filters.h"
 
 #include <algorithm>
@@ -148,6 +149,7 @@ RenderingTarget MinimalTargets::Target(std::uint32_t views,
     none.uint32[0] = 0xFFFFFFFFu;
     target.clearColors = {background, none};
     target.depth = depth_->View();
+    target.clearDepth = RenderTargets::kDepthClear;
     target.extent = extent_;
     target.layers = std::min(views, chunk_);
     return target;

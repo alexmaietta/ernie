@@ -95,7 +95,8 @@ public float4 cameraProject(float4x4 viewProj, float4 intrinsics, float3 world) 
     let depth = -local.z;
     let x = local.x / depth * intrinsics.x + intrinsics.y;
     let y = 1.0 - 2.0 * s;
-    return float4(x * depth, y * depth, strip.far * (depth - strip.near) / (strip.far - strip.near),
+    // Reverse-Z, as the cameras' projections: 1 at the near plane, 0 at the far.
+    return float4(x * depth, y * depth, strip.near * (strip.far - depth) / (strip.far - strip.near),
                   depth);
 }
 
@@ -116,7 +117,7 @@ public float3 cameraPoint(float4x4 invViewProj, float4 intrinsics, float2 ndc, f
     float4 rotation;
     rayAt(strip, intrinsics, ndc, origin, direction, rotation);
     // The view depth of [0, 1] depth, as the projection mapped it.
-    let viewDepth = strip.near * strip.far / (strip.far - depth * (strip.far - strip.near));
+    let viewDepth = strip.near * strip.far / (strip.near + depth * (strip.far - strip.near));
     return origin + direction * viewDepth;
 }
 

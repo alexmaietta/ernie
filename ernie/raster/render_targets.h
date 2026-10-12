@@ -37,6 +37,15 @@ class RenderTargets : public FrameImages {
         VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT,
         VK_FORMAT_R32G32B32A32_UINT};
     static constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
+    /// Camera views' depth is reverse-Z (`CameraView`): cleared to 0,
+    /// the far plane, nearer surfaces greater; the motion passes
+    /// redraw the colour pass's own depths. Light shadow maps keep
+    /// standard depth (cleared to 1, `VK_COMPARE_OP_LESS`).
+    static constexpr float kDepthClear = 0.0f;
+    static constexpr VkCompareOp kDepthCompare =
+        VK_COMPARE_OP_GREATER;
+    static constexpr VkCompareOp kDepthCompareEqual =
+        VK_COMPARE_OP_GREATER_OR_EQUAL;
 
     /// @throws std::runtime_error if allocation fails, or
     /// std::invalid_argument for a zero extent, a band count outside

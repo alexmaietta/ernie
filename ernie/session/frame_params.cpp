@@ -90,6 +90,13 @@ glm::dmat4 InterpolatePose(const glm::dmat4& from,
 
 namespace {
 
+/// A pushbroom camera's far plane, finite for its strip's envelope
+/// and depth: an infinite one 10^9 near planes out.
+double StripFar(const CameraParams& camera) {
+    return std::isfinite(camera.farPlane) ? camera.farPlane
+                                          : 1e9 * camera.nearPlane;
+}
+
 /// The rotation of camera-to-world `pose`, its scale left out.
 glm::dquat RotationOf(const glm::dmat4& pose) {
     return glm::normalize(glm::quat_cast(
@@ -147,7 +154,7 @@ CameraView PushbroomEnvelope(const CameraParams& camera,
         const glm::dvec3 position(sample[3]);
         for (const double x : edges) {
             for (const double depth :
-                 {camera.nearPlane, camera.farPlane}) {
+                 {camera.nearPlane, StripFar(camera)}) {
                 const glm::dvec3 world =
                     position +
                     glm::dvec3(pose * glm::dvec4(x * depth,
@@ -174,7 +181,7 @@ CameraView PushbroomEnvelope(const CameraParams& camera,
     view.eye = glm::vec3(eyePose[3]);
     view.forward = glm::vec3(forward);
     view.view = glm::mat4(toEye);
-    view.projection = glm::perspectiveRH_ZO(
+    view.projection = ReversedPerspective(
         view.verticalFov, view.aspect, view.nearPlane, view.farPlane);
     return view;
 }
@@ -204,7 +211,7 @@ PushbroomStrip FrameParams::Strip(std::size_t view) const {
     strip.fromRotation = glm::quat(a);
     strip.toRotation = glm::quat(b);
     strip.nearPlane = static_cast<float>(camera.nearPlane);
-    strip.farPlane = static_cast<float>(camera.farPlane);
+    strip.farPlane = static_cast<float>(StripFar(camera));
     const double width = camera.width;
     // The raster image is drawn with the focal length over the
     // overscan, so the undistorted line's ends stay in it (the lens

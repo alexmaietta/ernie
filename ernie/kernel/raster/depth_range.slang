@@ -7,9 +7,9 @@
 // A camera rendered on cube faces reduces its faces' layers, one per dispatch z, its depths
 // along each face's own axis as shading compares them.
 //
-// Bindings: 0 the views' depth ([0, 1]), 1 the result: [0] the nearest depth's bits,
+// Bindings: 0 the views' depth ([0, 1], reverse-Z), 1 the result: [0] the nearest depth's bits,
 // cleared to the largest float, and [1] the farthest's, cleared to 0. Pixels without a surface
-// (depth 1) count for neither.
+// (the cleared depth 0) count for neither.
 //
 // Reference: A. Lauritzen, M. Salvi and A. Lefohn, "Sample Distribution Shadow Maps", Proc. ACM
 // I3D 2011, 97-102. https://doi.org/10.1145/1944745.1944761
@@ -17,7 +17,7 @@
 struct DepthRangeConstants {
     // xy: image size, z: the first layer, w: 1 when the projection is orthographic (depth linear).
     uint4 size;
-    // x: near plane, y: far plane.
+    // x: near plane, y: far plane, which may be infinite.
     float4 clip;
 }
 
@@ -32,11 +32,16 @@ void depthRangeMain(uint3 id : SV_DispatchThreadID) {
     var farthest = 0.0;
     if (all(id.xy < constants.size.xy)) {
         let d = depth.Load(int4(int2(id.xy), int(constants.size.z + id.z), 0));
-        if (d < 1.0) {
+        if (d > 0.0) {
+            // Reverse-Z (`ReversedPerspective`, `ReversedOrthographic`): near f / (near + d
+            // (f - near)) in perspective, near / d with an infinite far plane, and linear from far
+            // (an infinite one 10^12 past the near plane) orthographic.
             let near = constants.clip.x;
             let far = constants.clip.y;
-            let viewDepth = constants.size.w != 0 ? near + d * (far - near)
-                                                  : near * far / (far - d * (far - near));
+            let viewDepth =
+                constants.size.w != 0
+                    ? lerp(isinf(far) ? near + 1e12 : far, near, d)
+                    : (isinf(far) ? near / d : near * far / (near + d * (far - near)));
             nearest = viewDepth;
             farthest = viewDepth;
         }

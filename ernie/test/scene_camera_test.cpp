@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <vector>
 
 using ernie::CameraParams;
@@ -202,8 +203,9 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
         EXPECT_NEAR(clip.w, 1.0f, 1e-6f);
         EXPECT_NEAR((clip.x + 1.0f) * 100.0f, 100.0f, 1e-4f);
         EXPECT_NEAR((1.0f - clip.y) * 50.0f, 40.0f, 1e-4f);
+        // Reverse-Z: 1 at the near plane, 0 at the far.
         EXPECT_NEAR(clip.z,
-                    (depth - camera.nearPlane) /
+                    (camera.farPlane - depth) /
                         (camera.farPlane - camera.nearPlane),
                     1e-6);
     }
@@ -439,4 +441,24 @@ TEST(Camera, SetCameraAndCameraParamsOfRoundTrip) {
         .SetProjection(tokens::kOrthographic);
     EXPECT_TRUE(
         ernie::CameraParamsOf(scene, "/Camera", 40, 20).orthographic);
+}
+
+// An infinite far plane: depth near / distance, never reaching 0, and
+// finite planes cut where they are.
+TEST(Camera, ReverseZReachesInfinity) {
+    const glm::mat4 infinite = ernie::ReversedPerspective(
+        0.8f, 1.5f, 0.5f, std::numeric_limits<float>::infinity());
+    for (const float distance : {0.5f, 2.0f, 384.4e6f}) {
+        const glm::vec4 clip =
+            infinite * glm::vec4(0.0f, 0.0f, -distance, 1.0f);
+        EXPECT_NEAR(clip.z / clip.w, 0.5f / distance, 1e-6f);
+    }
+    const glm::mat4 finite =
+        ernie::ReversedPerspective(0.8f, 1.5f, 0.5f, 100.0f);
+    const glm::vec4 far =
+        finite * glm::vec4(0.0f, 0.0f, -100.0f, 1.0f);
+    EXPECT_NEAR(far.z / far.w, 0.0f, 1e-6f);
+    const glm::vec4 near =
+        finite * glm::vec4(0.0f, 0.0f, -0.5f, 1.0f);
+    EXPECT_NEAR(near.z / near.w, 1.0f, 1e-6f);
 }

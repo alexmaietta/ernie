@@ -667,8 +667,9 @@ bool gbufferPoint(int2 pixel, uint layer, out float3 world) {
     if (any(pixel < 0) || any(pixel >= size)) {
         return false;
     }
+    // Reverse-Z: the background keeps the cleared 0.
     let depth = gDepth.Load(int4(pixel, int(layer), 0));
-    if (depth >= 1.0) {
+    if (depth <= 0.0) {
         return false;
     }
     let ndc = float2((float(pixel.x) + 0.5) / float(size.x) * 2.0 - 1.0,
@@ -1201,7 +1202,7 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
         float3 ray;
         cameraRayThrough(sh.invViewProj, sh.strip, ndc, eye, ray);
     } else if (sh.range.w != 0.0) {
-        eye = cameraPoint(sh.invViewProj, sh.strip, ndc, 0.0);
+        eye = cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0);
     } else {
         eye = sh.eye.xyz;
     }
@@ -1857,9 +1858,11 @@ float planckRatio(float wavelength, float kelvin) {
 // The direction through normalised device coordinates `ndc`, from the near to the far plane: its
 // length varies so that it is linear in `ndc`, a point of the image plane.
 float3 rayThrough(float2 ndc) {
-    let near = mul(sh.invViewProj, float4(ndc, 0.0, 1.0));
-    let far = mul(sh.invViewProj, float4(ndc, 1.0, 1.0));
-    return far.xyz / far.w - near.xyz / near.w;
+    // Reverse-Z: from the near plane (depth 1) to twice its distance (1/2), which an infinite far
+    // plane, with no point at depth 0, still has.
+    let near = mul(sh.invViewProj, float4(ndc, 1.0, 1.0));
+    let beyond = mul(sh.invViewProj, float4(ndc, 0.5, 1.0));
+    return beyond.xyz / beyond.w - near.xyz / near.w;
 }
 
 // Texel (`x`, `y`) of mip `level` of the dome map (the lighting map with `lighting`), wrapping
@@ -2095,7 +2098,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
             }
         }
         // Each pixel's ray starts on the near plane.
-        atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 0.0), d, 0.0);
+        atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
         for (uint band = 0; band < bands; ++band) {
             spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
         }

@@ -12,8 +12,10 @@ Frustum Frustum::FromMatrix(const glm::mat4& viewProjection) {
     frustum.planes[1] = m[3] - m[0];
     frustum.planes[2] = m[3] + m[1];
     frustum.planes[3] = m[3] - m[1];
-    // With [0, 1] depth the near plane is z_clip >= 0 rather than
-    // Gribb and Hartmann's z_clip >= -w_clip.
+    // [0, 1] depth bounds z_clip by 0 rather than Gribb and
+    // Hartmann's -w_clip, and by w_clip: the near and far planes, or
+    // with reverse-Z the far and near (an infinite far plane's being
+    // (0, 0, 0, near), which everything is inside).
     frustum.planes[4] = m[2];
     frustum.planes[5] = m[3] - m[2];
     return frustum;

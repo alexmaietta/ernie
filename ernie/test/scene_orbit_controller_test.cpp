@@ -49,6 +49,7 @@ TEST(OrbitController, ViewPlacesTargetStraightAhead) {
     EXPECT_NEAR(inView.z, -25.0f, 1e-3f);
 }
 
+// Reverse-Z: 1 at the near plane, 0 at the far.
 TEST(OrbitController, ProjectionUsesZeroToOneDepth) {
     OrbitController camera;
     camera.distance = 10.0f;
@@ -59,11 +60,11 @@ TEST(OrbitController, ProjectionUsesZeroToOneDepth) {
     EXPECT_NEAR(Project(viewProjection,
                         glm::vec3(camera.Eye()) + forward * 0.1f)
                     .z,
-                0.0f, 1e-4f);
+                1.0f, 1e-4f);
     EXPECT_NEAR(Project(viewProjection,
                         glm::vec3(camera.Eye()) + forward * 1000.0f)
                     .z,
-                1.0f, 1e-4f);
+                0.0f, 1e-4f);
 }
 
 TEST(OrbitController, OrbitClampsPitch) {
