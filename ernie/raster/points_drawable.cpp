@@ -5,6 +5,7 @@
 #include "ernie/geometry/frustum.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/mesh_drawable.h"
+#include "ernie/raster/minimal_targets.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -228,6 +229,30 @@ void PointsDrawable::CreateGBufferPipeline(bool pushbroom) {
     gbufferPipelines_[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(context_, layout_,
                                            gbuffer);
+}
+
+void PointsDrawable::CreateMinimalPipelines() {
+    const ShaderCompiler& compiler = renderer_.Compiler();
+    const std::vector<ShaderModuleSource> modules =
+        PointsModules(false);
+    const std::vector<std::uint32_t> vertex =
+        compiler.CompileSpirv(modules, "vertexMain");
+    const char* const entries[] = {"minimalFragmentMain",
+                                   "idsFragmentMain"};
+    for (std::size_t i = 0; i < minimalPipelines_.size(); ++i) {
+        const std::vector<std::uint32_t> fragment =
+            compiler.CompileSpirv(modules, entries[i]);
+        GraphicsPipelineDesc minimal;
+        minimal.vertexSpirv = vertex;
+        minimal.fragmentSpirv = fragment;
+        minimal.colorFormats.assign(
+            MinimalTargets::kColorFormats.begin(),
+            MinimalTargets::kColorFormats.end());
+        minimal.depthFormat = MinimalTargets::kDepthFormat;
+        minimal.depthCompare = RenderTargets::kDepthCompare;
+        minimalPipelines_[i] = std::make_unique<GraphicsPipeline>(
+            context_, layout_, minimal);
+    }
 }
 
 void PointsDrawable::Check(const Cloud& cloud) const {
@@ -650,8 +675,13 @@ void PointsDrawable::Prepare(
         return;
     }
     pushbroom_ = params.camera.pushbroom;
+    minimal_ = params.minimal;
     if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
         CreateGBufferPipeline(pushbroom_);
+    }
+    if (minimal_ != MinimalMode::Off &&
+        minimalPipelines_[0] == nullptr) {
+        CreateMinimalPipelines();
     }
     for (auto& [handle, cloud] : clouds_) {
         if (cloud.dirty && cloud.count > 0) {
@@ -1065,9 +1095,13 @@ void PointsDrawable::RecordColor(VkCommandBuffer commands,
     if (phase == DrawPhase::Occludees || view >= viewItems_.size()) {
         return;
     }
-    vkCmdBindPipeline(
-        commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
+    const GraphicsPipeline& pipeline =
+        minimal_ != MinimalMode::Off
+            ? *minimalPipelines_[minimal_ == MinimalMode::None ? 1
+                                                               : 0]
+            : *gbufferPipelines_[pushbroom_ ? 1 : 0];
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pipeline.Handle());
     for (std::size_t k = 0; k < viewItems_[view].size(); ++k) {
         const std::uint32_t i = viewItems_[view][k];
         const std::int32_t job = viewJobs_[view][k];

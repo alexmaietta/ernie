@@ -400,17 +400,10 @@ class ViewerErnie(ViewerGL):
 
     def _apply_shading(self) -> None:
         """Shades the frame as asked, but fully while the scene holds
-        what minimal shading does not draw yet (point clouds such as
-        Newton's particles, terrain or planets)."""
+        what minimal shading does not draw yet (terrain, planets)."""
         mode = _SHADING[self._shading]
-        if mode != "off":
-            scene = self.ernie_scene
-            visible = any(
-                self._visible.get(str(path), True)
-                for path in scene.prims("Points")
-            )
-            if visible or scene.prims("Terrain"):
-                mode = "off"
+        if mode != "off" and self.ernie_scene.prims("Terrain"):
+            mode = "off"
         if mode == self._mode:
             return
         self._mode = mode

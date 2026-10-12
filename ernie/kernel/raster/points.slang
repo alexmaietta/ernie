@@ -159,10 +159,11 @@ bool sphereHit(VertexOutput in, out float3 hit) {
     return h >= 0.0;
 }
 
-[shader("fragment")]
-PointsOutput fragmentMain(VertexOutput in) {
+// What the G-buffer pass writes of the sphere where the pixel's ray meets it (`hit`); shared by
+// `fragmentMain` and the minimal passes, since an entry point calling another hangs Slang's
+// entry-point parameter lowering.
+PointsOutput shadePoint(VertexOutput in, out float3 hit) {
     let d = draws[draw.first];
-    float3 hit;
     if (!sphereHit(in, hit)) {
         discard;
     }
@@ -174,6 +175,52 @@ PointsOutput fragmentMain(VertexOutput in) {
     out.normal = float4(normal, 1.0);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, packSurfaceFlags(linkGroupFlags(d.ids.z), 0.0));
+    out.depth = saturate(clip.z / clip.w);
+    return out;
+}
+
+[shader("fragment")]
+PointsOutput fragmentMain(VertexOutput in) {
+    float3 hit;
+    return shadePoint(in, hit);
+}
+
+// Minimal shading (`minimalShade`) of what `fragmentMain` writes, at the sphere's depth.
+struct PointsMinimalOutput {
+    float4 color : SV_Target0;
+    uint4 ids : SV_Target1;
+    float depth : SV_Depth;
+}
+
+[shader("fragment")]
+PointsMinimalOutput minimalFragmentMain(VertexOutput in) {
+    float3 hit;
+    let point = shadePoint(in, hit);
+    GBuffer g;
+    g.normal = point.normal;
+    g.albedo = point.albedo;
+    g.ids = point.ids;
+    let shaded = minimalShade(g, hit);
+    PointsMinimalOutput out;
+    out.color = shaded.color;
+    out.ids = shaded.ids;
+    out.depth = point.depth;
+    return out;
+}
+
+// Minimal shading without colour (kMinimalNone): the sphere's ids and normal at its depth, with
+// no material evaluated.
+[shader("fragment")]
+PointsMinimalOutput idsFragmentMain(VertexOutput in) {
+    let d = draws[draw.first];
+    float3 hit;
+    if (!sphereHit(in, hit)) {
+        discard;
+    }
+    let clip = projectWorld(hit);
+    PointsMinimalOutput out;
+    out.color = float4(0.0, 0.0, 0.0, 1.0);
+    out.ids = uint4(d.ids.y, in.point, packOctahedral(normalize(hit - in.sphere.xyz)), 0u);
     out.depth = saturate(clip.z / clip.w);
     return out;
 }

@@ -3117,9 +3117,8 @@ void RasterRenderer::Update(
         for (const RasterDrawable* drawable : drawables) {
             if (!drawable->DrawsMinimal() && drawable->Bounds()) {
                 throw std::invalid_argument(
-                    "Minimal shading draws meshes and the ground "
-                    "plane, "
-                    "not yet terrain, planets or point clouds");
+                    "Minimal shading draws meshes, the ground plane "
+                    "and point clouds, not yet terrain or planets");
             }
         }
     }

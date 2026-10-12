@@ -149,6 +149,46 @@ TEST_F(RasterDelegateTest,
                 37.0f, 0.05f);
 }
 
+TEST_F(RasterDelegateTest, MinimalShadingDrawsPointsAsTheFullDoes) {
+    RasterDelegate delegate(*context_);
+    Scene scene = PointsScene();
+    const auto full = Step(delegate, scene);
+    // Minimal shading through settings that render the product.
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetProducts({"/Render/Out"});
+    scene.Set("/Render/Settings", tokens::kMinimalMode,
+              std::string(tokens::kDiffuseGlossyEmission));
+    const auto minimal = Step(delegate, scene);
+    for (const char* var :
+         {"DistanceToCamera", "InstanceId", "PrimId"}) {
+        for (const auto [x, y] :
+             {std::pair{-8.0, 0.0}, std::pair{0.0, 0.0},
+              std::pair{8.0, 0.0}, std::pair{4.0, 6.0}}) {
+            const std::size_t pixel = PixelOf(x, y);
+            const float a = full.at(var)[pixel];
+            const float b = minimal.at(var)[pixel];
+            if (std::isinf(a)) {
+                EXPECT_TRUE(std::isinf(b)) << var << " at " << x;
+            } else {
+                EXPECT_NEAR(b, a, 0.05f) << var << " at " << x;
+            }
+        }
+    }
+    // Their own colours, lit.
+    const std::vector<float>& ldr = minimal.at("LdrColor");
+    const std::size_t red = 4 * PixelOf(-8.0, 0.0);
+    const std::size_t blue = 4 * PixelOf(8.0, 0.0);
+    EXPECT_GT(ldr[red], 4.0f * ldr[red + 2]);
+    EXPECT_GT(ldr[blue + 2], 4.0f * ldr[blue]);
+
+    // Without colour, their ids alone.
+    scene.Set("/Render/Settings", tokens::kMinimalMode,
+              std::string(tokens::kNone));
+    const auto ids = Step(delegate, scene);
+    EXPECT_EQ(ids.at("InstanceId")[PixelOf(8.0, 0.0)], 2.0f);
+    EXPECT_EQ(ids.at("LdrColor")[red], 0.0f) << "no colour";
+}
+
 TEST_F(RasterDelegateTest,
        PointsTakeAWidthEachAsAValueListOrAnArray) {
     RasterDelegate delegate(*context_);

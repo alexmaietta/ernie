@@ -172,6 +172,10 @@ class PointsDrawable : public RasterDrawable {
         return "Points";
     }
     std::optional<Bounds3> Bounds() const override;
+
+    bool DrawsMinimal() const override {
+        return true;
+    }
     std::map<std::int32_t, Bounds3> WorldsBounds() const override;
     void Prepare(const FrameParams& params,
                  std::span<const ShadowCascade> cascades) override;
@@ -236,6 +240,9 @@ class PointsDrawable : public RasterDrawable {
     /// Draw `item`'s bounds relative to the origin. The G-buffer
     /// pipeline for a frame camera's views, or a pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
+    /// Minimal shading's pipelines (`minimalPipelines_`), made the
+    /// first time a frame with points shades minimally.
+    void CreateMinimalPipelines();
     Bounds3 ItemBounds(std::size_t item) const;
     std::vector<DescriptorResource>
     Resources(const RasterFrame& frame, std::size_t item) const;
@@ -257,6 +264,11 @@ class PointsDrawable : public RasterDrawable {
         gbufferPipelines_;
     bool pushbroom_ = false;  ///< Whether the last `Prepare`'s camera
                               ///< is a pushbroom.
+    /// The last `Prepare`'s minimal shading, and its pipelines for
+    /// frame cameras: shaded, then ids alone (`MinimalMode::None`).
+    MinimalMode minimal_ = MinimalMode::Off;
+    std::array<std::unique_ptr<GraphicsPipeline>, 2>
+        minimalPipelines_;
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     std::map<std::uint32_t, Cloud> clouds_;
     std::uint32_t nextHandle_ = 1;
