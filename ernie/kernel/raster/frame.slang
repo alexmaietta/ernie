@@ -5,7 +5,7 @@
 //   sampler's slots in the bindless heap), 1 Shadows (a shadow pass's light view, the cascades'
 //   splits); 2 to 4 are free;
 // the per-draw push constants; and reflectance helpers. Materials take
-// bindings 5 to 9 (surface.slang) and each drawable's own resources start at 10.
+// binding 5 (surface.slang) and each drawable's own resources start at 10.
 //
 // Passes place world points in the image with `projectWorld`, from module `projection`: a frame
 // camera's view-projection (projection_pinhole.slang), or a pushbroom's strip

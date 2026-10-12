@@ -277,23 +277,14 @@ void Reserve(const VulkanContext& context,
         std::make_unique<GpuBuffer>(context, bytes, usage, memory);
 }
 
-/// Frame (0 and 1), material (5 to 9) and mesh (10, its buffers'
+/// Frame (0 and 1), material (5) and mesh (10, its buffers'
 /// addresses; 22 to 26, its material's textures) bindings; see
 /// mesh.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
 };
 
 /// The motion pass's: the mesh passes' and 20, the view's
@@ -302,16 +293,7 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {22, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {23, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {24, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {25, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
-    {26, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kGraphics},
     {20, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
@@ -2994,8 +2976,6 @@ MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
         .AppendResources(resources);
     resources.push_back(
         DescriptorResource::Of(*meshResources_[culled ? 1 : 0]));
-    renderer_.MaterialOrDefault(draw.material)
-        .AppendTextureResources(resources);
     return resources;
 }
 

@@ -108,9 +108,9 @@ enum class DrawPhase {
 /// then the views of the other lights' shadow maps), lets each
 /// drawable prepare for the final view and shadow views, and then has
 /// each record its draws into every shadow view and into the main
-/// pass. Drawables bind the frame's resources at bindings 0 to 4, a
-/// material's at 5 to 9 (`RasterRenderer::Material`) and their own
-/// from 10.
+/// pass. Drawables bind the frame's resources at bindings 0 and 1, a
+/// material's at 5 (`RasterRenderer::Material`) and their own from
+/// 10.
 class RasterDrawable {
   public:
     virtual ~RasterDrawable() = default;

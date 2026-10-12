@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Terrain resources and the CDLOD grid vertex, used by the terrain's shadow and colour passes.
-// Besides the frame (bindings 0 and 1, frame.slang) and material (5 to 9, surface.slang) the
+// Besides the frame (bindings 0 and 1, frame.slang) and material (5, surface.slang) the
 // passes bind
 //   10 TerrainUniforms, 11 heights, 12 LOD patches, 13 height gradients.
 __exported import frame;

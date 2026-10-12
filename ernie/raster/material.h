@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/device/bindless.h"
 #include "ernie/device/buffer.h"
 #include "ernie/device/frame_uploads.h"
 #include "ernie/device/image.h"
@@ -81,8 +82,9 @@ std::shared_ptr<const MaterialTexture> UploadMaterialTexture(
 
 /// A material's GPU resources: the material uniform, an optional
 /// albedo map and optional tileable detail albedo and normal
-/// textures, bound at bindings 5 to 9 of every raster pass
-/// (`surface.slang`), so terrain and meshes share materials.
+/// textures, its uniform bound at binding 5 of every raster pass
+/// (`surface.slang`) and naming the textures by their bindless heap
+/// slots, so terrain and meshes share materials.
 ///
 /// The albedo map is a georeferenced raster sampled by world x and y,
 /// like the heightfield but with its own grid. Detail textures repeat
@@ -108,8 +110,11 @@ class RasterMaterial {
     RasterMaterial(const RasterMaterial&) = delete;
     RasterMaterial& operator=(const RasterMaterial&) = delete;
 
-    /// The material's uniform buffer, albedo map, detail albedo,
-    /// detail normal and detail sampler, in binding order (5 to 9).
+    /// The material's uniform buffer (binding 5), which names its
+    /// albedo map, detail textures and sampler, and the textures mesh
+    /// passes read through texture coordinates (albedo, normal map,
+    /// roughness, metallic and opacity, each with its own sampler) by
+    /// their slots in the bindless heap.
     void
     AppendResources(std::vector<DescriptorResource>& resources) const;
 
@@ -155,12 +160,6 @@ class RasterMaterial {
     bool HasTexture(MaterialTextureSlot slot) const {
         return textures_[static_cast<std::size_t>(slot)] != nullptr;
     }
-
-    /// The textures mesh passes read through texture coordinates,
-    /// albedo, normal map, roughness, metallic and opacity, each with
-    /// its own sampler (bindings 22 to 26 of mesh.slang).
-    void AppendTextureResources(
-        std::vector<DescriptorResource>& resources) const;
 
     bool HasDetailAlbedo() const {
         return hasDetailAlbedo_;
@@ -244,6 +243,9 @@ class RasterMaterial {
         fallbacks_;
     std::array<std::unique_ptr<Sampler>, kMaterialTextureSlots>
         samplers_;
+    /// The textures' and samplers' slots in the bindless heap that
+    /// the uniform names, as of its last write (`WriteUniform`).
+    std::vector<BindlessHeap::Slot> heapSlots_;
 
     bool hasAlbedoMap_ = false;
     bool hasDetailAlbedo_ = false;

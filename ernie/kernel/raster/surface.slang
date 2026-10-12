@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Materials, shared by every raster drawable: the material uniform, albedo map, and tileable detail
-// albedo and normal textures with hex-tiling, at bindings 5 to 9.
+// Materials, shared by every raster drawable: the material uniform at binding 5, whose `heap`
+// names its albedo map, tileable detail albedo and normal textures (with hex-tiling) and mesh
+// textures in the bindless heap; 6 to 9 are free.
+import bindless;
 import brdf;
 import frame;
 
@@ -47,15 +49,39 @@ public struct Surface {
     // linear RGB cd/m^2.
     public float4 gloss;
     public float4 emission;
+    // Slots in the bindless heap (`surfaceSlot`): 0 the albedo map, 1 the detail albedo and 2
+    // the detail normal textures (`heapTextures`), 3 the detail sampler (`heapSamplers`); 4 to 8
+    // the mesh textures' images and 9 to 13 their samplers, by `MaterialTextureSlot`.
+    public uint4 heap[4];
 }
 
 [[vk::binding(5, 0)]] public ConstantBuffer<Surface> surface;
+
+// The material's heap slot `i` (`Surface::heap`).
+public uint surfaceSlot(uint i) {
+    return surface.heap[i / 4][i % 4];
+}
+
 // Albedo map: r albedo times validity, g validity, so filtering fades to the constant albedo at
 // gaps.
-[[vk::binding(6, 0)]] public Texture2D<float2> albedoMap;
-[[vk::binding(7, 0)]] public Texture2D<float4> detailAlbedo;
-[[vk::binding(8, 0)]] public Texture2D<float4> detailNormal;
-[[vk::binding(9, 0)]] public SamplerState detailSampler;
+Texture2D<float4> albedoMap() {
+    return heapTextures[surfaceSlot(0)];
+}
+Texture2D<float4> detailAlbedo() {
+    return heapTextures[surfaceSlot(1)];
+}
+Texture2D<float4> detailNormal() {
+    return heapTextures[surfaceSlot(2)];
+}
+SamplerState detailSampler() {
+    return heapSamplers[surfaceSlot(3)];
+}
+
+// Mesh texture `slot` (0 albedo, 1 normal, 2 roughness, 3 metallic, 4 opacity) at `uv`, with its
+// own sampler; in fragment shaders.
+public float4 materialTexture(uint slot, float2 uv) {
+    return heapTextures[surfaceSlot(4 + slot)].Sample(heapSamplers[surfaceSlot(9 + slot)], uv);
+}
 
 // Luminance albedo at a world position, which scales the material's reflectance spectrum
 // normalised to luminance 1 (white where the material is black): the reflectance's luminance
@@ -67,7 +93,7 @@ public float surfaceAlbedoScale(float3 world) {
     }
     let extent = surface.albedoMapSize.xy * surface.albedoMap.z;
     let uv = float2(world.x - surface.albedoMap.x, surface.albedoMap.y - world.y) / extent;
-    let m = albedoMap.SampleLevel(clampSampler(), uv, 0);
+    let m = albedoMap().SampleLevel(clampSampler(), uv, 0);
     return m.r + (1.0 - m.g) * surface.albedo.a;
 }
 
@@ -144,13 +170,13 @@ DetailTap detailTap(float2 tile, float2 dx, float2 dy, float2 inverse) {
     t.slope = float2(0.0);
     t.slopeVariance = 0.0;
     if (surface.detail.z > 0.0) {
-        t.albedo = detailAlbedo
-                       .SampleGrad(detailSampler, toTexture(tile), toTexture(dx), toTexture(dy))
+        t.albedo = detailAlbedo()
+                       .SampleGrad(detailSampler(), toTexture(tile), toTexture(dx), toTexture(dy))
                        .rgb;
     }
     if (surface.detail.w > 0.0) {
         let texel =
-            detailNormal.SampleGrad(detailSampler, toTexture(tile), toTexture(dx), toTexture(dy));
+            detailNormal().SampleGrad(detailSampler(), toTexture(tile), toTexture(dx), toTexture(dy));
         // Stored as n * 127 + 128 in 8 bits (`RasterMaterial::SetDetailNormal`).
         var n = (texel.xyz * 255.0 - 128.0) / 127.0;
         n.y = n.y * surface.albedoMapSize.w;

@@ -44,8 +44,12 @@ struct SurfaceUniforms {
     /// the emission, linear RGB cd/m^2.
     float gloss[4];
     float emission[4];
+    /// Bindless heap slots: the albedo map, detail albedo and detail
+    /// normal textures, the detail sampler; the mesh textures'
+    /// images, then their samplers, by `MaterialTextureSlot`.
+    std::uint32_t heap[16];
 };
-static_assert(sizeof(SurfaceUniforms) == 464,
+static_assert(sizeof(SurfaceUniforms) == 528,
               "SurfaceUniforms must match Surface in surface.slang");
 
 /// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate
@@ -414,6 +418,8 @@ RasterMaterial::RasterMaterial(const VulkanContext& context,
             context, static_cast<MaterialTextureSlot>(slot));
         samplers_[slot] = TextureSampler(context, TextureReader());
     }
+    // With the fallbacks' heap slots.
+    WriteUniform();
 }
 
 void RasterMaterial::SetTexture(
@@ -428,27 +434,9 @@ void RasterMaterial::SetTexture(
     WriteUniform();
 }
 
-void RasterMaterial::AppendTextureResources(
-    std::vector<DescriptorResource>& resources) const {
-    for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
-        const GpuImage& image = textures_[slot] != nullptr
-                                    ? *textures_[slot]->image
-                                    : *fallbacks_[slot];
-        resources.push_back(DescriptorResource::Of(
-            image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            *samplers_[slot]));
-    }
-}
-
 void RasterMaterial::AppendResources(
     std::vector<DescriptorResource>& resources) const {
     resources.push_back(DescriptorResource::Of(uniform_));
-    resources.push_back(DescriptorResource::Of(albedoMap_->View()));
-    resources.push_back(
-        DescriptorResource::Of(detailAlbedo_->View()));
-    resources.push_back(
-        DescriptorResource::Of(detailNormal_->View()));
-    resources.push_back(DescriptorResource::Of(sampler_));
 }
 
 void RasterMaterial::SetAlbedoMap(const RasterView& albedo) {
@@ -670,6 +658,36 @@ void RasterMaterial::WriteUniform() {
     u.emission[0] = settings.emission.r;
     u.emission[1] = settings.emission.g;
     u.emission[2] = settings.emission.b;
+    // The textures and samplers in the bindless heap, in fresh slots
+    // with each write: the last ones retire once no frame in flight
+    // reads them. Slot 0 stands for one not made yet, never sampled.
+    BindlessHeap& heap = context_.Bindless();
+    heapSlots_.clear();
+    const auto image = [&](const GpuImage* texture) -> std::uint32_t {
+        if (texture == nullptr) {
+            return 0;
+        }
+        heapSlots_.push_back(heap.AddImage(
+            BindlessHeap::Kind::Texture2D, texture->View()));
+        return heapSlots_.back().Index();
+    };
+    const auto sampler = [&](const Sampler* filter) -> std::uint32_t {
+        if (filter == nullptr) {
+            return 0;
+        }
+        heapSlots_.push_back(heap.AddSampler(filter->Handle()));
+        return heapSlots_.back().Index();
+    };
+    u.heap[0] = image(albedoMap_.get());
+    u.heap[1] = image(detailAlbedo_.get());
+    u.heap[2] = image(detailNormal_.get());
+    u.heap[3] = sampler(&sampler_);
+    for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
+        u.heap[4 + slot] = image(textures_[slot] != nullptr
+                                     ? textures_[slot]->image.get()
+                                     : fallbacks_[slot].get());
+        u.heap[9 + slot] = sampler(samplers_[slot].get());
+    }
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 

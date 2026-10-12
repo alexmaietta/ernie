@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Mesh and PointInstancer passes. Geometry is pulled from storage buffers rather than vertex
 // buffers, read through their addresses. Besides the frame (bindings 0 and 1, frame.slang) and
-// the draw's material (5 to 9, surface.slang) the passes bind
-//   10 the buffers' addresses (`MeshResources`),
-//   22 the material's albedo texture, 23 its normal map, 24 its roughness, 25 its metallic and
-//   26 its opacity texture, each with its own sampler
-//   (`RasterMaterial::AppendTextureResources`).
+// the draw's material (5, surface.slang, whose textures come from the bindless heap: its albedo
+// texture, normal map, roughness, metallic and opacity texture, each with its own sampler, through
+// `materialTexture`) the passes bind
+//   10 the buffers' addresses (`MeshResources`).
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import surface;
@@ -86,17 +85,17 @@ static uint4* drawRecords = meshResources.drawRecords;
 static float* uvs = meshResources.uvs;
 static float* instanceColors = meshResources.instanceColors;
 static int* activeCounts = meshResources.activeCounts;
-[[vk::binding(22, 0)]] Sampler2D albedoTexture;
-// Tangent-space normals as `surface.textures.y` says: 1 stored as n * 127 + 128 in 8 bits, with
-// the deviation of the slopes each texel covers in alpha (`MipFilter::NormalSlopes`), as the
-// detail normal map; from DDS and KTX2 files as stored, 2 n / 2 + 1/2 in rgb, 3 the same in rg
-// (BC5) with z rebuilt.
-[[vk::binding(23, 0)]] Sampler2D normalTexture;
-// Roughness and metallic, one channel each in r.
-[[vk::binding(24, 0)]] Sampler2D roughnessTexture;
-[[vk::binding(25, 0)]] Sampler2D metallicTexture;
-// Opacity, one channel in r, for cutouts (`meshCutoutFragmentMain`, `meshShadowCutoutFragment`).
-[[vk::binding(26, 0)]] Sampler2D opacityTexture;
+// The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
+// normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
+// the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
+// DDS and KTX2 files as stored, 2 n / 2 + 1/2 in rgb, 3 the same in rg, BC5, with z rebuilt);
+// roughness and metallic, one channel each in r; opacity, one channel in r, for cutouts
+// (`meshCutoutFragmentMain`, `meshShadowCutoutFragment`).
+static const uint kAlbedoTexture = 0;
+static const uint kNormalTexture = 1;
+static const uint kRoughnessTexture = 2;
+static const uint kMetallicTexture = 3;
+static const uint kOpacityTexture = 4;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
@@ -393,15 +392,17 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
     s.slopeVariance = 0.0;
     s.metallic = 0.0;
     if (surface.textures.z > 0.0) {
-        let roughness = roughnessTexture.Sample(imageUv(transformUv(surface.roughnessUv, st))).r;
+        let roughness =
+            materialTexture(kRoughnessTexture, imageUv(transformUv(surface.roughnessUv, st))).r;
         let alpha = roughness * roughness;
         s.slopeVariance = 0.5 * alpha * alpha;
     }
     if (surface.textures.w > 0.0) {
-        s.metallic = metallicTexture.Sample(imageUv(transformUv(surface.metallicUv, st))).r;
+        s.metallic =
+            materialTexture(kMetallicTexture, imageUv(transformUv(surface.metallicUv, st))).r;
     }
     if (surface.textures.x > 0.0) {
-        let c = albedoTexture.Sample(imageUv(transformUv(surface.albedoUv, st)));
+        let c = materialTexture(kAlbedoTexture, imageUv(transformUv(surface.albedoUv, st)));
         s.albedo = max(c.rgb * surface.albedoTextureScale.rgb + surface.albedoTextureBias.rgb,
                        float3(0.0));
     }
@@ -416,7 +417,7 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
         let bitangent = handedness * (dp2perp * duvdx.y + dp1perp * duvdy.y);
         let size = max(dot(tangent, tangent), dot(bitangent, bitangent));
         if (size > 1e-30) {
-            let texel = normalTexture.Sample(imageUv(normalUv));
+            let texel = materialTexture(kNormalTexture, imageUv(normalUv));
             var n = (texel.xyz * 255.0 - 128.0) / 127.0;
             if (surface.textures.y > 2.5) {
                 let xy = texel.xy * 2.0 - 1.0;
@@ -446,7 +447,7 @@ GBuffer meshFragmentMain(VertexOutput in) {
 // The surface's opacity at texture coordinates `st`: its texture's, or its constant.
 float surfaceOpacity(float2 st) {
     if (surface.opacity.z > 0.0) {
-        return opacityTexture.Sample(imageUv(transformUv(surface.opacityUv, st))).r;
+        return materialTexture(kOpacityTexture, imageUv(transformUv(surface.opacityUv, st))).r;
     }
     return surface.opacity.x;
 }

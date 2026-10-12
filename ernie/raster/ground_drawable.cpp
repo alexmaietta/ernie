@@ -50,16 +50,12 @@ constexpr std::size_t kViewWord = 21;
 constexpr VkShaderStageFlags kGraphics =
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-/// Frame (0 and 1), material (5 to 9) and ground (10) bindings; see
+/// Frame (0 and 1), material (5) and ground (10) bindings; see
 /// ground.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
-    {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
     {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 

@@ -52,7 +52,7 @@ std::string ShaderSource(const std::string& name) {
 }
 
 // Detail albedo (red) and slope from hexDetail at each tile-space
-// point. The material binds at 5 to 9 as in every raster pass; the
+// point. The material binds at 5 as in every raster pass; the
 // harness's buffers follow at 10 and 11.
 constexpr char kHarness[] = R"(import surface;
 
@@ -92,10 +92,6 @@ class HexTilingGpuTest : public ernie::testing::VulkanTest {
             VK_SHADER_STAGE_COMPUTE_BIT;
         const DescriptorBinding bindings[] = {
             {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kCompute},
-            {6, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-            {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-            {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
-            {9, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
             {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
             {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute}};
         const PipelineLayout layout(*context_, bindings, 80);

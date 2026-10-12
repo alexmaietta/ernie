@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Planet resources and the cube-sphere CDLOD grid vertex, used by the planet's shadow and colour
-// passes. Besides the frame (bindings 0 and 1, frame.slang) and material (5 to 9, surface.slang)
+// passes. Besides the frame (bindings 0 and 1, frame.slang) and material (5, surface.slang)
 // the passes bind
 //   10 PlanetUniforms, 11 heights, 12 LOD patches, 13 height gradients, 14 patch anchors.
 __exported import frame;

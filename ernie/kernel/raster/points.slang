@@ -4,7 +4,7 @@
 // the hit's depth, so the spheres are exact at any distance and sort against everything else.
 // Draw `draw.first` of `draws`; instance `i` of the draw is point `i`, six vertices each.
 //
-// Bindings: frame 0 and 1 (frame.slang), material 5 to 9 (surface.slang), 10 the buffers'
+// Bindings: frame 0 and 1 (frame.slang), material 5 (surface.slang), 10 the buffers'
 // addresses (`PointsResources`: positions in two halves for motion blur, widths, colours, the
 // draws, the visible chunks of culled draws); 14 the motion pass's view; culling's 19 and 20.
 //
