@@ -2668,7 +2668,7 @@ void MeshDrawable::Cull(const FrameParams& params,
                                          return !c.gpuFitted;
                                      }));
     std::vector<std::vector<std::optional<Bounds3>>> bounds(
-        items_.size());
+        tested ? items_.size() : 0);
     for (std::size_t i = 0; i < items_.size() && tested; ++i) {
         for (const WorldRange& range : itemRanges_[i]) {
             bounds[i].push_back(range.count == 0
@@ -2708,17 +2708,21 @@ void MeshDrawable::Cull(const FrameParams& params,
     // The draw ranges a view or shadow view may see, in item order:
     // every one, or for one world its own and (unless it skips them)
     // the shared ones, so a view of one of many worlds looks at its
-    // world's ranges only.
-    using RangeIndex = std::pair<std::size_t, std::size_t>;
-    std::vector<RangeIndex> everyRange;
-    std::unordered_map<std::int32_t, std::vector<RangeIndex>>
-        rangesOfWorld;
-    for (std::size_t i = 0; i < items_.size(); ++i) {
-        for (std::size_t r = 0; r < itemRanges_[i].size(); ++r) {
-            everyRange.emplace_back(i, r);
-            rangesOfWorld[itemRanges_[i][r].world].emplace_back(i, r);
+    // world's ranges only. Indexed again only when the ranges change.
+    if (rangeIndexVersion_ != layoutVersion_) {
+        rangeIndexVersion_ = layoutVersion_;
+        everyRange_.clear();
+        rangesOfWorld_.clear();
+        for (std::size_t i = 0; i < items_.size(); ++i) {
+            for (std::size_t r = 0; r < itemRanges_[i].size(); ++r) {
+                everyRange_.emplace_back(i, r);
+                rangesOfWorld_[itemRanges_[i][r].world].emplace_back(
+                    i, r);
+            }
         }
     }
+    const std::vector<RangeIndex>& everyRange = everyRange_;
+    const auto& rangesOfWorld = rangesOfWorld_;
     std::map<std::pair<std::int32_t, bool>, std::vector<RangeIndex>>
         seenRanges;
     const std::vector<RangeIndex> none;
@@ -3534,6 +3538,9 @@ std::size_t MeshDrawable::Record(
     };
     std::optional<Batch> batch;
     const auto materialOf = [&](std::uint32_t item) {
+        if (item < itemMaterials_.size()) {
+            return itemMaterials_[item];
+        }
         const std::uint32_t material = items_[item].material;
         return renderer_.HasMaterial(material)
                    ? material

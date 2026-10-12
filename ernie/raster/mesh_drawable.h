@@ -1016,6 +1016,15 @@ class MeshDrawable : public RasterDrawable {
     /// Whether `SetItems` may have moved items `SettleMotion` has yet
     /// to settle.
     bool itemsMoving_ = false;
+    /// A draw range: its item and its index in the item's ranges.
+    using RangeIndex = std::pair<std::size_t, std::size_t>;
+    /// Every draw range in item order, and each world's (-1 the
+    /// shared ones'), as of `layoutVersion_` `rangeIndexVersion_`
+    /// (`Cull`).
+    std::vector<RangeIndex> everyRange_;
+    std::unordered_map<std::int32_t, std::vector<RangeIndex>>
+        rangesOfWorld_;
+    std::uint64_t rangeIndexVersion_ = ~std::uint64_t{0};
     std::vector<std::uint32_t>
         cullDrawCounts_;  ///< Per job, its indirect draws (levels).
     /// Counts changes to what the cull lists are made of: the items,

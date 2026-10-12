@@ -2800,29 +2800,34 @@ void RasterRenderer::Update(
                       "Views' uniforms are an array");
         std::vector<Uniforms> viewUniforms(views_);
         for (std::uint32_t v = 0; v < views_; ++v) {
-            const CameraView viewOf = raster.View(v);
             Uniforms& uniforms = viewUniforms[v];
-            // A pushbroom projects through its strip in place of a
-            // view-projection (`projectWorld`).
-            if (params.camera.pushbroom) {
-                const PushbroomStrip strip = params.Strip(v);
-                CopyMatrix(uniforms.viewProjection, strip.Packed());
-                const glm::vec4 intrinsics = strip.Intrinsics();
-                std::memcpy(uniforms.strip,
-                            glm::value_ptr(intrinsics),
-                            sizeof(uniforms.strip));
-            } else {
-                CopyMatrix(uniforms.viewProjection,
-                           viewOf.ViewProjection());
+            // With the poses on the GPU, it writes the camera
+            // (`RecordViewPoses`).
+            if (!posesOnGpu_) {
+                const CameraView viewOf = raster.View(v);
+                // A pushbroom projects through its strip in place of
+                // a view-projection (`projectWorld`).
+                if (params.camera.pushbroom) {
+                    const PushbroomStrip strip = params.Strip(v);
+                    CopyMatrix(uniforms.viewProjection,
+                               strip.Packed());
+                    const glm::vec4 intrinsics = strip.Intrinsics();
+                    std::memcpy(uniforms.strip,
+                                glm::value_ptr(intrinsics),
+                                sizeof(uniforms.strip));
+                } else {
+                    CopyMatrix(uniforms.viewProjection,
+                               viewOf.ViewProjection());
+                }
+                uniforms.forward[0] = viewOf.forward.x;
+                uniforms.forward[1] = viewOf.forward.y;
+                uniforms.forward[2] = viewOf.forward.z;
+                uniforms.forward[3] =
+                    glm::dot(viewOf.eye, viewOf.forward);
+                uniforms.eye[0] = viewOf.eye.x;
+                uniforms.eye[1] = viewOf.eye.y;
+                uniforms.eye[2] = viewOf.eye.z;
             }
-            uniforms.forward[0] = viewOf.forward.x;
-            uniforms.forward[1] = viewOf.forward.y;
-            uniforms.forward[2] = viewOf.forward.z;
-            uniforms.forward[3] =
-                glm::dot(viewOf.eye, viewOf.forward);
-            uniforms.eye[0] = viewOf.eye.x;
-            uniforms.eye[1] = viewOf.eye.y;
-            uniforms.eye[2] = viewOf.eye.z;
             uniforms.eye[3] = params.exposure;
             uniforms.flags[0] =
                 static_cast<std::uint32_t>(params.wireframe);
@@ -3435,22 +3440,26 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     std::vector<ShadingUniforms> viewShading;
     viewShading.reserve(views_);
     for (std::uint32_t v = 0; v < views_; ++v) {
-        const CameraView view = params.View(v);
-        if (params.camera.pushbroom) {
-            // Its pixels' rays come from its strip
-            // (projection_pushbroom.slang).
-            const PushbroomStrip strip = params.Strip(v);
-            CopyMatrix(shading.invViewProj, strip.Packed());
-            const glm::vec4 intrinsics = strip.Intrinsics();
-            std::memcpy(shading.strip, glm::value_ptr(intrinsics),
-                        sizeof(shading.strip));
-        } else {
-            CopyMatrix(shading.invViewProj,
-                       glm::inverse(view.ViewProjection()));
+        // With the poses on the GPU, it writes the camera
+        // (`RecordViewPoses`).
+        if (!posesOnGpu_) {
+            const CameraView view = params.View(v);
+            if (params.camera.pushbroom) {
+                // Its pixels' rays come from its strip
+                // (projection_pushbroom.slang).
+                const PushbroomStrip strip = params.Strip(v);
+                CopyMatrix(shading.invViewProj, strip.Packed());
+                const glm::vec4 intrinsics = strip.Intrinsics();
+                std::memcpy(shading.strip, glm::value_ptr(intrinsics),
+                            sizeof(shading.strip));
+            } else {
+                CopyMatrix(shading.invViewProj,
+                           glm::inverse(view.ViewProjection()));
+            }
+            shading.eye[0] = view.eye.x;
+            shading.eye[1] = view.eye.y;
+            shading.eye[2] = view.eye.z;
         }
-        shading.eye[0] = view.eye.x;
-        shading.eye[1] = view.eye.y;
-        shading.eye[2] = view.eye.z;
         // The lights the view sees: the shared ones and its world's,
         // or all for every world.
         const std::int32_t world = params.ViewWorld(v);
