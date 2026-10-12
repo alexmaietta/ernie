@@ -230,6 +230,9 @@
     X(double, Power, ::ernie::tokens::kLaserPower, 0.001,                                          \
       (::ernie::AttributeMeta{.doc = "Average optical power out of the aperture, W.",              \
                               .group = "Laser", .max = 1e5}))                                      \
+    X(bool, Speckle, ::ernie::tokens::kLaserSpeckle, false,                                        \
+      (::ernie::AttributeMeta{.doc = "Grain on rough surfaces, sized by the camera's aperture.",   \
+                              .group = "Laser"}))                                                  \
     X(glm::dvec2, WaistRadius, ::ernie::tokens::kLaserWaistRadius, glm::dvec2(0.0005),             \
       (::ernie::AttributeMeta{.label = "Waist radius",                                             \
                               .doc = "1/e^2 radius at the waist along x and y, m.",                \

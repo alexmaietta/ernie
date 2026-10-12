@@ -1174,6 +1174,82 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       LaserSpeckleFollowsTheApertureAndThePixel) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    // A wide beam, polarized, on a floor that keeps it: one pattern.
+    Scene scene = LaserScene(20.0, &bandWidth);
+    ernie::LaserLight laser(scene, "/World/Laser");
+    laser.SetPolarizationDegree(1.0);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(1.0);
+    // Pixels 2 um across, the field of view kept.
+    const ernie::CameraParams params = ernie::CameraParamsOf(
+        scene, "/World/Camera", kVarSize, kVarSize);
+    const double pitch = 2e-6;
+    const double shrink =
+        pitch * kVarSize / (params.verticalApertureMm * 1e-3);
+    ernie::Camera camera(scene, "/World/Camera");
+    camera.SetVerticalAperture(params.verticalApertureMm * shrink)
+        .SetHorizontalAperture(params.verticalApertureMm * shrink)
+        .SetFocalLength(params.focalLengthMm * shrink);
+    const std::vector<float> plain = Band8(delegate, scene);
+    const float peak = *std::max_element(plain.begin(), plain.end());
+    ASSERT_GT(peak, 0.0f);
+    // Each lit pixel's light over its light without speckle: the
+    // pattern's mean and contrast.
+    const auto measure = [&](double fNumber) {
+        camera.SetExposureFStop(fNumber);
+        const std::vector<float> speckled = Band8(delegate, scene);
+        double sum = 0.0;
+        double squares = 0.0;
+        int count = 0;
+        for (std::size_t i = 0; i < plain.size(); ++i) {
+            if (plain[i] > 0.5f * peak) {
+                const double ratio = speckled[i] / plain[i];
+                sum += ratio;
+                squares += ratio * ratio;
+                ++count;
+            }
+        }
+        const double mean = sum / count;
+        return glm::dvec2(
+            mean, std::sqrt(squares / count - mean * mean) / mean);
+    };
+    EXPECT_NEAR(measure(4.0).y, 0.0, 1e-6) << "off by default";
+
+    // Patterns M = 1 + p^2 / (1.08 (1.086 lambda N)^2) summed in each
+    // pixel of pitch p, at f-number N: contrast 1 / sqrt(M).
+    laser.SetSpeckle(true);
+    const double lambda =
+        ernie::CameraParamsOf(scene, "/World/Camera", kVarSize,
+                              kVarSize)
+                .bands.Lower(8) *
+            1e-9 +
+        0.5 * bandWidth * 1e-9;
+    const auto contrast = [&](double fNumber, double patterns) {
+        const double cell = 1.086 * lambda * fNumber;
+        return 1.0 /
+               std::sqrt(patterns * (1.0 + pitch * pitch /
+                                               (1.08 * cell * cell)));
+    };
+    // Grains a third of a pixel: about ten in each.
+    const glm::dvec2 fine = measure(1.0);
+    EXPECT_NEAR(fine.x, 1.0, 0.05) << "the light's mean kept";
+    EXPECT_NEAR(fine.y, contrast(1.0, 1.0), 0.06);
+    // Grains a few pixels across: nearly full contrast.
+    const glm::dvec2 coarse = measure(8.0);
+    EXPECT_NEAR(coarse.y, contrast(8.0, 1.0), 0.15);
+    EXPECT_GT(coarse.y, 1.8 * fine.y);
+    // Fixed to the scene: the same frame again.
+    EXPECT_EQ(measure(8.0), coarse);
+    // A floor that depolarizes the light shows two patterns.
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(0.0);
+    EXPECT_NEAR(measure(8.0).y, contrast(8.0, 2.0), 0.12);
+}
+
+TEST_F(RasterDelegateTest,
        SpecularReflectionPolarizesByFresnelsLaws) {
     // FlatScene's floor as black glass (index 1.5), mirroring the sun
     // into the camera in the x-z plane: its light comes off polarized

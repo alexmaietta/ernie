@@ -1524,6 +1524,8 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
     }
     light.beam.waist = glm::vec2(waist);
     light.beam.wavelength = static_cast<float>(wavelength);
+    light.beam.linewidth = static_cast<float>(laser.GetLinewidth());
+    light.beam.speckle = laser.GetSpeckle();
     light.beam.rayleigh = glm::vec2(laser.RayleighRange());
     light.beam.waistDistance =
         static_cast<float>(laser.GetWaistDistance());

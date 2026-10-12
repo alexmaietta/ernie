@@ -146,7 +146,8 @@ struct LightGpu {
     float patternParams[16];
     /// x: texels along each side of its shadow maps, in that corner
     /// of their layers; y: 1 for a batch's distant light, whose maps
-    /// are the shared one then one per world.
+    /// are the shared one then one per world; z: 1 for a laser
+    /// showing speckle; w: its linewidth, nm.
     float map[4];
     /// Light linking (`LinkGroups`): the groups it lights, then those
     /// casting its shadows; the rest unused.
@@ -2156,6 +2157,8 @@ void RasterRenderer::WriteLights(
             entry.beamExtra[1] = beam.IsSpot() ? 0.0f : 1.0f;
             entry.beamExtra[2] = beam.efficiency;
             entry.beamExtra[3] = beam.zeroOrder;
+            entry.map[2] = beam.speckle ? 1.0f : 0.0f;
+            entry.map[3] = beam.linewidth;
             const auto index = static_cast<std::uint32_t>(
                 lightPatterns_.IndexOf(model->id));
             entry.pattern[0] = static_cast<float>(index);
@@ -3514,7 +3517,8 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 const PushbroomStrip strip = params.Strip(v);
                 CopyMatrix(shading.invViewProj, strip.Packed());
                 const glm::vec4 intrinsics = strip.Intrinsics();
-                std::memcpy(shading.strip, glm::value_ptr(intrinsics),
+                std::memcpy(shading.strip,
+                            glm::value_ptr(intrinsics),
                             sizeof(shading.strip));
             } else {
                 CopyMatrix(shading.invViewProj,

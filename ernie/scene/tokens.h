@@ -439,6 +439,12 @@ inline constexpr std::string_view kLaserBeamQuality =
     "ernie:laser:beamQuality";
 inline constexpr std::string_view kLaserApertureRadius =
     "ernie:laser:apertureRadius";
+/// Whether a laser's light shows speckle (bool): the grain coherent
+/// light takes on optically rough surfaces, its size set by the
+/// camera's aperture and its contrast lowered by the pixel's area,
+/// depolarization and the laser's linewidth.
+inline constexpr std::string_view kLaserSpeckle =
+    "ernie:laser:speckle";
 /// A laser's pattern: "spot" (its beam), "line" (fanned over
 /// `fanAngle` degrees along its x axis, its profile along the line
 /// "flat" as a Powell lens gives or "gaussian" as a cylindrical lens
