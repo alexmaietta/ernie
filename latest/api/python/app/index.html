@@ -4118,6 +4118,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            step_clock (ernie._ernie.app.Viewer.step_clock)" href="#ernie._ernie.app.Viewer.step_clock">step_clock</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Advances the sensor clock by <code>seconds</code> at the next frame, paused or not.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            sync (ernie._ernie.app.Viewer.sync)" href="#ernie._ernie.app.Viewer.sync">sync</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4187,6 +4195,14 @@
               –
               <div class="doc-md-description">
                 <p>The viewer's cameras, then the scene's, by path.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>clock_paused</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether the sensor clock stands still between frames; by default it runs with them.</p>
               </div>
             </li>
             <li>
@@ -4458,6 +4474,30 @@
     <div class="doc doc-contents ">
 
         <p>The viewer's cameras, then the scene's, by path.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.clock_paused" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">clock_paused</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">clock_paused: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the sensor clock stands still between frames; by default it runs with them.</p>
 
     </div>
 
@@ -6021,6 +6061,25 @@
     <div class="doc doc-contents ">
 
         <p>Draws one frame; returns whether the window is still open.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.step_clock" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">step_clock</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">step_clock(seconds: float) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Advances the sensor clock by <code>seconds</code> at the next frame, paused or not.</p>
 
 
     </div>

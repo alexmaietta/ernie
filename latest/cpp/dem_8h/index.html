@@ -238,7 +238,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on a simple cylindrical (equirectangular) grid, as LOLA's LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>both ways.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on an equirectangular grid, as LOLA's LDEM products (simple cylindrical, true at the equator) and LROC's NAC DTMs (true at a standard parallel) hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>; NaN where the product has no data) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>along the meridians and that times cos(standardParallel) along the parallels.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>

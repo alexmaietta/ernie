@@ -2041,6 +2041,14 @@
               </div>
             </li>
             <li>
+              <b><code>standard_parallel</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
               <b><code>west_longitude</code></b>
                   (<code><span title="float">float</span></code>)
               –
@@ -2162,6 +2170,27 @@
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">samples: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.CylindricalDem.standard_parallel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">standard_parallel</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">standard_parallel: float</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2581,11 +2610,12 @@
     longitude: float,
     cells: int,
     cell_size: float,
+    fallback: CylindricalDem | None = None,
 ) -&gt; dict</code></pre>
 
     <div class="doc doc-contents first">
 
-        <p>The cells x cells heightfield of <code>dem</code>, <code>cell_size</code> m apart, about a latitude and east longitude (degrees), in a local frame there (x east, y north, z up, its origin on the reference sphere), the planet's curvature in the heights: a dict of heights (float32, the first row northern), origin (x, y of the north-western cell), cell_size and body_to_local (body-fixed metres to the local frame).</p>
+        <p>The cells x cells heightfield of <code>dem</code>, <code>cell_size</code> m apart, about a latitude and east longitude (degrees), in a local frame there (x east, y north, z up, its origin on the reference sphere), the planet's curvature in the heights: a dict of heights (float32, the first row northern), origin (x, y of the north-western cell), cell_size and body_to_local (body-fixed metres to the local frame). Where <code>dem</code> has no data, <code>fallback</code>'s heights (a cylindrical DEM about a high-resolution DTM), else the reference sphere.</p>
 
 
     </div>

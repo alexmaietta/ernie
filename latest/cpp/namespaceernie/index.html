@@ -474,7 +474,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on a simple cylindrical (equirectangular) grid, as LOLA's LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>both ways.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> <br><em>A planet's radius on an equirectangular grid, as LOLA's LDEM products (simple cylindrical, true at the equator) and LROC's NAC DTMs (true at a standard parallel) hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>; NaN where the product has no data) row by row from the northern, each row from the western sample eastwards,</em><code>pixelsPerDegree</code> <em>along the meridians and that times cos(standardParallel) along the parallels.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -1838,6 +1838,10 @@
 <td style="text-align: left;"><a href="#function-localterrainof"><strong>LocalTerrainOf</strong></a> (const <a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a> &amp; dem, double latitudeDeg, double longitudeDeg, std::uint32_t cells, double cellSize) <br></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1LocalTerrain/"><strong>LocalTerrain</strong></a></td>
+<td style="text-align: left;"><a href="#function-localterrainof"><strong>LocalTerrainOf</strong></a> (const <a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> &amp; dem, const <a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a> &amp; fallback, double latitudeDeg, double longitudeDeg, std::uint32_t cells, double cellSize) <br><em>As</em> <code>LocalTerrainOf(dem, ...)</code> <em>, with</em><code>fallback</code> <em>'s heights wherever</em><code>dem</code> <em>has none: a high-resolution DTM inside a regional DEM.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; std::pair&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a> &gt; &gt;</td>
 <td style="text-align: left;"><a href="#function-localtransformedits"><strong>LocalTransformEdits</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; local) <br><em>The attribute values that give the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>.</em></td>
 </tr>
@@ -1991,7 +1995,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1CylindricalDem/"><strong>CylindricalDem</strong></a></td>
-<td style="text-align: left;"><a href="#function-readcylindricaldem"><strong>ReadCylindricalDem</strong></a> (const std::string &amp; labelPath) <br><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical grid.</em></td>
+<td style="text-align: left;"><a href="#function-readcylindricaldem"><strong>ReadCylindricalDem</strong></a> (const std::string &amp; labelPath) <br><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii; reals below -1e30, PDS's null, or not finite are no data) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical or equirectangular grid (true at CENTER_LATITUDE).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1IesProfile/"><strong>IesProfile</strong></a></td>
@@ -4101,6 +4105,20 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-localterrainof_2">function LocalTerrainOf</h3>
+<p><em>As</em> <code>LocalTerrainOf(dem, ...)</code> <em>, with</em><code>fallback</code> <em>'s heights wherever</em><code>dem</code> <em>has none: a high-resolution DTM inside a regional DEM.</em></p>
+<pre><code class="language-C++">LocalTerrain ernie::LocalTerrainOf (
+    const CylindricalDem &amp; dem,
+    const CylindricalDem &amp; fallback,
+    double latitudeDeg,
+    double longitudeDeg,
+    std::uint32_t cells,
+    double cellSize
+) 
+</code></pre>
+<p>Both share <code>dem</code>'s reference radius. </p>
+<hr>
+
 <h3 id="function-localtransformedits">function LocalTransformEdits</h3>
 <p><em>The attribute values that give the prim at</em> <code>path</code> <em>the local transform</em><code>local</code> <em>.</em></p>
 <pre><code class="language-C++">std::vector&lt; std::pair&lt; std::string, Value &gt; &gt; ernie::LocalTransformEdits (
@@ -4539,7 +4557,7 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <hr>
 
 <h3 id="function-readcylindricaldem">function ReadCylindricalDem</h3>
-<p><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical grid.</em></p>
+<p><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes: its IMAGE object (16- or 32-bit LSB integers, or 32-bit LSB reals, each times SCALING_FACTOR, plus the label's OFFSET where the label says the heights are radii; reals below -1e30, PDS's null, or not finite are no data) in the file its ^IMAGE pointer names beside the label, on its IMAGE_MAP_PROJECTION's simple cylindrical or equirectangular grid (true at CENTER_LATITUDE).</em></p>
 <pre><code class="language-C++">CylindricalDem ernie::ReadCylindricalDem (
     const std::string &amp; labelPath
 ) 

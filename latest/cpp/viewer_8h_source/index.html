@@ -443,6 +443,11 @@ class Viewer {
     Lighting GetLighting() const;
     void SetLighting(Lighting lighting);
 
+    bool ClockPaused() const;
+    void SetClockPaused(bool paused);
+
+    void StepClock(double seconds);
+
     enum class Exposure { Default, Auto, Camera };
     Exposure GetExposure() const;
     void SetExposure(Exposure exposure);

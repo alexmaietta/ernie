@@ -306,6 +306,10 @@
 <td style="text-align: left;"><a href="#function-clearscene"><strong>ClearScene</strong></a> () <br><em>Empties the stage for new content: removes every prim but the viewer's own and every overlay but the viewer's (named with a leading "__"), clears the selection and undo history, and forgets the settings, camera and lighting the application chose.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-clockpaused"><strong>ClockPaused</strong></a> () const<br><em>Whether the sensor clock (</em> <code>RenderDelegate::AdvanceTime</code> <em>) stands still between frames; by default it runs with them, a frame's seconds a frame, so pulses and pattern sequences play out.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-close"><strong>Close</strong></a> () <br><em>Asks the window to close;</em> <code>Run</code> <em>returns and</em><code>Step</code> <em>returns false after the current frame.</em></td>
 </tr>
@@ -567,6 +571,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setclockpaused"><strong>SetClockPaused</strong></a> (bool paused) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-setexposure"><strong>SetExposure</strong></a> (<a href="./#enum-exposure"><strong>Exposure</strong></a> exposure) <br></td>
 </tr>
 <tr>
@@ -644,6 +652,10 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-step"><strong>Step</strong></a> () <br><em>Processes window events, syncs the scene, renders the viewport and the UI and presents one frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-stepclock"><strong>StepClock</strong></a> (double seconds) <br><em>Advances the sensor clock by</em> <code>seconds</code> <em>at the next frame, paused or not, as a single step does.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -921,6 +933,12 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <pre><code class="language-C++">void ernie::app::Viewer::ClearScene () 
 </code></pre>
 <p>Call <code>ResetSession</code> once the new content is in. </p>
+<hr>
+
+<h3 id="function-clockpaused">function ClockPaused</h3>
+<p><em>Whether the sensor clock (</em> <code>RenderDelegate::AdvanceTime</code> <em>) stands still between frames; by default it runs with them, a frame's seconds a frame, so pulses and pattern sequences play out.</em></p>
+<pre><code class="language-C++">bool ernie::app::Viewer::ClockPaused () const
+</code></pre>
 <hr>
 
 <h3 id="function-close">function Close</h3>
@@ -1430,6 +1448,13 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 </ul>
 <hr>
 
+<h3 id="function-setclockpaused">function SetClockPaused</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetClockPaused (
+    bool paused
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-setexposure">function SetExposure</h3>
 <pre><code class="language-C++">void ernie::app::Viewer::SetExposure (
     Exposure exposure
@@ -1582,6 +1607,14 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <pre><code class="language-C++">bool ernie::app::Viewer::Step () 
 </code></pre>
 <p>Returns whether the window is still open. </p>
+<hr>
+
+<h3 id="function-stepclock">function StepClock</h3>
+<p><em>Advances the sensor clock by</em> <code>seconds</code> <em>at the next frame, paused or not, as a single step does.</em></p>
+<pre><code class="language-C++">void ernie::app::Viewer::StepClock (
+    double seconds
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-sync">function Sync</h3>

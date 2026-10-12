@@ -234,6 +234,7 @@ struct CylindricalDem {
     double pixelsPerDegree = 1.0;
     double maxLatitudeDeg = 90.0;
     double westLongitudeDeg = 0.0;
+    double standardParallelDeg = 0.0;
     double referenceRadius = 0.0;  
     std::vector&lt;float&gt; heights;
 
@@ -271,6 +272,10 @@ LocalTerrain LocalTerrainOf(const CylindricalDem&amp; dem,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 LocalTerrain LocalTerrainOf(const PolarStereographicDem&amp; dem,
+                            double latitudeDeg, double longitudeDeg,
+                            std::uint32_t cells, double cellSize);
+LocalTerrain LocalTerrainOf(const CylindricalDem&amp; dem,
+                            const CylindricalDem&amp; fallback,
                             double latitudeDeg, double longitudeDeg,
                             std::uint32_t cells, double cellSize);
 
