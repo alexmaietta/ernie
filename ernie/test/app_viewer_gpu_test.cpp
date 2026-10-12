@@ -278,6 +278,33 @@ TEST_F(ViewerTest, FrameAimsAtTheGivenPrims) {
     EXPECT_GT(glm::dot(toFar, camera.Forward()), 0.999);
 }
 
+TEST_F(ViewerTest, LookAtPlacesTheActiveCamera) {
+    // The viewer's own camera, and a scene camera once active, far
+    // from the origin as a planet's view is.
+    const glm::dvec3 eye(2.0e6, -1.0e6, 5.0e5);
+    const glm::dvec3 target(0.0, 0.0, 0.0);
+    for (const Path& path :
+         {Viewer::PerspectiveCamera(), Path("/Cameras/Orbit")}) {
+        if (path != Viewer::PerspectiveCamera()) {
+            SetCamera(scene_, path, CameraParams{});
+            viewer_->SetActiveCamera(path);
+        }
+        viewer_->LookAt(eye, target);
+        const CameraParams camera =
+            CameraParamsOf(scene_, path, 64, 64);
+        // To a part in 10^6 of the distance: the controller's angles
+        // are floats.
+        EXPECT_NEAR(glm::length(camera.Eye() - eye), 0.0,
+                    1e-6 * glm::length(eye - target))
+            << path.String();
+        EXPECT_GT(
+            glm::dot(glm::normalize(target - eye), camera.Forward()),
+            0.999999)
+            << path.String();
+    }
+    EXPECT_THROW(viewer_->LookAt(eye, eye), std::invalid_argument);
+}
+
 TEST_F(ViewerTest, CameraFromViewCopiesTheActiveCamera) {
     const Path made = viewer_->CameraFromView(Path("/Cameras/Saved"));
     EXPECT_EQ(made, Path("/Cameras/Saved"));
