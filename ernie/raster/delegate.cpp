@@ -782,35 +782,13 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             throw UploadError(path, attribute, error.what());
         }
     }
-    // Its temperature texture: its thermal terminal's, one channel in
-    // kelvin after the reader's scale and bias, else its own tensor.
     const Key temperatureKey =
         KeyOf(scene, path, {kThermalTemperatureTexture});
-    const std::string temperatureReader =
-        settings.temperatureTexture
-            ? TextureKey(scene, *settings.temperatureTexture)
-            : std::string();
-    if (material.temperatureTexture != temperatureKey ||
-        material.temperatureReader != temperatureReader) {
+    if (material.temperatureTexture != temperatureKey) {
         material.temperatureTexture = temperatureKey;
-        material.temperatureReader = temperatureReader;
         try {
-            if (settings.temperatureTexture) {
-                TextureReader reader = *settings.temperatureTexture;
-                reader.colorSpace = TextureColorSpace::Raw;
-                const Image image = TextureImageOf(scene, reader);
-                const auto c =
-                    static_cast<std::size_t>(reader.channel);
-                std::vector<float> kelvin;
-                kelvin.reserve(image.pixels.size());
-                for (const glm::vec4& texel : image.pixels) {
-                    kelvin.push_back(texel[c] * reader.scale[c] +
-                                     reader.bias[c]);
-                }
-                gpu.SetTemperatureTexture(kelvin, image.width,
-                                          image.height);
-            } else if (const Tensor* tensor =
-                           prim.GetThermalTemperatureTexture()) {
+            if (const Tensor* tensor =
+                    prim.GetThermalTemperatureTexture()) {
                 const Tensor kelvin = tensor->Contiguous();
                 const std::vector<std::int64_t> shape =
                     kelvin.Shape();

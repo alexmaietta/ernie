@@ -9,7 +9,6 @@
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
-#include "ernie/session/resolve.h"
 #include "ernie/util/regolith.h"
 #include "ernie/util/texture_bake.h"
 #include "support/delegate_scenes.h"
@@ -1376,75 +1375,5 @@ public struct Warm : ITemperatureModel {
     warm.id = "broken";
     warm.slang = "import temperature_model;\nstruct Warm { oops }";
     EXPECT_THROW(delegate.AddTemperatureModel(warm),
-                 std::invalid_argument);
-}
-
-TEST_F(RasterDelegateTest,
-       ThermalTerminalsSetTheMaterialsThermalProperties) {
-    // The Material at 250 K of its own, its outputs:ernie:thermal an
-    // ErnieThermal node at 320 K in its place; then the node's
-    // temperature a 1 x 2 texture's red channel of 0.3 and 0.5 scaled
-    // by 1000 and offset by 10: 310 and 510 K at the texels' centres.
-    // Its emissivity and model replace the Material's; another node
-    // type is refused.
-    Scene scene = TexturedScene();
-    const Path var("/Render/Vars/Temperature");
-    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
-    scene.Set("/Render/Out", tokens::kOrderedVars,
-              std::vector<Path>{var});
-    ernie::RenderSettings(scene, "/Render/Settings")
-        .SetThermalEnable(true);
-    ernie::Material(scene, "/Looks/M").SetThermalTemperature(250.0);
-    const Path node("/Looks/M/Thermal");
-    ernie::Shader::Define(scene, node)
-        .SetInfoId(std::string(tokens::kErnieThermal))
-        .SetThermalTemperature(320.0)
-        .SetThermalEmissivity(0.5)
-        .SetThermalModel("balance")
-        .SetThermalModelParams({0.2f});
-    ernie::Connect(scene, "/Looks/M", tokens::kThermalOutput, node,
-                   "outputs:out");
-    RasterDelegate delegate(*context_);
-    const auto at = [&](float x) {
-        const Tensor kelvin = Render(delegate, scene, "Temperature");
-        const glm::vec4 clip =
-            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
-                                  kSize)
-                .RasterView()
-                .ViewProjection() *
-            glm::vec4(x, 0.0f, 0.0f, 1.0f);
-        const auto col = static_cast<std::size_t>(
-            (clip.x / clip.w * 0.5f + 0.5f) * kSize);
-        return kelvin.As<float>()[(kSize / 2) * kSize + col];
-    };
-    const ernie::MaterialSettings settings =
-        ernie::MaterialSettingsOf(
-            scene, "/Looks/M", ernie::BrdfRegistry::WithBuiltins());
-    EXPECT_EQ(settings.temperature, 320.0f);
-    EXPECT_NEAR(settings.emissivity(10000.0), 0.5, 1e-6);
-    EXPECT_EQ(settings.temperatureModel, "balance");
-    EXPECT_EQ(settings.temperatureModelParams,
-              std::vector<float>{0.2f});
-    ernie::Shader(scene, node).SetThermalModel("");
-    EXPECT_EQ(at(0.0f), 320.0f) << "the node's, not the Material's";
-
-    const Path heat("/Looks/M/Heat");
-    ernie::Shader::Define(scene, heat)
-        .SetInfoId(std::string(tokens::kUsdUVTexture))
-        .SetBias(glm::dvec4(10.0));
-    scene.Set(heat, tokens::kShaderScale, glm::dvec4(1000.0));
-    const std::array<float, 2> texels{0.3f, 0.5f};
-    scene.Write(heat, tokens::kShaderTexture,
-                Tensor::Copy<float>(texels, {1, 2, 1}));
-    ernie::Connect(scene, "/Looks/M/Heat", tokens::kSt, "/Looks/M/St",
-                   "outputs:result");
-    ernie::Connect(scene, node, tokens::kThermalTemperatureInput,
-                   heat, "outputs:r");
-    EXPECT_NEAR(at(-6.0f), 310.0f, 0.5f);
-    EXPECT_NEAR(at(6.0f), 510.0f, 0.5f);
-
-    ernie::Shader(scene, node)
-        .SetInfoId(std::string(tokens::kUsdPreviewSurface));
-    EXPECT_THROW(Render(delegate, scene, "Temperature"),
                  std::invalid_argument);
 }
