@@ -53,8 +53,8 @@ static_assert(sizeof(DrawConstants) == 96,
 constexpr VkShaderStageFlags kGraphics =
     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-/// Frame (0 to 4), material (5 to 9) and points (10 to 13) bindings;
-/// see points.slang.
+/// Frame (0 to 4), material (5 to 9) and points (10, its buffers'
+/// addresses) bindings; see points.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -66,11 +66,7 @@ constexpr DescriptorBinding kBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
 };
 
 /// The motion pass's: the points passes' and 14, the view's
@@ -86,35 +82,37 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {7, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {8, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kGraphics},
     {9, VK_DESCRIPTOR_TYPE_SAMPLER, kGraphics},
-    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
-    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
-    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
-/// Culling's: positions, widths, draws, then jobs, raster views'
-/// Uniforms, light views' matrices, visible chunks and indirect draws
-/// (points.slang's `cullMain`).
+/// Culling's: the cloud's buffers' addresses, then the visible chunks
+/// and indirect draws it writes (points.slang's `cullMain`).
 constexpr DescriptorBinding kCullBindings[] = {
-    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
-    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
-    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
-    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
-    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     VK_SHADER_STAGE_COMPUTE_BIT},
-    {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
     {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
     {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      VK_SHADER_STAGE_COMPUTE_BIT},
 };
+
+/// points.slang's PointsResources: a cloud's passes' buffers'
+/// addresses.
+struct PointsResources {
+    VkDeviceAddress positions;
+    VkDeviceAddress widths;
+    VkDeviceAddress colors;
+    VkDeviceAddress draws;
+    /// The visible chunks culling listed, or the draws when it lists
+    /// none (draws of every point read nothing there).
+    VkDeviceAddress visibleChunks;
+    VkDeviceAddress cullJobs;
+    VkDeviceAddress cullViews;
+    VkDeviceAddress cullLights;
+};
+static_assert(sizeof(PointsResources) == 64,
+              "PointsResources must match points.slang");
 
 /// Points per chunk culling tests together (points.slang's `kChunk`).
 constexpr std::uint32_t kChunk = 64;
@@ -847,6 +845,7 @@ void PointsDrawable::Prepare(
             first, static_cast<std::uint32_t>(jobs_.size()) - first);
     }
     if (jobs_.empty()) {
+        WriteResources();
         return;
     }
     // Each job's indirect draw: six vertices per point, its instances
@@ -878,6 +877,7 @@ void PointsDrawable::Prepare(
                               std::as_bytes(std::span(jobs_)));
     renderer_.Uploads().Write(*cullCommands_,
                               std::as_bytes(std::span(commands)));
+    WriteResources();
 }
 
 void PointsDrawable::RecordCull(VkCommandBuffer commands) const {
@@ -893,12 +893,7 @@ void PointsDrawable::RecordCull(VkCommandBuffer commands) const {
         }
         const Cloud& cloud = clouds_.at(items_[i].points);
         const DescriptorResource resources[] = {
-            DescriptorResource::Of(*cloud.positions),
-            DescriptorResource::Of(*cloud.widths),
-            DescriptorResource::Of(*draws_),
-            DescriptorResource::Of(*cullJobs_),
-            DescriptorResource::Of(renderer_.ViewUniforms()),
-            DescriptorResource::Of(renderer_.LightViewMatrices()),
+            DescriptorResource::Of(*cloud.resources),
             DescriptorResource::Of(*visibleChunks_),
             DescriptorResource::Of(*cullCommands_)};
         cullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -985,19 +980,37 @@ PointsDrawable::Resources(const RasterFrame& frame,
         frame.shadowSampler, frame.clampSampler};
     renderer_.MaterialOrDefault(items_[item].material)
         .AppendResources(resources);
-    const Cloud& cloud = clouds_.at(items_[item].points);
-    for (const GpuBuffer* buffer :
-         {cloud.positions.get(), cloud.widths.get(),
-          cloud.colors.get(), draws_.get()}) {
-        resources.push_back(DescriptorResource::Of(*buffer));
-    }
+    resources.push_back(DescriptorResource::Of(
+        *clouds_.at(items_[item].points).resources));
     return resources;
 }
 
-DescriptorResource PointsDrawable::VisibleResource() const {
-    // Draws of every point read nothing there: the draws stand in.
-    return DescriptorResource::Of(
-        visibleChunks_ != nullptr ? *visibleChunks_ : *draws_);
+void PointsDrawable::WriteResources() {
+    const auto address = [](const auto& buffer) {
+        return buffer != nullptr ? buffer->Address()
+                                 : VkDeviceAddress{0};
+    };
+    for (auto& [handle, cloud] : clouds_) {
+        const PointsResources resources{
+            address(cloud.positions),
+            address(cloud.widths),
+            address(cloud.colors),
+            address(draws_),
+            visibleChunks_ != nullptr ? address(visibleChunks_)
+                                      : address(draws_),
+            address(cullJobs_),
+            renderer_.ViewUniforms().Address(),
+            renderer_.LightViewMatrices().Address()};
+        if (cloud.resources == nullptr) {
+            cloud.resources = std::make_unique<GpuBuffer>(
+                context_, sizeof(resources),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        renderer_.Uploads().Write(
+            *cloud.resources,
+            std::as_bytes(std::span(&resources, 1)));
+    }
 }
 
 void PointsDrawable::RecordMotion(
@@ -1044,7 +1057,6 @@ void PointsDrawable::RecordMotion(
         std::vector<DescriptorResource> resources =
             Resources(frame, i);
         resources.push_back(motion);
-        resources.push_back(VisibleResource());
         motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                            resources);
         DrawConstants constants{};
@@ -1092,9 +1104,8 @@ void PointsDrawable::RecordShadow(
         const std::int32_t job = cascade < shadowJobs_.size()
                                      ? shadowJobs_[cascade][i]
                                      : -1;
-        std::vector<DescriptorResource> resources =
+        const std::vector<DescriptorResource> resources =
             Resources(frame, i);
-        resources.push_back(VisibleResource());
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                      resources);
         DrawConstants constants{};
@@ -1129,9 +1140,8 @@ void PointsDrawable::RecordColor(VkCommandBuffer commands,
     for (std::size_t k = 0; k < viewItems_[view].size(); ++k) {
         const std::uint32_t i = viewItems_[view][k];
         const std::int32_t job = viewJobs_[view][k];
-        std::vector<DescriptorResource> resources =
+        const std::vector<DescriptorResource> resources =
             Resources(frame, i);
-        resources.push_back(VisibleResource());
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                      resources);
         DrawConstants constants{};

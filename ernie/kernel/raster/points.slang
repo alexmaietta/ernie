@@ -4,8 +4,9 @@
 // the hit's depth, so the spheres are exact at any distance and sort against everything else.
 // Draw `draw.first` of `draws`; instance `i` of the draw is point `i`, six vertices each.
 //
-// Bindings: frame 0 to 4 (frame.slang), material 5 to 9 (surface.slang), 10 positions (two halves
-// for motion blur), 11 widths, 12 colours, 13 the draws, 15 the visible chunks of culled draws.
+// Bindings: frame 0 to 4 (frame.slang), material 5 to 9 (surface.slang), 10 the buffers'
+// addresses (`PointsResources`: positions in two halves for motion blur, widths, colours, the
+// draws, the visible chunks of culled draws); 14 the motion pass's view; culling's 19 and 20.
 //
 // Culling on the GPU (`cullMain`, `PointsDrawable::RecordCull`): each job, a cloud in one raster
 // or shadow view, tests its points in chunks of 64 against that view's frustum, taken from its
@@ -38,11 +39,25 @@ struct PointsDraw {
 
 static const uint kChunk = 64;
 
-[[vk::binding(10, 0)]] StructuredBuffer<float> positions;
-[[vk::binding(11, 0)]] StructuredBuffer<float> widths;
-[[vk::binding(12, 0)]] StructuredBuffer<float> colors;
-[[vk::binding(13, 0)]] StructuredBuffer<PointsDraw> draws;
-[[vk::binding(15, 0)]] StructuredBuffer<uint> visibleChunks;
+// The passes' buffers' addresses, a cloud's (renderer's `PointsResources`, points_drawable.cpp):
+// its positions, widths and colours; the draws; the visible chunks culling listed (the draws when
+// it lists none); and culling's jobs, raster views' Uniforms and light views' matrices (below).
+struct PointsResources {
+    float* positions;
+    float* widths;
+    float* colors;
+    PointsDraw* draws;
+    uint* visibleChunks;
+    uint4* cullJobs;
+    float4* cullViews;
+    float4* cullLights;
+}
+[[vk::binding(10, 0)]] ConstantBuffer<PointsResources> pointsResources;
+static float* positions = pointsResources.positions;
+static float* widths = pointsResources.widths;
+static float* colors = pointsResources.colors;
+static PointsDraw* draws = pointsResources.draws;
+static uint* visibleChunks = pointsResources.visibleChunks;
 
 // The point instance `instance` of the draw draws: itself, or for a culled draw (`instanceOffset`
 // 1 + where its visible chunks start) the point of its chunk listed; not `live` past the end.
@@ -60,7 +75,7 @@ uint pointOf(uint instance, out bool live) {
 // Off every view: a vertex of a point that is not drawn.
 static const float4 kNowhere = float4(2.0, 2.0, 0.5, 1.0);
 
-float3 load3(StructuredBuffer<float> buffer, uint i) {
+float3 load3(float* buffer, uint i) {
     return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
 }
 
@@ -330,9 +345,11 @@ void virtualShadowFragment(ShadowVertexOutput in) {
 // float4s apart; 1 a light view, its matrix in `cullLights`), y the view's index, z where its
 // visible chunks start; the jobs' indirect draws (vertices, instances, first vertex, first
 // instance), whose instances start at 0.
-[[vk::binding(16, 0)]] StructuredBuffer<uint4> cullJobs;
-[[vk::binding(17, 0)]] StructuredBuffer<float4> cullViews;
-[[vk::binding(18, 0)]] StructuredBuffer<float4> cullLights;
+// Read through their addresses (`PointsResources`); the visible chunks and indirect draws written
+// through their bindings, atomically.
+static uint4* cullJobs = pointsResources.cullJobs;
+static float4* cullViews = pointsResources.cullViews;
+static float4* cullLights = pointsResources.cullLights;
 [[vk::binding(19, 0)]] RWStructuredBuffer<uint> visibleOut;
 [[vk::binding(20, 0)]] RWStructuredBuffer<uint> cullDraws;
 

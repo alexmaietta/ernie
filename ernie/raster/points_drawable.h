@@ -224,6 +224,9 @@ class PointsDrawable : public RasterDrawable {
         std::shared_ptr<GpuBuffer> positions;
         std::shared_ptr<GpuBuffer> widths;
         std::shared_ptr<GpuBuffer> colors;
+        /// points.slang's PointsResources for its passes, written
+        /// each frame (`WriteResources`).
+        std::unique_ptr<GpuBuffer> resources;
         std::uint32_t set = 0;
         bool moving = false;
         bool written = false;
@@ -250,8 +253,9 @@ class PointsDrawable : public RasterDrawable {
     Bounds3 ItemBounds(std::size_t item) const;
     std::vector<DescriptorResource>
     Resources(const RasterFrame& frame, std::size_t item) const;
-    /// Binding 15: the visible chunks of culled draws.
-    DescriptorResource VisibleResource() const;
+    /// Writes each cloud's `resources` from the buffers in place
+    /// (`Prepare`).
+    void WriteResources();
 
     RasterRenderer& renderer_;
     const VulkanContext& context_;
