@@ -23,6 +23,12 @@ namespace ernie::demos {
 /// count next to each other, with black gaps of `gap` columns.
 Tensor SideBySide(std::span<const Tensor> images, int gap = 4);
 
+/// `values` (rows, cols, as doubles) from `low` (blue) through cyan,
+/// green and yellow to `high` (red), as a uint8 (rows, cols, 3)
+/// image, as Python's `ernie.demo.heatmap`.
+Tensor Heatmap(std::span<const double> values, std::int64_t rows,
+               std::int64_t cols, double low, double high);
+
 /// An sRGB-encoded colour in [0, 1] to linear.
 glm::dvec3 SrgbToLinear(glm::dvec3 srgb);
 

@@ -108,6 +108,32 @@ void RequireDownloads() {
 
 }  // namespace
 
+Tensor Heatmap(std::span<const double> values, std::int64_t rows,
+               std::int64_t cols, double low, double high) {
+    constexpr double kStops[5][3] = {{0, 0, 255},
+                                     {0, 255, 255},
+                                     {0, 255, 0},
+                                     {255, 255, 0},
+                                     {255, 0, 0}};
+    Tensor image = Tensor::Zeros(DType::UInt8, {rows, cols, 3});
+    auto* data = static_cast<std::uint8_t*>(image.Data());
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        const double t = std::clamp((values[i] - low) /
+                                        std::max(high - low, 1e-12),
+                                    0.0, 1.0);
+        const double position = t * 4.0;
+        const int index = std::min(static_cast<int>(position), 3);
+        const double fraction = position - index;
+        for (int c = 0; c < 3; ++c) {
+            data[i * 3 + static_cast<std::size_t>(c)] =
+                static_cast<std::uint8_t>(
+                    (1.0 - fraction) * kStops[index][c] +
+                    fraction * kStops[index + 1][c]);
+        }
+    }
+    return image;
+}
+
 Tensor SideBySide(std::span<const Tensor> images, int gap) {
     if (images.empty()) {
         throw std::invalid_argument("SideBySide needs images");
