@@ -196,8 +196,9 @@ std::vector<VirtualShadowLevel> VirtualShadowMap::FitLevels(
 
 std::int32_t VirtualShadowMap::LevelFor(double distance,
                                         double bias) {
+    const double l = std::log2(std::max(distance, 1e-6));
     return static_cast<std::int32_t>(
-        std::floor(std::log2(std::max(distance, 1e-6)) + bias));
+        std::max(std::floor(l + bias), std::ceil(l) - 1.0));
 }
 
 void VirtualShadowMap::SetLevels(
@@ -243,14 +244,18 @@ std::optional<glm::mat4> VirtualShadowMap::CasterCull(
     const VirtualShadowLevel& level,
     const glm::mat4& inverseViewProjection, const glm::vec3& eye,
     float bias, std::uint32_t filterLevels, bool first, bool last) {
-    // Its receivers' distances, a little wider for the shaders' float
-    // rounding of the level.
+    // Its receivers' distances (`LevelFor`, no finer than the level
+    // whose radius reaches them), a little wider for the shaders'
+    // float rounding of the level.
+    const double lowest =
+        level.level - static_cast<double>(filterLevels);
     const double near =
         first ? 0.0
-              : 0.99 * std::exp2(level.level -
-                                 static_cast<double>(filterLevels) -
-                                 bias);
-    const double far = 1.01 * std::exp2(level.level + 1.0 - bias);
+              : 0.99 * std::min(std::exp2(lowest - bias),
+                                std::exp2(lowest));
+    const double far =
+        1.01 * std::max(std::exp2(level.level + 1.0 - bias),
+                        std::exp2(level.level + 1.0));
     const auto unproject = [&](float x, float y, float z) {
         const glm::vec4 h =
             inverseViewProjection * glm::vec4(x, y, z, 1.0f);
@@ -429,8 +434,7 @@ void VirtualShadowMap::RecordMark(
                       markPipeline_->Handle());
     Push(commands, depth,
          ConstantsOf(width, height, inverseViewProjection, eye));
-    vkCmdDispatch(commands, Groups((width + 1) / 2),
-                  Groups((height + 1) / 2), 1);
+    vkCmdDispatch(commands, Groups(width), Groups(height), 1);
     if (volumeBoxCount_ > 0) {
         // Writing the same flags, in any order.
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,

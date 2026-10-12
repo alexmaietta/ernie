@@ -65,6 +65,55 @@ GpuImage FlatDepth(const ernie::VulkanContext& context,
     return image;
 }
 
+/// A depth image of `depth` in its top `rows` rows and the sky's 0
+/// below, ready to sample.
+GpuImage TopRowsDepth(const ernie::VulkanContext& context,
+                      std::uint32_t width, std::uint32_t height,
+                      std::uint32_t rows, float depth) {
+    GpuImage image(
+        context,
+        ernie::ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT,
+                         VK_IMAGE_USAGE_SAMPLED_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_DST_BIT});
+    std::vector<float> texels(std::size_t{width} * height, 0.0f);
+    std::fill_n(texels.begin(), std::size_t{width} * rows, depth);
+    GpuBuffer staging(context, texels.size() * sizeof(float),
+                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                      ernie::BufferMemory::Upload);
+    staging.Write(std::as_bytes(std::span(texels)));
+    context.Submit([&](VkCommandBuffer commands) {
+        image.Transition(commands,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
+                                   1};
+        region.imageExtent = {width, height, 1};
+        vkCmdCopyBufferToImage(
+            commands, staging.Handle(), image.Handle(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        image.Transition(commands,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    });
+    return image;
+}
+
+/// The page table index of the page holding `p` (origin-relative) in
+/// level `index` of `levels`.
+std::size_t
+PageOf(const std::vector<ernie::VirtualShadowLevel>& levels,
+       std::size_t index, const glm::dvec3& p) {
+    const glm::dvec4 clip =
+        glm::dmat4(levels[index].viewProjection) * glm::dvec4(p, 1.0);
+    const double texels = VirtualShadowMap::kVirtualTexels;
+    const auto x =
+        static_cast<std::size_t>((clip.x * 0.5 + 0.5) * texels);
+    const auto y =
+        static_cast<std::size_t>((0.5 - clip.y * 0.5) * texels);
+    const std::size_t across = VirtualShadowMap::kPagesAcross;
+    const std::size_t page = VirtualShadowMap::kPageTexels;
+    return (index * across + y / page) * across + x / page;
+}
+
 std::uint32_t Backed(const std::vector<std::uint32_t>& table) {
     std::uint32_t backed = 0;
     for (const std::uint32_t entry : table) {
@@ -74,6 +123,40 @@ std::uint32_t Backed(const std::vector<std::uint32_t>& table) {
 }
 
 }  // namespace
+
+// The depth buffer's top rows see the top of the view, clip y near
+// +1, as the views draw them with the viewport flipped: they mark the
+// pages there, not those of the bottom of the view.
+TEST_F(VirtualShadowMapTest, TheTopRowsMarkTheTopOfTheView) {
+    ernie::ShaderCompiler compiler;
+    VirtualShadowMap map(*context_, compiler, -2, 12, 256);
+    const glm::dvec3 eye(0.0, 0.0, 5.0);
+    const auto levels = VirtualShadowMap::FitLevels(
+        glm::normalize(glm::dvec3(0.3, 0.2, 1.0)), eye, eye, -2, 12);
+    // Points 10 to 15 m away in level 5 and its 2 m pages.
+    map.SetLevels(levels, 2.0f);
+    // Clip x, y at depth 0.5 to the ground 5 m below the eye, 10 m
+    // out.
+    glm::mat4 inverse(0.0f);
+    inverse[0][0] = 10.0f;
+    inverse[1][1] = 10.0f;
+    inverse[3][2] = -5.0f;
+    inverse[3][3] = 1.0f;
+    const GpuImage depth = TopRowsDepth(*context_, 64, 48, 4, 0.5f);
+    context_->Submit([&](VkCommandBuffer commands) {
+        map.RecordMark(commands, depth.View(), 64, 48, inverse,
+                       glm::vec3(0.0f));
+        map.RecordAllocate(commands);
+    });
+    const std::vector<std::uint32_t> table = WordsOf(map.PageTable());
+    const std::size_t level5 = 5 + 2;
+    EXPECT_NE(table[PageOf(levels, level5, {0.0, 9.2, -5.0})] >> 31,
+              0u)
+        << "the top of the view";
+    EXPECT_EQ(table[PageOf(levels, level5, {0.0, -9.2, -5.0})] >> 31,
+              0u)
+        << "not its bottom";
+}
 
 // A 20 m square of ground seen from 5 m above its centre: its points
 // mark pages in the levels suiting 5 to 15 m and the next four, plus

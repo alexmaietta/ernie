@@ -91,7 +91,9 @@ class VirtualShadowMap {
 
     /// The level whose texels suit a receiver `distance` metres from
     /// the camera: floor(log2 distance + bias), as Unreal's clipmap
-    /// level selection.
+    /// level selection, but no finer than ceil(log2 distance) - 1,
+    /// the level whose radius reaches it, which a negative bias (a
+    /// long lens) would otherwise undercut.
     static std::int32_t LevelFor(double distance, double bias);
 
     std::int32_t FirstLevel() const {
@@ -149,7 +151,7 @@ class VirtualShadowMap {
 
     static constexpr std::uint32_t kMaxVolumeBoxes = 256;
 
-    /// Flags the pages of every second pixel's point in `depth`
+    /// Flags the pages of every pixel's point in `depth`
     /// (reversed-Z, 0 far; sampled as `VK_IMAGE_LAYOUT_SHADER_READ_
     /// ONLY_OPTIMAL`), `inverseViewProjection` taking clip space to
     /// origin-relative world, the camera at `eye` (origin-relative);

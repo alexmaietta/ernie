@@ -85,7 +85,11 @@ TEST(VirtualShadowMap, LevelsSuitTheDistance) {
     EXPECT_EQ(VirtualShadowMap::LevelFor(1.9, 0.0), 0);
     EXPECT_EQ(VirtualShadowMap::LevelFor(2.0, 0.0), 1);
     EXPECT_EQ(VirtualShadowMap::LevelFor(0.3, 0.0), -2);
-    EXPECT_EQ(VirtualShadowMap::LevelFor(1000.0, -1.0), 8);
+    EXPECT_EQ(VirtualShadowMap::LevelFor(1000.0, 1.0), 10);
+    // A negative bias goes no finer than the level whose radius
+    // reaches the receiver: level 8's is 512 m.
+    EXPECT_EQ(VirtualShadowMap::LevelFor(1000.0, -1.0), 9);
+    EXPECT_EQ(VirtualShadowMap::LevelFor(1000.0, -4.0), 9);
     // A receiver's level holds it: within R of the camera.
     for (const double d : {0.7, 3.0, 50.0, 4.2e5}) {
         const double r =
@@ -114,7 +118,7 @@ TEST(VirtualShadowMap, WideLightsFilterInCoarserLevels) {
 // behind it; a level for distances nearer than the near plane draws
 // nothing.
 TEST(VirtualShadowMap, LevelsCullToTheirReceivers) {
-    // 10 m up looking along +y, reversed-Z, the near plane 0.1 m
+    // 10 m up looking along +y, reversed-Z, the near plane 0.2 m
     // away.
     const glm::dvec3 eye(0.0, 0.0, 10.0);
     const glm::dmat4 view = glm::lookAtRH(
@@ -124,12 +128,13 @@ TEST(VirtualShadowMap, LevelsCullToTheirReceivers) {
     reverse[3][2] = 1.0;
     const glm::dmat4 projection =
         reverse *
-        glm::perspectiveRH_ZO(glm::radians(60.0), 1.0, 0.1, 1.0e4);
+        glm::perspectiveRH_ZO(glm::radians(60.0), 1.0, 0.2, 1.0e4);
     const glm::mat4 inverse(glm::inverse(projection * view));
     const auto levels = VirtualShadowMap::FitLevels(
         kToSun, eye, glm::dvec3(0.0), -4, 22);
     constexpr float kBias = 1.0f;
-    // Level -4 holds distances to 2^(-4) m, short of the near plane.
+    // Level -4 holds distances to 2^(-3) m, its radius, short of the
+    // near plane.
     EXPECT_FALSE(VirtualShadowMap::CasterCull(
         levels[0], inverse, glm::vec3(eye), kBias, 0, false, false));
     // Level 5 holds 16 to 32 m.

@@ -99,8 +99,11 @@ public void virtualShadowWrite(VirtualShadow* map, float4 position, uint levelIn
 
 // The level whose texels suit a receiver `distance` metres from the camera, as
 // `VirtualShadowMap::LevelFor`.
+// No finer than the level whose radius reaches the receiver, so a negative bias (a long lens)
+// cannot pick a level whose square, about the camera, misses it.
 public int virtualLevelFor(float distance, float bias) {
-    return int(floor(log2(max(distance, 1e-6)) + bias));
+    let l = log2(max(distance, 1e-6));
+    return int(max(floor(l + bias), ceil(l) - 1.0));
 }
 
 // The stored depth over `world` (origin-relative) in level `levelIndex` or, where its page is not
@@ -144,6 +147,13 @@ struct VirtualConstants {
 [[vk::binding(1, 0)]] Texture2D<float> depth;
 [[vk::push_constant]] ConstantBuffer<VirtualConstants> constants;
 
+// The clip-space x and y of depth buffer pixel `pixel`'s centre, as shading reconstructs it: the
+// views draw with a flipped viewport, row 0 at the top, y = +1.
+float2 virtualPixelNdc(uint2 pixel) {
+    let uv = (float2(pixel) + 0.5) / float2(constants.sizes.xy);
+    return float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+}
+
 // Flags the page of virtual texel `texel` of level `levelIndex` and, within 5% of a page of its
 // edges, those beside it, so filters near a page's edge find their neighbours backed.
 void markAround(uint levelIndex, float2 texel) {
@@ -157,8 +167,9 @@ void markAround(uint levelIndex, float2 texel) {
     }
 }
 
-// Every second pixel of the depth buffer in x and y, as Unreal marks: the page of its point in
-// the level that suits its distance.
+// Every pixel of the depth buffer: the page of its point in the level that suits its distance.
+// Unreal marks every second pixel in x and y, which at grazing views leaves the pages between
+// two rows' points unmarked far out on the ground.
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void markMain(uint3 id: SV_DispatchThreadID) {
@@ -172,7 +183,7 @@ void markMain(uint3 id: SV_DispatchThreadID) {
             }
         }
     }
-    let pixel = id.xy * 2;
+    let pixel = id.xy;
     if (any(pixel >= constants.sizes.xy)) {
         return;
     }
@@ -180,7 +191,7 @@ void markMain(uint3 id: SV_DispatchThreadID) {
     if (d <= 0.0) {
         return;  // the sky
     }
-    let ndc = (float2(pixel) + 0.5) / float2(constants.sizes.xy) * 2.0 - 1.0;
+    let ndc = virtualPixelNdc(pixel);
     let h = mul(constants.inverseViewProjection, float4(ndc, d, 1.0));
     let world = h.xyz / h.w;
     let level = virtualLevelFor(length(world - constants.eye.xyz), map.bias) - map.firstLevel;
@@ -213,7 +224,7 @@ void markVolumesMain(uint3 id: SV_DispatchThreadID) {
     if (any(pixel >= constants.sizes.xy)) {
         return;
     }
-    let ndc = (float2(pixel) + 0.5) / float2(constants.sizes.xy) * 2.0 - 1.0;
+    let ndc = virtualPixelNdc(pixel);
     let eye = constants.eye.xyz;
     let near = mul(constants.inverseViewProjection, float4(ndc, 1.0, 1.0));
     let direction = normalize(near.xyz / near.w - eye);

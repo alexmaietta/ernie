@@ -632,6 +632,10 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
         uint used;
         return virtualShadowDepth(map, index, world, stored, depth, used) ? 1.0 : 0.0;
     }
+    // A surface facing away from the light shadows itself.
+    if (nDotL <= 0.0) {
+        return 0.0;
+    }
     let texelWorld = map.levels[index].info.x;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
     let receiver = world + offset;
@@ -647,8 +651,9 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     // so the plane falling away on one side does not hide blockers a little above it.
     let cosine = clamp(nDotL, 0.05, 1.0);
     let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
-    // The comparisons' slack: a texel and a half of the level used, and more as the receiver's
-    // plane tilts.
+    // The comparisons' slack, per texel of the level a tap's depth comes from (a coarser one where
+    // its page is not backed): a texel and a half, and more as the receiver's plane tilts.
+    let slackTexels = 1.5 + 1.5 * tilt;
     var filterIndex = index;
     var filterTexels = softness;
     let tanRadius = light.extentY.w;
@@ -659,7 +664,6 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
         let searchIndex = virtualCoarserFor(map, index, reach / texelWorld);
         let searchTexel = map.levels[searchIndex].info.x;
         let searchTexels = clamp(reach / searchTexel, softness, kMaxLightFilterTexels);
-        let searchSlack = (1.5 + 1.5 * tilt) * searchTexel;
         var blockers = 0.0;
         var blockerSum = 0.0;
         for (uint i = 0; i < 16; ++i) {
@@ -673,7 +677,7 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
             // Metres towards the light above the receiver's plane there.
             let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
             let height = (stored - depth) / perWorld + dot(n, tap) / cosine;
-            if (height > searchSlack) {
+            if (height > slackTexels * map.levels[used].info.x) {
                 blockers += 1.0;
                 blockerSum += height;
             }
@@ -688,23 +692,26 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
                              kMaxLightFilterTexels);
     }
     let filterTexel = map.levels[filterIndex].info.x;
-    let filterSlack = (1.5 + 1.5 * tilt) * filterTexel;
+    // Taps off every backed page count for nothing, rather than as lit, so a filter reaching past
+    // the pages marked about the receivers does not leak light.
     var lit = 0.0;
+    var taps = 0.0;
     for (uint i = 0; i < 16; ++i) {
         let tap = lightDisk(i, rotation, across, across2, filterTexels * filterTexel);
         float stored;
         float depth;
         uint used;
         if (!virtualShadowDepth(map, filterIndex, receiver + tap, stored, depth, used)) {
-            lit += 1.0;
             continue;
         }
         // Compared at the receiver's plane there, with the slack.
         let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
         let rise = -dot(n, tap) / cosine;
-        lit += stored <= depth + (rise + filterSlack) * perWorld ? 1.0 : 0.0;
+        let slack = slackTexels * map.levels[used].info.x;
+        lit += stored <= depth + (rise + slack) * perWorld ? 1.0 : 0.0;
+        taps += 1.0;
     }
-    return lit / 16.0;
+    return taps > 0.0 ? lit / taps : 1.0;
 }
 
 // Fraction of a light reaching `world` past its shadow map: Poisson-disk PCF with normal offset,
