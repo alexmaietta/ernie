@@ -310,6 +310,41 @@ float sampleField(FieldGpu field, float3 local, inout pnanovdb_readaccessor_t ac
     return lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z);
 }
 
+// Empty-space skipping, exact: when index-space point `index` (on the ray `origin` + `step` t, in
+// march steps `dt` from `start` offset by `jitter`) lies in a tile of `field`'s tree that holds no
+// values (a node above the leaves, all background) and is not within a voxel of its far side, so
+// that every trilinear sample there reads only its zeros, the first step past where the ray
+// leaves that interior; else 0.
+//
+// Reference: K. Museth, "Hierarchical Digital Differential Analyzer for Efficient Ray-Marching in
+//   OpenVDB", SIGGRAPH 2014 Talks. https://doi.org/10.1145/2614106.2614136
+uint stepAfterEmptyTile(FieldGpu field, float3 index, float3 origin, float3 step, float start,
+                        float dt, float jitter, inout pnanovdb_readaccessor_t accessor) {
+    pnanovdb_coord_t ijk;
+    let cell = int3(floor(index));
+    ijk.x = cell.x;
+    ijk.y = cell.y;
+    ijk.z = cell.z;
+    let dim = pnanovdb_readaccessor_get_dim(field.grid.y, grids, accessor, ijk);
+    if (dim <= 1 || valueAt(field.grid.y, ijk, accessor) != 0.0) {
+        return 0;
+    }
+    let low = float3(cell & int3(~int(dim - 1)));
+    let high = low + float(dim) - 1.0;
+    if (any(index >= high)) {
+        return 0;
+    }
+    float exit = 1e30;
+    for (int a = 0; a < 3; ++a) {
+        if (step[a] > 0.0) {
+            exit = min(exit, (high[a] - origin[a]) / step[a]);
+        } else if (step[a] < 0.0) {
+            exit = min(exit, (low[a] - origin[a]) / step[a]);
+        }
+    }
+    return uint(max(ceil((exit - start) / dt - jitter), 0.0));
+}
+
 pnanovdb_readaccessor_t accessorOf(FieldGpu field) {
     pnanovdb_grid_handle_t grid;
     grid.address.byte_offset = field.grid.x == kNoGrid ? 0 : field.grid.x;
@@ -895,9 +930,28 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
         var densityAccessor = accessorOf(volume.density);
         var temperatureAccessor = accessorOf(volume.temperature);
         var emissionAccessor = accessorOf(volume.emission);
+        // Without an emission field of its own, what the volume adds goes with its density, so the
+        // steps in an empty tile of the density's tree add nothing and are skipped: exactly, the
+        // steps after the same as without skipping. The ray in the density grid's index space.
+        let skips = hasDensity && !hasEmission;
+        let indexOrigin = float3(dot(volume.density.toIndex[0], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[1], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[2], float4(o, 1.0)));
+        let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
+                               dot(volume.density.toIndex[1].xyz, d),
+                               dot(volume.density.toIndex[2].xyz, d));
         for (uint i = 0; i < steps && transmittance > kOpaque; ++i) {
             let t = span.x + (float(i) + jitter) * dt;
             let local = o + d * t;
+            if (skips) {
+                let next = stepAfterEmptyTile(volume.density, indexOrigin + indexStep * t,
+                                              indexOrigin, indexStep, span.x, dt, jitter,
+                                              densityAccessor);
+                if (next > i) {
+                    i = next - 1;
+                    continue;
+                }
+            }
             let rho = hasDensity ? max(sampleField(volume.density, local, densityAccessor), 0.0)
                                  : 0.0;
             let sigma = rho * volume.params.x;
