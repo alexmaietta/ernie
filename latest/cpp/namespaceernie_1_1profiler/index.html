@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,7 +203,7 @@
               
                 <h1 id="namespace-ernieprofiler">Namespace ernie::profiler</h1>
 <p><a href="../namespaces/"><strong>Namespace List</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>profiler</strong></a></p>
-<p><em>Ernie's in-process profiler: the zones of</em> <code>ERNIE_ZONE</code> <em>and</em><code>ERNIE_GPU_ZONE</code> <em>(</em><a href="../profile_8h/"><em><strong>ernie/util/profile.h</strong></em></a> <em>,</em><a href="../gpu__profile_8h/"><em><strong>ernie/device/gpu_profile.h</strong></em></a> <em>) recorded frame by frame for a profiler panel, alongside Tracy's (which streams them to its own viewer in a profiling build).</em><a href="#detailed-description">More...</a></p>
+<p><em>Summaries of the profiler's frames (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) as Omniverse Kit's profiler window shows them: each zone nested in the zone that encloses it, with its time averaged over the frames, its share of the frame, and exports as text, JSON and a Chrome trace.</em><a href="#detailed-description">More...</a></p>
 <h2 id="classes">Classes</h2>
 <table>
 <thead>
@@ -214,6 +216,22 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1profiler_1_1Frame/"><strong>Frame</strong></a> <br><em>One frame's zones.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1profiler_1_1Report/"><strong>Report</strong></a> <br><em>The GPU's zones and the CPU's, the latter under a node per thread.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1profiler_1_1ReportFilter/"><strong>ReportFilter</strong></a> <br><em>What to list of a report: zones nested at most</em> <code>depth</code> <em>deep (0: the outermost alone) and taking at least</em><code>minMs</code> <em>, in a tree as they ran or,</em><code>byTime</code> <em>, in one list longest first.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1profiler_1_1ReportNode/"><strong>ReportNode</strong></a> <br><em>A zone's averages over the frames summarized: zones of the same name under the same parent merge.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1profiler_1_1ReportRow/"><strong>ReportRow</strong></a> <br><em>A listed zone and how deep it is shown.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -247,6 +265,10 @@
 <td style="text-align: left;"><a href="#function-clear"><strong>Clear</strong></a> () <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-cpuenabled"><strong>CpuEnabled</strong></a> () <br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint64_t</td>
 <td style="text-align: left;"><a href="#function-currentframe"><strong>CurrentFrame</strong></a> () <br><em>The index of the frame being recorded.</em></td>
 </tr>
@@ -259,6 +281,10 @@
 <td style="text-align: left;"><a href="#function-frames"><strong>Frames</strong></a> () <br><em>The finished frames kept, oldest first, at most</em> <code>History</code> <em>of them.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-gpuenabled"><strong>GpuEnabled</strong></a> () <br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::size_t</td>
 <td style="text-align: left;"><a href="#function-history"><strong>History</strong></a> () <br></td>
 </tr>
@@ -267,8 +293,28 @@
 <td style="text-align: left;"><a href="#function-now"><strong>Now</strong></a> () <br><em>Nanoseconds on the steady clock.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-reportjson"><strong>ReportJson</strong></a> (const <a href="../structernie_1_1profiler_1_1Report/"><strong>Report</strong></a> &amp; report) <br><em>The report as JSON: {"gpu": {"ms", "zones": [...]}, "cpu": ...}, each zone {"name", "ms", "calls", "percent", "children"}.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-reporttext"><strong>ReportText</strong></a> (const <a href="../structernie_1_1profiler_1_1Report/"><strong>Report</strong></a> &amp; report, const <a href="../structernie_1_1profiler_1_1ReportFilter/"><strong>ReportFilter</strong></a> &amp; filter) <br><em>The report as lines of indented names, times and shares.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1profiler_1_1ReportRow/"><strong>ReportRow</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-rows"><strong>Rows</strong></a> (const std::vector&lt; <a href="../structernie_1_1profiler_1_1ReportNode/"><strong>ReportNode</strong></a> &gt; &amp; nodes, const <a href="../structernie_1_1profiler_1_1ReportFilter/"><strong>ReportFilter</strong></a> &amp; filter) <br><em>The rows of</em> <code>nodes</code> <em>that</em><code>filter</code> <em>lists, parents before their children.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-setenabled"><strong>SetEnabled</strong></a> (bool enabled) <br><em>Starts or stops recording; stopping keeps the frames recorded so far.</em></td>
+<td style="text-align: left;"><a href="#function-setcpuenabled"><strong>SetCpuEnabled</strong></a> (bool enabled) <br><em>Starts or stops recording CPU zones (</em> <code>ERNIE_ZONE</code> <em>) alone, or GPU zones (</em><code>ERNIE_GPU_ZONE</code> <em>) alone.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setenabled"><strong>SetEnabled</strong></a> (bool enabled) <br><em>Starts or stops recording CPU and GPU zones both; stopping keeps the frames recorded so far.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setgpuenabled"><strong>SetGpuEnabled</strong></a> (bool enabled) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -279,6 +325,10 @@
 <td style="text-align: left;"><a href="#function-setthreadname"><strong>SetThreadName</strong></a> (std::string name) <br></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1profiler_1_1Report/"><strong>Report</strong></a></td>
+<td style="text-align: left;"><a href="#function-summarize"><strong>Summarize</strong></a> (std::span&lt; const <a href="../structernie_1_1profiler_1_1Frame/"><strong>Frame</strong></a> &gt; frames, const std::vector&lt; std::string &gt; &amp; threadNames) <br><em>Averages</em> <code>frames</code> <em>' zones;</em><code>threadNames</code> <em>names the CPU's threads by index (</em><code>ThreadNames</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#function-threadindex"><strong>ThreadIndex</strong></a> () <br><em>The calling thread's index in</em> <code>Zone::thread</code> <em>, and the names threads gave themselves (</em><code>SetThreadName</code> <em>, else "Thread &lt;index&gt;"), by index.</em></td>
 </tr>
@@ -286,10 +336,17 @@
 <td style="text-align: right;">std::vector&lt; std::string &gt;</td>
 <td style="text-align: left;"><a href="#function-threadnames"><strong>ThreadNames</strong></a> () <br></td>
 </tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-tracejson"><strong>TraceJson</strong></a> (std::span&lt; const <a href="../structernie_1_1profiler_1_1Frame/"><strong>Frame</strong></a> &gt; frames, const std::vector&lt; std::string &gt; &amp; threadNames) <br><code>frames</code> <em>in the Trace Event Format: a complete event per zone, the CPU's threads as threads of process 1 and the GPU's zones as process 2, times in microseconds from the first frame.</em></td>
+</tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Recording is off until <code>SetEnabled</code>; while off a zone costs one atomic load.</p>
+<p>Ernie's in-process profiler: the zones of <code>ERNIE_ZONE</code> and <code>ERNIE_GPU_ZONE</code> (<a href="../profile_8h/"><strong>ernie/util/profile.h</strong></a>, <a href="../gpu__profile_8h/"><strong>ernie/device/gpu_profile.h</strong></a>) recorded frame by frame for a profiler panel, alongside Tracy's (which streams them to its own viewer in a profiling build).</p>
+<p>References:
+* NVIDIA, "Profiling", Omniverse Kit SDK manual (the Profiler window: GPU and CPU zone trees, depths, averaging, exports). <a href="https://docs.omniverse.nvidia.com/kit/docs/kit-manual/latest/guide/profiling.html">https://docs.omniverse.nvidia.com/kit/docs/kit-manual/latest/guide/profiling.html</a>
+* Google, "Trace Event Format" (complete events, "ph": "X", and thread-name metadata), read by Perfetto and chrome://tracing. <a href="https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU">https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU</a>Recording is off until <code>SetEnabled</code>; while off a zone costs one atomic load.</p>
 <p>A frame runs from one <code>BeginFrame</code> to the next: CPU zones belong to the frame in which they end, GPU zones to the frame in which their commands were recorded (they arrive later, once the device has run them). The latest frames are kept, oldest first (<code>Frames</code>). </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-addgpuzone">function AddGpuZone</h3>
@@ -312,6 +369,11 @@
 </code></pre>
 <hr>
 
+<h3 id="function-cpuenabled">function CpuEnabled</h3>
+<pre><code class="language-C++">bool ernie::profiler::CpuEnabled () 
+</code></pre>
+<hr>
+
 <h3 id="function-currentframe">function CurrentFrame</h3>
 <p><em>The index of the frame being recorded.</em> </p>
 <pre><code class="language-C++">std::uint64_t ernie::profiler::CurrentFrame () 
@@ -329,6 +391,11 @@
 </code></pre>
 <hr>
 
+<h3 id="function-gpuenabled">function GpuEnabled</h3>
+<pre><code class="language-C++">bool ernie::profiler::GpuEnabled () 
+</code></pre>
+<hr>
+
 <h3 id="function-history">function History</h3>
 <pre><code class="language-C++">std::size_t ernie::profiler::History () 
 </code></pre>
@@ -340,9 +407,51 @@
 </code></pre>
 <hr>
 
+<h3 id="function-reportjson">function ReportJson</h3>
+<p><em>The report as JSON: {"gpu": {"ms", "zones": [...]}, "cpu": ...}, each zone {"name", "ms", "calls", "percent", "children"}.</em> </p>
+<pre><code class="language-C++">std::string ernie::profiler::ReportJson (
+    const Report &amp; report
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-reporttext">function ReportText</h3>
+<p><em>The report as lines of indented names, times and shares.</em> </p>
+<pre><code class="language-C++">std::string ernie::profiler::ReportText (
+    const Report &amp; report,
+    const ReportFilter &amp; filter
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-rows">function Rows</h3>
+<p><em>The rows of</em> <code>nodes</code> <em>that</em><code>filter</code> <em>lists, parents before their children.</em></p>
+<pre><code class="language-C++">std::vector&lt; ReportRow &gt; ernie::profiler::Rows (
+    const std::vector&lt; ReportNode &gt; &amp; nodes,
+    const ReportFilter &amp; filter
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setcpuenabled">function SetCpuEnabled</h3>
+<p><em>Starts or stops recording CPU zones (</em> <code>ERNIE_ZONE</code> <em>) alone, or GPU zones (</em><code>ERNIE_GPU_ZONE</code> <em>) alone.</em></p>
+<pre><code class="language-C++">void ernie::profiler::SetCpuEnabled (
+    bool enabled
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-setenabled">function SetEnabled</h3>
-<p><em>Starts or stops recording; stopping keeps the frames recorded so far.</em> </p>
+<p><em>Starts or stops recording CPU and GPU zones both; stopping keeps the frames recorded so far.</em> </p>
 <pre><code class="language-C++">void ernie::profiler::SetEnabled (
+    bool enabled
+) 
+</code></pre>
+<p><code>Enabled</code> is whether either records. </p>
+<hr>
+
+<h3 id="function-setgpuenabled">function SetGpuEnabled</h3>
+<pre><code class="language-C++">void ernie::profiler::SetGpuEnabled (
     bool enabled
 ) 
 </code></pre>
@@ -362,6 +471,16 @@
 </code></pre>
 <hr>
 
+<h3 id="function-summarize">function Summarize</h3>
+<p><em>Averages</em> <code>frames</code> <em>' zones;</em><code>threadNames</code> <em>names the CPU's threads by index (</em><code>ThreadNames</code> <em>).</em></p>
+<pre><code class="language-C++">Report ernie::profiler::Summarize (
+    std::span&lt; const Frame &gt; frames,
+    const std::vector&lt; std::string &gt; &amp; threadNames
+) 
+</code></pre>
+<p>GPU zones average over the frames whose zones have arrived. </p>
+<hr>
+
 <h3 id="function-threadindex">function ThreadIndex</h3>
 <p><em>The calling thread's index in</em> <code>Zone::thread</code> <em>, and the names threads gave themselves (</em><code>SetThreadName</code> <em>, else "Thread &lt;index&gt;"), by index.</em></p>
 <pre><code class="language-C++">std::uint32_t ernie::profiler::ThreadIndex () 
@@ -373,8 +492,18 @@
 </code></pre>
 <hr>
 
+<h3 id="function-tracejson">function TraceJson</h3>
+<p><code>frames</code> <em>in the Trace Event Format: a complete event per zone, the CPU's threads as threads of process 1 and the GPU's zones as process 2, times in microseconds from the first frame.</em></p>
+<pre><code class="language-C++">std::string ernie::profiler::TraceJson (
+    std::span&lt; const Frame &gt; frames,
+    const std::vector&lt; std::string &gt; &amp; threadNames
+) 
+</code></pre>
+<p>The GPU's own clock is not the host's, so each frame's GPU zones are placed from that frame's start. </p>
+<hr>
+
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/util/profiler.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/util/profile_report.h</code></p>
               
             </div>
           </div><footer>

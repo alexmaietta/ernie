@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,7 +203,7 @@
               
                 <h1 id="struct-ernieframeparams">Struct ernie::FrameParams</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>FrameParams</strong></a></p>
-<p><em>Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights, the sensor filters and the frame's place in the random streams.</em> <a href="#detailed-description">More...</a></p>
+<p><em>Per-frame parameters of a render, whatever the backend: the camera, the lights, the sensor filters and the frame's place in the random streams.</em> <a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
@@ -295,7 +297,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#variable-lights"><strong>lights</strong></a>  <br><em>Other lights; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#variable-lights"><strong>lights</strong></a>  <br><em>The lights, distant ones such as the sun and earthshine among them, all alike; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
@@ -366,22 +368,6 @@
 <td style="text-align: left;"><a href="#variable-stream"><strong>stream</strong></a>   = <code>0</code><br><em>Decorrelates images rendered with the same seed and frame, such as the products of one step:</em> <code>StreamOf</code> <em>the render product's path.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-sun"><strong>sun</strong></a>   = <code>true</code><br><em>Off lights the scene with</em> <code>lights</code> <em>alone (no sun or cascades).</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-sunangle"><strong>sunAngle</strong></a>   = <code>0.53f</code><br><em>Angular diameter of the sun's disk in degrees, which widens shadow penumbrae with the distance from the occluder (percentage-closer soft shadows); 0 keeps</em> <code>shadows.softness</code> <em>.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">glm::vec3</td>
-<td style="text-align: left;"><a href="#variable-sundirection"><strong>sunDirection</strong></a>   = <code>/* multi line expression */</code><br><em>Unit vector pointing towards the sun.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">std::vector&lt; float &gt;</td>
-<td style="text-align: left;"><a href="#variable-sunirradiance"><strong>sunIrradiance</strong></a>  <br><em>The sun's spectral irradiance at normal incidence per band of</em> <code>camera.bands</code> <em>, in W m^-2 nm^-1.</em></td>
-</tr>
-<tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-time"><strong>time</strong></a>   = <code>0.0</code><br><em>The frame on the sensor clock (</em> <code>RenderDelegate::Time</code> <em>), seconds: it ends at</em><code>time</code> <em>, its frame-relative time 0, and starts at</em><code>startTime</code> <em>, the last frame's end, -1.</em></td>
 </tr>
@@ -396,6 +382,10 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; std::string_view &gt;</td>
 <td style="text-align: left;"><a href="#variable-vars"><strong>vars</strong></a>  <br><em>The render vars wanted from the frame; empty for all.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-volumes"><strong>volumes</strong></a>  <br><em>The visible Volumes (</em> <code>VolumesOf</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-wireframe"><strong>Wireframe</strong></a></td>
@@ -589,7 +579,7 @@
 <hr>
 
 <h3 id="variable-lights">variable lights</h3>
-<p><em>Other lights; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></p>
+<p><em>The lights, distant ones such as the sun and earthshine among them, all alike; the rasterizer takes</em> <code>RasterRenderer::kMaxLights</code> <em>.</em></p>
 <pre><code class="language-C++">std::vector&lt;LightParams&gt; ernie::FrameParams::lights;
 </code></pre>
 <hr>
@@ -697,31 +687,6 @@
 </code></pre>
 <hr>
 
-<h3 id="variable-sun">variable sun</h3>
-<p><em>Off lights the scene with</em> <code>lights</code> <em>alone (no sun or cascades).</em></p>
-<pre><code class="language-C++">bool ernie::FrameParams::sun;
-</code></pre>
-<hr>
-
-<h3 id="variable-sunangle">variable sunAngle</h3>
-<p><em>Angular diameter of the sun's disk in degrees, which widens shadow penumbrae with the distance from the occluder (percentage-closer soft shadows); 0 keeps</em> <code>shadows.softness</code> <em>.</em></p>
-<pre><code class="language-C++">float ernie::FrameParams::sunAngle;
-</code></pre>
-<hr>
-
-<h3 id="variable-sundirection">variable sunDirection</h3>
-<p><em>Unit vector pointing towards the sun.</em> </p>
-<pre><code class="language-C++">glm::vec3 ernie::FrameParams::sunDirection;
-</code></pre>
-<hr>
-
-<h3 id="variable-sunirradiance">variable sunIrradiance</h3>
-<p><em>The sun's spectral irradiance at normal incidence per band of</em> <code>camera.bands</code> <em>, in W m^-2 nm^-1.</em></p>
-<pre><code class="language-C++">std::vector&lt;float&gt; ernie::FrameParams::sunIrradiance;
-</code></pre>
-<p>Empty means a flat spectrum scaled so a white Lambertian surface facing the sun has a luminance of 1 cd/m^2 (relative units). </p>
-<hr>
-
 <h3 id="variable-time">variable time</h3>
 <p><em>The frame on the sensor clock (</em> <code>RenderDelegate::Time</code> <em>), seconds: it ends at</em><code>time</code> <em>, its frame-relative time 0, and starts at</em><code>startTime</code> <em>, the last frame's end, -1.</em></p>
 <pre><code class="language-C++">double ernie::FrameParams::time;
@@ -744,6 +709,12 @@
 <pre><code class="language-C++">std::vector&lt;std::string_view&gt; ernie::FrameParams::vars;
 </code></pre>
 <p>Only they are held, and filters that produce none of them do not run (the sensor fuses the rest, <code>PlanSensor</code>). </p>
+<hr>
+
+<h3 id="variable-volumes">variable volumes</h3>
+<p><em>The visible Volumes (</em> <code>VolumesOf</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt;VolumeParams&gt; ernie::FrameParams::volumes;
+</code></pre>
 <hr>
 
 <h3 id="variable-wireframe">variable wireframe</h3>

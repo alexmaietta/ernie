@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,7 +203,7 @@
               
                 <h1 id="struct-ernieapptheme">Struct ernie::app::Theme</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a> <strong>&gt;</strong> <a href="./"><strong>Theme</strong></a></p>
-<p><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI.</em> <a href="#detailed-description">More...</a></p>
+<p><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI: a classic scientific desktop look, as Qt's and GTK's of the 2000s that tools such as PANGU wear (colours read from PANGU v7's renderer GUI): light grey-green windows (#D4D7D0), white sunken fields and raised buttons with one-pixel edges, square corners, black text, a navy accent and pale-blue selection.</em> </p>
 <ul>
 <li><code>#include &lt;ernie/app/theme.h&gt;</code></li>
 </ul>
@@ -216,7 +218,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-accent"><strong>accent</strong></a>   = <code>/* multi line expression */</code><br><em>Changed values, active tools, sliders.</em></td>
+<td style="text-align: left;"><a href="#variable-accent"><strong>accent</strong></a>   = <code>/* multi line expression */</code><br><em>Chosen menu items, active tools.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
@@ -224,19 +226,43 @@
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-border"><strong>border</strong></a>   = <code>/* multi line expression */</code><br><em>Frames', tabs' and popups' edges.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-button"><strong>button</strong></a>   = <code>{0.863f, 0.875f, 0.847f, 1.0f}</code><br><em>Buttons.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-buttonlit"><strong>buttonLit</strong></a>   = <code>/* multi line expression */</code><br><em>A pressed or chosen button.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-checkbox"><strong>checkBox</strong></a>   = <code>{1.0f, 1.0f, 1.0f, 1.0f}</code><br><em>A checked box.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-checkmark"><strong>checkMark</strong></a>   = <code>/* multi line expression */</code><br><em>The check in it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
 <td style="text-align: left;"><a href="#variable-error"><strong>error</strong></a>   = <code>{0.886f, 0.341f, 0.318f, 1.0f}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-field"><strong>field</strong></a>   = <code>/* multi line expression */</code><br><em>Input fields, combos, sliders.</em></td>
+<td style="text-align: left;"><a href="#variable-field"><strong>field</strong></a>   = <code>/* multi line expression */</code><br><em>Input fields, combos.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-fieldhovered"><strong>fieldHovered</strong></a>   = <code>{0.224f, 0.235f, 0.247f, 1.0f}</code><br></td>
+<td style="text-align: left;"><a href="#variable-fieldhovered"><strong>fieldHovered</strong></a>   = <code>{0.957f, 0.965f, 0.945f, 1.0f}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-fontsize"><strong>fontSize</strong></a>   = <code>/* multi line expression */</code><br><em>Text size in pixels at a content scale of 1.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-frameborder"><strong>frameBorder</strong></a>   = <code>1.0f</code><br><em>Fields' and buttons' edge width, in pixels at a content scale of 1.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec2</td>
@@ -260,15 +286,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-overlay"><strong>overlay</strong></a>   = <code>/* multi line expression */</code><br><em>Viewport toolbar pills and HUD.</em></td>
+<td style="text-align: left;"><a href="#variable-overlay"><strong>overlay</strong></a>   = <code>/* multi line expression */</code><br><em>The viewport's toolbar, menus, HUD.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-panel"><strong>panel</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1app_1_1Panel/"><em><strong>Panel</strong></em></a> <em>bodies (Kit's #1F2123).</em></td>
+<td style="text-align: left;"><a href="#variable-overlayborder"><strong>overlayBorder</strong></a>   = <code>/* multi line expression */</code><br><em>The toolbar buttons' edge.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec4</td>
+<td style="text-align: left;"><a href="#variable-panel"><strong>panel</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1app_1_1Panel/"><em><strong>Panel</strong></em></a> <em>bodies (#D4D7D0).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-pillrounding"><strong>pillRounding</strong></a>   = <code>/* multi line expression */</code><br><em>Corner radius of the viewport's toolbar pills.</em></td>
+<td style="text-align: left;"><a href="#variable-pillrounding"><strong>pillRounding</strong></a>   = <code>/* multi line expression */</code><br><em>Corner radius of the viewport's toolbar buttons.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
@@ -276,19 +306,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-rounding"><strong>rounding</strong></a>   = <code>/* multi line expression */</code><br><em>Corner radius of frames, tabs and popups.</em></td>
+<td style="text-align: left;"><a href="#variable-rounding"><strong>rounding</strong></a>   = <code>/* multi line expression */</code><br><em>Corner radius of frames, tabs, popups.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-selection"><strong>selection</strong></a>   = <code>/* multi line expression */</code><br><em>Selected rows (Kit's subtle blue-grey).</em></td>
+<td style="text-align: left;"><a href="#variable-selection"><strong>selection</strong></a>   = <code>/* multi line expression */</code><br><em>Selected and hovered rows.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-separator"><strong>separator</strong></a>   = <code>/* multi line expression */</code><br><em>One-pixel lines between areas.</em></td>
+<td style="text-align: left;"><a href="#variable-separator"><strong>separator</strong></a>   = <code>/* multi line expression */</code><br><em>Lines between areas (#AAADA6).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
-<td style="text-align: left;"><a href="#variable-text"><strong>text</strong></a>   = <code>{0.800f, 0.804f, 0.808f, 1.0f}</code><br></td>
+<td style="text-align: left;"><a href="#variable-text"><strong>text</strong></a>   = <code>{0.0f, 0.0f, 0.0f, 1.0f}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
@@ -300,11 +330,9 @@
 </tr>
 </tbody>
 </table>
-<h2 id="detailed-description">Detailed Description</h2>
-<p>The defaults follow NVIDIA Omniverse Kit's dark look: a near-black tab bar and docking area, charcoal panels, darker input fields, grey labels with light values, section headers as lighter bars, a steel-blue accent for selection and changed values, and dark translucent pills over the viewport. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-accent">variable accent</h3>
-<p><em>Changed values, active tools, sliders.</em> </p>
+<p><em>Chosen menu items, active tools.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::accent;
 </code></pre>
 <hr>
@@ -315,13 +343,43 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-border">variable border</h3>
+<p><em>Frames', tabs' and popups' edges.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::border;
+</code></pre>
+<hr>
+
+<h3 id="variable-button">variable button</h3>
+<p><em>Buttons.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::button;
+</code></pre>
+<hr>
+
+<h3 id="variable-buttonlit">variable buttonLit</h3>
+<p><em>A pressed or chosen button.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::buttonLit;
+</code></pre>
+<hr>
+
+<h3 id="variable-checkbox">variable checkBox</h3>
+<p><em>A checked box.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::checkBox;
+</code></pre>
+<hr>
+
+<h3 id="variable-checkmark">variable checkMark</h3>
+<p><em>The check in it.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::checkMark;
+</code></pre>
+<hr>
+
 <h3 id="variable-error">variable error</h3>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::error;
 </code></pre>
 <hr>
 
 <h3 id="variable-field">variable field</h3>
-<p><em>Input fields, combos, sliders.</em> </p>
+<p><em>Input fields, combos.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::field;
 </code></pre>
 <hr>
@@ -334,6 +392,12 @@
 <h3 id="variable-fontsize">variable fontSize</h3>
 <p><em>Text size in pixels at a content scale of 1.</em> </p>
 <pre><code class="language-C++">float ernie::app::Theme::fontSize;
+</code></pre>
+<hr>
+
+<h3 id="variable-frameborder">variable frameBorder</h3>
+<p><em>Fields' and buttons' edge width, in pixels at a content scale of 1.</em> </p>
+<pre><code class="language-C++">float ernie::app::Theme::frameBorder;
 </code></pre>
 <hr>
 
@@ -366,19 +430,25 @@
 <hr>
 
 <h3 id="variable-overlay">variable overlay</h3>
-<p><em>Viewport toolbar pills and HUD.</em> </p>
+<p><em>The viewport's toolbar, menus, HUD.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::overlay;
 </code></pre>
 <hr>
 
+<h3 id="variable-overlayborder">variable overlayBorder</h3>
+<p><em>The toolbar buttons' edge.</em> </p>
+<pre><code class="language-C++">glm::vec4 ernie::app::Theme::overlayBorder;
+</code></pre>
+<hr>
+
 <h3 id="variable-panel">variable panel</h3>
-<p><a href="../classernie_1_1app_1_1Panel/"><em><strong>Panel</strong></em></a> <em>bodies (Kit's #1F2123).</em></p>
+<p><a href="../classernie_1_1app_1_1Panel/"><em><strong>Panel</strong></em></a> <em>bodies (#D4D7D0).</em></p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::panel;
 </code></pre>
 <hr>
 
 <h3 id="variable-pillrounding">variable pillRounding</h3>
-<p><em>Corner radius of the viewport's toolbar pills.</em> </p>
+<p><em>Corner radius of the viewport's toolbar buttons.</em> </p>
 <pre><code class="language-C++">float ernie::app::Theme::pillRounding;
 </code></pre>
 <hr>
@@ -390,19 +460,19 @@
 <hr>
 
 <h3 id="variable-rounding">variable rounding</h3>
-<p><em>Corner radius of frames, tabs and popups.</em> </p>
+<p><em>Corner radius of frames, tabs, popups.</em> </p>
 <pre><code class="language-C++">float ernie::app::Theme::rounding;
 </code></pre>
 <hr>
 
 <h3 id="variable-selection">variable selection</h3>
-<p><em>Selected rows (Kit's subtle blue-grey).</em> </p>
+<p><em>Selected and hovered rows.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::selection;
 </code></pre>
 <hr>
 
 <h3 id="variable-separator">variable separator</h3>
-<p><em>One-pixel lines between areas.</em> </p>
+<p><em>Lines between areas (#AAADA6).</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::app::Theme::separator;
 </code></pre>
 <hr>

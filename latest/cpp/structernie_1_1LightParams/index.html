@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,7 +203,7 @@
               
                 <h1 id="struct-ernielightparams">Struct ernie::LightParams</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>LightParams</strong></a></p>
-<p><em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em><a href="#detailed-description">More...</a></p>
+<p><em>A light, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
@@ -217,6 +219,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Beam/"><strong>Beam</strong></a> <br><em>A laser's Gaussian beam (Siegman 1986): its 1/e^2 radius at the waist along the light's x and y, its Rayleigh range along each, and the waist's distance along the beam from</em> <code>position</code> <em>, m.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Pose/"><strong>Pose</strong></a> <br><em>Where a light is: its</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>.</em></td>
 </tr>
 </tbody>
 </table>
@@ -262,6 +268,18 @@
 <td style="text-align: left;"><a href="#variable-focustint"><strong>focusTint</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-lightmask"><strong>lightMask</strong></a>   = <code>~0u</code><br><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>linking (</em><code>LinkGroups</code> <em>): the link groups of the surfaces it lights, and of the geometry that casts its shadows, a bit each; every group by default.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-polarization"><strong>polarization</strong></a>   = <code>0.0f</code><br><em>The fraction of its light linearly polarized (</em> <code>tokens::kPolarizationDegree</code> <em>), and its electric field's direction, a unit vector across the light's direction of travel (its +x turned by</em><code>tokens::kPolarizationAngle</code> <em>about its axis).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec3</td>
+<td style="text-align: left;"><a href="#variable-polarizationaxis"><strong>polarizationAxis</strong></a>   = <code>{1.0f, 0.0f, 0.0f}</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-posedongpu"><strong>posedOnGpu</strong></a>   = <code>false</code><br><em>Posed on the GPU under a prim posed there (a lamp on a robot's link):</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>are the CPU's estimate, and the renderer takes the pose the GPU composes for the light and its shadow views (</em><code>RasterRenderer::LightPoseBuffer</code> <em>).</em></td>
 </tr>
@@ -270,12 +288,20 @@
 <td style="text-align: left;"><a href="#variable-position"><strong>position</strong></a>   = <code>/* multi line expression */</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>, rect and disk: world centre.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1LightParams_1_1Pose/"><strong>Pose</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-previous"><strong>previous</strong></a>  <br><em>Its pose at the last frame, for motion blur: with sub-frames (</em> <code>CameraParams::Subframes</code> <em>) a light that moved lights each from where it was then, between this pose and its own.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>  <br><em>Not distant, with an IES profile: its candela,</em> <code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-radius"><strong>radius</strong></a>   = <code>0.0f</code><br><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>radius (irradiance follows the inverse square law outside it and is capped at its surface value inside), or disk radius.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-shadowmask"><strong>shadowMask</strong></a>   = <code>~0u</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -327,7 +353,7 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>In the rasterizer, distant lights get one orthographic shadow map over the scene; sphere lights a perspective map when their cone is at most <code>kMaxSpotConeDegrees</code>, else six (a cube); rect and disk lights a cube at their centre.</p>
+<p>In the rasterizer, distant lights get cascades over a single view, or orthographic maps over the scene in a batch; sphere lights a perspective map when their cone is at most <code>kMaxSpotConeDegrees</code>, else six (a cube); rect and disk lights a cube at their centre.</p>
 <p>The rasterizer shades rect and disk lights with their exact Lambertian irradiance, the vector form factor of the emitter clipped to the receiver's horizon (Lambert's polygon formula; Arvo 1994), and the receiver's BRDF evaluated along that vector. Disks are integrated as 16-gons of the same area.</p>
 <p>Reference: J. Arvo, "The Irradiance Jacobian for Partially
 Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.org/10.1145/192161.192250">https://doi.org/10.1145/192161.192250</a> </p>
@@ -380,6 +406,23 @@ Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.
 </code></pre>
 <hr>
 
+<h3 id="variable-lightmask">variable lightMask</h3>
+<p><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>linking (</em><code>LinkGroups</code> <em>): the link groups of the surfaces it lights, and of the geometry that casts its shadows, a bit each; every group by default.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::LightParams::lightMask;
+</code></pre>
+<hr>
+
+<h3 id="variable-polarization">variable polarization</h3>
+<p><em>The fraction of its light linearly polarized (</em> <code>tokens::kPolarizationDegree</code> <em>), and its electric field's direction, a unit vector across the light's direction of travel (its +x turned by</em><code>tokens::kPolarizationAngle</code> <em>about its axis).</em></p>
+<pre><code class="language-C++">float ernie::LightParams::polarization;
+</code></pre>
+<hr>
+
+<h3 id="variable-polarizationaxis">variable polarizationAxis</h3>
+<pre><code class="language-C++">glm::vec3 ernie::LightParams::polarizationAxis;
+</code></pre>
+<hr>
+
 <h3 id="variable-posedongpu">variable posedOnGpu</h3>
 <p><em>Posed on the GPU under a prim posed there (a lamp on a robot's link):</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>are the CPU's estimate, and the renderer takes the pose the GPU composes for the light and its shadow views (</em><code>RasterRenderer::LightPoseBuffer</code> <em>).</em></p>
 <pre><code class="language-C++">bool ernie::LightParams::posedOnGpu;
@@ -393,6 +436,13 @@ Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.
 </code></pre>
 <hr>
 
+<h3 id="variable-previous">variable previous</h3>
+<p><em>Its pose at the last frame, for motion blur: with sub-frames (</em> <code>CameraParams::Subframes</code> <em>) a light that moved lights each from where it was then, between this pose and its own.</em></p>
+<pre><code class="language-C++">std::optional&lt;Pose&gt; ernie::LightParams::previous;
+</code></pre>
+<p>Empty for its first frame or a light posed on the GPU. </p>
+<hr>
+
 <h3 id="variable-profile">variable profile</h3>
 <p><em>Not distant, with an IES profile: its candela,</em> <code>kProfileRows</code> <em>rows of</em><code>kProfileColumns</code> <em>, row i at i x 180 / (kProfileRows - 1) degrees off the axis (its angle scale applied) and column j at j x 360 / kProfileColumns degrees around it from the light's +x towards +y; the emission per band is spectrum x the profile, interpolated, besides cone and focus.</em></p>
 <pre><code class="language-C++">std::vector&lt;float&gt; ernie::LightParams::profile;
@@ -403,6 +453,11 @@ Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.
 <h3 id="variable-radius">variable radius</h3>
 <p><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>radius (irradiance follows the inverse square law outside it and is capped at its surface value inside), or disk radius.</em></p>
 <pre><code class="language-C++">float ernie::LightParams::radius;
+</code></pre>
+<hr>
+
+<h3 id="variable-shadowmask">variable shadowMask</h3>
+<pre><code class="language-C++">std::uint32_t ernie::LightParams::shadowMask;
 </code></pre>
 <hr>
 

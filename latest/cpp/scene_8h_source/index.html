@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -307,6 +309,8 @@ class Prim {
     T Get(std::string_view attribute, T fallback) const;
 
     const Tensor* Read(std::string_view attribute) const;
+
+    std::vector&lt;std::string&gt; Attributes() const;
 
   private:
     Scene* scene_ = nullptr;

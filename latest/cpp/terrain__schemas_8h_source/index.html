@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -252,8 +254,9 @@
                               .group = &quot;Terrain&quot;}))                                                \
     X(double, PlanetRadius, ::ernie::tokens::kPlanetRadius, 0.0,                                   \
       (::ernie::AttributeMeta{.doc = &quot;World units. Set, the Terrain is a whole planet of this &quot;    \
-                                     &quot;radius centred at the world's origin, its heights cube &quot;     \
-                                     &quot;faces, and the origin and cell size do not apply.&quot;,          \
+                                     &quot;radius centred at its transform's translation (its &quot;         \
+                                     &quot;rotation not yet applied), its heights cube faces, and the &quot; \
+                                     &quot;origin and cell size do not apply.&quot;,                         \
                               .group = &quot;Terrain&quot;}))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \
@@ -319,7 +322,22 @@
                               .group = &quot;Atmosphere&quot;, .max = 20e3}))                                \
     X(double, CloudCover, ::ernie::tokens::kAtmosphereCloudCover, 0.5,                             \
       (::ernie::AttributeMeta{.doc = &quot;The fraction of the planet's limb the clouds cover.&quot;,        \
-                              .group = &quot;Atmosphere&quot;, .max = 1.0}))
+                              .group = &quot;Atmosphere&quot;, .max = 1.0}))                                 \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.75,                      \
+      (::ernie::AttributeMeta{.label = &quot;Sky polarization&quot;,                                         \
+                              .doc = &quot;The sky's greatest degree of linear polarization, 90 &quot;       \
+                                     &quot;degrees from the sun: Rayleigh scattering's 1, lowered by &quot;  \
+                                     &quot;multiple scattering and haze (a clear sky about 0.75, a &quot;    \
+                                     &quot;dusty one far less).&quot;,                                       \
+                              .group = &quot;Atmosphere&quot;, .max = 1.0}))                                 \
+    X(std::string, Anchor, ::ernie::tokens::kAtmosphereAnchor, ::ernie::tokens::kAnchorGround,     \
+      (::ernie::AttributeMeta{.doc = &quot;ground: its origin is on the planet's surface, the centre &quot;  \
+                                     &quot;a radius below along its -z; centre: its origin is the &quot;     \
+                                     &quot;planet's centre. Its transform places it; anchored on &quot;      \
+                                     &quot;the ground, a planet Terrain's air, centred on it.&quot;,         \
+                              .group = &quot;Atmosphere&quot;,                                               \
+                              .options = {::ernie::tokens::kAnchorGround,                          \
+                                          ::ernie::tokens::kAnchorCentre}}))
 
 #define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
     X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \

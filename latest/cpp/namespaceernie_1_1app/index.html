@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -214,6 +216,10 @@
 <td style="text-align: right;">namespace</td>
 <td style="text-align: left;"><a href="../namespaceernie_1_1app_1_1icons/"><strong>icons</strong></a> <br><em>Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text drawn with the viewer's font, which has the icons merged in:</em> <code>ImGui::Button(icons::kSave)</code> <em>, or</em><code>std::string(icons::kCamera) + " Camera"</code> <em>as a label.</em></td>
 </tr>
+<tr>
+<td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1app_1_1menu/"><strong>menu</strong></a> <br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="classes">Classes</h2>
@@ -299,7 +305,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> <br><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> <br><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI: a classic scientific desktop look, as Qt's and GTK's of the 2000s that tools such as PANGU wear (colours read from PANGU v7's renderer GUI): light grey-green windows (#D4D7D0), white sunken fields and raised buttons with one-pixel edges, square corners, black text, a navy accent and pale-blue selection.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -396,10 +402,6 @@
 <td style="text-align: left;"><a href="#function-creatabletypes"><strong>CreatableTypes</strong></a> () <br><em>Every type the Create menu offers, by group.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a></td>
-<td style="text-align: left;"><a href="#function-darktheme"><strong>DarkTheme</strong></a> () <br><em>The default dark theme.</em></td>
-</tr>
-<tr>
 <td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-defaultlightpath"><strong>DefaultLightPath</strong></a> () <br><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></td>
 </tr>
@@ -458,10 +460,6 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-issessionpath"><strong>IsSessionPath</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Whether</em> <code>path</code> <em>is the session root or under it.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a></td>
-<td style="text-align: left;"><a href="#function-lighttheme"><strong>LightTheme</strong></a> () <br><em>A light theme with the same metrics and accent.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>DirectoryEntry</strong></a> &gt;</td>
@@ -688,12 +686,6 @@
 </code></pre>
 <hr>
 
-<h3 id="function-darktheme">function DarkTheme</h3>
-<p><em>The default dark theme.</em> </p>
-<pre><code class="language-C++">Theme ernie::app::DarkTheme () 
-</code></pre>
-<hr>
-
 <h3 id="function-defaultlightpath">function DefaultLightPath</h3>
 <p><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></p>
 <pre><code class="language-C++">const Path &amp; ernie::app::DefaultLightPath () 
@@ -831,12 +823,6 @@
 <pre><code class="language-C++">bool ernie::app::IsSessionPath (
     const Path &amp; path
 ) 
-</code></pre>
-<hr>
-
-<h3 id="function-lighttheme">function LightTheme</h3>
-<p><em>A light theme with the same metrics and accent.</em> </p>
-<pre><code class="language-C++">Theme ernie::app::LightTheme () 
 </code></pre>
 <hr>
 

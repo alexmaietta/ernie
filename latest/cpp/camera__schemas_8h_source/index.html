@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -266,6 +268,27 @@
     X(double, LensTransmission, ::ernie::tokens::kLensTransmission, 1.0,                           \
       (::ernie::AttributeMeta{.label = &quot;Transmission&quot;, .doc = &quot;Fraction of light the optics pass.&quot;, \
                               .group = &quot;Lens&quot;, .max = 1.0}))                                       \
+    X(std::string, PolarizerType, ::ernie::tokens::kPolarizerType, &quot;none&quot;,                         \
+      (::ernie::AttributeMeta{                                                                     \
+          .label = &quot;Polarizer&quot;,                                                                    \
+          .doc = &quot;\&quot;linear\&quot; in front of the lens, or a \&quot;mosaic\&quot; of 90, 45 / 135, 0 degree &quot;     \
+                 &quot;polarizers over 2 x 2 pixels, as a polarization sensor's.&quot;,                      \
+          .group = &quot;Polarizer&quot;,                                                                    \
+          .options = {::ernie::tokens::kNone, ::ernie::tokens::kLinear,                            \
+                      ::ernie::tokens::kMosaic}}))                                                 \
+    X(double, PolarizerAngle, ::ernie::tokens::kPolarizerAngle, 0.0,                               \
+      (::ernie::AttributeMeta{.label = &quot;Angle&quot;,                                                    \
+                              .doc = &quot;A linear polarizer's axis from the image's +x towards +y, &quot;  \
+                                     &quot;degrees.&quot;,                                                   \
+                              .group = &quot;Polarizer&quot;, .min = -180.0, .max = 180.0}))                 \
+    X(double, PolarizerExtinction, ::ernie::tokens::kPolarizerExtinction, 1000.0,                  \
+      (::ernie::AttributeMeta{.label = &quot;Extinction ratio&quot;,                                         \
+                              .doc = &quot;Light passed along the axis over across it.&quot;,                \
+                              .group = &quot;Polarizer&quot;, .min = 1.0, .max = 1e6}))                      \
+    X(double, PolarizerTransmission, ::ernie::tokens::kPolarizerTransmission, 0.85,                \
+      (::ernie::AttributeMeta{.label = &quot;Transmission&quot;,                                             \
+                              .doc = &quot;Fraction of light polarized along the axis it passes.&quot;,      \
+                              .group = &quot;Polarizer&quot;, .max = 1.0}))                                  \
     X(std::vector&lt;float&gt;, LensChromaticScale, ::ernie::tokens::kLensChromaticScale,                \
       std::vector&lt;float&gt;{},                                                                        \
       (::ernie::AttributeMeta{.doc = &quot;(nm, scale) pairs: lateral colour, the image's scale per &quot;   \

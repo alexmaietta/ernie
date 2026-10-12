@@ -85,6 +85,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/concepts/volumes/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/extending/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -445,6 +449,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1FieldAsset/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1FieldBase/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1FrameId/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -597,6 +609,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightParams_1_1Pose/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LightPatternImage/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -610,6 +626,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1LightPatternRegistry/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LinkCollection/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1LinkGroups/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -669,6 +693,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1NanoVdbGrid/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1NonboundableLight/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -681,6 +709,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1OpenVDBAsset/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1OrArray/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -690,6 +722,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1Overlay/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1OverlayBatch/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -750,6 +786,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1PolarStereographicDem/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1Polarizer/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1001,6 +1041,18 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1VolumeFieldParams/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1VolumeMaterialParams/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1VolumeParams/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1VulkanContext/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1125,7 +1177,19 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1app_1_1menu/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1detail/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/namespaceernie_1_1memory/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1memory_1_1Allocation/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1134,6 +1198,22 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1Frame/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1Report/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1ReportFilter/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1ReportNode/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1profiler_1_1ReportRow/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1281,6 +1361,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/menu_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/menu_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/panel_8h/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1397,6 +1485,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/memory__stats_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/memory__stats_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/offscreen__target_8h/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1478,6 +1574,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/primitives_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/sphere__tessellation_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/sphere__tessellation_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1693,6 +1797,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/volume__schemas_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/volume__schemas_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/wide__view_8h/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1726,6 +1838,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/frame__params_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/light__links_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/light__links_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1766,6 +1886,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/sampling_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/volumes_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/volumes_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1813,11 +1941,27 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/nanovdb_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/nanovdb_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/profile_8h/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/profile_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/profile__report_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/profile__report_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>

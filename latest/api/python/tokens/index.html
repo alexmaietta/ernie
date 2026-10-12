@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -174,9 +176,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.AMBIENT_COLOR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;AMBIENT_COLOR</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ANCHOR_CENTRE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ANCHOR_CENTRE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ANCHOR_GROUND"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ANCHOR_GROUND</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ANGLE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ANGLE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE_ANCHOR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE_ANCHOR</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE_CLOUD_COVER"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE_CLOUD_COVER</a>
     </li>
@@ -252,6 +260,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CUBE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CUBE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CUBE_SPHERE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CUBE_SPHERE</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CULLING"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CULLING</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CUSTOM"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CUSTOM</a>
@@ -324,7 +334,13 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FACE_VERTEX_INDICES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FACE_VERTEX_INDICES</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FIELD_INDEX"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FIELD_INDEX</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FIELD_NAME"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FIELD_NAME</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FILE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FILE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FILE_PATH"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FILE_PATH</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FILTERS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FILTERS</a>
     </li>
@@ -358,6 +374,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.GROUND_PLANE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;GROUND_PLANE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEALPIX"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEALPIX</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS</a>
@@ -377,6 +395,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HORIZONTAL_APERTURE_OFFSET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HORIZONTAL_APERTURE_OFFSET</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HOST"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HOST</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ICOSPHERE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ICOSPHERE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ILLUMINANT_D"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ILLUMINANT_D</a>
     </li>
@@ -477,6 +497,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.OPACITY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;OPACITY</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.OPACITY_THRESHOLD"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;OPACITY_THRESHOLD</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.OPENVDB_ASSET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;OPENVDB_ASSET</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ORDERED_VARS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ORDERED_VARS</a>
     </li>
@@ -704,6 +726,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TERRAIN"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TERRAIN</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TESSELLATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TESSELLATION</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TESSELLATION_LEVEL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TESSELLATION_LEVEL</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TEXTURED_DIFFUSE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TEXTURED_DIFFUSE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TEXTURE_FILE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TEXTURE_FILE</a>
@@ -734,6 +760,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USE_SPECULAR_WORKFLOW"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USE_SPECULAR_WORKFLOW</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.UV_SPHERE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;UV_SPHERE</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VARNAME"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VARNAME</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VELOCITIES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VELOCITIES</a>
@@ -749,6 +777,14 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VISIBLE_IN_PRIMARY_RAY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VISIBLE_IN_PRIMARY_RAY</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VOLUME"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VOLUME</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VOLUME_ALBEDO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VOLUME_ALBEDO</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VOLUME_DENSITY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VOLUME_DENSITY</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VOLUME_EMISSION_STRENGTH"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VOLUME_EMISSION_STRENGTH</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VOLUME_TEMPERATURE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VOLUME_TEMPERATURE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.WHITE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;WHITE</a>
     </li>
@@ -1027,6 +1063,48 @@
 
 
 
+<h2 id="ernie.tokens.ANCHOR_CENTRE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ANCHOR_CENTRE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ANCHOR_CENTRE: str = 'centre'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.ANCHOR_GROUND" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ANCHOR_GROUND</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ANCHOR_GROUND: str = 'ground'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.ANGLE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ANGLE</span>
 
@@ -1058,6 +1136,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">ATMOSPHERE: str = 'Atmosphere'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.ATMOSPHERE_ANCHOR" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ATMOSPHERE_ANCHOR</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ATMOSPHERE_ANCHOR: str = 'ernie:atmosphere:anchor'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1846,6 +1945,27 @@
 
 
 
+<h2 id="ernie.tokens.CUBE_SPHERE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CUBE_SPHERE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">CUBE_SPHERE: str = 'cubeSphere'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.CULLING" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CULLING</span>
 
@@ -2602,6 +2722,48 @@
 
 
 
+<h2 id="ernie.tokens.FIELD_INDEX" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FIELD_INDEX</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FIELD_INDEX: str = 'fieldIndex'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.FIELD_NAME" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FIELD_NAME</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FIELD_NAME: str = 'fieldName'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.FILE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FILE</span>
 
@@ -2612,6 +2774,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">FILE: str = 'inputs:file'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.FILE_PATH" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FILE_PATH</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FILE_PATH: str = 'filePath'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2959,6 +3142,27 @@
 
 
 
+<h2 id="ernie.tokens.HEALPIX" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HEALPIX</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">HEALPIX: str = 'healpix'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.HEIGHT" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HEIGHT</span>
 
@@ -3158,6 +3362,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">HOST: str = 'host'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.ICOSPHERE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ICOSPHERE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ICOSPHERE: str = 'icosphere'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -4208,6 +4433,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">OPACITY_THRESHOLD: str = 'inputs:opacityThreshold'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.OPENVDB_ASSET" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">OPENVDB_ASSET</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">OPENVDB_ASSET: str = 'OpenVDBAsset'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -6592,6 +6838,48 @@
 
 
 
+<h2 id="ernie.tokens.TESSELLATION" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">TESSELLATION</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">TESSELLATION: str = 'ernie:tessellation'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.TESSELLATION_LEVEL" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">TESSELLATION_LEVEL</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">TESSELLATION_LEVEL: str = 'ernie:tessellation:level'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.TEXTURED_DIFFUSE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">TEXTURED_DIFFUSE</span>
 
@@ -6907,6 +7195,27 @@
 
 
 
+<h2 id="ernie.tokens.UV_SPHERE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">UV_SPHERE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">UV_SPHERE: str = 'uv'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.VARNAME" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VARNAME</span>
 
@@ -7064,6 +7373,90 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">VOLUME: str = 'Volume'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.VOLUME_ALBEDO" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VOLUME_ALBEDO</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">VOLUME_ALBEDO: str = 'inputs:volumeAlbedo'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.VOLUME_DENSITY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VOLUME_DENSITY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">VOLUME_DENSITY: str = 'inputs:density'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.VOLUME_EMISSION_STRENGTH" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VOLUME_EMISSION_STRENGTH</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">VOLUME_EMISSION_STRENGTH: str = 'inputs:emissionStrength'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.VOLUME_TEMPERATURE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VOLUME_TEMPERATURE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">VOLUME_TEMPERATURE: str = 'inputs:temperature'</code></pre>
 
     <div class="doc doc-contents ">
 

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -252,6 +254,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LensRayTable/"><strong>LensRayTable</strong></a> <br><em>A lens given as its rays: unit directions in the camera's frame at every</em> <code>step</code> <em>th sensor pixel corner, (</em><code>width</code> <em>/</em><code>step</code> <em>+ 1) by (</em><code>height</code> <em>/</em><code>step</code> <em>+ 1) of them row by row from the top left, interpolated between.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Polarizer/"><strong>Polarizer</strong></a> <br><em>A camera's linear polarizer (</em> <code>tokens::kPolarizerType</code> <em>): none, one in front of the lens at</em><code>angle</code> <em>(radians from the image's +x towards +y), or a polarization sensor's mosaic of 2 x 2 pixels at 90, 45 / 135, 0 degrees (Sony's IMX250MZR).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>

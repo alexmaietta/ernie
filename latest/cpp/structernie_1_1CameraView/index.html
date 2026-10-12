@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,7 +203,7 @@
               
                 <h1 id="struct-erniecameraview">Struct ernie::CameraView</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>CameraView</strong></a></p>
-<p><em>The raster view of a camera for one frame, derived from a</em> <code>CameraParams</code> <em>by</em><code>CameraParams::RasterView</code> <em>: what the rasterizer's passes need.</em></p>
+<p><em>The raster view of a camera for one frame, derived from a</em> <code>CameraParams</code> <em>by</em><code>CameraParams::RasterView</code> <em>: what the rasterizer's passes need.</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/scene/camera.h&gt;</code></li>
 </ul>
@@ -267,6 +269,12 @@
 </tr>
 </tbody>
 </table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Its projection is reverse-Z: depth 1 at the near plane falling to 0 at the far plane, so float depth keeps its precision far away; an infinite far plane (<code>ReversedPerspective</code>) gives depth near / distance, 0 only at infinity.</p>
+<p>References:
+* E. Persson, "Creating Vast Game Worlds: Experiences from
+  Avalanche Studios", SIGGRAPH 2012 Advances in Real-Time Rendering course (reversed float depth).
+* N. Reed, "Depth Precision Visualized", NVIDIA Developer Blog, 2015. <a href="https://developer.nvidia.com/content/depth-precision-visualized">https://developer.nvidia.com/content/depth-precision-visualized</a> </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-aspect">variable aspect</h3>
 <pre><code class="language-C++">float ernie::CameraView::aspect;

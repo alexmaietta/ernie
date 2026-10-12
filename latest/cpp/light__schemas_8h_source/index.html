@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -218,6 +220,38 @@
     &quot; Setting any photometric value puts the light in photometric units: they alone then set its &quot; \
     &quot;brightness.&quot;
 
+// USD's light and shadow link collections (`light_links.h`), on UsdLux's lights and Ernie's
+// LaserLight alike.
+#define ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                             \
+    X(bool, LightLinkIncludeRoot, ::ernie::tokens::kLightLinkIncludeRoot, true,                    \
+      (::ernie::AttributeMeta{.label = &quot;Lights everything&quot;, .doc = &quot;Lights the whole scene &quot;       \
+                                     &quot;unless excluded; off, only what it includes.&quot;,               \
+                              .group = &quot;Linking&quot;}))                                                \
+    X(std::vector&lt;::ernie::Path&gt;, LightLinkIncludes, ::ernie::tokens::kLightLinkIncludes,          \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.label = &quot;Lights&quot;, .doc = &quot;Prims it lights, with their &quot;             \
+                                     &quot;descendants.&quot;,                                               \
+                              .group = &quot;Linking&quot;}))                                                \
+    X(std::vector&lt;::ernie::Path&gt;, LightLinkExcludes, ::ernie::tokens::kLightLinkExcludes,          \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.label = &quot;Does not light&quot;, .doc = &quot;Prims it leaves unlit, with &quot;     \
+                                     &quot;their descendants.&quot;,                                         \
+                              .group = &quot;Linking&quot;}))                                                \
+    X(bool, ShadowLinkIncludeRoot, ::ernie::tokens::kShadowLinkIncludeRoot, true,                  \
+      (::ernie::AttributeMeta{.label = &quot;Everything shadows&quot;, .doc = &quot;The whole scene casts its &quot;    \
+                                     &quot;shadows unless excluded; off, only what it includes.&quot;,       \
+                              .group = &quot;Linking&quot;}))                                                \
+    X(std::vector&lt;::ernie::Path&gt;, ShadowLinkIncludes, ::ernie::tokens::kShadowLinkIncludes,        \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.label = &quot;Casters&quot;, .doc = &quot;Prims that cast its shadows, with &quot;      \
+                                     &quot;their descendants.&quot;,                                         \
+                              .group = &quot;Linking&quot;}))                                                \
+    X(std::vector&lt;::ernie::Path&gt;, ShadowLinkExcludes, ::ernie::tokens::kShadowLinkExcludes,        \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.label = &quot;Not casters&quot;, .doc = &quot;Prims that cast none of its &quot;        \
+                                     &quot;shadows, with their descendants.&quot;,                           \
+                              .group = &quot;Linking&quot;}))
+
 #define ERNIE_LIGHT_ATTRIBUTES(X)                                                                  \
     X(double, Intensity, ::ernie::tokens::kIntensity, 1.0,                                         \
       (::ernie::AttributeMeta{.group = &quot;Light&quot;, .max = 1e6}))                                      \
@@ -234,6 +268,7 @@
                               .min = 1000.0, .max = 20000.0}))                                     \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Light&quot;}))                              \
+    ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                                 \
     X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
       (::ernie::AttributeMeta{.doc = &quot;Divides the intensity by the light's size (its area, or a &quot;  \
                                      &quot;distant light's projected solid angle), so resizing it &quot;     \
@@ -260,7 +295,15 @@
       (::ernie::AttributeMeta{.doc = &quot;(nm, value) pairs of a physical light's spectrum: W m^-2 &quot;   \
                                      &quot;nm^-1 for a distant light, W sr^-1 nm^-1 for a sphere, W &quot;   \
                                      &quot;m^-2 sr^-1 nm^-1 for a rect, disk or dome.&quot;,                 \
-                              .group = &quot;Spectrum&quot;}))
+                              .group = &quot;Spectrum&quot;}))                                               \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.0,                       \
+      (::ernie::AttributeMeta{.label = &quot;Polarized&quot;,                                                \
+                              .doc = &quot;Fraction of the light linearly polarized, 0 to 1.&quot;,          \
+                              .group = &quot;Polarization&quot;, .max = 1.0}))                               \
+    X(double, PolarizationAngle, ::ernie::tokens::kPolarizationAngle, 0.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;Angle&quot;,                                                    \
+                              .doc = &quot;Its electric field's angle from the light's +x, degrees.&quot;,   \
+                              .group = &quot;Polarization&quot;, .min = -180.0, .max = 180.0}))
 
 #define ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)                                                        \
     X(double, Power, ::ernie::tokens::kLightPower, 0.0,                                            \
@@ -501,7 +544,17 @@
                               .doc = &quot;When the first pattern shows on the sensor clock, seconds.&quot;, \
                               .group = &quot;Time&quot;, .min = -10.0, .max = 10.0}))                        \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
-      (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Laser&quot;}))
+      (::ernie::AttributeMeta{.label = &quot;Shadows&quot;, .group = &quot;Laser&quot;}))                              \
+    ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                                 \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.98,                      \
+      (::ernie::AttributeMeta{.label = &quot;Polarized&quot;,                                                \
+                              .doc = &quot;Fraction of the beam linearly polarized, 0 to 1: a laser &quot;   \
+                                     &quot;diode's 100:1 is 0.98.&quot;,                                     \
+                              .group = &quot;Polarization&quot;, .max = 1.0}))                               \
+    X(double, PolarizationAngle, ::ernie::tokens::kPolarizationAngle, 0.0,                         \
+      (::ernie::AttributeMeta{.label = &quot;Angle&quot;,                                                    \
+                              .doc = &quot;Its electric field's angle from the laser's +x, degrees.&quot;,   \
+                              .group = &quot;Polarization&quot;, .min = -180.0, .max = 180.0}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_LASER_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LASER_LIGHT_ATTRIBUTES(X)

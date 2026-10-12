@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -179,10 +181,6 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.ViewportDisplay"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ViewportDisplay</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.WidgetPanel"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;WidgetPanel</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.dark_theme"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;dark_theme</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.light_theme"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;light_theme</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.main"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;main</a>
     </li>
@@ -391,22 +389,6 @@
         </tr>
       </thead>
       <tbody>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            dark_theme (ernie._ernie.app.dark_theme)" href="#ernie._ernie.app.dark_theme">dark_theme</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>The default dark theme.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="            light_theme (ernie._ernie.app.light_theme)" href="#ernie._ernie.app.light_theme">light_theme</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>A light theme with the same metrics and accent.</p>
-                </div>
-              </td>
-            </tr>
             <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            main (ernie._ernie.app.main)" href="#ernie._ernie.app.main">main</a></code></td>
               <td>
@@ -3082,6 +3064,14 @@
               </div>
             </li>
             <li>
+              <b><code>border</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Frames' and popups' edges.</p>
+              </div>
+            </li>
+            <li>
               <b><code>error</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
               –
@@ -3111,6 +3101,14 @@
               –
               <div class="doc-md-description">
                 <p>Text size in pixels at a content scale of 1.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>frame_border</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Fields' and buttons' edge width in pixels.</p>
               </div>
             </li>
             <li>
@@ -3167,6 +3165,14 @@
               –
               <div class="doc-md-description">
                 <p>Corner radius of frames, tabs and popups.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>selection</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Selected and hovered rows.</p>
               </div>
             </li>
             <li>
@@ -3269,6 +3275,30 @@
 
 
 
+<h3 id="ernie._ernie.app.Theme.border" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">border</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">border: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Frames' and popups' edges.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Theme.error" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">error</span>
 
@@ -3356,6 +3386,30 @@
     <div class="doc doc-contents ">
 
         <p>Text size in pixels at a content scale of 1.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.frame_border" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">frame_border</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">frame_border: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Fields' and buttons' edge width in pixels.</p>
 
     </div>
 
@@ -3524,6 +3578,30 @@
     <div class="doc doc-contents ">
 
         <p>Corner radius of frames, tabs and popups.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.selection" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">selection</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">selection: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Selected and hovered rows.</p>
 
     </div>
 
@@ -4278,6 +4356,22 @@
               </div>
             </li>
             <li>
+              <b><code>minimal</code></b>
+                  (<code><span title="bool">bool</span> | None</code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether the viewport shades minimally (Kit's RTX - Minimal), overriding the render settings' ernie:minimal:mode; None follows them.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>minimal_shown</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether the viewport shades minimally now.</p>
+              </div>
+            </li>
+            <li>
               <b><code>perspective_camera</code></b>
                   (<code><span title="typing.Final">Final</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
               –
@@ -4698,6 +4792,53 @@
     <div class="doc doc-contents ">
 
         <p>EV100 of the scene's average luminance as last metered, or None.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.minimal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">minimal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">minimal: bool | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the viewport shades minimally (Kit's RTX - Minimal), overriding the render settings' ernie:minimal:mode; None follows them.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.minimal_shown" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">minimal_shown</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">minimal_shown: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the viewport shades minimally now.</p>
 
     </div>
 
@@ -7283,44 +7424,6 @@
 
 </div>
 
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie._ernie.app.dark_theme" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">dark_theme</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">dark_theme() -&gt; Theme</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>The default dark theme.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="ernie._ernie.app.light_theme" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">light_theme</span>
-
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">light_theme() -&gt; Theme</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>A light theme with the same metrics and accent.</p>
-
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 

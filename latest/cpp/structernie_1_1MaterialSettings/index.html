@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -263,6 +265,10 @@
 <td style="text-align: left;"><a href="#variable-opacitythreshold"><strong>opacityThreshold</strong></a>   = <code>0.0f</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-polarizationretention"><strong>polarizationRetention</strong></a>   = <code>0.0f</code><br><em>How much of incident polarization its diffuse reflection keeps (</em> <code>tokens::kPolarizationRetention</code> <em>), 0 to 1.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a></td>
 <td style="text-align: left;"><a href="#variable-reflectance"><strong>reflectance</strong></a>  <br><em>Reflectance spectrum replacing</em> <code>albedo</code> <em>when not empty.</em></td>
 </tr>
@@ -358,6 +364,12 @@
 
 <h3 id="variable-opacitythreshold">variable opacityThreshold</h3>
 <pre><code class="language-C++">float ernie::MaterialSettings::opacityThreshold;
+</code></pre>
+<hr>
+
+<h3 id="variable-polarizationretention">variable polarizationRetention</h3>
+<p><em>How much of incident polarization its diffuse reflection keeps (</em> <code>tokens::kPolarizationRetention</code> <em>), 0 to 1.</em></p>
+<pre><code class="language-C++">float ernie::MaterialSettings::polarizationRetention;
 </code></pre>
 <hr>
 

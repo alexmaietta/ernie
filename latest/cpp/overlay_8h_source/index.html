@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -205,6 +207,8 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &quot;ernie/util/tensor.h&quot;
+
 #include &lt;glm/glm.hpp&gt;
 
 #include &lt;array&gt;
@@ -267,6 +271,35 @@ struct OverlaySprite {
     glm::vec4 rect{0.0f};
     MarkerShape shape = MarkerShape::Square;
     OverlayItem item;
+};
+
+enum class OverlayBatchKind : std::uint8_t {
+    Lines,    
+    Arrows,   
+    Markers,  
+    Boxes,    
+    Spheres,  
+    Frames,   
+};
+
+struct OverlayBatch {
+    OverlayBatchKind kind = OverlayBatchKind::Lines;
+    Tensor points;        
+    Tensor ends;          
+    Tensor halfExtents;   
+    Tensor orientations;  
+    Tensor radii;         
+    Tensor colors;
+    Tensor sizes;
+    Tensor worlds;  
+    double head = 0.0;
+    double length = 1.0;  
+    MarkerShape shape = MarkerShape::Circle;
+    OverlayStyle style;
+    glm::dvec3 origin{0.0};
+    std::uintptr_t stream = 1;
+
+    std::size_t Count() const;
 };
 
 class Overlay {
@@ -336,6 +369,8 @@ class Overlay {
     Overlay&amp; Label(const glm::dvec3&amp; point, std::string_view text,
                    const OverlayStyle&amp; style = {});
 
+    Overlay&amp; Batch(OverlayBatch batch);
+
     const std::vector&lt;OverlaySegment&gt;&amp; Segments() const {
         return segments_;
     }
@@ -348,9 +383,13 @@ class Overlay {
         return sprites_;
     }
 
+    const std::vector&lt;OverlayBatch&gt;&amp; Batches() const {
+        return batches_;
+    }
+
     bool Empty() const {
         return segments_.empty() &amp;&amp; triangles_.empty() &amp;&amp;
-               sprites_.empty();
+               sprites_.empty() &amp;&amp; batches_.empty();
     }
 
   private:
@@ -362,6 +401,7 @@ class Overlay {
     std::vector&lt;OverlaySegment&gt; segments_;
     std::vector&lt;OverlayTriangle&gt; triangles_;
     std::vector&lt;OverlaySprite&gt; sprites_;
+    std::vector&lt;OverlayBatch&gt; batches_;
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };

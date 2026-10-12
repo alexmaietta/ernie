@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -201,9 +203,9 @@
               
                 <h1 id="class-ernievolume">Class ernie::Volume</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Volume</strong></a></p>
-<p><em>A volume (UsdVol); Ernie does not draw volumes yet.</em> </p>
+<p><em>A participating medium: fields, each named by a relationship</em> <code>field:&lt;name&gt;</code> <em>to a field prim, shaded by the bound</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (density, albedo, emission, temperature).</em><a href="#detailed-description">More...</a></p>
 <ul>
-<li><code>#include &lt;ernie/scene/geometry_schemas.h&gt;</code></li>
+<li><code>#include &lt;ernie/scene/volume_schemas.h&gt;</code></li>
 </ul>
 <p>Inherits the following classes: <a href="../classernie_1_1Gprim/">ernie::Gprim</a></p>
 <h2 id="public-functions-inherited-from-ernieschemaview">Public Functions inherited from ernie::SchemaView</h2>
@@ -262,8 +264,10 @@
 </tr>
 </tbody>
 </table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Its transform places its fields, each also through its own. </p>
 <hr />
-<p>The documentation for this class was generated from the following file <code>ernie/scene/geometry_schemas.h</code></p>
+<p>The documentation for this class was generated from the following file <code>ernie/scene/volume_schemas.h</code></p>
               
             </div>
           </div><footer>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/concepts/volumes/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Volumes - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Volumes";
+        var mkdocs_page_input_path = "concepts/volumes.md";
+        var mkdocs_page_url = "/ernie/latest/concepts/volumes/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../star-fields/">Star fields</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Volumes</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#grids">Grids</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#shading">Shading</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#rendering">Rendering</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../cpp/files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Concepts</li>
+      <li class="breadcrumb-item active">Volumes</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/concepts/volumes.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="volumes">Volumes</h1>
+<p>Volumes are participating media such as engine plumes, smoke and dust, after OpenUSD's UsdVol schemas. A <code>Volume</code> prim names its fields with relationships <code>field:&lt;name&gt;</code>, each to a field prim. An <code>OpenVDBAsset</code> field reads one grid of a NanoVDB file. The Volume's bound Material says how the fields shade.</p>
+<pre><code class="language-python">import ernie
+
+scene = ernie.Scene()
+plume = scene.define(&quot;/World/Plume&quot;, ernie.Volume, material_binding=&quot;/Looks/Exhaust&quot;)
+plume.set_field(&quot;density&quot;, scene.define(&quot;/World/Plume/Density&quot;, ernie.OpenVDBAsset, file_path=&quot;plume.nvdb&quot;, field_name=&quot;density&quot;))
+plume.set_field(&quot;temperature&quot;, scene.define(&quot;/World/Plume/Temperature&quot;, ernie.OpenVDBAsset, file_path=&quot;plume.nvdb&quot;, field_name=&quot;temperature&quot;))
+scene.define(&quot;/Looks/Exhaust&quot;, ernie.Material, density=20.0)
+</code></pre>
+<h2 id="grids">Grids</h2>
+<p>Ernie reads NanoVDB files (<code>.nvdb</code>), uncompressed. The GPU walks each grid's tree in place, so sparse grids stay sparse in memory. Convert OpenVDB files (<code>.vdb</code>) first, with OpenVDB's <code>nanovdb_convert</code> (without <code>-z</code> or <code>-b</code>) or with Warp (<code>wp.Volume.load_from_nvdb</code>, <code>save_to_nvdb</code>).</p>
+<p><code>fieldName</code> picks a grid of the file by name, and <code>fieldIndex</code> picks among grids of the same name. Without a name, <code>fieldIndex</code> counts every grid in the file. Every grid type NanoVDB stores as floats is read: float, half, Fp4, Fp8, Fp16 and FpN. A vec3f grid is read as the lengths of its vectors.</p>
+<p>A field prim's transform places its grid in the Volume, and the Volume's transform places the Volume in the world. Values sit at the grid's integer index coordinates, and Ernie interpolates trilinearly between them.</p>
+<h2 id="shading">Shading</h2>
+<p>The Material's volume inputs, in its "Volume" group:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inputs:density</code></td>
+<td>Scales the density field into the extinction coefficient, in 1/m.</td>
+</tr>
+<tr>
+<td><code>inputs:densityField</code></td>
+<td>The field holding density, <code>density</code> by default.</td>
+</tr>
+<tr>
+<td><code>inputs:volumeAlbedo</code></td>
+<td>The share of extinction that scatters; the rest absorbs.</td>
+</tr>
+<tr>
+<td><code>inputs:phaseFunction</code></td>
+<td>How what scatters spreads its light: <code>henyeyGreenstein</code>, <code>doubleHenyeyGreenstein</code>, <code>rayleigh</code> or <code>isotropic</code>.</td>
+</tr>
+<tr>
+<td><code>inputs:anisotropy</code></td>
+<td>The Henyey-Greenstein g: above 0 forwards, below 0 backwards.</td>
+</tr>
+<tr>
+<td><code>inputs:b</code>, <code>inputs:c</code></td>
+<td>The double Henyey-Greenstein lobe width and backscatter weight, the same inputs the <code>hapke</code> BRDF reads.</td>
+</tr>
+<tr>
+<td><code>inputs:emissionColor</code>, <code>inputs:emissionStrength</code></td>
+<td>Radiance added per metre, in cd/m² per m for white, times the emission field.</td>
+</tr>
+<tr>
+<td><code>inputs:emissionField</code></td>
+<td>The field emission follows; the density field when unset.</td>
+</tr>
+<tr>
+<td><code>inputs:temperature</code>, <code>inputs:temperatureField</code>, <code>inputs:temperatureScale</code></td>
+<td>Kelvin: of the whole volume, or a field of it times its scale.</td>
+</tr>
+<tr>
+<td><code>inputs:blackbody</code></td>
+<td>Scales the glow of what absorbs at its temperature: Planck's law per band times the absorption coefficient (Kirchhoff's law). 1 is physical.</td>
+</tr>
+</tbody>
+</table>
+<p>Extinction is the same in every band. Albedo, emission and black-body glow are spectral, binned to the camera's bands like everything else Ernie renders.</p>
+<p>Volumes have no BRDF. The medium's counterpart is its single-scattering albedo and phase function, so Hapke's model carries over in its particle parameters: the albedo is Hapke's w, and the double Henyey-Greenstein phase reads the same <code>inputs:b</code> and <code>inputs:c</code> as a Hapke surface. One Material can then shade both the regolith (<code>ernie:brdf</code> <code>hapke</code>) and the dust lofted from it, the dust lacking only the packed surface's opposition effect and roughness.</p>
+<pre><code class="language-python">regolith = scene.define(&quot;/Looks/Regolith&quot;, ernie.Material, brdf=&quot;hapke&quot;, albedo=(0.25, 0.25, 0.25),
+                        volume_albedo=(0.25, 0.25, 0.25), phase_function=&quot;doubleHenyeyGreenstein&quot;, density=5.0)
+regolith.set(&quot;inputs:b&quot;, 0.25).set(&quot;inputs:c&quot;, 0.5)
+</code></pre>
+<h2 id="rendering">Rendering</h2>
+<p>After shading, each pixel's ray is marched through the volumes it crosses, nearest first, up to the surface behind or on to infinity. The radiance behind is dimmed by the volumes' transmittance, and what they emit along the way is added. Steps are half a voxel of the density grid, at most 256 per volume, with each step's emission integrated exactly for its coefficients.</p>
+<p>Each grid is loaded once, however many Volumes name it, and loaded again when its file changes. In a batch of worlds, a Volume's <code>ernie:world</code> puts it in one world, and each view marches only the volumes of its own world and the shared ones that its frustum reaches.</p>
+<p>Distant and sphere lights (spots included) light the medium: each step adds their light scattered once towards the eye, dimmed by the volume between the step and the light, a short march towards it. Other volumes, geometry and the atmosphere do not dim it yet.</p>
+<p>Not yet: rect, disk, cylinder and laser lights in the medium, multiple scattering, shadows cast by volumes, and fields written from the GPU.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../star-fields/" class="btn btn-neutral float-left" title="Star fields"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../extending/" class="btn btn-neutral float-right" title="Overview">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+      <span><a href="../star-fields/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../extending/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

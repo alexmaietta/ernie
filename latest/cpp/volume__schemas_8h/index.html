@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/volume__schemas_8h/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File volume_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File volume_schemas.h";
+        var mkdocs_page_input_path = "cpp/volume__schemas_8h.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/volume__schemas_8h/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File volume_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/volume__schemas_8h.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-volume_schemash">File volume_schemas.h</h1>
+<p><a href="../files/"><strong>FileList</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="./"><strong>volume_schemas.h</strong></a></p>
+<p><a href="../volume__schemas_8h_source/">Go to the source code of this file</a></p>
+<ul>
+<li><code>#include "ernie/scene/base_schemas.h"</code></li>
+<li><code>#include "ernie/scene/prim_type.h"</code></li>
+<li><code>#include "ernie/scene/tokens.h"</code></li>
+<li><code>#include &lt;string&gt;</code></li>
+<li><code>#include &lt;string_view&gt;</code></li>
+<li><code>#include &lt;vector&gt;</code></li>
+</ul>
+<h2 id="namespaces">Namespaces</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie/"><strong>ernie</strong></a> <br><em>Planetary digital elevation models, as the PDS archives them, and the local heightfields Ernie's</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>draws of them.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1FieldAsset/"><strong>FieldAsset</strong></a> <br><em>A field read from a file (UsdVol's</em> <a href="../classernie_1_1FieldAsset/"><em><strong>FieldAsset</strong></em></a> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1FieldBase/"><strong>FieldBase</strong></a> <br><em>A field of values over space, which Volumes name; its transform places the field in its</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(UsdVol's</em><a href="../classernie_1_1FieldBase/"><em><strong>FieldBase</strong></em></a> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1OpenVDBAsset/"><strong>OpenVDBAsset</strong></a> <br><em>A grid of a VDB file.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <br><em>A participating medium: fields, each named by a relationship</em> <code>field:&lt;name&gt;</code> <em>to a field prim, shaded by the bound</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (density, albedo, emission, temperature).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="macros">Macros</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_field_asset_all"><strong>ERNIE_FIELD_ASSET_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_FIELD\_ASSET\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_field_asset_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_field_asset_attributes"><strong>ERNIE_FIELD_ASSET_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br><em>Volumes as reflected schemas (</em> <code>prim_type.h</code> <em>), after UsdVol: a Volume names its fields with</em><code>field:&lt;name&gt;</code> <em>relationships (an open namespace), and each field is a prim of its own, such as an OpenVDBAsset naming a grid of a NanoVDB file.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_field_base_all"><strong>ERNIE_FIELD_BASE_ALL</strong></a> (X) <code>[**ERNIE\_IMAGEABLE\_ATTRIBUTES**](base__schemas_8h.md#define-ernie_imageable_attributes)(X) [**ERNIE\_FIELD\_BASE\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_field_base_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_field_base_attributes"><strong>ERNIE_FIELD_BASE_ATTRIBUTES</strong></a> (X) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_openvdb_asset_all"><strong>ERNIE_OPENVDB_ASSET_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_ASSET\_ALL**](volume__schemas_8h.md#define-ernie_field_asset_all)(X) [**ERNIE\_OPENVDB\_ASSET\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_openvdb_asset_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_openvdb_asset_attributes"><strong>ERNIE_OPENVDB_ASSET_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_volume_all"><strong>ERNIE_VOLUME_ALL</strong></a> (X) <code>[**ERNIE\_GPRIM\_ALL**](base__schemas_8h.md#define-ernie_gprim_all)(X) [**ERNIE\_VOLUME\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_volume_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_volume_attributes"><strong>ERNIE_VOLUME_ATTRIBUTES</strong></a> (X) <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
+<h3 id="define-ernie_field_asset_all">define ERNIE_FIELD_ASSET_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_FIELD_ASSET_ALL (
+    X
+) `ERNIE_FIELD_BASE_ALL (X) ERNIE_FIELD_ASSET_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_field_asset_attributes">define ERNIE_FIELD_ASSET_ATTRIBUTES</h3>
+<p><em>Volumes as reflected schemas (</em> <code>prim_type.h</code> <em>), after UsdVol: a Volume names its fields with</em><code>field:&lt;name&gt;</code> <em>relationships (an open namespace), and each field is a prim of its own, such as an OpenVDBAsset naming a grid of a NanoVDB file.</em></p>
+<pre><code class="language-C++">#define ERNIE_FIELD_ASSET_ATTRIBUTES (
+    X
+) `/* multi line expression */`
+</code></pre>
+<p>How the fields shade is the Volume's bound Material's volume inputs (<code>material_schemas.h</code>).</p>
+<p>Reference: Pixar, UsdVol, <a href="https://openusd.org/release/api/usd_vol_page_front.html">https://openusd.org/release/api/usd_vol_page_front.html</a> </p>
+<hr>
+
+<h3 id="define-ernie_field_base_all">define ERNIE_FIELD_BASE_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_FIELD_BASE_ALL (
+    X
+) `ERNIE_IMAGEABLE_ATTRIBUTES (X) ERNIE_FIELD_BASE_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_field_base_attributes">define ERNIE_FIELD_BASE_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_FIELD_BASE_ATTRIBUTES (
+    X
+) 
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_openvdb_asset_all">define ERNIE_OPENVDB_ASSET_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_OPENVDB_ASSET_ALL (
+    X
+) `ERNIE_FIELD_ASSET_ALL (X) ERNIE_OPENVDB_ASSET_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_openvdb_asset_attributes">define ERNIE_OPENVDB_ASSET_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_OPENVDB_ASSET_ATTRIBUTES (
+    X
+) `/* multi line expression */`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_volume_all">define ERNIE_VOLUME_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_VOLUME_ALL (
+    X
+) `ERNIE_GPRIM_ALL (X) ERNIE_VOLUME_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_volume_attributes">define ERNIE_VOLUME_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_VOLUME_ATTRIBUTES (
+    X
+) 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/volume_schemas.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

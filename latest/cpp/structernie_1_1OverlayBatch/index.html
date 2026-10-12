@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1OverlayBatch/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Struct ernie::OverlayBatch - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Struct ernie::OverlayBatch";
+        var mkdocs_page_input_path = "cpp/structernie_1_1OverlayBatch.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/structernie_1_1OverlayBatch/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Struct ernie::OverlayBatch</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/structernie_1_1OverlayBatch.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="struct-ernieoverlaybatch">Struct ernie::OverlayBatch</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>OverlayBatch</strong></a></p>
+<p><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/scene/overlay.h&gt;</code></li>
+</ul>
+<h2 id="public-attributes">Public Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-colors"><strong>colors</strong></a>  <br><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-ends"><strong>ends</strong></a>  <br><em>(n, 3): lines' and arrows'.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-halfextents"><strong>halfExtents</strong></a>  <br><em>(n, 3): boxes'.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-head"><strong>head</strong></a>   = <code>0.0</code><br><em>Arrows' heads' length; 0 makes each a fifth of its arrow.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-overlaybatchkind"><strong>OverlayBatchKind</strong></a></td>
+<td style="text-align: left;"><a href="#variable-kind"><strong>kind</strong></a>   = <code>OverlayBatchKind::Lines</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-length"><strong>length</strong></a>   = <code>1.0</code><br><em>Frames' axis length.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-orientations"><strong>orientations</strong></a>  <br><em>(n, 4) quaternions x, y, z, w: boxes' and frames', optional.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#variable-origin"><strong>origin</strong></a>   = <code>{0.0}</code><br><em>The point the arrays' coordinates are relative to, so items far from the world's origin keep float32's precision.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-points"><strong>points</strong></a>  <br><em>(n, 3); the number of items.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-radii"><strong>radii</strong></a>  <br><em>(n,): spheres'.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../namespaceernie/#enum-markershape"><strong>MarkerShape</strong></a></td>
+<td style="text-align: left;"><a href="#variable-shape"><strong>shape</strong></a>   = <code>MarkerShape::Circle</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-sizes"><strong>sizes</strong></a>  <br><em>(n,) pixels: line widths, or markers' sizes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uintptr_t</td>
+<td style="text-align: left;"><a href="#variable-stream"><strong>stream</strong></a>   = <code>1</code><br><em>The CUDA stream GPU arrays are written on; copies follow it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a></td>
+<td style="text-align: left;"><a href="#variable-style"><strong>style</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-worlds"><strong>worlds</strong></a>  <br><em>(n,) int32: the world whose views show each.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::size_t</td>
+<td style="text-align: left;"><a href="#function-count"><strong>Count</strong></a> () const<br><em>The number of items.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Arrays have one row per item: float32 but <code>worlds</code> (int32), and contiguous; on a GPU, all on the renderer's compute device. Optional ones are empty when absent, the style's value standing for them. </p>
+<h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-colors">variable colors</h3>
+<p><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::colors;
+</code></pre>
+<hr>
+
+<h3 id="variable-ends">variable ends</h3>
+<p><em>(n, 3): lines' and arrows'.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::ends;
+</code></pre>
+<hr>
+
+<h3 id="variable-halfextents">variable halfExtents</h3>
+<p><em>(n, 3): boxes'.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::halfExtents;
+</code></pre>
+<hr>
+
+<h3 id="variable-head">variable head</h3>
+<p><em>Arrows' heads' length; 0 makes each a fifth of its arrow.</em> </p>
+<pre><code class="language-C++">double ernie::OverlayBatch::head;
+</code></pre>
+<hr>
+
+<h3 id="variable-kind">variable kind</h3>
+<pre><code class="language-C++">OverlayBatchKind ernie::OverlayBatch::kind;
+</code></pre>
+<hr>
+
+<h3 id="variable-length">variable length</h3>
+<p><em>Frames' axis length.</em> </p>
+<pre><code class="language-C++">double ernie::OverlayBatch::length;
+</code></pre>
+<hr>
+
+<h3 id="variable-orientations">variable orientations</h3>
+<p><em>(n, 4) quaternions x, y, z, w: boxes' and frames', optional.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::orientations;
+</code></pre>
+<hr>
+
+<h3 id="variable-origin">variable origin</h3>
+<p><em>The point the arrays' coordinates are relative to, so items far from the world's origin keep float32's precision.</em> </p>
+<pre><code class="language-C++">glm::dvec3 ernie::OverlayBatch::origin;
+</code></pre>
+<hr>
+
+<h3 id="variable-points">variable points</h3>
+<p><em>(n, 3); the number of items.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::points;
+</code></pre>
+<hr>
+
+<h3 id="variable-radii">variable radii</h3>
+<p><em>(n,): spheres'.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::radii;
+</code></pre>
+<hr>
+
+<h3 id="variable-shape">variable shape</h3>
+<pre><code class="language-C++">MarkerShape ernie::OverlayBatch::shape;
+</code></pre>
+<hr>
+
+<h3 id="variable-sizes">variable sizes</h3>
+<p><em>(n,) pixels: line widths, or markers' sizes.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::sizes;
+</code></pre>
+<hr>
+
+<h3 id="variable-stream">variable stream</h3>
+<p><em>The CUDA stream GPU arrays are written on; copies follow it.</em> </p>
+<pre><code class="language-C++">std::uintptr_t ernie::OverlayBatch::stream;
+</code></pre>
+<hr>
+
+<h3 id="variable-style">variable style</h3>
+<pre><code class="language-C++">OverlayStyle ernie::OverlayBatch::style;
+</code></pre>
+<hr>
+
+<h3 id="variable-worlds">variable worlds</h3>
+<p><em>(n,) int32: the world whose views show each.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::worlds;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-count">function Count</h3>
+<p><em>The number of items.</em> </p>
+<pre><code class="language-C++">std::size_t ernie::OverlayBatch::Count () const
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/scene/overlay.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -257,7 +259,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1FrameParams/"><strong>FrameParams</strong></a> <br><em>Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights, the sensor filters and the frame's place in the random streams.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1FrameParams/"><strong>FrameParams</strong></a> <br><em>Per-frame parameters of a render, whatever the backend: the camera, the lights, the sensor filters and the frame's place in the random streams.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -265,7 +267,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <br><em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <br><em>A light, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -274,6 +276,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Beam_1_1Lit/"><strong>Lit</strong></a> <br><em>One frame of its sequence lit during a span of time, and how much: the light's mean over the span relative to its average power.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams_1_1Pose/"><strong>Pose</strong></a> <br><em>Where a light is: its</em> <code>position</code> <em>,</em><code>direction</code> <em>and</em><code>tangent</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -290,6 +296,18 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1StarFieldParams/"><strong>StarFieldParams</strong></a> <br><em>The stars of a</em> <a href="../classernie_1_1StarField/"><em><strong>StarField</strong></em></a> <em>prim (</em><code>StarsOf</code> <em>) are uploaded when they change; each frame takes only where the catalogue's frame lies (</em><code>StarFieldParamsOf</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeFieldParams/"><strong>VolumeFieldParams</strong></a> <br><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeMaterialParams/"><strong>VolumeMaterialParams</strong></a> <br><em>How a volume's fields shade: its</em> <a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (</em><code>material_schemas.h</code> <em>), the emission colour times its strength.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> <br><em>A</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(</em><code>VolumesOf</code> <em>): where it is, which world, its material and its density, temperature and emission fields, each optional.</em></td>
 </tr>
 </tbody>
 </table>

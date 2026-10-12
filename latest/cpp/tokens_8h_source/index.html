@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -244,6 +246,66 @@ inline constexpr std::string_view kPlane = &quot;Plane&quot;;
 inline constexpr std::string_view kPointInstancer = &quot;PointInstancer&quot;;
 inline constexpr std::string_view kGeomPoints = &quot;Points&quot;;
 inline constexpr std::string_view kVolume = &quot;Volume&quot;;
+
+// Volumes (UsdVol). A Volume names its fields with relationships
+// `field:&lt;name&gt;` (`field:density`, `field:temperature`), each to a
+// field prim: an OpenVDBAsset, a grid of a NanoVDB file (.nvdb; .vdb
+// files are converted first). Its bound Material's volume inputs
+// below say how the fields shade.
+//
+// Reference: Pixar, UsdVol,
+// https://openusd.org/release/api/usd_vol_page_front.html
+inline constexpr std::string_view kFieldBase = &quot;FieldBase&quot;;
+inline constexpr std::string_view kFieldAsset = &quot;FieldAsset&quot;;
+inline constexpr std::string_view kOpenVDBAsset = &quot;OpenVDBAsset&quot;;
+inline constexpr std::string_view kField = &quot;field&quot;;
+inline constexpr std::string_view kFilePath =
+    &quot;filePath&quot;;  
+inline constexpr std::string_view kFieldName =
+    &quot;fieldName&quot;;  
+inline constexpr std::string_view kFieldIndex =
+    &quot;fieldIndex&quot;;  
+inline constexpr std::string_view kFieldDataType =
+    &quot;fieldDataType&quot;;  
+inline constexpr std::string_view kVectorDataRoleHint =
+    &quot;vectorDataRoleHint&quot;;  
+inline constexpr std::string_view kFieldClass =
+    &quot;fieldClass&quot;;  
+// The volume inputs of a Material. The density field times
+// `inputs:density` is the extinction coefficient in 1/m, of which
+// `inputs:volumeAlbedo` scatters; the rest absorbs, and a temperature
+// field makes what absorbs glow as a black body.
+inline constexpr std::string_view kVolumeDensity = &quot;inputs:density&quot;;
+inline constexpr std::string_view kVolumeDensityField =
+    &quot;inputs:densityField&quot;;
+inline constexpr std::string_view kVolumeAlbedo =
+    &quot;inputs:volumeAlbedo&quot;;
+inline constexpr std::string_view kVolumeAnisotropy =
+    &quot;inputs:anisotropy&quot;;
+inline constexpr std::string_view kVolumeEmissionColor =
+    &quot;inputs:emissionColor&quot;;
+inline constexpr std::string_view kVolumeEmissionStrength =
+    &quot;inputs:emissionStrength&quot;;
+inline constexpr std::string_view kVolumeEmissionField =
+    &quot;inputs:emissionField&quot;;
+inline constexpr std::string_view kVolumeBlackbody =
+    &quot;inputs:blackbody&quot;;
+inline constexpr std::string_view kVolumeTemperature =
+    &quot;inputs:temperature&quot;;
+inline constexpr std::string_view kVolumeTemperatureField =
+    &quot;inputs:temperatureField&quot;;
+inline constexpr std::string_view kVolumeTemperatureScale =
+    &quot;inputs:temperatureScale&quot;;
+inline constexpr std::string_view kVolumePhaseFunction =
+    &quot;inputs:phaseFunction&quot;;
+inline constexpr std::string_view kHenyeyGreenstein =
+    &quot;henyeyGreenstein&quot;;
+inline constexpr std::string_view kDoubleHenyeyGreenstein =
+    &quot;doubleHenyeyGreenstein&quot;;
+inline constexpr std::string_view kRayleigh = &quot;rayleigh&quot;;
+inline constexpr std::string_view kIsotropic = &quot;isotropic&quot;;
+inline constexpr std::string_view kPhaseB = &quot;inputs:b&quot;;
+inline constexpr std::string_view kPhaseC = &quot;inputs:c&quot;;
 inline constexpr std::string_view kCamera = &quot;Camera&quot;;
 inline constexpr std::string_view kDistantLight = &quot;DistantLight&quot;;
 inline constexpr std::string_view kSphereLight = &quot;SphereLight&quot;;
@@ -328,6 +390,14 @@ inline constexpr std::string_view kGeomLength =
     &quot;length&quot;;  
 inline constexpr std::string_view kAxis =
     &quot;axis&quot;;  
+inline constexpr std::string_view kTessellation =
+    &quot;ernie:tessellation&quot;;
+inline constexpr std::string_view kTessellationLevel =
+    &quot;ernie:tessellation:level&quot;;
+inline constexpr std::string_view kUvSphere = &quot;uv&quot;;
+inline constexpr std::string_view kIcosphere = &quot;icosphere&quot;;
+inline constexpr std::string_view kCubeSphere = &quot;cubeSphere&quot;;
+inline constexpr std::string_view kHealpix = &quot;healpix&quot;;
 
 // Material binding (UsdShade MaterialBindingAPI): a Path.
 inline constexpr std::string_view kMaterialBinding =
@@ -540,6 +610,18 @@ inline constexpr std::string_view kTextureFile =
     &quot;inputs:texture:file&quot;;
 inline constexpr std::string_view kShadowEnable =
     &quot;inputs:shadow:enable&quot;;
+inline constexpr std::string_view kLightLinkIncludeRoot =
+    &quot;collection:lightLink:includeRoot&quot;;
+inline constexpr std::string_view kLightLinkIncludes =
+    &quot;collection:lightLink:includes&quot;;
+inline constexpr std::string_view kLightLinkExcludes =
+    &quot;collection:lightLink:excludes&quot;;
+inline constexpr std::string_view kShadowLinkIncludeRoot =
+    &quot;collection:shadowLink:includeRoot&quot;;
+inline constexpr std::string_view kShadowLinkIncludes =
+    &quot;collection:shadowLink:includes&quot;;
+inline constexpr std::string_view kShadowLinkExcludes =
+    &quot;collection:shadowLink:excludes&quot;;
 inline constexpr std::string_view kColorTemperature =
     &quot;inputs:colorTemperature&quot;;  
 inline constexpr std::string_view kEnableColorTemperature =
@@ -547,6 +629,22 @@ inline constexpr std::string_view kEnableColorTemperature =
 inline constexpr std::string_view kLightIrradiance =
     &quot;ernie:irradiance&quot;;
 inline constexpr std::string_view kLightSpectrum = &quot;ernie:spectrum&quot;;
+inline constexpr std::string_view kPolarizationDegree =
+    &quot;ernie:polarization:degree&quot;;
+inline constexpr std::string_view kPolarizationAngle =
+    &quot;ernie:polarization:angle&quot;;
+inline constexpr std::string_view kPolarizationRetention =
+    &quot;ernie:polarization:retention&quot;;
+inline constexpr std::string_view kPolarizerType =
+    &quot;ernie:polarizer:type&quot;;
+inline constexpr std::string_view kPolarizerAngle =
+    &quot;ernie:polarizer:angle&quot;;
+inline constexpr std::string_view kPolarizerExtinction =
+    &quot;ernie:polarizer:extinction&quot;;
+inline constexpr std::string_view kPolarizerTransmission =
+    &quot;ernie:polarizer:transmission&quot;;
+inline constexpr std::string_view kLinear = &quot;linear&quot;;
+inline constexpr std::string_view kMosaic = &quot;mosaic&quot;;
 inline constexpr std::string_view kLightPower = &quot;ernie:power&quot;;
 inline constexpr std::string_view kLightTexture = &quot;ernie:texture&quot;;
 
@@ -625,6 +723,10 @@ inline constexpr std::string_view kAtmosphereCloudTop =
     &quot;ernie:atmosphere:cloudTop&quot;;
 inline constexpr std::string_view kAtmosphereCloudCover =
     &quot;ernie:atmosphere:cloudCover&quot;;
+inline constexpr std::string_view kAtmosphereAnchor =
+    &quot;ernie:atmosphere:anchor&quot;;
+inline constexpr std::string_view kAnchorGround = &quot;ground&quot;;
+inline constexpr std::string_view kAnchorCentre = &quot;centre&quot;;
 
 // CelestialBody (Ernie): a sphere far beyond the scene, such as a
 // moon, at its transform's origin, drawn in the sky and casting

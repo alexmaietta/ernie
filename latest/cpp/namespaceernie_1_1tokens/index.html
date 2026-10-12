@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -245,11 +247,23 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kanchorcentre"><strong>kAnchorCentre</strong></a>   = <code>"centre"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kanchorground"><strong>kAnchorGround</strong></a>   = <code>"ground"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kangle"><strong>kAngle</strong></a>   = <code>/* multi line expression */</code><br><em>Degrees subtended.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-katmosphere"><strong>kAtmosphere</strong></a>   = <code>/* multi line expression */</code><br><em>Ernie: a planet's air and aerosols.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-katmosphereanchor"><strong>kAtmosphereAnchor</strong></a>   = <code>/* multi line expression */</code><br><em>token: where the</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>'s origin is on its planet: "ground" (on the surface, the planet's centre a radius below along its -z; the default) or "centre" (at the planet's centre), its world transform then placing the planet.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -405,6 +419,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kcubesphere"><strong>kCubeSphere</strong></a>   = <code>"cubeSphere"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kculling"><strong>kCulling</strong></a>   = <code>"ernie:culling"</code><br><em>token: how the rasterizer culls what lies outside a view: "off", "cpu" (whole draws) or "gpu" (whole draws, then every instance on the GPU; the default).</em></td>
 </tr>
 <tr>
@@ -501,6 +519,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdoublehenyeygreenstein"><strong>kDoubleHenyeyGreenstein</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kearth"><strong>kEarth</strong></a>   = <code>"earth"</code><br></td>
 </tr>
 <tr>
@@ -569,7 +591,39 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfield"><strong>kField</strong></a>   = <code>"field"</code><br><em>The namespace of a</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s field relationships.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfieldasset"><strong>kFieldAsset</strong></a>   = <code>"FieldAsset"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfieldbase"><strong>kFieldBase</strong></a>   = <code>"FieldBase"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfieldclass"><strong>kFieldClass</strong></a>   = <code>/* multi line expression */</code><br><em>token: levelSet, fogVolume, staggered.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfielddatatype"><strong>kFieldDataType</strong></a>   = <code>/* multi line expression */</code><br><em>token: the grid's value type.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfieldindex"><strong>kFieldIndex</strong></a>   = <code>/* multi line expression */</code><br><em>int: which of the grids of that name.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfieldname"><strong>kFieldName</strong></a>   = <code>/* multi line expression */</code><br><em>token: the grid's name in the file.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kfile"><strong>kFile</strong></a>   = <code>"inputs:file"</code><br><em>UsdUVTexture: an image file (PNG, JPEG or EXR), or the tensor</em> <code>ernie:texture</code> <em>(float32 or uint8 (rows, cols, channels), rows top to bottom) in its place; texture coordinates from</em><code>inputs:st</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kfilepath"><strong>kFilePath</strong></a>   = <code>/* multi line expression */</code><br><em>asset: the grid's file.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -649,6 +703,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-khealpix"><strong>kHealpix</strong></a>   = <code>"healpix"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kheight"><strong>kHeight</strong></a>   = <code>"inputs:height"</code><br></td>
 </tr>
 <tr>
@@ -658,6 +716,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kheightsdirty"><strong>kHeightsDirty</strong></a>   = <code>/* multi line expression */</code><br><em>int4 (first column, first row, columns, rows): the cells that changed with the last write of heights on a GPU, so only their gradients and LOD bounds are rebuilt; absent for all.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-khenyeygreenstein"><strong>kHenyeyGreenstein</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -686,6 +748,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-khost"><strong>kHost</strong></a>   = <code>"host"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kicosphere"><strong>kIcosphere</strong></a>   = <code>"icosphere"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -726,6 +792,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kior"><strong>kIor</strong></a>   = <code>"inputs:ior"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kisotropic"><strong>kIsotropic</strong></a>   = <code>"isotropic"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -913,6 +983,18 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klightlinkexcludes"><strong>kLightLinkExcludes</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klightlinkincluderoot"><strong>kLightLinkIncludeRoot</strong></a>   = <code>/* multi line expression */</code><br><em>UsdLuxLightAPI's light and shadow linking (UsdCollectionAPI, its prims expanded): the geometry a light lights, and the geometry that casts its shadows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klightlinkincludes"><strong>kLightLinkIncludes</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klightpower"><strong>kLightPower</strong></a>   = <code>"ernie:power"</code><br><em>Physical lamp (Ernie): radiant flux over 360 to 830 nm in W.</em></td>
 </tr>
 <tr>
@@ -930,6 +1012,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kline"><strong>kLine</strong></a>   = <code>"line"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klinear"><strong>kLinear</strong></a>   = <code>"linear"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1001,6 +1087,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kmosaic"><strong>kMosaic</strong></a>   = <code>"mosaic"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-knodata"><strong>kNoData</strong></a>   = <code>/* multi line expression */</code><br><em>float marking missing cells.</em></td>
 </tr>
 <tr>
@@ -1041,6 +1131,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kopenvdbasset"><strong>kOpenVDBAsset</strong></a>   = <code>"OpenVDBAsset"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-korderedvars"><strong>kOrderedVars</strong></a>   = <code>/* multi line expression */</code><br><em>Paths of RenderVars.</em></td>
 </tr>
 <tr>
@@ -1070,6 +1164,14 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kperspective"><strong>kPerspective</strong></a>   = <code>"perspective"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kphaseb"><strong>kPhaseB</strong></a>   = <code>"inputs:b"</code><br><em>Hapke's double Henyey-Greenstein lobe width b and backscatter weight c (</em> <code>brdf.cpp</code> <em>'s hapke model's parameters).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kphasec"><strong>kPhaseC</strong></a>   = <code>"inputs:c"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1106,6 +1208,34 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kpoints"><strong>kPoints</strong></a>   = <code>"points"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizationangle"><strong>kPolarizationAngle</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizationdegree"><strong>kPolarizationDegree</strong></a>   = <code>/* multi line expression */</code><br><em>A light's linear polarization (Ernie): the fraction of its light polarized, 0 to 1 (a laser diode's 100:1 is 0.98), and the angle of its electric field from the light's +x about its axis, degrees counterclockwise looking along its light.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizationretention"><strong>kPolarizationRetention</strong></a>   = <code>/* multi line expression */</code><br><em>A material's share of incident polarization its diffuse reflection keeps, 0 (all scattered into unpolarized light) to 1; its specular reflection polarizes by Fresnel's laws regardless.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizerangle"><strong>kPolarizerAngle</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizerextinction"><strong>kPolarizerExtinction</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizertransmission"><strong>kPolarizerTransmission</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpolarizertype"><strong>kPolarizerType</strong></a>   = <code>/* multi line expression */</code><br><em>A camera's polarizer (Ernie): "none", "linear" (one in front of the lens, at</em> <code>ernie:polarizer:angle</code> <em>) or "mosaic" (a polarization sensor's 2 x 2 cells of 90, 45 / 135, 0 degree polarizers over its pixels, as Sony's IMX250MZR); the angle of its transmission axis from the image's +x towards +y, degrees; its extinction ratio, the light it passes along that axis over across it; and that transmission along it.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1154,6 +1284,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kradius"><strong>kRadius</strong></a>   = <code>"inputs:radius"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-krayleigh"><strong>kRayleigh</strong></a>   = <code>"rayleigh"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1365,6 +1499,18 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowlinkexcludes"><strong>kShadowLinkExcludes</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowlinkincluderoot"><strong>kShadowLinkIncludeRoot</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowlinkincludes"><strong>kShadowLinkIncludes</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kshadownormaloffset"><strong>kShadowNormalOffset</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
@@ -1541,6 +1687,14 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktessellation"><strong>kTessellation</strong></a>   = <code>/* multi line expression */</code><br><em>token, on a</em> <a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>(Ernie): how it is divided into triangles (</em><code>ernie::SphereTessellation</code> <em>), and int: its level, 0 for the default.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktessellationlevel"><strong>kTessellationLevel</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-ktexturefile"><strong>kTextureFile</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
@@ -1605,7 +1759,15 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kuvsphere"><strong>kUvSphere</strong></a>   = <code>"uv"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kvarname"><strong>kVarname</strong></a>   = <code>/* multi line expression */</code><br><em>Primvar reader: e.g.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvectordatarolehint"><strong>kVectorDataRoleHint</strong></a>   = <code>/* multi line expression */</code><br><em>token: what a vector grid holds.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1634,6 +1796,54 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kvolume"><strong>kVolume</strong></a>   = <code>"Volume"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumealbedo"><strong>kVolumeAlbedo</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumeanisotropy"><strong>kVolumeAnisotropy</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumeblackbody"><strong>kVolumeBlackbody</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumedensity"><strong>kVolumeDensity</strong></a>   = <code>"inputs:density"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumedensityfield"><strong>kVolumeDensityField</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumeemissioncolor"><strong>kVolumeEmissionColor</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumeemissionfield"><strong>kVolumeEmissionField</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumeemissionstrength"><strong>kVolumeEmissionStrength</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumephasefunction"><strong>kVolumePhaseFunction</strong></a>   = <code>/* multi line expression */</code><br><em>token: how what scatters spreads its light: henyeyGreenstein (by</em> <code>inputs:anisotropy</code> <em>), doubleHenyeyGreenstein (Hapke's, by the</em><code>inputs:b</code> <em>and</em><code>inputs:c</code> <em>a Hapke surface reads), rayleigh or isotropic.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumetemperature"><strong>kVolumeTemperature</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumetemperaturefield"><strong>kVolumeTemperatureField</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kvolumetemperaturescale"><strong>kVolumeTemperatureScale</strong></a>   = <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1751,6 +1961,16 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kanchorcentre">variable kAnchorCentre</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAnchorCentre;
+</code></pre>
+<hr>
+
+<h3 id="variable-kanchorground">variable kAnchorGround</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAnchorGround;
+</code></pre>
+<hr>
+
 <h3 id="variable-kangle">variable kAngle</h3>
 <p><em>Degrees subtended.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAngle;
@@ -1760,6 +1980,12 @@
 <h3 id="variable-katmosphere">variable kAtmosphere</h3>
 <p><em>Ernie: a planet's air and aerosols.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAtmosphere;
+</code></pre>
+<hr>
+
+<h3 id="variable-katmosphereanchor">variable kAtmosphereAnchor</h3>
+<p><em>token: where the</em> <a href="../classernie_1_1Atmosphere/"><em><strong>Atmosphere</strong></em></a> <em>'s origin is on its planet: "ground" (on the surface, the planet's centre a radius below along its -z; the default) or "centre" (at the planet's centre), its world transform then placing the planet.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kAtmosphereAnchor;
 </code></pre>
 <hr>
 
@@ -1976,6 +2202,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kcubesphere">variable kCubeSphere</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCubeSphere;
+</code></pre>
+<hr>
+
 <h3 id="variable-kculling">variable kCulling</h3>
 <p><em>token: how the rasterizer culls what lies outside a view: "off", "cpu" (whole draws) or "gpu" (whole draws, then every instance on the GPU; the default).</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kCulling;
@@ -2100,6 +2331,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kdoublehenyeygreenstein">variable kDoubleHenyeyGreenstein</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kDoubleHenyeyGreenstein;
+</code></pre>
+<hr>
+
 <h3 id="variable-kearth">variable kEarth</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kEarth;
 </code></pre>
@@ -2193,9 +2429,55 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kfield">variable kField</h3>
+<p><em>The namespace of a</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s field relationships.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kField;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfieldasset">variable kFieldAsset</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldAsset;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfieldbase">variable kFieldBase</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldBase;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfieldclass">variable kFieldClass</h3>
+<p><em>token: levelSet, fogVolume, staggered.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldClass;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfielddatatype">variable kFieldDataType</h3>
+<p><em>token: the grid's value type.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldDataType;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfieldindex">variable kFieldIndex</h3>
+<p><em>int: which of the grids of that name.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldIndex;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfieldname">variable kFieldName</h3>
+<p><em>token: the grid's name in the file.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFieldName;
+</code></pre>
+<hr>
+
 <h3 id="variable-kfile">variable kFile</h3>
 <p><em>UsdUVTexture: an image file (PNG, JPEG or EXR), or the tensor</em> <code>ernie:texture</code> <em>(float32 or uint8 (rows, cols, channels), rows top to bottom) in its place; texture coordinates from</em><code>inputs:st</code> <em>.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFile;
+</code></pre>
+<hr>
+
+<h3 id="variable-kfilepath">variable kFilePath</h3>
+<p><em>asset: the grid's file.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kFilePath;
 </code></pre>
 <hr>
 
@@ -2302,6 +2584,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-khealpix">variable kHealpix</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHealpix;
+</code></pre>
+<hr>
+
 <h3 id="variable-kheight">variable kHeight</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHeight;
 </code></pre>
@@ -2316,6 +2603,11 @@
 <h3 id="variable-kheightsdirty">variable kHeightsDirty</h3>
 <p><em>int4 (first column, first row, columns, rows): the cells that changed with the last write of heights on a GPU, so only their gradients and LOD bounds are rebuilt; absent for all.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHeightsDirty;
+</code></pre>
+<hr>
+
+<h3 id="variable-khenyeygreenstein">variable kHenyeyGreenstein</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHenyeyGreenstein;
 </code></pre>
 <hr>
 
@@ -2352,6 +2644,11 @@
 
 <h3 id="variable-khost">variable kHost</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kHost;
+</code></pre>
+<hr>
+
+<h3 id="variable-kicosphere">variable kIcosphere</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kIcosphere;
 </code></pre>
 <hr>
 
@@ -2404,6 +2701,11 @@
 
 <h3 id="variable-kior">variable kIor</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kIor;
+</code></pre>
+<hr>
+
+<h3 id="variable-kisotropic">variable kIsotropic</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kIsotropic;
 </code></pre>
 <hr>
 
@@ -2660,6 +2962,23 @@
 <p>Either one makes the light physical; without a spectrum it has its <code>physical:illuminant</code>'s shape, else is a black body (the colour temperature when enabled, else the Sun's 5772 K), and without an irradiance a black body carries the solar constant, 1361 W/m^2. </p>
 <hr>
 
+<h3 id="variable-klightlinkexcludes">variable kLightLinkExcludes</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightLinkExcludes;
+</code></pre>
+<hr>
+
+<h3 id="variable-klightlinkincluderoot">variable kLightLinkIncludeRoot</h3>
+<p><em>UsdLuxLightAPI's light and shadow linking (UsdCollectionAPI, its prims expanded): the geometry a light lights, and the geometry that casts its shadows.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightLinkIncludeRoot;
+</code></pre>
+<p>bool: whether the whole scene is included unless excluded (default true); relationships: the prims, with their descendants, included or excluded, the nearest listed ancestor deciding. </p>
+<hr>
+
+<h3 id="variable-klightlinkincludes">variable kLightLinkIncludes</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightLinkIncludes;
+</code></pre>
+<hr>
+
 <h3 id="variable-klightpower">variable kLightPower</h3>
 <p><em>Physical lamp (Ernie): radiant flux over 360 to 830 nm in W.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightPower;
@@ -2687,6 +3006,11 @@
 
 <h3 id="variable-kline">variable kLine</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLine;
+</code></pre>
+<hr>
+
+<h3 id="variable-klinear">variable kLinear</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLinear;
 </code></pre>
 <hr>
 
@@ -2781,6 +3105,11 @@
 <p>Its products render LdrColor, DistanceToCamera, DistanceToImagePlane, Normal, PrimId and InstanceId. </p>
 <hr>
 
+<h3 id="variable-kmosaic">variable kMosaic</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kMosaic;
+</code></pre>
+<hr>
+
 <h3 id="variable-knodata">variable kNoData</h3>
 <p><em>float marking missing cells.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kNoData;
@@ -2837,6 +3166,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kopenvdbasset">variable kOpenVDBAsset</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kOpenVDBAsset;
+</code></pre>
+<hr>
+
 <h3 id="variable-korderedvars">variable kOrderedVars</h3>
 <p><em>Paths of RenderVars.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kOrderedVars;
@@ -2878,6 +3212,17 @@
 
 <h3 id="variable-kperspective">variable kPerspective</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPerspective;
+</code></pre>
+<hr>
+
+<h3 id="variable-kphaseb">variable kPhaseB</h3>
+<p><em>Hapke's double Henyey-Greenstein lobe width b and backscatter weight c (</em> <code>brdf.cpp</code> <em>'s hapke model's parameters).</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPhaseB;
+</code></pre>
+<hr>
+
+<h3 id="variable-kphasec">variable kPhaseC</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPhaseC;
 </code></pre>
 <hr>
 
@@ -2929,6 +3274,44 @@
 
 <h3 id="variable-kpoints">variable kPoints</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPoints;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizationangle">variable kPolarizationAngle</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizationAngle;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizationdegree">variable kPolarizationDegree</h3>
+<p><em>A light's linear polarization (Ernie): the fraction of its light polarized, 0 to 1 (a laser diode's 100:1 is 0.98), and the angle of its electric field from the light's +x about its axis, degrees counterclockwise looking along its light.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizationDegree;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizationretention">variable kPolarizationRetention</h3>
+<p><em>A material's share of incident polarization its diffuse reflection keeps, 0 (all scattered into unpolarized light) to 1; its specular reflection polarizes by Fresnel's laws regardless.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizationRetention;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizerangle">variable kPolarizerAngle</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizerAngle;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizerextinction">variable kPolarizerExtinction</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizerExtinction;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizertransmission">variable kPolarizerTransmission</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizerTransmission;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpolarizertype">variable kPolarizerType</h3>
+<p><em>A camera's polarizer (Ernie): "none", "linear" (one in front of the lens, at</em> <code>ernie:polarizer:angle</code> <em>) or "mosaic" (a polarization sensor's 2 x 2 cells of 90, 45 / 135, 0 degree polarizers over its pixels, as Sony's IMX250MZR); the angle of its transmission axis from the image's +x towards +y, degrees; its extinction ratio, the light it passes along that axis over across it; and that transmission along it.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPolarizerType;
 </code></pre>
 <hr>
 
@@ -2998,6 +3381,11 @@
 
 <h3 id="variable-kradius">variable kRadius</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kRadius;
+</code></pre>
+<hr>
+
+<h3 id="variable-krayleigh">variable kRayleigh</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kRayleigh;
 </code></pre>
 <hr>
 
@@ -3287,6 +3675,21 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kshadowlinkexcludes">variable kShadowLinkExcludes</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowLinkExcludes;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowlinkincluderoot">variable kShadowLinkIncludeRoot</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowLinkIncludeRoot;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowlinkincludes">variable kShadowLinkIncludes</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowLinkIncludes;
+</code></pre>
+<hr>
+
 <h3 id="variable-kshadownormaloffset">variable kShadowNormalOffset</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowNormalOffset;
 </code></pre>
@@ -3535,6 +3938,17 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-ktessellation">variable kTessellation</h3>
+<p><em>token, on a</em> <a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> <em>(Ernie): how it is divided into triangles (</em><code>ernie::SphereTessellation</code> <em>), and int: its level, 0 for the default.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTessellation;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktessellationlevel">variable kTessellationLevel</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTessellationLevel;
+</code></pre>
+<hr>
+
 <h3 id="variable-ktexturefile">variable kTextureFile</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kTextureFile;
 </code></pre>
@@ -3620,11 +4034,22 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-kuvsphere">variable kUvSphere</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kUvSphere;
+</code></pre>
+<hr>
+
 <h3 id="variable-kvarname">variable kVarname</h3>
 <p><em>Primvar reader: e.g.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVarname;
 </code></pre>
 <p>"st". </p>
+<hr>
+
+<h3 id="variable-kvectordatarolehint">variable kVectorDataRoleHint</h3>
+<p><em>token: what a vector grid holds.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVectorDataRoleHint;
+</code></pre>
 <hr>
 
 <h3 id="variable-kvelocities">variable kVelocities</h3>
@@ -3662,6 +4087,67 @@
 
 <h3 id="variable-kvolume">variable kVolume</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolume;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumealbedo">variable kVolumeAlbedo</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeAlbedo;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumeanisotropy">variable kVolumeAnisotropy</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeAnisotropy;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumeblackbody">variable kVolumeBlackbody</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeBlackbody;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumedensity">variable kVolumeDensity</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeDensity;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumedensityfield">variable kVolumeDensityField</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeDensityField;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumeemissioncolor">variable kVolumeEmissionColor</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeEmissionColor;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumeemissionfield">variable kVolumeEmissionField</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeEmissionField;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumeemissionstrength">variable kVolumeEmissionStrength</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeEmissionStrength;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumephasefunction">variable kVolumePhaseFunction</h3>
+<p><em>token: how what scatters spreads its light: henyeyGreenstein (by</em> <code>inputs:anisotropy</code> <em>), doubleHenyeyGreenstein (Hapke's, by the</em><code>inputs:b</code> <em>and</em><code>inputs:c</code> <em>a Hapke surface reads), rayleigh or isotropic.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumePhaseFunction;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumetemperature">variable kVolumeTemperature</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeTemperature;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumetemperaturefield">variable kVolumeTemperatureField</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeTemperatureField;
+</code></pre>
+<hr>
+
+<h3 id="variable-kvolumetemperaturescale">variable kVolumeTemperatureScale</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kVolumeTemperatureScale;
 </code></pre>
 <hr>
 

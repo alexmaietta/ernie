@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -238,6 +240,13 @@ struct CameraView {
     }
 };
 
+glm::mat4 ReversedPerspective(float verticalFov, float aspect,
+                              float nearPlane, float farPlane);
+
+glm::mat4 ReversedOrthographic(double left, double right,
+                               double bottom, double top,
+                               double nearPlane, double farPlane);
+
 enum class LensProjection : std::uint8_t {
     Perspective,
     Fisheye,
@@ -252,6 +261,22 @@ struct LensRayTable {
     std::vector&lt;glm::vec3&gt; rays;
 
     glm::dvec3 RayAt(glm::dvec2 pixel) const;
+};
+
+struct Polarizer {
+    enum class Type { None, Linear, Mosaic };
+    Type type = Type::None;
+    double angle = 0.0;
+    double extinction = 1000.0;
+    double transmission = 0.85;
+
+    double AngleAt(std::uint32_t x, std::uint32_t y) const;
+    double AlongAxis() const {
+        return transmission;
+    }
+    double AcrossAxis() const {
+        return transmission / extinction;
+    }
 };
 
 struct LensModel {
@@ -346,6 +371,7 @@ struct CameraParams {
     SpectralBands bands;
     LensModel lens;
     SensorModel sensor = SensorModel::Rgb();
+    Polarizer polarizer;
 
     glm::dvec3 Eye() const {
         return glm::dvec3(transform[3]);

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -389,9 +391,24 @@ struct LightParams {
     };
     Beam beam;
     bool shadows = true;
+    std::uint32_t lightMask = ~0u;
+    std::uint32_t shadowMask = ~0u;
     bool domeDiffuse = false;
     std::int32_t world = -1;
     bool posedOnGpu = false;
+
+    struct Pose {
+        glm::dvec3 position{0.0};
+        glm::vec3 direction{0.0f, 0.0f, 1.0f};
+        glm::vec3 tangent{1.0f, 0.0f, 0.0f};
+
+        glm::dmat4 Matrix() const;
+    };
+
+    std::optional&lt;Pose&gt; previous;
+
+    float polarization = 0.0f;
+    glm::vec3 polarizationAxis{1.0f, 0.0f, 0.0f};
 
     static constexpr float kMaxSpotConeDegrees = 75.0f;
 };
@@ -431,6 +448,7 @@ struct AtmosphereParams {
     double hazeOpticalDepth = 0.1;  
     double ozoneColumn = 300.0;     
     double dustOpticalDepth = 0.5;  
+    double polarization = 0.75;
     double cloudTop = 0.0;
     double cloudCover = 0.5;
 
@@ -443,6 +461,45 @@ struct AtmosphereParams {
     }
 };
 
+struct VolumeFieldParams {
+    std::string file;      
+    std::string gridName;  
+    int gridIndex = 0;     
+    glm::dmat4 toVolume{1.0};
+
+    bool operator==(const VolumeFieldParams&amp;) const = default;
+};
+
+struct VolumeMaterialParams {
+    double density = 1.0;
+    glm::dvec3 albedo{0.0};
+    double anisotropy = 0.0;
+    std::string phase = &quot;henyeyGreenstein&quot;;
+    double b = 0.25;
+    double c = 0.5;
+    glm::dvec3 emission{0.0};  
+    double blackbody = 1.0;
+    double temperature = 0.0;  
+    double temperatureScale = 1.0;
+
+    bool operator==(const VolumeMaterialParams&amp;) const = default;
+};
+
+struct VolumeParams {
+    std::string prim;           
+    glm::dmat4 transform{1.0};  
+    std::int32_t world = -1;
+    std::uint32_t linkGroup = 0;
+    VolumeMaterialParams material;
+    std::optional&lt;VolumeFieldParams&gt; density;
+    std::optional&lt;VolumeFieldParams&gt; temperature;
+    std::optional&lt;VolumeFieldParams&gt; emission;
+    std::vector&lt;glm::dmat4&gt; instances;  
+    std::vector&lt;std::int32_t&gt; instanceWorlds;
+
+    bool operator==(const VolumeParams&amp;) const = default;
+};
+
 struct BodyParams {
     glm::dvec3 centre{0.0};   
     double radius = 0.0;      
@@ -451,14 +508,12 @@ struct BodyParams {
     bool operator==(const BodyParams&amp;) const = default;
 };
 
+LightParams RelativeDistantLight(const glm::vec3&amp; towards,
+                                 const SpectralBands&amp; bands);
+
 struct FrameParams {
     CameraParams camera;
     double overscan = 1.0;
-    bool sun = true;  
-    glm::vec3 sunDirection{
-        0.0f, 0.0f, 1.0f};  
-    float sunAngle = 0.53f;
-    std::vector&lt;float&gt; sunIrradiance;
     float ambient = 0.0f;
     glm::vec3 ambientColor{1.0f};
     std::vector&lt;LightParams&gt; lights;
@@ -473,6 +528,7 @@ struct FrameParams {
         atmosphere;  
     std::vector&lt;BodyParams&gt; bodies;
     static constexpr std::size_t kMaxBodies = 4;
+    std::vector&lt;VolumeParams&gt; volumes;
     float exposure =
         1.0f;  
     bool meter =

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -203,6 +205,7 @@
 <p><a href="../files/"><strong>FileList</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="./"><strong>overlay.h</strong></a></p>
 <p><a href="../overlay_8h_source/">Go to the source code of this file</a></p>
 <ul>
+<li><code>#include "ernie/util/tensor.h"</code></li>
 <li><code>#include &lt;glm/glm.hpp&gt;</code></li>
 <li><code>#include &lt;array&gt;</code></li>
 <li><code>#include &lt;cstdint&gt;</code></li>
@@ -238,6 +241,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>

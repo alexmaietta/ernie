@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -215,6 +217,10 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-attributes"><strong>Attributes</strong></a> () const<br><em>As</em> <code>Scene::Attributes</code> <em>; empty for an empty handle.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="./"><strong>Prim</strong></a></td>
 <td style="text-align: left;"><a href="#function-define"><strong>Define</strong></a> (std::string_view relative, std::string_view type) const<br><em>As</em> <code>Scene::Define</code> <em>at</em><code>relative</code> <em>below this prim: a name such as "Rock", or names joined by '/' such as "Rig/Arm".</em></td>
 </tr>
@@ -275,6 +281,12 @@
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Copyable and cheap; valid while the scene lives, though the prim it names may be removed. </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-attributes">function Attributes</h3>
+<p><em>As</em> <code>Scene::Attributes</code> <em>; empty for an empty handle.</em></p>
+<pre><code class="language-C++">std::vector&lt; std::string &gt; ernie::Prim::Attributes () const
+</code></pre>
+<hr>
+
 <h3 id="function-define">function Define</h3>
 <p><em>As</em> <code>Scene::Define</code> <em>at</em><code>relative</code> <em>below this prim: a name such as "Rock", or names joined by '/' such as "Rig/Arm".</em></p>
 <pre><code class="language-C++">Prim ernie::Prim::Define (

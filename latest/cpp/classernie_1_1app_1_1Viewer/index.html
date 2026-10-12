@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -378,6 +380,10 @@
 <td style="text-align: left;"><a href="#function-getlighting"><strong>GetLighting</strong></a> () const<br></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::optional&lt; bool &gt;</td>
+<td style="text-align: left;"><a href="#function-getminimal"><strong>GetMinimal</strong></a> () const<br><em>Whether the viewport shades minimally (</em> <code>ernie:minimal:mode</code> <em>, Kit's "RTX - Minimal"): true for the surfaces' diffuse colours, false for full shading, overriding the render settings in the viewport only; or none (the default) to follow them.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-getscene"><strong>GetScene</strong></a> () <br></td>
 </tr>
@@ -448,6 +454,10 @@
 <tr>
 <td style="text-align: right;">std::optional&lt; double &gt;</td>
 <td style="text-align: left;"><a href="#function-meteredev"><strong>MeteredEv</strong></a> () const<br><em>The EV100 of the scene's average luminance as last metered (EV = log2(L x 100 / 12.5)), if the backend meters.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-minimalshown"><strong>MinimalShown</strong></a> () const<br><em>Whether the viewport shades minimally now, by</em> <code>GetMinimal</code> <em>or else the render settings.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint64_t</td>
@@ -596,6 +606,10 @@
 <tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-setlighting"><strong>SetLighting</strong></a> (<a href="../namespaceernie_1_1app/#enum-lighting"><strong>Lighting</strong></a> lighting) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setminimal"><strong>SetMinimal</strong></a> (std::optional&lt; bool &gt; minimal) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -1075,6 +1089,12 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 </code></pre>
 <hr>
 
+<h3 id="function-getminimal">function GetMinimal</h3>
+<p><em>Whether the viewport shades minimally (</em> <code>ernie:minimal:mode</code> <em>, Kit's "RTX - Minimal"): true for the surfaces' diffuse colours, false for full shading, overriding the render settings in the viewport only; or none (the default) to follow them.</em></p>
+<pre><code class="language-C++">std::optional&lt; bool &gt; ernie::app::Viewer::GetMinimal () const
+</code></pre>
+<hr>
+
 <h3 id="function-getscene">function GetScene</h3>
 <pre><code class="language-C++">Scene &amp; ernie::app::Viewer::GetScene () 
 </code></pre>
@@ -1228,6 +1248,12 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <h3 id="function-meteredev">function MeteredEv</h3>
 <p><em>The EV100 of the scene's average luminance as last metered (EV = log2(L x 100 / 12.5)), if the backend meters.</em> </p>
 <pre><code class="language-C++">std::optional&lt; double &gt; ernie::app::Viewer::MeteredEv () const
+</code></pre>
+<hr>
+
+<h3 id="function-minimalshown">function MinimalShown</h3>
+<p><em>Whether the viewport shades minimally now, by</em> <code>GetMinimal</code> <em>or else the render settings.</em></p>
+<pre><code class="language-C++">bool ernie::app::Viewer::MinimalShown () const
 </code></pre>
 <hr>
 
@@ -1494,6 +1520,13 @@ inline T &amp; ernie::app::Viewer::AddPanel (
 <h3 id="function-setlighting">function SetLighting</h3>
 <pre><code class="language-C++">void ernie::app::Viewer::SetLighting (
     Lighting lighting
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-setminimal">function SetMinimal</h3>
+<pre><code class="language-C++">void ernie::app::Viewer::SetMinimal (
+    std::optional&lt; bool &gt; minimal
 ) 
 </code></pre>
 <hr>

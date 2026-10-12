@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -230,6 +232,11 @@ struct Frame {
 
 void SetEnabled(bool enabled);
 bool Enabled();
+
+void SetCpuEnabled(bool enabled);
+bool CpuEnabled();
+void SetGpuEnabled(bool enabled);
+bool GpuEnabled();
 
 std::uint64_t Now();
 

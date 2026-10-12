@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -205,10 +207,12 @@
 <li><strong>namespace</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <em>Planetary digital elevation models, as the PDS archives them, and the local heightfields Ernie's</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>draws of them.</em>    <ul>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a>     <ul>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1app_1_1icons/"><strong>icons</strong></a> <em>Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text drawn with the viewer's font, which has the icons merged in:</em> <code>ImGui::Button(icons::kSave)</code> <em>, or</em><code>std::string(icons::kCamera) + " Camera"</code> <em>as a label.</em>    </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1app_1_1menu/"><strong>menu</strong></a>     </li>
 </ul>
 </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1detail/"><strong>detail</strong></a> <em>What the view macros expand to.</em>     </li>
-<li><strong>namespace</strong> <a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <em>Ernie's in-process profiler: the zones of</em> <code>ERNIE_ZONE</code> <em>and</em><code>ERNIE_GPU_ZONE</code> <em>(</em><a href="../profile_8h/"><em><strong>ernie/util/profile.h</strong></em></a> <em>,</em><a href="../gpu__profile_8h/"><em><strong>ernie/device/gpu_profile.h</strong></em></a> <em>) recorded frame by frame for a profiler panel, alongside Tracy's (which streams them to its own viewer in a profiling build).</em>    </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1memory/"><strong>memory</strong></a> <em>The device memory Ernie's buffers and images hold, for the viewer's Profiler panel: each live</em> <code>GpuBuffer</code> <em>and</em><code>GpuImage</code> <em>registers its allocation under a category from its usage (render targets, textures, storage buffers, ...) until it is released.</em>    </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <em>Summaries of the profiler's frames (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) as Omniverse Kit's profiler window shows them: each zone nested in the zone that encloses it, with its time averaged over the frames, its share of the frame, and exports as text, JSON and a Chrome trace.</em>    </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1reflectance__table/"><strong>reflectance_table</strong></a>     </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1render__vars/"><strong>render_vars</strong></a> <em>Render var names, after Omniverse's where it has the quantity.</em>     </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1solar__table/"><strong>solar_table</strong></a>     </li>

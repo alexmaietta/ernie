@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -224,6 +226,14 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-batch"><strong>Batch</strong></a> (<a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> batch) <br><em>Many items of one kind from arrays (</em> <code>OverlayBatch</code> <em>), kept as they are and drawn on the GPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-batches"><strong>Batches</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-box"><strong>Box</strong></a> (const glm::dvec3 &amp; low, const glm::dvec3 &amp; high, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::dmat4 &amp; transform=glm::dmat4(1.0)) <br><em>The edges of the box from</em> <code>low</code> <em>to</em><code>high</code> <em>, placed by</em><code>transform</code> <em>.</em></td>
 </tr>
 <tr>
@@ -326,6 +336,24 @@
     double length,
     const OverlayStyle &amp; style={}
 ) 
+</code></pre>
+<hr>
+
+<h3 id="function-batch">function Batch</h3>
+<p><em>Many items of one kind from arrays (</em> <code>OverlayBatch</code> <em>), kept as they are and drawn on the GPU.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Batch (
+    OverlayBatch batch
+) 
+</code></pre>
+<p>The overlay holds the arrays: add the batch again after writing into them in place. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for arrays of the wrong type or shape, rows that differ in number, or ones the kind needs missing. </li>
+</ul>
+<hr>
+
+<h3 id="function-batches">function Batches</h3>
+<pre><code class="language-C++">inline const std::vector&lt; OverlayBatch &gt; &amp; ernie::Overlay::Batches () const
 </code></pre>
 <hr>
 

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -238,7 +240,6 @@ struct RenderPrims {
     Path camera;
     Path terrain;
     Path material;
-    Path light;
     std::vector&lt;Path&gt; lights;
     Path dome;
     Path ground;
@@ -374,6 +375,8 @@ std::optional&lt;PlanetSphere&gt; PlanetOf(const Scene&amp; scene,
                                      const Path&amp; path);
 
 std::optional&lt;PlanetSphere&gt; PlanetOf(const Scene&amp; scene);
+
+Path NearestAtmosphere(const Scene&amp; scene, const glm::dvec3&amp; point);
 
 BodyParams BodyParamsOf(const Scene&amp; scene, const Path&amp; path);
 

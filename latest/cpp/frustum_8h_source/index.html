@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -212,8 +214,7 @@
 namespace ernie {
 
 struct Frustum {
-    std::array&lt;glm::vec4, 6&gt;
-        planes{};  
+    std::array&lt;glm::vec4, 6&gt; planes{};
 
     static Frustum FromMatrix(const glm::mat4&amp; viewProjection);
 

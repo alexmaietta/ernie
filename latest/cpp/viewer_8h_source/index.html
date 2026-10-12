@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -254,7 +256,7 @@ struct ViewerOptions {
     std::string device;  
     std::string renderer =
         &quot;raster&quot;;  
-    Theme theme = DarkTheme();  
+    Theme theme;   
     std::filesystem::path
         layout;  
     DockSizes docks;  
@@ -464,6 +466,10 @@ class Viewer {
 
     std::optional&lt;Wireframe&gt; GetWireframe() const;
     void SetWireframe(std::optional&lt;Wireframe&gt; mode);
+
+    std::optional&lt;bool&gt; GetMinimal() const;
+    void SetMinimal(std::optional&lt;bool&gt; minimal);
+    bool MinimalShown() const;
 
     const ViewportDisplay&amp; GetViewportDisplay() const;
     void SetViewportDisplay(const ViewportDisplay&amp; display);

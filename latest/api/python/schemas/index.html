@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -3628,6 +3630,22 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
                 <p>Metres. Default 1.0. USD name <code>radius</code>.</p>
               </div>
             </li>
+            <li>
+              <b><code>tessellation</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>uv: latitude rings and meridians; icosphere: a divided icosahedron; cubeSphere: a cube's</p>
+              </div>
+            </li>
+            <li>
+              <b><code>tessellation_level</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>UV stacks, icosphere subdivisions, cube quads a face edge or HEALPix N_side; 0 for some</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -3688,6 +3706,55 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Sphere.tessellation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">tessellation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">tessellation: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>uv: latitude rings and meridians; icosphere: a divided icosahedron; cubeSphere: a cube's
+faces as planet Terrains'; healpix: HEALPix's equal-area pixels. Each has equirectangular
+texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Sphere.tessellation_level" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">tessellation_level</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">tessellation_level: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>UV stacks, icosphere subdivisions, cube quads a face edge or HEALPix N_side; 0 for some
+2,000 to 6,000 triangles. Default 0. USD name <code>ernie:tessellation:level</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -3708,6 +3775,8 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
     radius: float = ...,
+    tessellation: str = ...,
+    tessellation_level: int = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -5392,6 +5461,14 @@ orientations and scales.</p>
               </div>
             </li>
             <li>
+              <b><code>display_color</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>(n, 3) linear RGB of each instance, in place of its prototype's displayColor (USD's per-</p>
+              </div>
+            </li>
+            <li>
               <b><code>orientations</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
               –
@@ -5471,6 +5548,30 @@ orientations and scales.</p>
 <pre class="highlight"><code class="language-python doc-signature">define: _Define[_PointInstancerDefine]</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.PointInstancer.display_color" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">display_color</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">display_color: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(n, 3) linear RGB of each instance, in place of its prototype's displayColor (USD's per-
+instance primvar). USD name <code>primvars:displayColor</code>.</p>
 
     </div>
 
@@ -5639,6 +5740,7 @@ all when unset. USD name <code>protoIndices</code>.</p>
     proto_indices: Any = ...,
     prototypes: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
     worlds: Any = ...,
+    display_color: Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -5679,7 +5781,8 @@ all when unset. USD name <code>protoIndices</code>.</p>
 
 
 
-        <p>A volume (UsdVol); not drawn yet.</p>
+        <p>A participating medium: fields named by field:<name> relationships, shaded by its Material's
+volume inputs.</p>
 
 
 
@@ -5701,7 +5804,31 @@ all when unset. USD name <code>protoIndices</code>.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            field_names (ernie.schema.Volume.field_names)" href="#ernie.schema.Volume.field_names">field_names</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            get_field (ernie.schema.Volume.get_field)" href="#ernie.schema.Volume.get_field">get_field</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.schema.Volume.set)" href="#ernie.schema.Volume.set">set</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            set_field (ernie.schema.Volume.set_field)" href="#ernie.schema.Volume.set_field">set_field</a></code></td>
               <td>
                 <div class="doc-md-description">
                   
@@ -5775,6 +5902,40 @@ all when unset. USD name <code>protoIndices</code>.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.schema.Volume.field_names" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">field_names</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">field_names() -&gt; list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.schema.Volume.get_field" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get_field</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">get_field(name: str) -&gt; Path | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.schema.Volume.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
@@ -5794,6 +5955,23 @@ all when unset. USD name <code>protoIndices</code>.</p>
     orient: Quat = ...,
     scale: float | Sequence[float] = ...,
 ) -&gt; Self</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.schema.Volume.set_field" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_field</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">set_field(name: str, field: Prim | Schema | Path | str) -&gt; Self</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -6291,7 +6469,7 @@ six cube faces.</p>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>World units. Set, the Terrain is a whole planet of this radius centred at the world's</p>
+                <p>World units. Set, the Terrain is a whole planet of this radius centred at its transform's</p>
               </div>
             </li>
         </ul>
@@ -6538,9 +6716,9 @@ default 315, from the north-west. Default 315.0. USD name <code>ernie:hillshade:
 
     <div class="doc doc-contents ">
 
-        <p>World units. Set, the Terrain is a whole planet of this radius centred at the world's
-origin, its heights cube faces, and the origin and cell size do not apply. Default 0.0. USD
-name <code>ernie:radius</code>.</p>
+        <p>World units. Set, the Terrain is a whole planet of this radius centred at its transform's
+translation (its rotation not yet applied), its heights cube faces, and the origin and cell
+size do not apply. Default 0.0. USD name <code>ernie:radius</code>.</p>
 
     </div>
 
@@ -6701,6 +6879,30 @@ name <code>ernie:radius</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>light_link_excludes</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Prims it leaves unlit, with their descendants. USD name <code>collection:lightLink:excludes</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>light_link_include_root</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Lights the whole scene unless excluded; off, only what it includes. Default True. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>light_link_includes</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Prims it lights, with their descendants. USD name <code>collection:lightLink:includes</code>.</p>
+              </div>
+            </li>
+            <li>
               <b><code>normalize</code></b>
                   (<code><span title="bool">bool</span></code>)
               –
@@ -6725,11 +6927,51 @@ name <code>ernie:radius</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>polarization_angle</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Its electric field's angle from the light's +x, degrees. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarization_degree</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Fraction of the light linearly polarized, 0 to 1. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
               <b><code>shadow_enable</code></b>
                   (<code><span title="bool">bool</span></code>)
               –
               <div class="doc-md-description">
                 <p>Default True. USD name <code>inputs:shadow:enable</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_link_excludes</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Prims that cast none of its shadows, with their descendants. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_link_include_root</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The whole scene casts its shadows unless excluded; off, only what it includes. Default True.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_link_includes</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Prims that cast its shadows, with their descendants. USD name</p>
               </div>
             </li>
             <li>
@@ -6875,6 +7117,76 @@ name <code>ernie:radius</code>.</p>
 
 
 
+<h3 id="ernie.schema.Light.light_link_excludes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">light_link_excludes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">light_link_excludes: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Prims it leaves unlit, with their descendants. USD name <code>collection:lightLink:excludes</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.light_link_include_root" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">light_link_include_root</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">light_link_include_root: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Lights the whole scene unless excluded; off, only what it includes. Default True. USD name
+<code>collection:lightLink:includeRoot</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.light_link_includes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">light_link_includes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">light_link_includes: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Prims it lights, with their descendants. USD name <code>collection:lightLink:includes</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Light.normalize" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">normalize</span>
 
@@ -6950,6 +7262,54 @@ if the temperature is used, else flat, over the whole range. USD name <code>phys
 
 
 
+<h3 id="ernie.schema.Light.polarization_angle" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarization_angle</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarization_angle: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Its electric field's angle from the light's +x, degrees. Default 0.0. USD name
+<code>ernie:polarization:angle</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.polarization_degree" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarization_degree</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarization_degree: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Fraction of the light linearly polarized, 0 to 1. Default 0.0. USD name
+<code>ernie:polarization:degree</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Light.shadow_enable" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_enable</span>
 
@@ -6964,6 +7324,78 @@ if the temperature is used, else flat, over the whole range. USD name <code>phys
     <div class="doc doc-contents ">
 
         <p>Default True. USD name <code>inputs:shadow:enable</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.shadow_link_excludes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_link_excludes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_link_excludes: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Prims that cast none of its shadows, with their descendants. USD name
+<code>collection:shadowLink:excludes</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.shadow_link_include_root" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_link_include_root</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_link_include_root: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The whole scene casts its shadows unless excluded; off, only what it includes. Default True.
+USD name <code>collection:shadowLink:includeRoot</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.shadow_link_includes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_link_includes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_link_includes: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Prims that cast its shadows, with their descendants. USD name
+<code>collection:shadowLink:includes</code>.</p>
 
     </div>
 
@@ -7015,10 +7447,34 @@ nm^-1 for a sphere, W m^-2 sr^-1 nm^-1 for a rect, disk or dome. USD name <code>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -7429,10 +7885,34 @@ intensity. Default False. USD name <code>inputs:shaping:ies:normalize</code>.</p
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     power: float = ...,
     shaping_focus: float = ...,
     shaping_focus_tint: Sequence[float] = ...,
@@ -7598,10 +8078,34 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     photometric_illuminance: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -7818,10 +8322,34 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     photometric_illuminance: float = ...,
     angle: float = ...,
     irradiance: float = ...,
@@ -8072,10 +8600,34 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     photometric_illuminance: float = ...,
     texture_file: str = ...,
     texture: Any = ...,
@@ -8358,10 +8910,34 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     power: float = ...,
     shaping_focus: float = ...,
     shaping_focus_tint: Sequence[float] = ...,
@@ -8589,10 +9165,34 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     power: float = ...,
     shaping_focus: float = ...,
     shaping_focus_tint: Sequence[float] = ...,
@@ -8787,10 +9387,34 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     enable_color_temperature: bool = ...,
     color_temperature: float = ...,
     shadow_enable: bool = ...,
+    light_link_include_root: bool = ...,
+    light_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    light_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_include_root: bool = ...,
+    shadow_link_includes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    shadow_link_excludes: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
     spectrum: float | Sequence[float] = ...,
+    polarization_degree: float = ...,
+    polarization_angle: float = ...,
     power: float = ...,
     shaping_focus: float = ...,
     shaping_focus_tint: Sequence[float] = ...,
@@ -9509,6 +10133,38 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
               –
               <div class="doc-md-description">
                 <p>Natural falloff of irradiance off axis. Default False. USD name <code>ernie:lens:vignetting</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarizer_angle</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A linear polarizer's axis from the image's +x towards +y, degrees. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarizer_extinction</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Light passed along the axis over across it. Default 1000.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarizer_transmission</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Fraction of light polarized along the axis it passes. Default 0.85. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarizer_type</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>"linear" in front of the lens, or a "mosaic" of 90, 45 / 135, 0 degree polarizers over 2 x 2</p>
               </div>
             </li>
             <li>
@@ -10306,6 +10962,102 @@ step pixels, in place of the projection and distortion. USD name <code>ernie:len
 
 
 
+<h3 id="ernie.schema.Camera.polarizer_angle" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarizer_angle</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarizer_angle: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A linear polarizer's axis from the image's +x towards +y, degrees. Default 0.0. USD name
+<code>ernie:polarizer:angle</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Camera.polarizer_extinction" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarizer_extinction</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarizer_extinction: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Light passed along the axis over across it. Default 1000.0. USD name
+<code>ernie:polarizer:extinction</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Camera.polarizer_transmission" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarizer_transmission</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarizer_transmission: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Fraction of light polarized along the axis it passes. Default 0.85. USD name
+<code>ernie:polarizer:transmission</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Camera.polarizer_type" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarizer_type</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarizer_type: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>"linear" in front of the lens, or a "mosaic" of 90, 45 / 135, 0 degree polarizers over 2 x 2
+pixels, as a polarization sensor's. Default 'none'. USD name <code>ernie:polarizer:type</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Camera.poses" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">poses</span>
 
@@ -11037,6 +11789,10 @@ name <code>ernie:shutter:rolling</code>.</p>
     lens_fisheye: float | Sequence[float] = ...,
     lens_vignetting: bool = ...,
     lens_transmission: float = ...,
+    polarizer_type: str = ...,
+    polarizer_angle: float = ...,
+    polarizer_extinction: float = ...,
+    polarizer_transmission: float = ...,
     lens_chromatic_scale: float | Sequence[float] = ...,
     lens_chromatic_focus: float | Sequence[float] = ...,
     lens_rays: Any = ...,
@@ -11210,6 +11966,22 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>anisotropy</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Henyey-Greenstein g: above 0 scatters forwards, below 0 backwards. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>blackbody</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Scales the glow of what absorbs at its temperature, Planck's law times the absorption</p>
+              </div>
+            </li>
+            <li>
               <b><code>brdf</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -11223,6 +11995,22 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 
+              </div>
+            </li>
+            <li>
+              <b><code>density</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Scales the density field into the extinction coefficient, 1/m. Default 1.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>density_field</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The Volume's field (field:<name>) of density. Default 'density'. USD name</p>
               </div>
             </li>
             <li>
@@ -11306,11 +12094,51 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>emission_color</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Linear RGB. Default (1.0, 1.0, 1.0). USD name <code>inputs:emissionColor</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>emission_field</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The field the emission follows; unset, the density field. USD name <code>inputs:emissionField</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>emission_strength</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Radiance added per metre, cd/m^2 per m for a white colour, times the emission field. Default</p>
+              </div>
+            </li>
+            <li>
               <b><code>emissive_color</code></b>
                   (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
               –
               <div class="doc-md-description">
                 <p>Linear RGB radiance in cd/m^2 for white, without a UsdPreviewSurface (whose own is read</p>
+              </div>
+            </li>
+            <li>
+              <b><code>phase_function</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>How what scatters spreads its light: Henyey-Greenstein by the anisotropy; Hapke's double</p>
+              </div>
+            </li>
+            <li>
+              <b><code>polarization_retention</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Share of incident polarization diffuse reflection keeps, 0 to 1; dark, single-scattering</p>
               </div>
             </li>
             <li>
@@ -11327,6 +12155,38 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 <p>A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 um and on into the thermal</p>
+              </div>
+            </li>
+            <li>
+              <b><code>temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin, of the whole volume when it has no temperature field; 0, no glow. Default 0.0. USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>temperature_field</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The Volume's field of temperature in kelvin, times the temperature scale. Default</p>
+              </div>
+            </li>
+            <li>
+              <b><code>temperature_scale</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Takes the temperature field's values to kelvin. Default 1.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_albedo</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Linear RGB share of the extinction that scatters; the rest absorbs. 0, smoke that only</p>
               </div>
             </li>
         </ul>
@@ -11489,6 +12349,54 @@ connects to.</p>
 
 
 
+<h3 id="ernie.schema.Material.anisotropy" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">anisotropy</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">anisotropy: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Henyey-Greenstein g: above 0 scatters forwards, below 0 backwards. Default 0.0. USD name
+<code>inputs:anisotropy</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.blackbody" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">blackbody</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">blackbody: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Scales the glow of what absorbs at its temperature, Planck's law times the absorption
+coefficient (Kirchhoff); 1 is physical, 0 none. Default 1.0. USD name <code>inputs:blackbody</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.brdf" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">brdf</span>
 
@@ -11525,6 +12433,54 @@ connects to.</p>
 <pre class="highlight"><code class="language-python doc-signature">define: _Define[_MaterialDefine]</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.density" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">density</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">density: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Scales the density field into the extinction coefficient, 1/m. Default 1.0. USD name
+<code>inputs:density</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.density_field" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">density_field</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">density_field: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The Volume's field (field:<name>) of density. Default 'density'. USD name
+<code>inputs:densityField</code>.</p>
 
     </div>
 
@@ -11774,6 +12730,76 @@ surface. USD name <code>inputs:detailNormal</code>.</p>
 
 
 
+<h3 id="ernie.schema.Material.emission_color" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">emission_color</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">emission_color: tuple[float, float, float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Linear RGB. Default (1.0, 1.0, 1.0). USD name <code>inputs:emissionColor</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.emission_field" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">emission_field</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">emission_field: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The field the emission follows; unset, the density field. USD name <code>inputs:emissionField</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.emission_strength" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">emission_strength</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">emission_strength: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Radiance added per metre, cd/m^2 per m for a white colour, times the emission field. Default
+0.0. USD name <code>inputs:emissionStrength</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.emissive_color" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">emissive_color</span>
 
@@ -11789,6 +12815,56 @@ surface. USD name <code>inputs:detailNormal</code>.</p>
 
         <p>Linear RGB radiance in cd/m^2 for white, without a UsdPreviewSurface (whose own is read
 then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.phase_function" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">phase_function</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">phase_function: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>How what scatters spreads its light: Henyey-Greenstein by the anisotropy; Hapke's double
+Henyey-Greenstein by the b and c a Hapke surface reads (inputs:b, inputs:c), so dust and the
+regolith it rose from scatter alike; Rayleigh; or isotropic. Default 'henyeyGreenstein'. USD
+name <code>inputs:phaseFunction</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.polarization_retention" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">polarization_retention</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">polarization_retention: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Share of incident polarization diffuse reflection keeps, 0 to 1; dark, single-scattering
+surfaces keep more. Default 0.0. USD name <code>ernie:polarization:retention</code>.</p>
 
     </div>
 
@@ -11843,6 +12919,102 @@ infrared, replacing the albedo unless a reflectance is given. USD name
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin, of the whole volume when it has no temperature field; 0, no glow. Default 0.0. USD
+name <code>inputs:temperature</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.temperature_field" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">temperature_field</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">temperature_field: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The Volume's field of temperature in kelvin, times the temperature scale. Default
+'temperature'. USD name <code>inputs:temperatureField</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.temperature_scale" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">temperature_scale</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">temperature_scale: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Takes the temperature field's values to kelvin. Default 1.0. USD name
+<code>inputs:temperatureScale</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.volume_albedo" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_albedo</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_albedo: tuple[float, float, float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Linear RGB share of the extinction that scatters; the rest absorbs. 0, smoke that only
+absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -11863,6 +13035,7 @@ infrared, replacing the albedo unless a reflectance is given. USD name
     albedo: Sequence[float] = ...,
     reflectance: float | Sequence[float] = ...,
     reflectance_library: str = ...,
+    polarization_retention: float = ...,
     albedo_map_enable: bool = ...,
     albedo_map: Any = ...,
     albedo_map_origin: Sequence[float] = ...,
@@ -11879,6 +13052,18 @@ infrared, replacing the albedo unless a reflectance is given. USD name
     detail_hex_rotation: float = ...,
     detail_hex_contrast: float = ...,
     detail_hex_sharpness: float = ...,
+    density: float = ...,
+    density_field: str = ...,
+    volume_albedo: Sequence[float] = ...,
+    phase_function: str = ...,
+    anisotropy: float = ...,
+    emission_color: Sequence[float] = ...,
+    emission_strength: float = ...,
+    emission_field: str = ...,
+    blackbody: float = ...,
+    temperature: float = ...,
+    temperature_field: str = ...,
+    temperature_scale: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",

@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -247,6 +249,10 @@
 <td style="text-align: left;"><a href="#variable-planetradius"><strong>planetRadius</strong></a>   = <code>0.0</code><br><em>Metres.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-polarization"><strong>polarization</strong></a>   = <code>0.75</code><br><em>The sky's greatest degree of linear polarization (</em> <code>tokens::kPolarizationDegree</code> <em>), 90 degrees from the sun.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-preset"><strong>preset</strong></a>   = <code>"earth"</code><br><code>tokens::kEarth</code> <em>or</em><code>tokens::kMars</code> <em>.</em></td>
 </tr>
@@ -317,6 +323,12 @@
 <h3 id="variable-planetradius">variable planetRadius</h3>
 <p><em>Metres.</em> </p>
 <pre><code class="language-C++">double ernie::AtmosphereParams::planetRadius;
+</code></pre>
+<hr>
+
+<h3 id="variable-polarization">variable polarization</h3>
+<p><em>The sky's greatest degree of linear polarization (</em> <code>tokens::kPolarizationDegree</code> <em>), 90 degrees from the sun.</em></p>
+<pre><code class="language-C++">double ernie::AtmosphereParams::polarization;
 </code></pre>
 <hr>
 

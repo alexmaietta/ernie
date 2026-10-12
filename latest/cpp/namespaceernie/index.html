@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -243,7 +245,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">namespace</td>
-<td style="text-align: left;"><a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <br><em>Ernie's in-process profiler: the zones of</em> <code>ERNIE_ZONE</code> <em>and</em><code>ERNIE_GPU_ZONE</code> <em>(</em><a href="../profile_8h/"><em><strong>ernie/util/profile.h</strong></em></a> <em>,</em><a href="../gpu__profile_8h/"><em><strong>ernie/device/gpu_profile.h</strong></em></a> <em>) recorded frame by frame for a profiler panel, alongside Tracy's (which streams them to its own viewer in a profiling build).</em></td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1memory/"><strong>memory</strong></a> <br><em>The device memory Ernie's buffers and images hold, for the viewer's Profiler panel: each live</em> <code>GpuBuffer</code> <em>and</em><code>GpuImage</code> <em>registers its allocation under a category from its usage (render targets, textures, storage buffers, ...) until it is released.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">namespace</td>
+<td style="text-align: left;"><a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <br><em>Summaries of the profiler's frames (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) as Omniverse Kit's profiler window shows them: each zone nested in the zone that encloses it, with its time averaged over the frames, its share of the frame, and exports as text, JSON and a Chrome trace.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">namespace</td>
@@ -537,6 +543,14 @@
 <td style="text-align: left;"><a href="../classernie_1_1EditHistory/"><strong>EditHistory</strong></a> <br><em>Undo and redo for scene edits made through it: attribute sets and clears, prims defined, and prims removed with their descendants.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1FieldAsset/"><strong>FieldAsset</strong></a> <br><em>A field read from a file (UsdVol's</em> <a href="../classernie_1_1FieldAsset/"><em><strong>FieldAsset</strong></em></a> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1FieldBase/"><strong>FieldBase</strong></a> <br><em>A field of values over space, which Volumes name; its transform places the field in its</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(UsdVol's</em><a href="../classernie_1_1FieldBase/"><em><strong>FieldBase</strong></em></a> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1FrameId/"><strong>FrameId</strong></a> <br><em>Where an image sits in the deterministic random streams of</em> <code>sampling.h</code> <em>.</em></td>
 </tr>
@@ -546,7 +560,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1FrameParams/"><strong>FrameParams</strong></a> <br><em>Per-frame parameters of a render, whatever the backend: the camera, the sun, the other lights, the sensor filters and the frame's place in the random streams.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1FrameParams/"><strong>FrameParams</strong></a> <br><em>Per-frame parameters of a render, whatever the backend: the camera, the lights, the sensor filters and the frame's place in the random streams.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -658,7 +672,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <br><em>A light besides the sun, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> <br><em>A light, resolved for a frame from its prim (</em> <code>LightParamsOf</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -675,6 +689,14 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1LightPatternRegistry/"><strong>LightPatternRegistry</strong></a> <br><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>patterns a renderer can draw, by</em><code>LightPatternModel::id</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LinkCollection/"><strong>LinkCollection</strong></a> <br><em>One of a light's collections (UsdCollectionAPI with its prims expanded): the whole scene when</em> <code>includeRoot</code> <em>, else nothing, then the prims listed and their descendants in or out, the nearest listed ancestor of a prim deciding.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1LinkGroups/"><strong>LinkGroups</strong></a> <br><em>Geometry grouped by the lights that light it and whose shadows it casts, as the rasterizer applies links: each surface carries its group (0, lit and shadowed by every light, for prims no link singles out), and each light a mask of the groups it lights and of those that cast its shadows.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -733,6 +755,10 @@
 <td style="text-align: left;"><a href="../structernie_1_1NamedCahvore/"><strong>NamedCahvore</strong></a> <br><em>A named camera model in a frame, as camera model files list them.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> <br><em>One sparse grid as NanoVDB lays it out: a buffer the GPU reads in place (PNanoVDB's tree walk), and what Ernie needs of its header.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1NonboundableLight/"><strong>NonboundableLight</strong></a> <br><em>A light at infinity (distant, dome), whose photometric brightness is an illuminance.</em></td>
 </tr>
@@ -745,6 +771,10 @@
 <td style="text-align: left;"><a href="../classernie_1_1OffscreenTarget/"><strong>OffscreenTarget</strong></a> <br><em>A colour and depth target for headless rendering, with readback of the colour image.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1OpenVDBAsset/"><strong>OpenVDBAsset</strong></a> <br><em>A grid of a VDB file.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1OrArray/"><strong>OrArray</strong></a> &lt;typename T&gt;<br><em>An attribute declared as</em> <code>T</code> <em>that also takes an array written in place of its value: colours per vertex for one</em><code>displayColor</code> <em>, a width per point.</em></td>
 </tr>
@@ -755,6 +785,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -815,6 +849,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a> <br><em>A planet's radius on a polar stereographic grid (spherical, true at the pole), as LOLA's polar LDEM products hold it:</em> <code>heights</code> <em>(metres above</em><code>referenceRadius</code> <em>) row by row,</em><code>mapScale</code> <em>metres a pixel at the pole.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Polarizer/"><strong>Polarizer</strong></a> <br><em>A camera's linear polarizer (</em> <code>tokens::kPolarizerType</code> <em>): none, one in front of the lens at</em><code>angle</code> <em>(radians from the image's +x towards +y), or a polarization sensor's mosaic of 2 x 2 pixels at 90, 45 / 135, 0 degrees (Sony's IMX250MZR).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -1054,7 +1092,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <br><em>A volume (UsdVol); Ernie does not draw volumes yet.</em></td>
+<td style="text-align: left;"><a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <br><em>A participating medium: fields, each named by a relationship</em> <code>field:&lt;name&gt;</code> <em>to a field prim, shaded by the bound</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (density, albedo, emission, temperature).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeFieldParams/"><strong>VolumeFieldParams</strong></a> <br><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeMaterialParams/"><strong>VolumeMaterialParams</strong></a> <br><em>How a volume's fields shade: its</em> <a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (</em><code>material_schemas.h</code> <em>), the emission colour times its strength.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> <br><em>A</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(</em><code>VolumesOf</code> <em>): where it is, which world, its material and its density, temperature and emission fields, each optional.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -1173,11 +1223,15 @@
 </tr>
 <tr>
 <td style="text-align: right;">enum std::uint32_t</td>
-<td style="text-align: left;"><a href="#enum-minimalmode"><strong>MinimalMode</strong></a>  <br><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the scene's ambient light.</em></td>
+<td style="text-align: left;"><a href="#enum-minimalmode"><strong>MinimalMode</strong></a>  <br><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the first four distant lights, unshadowed, and the scene's ambient light.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum</td>
 <td style="text-align: left;"><a href="#enum-mipfilter"><strong>MipFilter</strong></a>  <br><em>How</em> <code>MipChain</code> <em>filters each level.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum std::uint32_t</td>
+<td style="text-align: left;"><a href="#enum-nanovdbtype"><strong>NanoVdbType</strong></a>  <br><em>A NanoVDB grid's value type, as</em> <code>PNANOVDB_GRID_TYPE_*</code> <em>numbers it.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum std::uint32_t</td>
@@ -1186,6 +1240,10 @@
 <tr>
 <td style="text-align: right;">typedef std::function&lt; <a href="../structernie_1_1ParticleOptics/"><strong>ParticleOptics</strong></a>(double wavelengthNm, std::span&lt; const double &gt;)&gt;</td>
 <td style="text-align: left;"><a href="#typedef-opticsmodel"><strong>OpticsModel</strong></a>  <br><em>Optical properties of one particle or molecule at a wavelength (nm), with the phase function at the given cosines.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum std::uint8_t</td>
+<td style="text-align: left;"><a href="#enum-overlaybatchkind"><strong>OverlayBatchKind</strong></a>  <br><em>The kinds of item an</em> <code>OverlayBatch</code> <em>holds many of.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum std::uint8_t</td>
@@ -1206,6 +1264,10 @@
 <tr>
 <td style="text-align: right;">enum std::uint32_t</td>
 <td style="text-align: left;"><a href="#enum-shadowfit"><strong>ShadowFit</strong></a>  <br><em>What bounds a single view's sun cascades (</em> <code>ernie:shadows:fit</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-spheretessellation"><strong>SphereTessellation</strong></a>  <br><em>How a sphere is divided into triangles.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum</td>
@@ -1598,6 +1660,10 @@
 <td style="text-align: left;"><a href="#function-defaultfilterchain"><strong>DefaultFilterChain</strong></a> () <br><em>Every filter in its natural order: the sensor chain then the photographic chain.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-defaultspherelevel"><strong>DefaultSphereLevel</strong></a> (<a href="./#enum-spheretessellation"><strong>SphereTessellation</strong></a> tessellation) <br><em>The level</em> <code>TessellatedSphere</code> <em>uses for 0: some 2,000 to 5,000 triangles each (24 stacks, 4 subdivisions, 16 quads a face edge, N_side 16).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="./#enum-dirty"><strong>Dirty</strong></a></td>
 <td style="text-align: left;"><a href="#function-dirtyof"><strong>DirtyOf</strong></a> (std::string_view attribute) <br><em>The dirty bit that setting or writing</em> <code>attribute</code> <em>raises:</em><code>Transform</code> <em>for xformOps, else what the registered types declare for it (</em><code>AttributeMeta::dirty</code> <em>, such as</em><code>Points</code> <em>for</em><code>points</code> <em>), else</em><code>Primvars</code> <em>for primvars and</em><code>Params</code> <em>for anything else.</em></td>
 </tr>
@@ -1648,6 +1714,14 @@
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1DomeSunExtraction/"><strong>DomeSunExtraction</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-extractdomesun"><strong>ExtractDomeSun</strong></a> (const <a href="../structernie_1_1Image/"><strong>Image</strong></a> &amp; map) <br><em>The sun of dome map</em> <code>map</code> <em>, if it has one: the brightest texel's connected region of texels above</em><code>kDomeSunThreshold</code> <em>of its luminance, when that region is compact (under 5 degrees across), much brighter than the sky (its peak over 20 times the map's median luminance) and carries at least 5% of the map's irradiance.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-fieldrelationship"><strong>FieldRelationship</strong></a> (std::string_view name) <br><em>The relationship naming a</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s field</em><code>name</code> <em>: "field:&lt;name&gt;".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findnanovdbgrid"><strong>FindNanoVdbGrid</strong></a> (std::span&lt; const <a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> &gt; grids, std::string_view name, int index=0) <br><em>The grid UsdVol's</em> <a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>names: the</em><code>index</code> <em>th grid (0 the first) named</em><code>name</code> <em>, or the</em><code>index</code> <em>th grid of the file when</em><code>name</code> <em>is empty; nullptr if there is none.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> *</td>
@@ -1778,6 +1852,10 @@
 <td style="text-align: left;"><a href="#function-lensray"><strong>LensRay</strong></a> (const <a href="../structernie_1_1LensModel/"><strong>LensModel</strong></a> &amp; lens, glm::dvec2 distorted) <br><em>The unit ray, in the camera's frame, that lands at distorted normalised image coordinates</em> <code>distorted</code> <em>((x, y) = ((u - cx) / f, (cy - v) / f), y up) through</em><code>lens</code> <em>: through the pinhole or the undone Brown-Conrady distortion for a perspective lens, and at the field angle a fisheye's radius gives, which may pass 90 degrees.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1LinkCollection/"><strong>LinkCollection</strong></a></td>
+<td style="text-align: left;"><a href="#function-lightlinkof"><strong>LightLinkOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>The light at</em> <code>path</code> <em>'s light link (</em><code>tokens::kLightLinkIncludeRoot</code> <em>and its relationships) and shadow link.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a></td>
 <td style="text-align: left;"><a href="#function-lightparamsof"><strong>LightParamsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands) <br><em>The</em> <a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>or</em><a href="../classernie_1_1SphereLight/"><em><strong>SphereLight</strong></em></a> <em>at</em><code>path</code> <em>as a</em><code>Light</code> <em>for</em><code>bands</code> <em>:</em></td>
 </tr>
@@ -1804,6 +1882,10 @@
 <tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#function-lineartosrgb"><strong>LinearToSrgb</strong></a> (float value) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LinkGroups/"><strong>LinkGroups</strong></a></td>
+<td style="text-align: left;"><a href="#function-linkgroupsof"><strong>LinkGroupsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; lights, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; geometry) <br><em>The link groups of</em> <code>geometry</code> <em>under</em><code>lights</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1Image/"><strong>Image</strong></a></td>
@@ -1896,6 +1978,18 @@
 <tr>
 <td style="text-align: right;">std::string_view</td>
 <td style="text-align: left;"><a href="#function-nameof"><strong>NameOf</strong></a> (<a href="./#enum-sensorfilter"><strong>SensorFilter</strong></a> filter) <br><em>The filter's name, as</em> <code>ernie:filter:type</code> <em>tokens spell it: "lens", "qe", "noise", "adc", "cie" or "exposure".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-nanovdbgridsof"><strong>NanoVdbGridsOf</strong></a> (std::span&lt; const std::uint8_t &gt; bytes) <br><em>The grids of a raw NanoVDB buffer, one or more grids back to back as NanoVDB keeps them in memory (Warp's</em> <code>Volume.array()</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-nanovdbtypename"><strong>NanoVdbTypeName</strong></a> (<a href="./#enum-nanovdbtype"><strong>NanoVdbType</strong></a> type) <br><em>The name</em> <code>PNANOVDB_GRID_TYPE_*</code> <em>gives a grid type, lower case ("float", "fp16", "vec3f"), or "type &lt;n&gt;" for others.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-nearestatmosphere"><strong>NearestAtmosphere</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const glm::dvec3 &amp; point) <br><em>Of the scene's visible Atmospheres, the one whose air is nearest</em> <code>point</code> <em>(world; inside it, distance 0, the smallest planet's first): the one a frame renders, as a camera flies between planets.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -2010,6 +2104,10 @@
 <td style="text-align: left;"><a href="#function-readisdfile"><strong>ReadIsdFile</strong></a> (const std::string &amp; path) <br><code>ReadIsd</code> <em>of the file at</em><code>path</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-readnanovdb"><strong>ReadNanoVdb</strong></a> (const std::filesystem::path &amp; path) <br><em>Every grid in a NanoVDB file (.nvdb), in file order: a file of segments (header, per-grid metadata and names, then the grids) or a raw grid buffer.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1PolarStereographicDem/"><strong>PolarStereographicDem</strong></a></td>
 <td style="text-align: left;"><a href="#function-readpolarstereographicdem"><strong>ReadPolarStereographicDem</strong></a> (const std::string &amp; labelPath) <br><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes, as</em><code>ReadCylindricalDem</code> <em>but on a polar stereographic grid.</em></td>
 </tr>
@@ -2020,6 +2118,10 @@
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
 <td style="text-align: left;"><a href="#function-reflectancetolinearsrgb"><strong>ReflectanceToLinearSrgb</strong></a> (const <a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a> &amp; reflectance) <br><em>The linear sRGB colour of a reflectance spectrum under the equal-energy illuminant, adapted to D65 (</em> <code>EqualEnergyXyzToLinearSrgb</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a></td>
+<td style="text-align: left;"><a href="#function-relativedistantlight"><strong>RelativeDistantLight</strong></a> (const glm::vec3 &amp; towards, const <a href="../structernie_1_1SpectralBands/"><strong>SpectralBands</strong></a> &amp; bands) <br><em>A distant light towards unit vector</em> <code>towards</code> <em>in relative units: a flat spectrum over</em><code>bands</code> <em>under which a white Lambertian surface facing it has a luminance of 1 cd/m^2, the sun's angular diameter, and shadows.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::string &gt;</td>
@@ -2052,6 +2154,14 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1RenderProductSpec/"><strong>RenderProductSpec</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-resolverenderproducts"><strong>ResolveRenderProducts</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; products, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings) <br><em>The render products a step of</em> <code>scene</code> <em>draws, following UsdRender: the given</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> <em>prims, or else the</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>'</em><code>products</code> <em>, or else one default product keyed by the settings' path (the root without settings).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::mat4</td>
+<td style="text-align: left;"><a href="#function-reversedorthographic"><strong>ReversedOrthographic</strong></a> (double left, double right, double bottom, double top, double nearPlane, double farPlane) <br><em>A right-handed reverse-Z orthographic projection of the box</em> <code>left</code> <em>to</em><code>right</code> <em>,</em><code>bottom</code> <em>to</em><code>top</code> <em>: depth 1 at</em><code>nearPlane</code> <em>and 0 at</em><code>farPlane</code> <em>, which an infinite one replaces with 10^12 beyond the near plane.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::mat4</td>
+<td style="text-align: left;"><a href="#function-reversedperspective"><strong>ReversedPerspective</strong></a> (float verticalFov, float aspect, float nearPlane, float farPlane) <br><em>A right-handed reverse-Z perspective projection to depth [0, 1]: 1 at</em> <code>nearPlane</code> <em>, 0 at</em><code>farPlane</code> <em>, or with an infinite far plane near / distance.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1SigmoidSpectrum/"><strong>SigmoidSpectrum</strong></a></td>
@@ -2094,6 +2204,10 @@
 <td style="text-align: left;"><a href="#function-setxform"><strong>SetXform</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const <a href="../structernie_1_1XformOps/"><strong>XformOps</strong></a> &amp; xform) <br><em>Sets the prim at</em> <code>path</code> <em>to</em><code>xform</code> <em>: its set parts as</em><code>xformOp:translate</code> <em>, a rotate op or</em><code>xformOp:orient</code> <em>, and</em><code>xformOp:scale</code> <em>, with</em><code>xformOpOrder</code> <em>listing them in that order (so points scale, then rotate, then move), after a leading</em><code>!resetXformStack!</code> <em>if it had one.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1LinkCollection/"><strong>LinkCollection</strong></a></td>
+<td style="text-align: left;"><a href="#function-shadowlinkof"><strong>ShadowLinkOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::size_t</td>
 <td style="text-align: left;"><a href="#function-sizeof"><strong>SizeOf</strong></a> (<a href="./#enum-dtype"><strong>DType</strong></a> type) <br><em>Bytes per element of</em> <code>type</code> <em>.</em></td>
 </tr>
@@ -2112,6 +2226,10 @@
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
 <td style="text-align: left;"><a href="#function-spheremesh"><strong>SphereMesh</strong></a> (float radius, std::uint32_t slices=48, std::uint32_t stacks=24) <br><em>A UV sphere (UsdGeomSphere, default radius 1).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="./#enum-spheretessellation"><strong>SphereTessellation</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-spheretessellationnamed"><strong>SphereTessellationNamed</strong></a> (std::string_view name) <br><em>The tessellation named "uv", "icosphere", "cubeSphere" or "healpix"; none for anything else.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
@@ -2152,6 +2270,10 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
 <td style="text-align: left;"><a href="#function-terrainschematypes"><strong>TerrainSchemaTypes</strong></a> () <br><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
+<td style="text-align: left;"><a href="#function-tessellatedsphere"><strong>TessellatedSphere</strong></a> (float radius, <a href="./#enum-spheretessellation"><strong>SphereTessellation</strong></a> tessellation, std::uint32_t level=0) <br><em>A sphere of</em> <code>radius</code> <em>about the origin, its poles on z, with outward normals, counter-clockwise triangles seen from outside, and equirectangular texture coordinates per corner: s the longitude east of +x over 360 degrees from -180, t the latitude from the south pole (0) to the north (1), a triangle across the antimeridian taking its corners' longitudes on one side, and a corner on a pole the mean of the triangle's other two.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::uint8_t &gt;</td>
@@ -2200,6 +2322,14 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; std::int32_t &gt;</td>
 <td style="text-align: left;"><a href="#function-viewworldsof"><strong>ViewWorldsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; cameras, std::size_t views, const <a href="./#typedef-hostarrayreader"><strong>HostArrayReader</strong></a> &amp; read={}) <br><em>The world each of the</em> <code>views</code> <em>views through</em><code>cameras</code> <em>sees (see</em><code>ViewPosesOf</code> <em>): each camera's world for several cameras; for one camera, its</em><code>ernie:worlds</code> <em>per pose (</em><code>tokens::kWorlds</code> <em>), or else its world for every view.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> * &gt;</td>
+<td style="text-align: left;"><a href="#function-volumeschematypes"><strong>VolumeSchemaTypes</strong></a> () <br><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-volumesof"><strong>VolumesOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>The scene's visible Volumes (UsdVol,</em> <code>volume_schemas.h</code> <em>), each with its bound</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (defaults without one) and the fields they name: the density field (</em><code>inputs:densityField</code> <em>), the temperature field and the emission field, each an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>the</em><a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s</em><code>field:&lt;name&gt;</code> <em>relationship targets; a name the</em><a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>has no field for, or a target of another type, leaves that field out.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#enum-wireframe"><strong>Wireframe</strong></a></td>
@@ -2528,7 +2658,7 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 <hr>
 
 <h3 id="enum-minimalmode">enum MinimalMode</h3>
-<p><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the sun (the first distant light) and the scene's ambient light.</em></p>
+<p><em>Minimal shading (</em> <code>ernie:minimal:mode</code> <em>), after RTX Minimal: for throughput, a product draws in one forward pass straight into its outputs, without the spectral shading, sensor filters, sky or dome; lit by the first four distant lights, unshadowed, and the scene's ambient light.</em></p>
 <pre><code class="language-C++">enum ernie::MinimalMode {
     Off = 0,
     None = 1,
@@ -2549,6 +2679,24 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 </code></pre>
 <hr>
 
+<h3 id="enum-nanovdbtype">enum NanoVdbType</h3>
+<p><em>A NanoVDB grid's value type, as</em> <code>PNANOVDB_GRID_TYPE_*</code> <em>numbers it.</em></p>
+<pre><code class="language-C++">enum ernie::NanoVdbType {
+    Unknown = 0,
+    Float = 1,
+    Double = 2,
+    Vec3f = 6,
+    Half = 9,
+    Fp4 = 13,
+    Fp8 = 14,
+    Fp16 = 15,
+    FpN = 16,
+    Vec4f = 17
+};
+</code></pre>
+<p>Volumes read the scalar types and the float vectors; other types load but are not sampled. </p>
+<hr>
+
 <h3 id="enum-occlusion">enum Occlusion</h3>
 <p><em>Whether the rasterizer also culls instances hidden behind others (</em> <code>ernie:occlusion</code> <em>), with GPU culling and for views only (not shadow views).</em></p>
 <pre><code class="language-C++">enum ernie::Occlusion {
@@ -2562,6 +2710,19 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 <h3 id="typedef-opticsmodel">typedef OpticsModel</h3>
 <p><em>Optical properties of one particle or molecule at a wavelength (nm), with the phase function at the given cosines.</em> </p>
 <pre><code class="language-C++">using ernie::OpticsModel = typedef std::function&lt;ParticleOptics( double wavelengthNm, std::span&lt;const double&gt;)&gt;;
+</code></pre>
+<hr>
+
+<h3 id="enum-overlaybatchkind">enum OverlayBatchKind</h3>
+<p><em>The kinds of item an</em> <code>OverlayBatch</code> <em>holds many of.</em></p>
+<pre><code class="language-C++">enum ernie::OverlayBatchKind {
+    Lines,
+    Arrows,
+    Markers,
+    Boxes,
+    Spheres,
+    Frames
+};
 </code></pre>
 <hr>
 
@@ -2621,6 +2782,17 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 <pre><code class="language-C++">enum ernie::ShadowFit {
     Scene = 0,
     Visible = 1
+};
+</code></pre>
+<hr>
+
+<h3 id="enum-spheretessellation">enum SphereTessellation</h3>
+<p><em>How a sphere is divided into triangles.</em> </p>
+<pre><code class="language-C++">enum ernie::SphereTessellation {
+    Uv,
+    Icosphere,
+    CubeSphere,
+    Healpix
 };
 </code></pre>
 <hr>
@@ -3432,6 +3604,14 @@ constexpr DType ernie::DTypeOf&lt; std::uint8_t &gt; ()
 </code></pre>
 <hr>
 
+<h3 id="function-defaultspherelevel">function DefaultSphereLevel</h3>
+<p><em>The level</em> <code>TessellatedSphere</code> <em>uses for 0: some 2,000 to 5,000 triangles each (24 stacks, 4 subdivisions, 16 quads a face edge, N_side 16).</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::DefaultSphereLevel (
+    SphereTessellation tessellation
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-dirtyof">function DirtyOf</h3>
 <p><em>The dirty bit that setting or writing</em> <code>attribute</code> <em>raises:</em><code>Transform</code> <em>for xformOps, else what the registered types declare for it (</em><code>AttributeMeta::dirty</code> <em>, such as</em><code>Points</code> <em>for</em><code>points</code> <em>), else</em><code>Primvars</code> <em>for primvars and</em><code>Params</code> <em>for anything else.</em></p>
 <pre><code class="language-C++">Dirty ernie::DirtyOf (
@@ -3576,6 +3756,24 @@ Sampling", SIGGRAPH 2005 posters. <a href="https://vgl.ict.usc.edu/Research/Medi
 <p>HDR skies with a sun disc have one; overcast skies, interiors and low-dynamic-range maps do not.</p>
 <p>References:
 * P. Debevec, "A Median Cut Algorithm for Light Probe Sampling", SIGGRAPH 2005 posters (lighting from the energy of an environment map's regions). <a href="https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf">https://vgl.ict.usc.edu/Research/MedianCut/MedianCutSampling.pdf</a> </p>
+<hr>
+
+<h3 id="function-fieldrelationship">function FieldRelationship</h3>
+<p><em>The relationship naming a</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s field</em><code>name</code> <em>: "field:&lt;name&gt;".</em></p>
+<pre><code class="language-C++">std::string ernie::FieldRelationship (
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-findnanovdbgrid">function FindNanoVdbGrid</h3>
+<p><em>The grid UsdVol's</em> <a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>names: the</em><code>index</code> <em>th grid (0 the first) named</em><code>name</code> <em>, or the</em><code>index</code> <em>th grid of the file when</em><code>name</code> <em>is empty; nullptr if there is none.</em></p>
+<pre><code class="language-C++">const NanoVdbGrid * ernie::FindNanoVdbGrid (
+    std::span&lt; const NanoVdbGrid &gt; grids,
+    std::string_view name,
+    int index=0
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-findprimtype">function FindPrimType</h3>
@@ -3934,6 +4132,15 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-lightlinkof">function LightLinkOf</h3>
+<p><em>The light at</em> <code>path</code> <em>'s light link (</em><code>tokens::kLightLinkIncludeRoot</code> <em>and its relationships) and shadow link.</em></p>
+<pre><code class="language-C++">LinkCollection ernie::LightLinkOf (
+    const Scene &amp; scene,
+    const Path &amp; path
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-lightparamsof">function LightParamsOf</h3>
 <p><em>The</em> <a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>or</em><a href="../classernie_1_1SphereLight/"><em><strong>SphereLight</strong></em></a> <em>at</em><code>path</code> <em>as a</em><code>Light</code> <em>for</em><code>bands</code> <em>:</em></p>
 <pre><code class="language-C++">LightParams ernie::LightParamsOf (
@@ -4002,6 +4209,20 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
     float value
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-linkgroupsof">function LinkGroupsOf</h3>
+<p><em>The link groups of</em> <code>geometry</code> <em>under</em><code>lights</code> <em>.</em></p>
+<pre><code class="language-C++">LinkGroups ernie::LinkGroupsOf (
+    const Scene &amp; scene,
+    std::span&lt; const Path &gt; lights,
+    std::span&lt; const Path &gt; geometry
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> when the links make more than <code>LinkGroups::kMaxGroups</code> groups. </li>
+</ul>
 <hr>
 
 <h3 id="function-loadimagefile">function LoadImageFile</h3>
@@ -4305,6 +4526,36 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-nanovdbgridsof">function NanoVdbGridsOf</h3>
+<p><em>The grids of a raw NanoVDB buffer, one or more grids back to back as NanoVDB keeps them in memory (Warp's</em> <code>Volume.array()</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt; NanoVdbGrid &gt; ernie::NanoVdbGridsOf (
+    std::span&lt; const std::uint8_t &gt; bytes
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the buffer does not start with a NanoVDB grid of major version 32. </li>
+</ul>
+<hr>
+
+<h3 id="function-nanovdbtypename">function NanoVdbTypeName</h3>
+<p><em>The name</em> <code>PNANOVDB_GRID_TYPE_*</code> <em>gives a grid type, lower case ("float", "fp16", "vec3f"), or "type &lt;n&gt;" for others.</em></p>
+<pre><code class="language-C++">std::string ernie::NanoVdbTypeName (
+    NanoVdbType type
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-nearestatmosphere">function NearestAtmosphere</h3>
+<p><em>Of the scene's visible Atmospheres, the one whose air is nearest</em> <code>point</code> <em>(world; inside it, distance 0, the smallest planet's first): the one a frame renders, as a camera flies between planets.</em></p>
+<pre><code class="language-C++">Path ernie::NearestAtmosphere (
+    const Scene &amp; scene,
+    const glm::dvec3 &amp; point
+) 
+</code></pre>
+<p>Empty without one. </p>
+<hr>
+
 <h3 id="function-needscubefaces">function NeedsCubeFaces</h3>
 <p><em>Whether</em> <code>camera</code> <em>needs its views on cube faces: a fisheye or a lens of rays whose field reaches past</em><code>kMaxSingleViewAngle</code> <em>off axis somewhere in its image, where one pinhole raster image would spread its pixels too thin at the centre.</em></p>
 <pre><code class="language-C++">bool ernie::NeedsCubeFaces (
@@ -4604,6 +4855,18 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </ul>
 <hr>
 
+<h3 id="function-readnanovdb">function ReadNanoVdb</h3>
+<p><em>Every grid in a NanoVDB file (.nvdb), in file order: a file of segments (header, per-grid metadata and names, then the grids) or a raw grid buffer.</em> </p>
+<pre><code class="language-C++">std::vector&lt; NanoVdbGrid &gt; ernie::ReadNanoVdb (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the file cannot be read, is not a NanoVDB file, has a major version other than 32, or is compressed (zip or blosc); write such files uncompressed (<code>nanovdb_convert</code> without <code>-z</code>/<code>-b</code>, or Warp's <code>Volume.save_to_nvdb</code>). </li>
+</ul>
+<hr>
+
 <h3 id="function-readpolarstereographicdem">function ReadPolarStereographicDem</h3>
 <p><em>Reads the DEM a PDS3 label at</em> <code>labelPath</code> <em>describes, as</em><code>ReadCylindricalDem</code> <em>but on a polar stereographic grid.</em></p>
 <pre><code class="language-C++">PolarStereographicDem ernie::ReadPolarStereographicDem (
@@ -4632,6 +4895,15 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <p><em>The linear sRGB colour of a reflectance spectrum under the equal-energy illuminant, adapted to D65 (</em> <code>EqualEnergyXyzToLinearSrgb</code> <em>).</em></p>
 <pre><code class="language-C++">glm::dvec3 ernie::ReflectanceToLinearSrgb (
     const Spectrum &amp; reflectance
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-relativedistantlight">function RelativeDistantLight</h3>
+<p><em>A distant light towards unit vector</em> <code>towards</code> <em>in relative units: a flat spectrum over</em><code>bands</code> <em>under which a white Lambertian surface facing it has a luminance of 1 cd/m^2, the sun's angular diameter, and shadows.</em></p>
+<pre><code class="language-C++">LightParams ernie::RelativeDistantLight (
+    const glm::vec3 &amp; towards,
+    const SpectralBands &amp; bands
 ) 
 </code></pre>
 <hr>
@@ -4710,6 +4982,32 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li><code>std::invalid_argument</code> for a path that is not a <a href="../classernie_1_1RenderProduct/"><strong>RenderProduct</strong></a>, a var that is not a <a href="../classernie_1_1RenderVar/"><strong>RenderVar</strong></a>, a filter that is not a SensorFilter or of an unknown type, an invalid filter chain (<code>CheckFilterChain</code>), or a var the chain does not write. </li>
 </ul>
+<hr>
+
+<h3 id="function-reversedorthographic">function ReversedOrthographic</h3>
+<p><em>A right-handed reverse-Z orthographic projection of the box</em> <code>left</code> <em>to</em><code>right</code> <em>,</em><code>bottom</code> <em>to</em><code>top</code> <em>: depth 1 at</em><code>nearPlane</code> <em>and 0 at</em><code>farPlane</code> <em>, which an infinite one replaces with 10^12 beyond the near plane.</em></p>
+<pre><code class="language-C++">glm::mat4 ernie::ReversedOrthographic (
+    double left,
+    double right,
+    double bottom,
+    double top,
+    double nearPlane,
+    double farPlane
+) 
+</code></pre>
+<p>Shaders linearise its depth d as (B - d) / A. </p>
+<hr>
+
+<h3 id="function-reversedperspective">function ReversedPerspective</h3>
+<p><em>A right-handed reverse-Z perspective projection to depth [0, 1]: 1 at</em> <code>nearPlane</code> <em>, 0 at</em><code>farPlane</code> <em>, or with an infinite far plane near / distance.</em></p>
+<pre><code class="language-C++">glm::mat4 ernie::ReversedPerspective (
+    float verticalFov,
+    float aspect,
+    float nearPlane,
+    float farPlane
+) 
+</code></pre>
+<p>Shaders linearise its depth d as B / (A + d) with A = <code>projection[2][2]</code> and B = <code>projection[3][2]</code>. </p>
 <hr>
 
 <h3 id="function-rgbtosigmoid">function RgbToSigmoid</h3>
@@ -4826,6 +5124,14 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </ul>
 <hr>
 
+<h3 id="function-shadowlinkof">function ShadowLinkOf</h3>
+<pre><code class="language-C++">LinkCollection ernie::ShadowLinkOf (
+    const Scene &amp; scene,
+    const Path &amp; path
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-sizeof">function SizeOf</h3>
 <p><em>Bytes per element of</em> <code>type</code> <em>.</em></p>
 <pre><code class="language-C++">std::size_t ernie::SizeOf (
@@ -4878,6 +5184,14 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 </code></pre>
 <hr>
 
+<h3 id="function-spheretessellationnamed">function SphereTessellationNamed</h3>
+<p><em>The tessellation named "uv", "icosphere", "cubeSphere" or "healpix"; none for anything else.</em> </p>
+<pre><code class="language-C++">std::optional&lt; SphereTessellation &gt; ernie::SphereTessellationNamed (
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-srgbtolinear">function SrgbToLinear</h3>
 <p><em>IEC 61966-2-1 sRGB transfer function for one channel in [0, 1]: decode to linear and encode.</em> </p>
 <pre><code class="language-C++">float ernie::SrgbToLinear (
@@ -4905,7 +5219,11 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <li><code>flare</code> (spatial, electrons; pyramid): lens flare ghosts, the image's bright sources as defocused aperture shapes on the line through the principal point, each at its own scale, size and coating tint; after <code>qe</code>, before <code>noise</code>.</li>
 <li><code>strayLight</code> (band): the sun's light from outside the field as a veil over the image, its irradiance times the optics' point source transmittance at its angle off the axis (from the frame's sun, which the image lacks); before <code>qe</code> and <code>cie</code>.</li>
 <li><code>lag</code> (pixel, electrons; temporal): a <code>fraction</code> of each frame's charge read out with the next.</li>
-<li><code>temporalAverage</code> (pixel, rgb; temporal): an exponential moving average, <code>alpha</code> the new frame's weight. Each file's header cites its references. </li>
+<li><code>temporalAverage</code> (pixel, rgb; temporal): an exponential moving average, <code>alpha</code> the new frame's weight.</li>
+<li><code>smear</code> (spatial, electrons): a frame-transfer CCD's readout smear (<code>transferTime</code>) and reset smear (<code>resetTime</code>), on either side of bright sources; before <code>noise</code>.</li>
+<li><code>radiation</code> (pixel, electrons): particle hits, <code>flux</code> per cm^2 per second, each a track of charge; before <code>noise</code>. AOV <code>deposited</code>: their electrons.</li>
+<li><code>commsErrors</code> (spatial, digital): lost packets, line slips and bit errors of a downlink; after <code>adc</code>. AOV <code>errors</code>: where.</li>
+<li><code>gaussianPsf</code> (spatial, electrons; pyramid): scattered light as a weighted sum of Gaussians; before <code>noise</code>. Each file's header cites its references. </li>
 </ul>
 <hr>
 
@@ -4999,6 +5317,28 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <p><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></p>
 <pre><code class="language-C++">std::vector&lt; const PrimTypeDef * &gt; ernie::TerrainSchemaTypes () 
 </code></pre>
+<hr>
+
+<h3 id="function-tessellatedsphere">function TessellatedSphere</h3>
+<p><em>A sphere of</em> <code>radius</code> <em>about the origin, its poles on z, with outward normals, counter-clockwise triangles seen from outside, and equirectangular texture coordinates per corner: s the longitude east of +x over 360 degrees from -180, t the latitude from the south pole (0) to the north (1), a triangle across the antimeridian taking its corners' longitudes on one side, and a corner on a pole the mean of the triangle's other two.</em></p>
+<pre><code class="language-C++">MeshData ernie::TessellatedSphere (
+    float radius,
+    SphereTessellation tessellation,
+    std::uint32_t level=0
+) 
+</code></pre>
+<p>Vertices on shared edges are shared, so the mesh is closed. <code>level</code> 0 takes the default.</p>
+<p>References:
+* K. M. Gorski, E. Hivon, A. J. Banday, B. D. Wandelt, F. K. Hansen, M. Reinecke and M. Bartelmann, "HEALPix: A Framework for
+  High-Resolution Discretization and Fast Analysis of Data
+  Distributed on the Sphere", The Astrophysical Journal 622(2):759-771, 2005 (the pixel boundaries, from each base pixel's local coordinates as healpix_base's <code>xyf2loc</code>). <a href="https://doi.org/10.1086/427976">https://doi.org/10.1086/427976</a>
+* J. R. Baumgardner and P. O. Frederickson, "Icosahedral
+  Discretization of the Two-Sphere", SIAM Journal on Numerical Analysis 22(6):1107-1115, 1985. <a href="https://doi.org/10.1137/0722066">https://doi.org/10.1137/0722066</a>
+* C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere'", Journal of Computational Physics 124(1):93-114, 1996. <a href="https://doi.org/10.1006/jcph.1996.0047">https://doi.org/10.1006/jcph.1996.0047</a> </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a radius that is not positive and finite, or a level beyond the tessellation's limit (UV 2 to 4096 stacks, icosphere 9 subdivisions, cube sphere 1024 and HEALPix 1024). </li>
+</ul>
 <hr>
 
 <h3 id="function-torgba8">function ToRgba8</h3>
@@ -5144,6 +5484,20 @@ std::array&lt; double, N &gt; ernie::SolveNormal (
 <ul>
 <li><code>std::invalid_argument</code> if <code>ernie:worlds</code> is not an integer array of one world per view, or is on a GPU without <code>read</code>. </li>
 </ul>
+<hr>
+
+<h3 id="function-volumeschematypes">function VolumeSchemaTypes</h3>
+<p><em>This file's types' registry entries, bases first (</em> <code>PrimTypes</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt; const PrimTypeDef * &gt; ernie::VolumeSchemaTypes () 
+</code></pre>
+<hr>
+
+<h3 id="function-volumesof">function VolumesOf</h3>
+<p><em>The scene's visible Volumes (UsdVol,</em> <code>volume_schemas.h</code> <em>), each with its bound</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s volume inputs (defaults without one) and the fields they name: the density field (</em><code>inputs:densityField</code> <em>), the temperature field and the emission field, each an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>the</em><a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s</em><code>field:&lt;name&gt;</code> <em>relationship targets; a name the</em><a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>has no field for, or a target of another type, leaves that field out.</em></p>
+<pre><code class="language-C++">std::vector&lt; VolumeParams &gt; ernie::VolumesOf (
+    const Scene &amp; scene
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-wireframeof">function WireframeOf</h3>

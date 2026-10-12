@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -280,10 +282,6 @@
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Sphere/"><strong>Sphere</strong></a> <br><em>A sphere centred on its origin.</em></td>
 </tr>
-<tr>
-<td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1Volume/"><strong>Volume</strong></a> <br><em>A volume (UsdVol); Ernie does not draw volumes yet.</em></td>
-</tr>
 </tbody>
 </table>
 <h2 id="macros">Macros</h2>
@@ -329,7 +327,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_geom_shape_range"><strong>ERNIE_GEOM_SHAPE_RANGE</strong></a>  <code>.group = "Shape", .min = 0.0, .max = 1000.0</code><br><em>Geometry as reflected schemas (</em> <code>prim_type.h</code> <em>): UsdGeom's implicit shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule and Plane), its point-based Mesh and Points, the PointInstancer and UsdVol's Volume, and Ernie's GroundPlane.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_geom_shape_range"><strong>ERNIE_GEOM_SHAPE_RANGE</strong></a>  <code>.group = "Shape", .min = 0.0, .max = 1000.0</code><br><em>Geometry as reflected schemas (</em> <code>prim_type.h</code> <em>): UsdGeom's implicit shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule and Plane), its point-based Mesh and Points, the PointInstancer, and Ernie's GroundPlane (UsdVol's Volume is in</em><code>volume_schemas.h</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -447,7 +445,7 @@
 <hr>
 
 <h3 id="define-ernie_geom_shape_range">define ERNIE_GEOM_SHAPE_RANGE</h3>
-<p><em>Geometry as reflected schemas (</em> <code>prim_type.h</code> <em>): UsdGeom's implicit shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule and Plane), its point-based Mesh and Points, the PointInstancer and UsdVol's Volume, and Ernie's GroundPlane.</em></p>
+<p><em>Geometry as reflected schemas (</em> <code>prim_type.h</code> <em>): UsdGeom's implicit shapes (Cube, Sphere, and along an axis Cylinder, Cone, Capsule and Plane), its point-based Mesh and Points, the PointInstancer, and Ernie's GroundPlane (UsdVol's Volume is in</em><code>volume_schemas.h</code> <em>).</em></p>
 <pre><code class="language-C++">#define ERNIE_GEOM_SHAPE_RANGE `.group = &quot;Shape&quot;, .min = 0.0, .max = 1000.0`
 </code></pre>
 <p>Each declaration's fallback is the value Ernie draws an unset attribute with (UsdGeom's own). Bulk arrays (points, topology, instance transforms) are tensors, written with <code>Scene::Write</code>; primvars other than the display colour are an open namespace (<code>primvars:&lt;name&gt;</code>), read by name.</p>

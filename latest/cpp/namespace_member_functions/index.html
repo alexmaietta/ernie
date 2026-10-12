@@ -79,6 +79,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
               </ul>
               <p class="caption"><span class="caption-text">Extending Ernie</span></p>
               <ul>
@@ -267,6 +269,7 @@
 <li><strong>ApplyTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>AuthorControllerCamera</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>AuthorDefaultPrim</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Action</strong> (<a href="../namespaceernie_1_1app_1_1menu/"><strong>ernie::app::menu</strong></a>)</li>
 <li><strong>AddGpuZone</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="b">b</h2>
@@ -284,6 +287,7 @@
 <li><strong>BrdfModules</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BrdfSlang</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>BeginPropertyTable</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>BeginSubmenu</strong> (<a href="../namespaceernie_1_1app_1_1menu/"><strong>ernie::app::menu</strong></a>)</li>
 <li><strong>BeginFrame</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="c">c</h2>
@@ -321,7 +325,9 @@
 <li><strong>ChosenPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>ControllerFromTransform</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>CreatableTypes</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Check</strong> (<a href="../namespaceernie_1_1app_1_1menu/"><strong>ernie::app::menu</strong></a>)</li>
 <li><strong>Clear</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>CpuEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 <li><strong>CurrentFrame</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="d">d</h2>
@@ -336,13 +342,13 @@
 <li><strong>DTypeOf&lt; std::uint8_t &gt;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DecodeSlopeDeviation</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DefaultFilterChain</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>DefaultSphereLevel</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DirtyOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DistantLightTransform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DomeDirectionsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DomeIrradianceSh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DomeMapOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>DomeParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
-<li><strong>DarkTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>DefaultLightPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>DefineDefaultScene</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>DemoMain</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
@@ -366,6 +372,8 @@
 </ul>
 <h2 id="f">f</h2>
 <ul>
+<li><strong>FieldRelationship</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>FindNanoVdbGrid</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FindPrimType</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FindReflectance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>FindXformOp</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -392,6 +400,7 @@
 <li><strong>GpuXformAnchorOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>GpuXformOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>GreenwichMeanSiderealTime</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>GpuEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="h">h</h2>
 <ul>
@@ -424,12 +433,14 @@
 <h2 id="l">l</h2>
 <ul>
 <li><strong>LensRay</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LightLinkOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightPatternImageOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightPatternModules</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightPatternSlang</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LightSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LinearToSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>LinkGroupsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LoadImageFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LoadLightPatternImage</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LoadScene</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -439,9 +450,9 @@
 <li><strong>LocalTerrainOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LocalTransformEdits</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>LookAtTransform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
-<li><strong>LightTheme</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>ListDirectory</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>LocalFromWorld</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Live</strong> (<a href="../namespaceernie_1_1memory/"><strong>ernie::memory</strong></a>)</li>
 </ul>
 <h2 id="m">m</h2>
 <ul>
@@ -470,6 +481,9 @@
 <h2 id="n">n</h2>
 <ul>
 <li><strong>NameOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>NanoVdbGridsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>NanoVdbTypeName</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>NearestAtmosphere</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>NeedsCubeFaces</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>Now</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
@@ -480,6 +494,7 @@
 <li><strong>OzoneCrossSection</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>OzoneMolecules</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>OrbitAboutPlanet</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Option</strong> (<a href="../namespaceernie_1_1app_1_1menu/"><strong>ernie::app::menu</strong></a>)</li>
 <li><strong>operator&amp;</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>operator|</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>operator|=</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -517,9 +532,11 @@
 <li><strong>ReadIes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReadIsd</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReadIsdFile</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReadNanoVdb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReadPolarStereographicDem</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReflectanceLibrary</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ReflectanceToLinearSrgb</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>RelativeDistantLight</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RenderBackends</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RenderSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RequiredVars</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -528,12 +545,17 @@
 <li><strong>ResolveBrdfParams</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ResolveRenderPrims</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ResolveRenderProducts</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReversedOrthographic</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ReversedPerspective</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RgbToSigmoid</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RgbToSpectrum</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RotateOp</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>RegisteredDemos</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>RenderSettingsSchema</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>ResetSquare</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>ReportJson</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>ReportText</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>Rows</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="s">s</h2>
 <ul>
@@ -544,11 +566,13 @@
 <li><strong>SetCamera</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SetSingletChromatic</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SetXform</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>ShadowLinkOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SizeOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SnakeCase</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SolarSpectralIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SolveNormal</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SphereMesh</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>SphereTessellationNamed</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>SrgbToLinear</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>StandardSensorFilters</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>StarFieldParamsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -561,13 +585,18 @@
 <li><strong>SchemaOf</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>SectionHeader</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>SessionRootPath</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Section</strong> (<a href="../namespaceernie_1_1app_1_1menu/"><strong>ernie::app::menu</strong></a>)</li>
+<li><strong>SetCpuEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 <li><strong>SetEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>SetGpuEnabled</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 <li><strong>SetHistory</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 <li><strong>SetThreadName</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>Summarize</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="t">t</h2>
 <ul>
 <li><strong>TerrainSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>TessellatedSphere</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ToRgba8</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ToXyz</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>TotalSolarIrradiance</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
@@ -575,13 +604,16 @@
 <li><strong>TransitionImage</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>TriangulateFaces</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>TriangulatedCorners</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>Track</strong> (<a href="../namespaceernie_1_1memory/"><strong>ernie::memory</strong></a>)</li>
 <li><strong>ThreadIndex</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 <li><strong>ThreadNames</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
+<li><strong>TraceJson</strong> (<a href="../namespaceernie_1_1profiler/"><strong>ernie::profiler</strong></a>)</li>
 </ul>
 <h2 id="u">u</h2>
 <ul>
 <li><strong>Union</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 <li><strong>UpdateSessionLights</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
+<li><strong>Untrack</strong> (<a href="../namespaceernie_1_1memory/"><strong>ernie::memory</strong></a>)</li>
 </ul>
 <h2 id="v">v</h2>
 <ul>
@@ -589,6 +621,8 @@
 <li><strong>VarsWrittenBy</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ViewPosesOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ViewWorldsOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>VolumeSchemaTypes</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
+<li><strong>VolumesOf</strong> (<a href="../namespaceernie/"><strong>ernie</strong></a>)</li>
 <li><strong>ViewableCameras</strong> (<a href="../namespaceernie_1_1app/"><strong>ernie::app</strong></a>)</li>
 </ul>
 <h2 id="w">w</h2>
