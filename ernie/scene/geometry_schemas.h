@@ -101,7 +101,15 @@
                                      "topology that changes on the GPU within their capacity, "    \
                                      "as simulators count them (more entries are ignored); read "  \
                                      "on the GPU, the rest neither drawn nor bounded.",            \
-                              .group = "Geometry", .integer = true}))
+                              .group = "Geometry", .integer = true}))                              \
+    X(::ernie::Tensor, ThermalTemperatures, ::ernie::tokens::kThermalTemperatures, nullptr,        \
+      (::ernie::AttributeMeta{.label = "Temperatures",                                             \
+                              .doc = "float32 (n,) kelvin, one per point, on the CPU or a CUDA "   \
+                                     "device, as a thermal solver writes them back each step: "    \
+                                     "with thermal emission on, in place of the prim's own and "   \
+                                     "its material's, interpolated across its faces; 0 at a "      \
+                                     "point for those.",                                           \
+                              .group = "Thermal", .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
     X(::ernie::OrArray<std::vector<float>>, Widths, ::ernie::tokens::kWidths,                      \

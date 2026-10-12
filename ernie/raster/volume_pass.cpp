@@ -158,7 +158,7 @@ constexpr std::uint32_t kTemporal = 1;
 constexpr std::uint32_t kHistoryHeld = 2;
 constexpr std::uint32_t kMarchOnly = 4;
 constexpr std::uint32_t kBlocksOfFour = 8;
-constexpr std::uint32_t kHistoryChannels = 3;
+constexpr std::uint32_t kHistoryChannels = 5;
 // Frames whose `volumeChangesMain` verdicts the host keeps, a word
 // each (`VolumePass::changes_`).
 constexpr std::uint32_t kChangeSlots = 8;
@@ -169,7 +169,7 @@ constexpr std::uint32_t kHostDiscrete = 16;
 // Its temporal flag for volumes whose grids changed to reproject too.
 constexpr std::uint32_t kAnimated = 256;
 // volume.slang's flag for writing the volumes' temperature
-// (`RenderTargets::MediaTemperature`), every pixel marched.
+// (`RenderTargets::MediaTemperature`).
 constexpr std::uint32_t kMediaTemperature = 512;
 // The pixel of each block that marches in each frame, x and y: in the
 // order of a Bayer matrix, each far from the ones just before.
@@ -1733,7 +1733,7 @@ void VolumePass::Record(VkCommandBuffer commands,
         // After the last frame's march wrote its history.
         ComputeBarrier(commands);
     }
-    // The Temperature var: every pixel marches, none reprojects.
+    // The Temperature var, which the history carries too.
     if (targets.HoldsMediaTemperature()) {
         constants.flags[3] |= kMediaTemperature;
     }

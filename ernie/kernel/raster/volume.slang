@@ -1322,8 +1322,8 @@ static const uint kHistoryHeld = 2u;
 static const uint kMarchOnly = 4u;
 static const uint kBlocksOfFour = 8u;
 static const uint kAnimated = 256u;
-// The frame holds the Temperature var: every pixel marches (none reprojects) and writes
-// `mediaTemperatureOut`.
+// The frame holds the Temperature var: every pixel writes `mediaTemperatureOut`, those that
+// reproject from the history.
 static const uint kMediaTemperature = 512u;
 
 void writeMediaTemperature(uint3 id, float2 media) {
@@ -1342,12 +1342,15 @@ uint2 marchedInBlock() {
 }
 
 // A history's channels per pixel: the volumes' transmittance (-1 where none were in view), the
-// distance along the ray of what they hold back, the geometry's (`kNoSurface` for none), and what
-// they add towards the eye in each band, two bands a channel as halves (`historyBand`).
+// distance along the ray of what they hold back, the geometry's (`kNoSurface` for none), the
+// Temperature var's two sums (`mediaTemperatureOut`), and what they add towards the eye in each
+// band, two bands a channel as halves (`historyBand`).
 static const uint kHistoryTransmittance = 0;
 static const uint kHistoryFront = 1;
 static const uint kHistorySurface = 2;
-static const uint kHistoryBands = 3;
+static const uint kHistoryMediaKelvin = 3;
+static const uint kHistoryMediaShare = 4;
+static const uint kHistoryBands = 5;
 static const float kNoSurface = 1e30;
 
 // Where channel `channel` of view `view`'s pixel `xy` is in a history of images `size` across: past
@@ -1410,9 +1413,10 @@ bool temporal() {
 //   others reprojected).
 bool reproject(uint3 id, uint2 size, float3 origin, float3 direction, float tMax, float middle,
                uint bands, out float transmittance, out float front,
-               out float4 added[kMaxGroups]) {
+               out float4 added[kMaxGroups], out float2 media) {
     transmittance = 1.0;
     front = 0.0;
+    media = float2(0.0);
     for (uint g = 0; g < kMaxGroups; ++g) {
         added[g] = float4(0.0);
     }
@@ -1463,6 +1467,8 @@ bool reproject(uint3 id, uint2 size, float3 origin, float3 direction, float tMax
         }
     }
     front = last[historyAt(kHistoryFront, id.z, then, size)];
+    media = float2(last[historyAt(kHistoryMediaKelvin, id.z, then, size)],
+                   last[historyAt(kHistoryMediaShare, id.z, then, size)]);
     for (uint b = 0; b < bands; ++b) {
         added[b / 4][b % 4] = historyBand(last, b, id.z, then, size);
     }
@@ -1476,9 +1482,10 @@ bool reproject(uint3 id, uint2 size, float3 origin, float3 direction, float tMax
 // Reference: B. Karis, "High-Quality Temporal Supersampling", SIGGRAPH Advances in Real-Time
 //   Rendering, 2014 (and bilateral upsampling of a lower resolution's results by depth).
 bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmittance,
-                 out float front, out float4 added[kMaxGroups]) {
+                 out float front, out float4 added[kMaxGroups], out float2 media) {
     transmittance = 1.0;
     front = 0.0;
+    media = float2(0.0);
     for (uint g = 0; g < kMaxGroups; ++g) {
         added[g] = float4(0.0);
     }
@@ -1498,6 +1505,8 @@ bool fromMarched(uint3 id, uint2 size, float tMax, uint bands, out float transmi
         return false;
     }
     front = now[historyAt(kHistoryFront, id.z, marched, size)];
+    media = float2(now[historyAt(kHistoryMediaKelvin, id.z, marched, size)],
+                   now[historyAt(kHistoryMediaShare, id.z, marched, size)]);
     for (uint b = 0; b < bands; ++b) {
         added[b / 4][b % 4] = historyBand(now, b, id.z, marched, size);
     }
@@ -1585,11 +1594,13 @@ void clampToMarched(uint3 id, uint2 size, uint bands, inout float transmittance,
 // Pixel `id`'s history this frame: the volumes' `transmittance` (-1 for none in view), `front`,
 // the geometry's distance `tMax` and what they add (`added`).
 void writeHistory(uint3 id, uint2 size, float transmittance, float front, float tMax, uint bands,
-                  float4 added[kMaxGroups]) {
+                  float4 added[kMaxGroups], float2 media) {
     let now = constants.historyNow;
     now[historyAt(kHistoryTransmittance, id.z, id.xy, size)] = transmittance;
     now[historyAt(kHistoryFront, id.z, id.xy, size)] = front;
     now[historyAt(kHistorySurface, id.z, id.xy, size)] = tMax;
+    now[historyAt(kHistoryMediaKelvin, id.z, id.xy, size)] = media.x;
+    now[historyAt(kHistoryMediaShare, id.z, id.xy, size)] = media.y;
     writeHistoryBands(now, bands, id.z, id.xy, size, added);
 }
 
@@ -1739,24 +1750,26 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     // last frame's history does not hold or what the volumes show changed; the others show the
     // last frame's where it reprojects.
     // Changed at a stroke, every pixel marches; their grids written again, the others reproject
-    // clamped to what this frame marched, where animated volumes may. With the Temperature var,
-    // which has no history, every pixel marches.
+    // clamped to what this frame marched, where animated volumes may; the Temperature var's sums
+    // reprojected with the rest.
     let changed = pass.rebuild[7] != 0;
     if (held && !marchOnly && pass.rebuild[6] == 0 &&
-        (temporalFlags & kMediaTemperature) == 0 &&
         (!changed || (temporalFlags & kAnimated) != 0)) {
         float kept;
         float front;
         float4 added[kMaxGroups];
+        float2 media;
         let middle = 0.5 * (spans[0].x + spans[count - 1].y);
         // Else, uncovered or come into view, its block's pixel marched this frame where the
         // geometry behind is as far (an upsampling that keeps to edges).
-        if (reproject(id, size.xy, origin, direction, tMax, middle, bands, kept, front, added) ||
-            fromMarched(id, size.xy, tMax, bands, kept, front, added)) {
+        if (reproject(id, size.xy, origin, direction, tMax, middle, bands, kept, front, added,
+                      media) ||
+            fromMarched(id, size.xy, tMax, bands, kept, front, added, media)) {
             if (changed) {
                 clampToMarched(id, size.xy, bands, kept, added);
             }
-            writeHistory(id, size.xy, kept, front, tMax, bands, added);
+            writeHistory(id, size.xy, kept, front, tMax, bands, added, media);
+            writeMediaTemperature(id, media);
             composite(id, bands, unwritten, kept, added);
             return;
         }
@@ -2118,7 +2131,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
     }
     if (temporal()) {
         let front = transmittance < 1.0 ? frontSum / (1.0 - transmittance) : 0.0;
-        writeHistory(id, size.xy, transmittance, front, tMax, bands, added);
+        writeHistory(id, size.xy, transmittance, front, tMax, bands, added, media);
     }
     writeMediaTemperature(id, media);
     composite(id, bands, unwritten, transmittance, added);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/device/compute_interop.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
@@ -893,4 +894,56 @@ TEST_F(RasterDelegateTest,
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetThermalEnable(false);
     EXPECT_EQ(at(6.0f), 0.0f);
+}
+
+TEST_F(RasterDelegateTest, SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
+    // The quad's points at 300 K on its left edge and 500 K on its
+    // right, written as a solver steps: interpolated across it, in
+    // place of the prim's own, updated in place from the host and,
+    // with CUDA, from device arrays.
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars, std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    ernie::Mesh(scene, "/World/Quad").SetThermalTemperature(250.0);
+    RasterDelegate delegate(*context_);
+    const auto at = [&](float x) {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        const glm::vec4 clip =
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize)
+                .RasterView()
+                .ViewProjection() *
+            glm::vec4(x, 0.0f, 0.0f, 1.0f);
+        const auto col = static_cast<std::size_t>(
+            (clip.x / clip.w * 0.5f + 0.5f) * kSize);
+        return kelvin.As<float>()[(kSize / 2) * kSize + col];
+    };
+    EXPECT_EQ(at(0.0f), 250.0f) << "the prim's own without a solver's";
+    const auto write = [&](std::array<float, 4> kelvin) {
+        scene.Write("/World/Quad", tokens::kThermalTemperatures,
+                    Tensor::Copy<float>(kelvin, {4}));
+    };
+    write({300.0f, 500.0f, 500.0f, 300.0f});
+    // Within a pixel of x = 0, where it climbs 12.5 K a metre.
+    EXPECT_NEAR(at(0.0f), 400.0f, 10.0f);
+    EXPECT_LT(at(-6.0f), at(6.0f));
+    write({600.0f, 600.0f, 600.0f, 600.0f});
+    EXPECT_NEAR(at(0.0f), 600.0f, 0.01f) << "the next step, in place";
+
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    const std::array<float, 4> device{700.0f, 700.0f, 700.0f, 700.0f};
+    scene.Write("/World/Quad", tokens::kThermalTemperatures,
+                cuda->Upload(Tensor::Copy<float>(device, {4})));
+    EXPECT_NEAR(at(0.0f), 700.0f, 0.01f) << "from the CUDA device";
+    const std::array<float, 4> next{720.0f, 720.0f, 720.0f, 720.0f};
+    scene.Write("/World/Quad", tokens::kThermalTemperatures,
+                cuda->Upload(Tensor::Copy<float>(next, {4})));
+    EXPECT_NEAR(at(0.0f), 720.0f, 0.01f);
+    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(false);
+    EXPECT_EQ(at(0.0f), 0.0f);
 }

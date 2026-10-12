@@ -2594,6 +2594,11 @@ TEST_F(RasterDelegateTest,
         centre();
     }
     EXPECT_NEAR(centre(), 118, 8) << "a tenth of the light";
+    // Exposure compensation: a stop over middle grey, 0.36 linear.
+    camera.SetExposure(1.0);
+    centre();
+    EXPECT_NEAR(centre(), 161, 8) << "a stop of compensation";
+    camera.SetExposure(0.0);
 
     // Manual exposure shows the light as it is: exposed for this
     // light, then ten times as much.

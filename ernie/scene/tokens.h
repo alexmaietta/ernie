@@ -1008,6 +1008,10 @@ inline constexpr std::string_view kThermalEmissivity =
 /// the top; 0 or below for the material's own temperature.
 inline constexpr std::string_view kThermalTemperatureTexture =
     "ernie:thermal:temperatureTexture";
+/// A mesh's temperatures (Ernie): float32 (n,) kelvin per point, a
+/// thermal solver's write-back, from the CPU or a CUDA device.
+inline constexpr std::string_view kThermalTemperatures =
+    "ernie:thermal:temperatures";
 /// RenderSettings' thermal emission (Ernie): whether materials glow
 /// at their temperatures (default off); the temperature in kelvin of
 /// materials without their own (default 0, none); and the

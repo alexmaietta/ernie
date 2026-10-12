@@ -3657,9 +3657,12 @@ void RasterRenderer::Update(
                            std::as_bytes(std::span(fresh)),
                            slot * sizeof(fresh));
         }
+        // Metered without the camera's exposure stops, so they
+        // compensate: middle grey lands that many stops off.
         exposing_ = Exposing{
             found->second, std::clamp(*autoExposure_, 0.0f, 1.0f),
-            static_cast<float>(params.camera.LinearExposureScale())};
+            static_cast<float>(params.camera.LinearExposureScale() /
+                               std::exp2(params.camera.exposureStops))};
     }
     autoExposure_.reset();
     meterKey_.clear();

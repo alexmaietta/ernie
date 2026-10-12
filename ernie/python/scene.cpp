@@ -2886,6 +2886,7 @@ void BindScene(nb::module_& m) {
         {"INVISIBLE", tokens::kInvisible},
         {"POINTS", tokens::kPoints},
         {"NORMALS", tokens::kNormals},
+        {"THERMAL_TEMPERATURES", tokens::kThermalTemperatures},
         {"WIDTHS", tokens::kWidths},
         {"FACE_VERTEX_COUNTS", tokens::kFaceVertexCounts},
         {"FACE_VERTEX_INDICES", tokens::kFaceVertexIndices},

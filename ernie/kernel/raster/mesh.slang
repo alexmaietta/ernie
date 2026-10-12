@@ -22,6 +22,8 @@ static const uint kHasUvs = 32;
 static const uint kHasInstanceColors = 64;
 // The frame has thermal emission on: the material's temperature texture applies.
 static const uint kThermal = 128;
+// The mesh has temperatures per point (`temperatures`).
+static const uint kHasTemperatures = 256;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -74,6 +76,8 @@ struct MeshResources {
     float* instanceColors;
     // Meshes' points and triangle indices in use, pairs by slot (`MeshDraw.uv.y`).
     int* activeCounts;
+    // Meshes' temperatures in kelvin per point (`kHasTemperatures`), a thermal solver's.
+    float* temperatures;
 }
 [[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
 static float* points = meshResources.points;
@@ -89,6 +93,7 @@ static uint4* drawRecords = meshResources.drawRecords;
 static float* uvs = meshResources.uvs;
 static float* instanceColors = meshResources.instanceColors;
 static int* activeCounts = meshResources.activeCounts;
+static float* temperatures = meshResources.temperatures;
 // The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
 // normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
 // the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
@@ -152,6 +157,7 @@ struct MeshVertex {
     float3 world;
     float3 normal;
     float3 color;
+    float kelvin;
     float2 uv;
     uint corner;
     uint instance;
@@ -230,6 +236,7 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
     if ((flags & kHasInstanceColors) != 0) {
         v.color = load3(instanceColors, d.motion.x + instance);
     }
+    v.kelvin = (flags & kHasTemperatures) != 0 ? temperatures[index] : 0.0;
     v.uv = float2(0.0);
     if ((flags & kHasUvs) != 0) {
         let at = d.uv.x + call.indexOffset + vertexIndex;
@@ -248,6 +255,7 @@ struct VertexOutput {
     float3 world : WORLD;
     float3 normal : NORMAL;
     float3 color : COLOR;
+    float kelvin : KELVIN;
     float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint instance : INSTANCE;
@@ -262,6 +270,7 @@ struct LayeredVertexOutput {
     float3 world : WORLD;
     float3 normal : NORMAL;
     float3 color : COLOR;
+    float kelvin : KELVIN;
     float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint instance : INSTANCE;
@@ -280,6 +289,7 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
     out.world = v.world;
     out.normal = v.normal;
     out.color = v.color;
+    out.kelvin = v.kelvin;
     out.uv = v.uv;
     out.barycentric = barycentric[v.corner];
     out.instance = v.instance;
@@ -586,9 +596,12 @@ GBuffer meshGBuffer(VertexOutput in) {
     let modulation = cascadeTint(in.color * textured.albedo * detail.albedo, in.world);
     let unlit = hiddenLine();
     GBuffer out;
-    // Its temperature: its own, else its material's texture's, else 0 for the material's.
-    var kelvin = d.tint.a;
-    if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs) &&
+    // Its temperature: its points' (a solver's), else its own, else its material's texture's,
+    // else 0 for the material's.
+    let thermal = (d.offsets.w & kThermal) != 0;
+    var kelvin = thermal && (d.offsets.w & kHasTemperatures) != 0 && in.kelvin > 0.0
+                     ? in.kelvin
+                     : d.tint.a;    if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs) &&
         surface.temperature.x > 0.0) {
         kelvin = max(temperatureTexture(imageUv(in.uv)), 0.0);
     }

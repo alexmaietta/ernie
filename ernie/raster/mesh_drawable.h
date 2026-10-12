@@ -265,6 +265,23 @@ class MeshDrawable : public RasterDrawable {
     void SetColors(std::uint32_t mesh, const Tensor& colors,
                    std::uintptr_t stream = 1);
 
+    /// Sets a mesh's temperatures, kelvin per point (a thermal
+    /// solver's write-back), which its pixels take in place of its
+    /// own and its material's with thermal emission on, interpolated
+    /// across its triangles; 0 at a point for the others there. From
+    /// the host, staged into the frame's uploads (only this mesh's
+    /// range); empty removes them.
+    /// @throws std::invalid_argument for an unknown mesh, or not one
+    /// per point.
+    void SetTemperatures(std::uint32_t mesh, std::span<const float> kelvin);
+
+    /// The same from a contiguous float32 tensor on the compute
+    /// device, copied as `SetNormals`.
+    /// @throws std::invalid_argument as the device `SetPoints`, or
+    /// not one per point.
+    void SetTemperatures(std::uint32_t mesh, const Tensor& kelvin,
+                         std::uintptr_t stream = 1);
+
     /// Replaces a mesh's triangles with a contiguous int32 or uint32
     /// tensor on the compute device, three point indices per
     /// triangle, as many as the mesh was added with (zeros holding
@@ -628,6 +645,14 @@ class MeshDrawable : public RasterDrawable {
                               ///< `data.colors`, if any.
         std::uintptr_t colorsStream = 1;
         bool colorsDirty = false;
+        /// Its temperatures (`SetTemperatures`): from the host, or on
+        /// the device in place of them; whether it has any, and
+        /// whether they wait to be uploaded or copied.
+        std::vector<float> temperatures;
+        Tensor deviceTemperatures;
+        std::uintptr_t temperaturesStream = 1;
+        bool hasTemperatures = false;
+        bool temperaturesDirty = false;
         Tensor deviceIndices;  ///< Device triangle indices replacing
                                ///< `data.indices` (zeros), if any.
         std::uintptr_t indicesStream = 1;
@@ -975,6 +1000,8 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t instanceTotal_ = 0;
     std::shared_ptr<GpuBuffer> normals_;
     std::shared_ptr<GpuBuffer> colors_;
+    /// Meshes' temperatures, a float per point (`SetTemperatures`).
+    std::shared_ptr<GpuBuffer> temperatures_;
     std::shared_ptr<GpuBuffer> indices_;
     std::unique_ptr<GpuBuffer>
         uvs_;  ///< Meshes' texture coordinates per corner

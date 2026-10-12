@@ -111,8 +111,10 @@
       (::ernie::AttributeMeta{.label = "Rays step", .doc = "Pixels between the lens's rays.",      \
                               .group = "Lens", .min = 1.0, .max = 256.0}))                         \
     X(double, Exposure, ::ernie::tokens::kCameraExposure, 0.0,                                     \
-      (::ernie::AttributeMeta{.doc = "Stops; scales the photographic outputs.",.group = "Exposure", \
-                              .min = -16.0, .max = 16.0}))                                         \
+      (::ernie::AttributeMeta{.doc = "Stops; scales the photographic outputs, and in \"auto\" "    \
+                                     "mode compensates: the metered scene that many stops off "    \
+                                     "middle grey.",                                               \
+                              .group = "Exposure", .min = -16.0, .max = 16.0}))                    \
     X(double, ExposureTime, ::ernie::tokens::kExposureTime, 1.0,                                   \
       (::ernie::AttributeMeta{.doc = "Seconds.",.group = "Exposure", .min = 1e-6, .max = 10.0}))   \
     X(double, ExposureIso, ::ernie::tokens::kExposureIso, 100.0,                                   \

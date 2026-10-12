@@ -34,6 +34,8 @@ constexpr std::uint32_t kHasUvs = 32;
 constexpr std::uint32_t kHasInstanceColors = 64;
 /// The frame has thermal emission on (`MeshDrawable::thermal_`).
 constexpr std::uint32_t kThermal = 128;
+/// The mesh has temperatures per point (`SetTemperatures`).
+constexpr std::uint32_t kHasTemperatures = 256;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -315,8 +317,10 @@ struct MeshResources {
     VkDeviceAddress uvs;
     VkDeviceAddress instanceColors;
     VkDeviceAddress activeCounts;
+    /// Meshes' temperatures per point (`MeshDrawable::temperatures_`).
+    VkDeviceAddress temperatures;
 };
-static_assert(sizeof(MeshResources) == 104,
+static_assert(sizeof(MeshResources) == 112,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -965,6 +969,50 @@ void MeshDrawable::SetColors(std::uint32_t mesh, const Tensor& colors,
     activeMeshes_.insert(mesh);
 }
 
+void MeshDrawable::SetTemperatures(std::uint32_t mesh,
+                                   std::span<const float> kelvin) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    if (!kelvin.empty() && kelvin.size() != target.data.points.size() / 3) {
+        throw std::invalid_argument(
+            "Mesh temperatures need one per point");
+    }
+    const bool has = !kelvin.empty();
+    drawsDirty_ = drawsDirty_ || has != target.hasTemperatures;
+    target.hasTemperatures = has;
+    target.temperatures.assign(kelvin.begin(), kelvin.end());
+    target.deviceTemperatures = Tensor();
+    target.temperaturesDirty = has;
+    activeMeshes_.insert(mesh);
+}
+
+void MeshDrawable::SetTemperatures(std::uint32_t mesh, const Tensor& kelvin,
+                                   std::uintptr_t stream) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    CheckDeviceTensor(kelvin, 1, "Mesh temperatures");
+    Mesh& target = it->second;
+    if (static_cast<std::size_t>(kelvin.Elements()) !=
+        target.data.points.size() / 3) {
+        throw std::invalid_argument(
+            "Mesh temperatures need one per point");
+    }
+    drawsDirty_ = drawsDirty_ || !target.hasTemperatures;
+    target.hasTemperatures = true;
+    target.temperatures.clear();
+    target.deviceTemperatures = kelvin;
+    target.temperaturesStream = stream;
+    target.temperaturesDirty = true;
+    activeMeshes_.insert(mesh);
+}
+
 void MeshDrawable::SetIndices(std::uint32_t mesh,
                               const Tensor& indices,
                               std::uintptr_t stream) {
@@ -1416,6 +1464,14 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
         compute_->CopyToBuffer(mesh.deviceColors, *colors_, offset,
                                mesh.colorsStream);
     }
+    if (!mesh.deviceTemperatures.Empty() &&
+        (all || mesh.temperaturesDirty)) {
+        compute_->CopyToBuffer(mesh.deviceTemperatures, *temperatures_,
+                               VkDeviceSize{mesh.firstVertex} *
+                                   sizeof(float),
+                               mesh.temperaturesStream);
+        mesh.temperaturesDirty = false;
+    }
     // The full mesh's triangles, first of its indices; written in
     // place (`MapIndices`), they are there already, and the frame
     // waits for their stream.
@@ -1840,8 +1896,8 @@ void MeshDrawable::SettleMotion() {
         mesh.pointsMoving = false;
         mesh.pointsWritten = false;
         mesh.mappedPoints = {};
-        const bool pending =
-            mesh.pointsDirty || mesh.normalsDirty || mesh.colorsDirty;
+        const bool pending = mesh.pointsDirty || mesh.normalsDirty ||
+                             mesh.colorsDirty || mesh.temperaturesDirty;
         it = pending ? std::next(it) : activeMeshes_.erase(it);
     }
     for (auto& [handle, instancer] : instancers_) {
@@ -1887,6 +1943,7 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<float> points;
     std::vector<float> normals;
     std::vector<float> colors;
+    std::vector<float> temperatures;
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
     std::vector<float> uvs;
@@ -1936,6 +1993,15 @@ void MeshDrawable::RebuildGeometry() {
         } else {
             colors.insert(colors.end(), mesh.data.colors.begin(),
                           mesh.data.colors.end());
+        }
+        // Device temperatures are copied in after.
+        if (mesh.temperatures.empty()) {
+            temperatures.resize(temperatures.size() + count / 3, 0.0f);
+        } else {
+            temperatures.insert(temperatures.end(),
+                                mesh.temperatures.begin(),
+                                mesh.temperatures.end());
+            mesh.temperaturesDirty = false;
         }
         indices.insert(indices.end(), mesh.data.indices.begin(),
                        mesh.data.indices.end());
@@ -1988,6 +2054,7 @@ void MeshDrawable::RebuildGeometry() {
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
+    temperatures_ = Pool(std::as_bytes(std::span(temperatures)));
     // Shared, as triangles may be copied in from the compute device.
     indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
@@ -2472,6 +2539,14 @@ void MeshDrawable::Prepare(const FrameParams& params,
             if (compute_ != nullptr) {
                 CopyDeviceAttributes(mesh, false);
             }
+            // Host temperatures, only this mesh's range.
+            if (mesh.temperaturesDirty && !mesh.temperatures.empty()) {
+                renderer_.Uploads().Write(
+                    *temperatures_,
+                    std::as_bytes(std::span(mesh.temperatures)),
+                    VkDeviceSize{mesh.firstVertex} * sizeof(float));
+                mesh.temperaturesDirty = false;
+            }
             // Written ones are written in place each frame.
             if (!mesh.pointsDirty || mesh.writer) {
                 mesh.pointsDirty = false;
@@ -2629,6 +2704,7 @@ void MeshDrawable::WriteDraws() {
                      : 0u;
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
         flags |= thermal_ ? kThermal : 0u;
+        flags |= mesh.hasTemperatures ? kHasTemperatures : 0u;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
         draw.uv[2] =
@@ -3008,7 +3084,8 @@ void MeshDrawable::WriteResources() {
             address(drawRecords_),
             address(uvs_),
             address(instanceColors_),
-            address(activeCounts_)};
+            address(activeCounts_),
+            address(temperatures_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);

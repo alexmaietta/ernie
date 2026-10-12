@@ -1211,6 +1211,32 @@ void RasterDelegate::SetMeshAttributes(const Scene& scene,
     }
 }
 
+void RasterDelegate::SetMeshTemperatures(const Scene& scene,
+                                         const Path& path,
+                                         std::uint32_t handle) {
+    const Tensor* kelvin = scene.Read(path, tokens::kThermalTemperatures);
+    if (kelvin == nullptr || kelvin->Empty()) {
+        meshes_.SetTemperatures(handle, std::span<const float>());
+        return;
+    }
+    if (IsGpu(kelvin->Location().kind)) {
+        RequireCompute();
+        meshes_.SetTemperatures(
+            handle, *kelvin,
+            scene.WriteStream(path, tokens::kThermalTemperatures));
+        return;
+    }
+    if (kelvin->Type() != DType::Float32 || kelvin->Rank() != 1) {
+        throw std::invalid_argument(
+            "'" + std::string(tokens::kThermalTemperatures) +
+            "' needs float32 (n,)");
+    }
+    const Tensor host = kelvin->Contiguous();
+    meshes_.SetTemperatures(
+        handle, std::span(host.As<float>(),
+                          static_cast<std::size_t>(host.Elements())));
+}
+
 void RasterDelegate::SyncMeshes(const Scene& scene) {
     ERNIE_ZONE("Sync meshes");
     using namespace tokens;
@@ -1249,8 +1275,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             key.second[2] = static_cast<std::uint64_t>(
                 scene.Read(path, kFaceVertexIndices)->Elements());
         }
-        // The points and triangles in use, read in place (slot 4).
-        const std::array<std::uint64_t, 5> versions{
+        // The points and triangles in use, read in place (slot 4), and
+        // the temperatures, written each solver step (slot 5).
+        const std::array<std::uint64_t, 6> versions{
             scene.AttributeVersion(path, kPoints),
             gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
             gpuColors ? scene.AttributeVersion(path, kDisplayColor)
@@ -1258,7 +1285,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             gpuIndices
                 ? scene.AttributeVersion(path, kFaceVertexIndices)
                 : 0,
-            scene.AttributeVersion(path, kActiveCounts)};
+            scene.AttributeVersion(path, kActiveCounts),
+            scene.AttributeVersion(path, kThermalTemperatures)};
         const auto it = syncedMeshes_.find(path);
         if (it != syncedMeshes_.end() && it->second.key == key) {
             SyncedMesh& synced = it->second;
@@ -1280,6 +1308,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
                     if (synced.versions[1] != versions[1] ||
                         synced.versions[2] != versions[2]) {
                         SetMeshAttributes(scene, path, synced.handle);
+                    }
+                    if (synced.versions[5] != versions[5]) {
+                        SetMeshTemperatures(scene, path, synced.handle);
                     }
                     synced.versions = versions;
                     continue;
@@ -1317,6 +1348,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             }
             if (gpuNormals || gpuColors) {
                 SetMeshAttributes(scene, path, synced.handle);
+            }
+            if (scene.Read(path, kThermalTemperatures) != nullptr) {
+                SetMeshTemperatures(scene, path, synced.handle);
             }
         } catch (const std::invalid_argument& error) {
             if (synced.handle != 0) {
