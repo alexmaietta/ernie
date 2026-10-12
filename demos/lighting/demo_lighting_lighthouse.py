@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """A lighthouse at night: its two beams sweep round through the hazy
 air, seen from the shore by the light the air scatters out of them,
-the lantern's iron bars cutting dark shafts through each.
+the lantern's iron bars cutting dark shafts through each; the lantern
+glass glows all round, the keeper's cottage windows throw their light
+out into the haze and the pier's lamps pour cones down onto it.
 
 References:
 - C. Kulla and M. Fajardo, "Importance Sampling Techniques for Path
@@ -28,6 +30,9 @@ PERIOD = 10.0  # s, a turn of the beacon
 # across, from a halogen lamp behind a Fresnel lens.
 LUMENS = 2e4
 CONE = 3.0  # degrees, the beam's half angle
+COTTAGE = (22.0, -28.0)  # m, the keeper's cottage
+# The pier's lamps, along the shore in front of the tower.
+PIER = [(-48.0 + 12.0 * i, -48.0) for i in range(4)]
 
 
 def beam(angle):
@@ -99,19 +104,78 @@ class Demo(ernie.demo.Demo):
                     color_temperature=3200.0,
                 )
             )
-        # The lantern's own glow, all round, which lights the tower's
-        # top and haloes the lamp.
+        # The lantern glass's own glow, all round (a cylinder light, its
+        # axis turned upright), which lights the tower's top and
+        # haloes the lamp.
         self.lamps.append(
             world.define(
                 "Glow",
-                ernie.SphereLight,
-                radius=0.5,
+                ernie.CylinderLight,
+                radius=1.2,
+                length=2.5,
                 photometric_power=3000.0,
                 enable_color_temperature=True,
                 color_temperature=3200.0,
                 translate=LAMP,
+                rotate=(0.0, -90.0, 0.0),
             )
         )
+        # The keeper's cottage, its two lit windows (rect lights)
+        # facing the shore.
+        looks.define("Cottage", ernie.Material, albedo=(0.5,) * 3)
+        world.define(
+            "Cottage",
+            ernie.Cube,
+            size=1.0,
+            translate=(COTTAGE[0], COTTAGE[1], 2.5),
+            scale=(8.0, 5.0, 5.0),
+            material_binding="/World/Looks/Cottage",
+        )
+        for i, dx in enumerate((-2.0, 2.0)):
+            window = (COTTAGE[0] + dx, COTTAGE[1] - 2.55, 2.5)
+            self.lamps.append(
+                world.define(
+                    f"Window{i}",
+                    ernie.RectLight,
+                    width=1.0,
+                    height=1.2,
+                    photometric_power=1200.0,
+                    enable_color_temperature=True,
+                    color_temperature=2700.0,
+                ).set(
+                    tokens.TRANSFORM,
+                    ernie.look_at_transform(
+                        window,
+                        (window[0], window[1] - 1.0, window[2]),
+                        (0.0, 0.0, 1.0),
+                    ),
+                )
+            )
+        # The pier's lamps (disk lights) on their posts, facing down.
+        for i, (x, y) in enumerate(PIER):
+            world.define(
+                f"Post{i}",
+                ernie.Cylinder,
+                radius=0.08,
+                height=4.0,
+                translate=(x, y, 2.0),
+                material_binding="/World/Looks/Iron",
+            )
+            self.lamps.append(
+                world.define(
+                    f"PierLamp{i}",
+                    ernie.DiskLight,
+                    radius=0.2,
+                    photometric_power=1500.0,
+                    enable_color_temperature=True,
+                    color_temperature=4000.0,
+                ).set(
+                    tokens.TRANSFORM,
+                    ernie.look_at_transform(
+                        (x, y, 4.1), (x, y, 0.0), (0.0, 1.0, 0.0)
+                    ),
+                )
+            )
         self.turn(0.0)
         # A long exposure, as for the night sky.
         self.camera = world.define(
@@ -217,11 +281,11 @@ class Demo(ernie.demo.Demo):
         # The beams in the sky above the horizon, the frame's top half.
         sky = slice(0, RESOLUTION[1] // 2)
         lit = (side[sky] > 0.02 * side[sky].max()).mean()
-        moved = np.abs(turned - side).sum() / side.sum()
+        moved = np.abs(turned - side)[sky].sum() / side[sky].sum()
         ratio = hazier[sky].sum() / turned[sky].sum()
         print(
             f"the beams light {100 * lit:.1f}% of the sky; a quarter "
-            f"turn changes {100 * moved:.0f}% of their light; twice "
+            f"turn changes {100 * moved:.0f}% of its light; twice "
             f"the haze scatters {ratio:.2f} times as much; dark, the "
             f"brightest pixel is {dark.max():.3g}"
         )

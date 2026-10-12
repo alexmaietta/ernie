@@ -503,7 +503,9 @@ float3 areaFormFactor(LightGpu light, float3 world, float3 n) {
         let edge = cross(u, w);
         let sine = length(edge);
         if (sine > 1e-7) {
-            vector += acos(clamp(dot(u, w), -1.0, 1.0)) * edge / sine;
+            // The edge's angle from atan2, which keeps its precision for a small or distant
+            // light's edges, where acos of a cosine near 1 is noise as large as the angle.
+            vector += atan2(sine, dot(u, w)) * edge / sine;
         }
     }
     vector *= 0.5;

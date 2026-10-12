@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // A lighthouse at night: its two beams sweep round through the hazy
 // air, seen from the shore by the light the air scatters out of them,
-// the lantern's iron bars cutting dark shafts through each.
+// the lantern's iron bars cutting dark shafts through each; the
+// lantern glass glows all round, the keeper's cottage windows throw
+// their light out into the haze and the pier's lamps pour cones down
+// onto it.
 //
 // References:
 // - C. Kulla and M. Fajardo, "Importance Sampling Techniques for Path
@@ -43,8 +46,10 @@ constexpr double kPeriod = 10.0;  // s, a turn of the beacon
 // across, from a halogen lamp behind a Fresnel lens.
 constexpr double kLumens = 2e4;
 constexpr double kCone = 3.0;  // degrees, the beam's half angle
-constexpr const char* kLamps[] = {"/World/Beam", "/World/Back",
-                                  "/World/Glow"};
+constexpr glm::dvec2 kCottage{22.0,
+                              -28.0};  // m, the keeper's cottage
+constexpr int kPierLamps =
+    4;  // along the shore in front of the tower
 
 /// The beacon's transform turned `angle` radians about the tower.
 glm::dmat4 Beam(double angle) {
@@ -91,7 +96,7 @@ class LighthouseDemo : public app::Demo {
                 {.translate = glm::dvec3(1.4 * std::cos(a),
                                          1.4 * std::sin(a), 24.0)});
         }
-        for (const char* path : {kLamps[0], kLamps[1]}) {
+        for (const char* path : {"/World/Beam", "/World/Back"}) {
             SphereLight::Define(scene, path)
                 .SetRadius(0.3)
                 .SetShapingConeAngle(kCone)
@@ -100,14 +105,65 @@ class LighthouseDemo : public app::Demo {
                 .SetEnableColorTemperature(true)
                 .SetColorTemperature(3200.0);
         }
-        // The lantern's own glow, all round, which lights the tower's
-        // top and haloes the lamp.
-        SphereLight::Define(scene, kLamps[2])
-            .SetRadius(0.5)
+        lamps_ = {"/World/Beam", "/World/Back", "/World/Glow"};
+        // The lantern glass's own glow, all round (a cylinder light,
+        // its axis turned upright), which lights the tower's top and
+        // haloes the lamp.
+        CylinderLight::Define(scene, "/World/Glow")
+            .SetRadius(1.2)
+            .SetLength(2.5)
             .SetPhotometricPower(3000.0)
             .SetEnableColorTemperature(true)
             .SetColorTemperature(3200.0);
-        SetXform(scene, kLamps[2], {.translate = kLamp});
+        SetXform(scene, "/World/Glow",
+                 {.translate = kLamp,
+                  .rotate = glm::dvec3(0.0, -90.0, 0.0)});
+        // The keeper's cottage, its two lit windows (rect lights)
+        // facing the shore.
+        Material::Define(scene, "/World/Looks/Cottage")
+            .SetAlbedo(glm::dvec3(0.5));
+        Cube::Define(scene, "/World/Cottage")
+            .SetSize(1.0)
+            .SetMaterialBinding("/World/Looks/Cottage");
+        SetXform(scene, "/World/Cottage",
+                 {.translate = glm::dvec3(kCottage, 2.5),
+                  .scale = glm::dvec3(8.0, 5.0, 5.0)});
+        for (int i = 0; i < 2; ++i) {
+            const glm::dvec3 window(kCottage.x +
+                                        (i == 0 ? -2.0 : 2.0),
+                                    kCottage.y - 2.55, 2.5);
+            const Path path("/World/Window" + std::to_string(i));
+            RectLight::Define(scene, path)
+                .SetWidth(1.0)
+                .SetHeight(1.2)
+                .SetPhotometricPower(1200.0)
+                .SetEnableColorTemperature(true)
+                .SetColorTemperature(2700.0)
+                .SetTransform(LookAtTransform(
+                    window, window - glm::dvec3(0.0, 1.0, 0.0),
+                    {0.0, 0.0, 1.0}));
+            lamps_.push_back(path);
+        }
+        // The pier's lamps (disk lights) on their posts, facing down.
+        for (int i = 0; i < kPierLamps; ++i) {
+            const glm::dvec2 at(-48.0 + 12.0 * i, -48.0);
+            const Path post("/World/Post" + std::to_string(i));
+            Cylinder::Define(scene, post)
+                .SetRadius(0.08)
+                .SetHeight(4.0)
+                .SetMaterialBinding("/World/Looks/Iron");
+            SetXform(scene, post, {.translate = glm::dvec3(at, 2.0)});
+            const Path lamp("/World/PierLamp" + std::to_string(i));
+            DiskLight::Define(scene, lamp)
+                .SetRadius(0.2)
+                .SetPhotometricPower(1500.0)
+                .SetEnableColorTemperature(true)
+                .SetColorTemperature(4000.0)
+                .SetTransform(LookAtTransform(glm::dvec3(at, 4.1),
+                                              glm::dvec3(at, 0.0),
+                                              {0.0, 1.0, 0.0}));
+            lamps_.push_back(lamp);
+        }
         Turn(0.0);
         // A long exposure, as for the night sky.
         Camera::Define(scene, "/World/Camera")
@@ -180,14 +236,12 @@ class LighthouseDemo : public app::Demo {
         double turnedSky = 0.0;
         double hazierSky = 0.0;
         double moved = 0.0;
-        for (std::size_t i = 0; i < side.size(); ++i) {
+        for (std::size_t i = 0; i < sky; ++i) {
             sideSum += side[i];
             moved += std::abs(turned[i] - side[i]);
-            if (i < sky) {
-                lit += side[i] > 0.02 * brightest ? 1 : 0;
-                turnedSky += turned[i];
-                hazierSky += hazier[i];
-            }
+            lit += side[i] > 0.02 * brightest ? 1 : 0;
+            turnedSky += turned[i];
+            hazierSky += hazier[i];
         }
         const double share =
             static_cast<double>(lit) / static_cast<double>(sky);
@@ -196,7 +250,7 @@ class LighthouseDemo : public app::Demo {
             *std::max_element(dark.begin(), dark.end());
         std::printf("the beams light %.1f%% of the sky; a quarter "
                     "turn changes "
-                    "%.0f%% of their light; twice the haze scatters "
+                    "%.0f%% of its light; twice the haze scatters "
                     "%.2f times "
                     "as much; dark, the brightest pixel is %.3g\n",
                     100.0 * share, 100.0 * moved / sideSum, ratio,
@@ -208,13 +262,16 @@ class LighthouseDemo : public app::Demo {
     }
 
   private:
+    std::vector<Path>
+        lamps_;  ///< Every light, which `Capture` turns off
     double angle_ = 0.0;
     double speed_ = 2.0 * std::numbers::pi / kPeriod;
 
     void Turn(double angle) {
         angle_ = angle;
-        SphereLight(GetScene(), kLamps[0]).SetTransform(Beam(angle));
-        SphereLight(GetScene(), kLamps[1])
+        SphereLight(GetScene(), "/World/Beam")
+            .SetTransform(Beam(angle));
+        SphereLight(GetScene(), "/World/Back")
             .SetTransform(Beam(angle + std::numbers::pi));
     }
 
@@ -227,7 +284,7 @@ class LighthouseDemo : public app::Demo {
     /// dark.
     std::vector<double> Capture(bool lit) {
         Scene& scene = GetScene();
-        for (const char* path : kLamps) {
+        for (const Path& path : lamps_) {
             scene.Set(path, tokens::kVisibility,
                       std::string(lit ? tokens::kInherited
                                       : tokens::kInvisible));

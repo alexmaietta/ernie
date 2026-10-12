@@ -2717,7 +2717,17 @@ void RasterRenderer::WriteLights(
                 lightPatterns_.IndexOf(model->id));
             entry.pattern[0] = static_cast<float>(index);
             entry.pattern[1] = beam.wavelength;
-            entry.pattern[2] = static_cast<float>(params.time);
+            // The time for a custom pattern, which may move with it;
+            // the built-in ones do not, and a constant leaves the
+            // light table as it was, so volumes still reproject.
+            const bool builtin = model->id == tokens::kSpot ||
+                                 model->id == tokens::kLine ||
+                                 model->id == tokens::kGrid ||
+                                 model->id == tokens::kImage ||
+                                 model->id == tokens::kDots ||
+                                 model->id == tokens::kScan;
+            entry.pattern[2] =
+                builtin ? 0.0f : static_cast<float>(params.time);
             entry.pattern[3] =
                 static_cast<float>(std::max(beam.sequenceCount, 1));
             entry.patternExtent[0] = beam.extent.x;
