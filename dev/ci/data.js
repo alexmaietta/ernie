@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791771793657,
+  "lastUpdate": 1791772665080,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -9531,6 +9531,293 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-gcc-4: ccache miss rate",
             "value": 40.11,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "2ce0cb1d9d5f90da2aa902b283204da3f62293ce",
+          "message": "Motion smear demo: a rover's dots drawn out on a rock face over a long exposure; laser demos render each case once",
+          "timestamp": "2026-10-12T02:21:26Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/2ce0cb1d9d5f90da2aa902b283204da3f62293ce"
+        },
+        "date": 1791772663870,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 15.53,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 7.8,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 6.62,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): job",
+            "value": 11.9,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): wheel build",
+            "value": 11.53,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.23,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.03,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 6.45,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 6.33,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 8.55,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 8.4,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 0.95,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.93,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 0.82,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): job",
+            "value": 0.73,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): Build and run an application against them",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 0.83,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compile time",
+            "value": 13.02,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compiles",
+            "value": 528,
+            "unit": "files"
+          },
+          {
+            "name": "build-windows-2025: compile time",
+            "value": 35.49,
+            "unit": "min"
+          },
+          {
+            "name": "build-windows-2025: compiles",
+            "value": 723,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 22.57,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 420,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 24.58,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 24.06,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 420,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 24.58,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 21.93,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 420,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 24.58,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 22.38,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 420,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 24.58,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 13.66,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 730,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 24.01,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 29.65,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 730,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 45.82,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 22.71,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 730,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 45.82,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 29.71,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 730,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 45.82,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-4: compile time",
+            "value": 18.83,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-4: compiles",
+            "value": 730,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-4: ccache miss rate",
+            "value": 45.82,
             "unit": "%"
           }
         ]
