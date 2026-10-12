@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/cli.h"
 
+#include "ernie/device/shader_compiler.h"
+#include "ernie/device/vulkan_context.h"
+#include "ernie/raster/gpu_block_encoder.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -104,7 +107,8 @@ textures (ernie:virtualTexture) need.
   --format bc1|bc3|bc4|bc5|bc7|rgba8
                                the stored format, in place of the role's
   --linear                     colour stored linear rather than sRGB
-  --quality 0-4                BC7's effort (default 1)
+  --quality 0-4                BC7's effort on the CPU (default 1)
+  --cpu                        encode BC7 on the CPU, not the GPU
   --mosaic COLUMNSxROWS        the inputs are one image's tiles of one size, row by row from the
                                top left (a global mosaic's), baked a tile at a time
 )";
@@ -112,6 +116,7 @@ textures (ernie:virtualTexture) need.
     BakeOptions options;
     std::uint32_t columns = 0;
     std::uint32_t rows = 0;
+    bool cpu = false;
     try {
         for (std::size_t i = 0; i < args.size(); ++i) {
             const std::string& arg = args[i];
@@ -156,6 +161,8 @@ textures (ernie:virtualTexture) need.
                                                 format);
                 }
                 options.format = it->second;
+            } else if (arg == "--cpu") {
+                cpu = true;
             } else if (arg == "--linear") {
                 options.srgb = false;
             } else if (arg == "--quality") {
@@ -189,6 +196,23 @@ textures (ernie:virtualTexture) need.
         std::fprintf(stderr, "ernie bake-texture: %s\n\n%s",
                      error.what(), std::string(kBakeUsage).c_str());
         return 2;
+    }
+    // BC7 on the GPU where there is one, else the CPU.
+    std::unique_ptr<VulkanContext> context;
+    std::unique_ptr<ShaderCompiler> compiler;
+    std::unique_ptr<GpuBlockEncoder> encoder;
+    if (!cpu) {
+        try {
+            context = VulkanContext::Create(VulkanContextOptions{});
+            compiler = std::make_unique<ShaderCompiler>();
+            encoder = std::make_unique<GpuBlockEncoder>(*context,
+                                                        *compiler);
+            options.encoder = encoder.get();
+        } catch (const std::exception& error) {
+            std::fprintf(stderr,
+                         "ernie bake-texture: BC7 on the CPU (%s)\n",
+                         error.what());
+        }
     }
     try {
         const std::filesystem::path output = files.back();

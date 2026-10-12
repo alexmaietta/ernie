@@ -15,8 +15,12 @@ FetchContent_Declare(
     SOURCE_SUBDIR no-build)
 FetchContent_MakeAvailable(bc7enc)
 
-add_library(ernie_bc7enc STATIC "${bc7enc_SOURCE_DIR}/bc7enc.cpp"
-                                "${bc7enc_SOURCE_DIR}/rgbcx.cpp")
+add_library(
+    ernie_bc7enc STATIC
+    "${bc7enc_SOURCE_DIR}/bc7enc.cpp"
+    "${bc7enc_SOURCE_DIR}/rgbcx.cpp"
+    # Its BC7 decoder, for checking encoders against their sources.
+    "${bc7enc_SOURCE_DIR}/bc7decomp.cpp")
 target_include_directories(ernie_bc7enc SYSTEM
                            PUBLIC "${bc7enc_SOURCE_DIR}")
 set_target_properties(

@@ -83,7 +83,7 @@ set(ernie_shaders
     raster/virtual_shadow.slang=kVirtualShadowSlang
     raster/virtual_shadow_caster.slang=kVirtualShadowCasterSlang
     raster/volume.slang=kVolumeSlang
-    texture/bc7_encode.slang=kBc7EncodeSlang
+    texture/bc7.slang=kBc7Slang
     bindless.slang=kBindlessSlang
     raster/pnanovdb_prelude.slang=kPNanoVdbPreludeSlang
     ../../third_party/nanovdb/PNanoVDB.h=kPNanoVdbHeader)

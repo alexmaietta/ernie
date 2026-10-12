@@ -4,6 +4,7 @@ ernie_add_library(
     SOURCES
     atmosphere_luts.cpp
     delegate.cpp
+    gpu_block_encoder.cpp
     ground_drawable.cpp
     material.cpp
     mesh_drawable.cpp

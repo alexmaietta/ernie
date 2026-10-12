@@ -224,12 +224,17 @@ bc7enc_compress_block_params Bc7Params(TextureFormat format,
 /// Encodes mip `mip` of `texture` from its RGBA8 texels `rgba`.
 void EncodeMip(TextureData& texture, std::uint32_t mip,
                std::span<const std::uint8_t> rgba,
-               const bc7enc_compress_block_params& bc7) {
+               const bc7enc_compress_block_params& bc7,
+               BlockEncoder* encoder) {
     const std::uint32_t width = std::max(1u, texture.width >> mip);
     const std::uint32_t height = std::max(1u, texture.height >> mip);
     std::byte* out = texture.bytes.data() + texture.offsets[mip];
     if (!InfoOf(texture.format).compressed()) {
         std::memcpy(out, rgba.data(), rgba.size());
+        return;
+    }
+    if (encoder != nullptr && encoder->Encodes(texture.format)) {
+        encoder->Encode(rgba, width, height, texture.format, out);
         return;
     }
     EncodeBlocks(texture.format, rgba, width, height, out, bc7);
@@ -289,7 +294,8 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
 
 TextureData EncodeTexture(std::span<const Image> mips,
                           TextureFormat format,
-                          ImageEncoding encoding, int quality) {
+                          ImageEncoding encoding, int quality,
+                          BlockEncoder* encoder) {
     if (mips.empty()) {
         throw std::invalid_argument("A texture needs a mip");
     }
@@ -307,7 +313,8 @@ TextureData EncodeTexture(std::span<const Image> mips,
     const bc7enc_compress_block_params bc7 =
         Bc7Params(format, quality);
     for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
-        EncodeMip(texture, mip, ToRgba8(mips[mip], encoding), bc7);
+        EncodeMip(texture, mip, ToRgba8(mips[mip], encoding), bc7,
+                  encoder);
     }
     return texture;
 }
@@ -422,7 +429,7 @@ TextureData BakeTexture(const std::filesystem::path& input,
         const bc7enc_compress_block_params bc7 =
             Bc7Params(format, options.quality);
         for (std::uint32_t mip = 0; mip < mips; ++mip) {
-            EncodeMip(texture, mip, rgba, bc7);
+            EncodeMip(texture, mip, rgba, bc7, options.encoder);
             if (mip + 1 < mips) {
                 halved = HalveRgba8(rgba, w, h, srgb);
                 rgba = halved;
@@ -441,8 +448,8 @@ TextureData BakeTexture(const std::filesystem::path& input,
                             : MipFilter::Average);
     // Normals' mips hold n / 2 + 1/2 in rgb, as the stored-texture
     // decode reads x and y; BC5 keeps those two.
-    TextureData texture =
-        EncodeTexture(mips, format, encoding, options.quality);
+    TextureData texture = EncodeTexture(
+        mips, format, encoding, options.quality, options.encoder);
     WriteDdsFile(output, texture);
     return texture;
 }
@@ -542,7 +549,13 @@ TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
                             std::uint32_t w, std::uint32_t h) {
         std::vector<std::byte> blocks(ImageBytes(format, w, h));
         if (info.compressed()) {
-            EncodeBlocks(format, rgba, w, h, blocks.data(), bc7);
+            if (options.encoder != nullptr &&
+                options.encoder->Encodes(format)) {
+                options.encoder->Encode(rgba, w, h, format,
+                                        blocks.data());
+            } else {
+                EncodeBlocks(format, rgba, w, h, blocks.data(), bc7);
+            }
         } else {
             std::memcpy(blocks.data(), rgba.data(), rgba.size());
         }

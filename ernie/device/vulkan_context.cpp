@@ -479,9 +479,12 @@ VulkanContext::Create(const VulkanContextOptions& options) {
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
     VkPhysicalDeviceVulkan12Features supported12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+    VkPhysicalDeviceVulkan13Features supported13{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+    supported13.pNext = &supported12;
     VkPhysicalDeviceFeatures2 supported{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
-    supported.pNext = &supported12;
+    supported.pNext = &supported13;
     if (rayExtensions) {
         supported12.pNext = &accelerationSupport;
         accelerationSupport.pNext = &rayQuerySupport;
@@ -527,6 +530,12 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     features13.dynamicRendering = VK_TRUE;
     features13.synchronization2 = VK_TRUE;
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
+    // For DirectXTex's BC7 encoder, the GPU tests' reference, whose
+    // shader takes dot products of integer vectors.
+    features13.shaderIntegerDotProduct =
+        supported13.shaderIntegerDotProduct;
+    c.integerDotProduct_ =
+        supported13.shaderIntegerDotProduct == VK_TRUE;
     features13.pNext = c.rayQuery_ ? &acceleration : nullptr;
     VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR executables{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR};

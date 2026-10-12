@@ -147,9 +147,8 @@ extern const char kGBufferSlang[];
 extern const char kVolumeSlang[];
 extern const char kPNanoVdbPreludeSlang[];
 extern const char kPNanoVdbHeader[];
-/// BC7 encoding on the GPU (`GpuBlockEncoder`), derived from
-/// DirectXTex's compute shader (third_party/directxtex).
-extern const char kBc7EncodeSlang[];
+/// BC7 encoding on the GPU in modes 1, 6 and 7 (`GpuBlockEncoder`).
+extern const char kBc7Slang[];
 /// Lasers' beams crossed by a pixel's ray, in closed form, for the
 /// media that scatter them (volume.slang, shading.slang).
 extern const char kLaserBeamsSlang[];

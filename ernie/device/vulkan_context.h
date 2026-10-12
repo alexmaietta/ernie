@@ -188,6 +188,13 @@ class VulkanContext {
         return sparseResidency_;
     }
 
+    /// Whether shaders take dot products of integer vectors
+    /// (`shaderIntegerDotProduct`), as DirectXTex's BC7 encoder (the
+    /// GPU tests' reference) does.
+    bool SupportsIntegerDotProduct() const {
+        return integerDotProduct_;
+    }
+
     /// Whether images can be BC1 to BC7 block-compressed
     /// (`textureCompressionBC`), as DDS and KTX2 textures often are.
     bool SupportsTextureCompressionBc() const {
@@ -362,6 +369,7 @@ class VulkanContext {
     bool anisotropy_ = false;
     bool textureCompressionBc_ = false;
     bool sparseResidency_ = false;
+    bool integerDotProduct_ = false;
     bool depthClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;

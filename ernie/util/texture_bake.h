@@ -20,6 +20,23 @@ enum class TextureRole {
     Data,  ///< Linear values such as roughness or metallic; BC7.
 };
 
+/// Encodes RGBA8 images into BC blocks away from the CPU, as
+/// `GpuBlockEncoder` does on the GPU: bakes use it for the formats it
+/// encodes, the CPU's encoders for the rest.
+class BlockEncoder {
+  public:
+    virtual ~BlockEncoder() = default;
+
+    virtual bool Encodes(TextureFormat format) const = 0;
+
+    /// `rgba` (`width` x `height` RGBA8, rows top to bottom) as
+    /// `format`'s blocks at `out` (`ImageBytes(format, width,
+    /// height)`), past the edges repeating the last row and column.
+    virtual void Encode(std::span<const std::uint8_t> rgba,
+                        std::uint32_t width, std::uint32_t height,
+                        TextureFormat format, std::byte* out) = 0;
+};
+
 /// How `BakeTexture` stores a texture.
 struct BakeOptions {
     TextureRole role = TextureRole::Colour;
@@ -28,19 +45,24 @@ struct BakeOptions {
     std::optional<TextureFormat> format;
     /// Colour stored as sRGB (the default) or linear.
     bool srgb = true;
-    /// BC7's effort, 0 (fastest) to 4.
+    /// BC7's effort on the CPU, 0 (fastest) to 4.
     int quality = 1;
+    /// Encodes the formats it can in place of the CPU (on the GPU);
+    /// null for the CPU's encoders alone.
+    BlockEncoder* encoder = nullptr;
 };
 
 /// `mips` (full size first, as `MipChain` makes them) stored in
 /// `format`, 8-bit values encoded with `encoding`; BC blocks over a
 /// mip's edge repeat its last row and column; `quality` is BC7's
-/// effort, 0 to 4. Encodes on every hardware thread.
+/// effort, 0 to 4. Encodes with `encoder` where it encodes `format`,
+/// else on every hardware thread.
 /// @throws std::invalid_argument for a format it does not write, or
 /// mips that do not halve.
 TextureData EncodeTexture(std::span<const Image> mips,
                           TextureFormat format,
-                          ImageEncoding encoding, int quality = 1);
+                          ImageEncoding encoding, int quality = 1,
+                          BlockEncoder* encoder = nullptr);
 
 /// Writes `texture` as a DDS file with the DX10 header, every layer's
 /// mips (`ReadDds` reads it back).

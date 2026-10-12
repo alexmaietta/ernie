@@ -82,6 +82,7 @@ ernie_add_test_suite(
     raster_batch_gpu_test.cpp
     raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp
+    raster_gpu_block_encoder_gpu_test.cpp
     raster_gpu_meshes_gpu_test.cpp
     raster_gpu_terrain_gpu_test.cpp
     raster_hex_tiling_gpu_test.cpp
@@ -106,6 +107,7 @@ ernie_add_test_suite(
     LIBRARIES
     ernie
     ernie_stb
+    ernie_bc7enc
     LABELS
     gpu
     DEFINITIONS
