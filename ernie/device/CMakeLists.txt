@@ -13,6 +13,7 @@ ernie_add_library(
     offscreen_target.cpp
     pipeline.cpp
     shader_compiler.cpp
+    sparse_image.cpp
     swapchain.cpp
     vulkan_context.cpp
     PUBLIC

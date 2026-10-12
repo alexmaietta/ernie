@@ -75,6 +75,7 @@ ernie_add_test_suite(
     device_cuda_interop_test.cpp
     device_frame_uploads_test.cpp
     device_pipeline_test.cpp
+    device_sparse_image_test.cpp
     device_vulkan_context_test.cpp
     raster_atmosphere_gpu_test.cpp
     raster_batch_gpu_test.cpp

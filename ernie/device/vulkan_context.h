@@ -177,6 +177,14 @@ class VulkanContext {
         return anisotropy_;
     }
 
+    /// Whether 2D images can be sparse, their memory bound tile by
+    /// tile on the queue, and shaders clamp sampling to a minimum
+    /// level of detail (`SparseImage`): virtual textures filtered in
+    /// hardware; without it they page in software.
+    bool SupportsSparseResidency() const {
+        return sparseResidency_;
+    }
+
     /// Whether images can be BC1 to BC7 block-compressed
     /// (`textureCompressionBC`), as DDS and KTX2 textures often are.
     bool SupportsTextureCompressionBc() const {
@@ -350,6 +358,7 @@ class VulkanContext {
     bool rayQuery_ = false;
     bool anisotropy_ = false;
     bool textureCompressionBc_ = false;
+    bool sparseResidency_ = false;
     bool depthClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;

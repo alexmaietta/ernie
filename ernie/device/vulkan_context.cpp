@@ -590,6 +590,28 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         supported.features.multiDrawIndirect;
     c.multiDrawIndirect_ =
         supported.features.multiDrawIndirect == VK_TRUE;
+    // For virtual textures backed by sparse images (`SparseImage`):
+    // tiles bound on the queue, and sampling clamped to the finest
+    // resident mip (min LOD), so filtering spans tiles in hardware.
+    {
+        std::uint32_t familyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            c.physicalDevice_, &familyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> families(familyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            c.physicalDevice_, &familyCount, families.data());
+        c.sparseResidency_ =
+            supported.features.sparseBinding == VK_TRUE &&
+            supported.features.sparseResidencyImage2D == VK_TRUE &&
+            supported.features.shaderResourceMinLod == VK_TRUE &&
+            (families[c.queueFamily_].queueFlags &
+             VK_QUEUE_SPARSE_BINDING_BIT) != 0;
+        if (c.sparseResidency_) {
+            features.features.sparseBinding = VK_TRUE;
+            features.features.sparseResidencyImage2D = VK_TRUE;
+            features.features.shaderResourceMinLod = VK_TRUE;
+        }
+    }
     features.pNext = &features11;
 
     const float priority = 1.0f;
