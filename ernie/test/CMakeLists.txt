@@ -129,6 +129,8 @@ if(TARGET _ernie)
                 PROPERTIES ENVIRONMENT "${environment}" LABELS
                            "gpu;python")
         endfunction()
+        # pytest makes each --basetemp, but not its parent.
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/pytest")
         set(python_tests "${CMAKE_CURRENT_SOURCE_DIR}/python")
         file(GLOB ernie_python_test_files CONFIGURE_DEPENDS
              "${python_tests}/test_*.py")
