@@ -1292,6 +1292,68 @@ TEST_F(RasterDelegateTest, ReadoutTapsOffsetInterleavedPixels) {
     EXPECT_GT(checked, 1000);
 }
 
+TEST_F(RasterDelegateTest,
+       ReadoutTableAppliesEachColumnsMeasuredReadout) {
+    // Each column's own flatfield gain, dark and offset from tables,
+    // and LROC NAC-like low-signal nonlinearity coefficients below
+    // 600 DN (Humm et al. 2016): every number is the solution of
+    // y - 1 / (a b^y + c) = gain x, less the offset, plus the dark.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(3e-7);
+    const Steps steps = {{"qe", kNone},
+                         {"adc", kNone},
+                         {"readoutTable", {{"limit", 600.0f}}}};
+    std::vector<float> gain;
+    std::vector<float> dark;
+    std::vector<float> offset;
+    for (std::size_t x = 0; x < kSize; ++x) {
+        gain.push_back(1.0f + 0.01f * static_cast<float>(x % 7));
+        dark.push_back(static_cast<float>(x % 3));
+        offset.push_back(x % 2 == 0 ? 53.0f : 66.0f);
+    }
+    constexpr double kA = 0.0604653;
+    constexpr double kB = 1.00472;
+    constexpr double kC = -0.055995;
+    const Arrays arrays = {{2,
+                            {{"gain", gain},
+                             {"dark", dark},
+                             {"offset", offset},
+                             {"a", {static_cast<float>(kA)}},
+                             {"b", {static_cast<float>(kB)}},
+                             {"c", {static_cast<float>(kC)}}}}};
+    const auto raw = VarsThrough(delegate, scene, {"RawDN"},
+                                 {{"qe", kNone}, {"adc", kNone}})
+                         .at("RawDN");
+    const auto read =
+        VarsThrough(delegate, scene, {"RawDN"}, steps, arrays)
+            .at("RawDN");
+    const auto h = [](double y) {
+        return 1.0 / std::max(kA * std::pow(kB, y) + kC, 1e-6);
+    };
+    int low = 0;
+    for (std::size_t y = 0; y < kSize; ++y) {
+        for (std::size_t x = 0; x < kSize; ++x) {
+            const std::size_t i = (y * kSize + x) * 4 + 1;
+            const double lin = raw[i] * gain[x];
+            double lo = lin;
+            double hi = lin + h(lin);
+            for (int k = 0; k < 60; ++k) {
+                const double mid = 0.5 * (lo + hi);
+                (mid - h(mid) < lin ? lo : hi) = mid;
+            }
+            const double solved = 0.5 * (lo + hi);
+            const double expected = std::clamp(
+                std::floor((solved < 600.0 ? solved : lin) -
+                           offset[x] + dark[x] + 0.5),
+                0.0, 4095.0);
+            EXPECT_NEAR(read[i], expected, 1.0) << x << ", " << y;
+            low += solved < 600.0 ? 1 : 0;
+        }
+    }
+    EXPECT_GT(low, 100) << "the nonlinearity should be exercised";
+}
+
 TEST_F(RasterDelegateTest, TdiSumsItsStagesAndSmearsWhenOutOfStep) {
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();

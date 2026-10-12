@@ -897,6 +897,12 @@ public void writeState(PixelContext pixel, uint slot, float4 value) {
 
 // A curve parameter (`SensorFilterParam::size` above 1) at `t` in [0, 1]: linear between its N
 // evenly spaced samples, values[0] at 0 and values[N - 1] at 1, held beyond them.
+// Value `i` of a table parameter (`SensorFilterParam::table`) whose
+// Params field is `start`.
+public float paramTable(float start, uint i) {
+    return filterParams[uint(start) + i];
+}
+
 public float curveAt<let N : int>(float values[N], float t) {
     let at = saturate(t) * float(N - 1);
     let lower = min(int(at), N - 2);

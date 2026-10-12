@@ -170,7 +170,11 @@ struct SensorFilterOutput {
 /// name[size]` in the filter's `Params`, such as a curve;
 /// sensor.slang's `curveAt` reads one), which the prim sets as a
 /// float array of any length, resampled linearly to `size` (a single
-/// number fills it).
+/// number fills it). A `table` of `size` values (one per detector,
+/// say) stays in the parameter buffer instead, its `Params` field a
+/// float holding where it starts, read with sensor.slang's
+/// `paramTable`; the prim's values are taken as they are, the last
+/// repeated to `size`.
 struct SensorFilterParam {
     std::string name;  ///< An identifier: the field of the filter's
                        ///< `Params` struct.
@@ -180,6 +184,7 @@ struct SensorFilterParam {
     /// An array parameter's default, resampled to `size`; empty fills
     /// it with `defaultValue`.
     std::vector<float> defaults = {};
+    bool table = false;
 };
 
 /// `values` resampled linearly to `size` evenly spaced samples, first
@@ -252,6 +257,7 @@ class SensorFilterRegistry {
     /// together.
     static constexpr std::size_t kMaxParams = 16;
     static constexpr std::size_t kMaxParamFloats = 1024;
+    static constexpr std::size_t kMaxTableFloats = 1 << 16;
 
     /// Adds `model`; its Slang is compiled when a chain first uses it
     /// (`RasterRenderer:: AddSensorFilter` compiles eagerly).

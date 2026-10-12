@@ -53,6 +53,7 @@ extern const char kFilterLagSlang[];
 extern const char kFilterMeasuredQeSlang[];
 extern const char kFilterPsfSlang[];
 extern const char kFilterReadoutTapsSlang[];
+extern const char kFilterReadoutTableSlang[];
 extern const char kFilterTdiSlang[];
 extern const char kFilterTemporalAverageSlang[];
 extern const char kFilterSpectralTransmissionSlang[];

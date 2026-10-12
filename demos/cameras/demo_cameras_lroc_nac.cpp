@@ -73,12 +73,57 @@ constexpr double kSunRadius = 6.957e8;
 constexpr double kAu = 1.495978707e11;
 constexpr double kSolarConstant = 1361.0;
 
-/// The NACs' focal ratio, gain, noise and full well (Robinson et al.
-/// 2010, Table 2).
+/// The NACs' focal ratio, gain, noise, full well and 7 um pixels
+/// (Robinson et al. 2010, Table 2).
 constexpr double kNacFNumber = 3.577;
 constexpr double kNacElectronsPerDn = 90.5;
 constexpr double kNacReadNoise = 101.0;
 constexpr double kNacFullWell = 334000.0;
+constexpr double kNacPixelUm = 7.0;
+
+/// NAC-R's responsivity, (DN/ms) / (W/m^2/sr/um), and nonlinearity
+/// limit, DN (ISIS lronaccal; Humm et al. 2016).
+constexpr double kNacResponsivity = 27.746;
+constexpr double kNacNonlinearLimit = 600.0;
+
+/// The flat QE over 400 to 760 nm that gives that responsivity under
+/// a flat spectrum, the optics' losses in it.
+double NacQe() {
+    constexpr double kPlanck = 6.62607015e-34;
+    constexpr double kSpeedOfLight = 299792458.0;
+    const double area = 1e-6 * kNacPixelUm * 1e-6 * kNacPixelUm;
+    const double optics = kPi / (4.0 * kNacFNumber * kNacFNumber);
+    return 1e3 * kNacResponsivity * kNacElectronsPerDn * kPlanck *
+           kSpeedOfLight / (1e6 * 360e-9 * optics * area * 580e-9);
+}
+
+/// NAC-R's per-column readout (lroNacRCalibration.csv, from ISIS's
+/// calibration data): flatfield, dark, offset and nonlinearity.
+struct NacColumns {
+    std::vector<float> gain, dark, offset, a, b, c;
+};
+
+NacColumns ReadNacColumns() {
+    std::ifstream file(demos::DataFile("lroNacRCalibration.csv"));
+    NacColumns columns;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#' || line[0] == 'f') {
+            continue;
+        }
+        float v[6];
+        if (std::sscanf(line.c_str(), "%f,%f,%f,%f,%f,%f", &v[0],
+                        &v[1], &v[2], &v[3], &v[4], &v[5]) == 6) {
+            columns.gain.push_back(v[0]);
+            columns.dark.push_back(v[1]);
+            columns.offset.push_back(v[2]);
+            columns.a.push_back(v[3]);
+            columns.b.push_back(v[4]);
+            columns.c.push_back(v[5]);
+        }
+    }
+    return columns;
+}
 
 /// The NAC's nominal 12- to 8-bit table (Appendix A, code 0): five
 /// linear segments.
@@ -378,6 +423,7 @@ class LrocNacDemo : public app::Demo {
         Camera(GetScene(), "/World/Nac").SetSensorNoise(false);
         CheckStripsSeeTheGroundWhereTheIsdPutsIt();
         CheckReadout();
+        CheckResponsivity();
         Camera(GetScene(), "/World/Nac").SetSensorNoise(true);
     }
 
@@ -388,9 +434,11 @@ class LrocNacDemo : public app::Demo {
         Scene& scene = GetScene();
         Camera::Define(scene, "/World/Nac")
             .SetSensorType("mono")
-            .SetSensorQeMono(std::vector<float>{390.0f, 0.0f, 400.0f,
-                                                0.6f, 760.0f, 0.6f,
-                                                770.0f, 0.0f})
+            .SetSensorQeMono(std::vector<float>{
+                395.0f, 0.0f, 405.0f, static_cast<float>(NacQe()),
+                755.0f, static_cast<float>(NacQe()), 765.0f, 0.0f})
+            .SetSpectralRange(glm::dvec2(390.0, 770.0))
+            .SetSpectralBands(8)
             .SetExposureFStop(kNacFNumber)
             .SetExposureIso(100.0)  // the gain is the ADC's
             .SetSensorElectronsPerDn(kNacElectronsPerDn)
@@ -401,15 +449,15 @@ class LrocNacDemo : public app::Demo {
             .SetSensorNoise(true);
         UseStrip(0, false);
         std::vector<Path> vars;
-        for (const char* var :
-             {"RawDN", "Electrons", "PrimId", "LdrColor"}) {
+        for (const char* var : {"RawDN", "Electrons", "PrimId",
+                                "LdrColor", "SpectralRadiance"}) {
             const Path path = Path("/Render/Nac").Child(var);
             RenderVar::Define(scene, path).SetSourceName(var);
             vars.push_back(path);
         }
         std::vector<Path> filters;
-        const char* types[] = {"qe",          "noise",        "adc",
-                               "readoutTaps", "compandTable", "cie",
+        const char* types[] = {"qe",           "noise",        "adc",
+                               "readoutTable", "compandTable", "cie",
                                "exposure"};
         for (std::size_t i = 0; i < std::size(types); ++i) {
             const Path path = Path("/Render/Nac/Chain")
@@ -418,7 +466,13 @@ class LrocNacDemo : public app::Demo {
                 .SetFilterType(types[i]);
             filters.push_back(path);
         }
-        scene.Set(filters[3], "inputs:taps", 2.0);
+        scene.Set(filters[3], "inputs:gain", columns_.gain);
+        scene.Set(filters[3], "inputs:dark", columns_.dark);
+        scene.Set(filters[3], "inputs:offset", columns_.offset);
+        scene.Set(filters[3], "inputs:a", columns_.a);
+        scene.Set(filters[3], "inputs:b", columns_.b);
+        scene.Set(filters[3], "inputs:c", columns_.c);
+        scene.Set(filters[3], "inputs:limit", kNacNonlinearLimit);
         RenderProduct::Define(scene, "/Render/Nac")
             .SetCamera(Path("/World/Nac"))
             .SetResolution(
@@ -545,35 +599,109 @@ class LrocNacDemo : public app::Demo {
         }
     }
 
-    /// Every 8-bit number is the companding table's of its electrons,
-    /// and the daylit ground sits within the ADC's range.
+    /// The 12-bit number column `x` reads for `electrons`: its
+    /// flatfield, nonlinearity (bisection), offset and dark.
+    double Measured(double electrons, std::size_t x) const {
+        const double gain = columns_.gain[x];
+        const double a = columns_.a[x];
+        const double b = columns_.b[x];
+        const double c = columns_.c[x];
+        const double lin =
+            std::floor(std::min(electrons, kNacFullWell) /
+                           kNacElectronsPerDn +
+                       0.5) *
+            (gain > 0.0 ? gain : 1.0);
+        const auto h = [&](double y) {
+            return 1.0 / std::max(a * std::pow(b, y) + c, 1e-6);
+        };
+        double lo = lin;
+        double hi = lin + h(lin);
+        for (int i = 0; i < 60; ++i) {
+            const double mid = 0.5 * (lo + hi);
+            (mid - h(mid) < lin ? lo : hi) = mid;
+        }
+        const double y = 0.5 * (lo + hi);
+        return (y < kNacNonlinearLimit ? y : lin) -
+               double(columns_.offset[x]) + double(columns_.dark[x]);
+    }
+
+    /// Every 8-bit number is the companding table's of its column's
+    /// readout, and the daylit ground sits within the ADC's range.
     void CheckReadout() {
         RenderProductSetOutputs outputs = RenderStrip(kStrips / 2);
         const Tensor electrons =
             Var(outputs, "/Render/Nac", "Electrons");
         const Tensor raw = Var(outputs, "/Render/Nac", "RawDN");
+        const std::int64_t samples = nac_.Isd().samples;
+        const std::int64_t pixels =
+            std::int64_t(kStripLines) * samples;
+        const std::int64_t channels = raw.Elements() / pixels;
         std::int64_t within = 0;
-        for (std::int64_t i = 0; i < raw.Elements(); ++i) {
-            const double e = std::min<double>(
-                electrons.As<float>()[i], kNacFullWell);
-            const auto code = [&](double scale) {
-                return NacCompand(std::clamp(
-                    std::floor(e * scale / kNacElectronsPerDn + 0.5),
-                    0.0, 4095.0));
-            };
-            const std::uint16_t dn = raw.As<std::uint16_t>()[i];
-            Check(dn == code(1.0 - 1e-6) || dn == code(1.0 + 1e-6),
-                  "the NAC should send its table's 8-bit numbers");
+        std::int64_t off = 0;
+        for (std::int64_t p = 0; p < pixels; ++p) {
+            const double measured =
+                Measured(electrons.As<float>()[p * channels],
+                         static_cast<std::size_t>(p % samples));
+            const std::uint16_t dn =
+                raw.As<std::uint16_t>()[p * channels];
+            const double expected = NacCompand(
+                std::clamp(std::floor(measured + 0.5), 0.0, 4095.0));
+            off += std::abs(dn - expected) > 1.0 ? 1 : 0;
             within += dn > 0 && dn < 255 ? 1 : 0;
         }
-        std::printf("NAC: %lld of %lld numbers within the range\n",
-                    static_cast<long long>(within),
-                    static_cast<long long>(raw.Elements()));
-        Check(within > raw.Elements() / 8,
+        std::printf(
+            "NAC: %lld of %lld numbers within the range, %lld "
+            "off the readout\n",
+            static_cast<long long>(within),
+            static_cast<long long>(pixels),
+            static_cast<long long>(off));
+        Check(off < pixels / 1000,
+              "the NAC should send its columns' readout, companded");
+        Check(within > pixels / 2,
               "the daylit ground should be exposed within the range");
     }
 
+    /// Under a flat spectrum the electrons, as DN per ms, are 27.746
+    /// times the radiance: NAC-R's responsivity.
+    void CheckResponsivity() {
+        Scene& scene = GetScene();
+        DistantLight sun(scene, "/World/Sun");
+        sun.SetPhysicalIlluminant(std::string(tokens::kCustom))
+            .SetPhysicalCustomIlluminant(
+                std::vector<float>{250.0f, 1.0f, 800.0f, 1.0f});
+        RenderProductSetOutputs outputs = RenderStrip(kStrips / 2);
+        sun.SetPhysicalIlluminant(std::string(tokens::kSun));
+        const Tensor electrons =
+            Var(outputs, "/Render/Nac", "Electrons");
+        const Tensor radiance =
+            Var(outputs, "/Render/Nac", "SpectralRadiance");
+        const std::int64_t pixels =
+            std::int64_t(kStripLines) * nac_.Isd().samples;
+        const std::int64_t channels = electrons.Elements() / pixels;
+        const std::int64_t bands = radiance.Elements() / pixels;
+        const double ms =
+            1e3 * Camera(scene, "/World/Nac").GetExposureTime();
+        double dn = 0.0;
+        double light = 0.0;
+        for (std::int64_t p = 0; p < pixels; ++p) {
+            dn += double(electrons.As<float>()[p * channels]) /
+                  kNacElectronsPerDn / ms;
+            for (std::int64_t k = 0; k < bands; ++k) {
+                // W/m^2/sr/nm to /um.
+                light +=
+                    1e3 *
+                    double(radiance.As<float>()[k * pixels + p]) /
+                    double(bands);
+            }
+        }
+        std::printf("NAC: %.3f (DN/ms) / (W/m^2/sr/um)\n",
+                    dn / light);
+        Check(std::abs(dn / light / kNacResponsivity - 1.0) < 0.01,
+              "the NAC should read its published responsivity");
+    }
+
     IsdLineScanner nac_;
+    NacColumns columns_ = ReadNacColumns();
     CylindricalDem dtm_;
     CylindricalDem lola_;
     glm::dmat4 bodyToLocal_{1.0};

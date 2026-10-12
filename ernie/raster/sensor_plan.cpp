@@ -239,6 +239,28 @@ SensorPlan PlanSensor(std::span<const SensorFilterStep> chain,
                     static_cast<std::uint32_t>(plan.params.size());
                 for (const SensorFilterParam& param : model.params) {
                     const auto input = step.inputs.find(param.name);
+                    if (param.table) {
+                        // Where the table starts, then its values as
+                        // given, the last repeated to its size.
+                        const auto array =
+                            step.arrays.find(param.name);
+                        std::vector<float> values =
+                            array != step.arrays.end() ? array->second
+                            : input != step.inputs.end()
+                                ? std::vector<float>{input->second}
+                                : std::vector<float>{
+                                      param.defaultValue};
+                        if (values.empty()) {
+                            values.push_back(param.defaultValue);
+                        }
+                        values.resize(param.size, values.back());
+                        plan.params.push_back(static_cast<float>(
+                            plan.params.size() + 1));
+                        plan.params.insert(plan.params.end(),
+                                           values.begin(),
+                                           values.end());
+                        continue;
+                    }
                     if (param.size == 1) {
                         plan.params.push_back(
                             input != step.inputs.end()
@@ -467,7 +489,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             std::uint32_t offset = stage.firstParam;
             for (const SensorFilterParam& param :
                  stage.custom->params) {
-                if (param.size == 1) {
+                if (param.size == 1 || param.table) {
                     params += "    " + var + "." + param.name +
                               " = filterParams[" +
                               std::to_string(offset) + "];\n";
@@ -479,7 +501,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
                               std::to_string(offset) +
                               " + i];\n    }\n";
                 }
-                offset += param.size;
+                offset += param.table ? 1 + param.size : param.size;
             }
         }
         const std::string args = stage.custom ? ", " + var : "";

@@ -29,6 +29,7 @@ set(ernie_shaders
     film/filter_measured_qe.slang=kFilterMeasuredQeSlang
     film/filter_psf.slang=kFilterPsfSlang
     film/filter_readout_taps.slang=kFilterReadoutTapsSlang
+    film/filter_readout_table.slang=kFilterReadoutTableSlang
     film/filter_smear.slang=kFilterSmearSlang
     film/filter_spectral_transmission.slang=kFilterSpectralTransmissionSlang
     film/filter_stray_light.slang=kFilterStrayLightSlang

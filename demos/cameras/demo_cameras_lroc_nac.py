@@ -52,12 +52,35 @@ SUN_RADIUS = 6.957e8
 AU = 1.495978707e11
 SOLAR_CONSTANT = 1361.0
 
-# The NACs' focal ratio, gain, noise and full well (Robinson et al.
-# 2010, Table 2).
+# The NACs' focal ratio, gain, noise, full well and 7 um pixels
+# (Robinson et al. 2010, Table 2).
 NAC_F_NUMBER = 3.577
 NAC_ELECTRONS_PER_DN = 90.5
 NAC_READ_NOISE = 101.0
 NAC_FULL_WELL = 334000.0
+NAC_PIXEL_UM = 7.0
+
+# NAC-R's responsivity, (DN/ms) / (W/m^2/sr/um), and nonlinearity limit,
+# DN (ISIS lronaccal; Humm et al. 2016).
+NAC_RESPONSIVITY = 27.746
+NAC_NONLINEAR_LIMIT = 600.0
+
+
+def nac_qe():
+    """The flat QE over 400 to 760 nm that gives that responsivity
+    under a flat spectrum, the optics' losses in it."""
+    planck = 6.62607015e-34
+    light = 299792458.0
+    area = 1e-6 * NAC_PIXEL_UM * 1e-6 * NAC_PIXEL_UM
+    optics = math.pi / (4.0 * NAC_F_NUMBER * NAC_F_NUMBER)
+    return (
+        1e3
+        * NAC_RESPONSIVITY
+        * NAC_ELECTRONS_PER_DN
+        * planck
+        * light
+        / (1e6 * 360e-9 * optics * area * 580e-9)
+    )
 
 
 def nac_compand(x):
@@ -248,6 +271,19 @@ class Demo(ernie.demo.Demo):
     def __init__(self, viewer, args):
         super().__init__(viewer, args)
         scene = self.scene
+        # NAC-R's per-column readout (lroNacRCalibration.csv, from
+        # ISIS's calibration data).
+        table = np.loadtxt(
+            data_file("lroNacRCalibration.csv"),
+            delimiter=",",
+            skiprows=2,
+        )
+        self.columns = {
+            name: table[:, i].astype(np.float32).astype(np.float64)
+            for i, name in enumerate(
+                ("gain", "dark", "offset", "a", "b", "c")
+            )
+        }
         self.nac = ernie.IsdLineScanner.from_file(
             data_file("lroNacM1282557272RE.json")
         )
@@ -374,6 +410,7 @@ class Demo(ernie.demo.Demo):
         self.camera().sensor_noise = False
         self.check_strips_see_the_ground_where_the_isd_puts_it()
         self.check_readout()
+        self.check_responsivity()
         self.camera().sensor_noise = True
 
     # -------------------------------------------------------- helpers
@@ -389,15 +426,16 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             sensor_type="mono",
             sensor_qe_mono=[
-                390.0,
+                395.0,
                 0.0,
-                400.0,
-                0.6,
-                760.0,
-                0.6,
-                770.0,
-                0.0,
-            ],
+                405.0,
+                nac_qe(),
+                755.0,
+                nac_qe(),
+            ]
+            + [765.0, 0.0],
+            spectral_range=(390.0, 770.0),
+            spectral_bands=8,
             exposure_f_stop=NAC_F_NUMBER,
             exposure_iso=100.0,  # the gain is the ADC's
             sensor_electrons_per_dn=NAC_ELECTRONS_PER_DN,
@@ -409,7 +447,13 @@ class Demo(ernie.demo.Demo):
         )
         self.use_strip(0, False)
         paths = []
-        for var in ("RawDN", "Electrons", "PrimId", "LdrColor"):
+        for var in (
+            "RawDN",
+            "Electrons",
+            "PrimId",
+            "LdrColor",
+            "SpectralRadiance",
+        ):
             self.scene.define(
                 f"/Render/Nac/{var}", ernie.RenderVar, source_name=var
             )
@@ -418,7 +462,7 @@ class Demo(ernie.demo.Demo):
             "qe",
             "noise",
             "adc",
-            "readoutTaps",
+            "readoutTable",
             "compandTable",
             "cie",
             "exposure",
@@ -431,7 +475,11 @@ class Demo(ernie.demo.Demo):
             )
             for i, kind in enumerate(types)
         ]
-        filters[3].set("inputs:taps", 2.0)
+        for name in ("gain", "dark", "offset", "a", "b", "c"):
+            filters[3].set(
+                f"inputs:{name}", self.columns[name].tolist()
+            )
+        filters[3].set("inputs:limit", NAC_NONLINEAR_LIMIT)
         self.scene.define(
             "/Render/Nac",
             ernie.RenderProduct,
@@ -470,7 +518,12 @@ class Demo(ernie.demo.Demo):
             name: np.asarray(
                 frame.render_vars[f"/Render/Nac/{name}"].map()
             )
-            for name in ("RawDN", "Electrons", "PrimId")
+            for name in (
+                "RawDN",
+                "Electrons",
+                "PrimId",
+                "SpectralRadiance",
+            )
         }
 
     def strip_image(self):
@@ -553,29 +606,95 @@ class Demo(ernie.demo.Demo):
                 and abs(centre[1] - s) < 1.0
             ), "a marker should land on its pixel"
 
-    def check_readout(self):
-        """Every 8-bit number is the companding table's of its
-        electrons, and the daylit ground sits within the ADC's range."""
-        out = self.render_strip(STRIPS // 2)
-        electrons = np.minimum(
-            out["Electrons"].ravel(), NAC_FULL_WELL
+    def measured(self, electrons):
+        """The 12-bit numbers a strip's columns read for `electrons`
+        (lines, samples): flatfield, nonlinearity (bisection), offset
+        and dark."""
+        k = self.columns
+        gain = np.where(k["gain"] > 0.0, k["gain"], 1.0)
+        lin = (
+            np.floor(
+                np.minimum(electrons, NAC_FULL_WELL)
+                / NAC_ELECTRONS_PER_DN
+                + 0.5
+            )
+            * gain
         )
-        raw = out["RawDN"].ravel()
 
-        def code(e, scale):
-            twelve = math.floor(
-                e * scale / NAC_ELECTRONS_PER_DN + 0.5
+        def h(y):
+            return 1.0 / np.maximum(
+                k["a"] * np.power(k["b"], y) + k["c"], 1e-6
             )
-            return nac_compand(min(max(twelve, 0), 4095))
 
-        for e, dn in zip(electrons.tolist(), raw.tolist()):
-            assert dn in (code(e, 1 - 1e-6), code(e, 1 + 1e-6)), (
-                "the NAC should send its table's 8-bit numbers"
+        lo, hi = lin, lin + h(lin)
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            below = mid - h(mid) < lin
+            lo, hi = (
+                np.where(below, mid, lo),
+                np.where(below, hi, mid),
             )
+        y = 0.5 * (lo + hi)
+        return (
+            np.where(y < NAC_NONLINEAR_LIMIT, y, lin)
+            - k["offset"]
+            + k["dark"]
+        )
+
+    def check_readout(self):
+        """Every 8-bit number is the companding table's of its column's
+        readout, and the daylit ground sits within the ADC's range."""
+        out = self.render_strip(STRIPS // 2)
+        samples = self.nac.samples
+        electrons = out["Electrons"].reshape(
+            STRIP_LINES, samples, -1
+        )[..., 0]
+        raw = out["RawDN"].reshape(STRIP_LINES, samples, -1)[..., 0]
+        twelve = np.clip(
+            np.floor(self.measured(electrons) + 0.5), 0, 4095
+        )
+        expected = np.vectorize(nac_compand)(twelve)
+        off = int(np.count_nonzero(np.abs(raw - expected) > 1.0))
         within = int(np.count_nonzero((raw > 0) & (raw < 255)))
-        print(f"NAC: {within} of {raw.size} numbers within the range")
-        assert within > raw.size // 8, (
+        print(
+            f"NAC: {within} of {raw.size} numbers within the range, "
+            f"{off} off the readout"
+        )
+        assert off < raw.size // 1000, (
+            "the NAC should send its columns' readout, companded"
+        )
+        assert within > raw.size // 2, (
             "the daylit ground should be exposed within the range"
+        )
+
+    def check_responsivity(self):
+        """Under a flat spectrum the electrons, as DN per ms, are 27.746
+        times the radiance: NAC-R's responsivity."""
+        sun = ernie.DistantLight.at(self.scene, "/World/Sun")
+        sun.set(
+            physical_illuminant=tokens.CUSTOM,
+            physical_custom_illuminant=[250.0, 1.0, 800.0, 1.0],
+        )
+        out = self.render_strip(STRIPS // 2)
+        sun.physical_illuminant = tokens.SUN
+        pixels = STRIP_LINES * self.nac.samples
+        electrons = out["Electrons"].reshape(pixels, -1)[:, 0]
+        radiance = out["SpectralRadiance"].reshape(-1, pixels)
+        ms = 1e3 * self.camera().exposure_time
+        dn = (
+            float(np.sum(electrons, dtype=np.float64))
+            / NAC_ELECTRONS_PER_DN
+            / ms
+        )
+        # W/m^2/sr/nm to /um.
+        light = (
+            1e3
+            * float(np.sum(radiance, dtype=np.float64))
+            / radiance.shape[0]
+        )
+        print(f"NAC: {dn / light:.3f} (DN/ms) / (W/m^2/sr/um)")
+        assert abs(dn / light / NAC_RESPONSIVITY - 1.0) < 0.01, (
+            "the NAC should read its published responsivity"
         )
 
 

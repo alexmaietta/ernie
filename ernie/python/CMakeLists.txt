@@ -89,6 +89,7 @@ file(
     "${PROJECT_SOURCE_DIR}/demos/*/*.py")
 set(ernie_demo_data
     "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroNacM1282557272RE.json"
+    "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroNacRCalibration.csv"
     "${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd/lroWacPushFrame.json"
 )
 foreach(source ernie/demos/__init__.py ernie/demos/__main__.py)

@@ -14,3 +14,4 @@ Image support data (ISD) fixtures from usgscsm's test data (https://github.com/D
 Generated here:
 
 - `lroNacM1282557272RE.json`: Lunar Reconnaissance Orbiter's Narrow Angle Camera (NAC, right), image M1282557272RE (2018-06-02, unsummed, 5064 x 25600) over Tycho's central peak. Made with ISIS (`lronac2isis`, `spiceinit web=true shape=ellipsoid`, the pointing from the USGS SPICE web service) and ALE 1.2.0's `isd_generate`, from the EDR in the PDS LROC archive (https://pds.lroc.im-ldi.com/data/LRO-L-LROC-2-EDR-V1.0/LROLRC_0035/DATA/ESM3/2018153/NAC/M1282557272RE.IMG).
+- `lroNacRCalibration.csv`: NAC-R's per-column flatfield, dark, linearization offset and nonlinearity coefficients (a, b, c), from ISIS's LRO calibration data (`NACR_Flatfield.0006`, `NACR_AverageDarks.0006`, `NACR_LinearizationOffsets.0006`, `NACR_LinearizationCoefficients.0007`, which `lronaccal` reads; Humm et al. 2016), via `downloadIsisData lro --include="calibration/**"`.

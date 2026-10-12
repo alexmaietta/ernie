@@ -142,7 +142,14 @@ void SensorFilterRegistry::Add(SensorFilterModel model) {
             throw std::invalid_argument(what + ": parameter '" +
                                         param.name + "' has size 0");
         }
-        floats += param.size;
+        if (param.table && param.size > kMaxTableFloats) {
+            throw std::invalid_argument(
+                what + ": table '" + param.name +
+                "' holds more than " +
+                std::to_string(kMaxTableFloats) + " floats");
+        }
+        // A table stays in the buffer; its field holds where.
+        floats += param.table ? 1 : param.size;
     }
     if (floats > kMaxParamFloats) {
         throw std::invalid_argument(
@@ -243,6 +250,9 @@ std::vector<float> IdentityCompandUppers() {
     }
     return uppers;
 }
+
+// Detectors readoutTable's tables hold: a line scanner's columns.
+constexpr std::uint32_t kReadoutDetectors = 8192;
 
 }  // namespace
 
@@ -654,6 +664,56 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
           {"gain3", 1.0f, "Tap 3's gain"}},
          "ReadoutTaps",
          shaders::kFilterReadoutTapsSlang},
+        {"readoutTable",
+         "Readout table",
+         "A line scanner's measured readout per detector: flatfield "
+         "gain, a low-signal nonlinearity y - 1 / (a b^y + c) = x "
+         "below a limit, and offset and dark numbers. After adc.",
+         {"D. C. Humm et al., \"Flight Calibration of the LROC "
+          "Narrow Angle Camera\", Space "
+          "Science Reviews 200, 2016"},
+         Kind::Pixel,
+         Domain::Digital,
+         {{"gain",
+           1.0f,
+           "Each detector's flatfield gain (0: none)",
+           kReadoutDetectors,
+           {},
+           true},
+          {"dark",
+           0.0f,
+           "Each detector's dark number, DN",
+           kReadoutDetectors,
+           {},
+           true},
+          {"offset",
+           0.0f,
+           "Each detector's linearization offset, DN",
+           kReadoutDetectors,
+           {},
+           true},
+          {"a",
+           1.0f,
+           "Each detector's nonlinearity a",
+           kReadoutDetectors,
+           {},
+           true},
+          {"b",
+           1.0f,
+           "Each detector's nonlinearity b",
+           kReadoutDetectors,
+           {},
+           true},
+          {"c",
+           0.0f,
+           "Each detector's nonlinearity c",
+           kReadoutDetectors,
+           {},
+           true},
+          {"limit", 0.0f,
+           "DN below which the nonlinearity applies; 0 for none"}},
+         "ReadoutTable",
+         shaders::kFilterReadoutTableSlang},
         {"tdi",
          "Time delay integration",
          "A TDI line scanner's stages summed along the track, each "
