@@ -1224,6 +1224,10 @@ class RasterRenderer {
     std::unique_ptr<ComputePipeline> depthRangePipeline_;
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
         depthRanges_;
+    /// Where the depth range reduces on the device before its copy to
+    /// the slot's `depthRanges_`: atomics on host memory would cross
+    /// the bus once per wave.
+    std::unique_ptr<GpuBuffer> depthRangeSums_;
     std::array<DepthSample, FrameUploads::kSlots> depthSlots_;
     std::map<std::uint32_t, DepthSample>
         seenDepths_;             ///< The latest read, by stream.
@@ -1247,6 +1251,9 @@ class RasterRenderer {
     GpuBuffer unheldVar_;
     std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
         meterBins_;
+    /// The meter's histogram summed on the device, then copied to the
+    /// slot's `meterBins_` (as `depthRangeSums_`).
+    std::unique_ptr<GpuBuffer> meterSums_;
     std::array<bool, FrameUploads::kSlots> metered_{};
     std::optional<double> meteredLuminance_;
     /// The key each slot's frame metered under, the next frame's, and

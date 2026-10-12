@@ -1003,6 +1003,18 @@ void ShaderBarrier(VkCommandBuffer commands) {
     vkCmdPipelineBarrier2(commands, &dependency);
 }
 
+/// Copies `from`, which compute just wrote on the device, into `to`
+/// for the host to read once the frame is done. Results reduced with
+/// atomics belong in device memory: on host memory each atomic
+/// crosses the bus.
+void CopyForHost(VkCommandBuffer commands, const GpuBuffer& from,
+                 const GpuBuffer& to) {
+    ShaderBarrier(commands);
+    const VkBufferCopy region{0, 0, std::min(from.Size(), to.Size())};
+    vkCmdCopyBuffer(commands, from.Handle(), to.Handle(), 1, &region);
+    ShaderBarrier(commands);
+}
+
 /// The integral of the CIE y function over 360-830 nm, in nm, by
 /// midpoints of 1 nm steps as light spectra are scaled
 /// (`RelativeSpectrum`).
@@ -1470,6 +1482,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             BufferMemory::Readback);
     }
+    depthRangeSums_ = std::make_unique<GpuBuffer>(
+        context_, 2 * sizeof(std::uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     const std::vector<ShaderModuleSource> meterModules{
         {"meter", shaders::kMeterSlang}};
     meterPipeline_ = std::make_unique<ComputePipeline>(
@@ -1482,6 +1497,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             BufferMemory::Readback);
     }
+    meterSums_ = std::make_unique<GpuBuffer>(
+        context_, kMeterBins * sizeof(std::uint32_t),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
 }
 
 RasterRenderer::~RasterRenderer() {
@@ -4455,7 +4473,7 @@ void RasterRenderer::RecordMinimal(
 void RasterRenderer::RecordDepthRange(VkCommandBuffer commands,
                                       RenderTargets& targets) const {
     ERNIE_GPU_ZONE(context_, commands, "Depth range");
-    const GpuBuffer& range = *depthRanges_[uploads_.Slot()];
+    const GpuBuffer& range = *depthRangeSums_;
     // Nearest starts at the largest float, farthest at 0.
     vkCmdFillBuffer(commands, range.Handle(), 0,
                     sizeof(std::uint32_t), 0x7F7FFFFFu);
@@ -4482,7 +4500,7 @@ void RasterRenderer::RecordDepthRange(VkCommandBuffer commands,
     // A cube camera's view 0 is its faces' first layers.
     vkCmdDispatch(commands, (extent_.width + 15) / 16,
                   (extent_.height + 15) / 16, faces_);
-    ShaderBarrier(commands);
+    CopyForHost(commands, range, *depthRanges_[uploads_.Slot()]);
 }
 
 void RasterRenderer::RecordMeter(VkCommandBuffer commands,
@@ -4492,7 +4510,7 @@ void RasterRenderer::RecordMeter(VkCommandBuffer commands,
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Exposure meter");
-    const GpuBuffer& bins = *meterBins_[uploads_.Slot()];
+    const GpuBuffer& bins = *meterSums_;
     vkCmdFillBuffer(commands, bins.Handle(), 0, VK_WHOLE_SIZE, 0u);
     hdr->Transition(commands,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -4513,6 +4531,7 @@ void RasterRenderer::RecordMeter(VkCommandBuffer commands,
                                sizeof(constants));
     vkCmdDispatch(commands, (extent_.width + 15) / 16,
                   (extent_.height + 15) / 16, 1);
+    CopyForHost(commands, bins, *meterBins_[uploads_.Slot()]);
     hdr->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
 }
 
