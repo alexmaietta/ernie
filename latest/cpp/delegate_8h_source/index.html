@@ -218,6 +218,7 @@
 #include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;cstdint&gt;
+#include &lt;functional&gt;
 #include &lt;map&gt;
 #include &lt;memory&gt;
 #include &lt;optional&gt;
@@ -244,6 +245,18 @@ struct RenderStats {
         0;  
     std::vector&lt;std::pair&lt;std::string, std::uint64_t&gt;&gt; counters;
 };
+
+struct MeshWriteTarget {
+    VkDeviceAddress points = 0;
+    VkDeviceAddress normals = 0;
+    VkDeviceAddress indices = 0;
+    VkDeviceAddress counts = 0;
+    std::uint32_t pointCapacity = 0;
+    std::uint32_t triangleCapacity = 0;
+};
+
+using MeshWriter =
+    std::function&lt;void(VkCommandBuffer, const MeshWriteTarget&amp;)&gt;;
 
 struct FrameId {
     std::uint64_t frame = 0;
@@ -289,6 +302,9 @@ class RenderDelegate {
                             std::string_view attribute,
                             std::uintptr_t stream = 1);
 
+    virtual void SetMeshWriter(const Path&amp; path, MeshWriter writer,
+                               std::optional&lt;Bounds3&gt; bounds = {});
+
     virtual std::vector&lt;std::string&gt; ViewVars() const {
         return Info().viewVars;
     }
@@ -315,6 +331,10 @@ class RenderDelegate {
 
     virtual std::optional&lt;double&gt; MeteredLuminance() const {
         return std::nullopt;
+    }
+
+    virtual void SetViewportAutoExposure(std::optional&lt;float&gt; blend) {
+        static_cast&lt;void&gt;(blend);
     }
 
     virtual void SetViewBand(int band) {

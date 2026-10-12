@@ -361,9 +361,9 @@ StarFieldParams StarFieldParamsOf(const Scene&amp; scene,
 
 double AtmospherePresetRadius(std::string_view preset);
 
-AtmosphereParams AtmosphereParamsOf(const Scene&amp; scene,
-                                    const Path&amp; path,
-                                    const Path&amp; terrain);
+AtmosphereParams AtmosphereParamsOf(
+    const Scene&amp; scene, const Path&amp; path, const Path&amp; terrain,
+    const std::optional&lt;glm::dvec3&gt;&amp; eye = std::nullopt);
 
 struct PlanetSphere {
     glm::dvec3 centre{0.0};

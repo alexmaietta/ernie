@@ -238,11 +238,19 @@
 <tbody>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1DenseField/"><strong>DenseField</strong></a> <br><em>Ernie's field of a dense array of values, such as a grid solver's smoke or dust each step (Warp's arrays): sampled as a NanoVDB grid of every voxel, which a device array fills in place on the GPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1FieldAsset/"><strong>FieldAsset</strong></a> <br><em>A field read from a file (UsdVol's</em> <a href="../classernie_1_1FieldAsset/"><em><strong>FieldAsset</strong></em></a> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1FieldBase/"><strong>FieldBase</strong></a> <br><em>A field of values over space, which Volumes name; its transform places the field in its</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(UsdVol's</em><a href="../classernie_1_1FieldBase/"><em><strong>FieldBase</strong></em></a> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1NanoVDBField/"><strong>NanoVDBField</strong></a> <br><em>Ernie's field of NanoVDB grids written as an array instead of a file, such as a simulation's each step (Warp's</em> <code>Volume.array()</code> <em>): one of its grids, read as an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -265,6 +273,14 @@
 <tbody>
 <tr>
 <td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_dense_field_all"><strong>ERNIE_DENSE_FIELD_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_DENSE\_FIELD\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_dense_field_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_dense_field_attributes"><strong>ERNIE_DENSE_FIELD_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_field_asset_all"><strong>ERNIE_FIELD_ASSET_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_FIELD\_ASSET\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_field_asset_attributes)(X)</code><br></td>
 </tr>
 <tr>
@@ -278,6 +294,14 @@
 <tr>
 <td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_field_base_attributes"><strong>ERNIE_FIELD_BASE_ATTRIBUTES</strong></a> (X) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_nanovdb_field_all"><strong>ERNIE_NANOVDB_FIELD_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_NANOVDB\_FIELD\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_nanovdb_field_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_nanovdb_field_attributes"><strong>ERNIE_NANOVDB_FIELD_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -298,6 +322,20 @@
 </tbody>
 </table>
 <h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
+<h3 id="define-ernie_dense_field_all">define ERNIE_DENSE_FIELD_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_DENSE_FIELD_ALL (
+    X
+) `ERNIE_FIELD_BASE_ALL (X) ERNIE_DENSE_FIELD_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_dense_field_attributes">define ERNIE_DENSE_FIELD_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_DENSE_FIELD_ATTRIBUTES (
+    X
+) `/* multi line expression */`
+</code></pre>
+<hr>
+
 <h3 id="define-ernie_field_asset_all">define ERNIE_FIELD_ASSET_ALL</h3>
 <pre><code class="language-C++">#define ERNIE_FIELD_ASSET_ALL (
     X
@@ -326,6 +364,20 @@
 <pre><code class="language-C++">#define ERNIE_FIELD_BASE_ATTRIBUTES (
     X
 ) 
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_nanovdb_field_all">define ERNIE_NANOVDB_FIELD_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_NANOVDB_FIELD_ALL (
+    X
+) `ERNIE_FIELD_BASE_ALL (X) ERNIE_NANOVDB_FIELD_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_nanovdb_field_attributes">define ERNIE_NANOVDB_FIELD_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_NANOVDB_FIELD_ATTRIBUTES (
+    X
+) `/* multi line expression */`
 </code></pre>
 <hr>
 

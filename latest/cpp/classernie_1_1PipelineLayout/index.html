@@ -203,7 +203,7 @@
               
                 <h1 id="class-erniepipelinelayout">Class ernie::PipelineLayout</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>PipelineLayout</strong></a></p>
-<p><em>A pipeline layout with one push-descriptor set and an optional push-constant block shared by all stages.</em> <a href="#detailed-description">More...</a></p>
+<p><em>A pipeline layout with one push-descriptor set (set 0), the device's bindless heap (set 1,</em> <code>BindlessHeap</code> <em>) and an optional push-constant block shared by all stages.</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/device/pipeline.h&gt;</code></li>
 </ul>
@@ -247,7 +247,7 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Every pass binds its resources by pushing descriptors when it records, so there are no descriptor pools or sets to manage. </p>
+<p>Every pass binds its per-dispatch resources (render targets, storage images, a uniform block) by pushing descriptors when it records; its long-lived textures are heap indices and its buffers addresses (<code>GpuBuffer::Address</code>), so no pass needs descriptor pools of its own, and no more than a few push bindings. </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-handle">function Handle</h3>
 <pre><code class="language-C++">inline VkPipelineLayout ernie::PipelineLayout::Handle () const

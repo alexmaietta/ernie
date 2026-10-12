@@ -5023,6 +5023,14 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
       <td class="field-body">
         <ul class="first simple">
             <li>
+              <b><code>active_counts</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>int32 (2,): the points and triangles in use, first, of those the points and triangle indices</p>
+              </div>
+            </li>
+            <li>
               <b><code>define</code></b>
                   (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._MeshDefine">_MeshDefine</span>]</code>)
               –
@@ -5069,6 +5077,31 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.active_counts" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">active_counts</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">active_counts: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>int32 (2,): the points and triangles in use, first, of those the points and triangle indices
+hold, for topology that changes on the GPU within their capacity; read on the GPU, the rest
+neither drawn nor bounded. USD name <code>ernie:activeCounts</code>.</p>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-attribute">
 
@@ -5183,6 +5216,7 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
     face_vertex_counts: Any = ...,
     face_vertex_indices: Any = ...,
     normals: Any = ...,
+    active_counts: Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -6425,6 +6459,14 @@ six cube faces.</p>
               </div>
             </li>
             <li>
+              <b><code>finest_cell</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>World units. A planet's LOD refines below its heights' quads, bilinear between them, down to</p>
+              </div>
+            </li>
+            <li>
               <b><code>heights</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
               –
@@ -6462,6 +6504,14 @@ six cube faces.</p>
               –
               <div class="doc-md-description">
                 <p>World x and y of the north-west corner Default (0.0, 0.0). USD name <code>ernie:origin</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>planet_radii</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>World units. Set, the Terrain is a planet on the ellipsoid of these semi-axes along its x, y</p>
               </div>
             </li>
             <li>
@@ -6575,6 +6625,30 @@ unlit. Default 'shaded'. USD name <code>ernie:colorMode</code>.</p>
     <div class="doc doc-contents ">
 
         <p>Scales the heights as drawn. Default 1.0. USD name <code>ernie:exaggeration</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.finest_cell" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">finest_cell</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">finest_cell: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>World units. A planet's LOD refines below its heights' quads, bilinear between them, down to
+quads about this size; 0 stops at the heights'. Default 1.0. USD name <code>ernie:finestCell</code>.</p>
 
     </div>
 
@@ -6703,6 +6777,31 @@ default 315, from the north-west. Default 315.0. USD name <code>ernie:hillshade:
 
 
 
+<h3 id="ernie.schema.Terrain.planet_radii" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">planet_radii</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">planet_radii: tuple[float, float, float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>World units. Set, the Terrain is a planet on the ellipsoid of these semi-axes along its x, y
+and z (oblate as a, a, c; triaxial too), heights rising along its normals; overrides the
+radius. Default (0.0, 0.0, 0.0). USD name <code>ernie:radii</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Terrain.planet_radius" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">planet_radius</span>
 
@@ -6752,6 +6851,8 @@ size do not apply. Default 0.0. USD name <code>ernie:radius</code>.</p>
     hillshade_altitude: float = ...,
     no_data: float = ...,
     planet_radius: float = ...,
+    planet_radii: Sequence[float] = ...,
+    finest_cell: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -6940,6 +7041,54 @@ size do not apply. Default 0.0. USD name <code>ernie:radius</code>.</p>
               –
               <div class="doc-md-description">
                 <p>Fraction of the light linearly polarized, 0 to 1. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_decay</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Seconds its level takes to fall by e over a pulse, as a xenon flash's; 0 flat. Default 0.0.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_delay</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>When a pulse starts, seconds on the sensor clock or after the exposure opens. Default 0.0.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_jitter</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each pulse starts up to this many seconds early or late. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_rate</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Pulses per second; 0 continuous. Domes ignore it. Default 0.0. USD name <code>ernie:pulse:rate</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_trigger</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The sensor clock, or the camera's exposure: one pulse a frame, its delay after the exposure</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pulse_width</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each pulse's length, seconds. Default 0.0. USD name <code>ernie:pulse:width</code>.</p>
               </div>
             </li>
             <li>
@@ -7310,6 +7459,148 @@ if the temperature is used, else flat, over the whole range. USD name <code>phys
 
 
 
+<h3 id="ernie.schema.Light.pulse_decay" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_decay</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_decay: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Seconds its level takes to fall by e over a pulse, as a xenon flash's; 0 flat. Default 0.0.
+USD name <code>ernie:pulse:decay</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.pulse_delay" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_delay</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_delay: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>When a pulse starts, seconds on the sensor clock or after the exposure opens. Default 0.0.
+USD name <code>ernie:pulse:delay</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.pulse_jitter" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_jitter</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_jitter: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each pulse starts up to this many seconds early or late. Default 0.0. USD name
+<code>ernie:pulse:jitter</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.pulse_rate" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_rate</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_rate: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Pulses per second; 0 continuous. Domes ignore it. Default 0.0. USD name <code>ernie:pulse:rate</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.pulse_trigger" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_trigger</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_trigger: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sensor clock, or the camera's exposure: one pulse a frame, its delay after the exposure
+opens. Default 'clock'. USD name <code>ernie:pulse:trigger</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Light.pulse_width" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pulse_width</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pulse_width: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each pulse's length, seconds. Default 0.0. USD name <code>ernie:pulse:width</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Light.shadow_enable" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_enable</span>
 
@@ -7469,6 +7760,12 @@ nm^-1 for a sphere, W m^-2 sr^-1 nm^-1 for a rect, disk or dome. USD name <code>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -7907,6 +8204,12 @@ intensity. Default False. USD name <code>inputs:shaping:ies:normalize</code>.</p
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -8100,6 +8403,12 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -8344,6 +8653,12 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -8622,6 +8937,12 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -8932,6 +9253,12 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -9187,6 +9514,12 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -9409,6 +9742,12 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
     | Prim
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
+    pulse_rate: float = ...,
+    pulse_width: float = ...,
+    pulse_delay: float = ...,
+    pulse_decay: float = ...,
+    pulse_jitter: float = ...,
+    pulse_trigger: str = ...,
     normalize: bool = ...,
     physical_illuminant: str = ...,
     physical_custom_illuminant: float | Sequence[float] = ...,
@@ -12126,6 +12465,30 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>octave_attenuation</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each order's scattering, of the one before's (a); at most the octave extinction, to conserve</p>
+              </div>
+            </li>
+            <li>
+              <b><code>octave_extinction</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each order's extinction towards the light, of the one before's (b): light that scattered</p>
+              </div>
+            </li>
+            <li>
+              <b><code>octave_phase</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each order's anisotropy, of the one before's (c): light that scattered many times spreads</p>
+              </div>
+            </li>
+            <li>
               <b><code>phase_function</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -12155,6 +12518,22 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 <p>A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 um and on into the thermal</p>
+              </div>
+            </li>
+            <li>
+              <b><code>scattering_octaves</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Orders of scattering approximated, after Wrenninge et al. (2013): 1 is single scattering;</p>
+              </div>
+            </li>
+            <li>
+              <b><code>sky_light</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Scales the light of the sky and the ground around the medium, from the atmosphere's distant</p>
               </div>
             </li>
             <li>
@@ -12824,6 +13203,78 @@ then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
 
 
 
+<h3 id="ernie.schema.Material.octave_attenuation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">octave_attenuation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">octave_attenuation: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each order's scattering, of the one before's (a); at most the octave extinction, to conserve
+energy. Default 0.5. USD name <code>inputs:octaveAttenuation</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.octave_extinction" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">octave_extinction</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">octave_extinction: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each order's extinction towards the light, of the one before's (b): light that scattered
+many times gets deeper. Default 0.5. USD name <code>inputs:octaveExtinction</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.octave_phase" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">octave_phase</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">octave_phase: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each order's anisotropy, of the one before's (c): light that scattered many times spreads
+more evenly. Default 0.5. USD name <code>inputs:octavePhase</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.phase_function" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">phase_function</span>
 
@@ -12914,6 +13365,55 @@ replacing the albedo; the nearest value outside them. USD name <code>inputs:refl
         <p>A measured spectrum Ernie embeds (ECOSTRESS), 0.35 to 2.5 um and on into the thermal
 infrared, replacing the albedo unless a reflectance is given. USD name
 <code>inputs:reflectanceLibrary</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.scattering_octaves" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">scattering_octaves</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">scattering_octaves: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Orders of scattering approximated, after Wrenninge et al. (2013): 1 is single scattering;
+dense media such as clouds want 4 to 8, which brighten their insides as light that scattered
+many times does. Default 1. USD name <code>inputs:scatteringOctaves</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.sky_light" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sky_light</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sky_light: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Scales the light of the sky and the ground around the medium, from the atmosphere's distant
+lights; 1 is physical, 0 none. Default 1.0. USD name <code>inputs:skyLight</code>.</p>
 
     </div>
 
@@ -13057,6 +13557,11 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
     volume_albedo: Sequence[float] = ...,
     phase_function: str = ...,
     anisotropy: float = ...,
+    scattering_octaves: int = ...,
+    octave_attenuation: float = ...,
+    octave_extinction: float = ...,
+    octave_phase: float = ...,
+    sky_light: float = ...,
     emission_color: Sequence[float] = ...,
     emission_strength: float = ...,
     emission_field: str = ...,
@@ -14129,8 +14634,8 @@ the settings' camera, else the scene's first. USD name <code>camera</code>.</p>
     <div class="doc doc-contents ">
 
         <p>Minimal shading for throughput: no colour ("none"), one colour or surfaces' diffuse colours,
-lit by the sun and ambient, without sensor filters. Default 'off'. USD name
-<code>ernie:minimal:mode</code>.</p>
+lit by the sun and ambient, with glossy highlights and emission or not, without sensor
+filters. Default 'off'. USD name <code>ernie:minimal:mode</code>.</p>
 
     </div>
 
@@ -14464,7 +14969,7 @@ name <code>resolution</code>.</p>
                   (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>visible: sample distribution shadow maps (the viewport's default). Default 'scene'. USD name</p>
+                <p>scene: the casters' bounds, an image the same every time; visible: sample distribution</p>
               </div>
             </li>
             <li>
@@ -14537,6 +15042,62 @@ name <code>resolution</code>.</p>
               –
               <div class="doc-md-description">
                 <p>Batches of views of several worlds: a map per world, one of what they share, or one of every</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_air_steps</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Steps through the atmosphere in front of the volumes; 0 leaves volumes the air of what is</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_max_octaves</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Orders of multiple scattering any material approximates, at most. Default 8. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_max_steps</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Steps through one volume, at most. Default 256. USD name <code>ernie:volumes:maxSteps</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_shadow_resolution</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Texels along each side of the volumes' shadow map of each light shadow view, which surfaces</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_shadow_steps</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Steps towards each light through each volume on the way. Default 12. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_sky_light_steps</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Steps up and down through the volumes for how much of the sky's and the ground's light they</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_steps_per_voxel</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 2.0. USD</p>
               </div>
             </li>
             <li>
@@ -15076,7 +15637,8 @@ frame (twoPass). Default 'off'. USD name <code>ernie:occlusion</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>visible: sample distribution shadow maps (the viewport's default). Default 'scene'. USD name
+        <p>scene: the casters' bounds, an image the same every time; visible: sample distribution
+shadow maps, from the depths a recent frame saw. Default 'scene'. USD name
 <code>ernie:shadows:fit</code>.</p>
 
     </div>
@@ -15297,6 +15859,173 @@ world's casters. Default 'separate'. USD name <code>ernie:shadows:worlds</code>.
 
 
 
+<h3 id="ernie.schema.RenderSettings.volume_air_steps" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_air_steps</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_air_steps: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps through the atmosphere in front of the volumes; 0 leaves volumes the air of what is
+behind them. Default 32. USD name <code>ernie:volumes:airSteps</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_max_octaves" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_max_octaves</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_max_octaves: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Orders of multiple scattering any material approximates, at most. Default 8. USD name
+<code>ernie:volumes:maxOctaves</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_max_steps" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_max_steps</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_max_steps: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps through one volume, at most. Default 256. USD name <code>ernie:volumes:maxSteps</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_shadow_resolution" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_shadow_resolution</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_shadow_resolution: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Texels along each side of the volumes' shadow map of each light shadow view, which surfaces
+read. Default 256. USD name <code>ernie:volumes:shadowResolution</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_shadow_steps" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_shadow_steps</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_shadow_steps: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps towards each light through each volume on the way. Default 12. USD name
+<code>ernie:volumes:shadowSteps</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_sky_light_steps" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_sky_light_steps</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_sky_light_steps: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps up and down through the volumes for how much of the sky's and the ground's light they
+let through; 0, all. Default 6. USD name <code>ernie:volumes:skyLightSteps</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_steps_per_voxel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_steps_per_voxel</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_steps_per_voxel: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 2.0. USD
+name <code>ernie:volumes:stepsPerVoxel</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.RenderSettings.wireframe" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">wireframe</span>
 
@@ -15367,6 +16096,13 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     shadow_world_fit: str = ...,
     shadow_world_resolution: int = ...,
     shadow_world_margin: float = ...,
+    volume_steps_per_voxel: float = ...,
+    volume_max_steps: int = ...,
+    volume_shadow_steps: int = ...,
+    volume_sky_light_steps: int = ...,
+    volume_air_steps: int = ...,
+    volume_max_octaves: int = ...,
+    volume_shadow_resolution: int = ...,
     dome_light_mode: str = ...,
     dome_shadow_radius: float = ...,
     dome_directions: int = ...,

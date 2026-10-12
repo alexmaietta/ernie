@@ -218,7 +218,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::uint8_t &gt;</td>
-<td style="text-align: left;"><a href="#variable-buffer"><strong>buffer</strong></a>  <br><em>The grid itself, from its GridData header on, padded to a multiple of 4 bytes.</em></td>
+<td style="text-align: left;"><a href="#variable-buffer"><strong>buffer</strong></a>  <br><em>The grid itself, from its GridData header on, padded to a multiple of 8 bytes; empty when only its head was read (</em> <code>NanoVdbGridHead</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -247,6 +247,10 @@
 <tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-name"><strong>name</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-size"><strong>size</strong></a>   = <code>0</code><br><em>The grid's bytes, as its header gives them.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-nanovdbtype"><strong>NanoVdbType</strong></a></td>
@@ -295,7 +299,7 @@
 * NanoVDB's file layout, nanovdb/io/IO.h and FileMetaData in nanovdb/NanoVDB.h, OpenVDB 13.0.0. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-buffer">variable buffer</h3>
-<p><em>The grid itself, from its GridData header on, padded to a multiple of 4 bytes.</em> </p>
+<p><em>The grid itself, from its GridData header on, padded to a multiple of 8 bytes; empty when only its head was read (</em> <code>NanoVdbGridHead</code> <em>).</em></p>
 <pre><code class="language-C++">std::vector&lt;std::uint8_t&gt; ernie::NanoVdbGrid::buffer;
 </code></pre>
 <hr>
@@ -336,6 +340,12 @@
 
 <h3 id="variable-name">variable name</h3>
 <pre><code class="language-C++">std::string ernie::NanoVdbGrid::name;
+</code></pre>
+<hr>
+
+<h3 id="variable-size">variable size</h3>
+<p><em>The grid's bytes, as its header gives them.</em> </p>
+<pre><code class="language-C++">std::uint64_t ernie::NanoVdbGrid::size;
 </code></pre>
 <hr>
 

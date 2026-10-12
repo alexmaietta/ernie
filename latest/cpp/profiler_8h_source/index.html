@@ -209,6 +209,7 @@
 
 #include &lt;cstdint&gt;
 #include &lt;string&gt;
+#include &lt;string_view&gt;
 #include &lt;vector&gt;
 
 namespace ernie::profiler {
@@ -229,6 +230,8 @@ struct Frame {
     std::vector&lt;Zone&gt; cpu;
     std::vector&lt;Zone&gt; gpu;
 };
+
+inline constexpr std::size_t kFramesInFlight = 2;
 
 void SetEnabled(bool enabled);
 bool Enabled();
@@ -252,6 +255,8 @@ void Clear();
 std::uint32_t ThreadIndex();
 void SetThreadName(std::string name);
 std::vector&lt;std::string&gt; ThreadNames();
+
+const char* Intern(std::string_view name);
 
 void AddGpuZone(std::uint64_t frame, const Zone&amp; zone);
 

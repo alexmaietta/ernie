@@ -272,6 +272,10 @@ class ChunkedFrameImages final : public FrameImages {
         return chunks_.front()-&gt;Var(name);
     }
 
+    LinearVar Linear(std::string_view name) const override {
+        return chunks_.front()-&gt;Linear(name);
+    }
+
     std::uint32_t Views() const override;
 
     std::span&lt;const std::unique_ptr&lt;FrameImages&gt;&gt; Chunks() const {

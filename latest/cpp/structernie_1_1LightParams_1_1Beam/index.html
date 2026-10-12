@@ -240,6 +240,10 @@
 <td style="text-align: left;"><a href="#variable-extent"><strong>extent</strong></a>   = <code>{0.0f}</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-linewidth"><strong>linewidth</strong></a>   = <code>0.0f</code><br><em>nm, its FWHM.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-pattern"><strong>pattern</strong></a>   = <code>{"spot"}</code><br><em>The pattern it makes (</em> <code>tokens::kLaserPattern</code> <em>), a</em><code>LightPatternModel</code> <em>the renderer finds by id: a built-in one ("spot", "line", "grid", "image") with its parameters in</em><code>patternParams</code> <em>and its tangent-plane half extents in</em><code>extent</code> <em>(0 unbounded), or a custom one with its parameters as given (the renderer fills in defaults and its extent).</em></td>
 </tr>
@@ -269,7 +273,23 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-pulsedecay"><strong>pulseDecay</strong></a>   = <code>0.0</code><br><em>Each pulse's level falls as exp(-t /</em> <code>pulseDecay</code> <em>) over its width (0 flat), its start strays uniformly within +-</em><code>pulseJitter</code> <em>, and with</em><code>pulseOnExposure</code> <em>one fires a frame,</em><code>pulseDelay</code> <em>after the exposure opens (</em><code>tokens::kPulseTrigger</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-pulsedelay"><strong>pulseDelay</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-pulsejitter"><strong>pulseJitter</strong></a>   = <code>0.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-pulseonexposure"><strong>pulseOnExposure</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-pulsepeak"><strong>pulsePeak</strong></a>   = <code>false</code><br><em>Its emission is its level as a pulse starts (a lamp's intensity), not its average over time (a laser's power).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -294,6 +314,10 @@
 <tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-sequenceperiod"><strong>sequencePeriod</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-speckle"><strong>speckle</strong></a>   = <code>false</code><br><em>Whether its light shows speckle (</em> <code>tokens::kLaserSpeckle</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec2</td>
@@ -343,7 +367,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightParams_1_1Beam_1_1Lit/"><strong>Lit</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-litbetween"><strong>LitBetween</strong></a> (double start, double end) const<br><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a pulse is on, 0 between them), exactly.</em></td>
+<td style="text-align: left;"><a href="#function-litbetween"><strong>LitBetween</strong></a> (double start, double end, double exposure=0.0, double framePeriod=0.0) const<br><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a flat pulse is on, 0 between them), or over a pulse's starting level with</em><code>pulsePeak</code> <em>, exactly.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-pulsed"><strong>Pulsed</strong></a> () const<br><em>Whether it pulses rather than shining continuously.</em></td>
 </tr>
 </tbody>
 </table>
@@ -357,6 +385,12 @@
 
 <h3 id="variable-extent">variable extent</h3>
 <pre><code class="language-C++">glm::vec2 ernie::LightParams::Beam::extent;
+</code></pre>
+<hr>
+
+<h3 id="variable-linewidth">variable linewidth</h3>
+<p><em>nm, its FWHM.</em> </p>
+<pre><code class="language-C++">float ernie::LightParams::Beam::linewidth;
 </code></pre>
 <hr>
 
@@ -399,8 +433,30 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-pulsedecay">variable pulseDecay</h3>
+<p><em>Each pulse's level falls as exp(-t /</em> <code>pulseDecay</code> <em>) over its width (0 flat), its start strays uniformly within +-</em><code>pulseJitter</code> <em>, and with</em><code>pulseOnExposure</code> <em>one fires a frame,</em><code>pulseDelay</code> <em>after the exposure opens (</em><code>tokens::kPulseTrigger</code> <em>).</em></p>
+<pre><code class="language-C++">double ernie::LightParams::Beam::pulseDecay;
+</code></pre>
+<hr>
+
 <h3 id="variable-pulsedelay">variable pulseDelay</h3>
 <pre><code class="language-C++">double ernie::LightParams::Beam::pulseDelay;
+</code></pre>
+<hr>
+
+<h3 id="variable-pulsejitter">variable pulseJitter</h3>
+<pre><code class="language-C++">double ernie::LightParams::Beam::pulseJitter;
+</code></pre>
+<hr>
+
+<h3 id="variable-pulseonexposure">variable pulseOnExposure</h3>
+<pre><code class="language-C++">bool ernie::LightParams::Beam::pulseOnExposure;
+</code></pre>
+<hr>
+
+<h3 id="variable-pulsepeak">variable pulsePeak</h3>
+<p><em>Its emission is its level as a pulse starts (a lamp's intensity), not its average over time (a laser's power).</em> </p>
+<pre><code class="language-C++">bool ernie::LightParams::Beam::pulsePeak;
 </code></pre>
 <hr>
 
@@ -432,6 +488,12 @@
 
 <h3 id="variable-sequenceperiod">variable sequencePeriod</h3>
 <pre><code class="language-C++">double ernie::LightParams::Beam::sequencePeriod;
+</code></pre>
+<hr>
+
+<h3 id="variable-speckle">variable speckle</h3>
+<p><em>Whether its light shows speckle (</em> <code>tokens::kLaserSpeckle</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::LightParams::Beam::speckle;
 </code></pre>
 <hr>
 
@@ -467,13 +529,21 @@
 <hr>
 
 <h3 id="function-litbetween">function LitBetween</h3>
-<p><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a pulse is on, 0 between them), exactly.</em></p>
+<p><em>What the beam shows over [</em> <code>start</code> <em>,</em><code>end</code> <em>] seconds of the sensor clock: each sequence frame shown then, weighted by its share of the span times its pulses' energy then over their average (1 / duty cycle while a flat pulse is on, 0 between them), or over a pulse's starting level with</em><code>pulsePeak</code> <em>, exactly.</em></p>
 <pre><code class="language-C++">std::vector&lt; Lit &gt; ernie::LightParams::Beam::LitBetween (
     double start,
-    double end
+    double end,
+    double exposure=0.0,
+    double framePeriod=0.0
 ) const
 </code></pre>
-<p>A span of no length is its instant's. Over more than <code>kMaxLit</code> frames, <code>kMaxLit</code> of them spread evenly carry the weight of all. </p>
+<p>A span of no length is its instant's. Over more than <code>kMaxLit</code> frames, <code>kMaxLit</code> of them spread evenly carry the weight of all. The frame's exposure opens at <code>exposure</code> (for <code>pulseOnExposure</code>), and its frames come <code>framePeriod</code> seconds apart. </p>
+<hr>
+
+<h3 id="function-pulsed">function Pulsed</h3>
+<p><em>Whether it pulses rather than shining continuously.</em> </p>
+<pre><code class="language-C++">inline bool ernie::LightParams::Beam::Pulsed () const
+</code></pre>
 <hr>
 
 <hr />

@@ -261,12 +261,13 @@ struct ViewerOptions {
         layout;  
     DockSizes docks;  
     Path settings;  
+    bool profile = false;
 };
 
 struct ViewportDisplay {
     bool lights = true;   
     bool cameras = true;  
-    bool grid = true;     
+    bool grid = false;    
     bool selection = true;  
     bool overlays =
         true;         
@@ -463,6 +464,10 @@ class Viewer {
 
     bool GetVsync() const;
     void SetVsync(bool vsync);
+
+    void SetRenderResolution(
+        std::optional&lt;std::pair&lt;std::uint32_t, std::uint32_t&gt;&gt; size,
+        float scale = 1.0f, bool fill = true);
 
     std::optional&lt;Wireframe&gt; GetWireframe() const;
     void SetWireframe(std::optional&lt;Wireframe&gt; mode);

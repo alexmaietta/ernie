@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1BindlessHeap/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::BindlessHeap - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::BindlessHeap";
+        var mkdocs_page_input_path = "cpp/classernie_1_1BindlessHeap.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1BindlessHeap/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Concepts</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Guides</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::BindlessHeap</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1BindlessHeap.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-erniebindlessheap">Class ernie::BindlessHeap</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>BindlessHeap</strong></a></p>
+<p><em>Every pass's textures and samplers in one descriptor set (set 1 of every</em> <code>PipelineLayout</code> <em>), each at an index shaders take from their uniforms: bindless descriptor indexing, so a pass's long-lived textures cost it no binding of its own (bindless.slang declares the arrays).</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/device/bindless.h&gt;</code></li>
+</ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1BindlessHeap_1_1Slot/"><strong>Slot</strong></a> <br><em>A slot of the heap, freed when destroyed; move-only.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-types">Public Types</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">enum std::uint32_t</td>
+<td style="text-align: left;"><a href="#enum-kind"><strong>Kind</strong></a>  <br><em>The heap's arrays, in bindless.slang's bindings.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-attributes">Public Static Attributes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-kkinds"><strong>kKinds</strong></a>   = <code>4</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-kretireframes"><strong>kRetireFrames</strong></a>   = <code>3</code><br><em>Frames a freed slot waits before reuse.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-ksamplers"><strong>kSamplers</strong></a>   = <code>256</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-ktextures"><strong>kTextures</strong></a>   = <code>4096</code><br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1BindlessHeap_1_1Slot/"><strong>Slot</strong></a></td>
+<td style="text-align: left;"><a href="#function-addimage"><strong>AddImage</strong></a> (<a href="./#enum-kind"><strong>Kind</strong></a> kind, VkImageView view, VkImageLayout layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) <br><em>A slot holding</em> <code>view</code> <em>(of</em><code>Texture2D</code> <em>or</em><code>Texture2DArray</code> <em>kind), sampled in</em><code>layout</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1BindlessHeap_1_1Slot/"><strong>Slot</strong></a></td>
+<td style="text-align: left;"><a href="#function-addsampler"><strong>AddSampler</strong></a> (VkSampler sampler, bool comparison=false) <br><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-advanceframe"><strong>AdvanceFrame</strong></a> () <br><em>Lets slots freed</em> <code>kRetireFrames</code> <em>frames ago be reused; the renderer calls it once a frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-bind"><strong>Bind</strong></a> (VkCommandBuffer commands, VkPipelineBindPoint point, VkPipelineLayout pipelineLayout) const<br><em>Binds the heap as set 1 of</em> <code>pipelineLayout</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-bindlessheap-12"><strong>BindlessHeap</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-bindlessheap-22"><strong>BindlessHeap</strong></a> (const <a href="./"><strong>BindlessHeap</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-inuse"><strong>InUse</strong></a> (<a href="./#enum-kind"><strong>Kind</strong></a> kind) const<br><em>Slots in use of</em> <code>kind</code> <em>, for tests.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkDescriptorSetLayout</td>
+<td style="text-align: left;"><a href="#function-layout"><strong>Layout</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>BindlessHeap</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>BindlessHeap</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-bindlessheap"><strong>~BindlessHeap</strong></a> () <br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Buffers need none: shaders read them through their addresses (<code>GpuBuffer::Address</code>).</p>
+<p>A slot's descriptor is written when it is added, while the set may be bound (update after bind), and a freed slot is reused only a few frames later (<code>AdvanceFrame</code>), or once the device is idle when the heap runs out, so work in flight never sees it change.</p>
+<p>Reference: Khronos, VK_EXT_descriptor_indexing (core in Vulkan 1.2), <a href="https://docs.vulkan.org/features/latest/features/proposals/VK_EXT_descriptor_indexing.html">https://docs.vulkan.org/features/latest/features/proposals/VK_EXT_descriptor_indexing.html</a> </p>
+<h2 id="public-types-documentation">Public Types Documentation</h2>
+<h3 id="enum-kind">enum Kind</h3>
+<p><em>The heap's arrays, in bindless.slang's bindings.</em> </p>
+<pre><code class="language-C++">enum ernie::BindlessHeap::Kind {
+    Texture2D = 0,
+    Texture2DArray = 1,
+    Sampler = 2,
+    ComparisonSampler = 3
+};
+</code></pre>
+<hr>
+<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kkinds">variable kKinds</h3>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BindlessHeap::kKinds;
+</code></pre>
+<hr>
+
+<h3 id="variable-kretireframes">variable kRetireFrames</h3>
+<p><em>Frames a freed slot waits before reuse.</em> </p>
+<pre><code class="language-C++">constexpr std::uint64_t ernie::BindlessHeap::kRetireFrames;
+</code></pre>
+<hr>
+
+<h3 id="variable-ksamplers">variable kSamplers</h3>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BindlessHeap::kSamplers;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktextures">variable kTextures</h3>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BindlessHeap::kTextures;
+</code></pre>
+<hr>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-addimage">function AddImage</h3>
+<p><em>A slot holding</em> <code>view</code> <em>(of</em><code>Texture2D</code> <em>or</em><code>Texture2DArray</code> <em>kind), sampled in</em><code>layout</code> <em>.</em></p>
+<pre><code class="language-C++">Slot ernie::BindlessHeap::AddImage (
+    Kind kind,
+    VkImageView view,
+    VkImageLayout layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> when the kind's array is full of slots in use. </li>
+</ul>
+<hr>
+
+<h3 id="function-addsampler">function AddSampler</h3>
+<p><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not.</em></p>
+<pre><code class="language-C++">Slot ernie::BindlessHeap::AddSampler (
+    VkSampler sampler,
+    bool comparison=false
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-advanceframe">function AdvanceFrame</h3>
+<p><em>Lets slots freed</em> <code>kRetireFrames</code> <em>frames ago be reused; the renderer calls it once a frame.</em></p>
+<pre><code class="language-C++">void ernie::BindlessHeap::AdvanceFrame () 
+</code></pre>
+<hr>
+
+<h3 id="function-bind">function Bind</h3>
+<p><em>Binds the heap as set 1 of</em> <code>pipelineLayout</code> <em>.</em></p>
+<pre><code class="language-C++">void ernie::BindlessHeap::Bind (
+    VkCommandBuffer commands,
+    VkPipelineBindPoint point,
+    VkPipelineLayout pipelineLayout
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-bindlessheap-12">function BindlessHeap [1/2]</h3>
+<pre><code class="language-C++">explicit ernie::BindlessHeap::BindlessHeap (
+    const VulkanContext &amp; context
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> if the set cannot be created. </li>
+</ul>
+<hr>
+
+<h3 id="function-bindlessheap-22">function BindlessHeap [2/2]</h3>
+<pre><code class="language-C++">ernie::BindlessHeap::BindlessHeap (
+    const BindlessHeap &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-inuse">function InUse</h3>
+<p><em>Slots in use of</em> <code>kind</code> <em>, for tests.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::BindlessHeap::InUse (
+    Kind kind
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-layout">function Layout</h3>
+<pre><code class="language-C++">inline VkDescriptorSetLayout ernie::BindlessHeap::Layout () const
+</code></pre>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">BindlessHeap &amp; ernie::BindlessHeap::operator= (
+    const BindlessHeap &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-bindlessheap">function ~BindlessHeap</h3>
+<pre><code class="language-C++">ernie::BindlessHeap::~BindlessHeap () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/device/bindless.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

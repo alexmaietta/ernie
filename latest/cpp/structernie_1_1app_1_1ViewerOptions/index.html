@@ -237,6 +237,10 @@
 <td style="text-align: left;"><a href="#variable-layout"><strong>layout</strong></a>  <br><em>Docking layout (ImGui .ini) to load; empty uses the built-in default layout.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>   = <code>false</code><br><em>Records the profiler's zones every frame (demos'</em> <code>--profile</code> <em>), not only while the Profiler panel shows.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-renderer"><strong>renderer</strong></a>   = <code>/* multi line expression */</code><br><em>Render backend, one of</em> <code>Viewer::Renderers()</code> <em>.</em></td>
 </tr>
@@ -294,6 +298,12 @@
 <h3 id="variable-layout">variable layout</h3>
 <p><em>Docking layout (ImGui .ini) to load; empty uses the built-in default layout.</em> </p>
 <pre><code class="language-C++">std::filesystem::path ernie::app::ViewerOptions::layout;
+</code></pre>
+<hr>
+
+<h3 id="variable-profile">variable profile</h3>
+<p><em>Records the profiler's zones every frame (demos'</em> <code>--profile</code> <em>), not only while the Profiler panel shows.</em></p>
+<pre><code class="language-C++">bool ernie::app::ViewerOptions::profile;
 </code></pre>
 <hr>
 

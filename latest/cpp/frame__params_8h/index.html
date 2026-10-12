@@ -299,7 +299,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1VolumeFieldParams/"><strong>VolumeFieldParams</strong></a> <br><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeFieldParams/"><strong>VolumeFieldParams</strong></a> <br><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s, or of a</em><a href="../classernie_1_1NanoVDBField/"><em><strong>NanoVDBField</strong></em></a> <em>'s array (</em><code>buffer</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -308,6 +308,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> <br><em>A</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>(</em><code>VolumesOf</code> <em>): where it is, which world, its material and its density, temperature and emission fields, each optional.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1VolumeSettings/"><strong>VolumeSettings</strong></a> <br><em>How finely volumes render (</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>'</em><code>ernie:volumes:*</code> <em>): steps through each volume, towards each light, up and down for the sky's light (0, unoccluded) and through the air in front (0, none), the most orders of multiple scattering, and the texels across the volumes' shadow maps.</em></td>
 </tr>
 </tbody>
 </table>

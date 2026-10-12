@@ -239,6 +239,10 @@
 <tbody>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1DenseNanoVdbLayout/"><strong>DenseNanoVdbLayout</strong></a> <br><em>Where a</em> <code>DenseNanoVdbTopology</code> <em>'s values go: leaf (a, b, c) of</em><code>leaves</code> <em>(the shape's 8^3 blocks) starts</em><code>firstLeaf</code> <em>+ ((a leaves.y + b) leaves.z + c)</em><code>leafBytes</code> <em>into the grid, and voxel (i, j, k)'s float is</em><code>valuesOffset</code> <em>+ 4 ((i &amp; 7) 64 + (j &amp; 7) 8 + (k &amp; 7)) bytes into its leaf.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1NanoVdbGrid/"><strong>NanoVdbGrid</strong></a> <br><em>One sparse grid as NanoVDB lays it out: a buffer the GPU reads in place (PNanoVDB's tree walk), and what Ernie needs of its header.</em></td>
 </tr>
 </tbody>

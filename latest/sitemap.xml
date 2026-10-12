@@ -269,6 +269,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1BindlessHeap/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1BindlessHeap_1_1Slot/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BodyParams/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -389,6 +397,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1DenseField/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1DenseNanoVdbLayout/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1DensityLayer/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -502,6 +518,10 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1GpuXform/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1GradientNoise/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -685,11 +705,19 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MeshWriteTarget/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1MieEfficiencies/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1NamedCahvore/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1NanoVDBField/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1053,6 +1081,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1VolumeSettings/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1VulkanContext/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1245,6 +1277,10 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1BindlessHeap_1_1Array/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/structernie_1_1EditHistory_1_1PrimSnapshot/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1429,6 +1465,14 @@
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/bindless_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/bindless_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/buffer_8h/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
@@ -1542,6 +1586,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/cube__sphere__lod_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/ellipsoid_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/ellipsoid_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>
@@ -1946,6 +1998,14 @@
     </url>
     <url>
          <loc>https://alexmaietta.github.io/ernie/latest/cpp/nanovdb_8h_source/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/noise_8h/</loc>
+         <lastmod>2026-10-12</lastmod>
+    </url>
+    <url>
+         <loc>https://alexmaietta.github.io/ernie/latest/cpp/noise_8h_source/</loc>
          <lastmod>2026-10-12</lastmod>
     </url>
     <url>

@@ -237,6 +237,10 @@
 <td style="text-align: left;"><a href="#variable-depthbiasslope"><strong>depthBiasSlope</strong></a>   = <code>/* multi line expression */</code><br><em>Slope-scaled depth bias, e.g.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-depthclamp"><strong>depthClamp</strong></a>   = <code>false</code><br><em>Clamp depth to the attachment's range rather than clip at the near and far planes, where the device supports it (</em> <code>VulkanContext::SupportsDepthClamp</code> <em>): a shadow map's casters in front of its near plane land on it ("pancaking").</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">VkCompareOp</td>
 <td style="text-align: left;"><a href="#variable-depthcompare"><strong>depthCompare</strong></a>   = <code>VK\_COMPARE\_OP\_LESS</code><br></td>
 </tr>
@@ -296,6 +300,12 @@
 <pre><code class="language-C++">float ernie::GraphicsPipelineDesc::depthBiasSlope;
 </code></pre>
 <p>for shadow maps. </p>
+<hr>
+
+<h3 id="variable-depthclamp">variable depthClamp</h3>
+<p><em>Clamp depth to the attachment's range rather than clip at the near and far planes, where the device supports it (</em> <code>VulkanContext::SupportsDepthClamp</code> <em>): a shadow map's casters in front of its near plane land on it ("pancaking").</em></p>
+<pre><code class="language-C++">bool ernie::GraphicsPipelineDesc::depthClamp;
+</code></pre>
 <hr>
 
 <h3 id="variable-depthcompare">variable depthCompare</h3>

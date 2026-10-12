@@ -261,6 +261,18 @@
 <td style="text-align: left;"><a href="#variable-paused"><strong>paused</strong></a>   = <code>/* multi line expression */</code><br><em>Starts paused, in a window (</em> <code>--paused</code> <em>).</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-profile"><strong>profile</strong></a>   = <code>false</code><br><em>Records the profiler's CPU and GPU zones and prints them, nested and averaged after a few frames' warm-up, at the end (</em> <code>--profile</code> <em>, or either path below).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::filesystem::path</td>
+<td style="text-align: left;"><a href="#variable-profilejson"><strong>profileJson</strong></a>  <br><em>Where to also write them as JSON (</em> <code>--profile-json</code> <em>), or empty.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::filesystem::path</td>
+<td style="text-align: left;"><a href="#variable-profiletrace"><strong>profileTrace</strong></a>  <br><em>Where to also write the frames as a Chrome trace for Perfetto or chrome://tracing (</em> <code>--profile-trace</code> <em>), or empty.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-renderer"><strong>renderer</strong></a>   = <code>/* multi line expression */</code><br><em>Render backend (</em> <code>--renderer</code> <em>).</em></td>
 </tr>
@@ -361,6 +373,24 @@
 <h3 id="variable-paused">variable paused</h3>
 <p><em>Starts paused, in a window (</em> <code>--paused</code> <em>).</em></p>
 <pre><code class="language-C++">bool ernie::app::DemoOptions::paused;
+</code></pre>
+<hr>
+
+<h3 id="variable-profile">variable profile</h3>
+<p><em>Records the profiler's CPU and GPU zones and prints them, nested and averaged after a few frames' warm-up, at the end (</em> <code>--profile</code> <em>, or either path below).</em></p>
+<pre><code class="language-C++">bool ernie::app::DemoOptions::profile;
+</code></pre>
+<hr>
+
+<h3 id="variable-profilejson">variable profileJson</h3>
+<p><em>Where to also write them as JSON (</em> <code>--profile-json</code> <em>), or empty.</em></p>
+<pre><code class="language-C++">std::filesystem::path ernie::app::DemoOptions::profileJson;
+</code></pre>
+<hr>
+
+<h3 id="variable-profiletrace">variable profileTrace</h3>
+<p><em>Where to also write the frames as a Chrome trace for Perfetto or chrome://tracing (</em> <code>--profile-trace</code> <em>), or empty.</em></p>
+<pre><code class="language-C++">std::filesystem::path ernie::app::DemoOptions::profileTrace;
 </code></pre>
 <hr>
 

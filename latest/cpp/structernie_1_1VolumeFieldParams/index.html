@@ -203,7 +203,7 @@
               
                 <h1 id="struct-ernievolumefieldparams">Struct ernie::VolumeFieldParams</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>VolumeFieldParams</strong></a></p>
-<p><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s.</em></p>
+<p><em>A field a volume shades with (</em> <code>VolumesOf</code> <em>): a grid of a NanoVDB file, an</em><a href="../classernie_1_1OpenVDBAsset/"><em><strong>OpenVDBAsset</strong></em></a> <em>'s, or of a</em><a href="../classernie_1_1NanoVDBField/"><em><strong>NanoVDBField</strong></em></a> <em>'s array (</em><code>buffer</code> <em>).</em></p>
 <ul>
 <li><code>#include &lt;ernie/session/frame_params.h&gt;</code></li>
 </ul>
@@ -218,10 +218,22 @@
 <tbody>
 <tr>
 <td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-array"><strong>array</strong></a>  <br><em>A</em> <a href="../classernie_1_1NanoVDBField/"><em><strong>NanoVDBField</strong></em></a> <em>'s: its path, its array of grids (on the CPU or a compute device, contiguous there), the array's version (</em><code>Scene::AttributeVersion</code> <em>), which changes when it is written again, and the stream it was written on.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-buffer"><strong>buffer</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
+<td style="text-align: left;"><a href="#variable-dense"><strong>dense</strong></a>   = <code>[**false**](structernie_1_1VolumeFieldParams.md#variable-array)</code><br><em>A</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s:</em><code>buffer</code> <em>holds its (x, y, z) float32 values,</em><code>voxelSize</code> <em>apart, rather than NanoVDB grids.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-file"><strong>file</strong></a>  <br><code>filePath</code> <em>, as authored.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">int</td>
+<td style="text-align: right;"><a href="./#variable-array"><strong>int</strong></a></td>
 <td style="text-align: left;"><a href="#variable-gridindex"><strong>gridIndex</strong></a>   = <code>0</code><br><code>fieldIndex</code> <em>.</em></td>
 </tr>
 <tr>
@@ -229,8 +241,20 @@
 <td style="text-align: left;"><a href="#variable-gridname"><strong>gridName</strong></a>  <br><code>fieldName</code> <em>; empty for any grid.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::uintptr_t</td>
+<td style="text-align: left;"><a href="#variable-stream"><strong>stream</strong></a>   = <code>1</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;">glm::dmat4</td>
 <td style="text-align: left;"><a href="#variable-tovolume"><strong>toVolume</strong></a>   = <code>{1.0}</code><br><em>The field prim's frame to its volume's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-version"><strong>version</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#variable-array"><strong>double</strong></a></td>
+<td style="text-align: left;"><a href="#variable-voxelsize"><strong>voxelSize</strong></a>   = <code>1.0</code><br></td>
 </tr>
 </tbody>
 </table>
@@ -244,12 +268,29 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#function-operator"><strong>operator==</strong></a> (const <a href="./"><strong>VolumeFieldParams</strong></a> &amp;) const<br></td>
+<td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator==</strong></a> (<a href="./#variable-array"><strong>const</strong></a> <a href="./"><strong>VolumeFieldParams</strong></a> &amp; other) const<br></td>
 </tr>
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-array">variable array</h3>
+<p><em>A</em> <a href="../classernie_1_1NanoVDBField/"><em><strong>NanoVDBField</strong></em></a> <em>'s: its path, its array of grids (on the CPU or a compute device, contiguous there), the array's version (</em><code>Scene::AttributeVersion</code> <em>), which changes when it is written again, and the stream it was written on.</em></p>
+<pre><code class="language-C++">std::string ernie::VolumeFieldParams::array;
+</code></pre>
+<hr>
+
+<h3 id="variable-buffer">variable buffer</h3>
+<pre><code class="language-C++">Tensor ernie::VolumeFieldParams::buffer;
+</code></pre>
+<hr>
+
+<h3 id="variable-dense">variable dense</h3>
+<p><em>A</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s:</em><code>buffer</code> <em>holds its (x, y, z) float32 values,</em><code>voxelSize</code> <em>apart, rather than NanoVDB grids.</em></p>
+<pre><code class="language-C++">bool ernie::VolumeFieldParams::dense;
+</code></pre>
+<hr>
+
 <h3 id="variable-file">variable file</h3>
 <p><code>filePath</code> <em>, as authored.</em></p>
 <pre><code class="language-C++">std::string ernie::VolumeFieldParams::file;
@@ -268,15 +309,30 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-stream">variable stream</h3>
+<pre><code class="language-C++">std::uintptr_t ernie::VolumeFieldParams::stream;
+</code></pre>
+<hr>
+
 <h3 id="variable-tovolume">variable toVolume</h3>
 <p><em>The field prim's frame to its volume's.</em> </p>
 <pre><code class="language-C++">glm::dmat4 ernie::VolumeFieldParams::toVolume;
 </code></pre>
 <hr>
+
+<h3 id="variable-version">variable version</h3>
+<pre><code class="language-C++">std::uint64_t ernie::VolumeFieldParams::version;
+</code></pre>
+<hr>
+
+<h3 id="variable-voxelsize">variable voxelSize</h3>
+<pre><code class="language-C++">double ernie::VolumeFieldParams::voxelSize;
+</code></pre>
+<hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-operator">function operator==</h3>
-<pre><code class="language-C++">bool ernie::VolumeFieldParams::operator== (
-    const VolumeFieldParams &amp;
+<pre><code class="language-C++">inline bool ernie::VolumeFieldParams::operator== (
+    const  VolumeFieldParams &amp; other
 ) const
 </code></pre>
 <hr>

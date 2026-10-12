@@ -176,6 +176,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.default_args"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;default_args</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.define_planet_surface"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;define_planet_surface</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.discover_demos"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;discover_demos</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.download"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;download</a>
@@ -1017,7 +1019,8 @@ to write in place and then <code>scene.unmap</code>: the viewer's
     <div class="doc doc-contents ">
 
         <p>Draws a frame: through the viewer, or with <code>renderer</code> into
-<code>image</code> without one.</p>
+<code>image</code> without one; a benchmark without checks renders
+asynchronously, reading nothing back (<code>_app.Demo.render</code>).</p>
 
 
     </div>
@@ -1410,6 +1413,29 @@ when it is not among them.</p>
     <div class="doc doc-contents ">
 
         <p>The parser's defaults, for a demo the Demos panel opens.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="ernie.demo.define_planet_surface" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">define_planet_surface</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">define_planet_surface(scene, path, radius, albedo, material)</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A smooth planet of <code>radius</code> metres at <code>path</code>: a planet Terrain of
+flat cube faces, its surface at the world's z = 0 (its centre
+<code>radius</code> below the origin), drawn with a Material of normal albedo
+<code>albedo</code> (linear RGB) at <code>material</code>. The ground under an atmosphere,
+which is the air alone (as the C++ demos' <code>DefinePlanetSurface</code>).</p>
 
 
     </div>

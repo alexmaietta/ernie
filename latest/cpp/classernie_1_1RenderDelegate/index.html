@@ -294,11 +294,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setmeshwriter"><strong>SetMeshWriter</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, <a href="../namespaceernie/#typedef-meshwriter"><strong>MeshWriter</strong></a> writer, std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt; bounds={}) <br><em>Has</em> <code>writer</code> <em>write the</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>at</em><code>path</code> <em>on the GPU every frame, recorded into the frame before anything reads the mesh: its points, normals, triangles and the counts of them in use, within the capacity its arrays in the scene hold (their values there are placeholders).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-setviewband"><strong>SetViewBand</strong></a> (int band) <br><em>Which spectral band</em> <code>Record</code> <em>shows when it presents SpectralRadiance: 0 to the camera's band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-setviewvar"><strong>SetViewVar</strong></a> (std::string_view var) <br><em>The render var the next</em> <code>Record</code> <em>draws, for</em><code>Update</code> <em>to prepare the vars only drawing it needs (such as the opt-in MotionVector); call before</em><code>Update</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setviewportautoexposure"><strong>SetViewportAutoExposure</strong></a> (std::optional&lt; float &gt; blend) <br><em>Exposes the viewport's frames (</em> <code>Record</code> <em>) automatically, as a viewer's automatic exposure asks: each frame moves</em><code>blend</code> <em>of the way (1 at once) to the exposure that keys the metered luminance to middle grey, on the GPU where the backend can; none for the camera's own exposure.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual <a href="../structernie_1_1RenderStats/"><strong>RenderStats</strong></a></td>
@@ -561,6 +569,21 @@
 <p>Backends that cannot outline ignore it. </p>
 <hr>
 
+<h3 id="function-setmeshwriter">function SetMeshWriter</h3>
+<p><em>Has</em> <code>writer</code> <em>write the</em><a href="../classernie_1_1Mesh/"><em><strong>Mesh</strong></em></a> <em>at</em><code>path</code> <em>on the GPU every frame, recorded into the frame before anything reads the mesh: its points, normals, triangles and the counts of them in use, within the capacity its arrays in the scene hold (their values there are placeholders).</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::SetMeshWriter (
+    const Path &amp; path,
+    MeshWriter writer,
+    std::optional&lt; Bounds3 &gt; bounds={}
+) 
+</code></pre>
+<p>Topology may change from frame to frame, so the mesh has no motion between frames. Without <code>bounds</code> the points in use are measured on the GPU, frames late; with them, they bound the mesh. A null writer stops writing. The writer holds across re-uploads of the mesh. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the backend has no writers. </li>
+</ul>
+<hr>
+
 <h3 id="function-setviewband">function SetViewBand</h3>
 <p><em>Which spectral band</em> <code>Record</code> <em>shows when it presents SpectralRadiance: 0 to the camera's band count - 1, or -1 for the mean over the bands; backends that cannot choose ignore it.</em></p>
 <pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewBand (
@@ -576,6 +599,14 @@
 ) 
 </code></pre>
 <p>Backends that render every var regardless ignore it. </p>
+<hr>
+
+<h3 id="function-setviewportautoexposure">function SetViewportAutoExposure</h3>
+<p><em>Exposes the viewport's frames (</em> <code>Record</code> <em>) automatically, as a viewer's automatic exposure asks: each frame moves</em><code>blend</code> <em>of the way (1 at once) to the exposure that keys the metered luminance to middle grey, on the GPU where the backend can; none for the camera's own exposure.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewportAutoExposure (
+    std::optional&lt; float &gt; blend
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-stats">function Stats</h3>

@@ -259,6 +259,21 @@ class CubeSphereLod {
     glm::dvec3 VertexDirection(std::uint32_t face, std::uint32_t col,
                                std::uint32_t row) const;
 
+    glm::dvec3 FineDirection(std::uint32_t face, std::uint32_t col,
+                             std::uint32_t row) const;
+
+    void SetRefinement(std::uint32_t levels);
+
+    std::uint32_t Refinement() const {
+        return refinement_;
+    }
+
+    std::uint32_t FineCells() const {
+        return faceCells_ &lt;&lt; refinement_;
+    }
+
+    static constexpr std::uint32_t kMaxLevels = 30;
+
     bool Empty() const {
         return faceCells_ == 0;
     }
@@ -266,6 +281,20 @@ class CubeSphereLod {
     double Radius() const {
         return radius_;
     }
+
+    const glm::dvec3&amp; Radii() const {
+        return radii_;
+    }
+
+    void SetRadii(const glm::dvec3&amp; radii);
+
+    double SurfaceRadius(const glm::dvec3&amp; d) const;
+
+    glm::dvec3 BasePoint(const glm::dvec3&amp; d) const {
+        return SurfaceRadius(d) * d;
+    }
+
+    glm::dvec3 SurfaceNormal(const glm::dvec3&amp; d) const;
 
     std::uint32_t FaceCells() const {
         return faceCells_;
@@ -280,7 +309,7 @@ class CubeSphereLod {
     }
 
     std::uint32_t Levels() const {
-        return trees_[0].Levels();
+        return trees_[0].Levels() + refinement_;
     }
 
     std::uint32_t LeavesPerSide() const {
@@ -338,8 +367,22 @@ class CubeSphereLod {
                        float exaggeration, double occluder,
                        std::vector&lt;LodPatch&gt;&amp; out) const;
 
+    glm::vec2 NodeHeights(std::uint32_t face, std::uint32_t level,
+                          std::uint32_t x, std::uint32_t y) const;
+
+    float FineHeight(std::uint32_t face, std::uint32_t col,
+                     std::uint32_t row) const;
+
     double radius_ = 0.0;
+    glm::dvec3 radii_{0.0};
+    double radiusSlope_ = 0.0;
+    double normalSin_ = 0.0;
+    double normalCos_ = 1.0;
+    double tiltRate_ = 0.0;
+    std::array&lt;std::vector&lt;float&gt;, kFaces&gt; heights_;
+    std::array&lt;double, kFaces&gt; maxStep_{};
     std::uint32_t faceCells_ = 0;
+    std::uint32_t refinement_ = 0;
     std::array&lt;LodQuadtree, kFaces&gt; trees_;
 };
 

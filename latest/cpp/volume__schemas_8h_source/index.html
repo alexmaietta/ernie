@@ -246,12 +246,44 @@
                               .group = &quot;Field&quot;,                                                    \
                               .options = {&quot;&quot;, &quot;levelSet&quot;, &quot;fogVolume&quot;, &quot;staggered&quot;, &quot;unknown&quot;}}))
 
+#define ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)                                                          \
+    X(::ernie::Tensor, Buffer, ::ernie::tokens::kNanoVdbBuffer, nullptr,                           \
+      (::ernie::AttributeMeta{.doc = &quot;One or more NanoVDB grids back to back as NanoVDB keeps &quot;    \
+                                     &quot;them in memory (Warp's Volume.array()), in an array of any &quot; \
+                                     &quot;type, on the CPU or a CUDA device. Written again in the &quot;    \
+                                     &quot;same device memory, as a simulation steps its grids, &quot;       \
+                                     &quot;their layout is taken as kept; a new array is read anew.&quot;,   \
+                              .group = &quot;Field&quot;, .dirty = ::ernie::Dirty::Points}))                 \
+    X(std::string, FieldName, ::ernie::tokens::kFieldName, &quot;&quot;,                                     \
+      (::ernie::AttributeMeta{.doc = &quot;The grid's name in the buffer; unset, any grid.&quot;,            \
+                              .group = &quot;Field&quot;, .dirty = ::ernie::Dirty::Points}))                 \
+    X(int, FieldIndex, ::ernie::tokens::kFieldIndex, 0,                                            \
+      (::ernie::AttributeMeta{.doc = &quot;Which of the buffer's grids of that name (or of all its &quot;    \
+                                     &quot;grids, without a name), 0 the first.&quot;,                       \
+                              .group = &quot;Field&quot;, .min = 0.0, .max = 1e6,                            \
+                              .dirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_DENSE_FIELD_ATTRIBUTES(X)                                                            \
+    X(::ernie::Tensor, Values, ::ernie::tokens::kDenseValues, nullptr,                             \
+      (::ernie::AttributeMeta{.doc = &quot;float32 (x, y, z) values, z fastest, on the CPU or a CUDA &quot;  \
+                                     &quot;device; 0 is empty. Written again on the device at its &quot;     \
+                                     &quot;shape, as a solver steps, it is copied into place on the &quot;   \
+                                     &quot;GPU with no work on the CPU.&quot;,                               \
+                              .group = &quot;Field&quot;, .dirty = ::ernie::Dirty::Points}))                 \
+    X(double, VoxelSize, ::ernie::tokens::kVoxelSize, 1.0,                                         \
+      (::ernie::AttributeMeta{.doc = &quot;World units between values: value (i, j, k) is at the &quot;      \
+                                     &quot;voxel size times (i, j, k) in the field's frame.&quot;,           \
+                              .group = &quot;Field&quot;, .min = 1e-9, .max = 1e9,                           \
+                              .dirty = ::ernie::Dirty::Points}))
+
 #define ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ATTRIBUTES(X)
 
 #define ERNIE_FIELD_BASE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_FIELD_ASSET_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_FIELD_ASSET_ATTRIBUTES(X)
 #define ERNIE_OPENVDB_ASSET_ALL(X) ERNIE_FIELD_ASSET_ALL(X) ERNIE_OPENVDB_ASSET_ATTRIBUTES(X)
+#define ERNIE_NANOVDB_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)
+#define ERNIE_DENSE_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_DENSE_FIELD_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_VOLUME_ATTRIBUTES(X)
 // clang-format on
 
@@ -269,6 +301,17 @@ class OpenVDBAsset : public FieldAsset {
     ERNIE_SCHEMA_BODY(OpenVDBAsset, FieldAsset,
                       ERNIE_OPENVDB_ASSET_ALL)
     ERNIE_SCHEMA_DEFINE(OpenVDBAsset)
+};
+
+class NanoVDBField : public FieldBase {
+    ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase,
+                      ERNIE_NANOVDB_FIELD_ALL)
+    ERNIE_SCHEMA_DEFINE(NanoVDBField)
+};
+
+class DenseField : public FieldBase {
+    ERNIE_SCHEMA_BODY(DenseField, FieldBase, ERNIE_DENSE_FIELD_ALL)
+    ERNIE_SCHEMA_DEFINE(DenseField)
 };
 
 class Volume : public Gprim {

@@ -215,6 +215,14 @@
 <tbody>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kangleoflinearpolarization"><strong>kAngleOfLinearPolarization</strong></a>   = <code>/* multi line expression */</code><br><em>float32 in [0, pi): its angle of linear polarization, from the image's +x towards +y (down), atan2(S2, S1) / 2.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kdegreeoflinearpolarization"><strong>kDegreeOfLinearPolarization</strong></a>   = <code>/* multi line expression */</code><br><em>float32 in [0, 1]: the degree of linear polarization of the light reaching each sensor pixel, before the camera's polarizer, over the bands: sqrt(S1^2 + S2^2) / S0.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kdistancetocamera"><strong>kDistanceToCamera</strong></a>   = <code>/* multi line expression */</code><br><em>float32.</em></td>
 </tr>
 <tr>
@@ -239,6 +247,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klinearstokes"><strong>kLinearStokes</strong></a>   = <code>"LinearStokes"</code><br><em>float32 (S0, S1, S2, 0): its linear Stokes vector summed over the bands, W m^-2 sr^-1 nm^-1, S1 and S2 from the image's +x towards +y.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kmotionvector"><strong>kMotionVector</strong></a>   = <code>"MotionVector"</code><br><em>float32 (x, y): how far, in sensor pixels, the point a pixel sees has moved across the image since the last frame (this frame's position minus the last's, x right and y down), from the camera's motion and the meshes', instances' and points' own; zero on a camera's first frame and for pushbroom cameras.</em></td>
 </tr>
 <tr>
@@ -260,6 +272,20 @@
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-kangleoflinearpolarization">variable kAngleOfLinearPolarization</h3>
+<p><em>float32 in [0, pi): its angle of linear polarization, from the image's +x towards +y (down), atan2(S2, S1) / 2.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kAngleOfLinearPolarization;
+</code></pre>
+<p>Opt-in. </p>
+<hr>
+
+<h3 id="variable-kdegreeoflinearpolarization">variable kDegreeOfLinearPolarization</h3>
+<p><em>float32 in [0, 1]: the degree of linear polarization of the light reaching each sensor pixel, before the camera's polarizer, over the bands: sqrt(S1^2 + S2^2) / S0.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kDegreeOfLinearPolarization;
+</code></pre>
+<p>Opt-in, as the polarization vars make the raster carry Stokes Q and U. </p>
+<hr>
+
 <h3 id="variable-kdistancetocamera">variable kDistanceToCamera</h3>
 <p><em>float32.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kDistanceToCamera;
@@ -294,6 +320,13 @@
 <p><em>uint8 sRGB (rows, cols, 4).</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kLdrColor;
 </code></pre>
+<hr>
+
+<h3 id="variable-klinearstokes">variable kLinearStokes</h3>
+<p><em>float32 (S0, S1, S2, 0): its linear Stokes vector summed over the bands, W m^-2 sr^-1 nm^-1, S1 and S2 from the image's +x towards +y.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kLinearStokes;
+</code></pre>
+<p>Opt-in. </p>
 <hr>
 
 <h3 id="variable-kmotionvector">variable kMotionVector</h3>

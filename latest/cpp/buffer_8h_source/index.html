@@ -251,6 +251,8 @@ class GpuBuffer {
         return memory_;
     }
 
+    VkDeviceAddress Address() const;
+
     ExternalHandle ExportHandle() const;
 
     VkDeviceSize AllocationSize() const {

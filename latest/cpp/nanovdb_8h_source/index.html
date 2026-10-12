@@ -244,6 +244,7 @@ struct NanoVdbGrid {
     double minValue = 0.0;
     double maxValue = 0.0;
     std::vector&lt;std::uint8_t&gt; buffer;
+    std::uint64_t size = 0;
 
     bool Empty() const;
     bool Scalar() const;
@@ -257,9 +258,31 @@ ReadNanoVdb(const std::filesystem::path&amp; path);
 std::vector&lt;NanoVdbGrid&gt;
 NanoVdbGridsOf(std::span&lt;const std::uint8_t&gt; bytes);
 
+inline constexpr std::size_t kNanoVdbHeadBytes = 1024;
+
+NanoVdbGrid NanoVdbGridHead(std::span&lt;const std::uint8_t&gt; head);
+
 const NanoVdbGrid* FindNanoVdbGrid(std::span&lt;const NanoVdbGrid&gt; grids,
                                    std::string_view name,
                                    int index = 0);
+
+std::vector&lt;std::uint8_t&gt;
+DenseNanoVdbGrid(std::span&lt;const float&gt; values,
+                 const glm::ivec3&amp; shape, double voxelSize,
+                 const glm::dvec3&amp; origin,
+                 std::string_view name = &quot;&quot;);
+
+struct DenseNanoVdbLayout {
+    std::uint64_t firstLeaf = 0;
+    std::uint32_t leafBytes = 0;
+    std::uint32_t valuesOffset = 0;
+    glm::ivec3 leaves{0};
+};
+
+std::vector&lt;std::uint8_t&gt;
+DenseNanoVdbTopology(const glm::ivec3&amp; shape, double voxelSize,
+                     const glm::dvec3&amp; origin, std::string_view name,
+                     DenseNanoVdbLayout&amp; layout);
 
 }  // namespace ernie
 </code></pre>

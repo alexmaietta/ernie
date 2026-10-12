@@ -284,7 +284,13 @@
     X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
       (::ernie::AttributeMeta{.doc = &quot;(n, 3) normals, one per point; ignored when of another &quot;     \
                                      &quot;count.&quot;,                                                     \
-                              .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))
+                              .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))              \
+    X(::ernie::Tensor, ActiveCounts, ::ernie::tokens::kActiveCounts, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;int32 (2,): the points and triangles in use, first, of &quot;     \
+                                     &quot;those the points and triangle indices hold, for topology &quot;   \
+                                     &quot;that changes on the GPU within their capacity; read on the &quot; \
+                                     &quot;GPU, the rest neither drawn nor bounded.&quot;,                   \
+                              .group = &quot;Geometry&quot;, .integer = true}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
     X(::ernie::OrArray&lt;std::vector&lt;float&gt;&gt;, Widths, ::ernie::tokens::kWidths,                      \

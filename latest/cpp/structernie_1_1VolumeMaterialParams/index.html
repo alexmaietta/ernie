@@ -245,8 +245,28 @@
 <td style="text-align: left;"><a href="#variable-emission"><strong>emission</strong></a>   = <code>{0.0}</code><br><em>cd/m^2 per world unit for white.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-octaveattenuation"><strong>octaveAttenuation</strong></a>   = <code>0.5</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-octaveextinction"><strong>octaveExtinction</strong></a>   = <code>0.5</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-octavephase"><strong>octavePhase</strong></a>   = <code>0.5</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#variable-octaves"><strong>octaves</strong></a>   = <code>1</code><br><em>Orders of scattering approximated, and each order's scattering, extinction and anisotropy of the one before's (Wrenninge's a, b and c).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-phase"><strong>phase</strong></a>   = <code>"henyeyGreenstein"</code><br><code>inputs:phaseFunction</code> <em>, and the double Henyey-Greenstein lobe width and backscatter weight (Hapke's</em><code>inputs:b</code> <em>,</em><code>inputs:c</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-skylight"><strong>skyLight</strong></a>   = <code>1.0</code><br><em>Scales the sky's and ground's light.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -310,9 +330,36 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-octaveattenuation">variable octaveAttenuation</h3>
+<pre><code class="language-C++">double ernie::VolumeMaterialParams::octaveAttenuation;
+</code></pre>
+<hr>
+
+<h3 id="variable-octaveextinction">variable octaveExtinction</h3>
+<pre><code class="language-C++">double ernie::VolumeMaterialParams::octaveExtinction;
+</code></pre>
+<hr>
+
+<h3 id="variable-octavephase">variable octavePhase</h3>
+<pre><code class="language-C++">double ernie::VolumeMaterialParams::octavePhase;
+</code></pre>
+<hr>
+
+<h3 id="variable-octaves">variable octaves</h3>
+<p><em>Orders of scattering approximated, and each order's scattering, extinction and anisotropy of the one before's (Wrenninge's a, b and c).</em> </p>
+<pre><code class="language-C++">int ernie::VolumeMaterialParams::octaves;
+</code></pre>
+<hr>
+
 <h3 id="variable-phase">variable phase</h3>
 <p><code>inputs:phaseFunction</code> <em>, and the double Henyey-Greenstein lobe width and backscatter weight (Hapke's</em><code>inputs:b</code> <em>,</em><code>inputs:c</code> <em>).</em></p>
 <pre><code class="language-C++">std::string ernie::VolumeMaterialParams::phase;
+</code></pre>
+<hr>
+
+<h3 id="variable-skylight">variable skyLight</h3>
+<p><em>Scales the sky's and ground's light.</em> </p>
+<pre><code class="language-C++">double ernie::VolumeMaterialParams::skyLight;
 </code></pre>
 <hr>
 

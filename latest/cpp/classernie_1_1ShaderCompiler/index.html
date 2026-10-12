@@ -217,6 +217,10 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::size_t</td>
+<td style="text-align: left;"><a href="#function-cachehits"><strong>CacheHits</strong></a> () const<br><em>How many</em> <code>CompileSpirv</code> <em>calls the disk cache answered.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
 <td style="text-align: left;"><a href="#function-compilespirv"><strong>CompileSpirv</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, const std::string &amp; entryPoint) const<br><em>SPIR-V for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></td>
 </tr>
@@ -226,7 +230,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"></td>
-<td style="text-align: left;"><a href="#function-shadercompiler-12"><strong>ShaderCompiler</strong></a> () <br></td>
+<td style="text-align: left;"><a href="#function-shadercompiler-12"><strong>ShaderCompiler</strong></a> () <br><em>Slang itself starts at the first compile the disk cache does not answer, which throws std::runtime_error if it cannot.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
@@ -247,6 +251,12 @@
 <p>Reference: Y. He, K. Fatahalian and T. Foley, "Slang: language
 mechanisms for extensible real-time shading systems", ACM Transactions on Graphics 37(4), 141, 2018. <a href="https://doi.org/10.1145/3197517.3201380">https://doi.org/10.1145/3197517.3201380</a> </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-cachehits">function CacheHits</h3>
+<p><em>How many</em> <code>CompileSpirv</code> <em>calls the disk cache answered.</em></p>
+<pre><code class="language-C++">std::size_t ernie::ShaderCompiler::CacheHits () const
+</code></pre>
+<hr>
+
 <h3 id="function-compilespirv">function CompileSpirv</h3>
 <p><em>SPIR-V for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></p>
 <pre><code class="language-C++">std::vector&lt; std::uint32_t &gt; ernie::ShaderCompiler::CompileSpirv (
@@ -254,6 +264,7 @@ mechanisms for extensible real-time shading systems", ACM Transactions on Graphi
     const std::string &amp; entryPoint
 ) const
 </code></pre>
+<p>Compiled SPIR-V is kept on disk between runs, keyed by a hash of the Slang version, the target, the entry point and every module's name and source, so a program compiles once until its sources change: in <code>ERNIE_SHADER_CACHE</code> (empty or "0" keeps none), else the user's cache folder (<code>$XDG_CACHE_HOME/ernie/shaders</code>, <code>~/.cache/ernie/shaders</code>). </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> with Slang's diagnostics if a module fails to compile or the entry point is missing. </li>
@@ -274,12 +285,9 @@ mechanisms for extensible real-time shading systems", ACM Transactions on Graphi
 <hr>
 
 <h3 id="function-shadercompiler-12">function ShaderCompiler [1/2]</h3>
+<p><em>Slang itself starts at the first compile the disk cache does not answer, which throws std::runtime_error if it cannot.</em> </p>
 <pre><code class="language-C++">ernie::ShaderCompiler::ShaderCompiler () 
 </code></pre>
-<p><strong>Exception:</strong></p>
-<ul>
-<li><code>std::runtime_error</code> if the Slang compiler cannot be initialised. </li>
-</ul>
 <hr>
 
 <h3 id="function-shadercompiler-22">function ShaderCompiler [2/2]</h3>

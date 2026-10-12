@@ -271,6 +271,14 @@ inline constexpr std::string_view kVectorDataRoleHint =
     &quot;vectorDataRoleHint&quot;;  
 inline constexpr std::string_view kFieldClass =
     &quot;fieldClass&quot;;  
+inline constexpr std::string_view kNanoVDBField = &quot;NanoVDBField&quot;;
+inline constexpr std::string_view kNanoVdbBuffer =
+    &quot;ernie:buffer&quot;;  
+inline constexpr std::string_view kDenseField = &quot;DenseField&quot;;
+inline constexpr std::string_view kDenseValues =
+    &quot;ernie:values&quot;;  
+inline constexpr std::string_view kVoxelSize =
+    &quot;ernie:voxelSize&quot;;  
 // The volume inputs of a Material. The density field times
 // `inputs:density` is the extinction coefficient in 1/m, of which
 // `inputs:volumeAlbedo` scatters; the rest absorbs, and a temperature
@@ -282,6 +290,15 @@ inline constexpr std::string_view kVolumeAlbedo =
     &quot;inputs:volumeAlbedo&quot;;
 inline constexpr std::string_view kVolumeAnisotropy =
     &quot;inputs:anisotropy&quot;;
+inline constexpr std::string_view kVolumeScatteringOctaves =
+    &quot;inputs:scatteringOctaves&quot;;
+inline constexpr std::string_view kVolumeOctaveAttenuation =
+    &quot;inputs:octaveAttenuation&quot;;
+inline constexpr std::string_view kVolumeOctaveExtinction =
+    &quot;inputs:octaveExtinction&quot;;
+inline constexpr std::string_view kVolumeOctavePhase =
+    &quot;inputs:octavePhase&quot;;
+inline constexpr std::string_view kVolumeSkyLight = &quot;inputs:skyLight&quot;;
 inline constexpr std::string_view kVolumeEmissionColor =
     &quot;inputs:emissionColor&quot;;
 inline constexpr std::string_view kVolumeEmissionStrength =
@@ -367,6 +384,8 @@ inline constexpr std::string_view kFaceVertexCounts =
     &quot;faceVertexCounts&quot;;
 inline constexpr std::string_view kFaceVertexIndices =
     &quot;faceVertexIndices&quot;;
+inline constexpr std::string_view kActiveCounts =
+    &quot;ernie:activeCounts&quot;;
 inline constexpr std::string_view kDisplayColor =
     &quot;primvars:displayColor&quot;;
 inline constexpr std::string_view kPositions = &quot;positions&quot;;
@@ -533,6 +552,8 @@ inline constexpr std::string_view kLaserBeamQuality =
     &quot;ernie:laser:beamQuality&quot;;
 inline constexpr std::string_view kLaserApertureRadius =
     &quot;ernie:laser:apertureRadius&quot;;
+inline constexpr std::string_view kLaserSpeckle =
+    &quot;ernie:laser:speckle&quot;;
 inline constexpr std::string_view kLaserPattern =
     &quot;ernie:laser:pattern&quot;;
 inline constexpr std::string_view kLaserFanAngle =
@@ -563,6 +584,15 @@ inline constexpr std::string_view kLaserPulseWidth =
     &quot;ernie:laser:pulse:width&quot;;
 inline constexpr std::string_view kLaserPulseDelay =
     &quot;ernie:laser:pulse:delay&quot;;
+inline constexpr std::string_view kPulseRate = &quot;ernie:pulse:rate&quot;;
+inline constexpr std::string_view kPulseWidth = &quot;ernie:pulse:width&quot;;
+inline constexpr std::string_view kPulseDelay = &quot;ernie:pulse:delay&quot;;
+inline constexpr std::string_view kPulseDecay = &quot;ernie:pulse:decay&quot;;
+inline constexpr std::string_view kPulseJitter = &quot;ernie:pulse:jitter&quot;;
+inline constexpr std::string_view kPulseTrigger =
+    &quot;ernie:pulse:trigger&quot;;
+inline constexpr std::string_view kClock = &quot;clock&quot;;
+inline constexpr std::string_view kExposureTrigger = &quot;exposure&quot;;
 inline constexpr std::string_view kLaserSequenceCount =
     &quot;ernie:laser:sequence:count&quot;;
 inline constexpr std::string_view kLaserSequencePeriod =
@@ -747,6 +777,8 @@ inline constexpr std::string_view kNoData =
 inline constexpr std::string_view kExaggeration =
     &quot;ernie:exaggeration&quot;;  
 inline constexpr std::string_view kPlanetRadius = &quot;ernie:radius&quot;;
+inline constexpr std::string_view kPlanetRadii = &quot;ernie:radii&quot;;
+inline constexpr std::string_view kFinestCell = &quot;ernie:finestCell&quot;;
 inline constexpr std::string_view kHeightsDirty =
     &quot;ernie:heights:dirty&quot;;
 
@@ -925,6 +957,8 @@ inline constexpr std::string_view kConstantDiffuse =
     &quot;constantDiffuse&quot;;
 inline constexpr std::string_view kTexturedDiffuse =
     &quot;texturedDiffuse&quot;;
+inline constexpr std::string_view kDiffuseGlossyEmission =
+    &quot;diffuseGlossyEmission&quot;;
 inline constexpr std::string_view kMinimalConstantColor =
     &quot;ernie:minimal:constantColor&quot;;
 inline constexpr std::string_view kCulling = &quot;ernie:culling&quot;;
@@ -948,6 +982,22 @@ inline constexpr std::string_view kShared = &quot;shared&quot;;
 inline constexpr std::string_view kMerged = &quot;merged&quot;;
 inline constexpr std::string_view kShadowWorldFit =
     &quot;ernie:shadows:worldFit&quot;;
+// RenderSettings' volume quality: steps through volumes and towards
+// lights, the sky and the air, multiple scattering and shadow maps.
+inline constexpr std::string_view kVolumeStepsPerVoxel =
+    &quot;ernie:volumes:stepsPerVoxel&quot;;
+inline constexpr std::string_view kVolumeMaxSteps =
+    &quot;ernie:volumes:maxSteps&quot;;
+inline constexpr std::string_view kVolumeShadowSteps =
+    &quot;ernie:volumes:shadowSteps&quot;;
+inline constexpr std::string_view kVolumeSkyLightSteps =
+    &quot;ernie:volumes:skyLightSteps&quot;;
+inline constexpr std::string_view kVolumeAirSteps =
+    &quot;ernie:volumes:airSteps&quot;;
+inline constexpr std::string_view kVolumeMaxOctaves =
+    &quot;ernie:volumes:maxOctaves&quot;;
+inline constexpr std::string_view kVolumeShadowResolution =
+    &quot;ernie:volumes:shadowResolution&quot;;
 inline constexpr std::string_view kScene = &quot;scene&quot;;
 inline constexpr std::string_view kWorldFit = &quot;world&quot;;
 inline constexpr std::string_view kShadowWorldMargin =

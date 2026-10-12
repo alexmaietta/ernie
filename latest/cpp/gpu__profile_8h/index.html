@@ -253,6 +253,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_gpu_zone_named"><strong>ERNIE_GPU_ZONE_NAMED</strong></a> (context, commands, name) <code>[**ERNIE\_OWN\_GPU\_ZONE**](gpu__profile_8h.md#define-ernie_own_gpu_zone)(context, commands, name)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_own_gpu_zone"><strong>ERNIE_OWN_GPU_ZONE</strong></a> (context, commands, name) <code>/* multi line expression */</code><br></td>
 </tr>
 </tbody>
@@ -260,6 +264,15 @@
 <h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
 <h3 id="define-ernie_gpu_zone">define ERNIE_GPU_ZONE</h3>
 <pre><code class="language-C++">#define ERNIE_GPU_ZONE (
+    context,
+    commands,
+    name
+) `ERNIE_OWN_GPU_ZONE (context, commands, name)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_gpu_zone_named">define ERNIE_GPU_ZONE_NAMED</h3>
+<pre><code class="language-C++">#define ERNIE_GPU_ZONE_NAMED (
     context,
     commands,
     name

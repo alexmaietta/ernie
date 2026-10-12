@@ -327,6 +327,7 @@ enum class MinimalMode : std::uint32_t {
     None = 1,  
     Constant = 2,  
     Textured = 3,  
+    Glossy = 4,    
 };
 
 enum class LightType : std::uint32_t {
@@ -370,9 +371,15 @@ struct LightParams {
         std::uintptr_t patternArrayStream = 1;
         std::string patternArrayKey;
         float wavelength = 0.0f;  
+        float linewidth = 0.0f;   
+        bool speckle = false;
         double pulseRate = 0.0;
         double pulseWidth = 0.0;
         double pulseDelay = 0.0;
+        double pulseDecay = 0.0;
+        double pulseJitter = 0.0;
+        bool pulseOnExposure = false;
+        bool pulsePeak = false;
         int sequenceCount = 1;
         double sequencePeriod = 1.0;
         double sequenceDelay = 0.0;
@@ -381,13 +388,19 @@ struct LightParams {
             return pattern == &quot;spot&quot;;
         }
 
+        bool Pulsed() const {
+            return pulseRate &gt; 0.0 || pulseOnExposure;
+        }
+
         struct Lit {
             std::uint32_t frame = 0;
             float weight = 0.0f;
         };
         static constexpr std::size_t kMaxLit = 4;
 
-        std::vector&lt;Lit&gt; LitBetween(double start, double end) const;
+        std::vector&lt;Lit&gt; LitBetween(double start, double end,
+                                    double exposure = 0.0,
+                                    double framePeriod = 0.0) const;
     };
     Beam beam;
     bool shadows = true;
@@ -461,13 +474,37 @@ struct AtmosphereParams {
     }
 };
 
+struct VolumeSettings {
+    double stepsPerVoxel = 2.0;
+    std::uint32_t maxSteps = 256;
+    std::uint32_t shadowSteps = 12;
+    std::uint32_t skyLightSteps = 6;
+    std::uint32_t airSteps = 32;
+    std::uint32_t maxOctaves = 8;
+    std::uint32_t shadowResolution = 256;
+
+    bool operator==(const VolumeSettings&amp;) const = default;
+};
+
 struct VolumeFieldParams {
     std::string file;      
     std::string gridName;  
     int gridIndex = 0;     
     glm::dmat4 toVolume{1.0};
+    std::string array;
+    Tensor buffer;
+    std::uint64_t version = 0;
+    std::uintptr_t stream = 1;
+    bool dense = false;
+    double voxelSize = 1.0;
 
-    bool operator==(const VolumeFieldParams&amp;) const = default;
+    bool operator==(const VolumeFieldParams&amp; other) const {
+        return file == other.file &amp;&amp; gridName == other.gridName &amp;&amp;
+               gridIndex == other.gridIndex &amp;&amp;
+               toVolume == other.toVolume &amp;&amp; array == other.array &amp;&amp;
+               version == other.version &amp;&amp; dense == other.dense &amp;&amp;
+               voxelSize == other.voxelSize;
+    }
 };
 
 struct VolumeMaterialParams {
@@ -477,6 +514,11 @@ struct VolumeMaterialParams {
     std::string phase = &quot;henyeyGreenstein&quot;;
     double b = 0.25;
     double c = 0.5;
+    int octaves = 1;
+    double octaveAttenuation = 0.5;
+    double octaveExtinction = 0.5;
+    double octavePhase = 0.5;
+    double skyLight = 1.0;  
     glm::dvec3 emission{0.0};  
     double blackbody = 1.0;
     double temperature = 0.0;  
@@ -541,6 +583,7 @@ struct FrameParams {
     Wireframe wireframe =
         Wireframe::Off;  
     ShadowSettings shadows;
+    VolumeSettings volumeSettings;  
     std::vector&lt;SensorFilterStep&gt; filters;
     std::vector&lt;std::string_view&gt; vars;
     struct SensorChain {

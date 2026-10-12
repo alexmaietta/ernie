@@ -228,6 +228,8 @@ class ShaderCompiler {
     CompileSpirv(std::span&lt;const ShaderModuleSource&gt; modules,
                  const std::string&amp; entryPoint) const;
 
+    std::size_t CacheHits() const;
+
     std::string
     CompileWgsl(std::span&lt;const ShaderModuleSource&gt; modules,
                 const std::string&amp; entryPoint) const;

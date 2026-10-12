@@ -213,6 +213,7 @@
 #include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;cstdint&gt;
+#include &lt;deque&gt;
 #include &lt;filesystem&gt;
 #include &lt;functional&gt;
 #include &lt;map&gt;
@@ -231,6 +232,9 @@ struct DemoOptions {
     std::optional&lt;std::uint64_t&gt; numFrames;
     bool benchmark = false;
     std::optional&lt;double&gt; benchmarkSeconds;
+    bool profile = false;
+    std::filesystem::path profileJson;
+    std::filesystem::path profileTrace;
     bool test = false;
     std::filesystem::path output;  
     bool paused =
@@ -268,6 +272,8 @@ class Demo {
     virtual void Step();
 
     virtual void Render();
+
+    std::pair&lt;std::uint32_t, std::uint32_t&gt; FinishFrames();
 
     virtual void SaveOutput(const std::filesystem::path&amp; path);
 
@@ -336,6 +342,8 @@ class Demo {
     std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; loggedArrays_;
     std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; loggedImages_;
     Tensor image_;
+    std::deque&lt;StepOperation&gt; running_;
+    std::pair&lt;std::uint32_t, std::uint32_t&gt; lastExtent_{0, 0};
     bool untestedSteps_ = false;
     bool untestedFinal_ = false;
 };

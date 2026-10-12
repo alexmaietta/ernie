@@ -220,6 +220,10 @@
 <td style="text-align: right;">constexpr std::uint32_t</td>
 <td style="text-align: left;"><a href="#variable-kfaces"><strong>kFaces</strong></a>   = <code>6</code><br></td>
 </tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxlevels"><strong>kMaxLevels</strong></a>   = <code>30</code><br><em>The most levels, the data's and the refinement's together.</em></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-functions">Public Functions</h2>
@@ -231,6 +235,10 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-basepoint"><strong>BasePoint</strong></a> (const glm::dvec3 &amp; d) const<br><em>The ellipsoid's point along unit direction</em> <code>d</code> <em>, where a height of 0 lies.</em></td>
+</tr>
 <tr>
 <td style="text-align: right;"></td>
 <td style="text-align: left;"><a href="#function-cubespherelod-13"><strong>CubeSphereLod</strong></a> () = default<br></td>
@@ -252,6 +260,14 @@
 <td style="text-align: left;"><a href="#function-facecells"><strong>FaceCells</strong></a> () const<br><em>Grid quads along each side of a face.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-finecells"><strong>FineCells</strong></a> () const<br><em>Quads along each side of a face's fine grid:</em> <code>FaceCells()</code> <em>times 2^</em><code>Refinement()</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-finedirection"><strong>FineDirection</strong></a> (std::uint32_t face, std::uint32_t col, std::uint32_t row) const<br><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>'s fine grid (</em><code>FineCells()</code> <em>), where patches lie.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">glm::vec2</td>
 <td style="text-align: left;"><a href="#function-heightrange"><strong>HeightRange</strong></a> () const<br><em>The (min, max) height over every face, min above max without valid samples.</em></td>
 </tr>
@@ -265,7 +281,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
-<td style="text-align: left;"><a href="#function-levels"><strong>Levels</strong></a> () const<br></td>
+<td style="text-align: left;"><a href="#function-levels"><strong>Levels</strong></a> () const<br><em>Levels in all: the data's and the refinement's.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -273,7 +289,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1CubeSphereRegion/"><strong>CubeSphereRegion</strong></a></td>
-<td style="text-align: left;"><a href="#function-noderegion"><strong>NodeRegion</strong></a> (std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y, float exaggeration) const<br><em>Region of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>of face</em><code>face</code> <em>; empty for nodes without valid samples.</em></td>
+<td style="text-align: left;"><a href="#function-noderegion"><strong>NodeRegion</strong></a> (std::uint32_t face, std::uint32_t level, std::uint32_t x, std::uint32_t y, float exaggeration) const<br><em>Region of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>of face</em><code>face</code> <em>(</em><code>LeafCells()</code> <em>2^</em><code>level</code> <em>fine quads across); empty for nodes without valid samples.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -284,12 +300,20 @@
 <td style="text-align: left;"><a href="#function-patchcells"><strong>PatchCells</strong></a> () const<br><em>Grid quads along each patch side, half of</em> <code>LeafCells()</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const glm::dvec3 &amp;</td>
+<td style="text-align: left;"><a href="#function-radii"><strong>Radii</strong></a> () const<br><em>The body's semi-axes along x, y and z: equal for a sphere.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#function-radius"><strong>Radius</strong></a> () const<br></td>
+<td style="text-align: left;"><a href="#function-radius"><strong>Radius</strong></a> () const<br><em>The largest of</em> <code>Radii()</code> <em>; the sphere's radius.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LodRange/"><strong>LodRange</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-ranges"><strong>Ranges</strong></a> (double firstRange, float morphStart) const<br><em>Per-level ranges as</em> <code>LodQuadtree::Ranges</code> <em>; the roots' range is infinite.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-refinement"><strong>Refinement</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -304,12 +328,28 @@
 <td style="text-align: left;"><a href="#function-setleaves"><strong>SetLeaves</strong></a> (std::uint32_t face, std::span&lt; const glm::vec2 &gt; leaves) <br><em>Replaces the (min, max) height of every leaf of face</em> <code>face</code> <em>, min above max for a leaf without valid samples, and rebuilds that face's levels above.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setradii"><strong>SetRadii</strong></a> (const glm::dvec3 &amp; radii) <br><em>Makes the body the ellipsoid of semi-axes</em> <code>radii</code> <em>, triaxial or not: base points move onto it along their directions (</em><code>BasePoint</code> <em>) and heights rise along its normals (</em><code>SurfaceNormal</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setrefinement"><strong>SetRefinement</strong></a> (std::uint32_t levels) <br><em>Adds</em> <code>levels</code> <em>levels finer than the data's.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dvec3</td>
+<td style="text-align: left;"><a href="#function-surfacenormal"><strong>SurfaceNormal</strong></a> (const glm::dvec3 &amp; d) const<br><em>The ellipsoid's outward unit (geodetic) normal at its point along unit direction</em> <code>d</code> <em>, along which heights rise: parallel to d_i / a_i^2.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-surfaceradius"><strong>SurfaceRadius</strong></a> (const glm::dvec3 &amp; d) const<br><em>The distance from the centre to the ellipsoid along unit direction</em> <code>d</code> <em>: 1 / sqrt(sum d_i^2 / a_i^2).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint64_t</td>
 <td style="text-align: left;"><a href="#function-trianglecount"><strong>TriangleCount</strong></a> (std::span&lt; const <a href="../structernie_1_1LodPatch/"><strong>LodPatch</strong></a> &gt; patches) const<br><em>Triangles drawn for</em> <code>patches</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
-<td style="text-align: left;"><a href="#function-vertexdirection"><strong>VertexDirection</strong></a> (std::uint32_t face, std::uint32_t col, std::uint32_t row) const<br><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-vertexdirection"><strong>VertexDirection</strong></a> (std::uint32_t face, std::uint32_t col, std::uint32_t row) const<br><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>'s data grid.</em></td>
 </tr>
 </tbody>
 </table>
@@ -337,11 +377,16 @@
 <p>Faces 0 to 3 straddle the equator, centred on longitudes 0, 90, 180 and 270 degrees east, with columns running east and rows running south. Face 4 is centred on the north pole and face 5 on the south pole. On every face, column x row points into the body, so all faces wind the same way. Adjacent faces may run their grids in opposite directions along a shared edge.</p>
 <p>The projection is equiangular (Ronchi et al. 1996): s and t map to the face plane through tan(pi s / 4), so cells span nearly equal angles and areas differ by at most a factor of about 1.4 over a face, against 5.2 for a plain gnomonic cube. Grid lines are great circles.</p>
 <p><code>Select</code> runs Strugar's algorithm on all six trees, using distances to each node's <code>CubeSphereRegion</code>. Neighbouring patches, across faces too, differ by at most one level when the first range is at least <code>MinFirstRange</code>. Odd vertices of a patch morph in 3D towards the midpoint of their two neighbours on the next coarser level: along the patch's edges these are the edge's own neighbours, and for vertices odd in both directions those on the quad diagonal from (1, 0) to (0, 1). Unlike the flat terrain's slide towards lower indices, this does not depend on which way a face's grid runs, so edges between faces match, and a fully morphed patch is exactly the coarser mesh.</p>
+<p>Refinement (<code>SetRefinement</code>) adds levels finer than the data: with k extra levels each face is a grid of <code>FineCells()</code> = 2^k <code>FaceCells()</code> quads, the data's vertices every 2^k of its lines and heights between them interpolated, so the surface keeps its shape (the sphere's curvature and the data's heights) down to cells 2^k times smaller than the data's near the eye. Levels then count from the finest, a data level l being level l + k, and patches' origins are on the fine grid. A refined node's heights are its data leaf's.</p>
+<p>The body may be an ellipsoid (<code>SetRadii</code>), triaxial or not: the cube's grid stays the same in direction, a height of 0 lies on the ellipsoid along the vertex's direction (<code>BasePoint</code>), and heights rise along the ellipsoid's geodetic normal there (<code>SurfaceNormal</code>). Node regions widen by bounds on how much the surface radius and the normal's tilt can vary, so selection stays conservative.</p>
 <p>Positions on a planet need more precision than single floats. Selection works in doubles, and its frustum is relative to the eye: build it from a view-projection matrix whose view has the eye at the origin and the body frame's axes.</p>
 <p>References:
 * C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere': A
   New Method for the Solution of Partial Differential Equations in
   Spherical Geometry", Journal of Computational Physics 124(1):93-114, 1996. <a href="https://doi.org/10.1006/jcph.1996.0047">https://doi.org/10.1006/jcph.1996.0047</a>
+* P. Cozzi and K. Ring, "3D Engine Design for Virtual Globes", A K Peters/CRC Press, 2011, chapter 2 (the ellipsoid's geodetic normal, proportional to x_i / a_i^2). <a href="https://doi.org/10.1201/9781439865583">https://doi.org/10.1201/9781439865583</a>
+* M. Lambers and A. Kolb, "Ellipsoidal Cube Maps for Accurate
+  Rendering of Planetary-Scale Terrain Data", Pacific Graphics 2012 Short Papers, 5-10 (a cube-map quadtree on an ellipsoid). <a href="https://diglib.eg.org/handle/10.2312/PE.PG.PG2012short.005-010">https://diglib.eg.org/handle/10.2312/PE.PG.PG2012short.005-010</a>
 * F. Strugar, "Continuous Distance-Dependent Level of Detail for
   Rendering Heightmaps", Journal of Graphics, GPU, and Game Tools 14(4):57-74, 2009. <a href="https://doi.org/10.1080/2151237X.2009.10129287">https://doi.org/10.1080/2151237X.2009.10129287</a> </p>
 <h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
@@ -349,7 +394,22 @@
 <pre><code class="language-C++">constexpr std::uint32_t ernie::CubeSphereLod::kFaces;
 </code></pre>
 <hr>
+
+<h3 id="variable-kmaxlevels">variable kMaxLevels</h3>
+<p><em>The most levels, the data's and the refinement's together.</em> </p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::CubeSphereLod::kMaxLevels;
+</code></pre>
+<hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-basepoint">function BasePoint</h3>
+<p><em>The ellipsoid's point along unit direction</em> <code>d</code> <em>, where a height of 0 lies.</em></p>
+<pre><code class="language-C++">inline glm::dvec3 ernie::CubeSphereLod::BasePoint (
+    const glm::dvec3 &amp; d
+) const
+</code></pre>
+<p>It is the radial point, not the foot of the normal through a point off the surface (Cesium's <code>scaleToGeodeticSurface</code> iterates from it to that). </p>
+<hr>
+
 <h3 id="function-cubespherelod-13">function CubeSphereLod [1/3]</h3>
 <pre><code class="language-C++">ernie::CubeSphereLod::CubeSphereLod () = default
 </code></pre>
@@ -401,6 +461,22 @@
 </code></pre>
 <hr>
 
+<h3 id="function-finecells">function FineCells</h3>
+<p><em>Quads along each side of a face's fine grid:</em> <code>FaceCells()</code> <em>times 2^</em><code>Refinement()</code> <em>.</em></p>
+<pre><code class="language-C++">inline std::uint32_t ernie::CubeSphereLod::FineCells () const
+</code></pre>
+<hr>
+
+<h3 id="function-finedirection">function FineDirection</h3>
+<p><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>'s fine grid (</em><code>FineCells()</code> <em>), where patches lie.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::CubeSphereLod::FineDirection (
+    std::uint32_t face,
+    std::uint32_t col,
+    std::uint32_t row
+) const
+</code></pre>
+<hr>
+
 <h3 id="function-heightrange">function HeightRange</h3>
 <p><em>The (min, max) height over every face, min above max without valid samples.</em> </p>
 <pre><code class="language-C++">glm::vec2 ernie::CubeSphereLod::HeightRange () const
@@ -419,6 +495,7 @@
 <hr>
 
 <h3 id="function-levels">function Levels</h3>
+<p><em>Levels in all: the data's and the refinement's.</em> </p>
 <pre><code class="language-C++">inline std::uint32_t ernie::CubeSphereLod::Levels () const
 </code></pre>
 <hr>
@@ -437,7 +514,7 @@
 <hr>
 
 <h3 id="function-noderegion">function NodeRegion</h3>
-<p><em>Region of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>of face</em><code>face</code> <em>; empty for nodes without valid samples.</em></p>
+<p><em>Region of the node at (</em> <code>x</code> <em>,</em><code>y</code> <em>) on</em><code>level</code> <em>of face</em><code>face</code> <em>(</em><code>LeafCells()</code> <em>2^</em><code>level</code> <em>fine quads across); empty for nodes without valid samples.</em></p>
 <pre><code class="language-C++">CubeSphereRegion ernie::CubeSphereLod::NodeRegion (
     std::uint32_t face,
     std::uint32_t level,
@@ -463,7 +540,14 @@
 </code></pre>
 <hr>
 
+<h3 id="function-radii">function Radii</h3>
+<p><em>The body's semi-axes along x, y and z: equal for a sphere.</em> </p>
+<pre><code class="language-C++">inline const glm::dvec3 &amp; ernie::CubeSphereLod::Radii () const
+</code></pre>
+<hr>
+
 <h3 id="function-radius">function Radius</h3>
+<p><em>The largest of</em> <code>Radii()</code> <em>; the sphere's radius.</em></p>
 <pre><code class="language-C++">inline double ernie::CubeSphereLod::Radius () const
 </code></pre>
 <hr>
@@ -474,6 +558,11 @@
     double firstRange,
     float morphStart
 ) const
+</code></pre>
+<hr>
+
+<h3 id="function-refinement">function Refinement</h3>
+<pre><code class="language-C++">inline std::uint32_t ernie::CubeSphereLod::Refinement () const
 </code></pre>
 <hr>
 
@@ -512,6 +601,46 @@
 </ul>
 <hr>
 
+<h3 id="function-setradii">function SetRadii</h3>
+<p><em>Makes the body the ellipsoid of semi-axes</em> <code>radii</code> <em>, triaxial or not: base points move onto it along their directions (</em><code>BasePoint</code> <em>) and heights rise along its normals (</em><code>SurfaceNormal</code> <em>).</em></p>
+<pre><code class="language-C++">void ernie::CubeSphereLod::SetRadii (
+    const glm::dvec3 &amp; radii
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for radii that are not positive and finite. </li>
+</ul>
+<hr>
+
+<h3 id="function-setrefinement">function SetRefinement</h3>
+<p><em>Adds</em> <code>levels</code> <em>levels finer than the data's.</em></p>
+<pre><code class="language-C++">void ernie::CubeSphereLod::SetRefinement (
+    std::uint32_t levels
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> when the fine grid would exceed 2^30 quads along a face or the levels <code>kMaxLevels</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-surfacenormal">function SurfaceNormal</h3>
+<p><em>The ellipsoid's outward unit (geodetic) normal at its point along unit direction</em> <code>d</code> <em>, along which heights rise: parallel to d_i / a_i^2.</em></p>
+<pre><code class="language-C++">glm::dvec3 ernie::CubeSphereLod::SurfaceNormal (
+    const glm::dvec3 &amp; d
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-surfaceradius">function SurfaceRadius</h3>
+<p><em>The distance from the centre to the ellipsoid along unit direction</em> <code>d</code> <em>: 1 / sqrt(sum d_i^2 / a_i^2).</em></p>
+<pre><code class="language-C++">double ernie::CubeSphereLod::SurfaceRadius (
+    const glm::dvec3 &amp; d
+) const
+</code></pre>
+<hr>
+
 <h3 id="function-trianglecount">function TriangleCount</h3>
 <p><em>Triangles drawn for</em> <code>patches</code> <em>.</em></p>
 <pre><code class="language-C++">std::uint64_t ernie::CubeSphereLod::TriangleCount (
@@ -521,7 +650,7 @@
 <hr>
 
 <h3 id="function-vertexdirection">function VertexDirection</h3>
-<p><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>.</em></p>
+<p><em>Unit direction of vertex (</em> <code>col</code> <em>,</em><code>row</code> <em>) of face</em><code>face</code> <em>'s data grid.</em></p>
 <pre><code class="language-C++">glm::dvec3 ernie::CubeSphereLod::VertexDirection (
     std::uint32_t face,
     std::uint32_t col,

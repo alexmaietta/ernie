@@ -272,6 +272,10 @@
 <td style="text-align: left;"><a href="#function-description"><strong>Description</strong></a> () const<br><em>One line on what the demo shows, for the Demos panel and the log.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::pair&lt; std::uint32_t, std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#function-finishframes"><strong>FinishFrames</strong></a> () <br><em>Waits for every frame</em> <code>Render</code> <em>left running; the extent of the last one's LdrColor, (0, 0) if it rendered none so.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual double</td>
 <td style="text-align: left;"><a href="#function-fixeddt"><strong>FixedDt</strong></a> () const<br><em>Seconds a step advances without a window, for runs that repeat:</em> <code>fixedDt</code> <em>.</em></td>
 </tr>
@@ -462,6 +466,12 @@
 </code></pre>
 <hr>
 
+<h3 id="function-finishframes">function FinishFrames</h3>
+<p><em>Waits for every frame</em> <code>Render</code> <em>left running; the extent of the last one's LdrColor, (0, 0) if it rendered none so.</em></p>
+<pre><code class="language-C++">std::pair&lt; std::uint32_t, std::uint32_t &gt; ernie::app::Demo::FinishFrames () 
+</code></pre>
+<hr>
+
 <h3 id="function-fixeddt">function FixedDt</h3>
 <p><em>Seconds a step advances without a window, for runs that repeat:</em> <code>fixedDt</code> <em>.</em></p>
 <pre><code class="language-C++">virtual double ernie::app::Demo::FixedDt () const
@@ -578,6 +588,7 @@
 <p><em>Draws a frame: the viewer's next, or without one the scene through</em> <code>GetRenderer</code> <em>into</em><code>Image</code> <em>.</em></p>
 <pre><code class="language-C++">virtual void ernie::app::Demo::Render () 
 </code></pre>
+<p>A benchmark without checks renders asynchronously instead, frames overlapping on the GPU and none read back (<code>Image</code> stays empty), until <code>FinishFrames</code>. </p>
 <hr>
 
 <h3 id="function-renderimage">function RenderImage</h3>

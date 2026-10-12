@@ -207,6 +207,7 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &quot;ernie/device/bindless.h&quot;
 #include &quot;ernie/device/gpu_timer.h&quot;
 
 #include &lt;vk_mem_alloc.h&gt;
@@ -318,6 +319,10 @@ class VulkanContext {
         return rayQuery_;
     }
 
+    bool SupportsDepthClamp() const {
+        return depthClamp_;
+    }
+
     bool SupportsAnisotropy() const {
         return anisotropy_;
     }
@@ -357,7 +362,13 @@ class VulkanContext {
         return pushDescriptorSet_;
     }
 
+    BindlessHeap&amp; Bindless() const {
+        return *bindless_;
+    }
+
     std::vector&lt;std::string&gt; TakeValidationMessages();
+
+    void WaitIdle() const;
 
     void Submit(const std::function&lt;void(VkCommandBuffer)&gt;&amp; record,
                 std::span&lt;const TimelinePoint&gt; waits = {},
@@ -412,12 +423,14 @@ class VulkanContext {
     VkPhysicalDeviceLimits limits_{};
     bool rayQuery_ = false;
     bool anisotropy_ = false;
+    bool depthClamp_ = false;
     bool multiDrawIndirect_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;
     void* gpuProfiler_ =
         nullptr;  
     std::unique_ptr&lt;GpuTimer&gt; timer_;
+    std::unique_ptr&lt;BindlessHeap&gt; bindless_;
     mutable std::mutex profilerMutex_;
     VkSemaphore submissions_ = VK_NULL_HANDLE;
     mutable std::uint64_t submitted_ = 0;

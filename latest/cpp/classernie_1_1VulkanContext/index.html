@@ -240,6 +240,10 @@
 <td style="text-align: left;"><a href="#function-allocator"><strong>Allocator</strong></a> () const<br></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1BindlessHeap/"><strong>BindlessHeap</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-bindless"><strong>Bindless</strong></a> () const<br><em>The device's textures and samplers for every pass, by index (set 1 of every</em> <code>PipelineLayout</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-collectgpuprofile"><strong>CollectGpuProfile</strong></a> (VkCommandBuffer commands) const<br><em>Records into</em> <code>commands</code> <em>, outside a rendering pass, the collection of finished GPU zones for Tracy, and hands those Ernie's profiler timed to it; nothing without either.</em></td>
 </tr>
@@ -317,6 +321,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsdepthclamp"><strong>SupportsDepthClamp</strong></a> () const<br><em>Whether pipelines can clamp depth (</em> <code>GraphicsPipelineDesc :: depthClamp</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-supportsexternalmemory"><strong>SupportsExternalMemory</strong></a> () const<br><em>Whether buffers can be allocated with</em> <code>BufferMemory::Shared</code> <em>: memory and semaphores exported for CUDA interop, as POSIX file descriptors (VK_KHR_external_memory_fd and VK_KHR_external_semaphore_fd) or, on Windows, Win32 handles (their _win32 counterparts).</em></td>
 </tr>
 <tr>
@@ -360,6 +368,10 @@
 <td style="text-align: left;"><a href="#function-waitforsubmissions"><strong>WaitForSubmissions</strong></a> () const<br><em>Waits until the device has finished every</em> <code>SubmitAsync</code> <em>submission.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-waitidle"><strong>WaitIdle</strong></a> () const<br><em>Waits for the device to finish all its work, as before freeing what submitted work may still use.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="./"><strong>VulkanContext</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>VulkanContext</strong></a> &amp;) = delete<br></td>
 </tr>
@@ -395,6 +407,12 @@
 
 <h3 id="function-allocator">function Allocator</h3>
 <pre><code class="language-C++">inline VmaAllocator ernie::VulkanContext::Allocator () const
+</code></pre>
+<hr>
+
+<h3 id="function-bindless">function Bindless</h3>
+<p><em>The device's textures and samplers for every pass, by index (set 1 of every</em> <code>PipelineLayout</code> <em>).</em></p>
+<pre><code class="language-C++">inline BindlessHeap &amp; ernie::VulkanContext::Bindless () const
 </code></pre>
 <hr>
 
@@ -553,6 +571,12 @@
 </code></pre>
 <hr>
 
+<h3 id="function-supportsdepthclamp">function SupportsDepthClamp</h3>
+<p><em>Whether pipelines can clamp depth (</em> <code>GraphicsPipelineDesc :: depthClamp</code> <em>).</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsDepthClamp () const
+</code></pre>
+<hr>
+
 <h3 id="function-supportsexternalmemory">function SupportsExternalMemory</h3>
 <p><em>Whether buffers can be allocated with</em> <code>BufferMemory::Shared</code> <em>: memory and semaphores exported for CUDA interop, as POSIX file descriptors (VK_KHR_external_memory_fd and VK_KHR_external_semaphore_fd) or, on Windows, Win32 handles (their _win32 counterparts).</em></p>
 <pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsExternalMemory () const
@@ -622,6 +646,12 @@
 <h3 id="function-waitforsubmissions">function WaitForSubmissions</h3>
 <p><em>Waits until the device has finished every</em> <code>SubmitAsync</code> <em>submission.</em></p>
 <pre><code class="language-C++">void ernie::VulkanContext::WaitForSubmissions () const
+</code></pre>
+<hr>
+
+<h3 id="function-waitidle">function WaitIdle</h3>
+<p><em>Waits for the device to finish all its work, as before freeing what submitted work may still use.</em> </p>
+<pre><code class="language-C++">void ernie::VulkanContext::WaitIdle () const
 </code></pre>
 <hr>
 

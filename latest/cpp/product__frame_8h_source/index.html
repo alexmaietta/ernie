@@ -212,7 +212,10 @@
 #include &quot;ernie/session/outputs.h&quot;
 
 #include &lt;cstdint&gt;
+#include &lt;functional&gt;
 #include &lt;memory&gt;
+#include &lt;set&gt;
+#include &lt;string&gt;
 #include &lt;vector&gt;
 
 namespace ernie {
@@ -229,6 +232,7 @@ struct ProductFrame {
     int arrayMaps =
         0;  
     std::vector&lt;std::shared_ptr&lt;GpuBuffer&gt;&gt;* linearPool = nullptr;
+    std::set&lt;std::string, std::less&lt;&gt;&gt;* linearVars = nullptr;
 };
 
 }  // namespace ernie

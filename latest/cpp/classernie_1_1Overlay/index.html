@@ -302,6 +302,10 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-touch"><strong>Touch</strong></a> () <br><em>Marks the layer changed, so the renderer reads its batches' arrays again: after writing into them in place.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-triangles"><strong>Triangles</strong></a> (std::span&lt; const glm::dvec3 &gt; points, std::span&lt; const std::uint32_t &gt; indices, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::dmat4 &amp; transform=glm::dmat4(1.0)) <br><em>The filled triangles</em> <code>indices</code> <em>(in threes) over</em><code>points</code> <em>, placed by</em><code>transform</code> <em>.</em></td>
 </tr>
 <tr>
@@ -345,7 +349,7 @@
     OverlayBatch batch
 ) 
 </code></pre>
-<p>The overlay holds the arrays: add the batch again after writing into them in place. </p>
+<p>The overlay holds the arrays: <code>Touch</code> it after writing into them in place. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> for arrays of the wrong type or shape, rows that differ in number, or ones the kind needs missing. </li>
@@ -501,6 +505,12 @@
 
 <h3 id="function-sprites">function Sprites</h3>
 <pre><code class="language-C++">inline const std::vector&lt; OverlaySprite &gt; &amp; ernie::Overlay::Sprites () const
+</code></pre>
+<hr>
+
+<h3 id="function-touch">function Touch</h3>
+<p><em>Marks the layer changed, so the renderer reads its batches' arrays again: after writing into them in place.</em> </p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Touch () 
 </code></pre>
 <hr>
 

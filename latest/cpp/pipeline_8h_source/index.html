@@ -307,6 +307,8 @@ class ComputePipeline {
     VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 
+void ComputeBarrier(VkCommandBuffer commands);
+
 struct GraphicsPipelineDesc {
     std::span&lt;const std::uint32_t&gt; vertexSpirv;
     std::span&lt;const std::uint32_t&gt;
@@ -324,6 +326,7 @@ struct GraphicsPipelineDesc {
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     float depthBiasSlope =
         0.0f;  
+    bool depthClamp = false;
     bool alphaBlend = false;
 };
 

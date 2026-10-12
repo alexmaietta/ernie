@@ -392,8 +392,9 @@ class Overlay {
                sprites_.empty() &amp;&amp; batches_.empty();
     }
 
+    Overlay&amp; Touch();
+
   private:
-    void Touch();
     void AddSegment(const glm::dvec3&amp; a, const glm::dvec3&amp; b,
                     const OverlayStyle&amp; style,
                     const glm::vec4&amp; color);

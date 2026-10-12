@@ -384,6 +384,10 @@
 <td style="text-align: left;"><a href="#variable-vars"><strong>vars</strong></a>  <br><em>The render vars wanted from the frame; empty for all.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1VolumeSettings/"><strong>VolumeSettings</strong></a></td>
+<td style="text-align: left;"><a href="#variable-volumesettings"><strong>volumeSettings</strong></a>  <br><em>How finely volumes render.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1VolumeParams/"><strong>VolumeParams</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#variable-volumes"><strong>volumes</strong></a>  <br><em>The visible Volumes (</em> <code>VolumesOf</code> <em>).</em></td>
 </tr>
@@ -709,6 +713,12 @@
 <pre><code class="language-C++">std::vector&lt;std::string_view&gt; ernie::FrameParams::vars;
 </code></pre>
 <p>Only they are held, and filters that produce none of them do not run (the sensor fuses the rest, <code>PlanSensor</code>). </p>
+<hr>
+
+<h3 id="variable-volumesettings">variable volumeSettings</h3>
+<p><em>How finely volumes render.</em> </p>
+<pre><code class="language-C++">VolumeSettings ernie::FrameParams::volumeSettings;
+</code></pre>
 <hr>
 
 <h3 id="variable-volumes">variable volumes</h3>

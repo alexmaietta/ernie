@@ -241,9 +241,14 @@ inline constexpr std::string_view kPrimId =
 inline constexpr std::string_view kInstanceId =
     &quot;InstanceId&quot;;  
 inline constexpr std::string_view kMotionVector = &quot;MotionVector&quot;;
+inline constexpr std::string_view kDegreeOfLinearPolarization =
+    &quot;DegreeOfLinearPolarization&quot;;
+inline constexpr std::string_view kAngleOfLinearPolarization =
+    &quot;AngleOfLinearPolarization&quot;;
+inline constexpr std::string_view kLinearStokes = &quot;LinearStokes&quot;;
 }  // namespace render_vars
 
-inline constexpr std::array&lt;std::string_view, 11&gt; kRenderVarNames{
+inline constexpr std::array&lt;std::string_view, 14&gt; kRenderVarNames{
     render_vars::kSpectralRadiance,
     render_vars::kElectrons,
     render_vars::kRawDn,
@@ -254,7 +259,10 @@ inline constexpr std::array&lt;std::string_view, 11&gt; kRenderVarNames{
     render_vars::kNormal,
     render_vars::kPrimId,
     render_vars::kInstanceId,
-    render_vars::kMotionVector};
+    render_vars::kMotionVector,
+    render_vars::kDegreeOfLinearPolarization,
+    render_vars::kAngleOfLinearPolarization,
+    render_vars::kLinearStokes};
 
 enum class SensorFilter : std::uint8_t {
     Lens,

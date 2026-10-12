@@ -237,11 +237,13 @@
       (::ernie::AttributeMeta{.label = &quot;Minimal mode&quot;,                                             \
                               .doc = &quot;Minimal shading for throughput: no colour (\&quot;none\&quot;), one &quot;  \
                                      &quot;colour or surfaces' diffuse colours, lit by the sun and &quot;    \
-                                     &quot;ambient, without sensor filters.&quot;,                           \
+                                     &quot;ambient, with glossy highlights and emission or not, &quot;       \
+                                     &quot;without sensor filters.&quot;,                                    \
                               .group = &quot;Minimal&quot;,                                                  \
                               .options = {::ernie::tokens::kOff, ::ernie::tokens::kNone,           \
                                           ::ernie::tokens::kConstantDiffuse,                       \
-                                          ::ernie::tokens::kTexturedDiffuse}}))                    \
+                                          ::ernie::tokens::kTexturedDiffuse,                       \
+                                          ::ernie::tokens::kDiffuseGlossyEmission}}))              \
     X(glm::dvec3, MinimalConstantColor, ::ernie::tokens::kMinimalConstantColor, glm::dvec3(1.0),   \
       (::ernie::AttributeMeta{.label = &quot;Constant colour&quot;, .doc = &quot;Linear RGB of constantDiffuse.&quot;, \
                               .group = &quot;Minimal&quot;, .color = true}))
@@ -323,8 +325,9 @@
       (::ernie::AttributeMeta{.label = &quot;Show LOD levels&quot;, .group = &quot;Culling and LOD&quot;}))            \
     X(std::string, ShadowFit, ::ernie::tokens::kShadowFit, ::ernie::tokens::kScene,                \
       (::ernie::AttributeMeta{.label = &quot;Fit&quot;,                                                      \
-                              .doc = &quot;visible: sample distribution shadow maps (the viewport's &quot;   \
-                                     &quot;default).&quot;,                                                  \
+                              .doc = &quot;scene: the casters' bounds, an image the same every time; &quot; \
+                                     &quot;visible: sample distribution shadow maps, from the depths a &quot; \
+                                     &quot;recent frame saw.&quot;,                                           \
                               .group = &quot;Shadows&quot;,                                                  \
                               .options = {::ernie::tokens::kScene, ::ernie::tokens::kVisible}}))   \
     X(int, ShadowCascades, ::ernie::tokens::kShadowCascades, 3,                                    \
@@ -363,6 +366,38 @@
     X(double, ShadowWorldMargin, ::ernie::tokens::kShadowWorldMargin, 1.0,                         \
       (::ernie::AttributeMeta{.label = &quot;World margin&quot;, .doc = &quot;Metres past the world's casters.&quot;,  \
                               .group = &quot;Shadows&quot;, .max = 100.0}))                                  \
+    X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 2.0,                     \
+      (::ernie::AttributeMeta{.label = &quot;Steps per voxel&quot;,                                          \
+                              .doc = &quot;Steps through a volume per voxel of its densest field, &quot;     \
+                                     &quot;fewer for speed.&quot;,                                           \
+                              .group = &quot;Volumes&quot;, .min = 0.1, .max = 8.0}))                        \
+    X(int, VolumeMaxSteps, ::ernie::tokens::kVolumeMaxSteps, 256,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Most steps&quot;, .doc = &quot;Steps through one volume, at most.&quot;,  \
+                              .group = &quot;Volumes&quot;, .min = 1.0, .max = 4096.0}))                     \
+    X(int, VolumeShadowSteps, ::ernie::tokens::kVolumeShadowSteps, 12,                             \
+      (::ernie::AttributeMeta{.label = &quot;Shadow steps&quot;,                                             \
+                              .doc = &quot;Steps towards each light through each volume on the way.&quot;,   \
+                              .group = &quot;Volumes&quot;, .min = 1.0, .max = 64.0}))                       \
+    X(int, VolumeSkyLightSteps, ::ernie::tokens::kVolumeSkyLightSteps, 6,                          \
+      (::ernie::AttributeMeta{.label = &quot;Sky light steps&quot;,                                          \
+                              .doc = &quot;Steps up and down through the volumes for how much of the &quot;  \
+                                     &quot;sky's and the ground's light they let through; 0, all.&quot;,     \
+                              .group = &quot;Volumes&quot;, .max = 64.0}))                                   \
+    X(int, VolumeAirSteps, ::ernie::tokens::kVolumeAirSteps, 32,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Air steps&quot;,                                                \
+                              .doc = &quot;Steps through the atmosphere in front of the volumes; 0 &quot;    \
+                                     &quot;leaves volumes the air of what is behind them.&quot;,             \
+                              .group = &quot;Volumes&quot;, .max = 128.0}))                                  \
+    X(int, VolumeMaxOctaves, ::ernie::tokens::kVolumeMaxOctaves, 8,                                \
+      (::ernie::AttributeMeta{.label = &quot;Most octaves&quot;,                                             \
+                              .doc = &quot;Orders of multiple scattering any material approximates, &quot;  \
+                                     &quot;at most.&quot;,                                                   \
+                              .group = &quot;Volumes&quot;, .min = 1.0, .max = 8.0}))                        \
+    X(int, VolumeShadowResolution, ::ernie::tokens::kVolumeShadowResolution, 256,                  \
+      (::ernie::AttributeMeta{.label = &quot;Shadow resolution&quot;,                                        \
+                              .doc = &quot;Texels along each side of the volumes' shadow map of each &quot;  \
+                                     &quot;light shadow view, which surfaces read.&quot;,                    \
+                              .group = &quot;Volumes&quot;, .min = 16.0, .max = 2048.0}))                    \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, &quot;approximate&quot;,                  \
       (::ernie::AttributeMeta{.label = &quot;Mode&quot;,                                                     \
                               .doc = &quot;approximate: unoccluded; full: also shadowed; directions: &quot;  \
