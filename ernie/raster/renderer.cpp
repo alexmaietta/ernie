@@ -2286,6 +2286,17 @@ void RasterRenderer::WriteLights(
             entry.map[1] = 1.0f;
         }
     }
+    // Shadow linking: each light's views draw only the geometry its
+    // shadow link holds.
+    for (std::size_t i = 0; i < table.size() && i < params.lights.size();
+         ++i) {
+        const auto first = static_cast<std::size_t>(table[i].cone[2]);
+        const auto count = static_cast<std::size_t>(table[i].cone[3]);
+        for (std::size_t v = first;
+             v < first + count && v < lightViews_.size(); ++v) {
+            lightViews_[v].shadowMask = params.lights[i].shadowMask;
+        }
+    }
     // Minimal shading's main light, the brightest distant light, and
     // its maps, which it shadows with.
     minimalKey_.reset();

@@ -36,6 +36,9 @@ struct ShadowCascade {
     /// the world whose casters it draws besides the shared ones, so
     /// passes consider only theirs; none for every world's.
     std::optional<std::int32_t> world;
+    /// Shadow linking (`LightParams::shadowMask`): the link groups of
+    /// the geometry its map draws.
+    std::uint32_t shadowMask = ~0u;
 };
 
 /// View-space split depths from `nearPlane` to `farPlane` with the

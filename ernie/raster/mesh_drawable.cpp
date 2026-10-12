@@ -2563,7 +2563,8 @@ void MeshDrawable::Cull(const FrameParams& params,
     };
     const auto list = [&](const glm::mat4& viewProjection,
                           float pixelsPerUnit, bool pyramid,
-                          const ShadowCasters* seen, bool posed) {
+                          const ShadowCasters* seen, bool posed,
+                          std::uint32_t linkMask = ~0u) {
         const Frustum frustum = Frustum::FromMatrix(viewProjection);
         const auto slot = static_cast<std::uint32_t>(views.size() /
                                                      kCullViewStride);
@@ -2572,7 +2573,8 @@ void MeshDrawable::Cull(const FrameParams& params,
         for (const auto [i, r] : candidates(seen)) {
             const WorldRange& range = itemRanges_[i][r];
             if (range.count == 0 ||
-                (seen != nullptr && !seen->Draws(range.world))) {
+                (seen != nullptr && !seen->Draws(range.world)) ||
+                ((linkMask >> (items_[i].linkGroup & 31u)) & 1u) == 0) {
                 continue;
             }
             if (posed && culling_ != Culling::Off) {
@@ -2743,7 +2745,8 @@ void MeshDrawable::Cull(const FrameParams& params,
         shadowDraws_.push_back(
             list(cascade.lightViewProjection,
                  1.0f / std::max(cascade.texelWorldSize, 1e-30f),
-                 false, seen ? &*seen : nullptr, !cascade.gpuFitted));
+                 false, seen ? &*seen : nullptr, !cascade.gpuFitted,
+                 cascade.shadowMask));
     }
     if (!gpuShadowSlots_.empty()) {
         Reserve(context_, gpuShadowSlotBuffer_,

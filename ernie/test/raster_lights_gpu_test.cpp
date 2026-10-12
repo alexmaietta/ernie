@@ -2226,3 +2226,22 @@ TEST_F(RasterDelegateTest, LightLinksChooseWhatALampLights) {
                 1e-3f * bothLeft);
     EXPECT_EQ(RadianceAt(delegate, scene, 5.0f, 0.0f), 0.0f);
 }
+
+// Shadow linking: a blocker shadows the ground under a lamp until the
+// lamp's shadow link leaves it out (as
+// LampsCastShadowsFromSpotAndCubeMaps sets it up).
+TEST_F(RasterDelegateTest, ShadowLinksChooseWhatCastsALampsShadows) {
+    RasterDelegate delegate(*context_);
+    Scene scene = LampScene(10.0);
+    const float lit = RadianceAt(delegate, scene, 3.0f, 0.0f);
+    DefineQuad(scene, "/World/Blocker");
+    scene.Set(
+        "/World/Blocker", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
+    ASSERT_LT(RadianceAt(delegate, scene, 3.0f, 0.0f), 0.1f * lit)
+        << "behind the blocker";
+    ernie::SphereLight(scene, "/World/Lamp")
+        .SetShadowLinkExcludes({ernie::Path("/World/Blocker")});
+    EXPECT_NEAR(RadianceAt(delegate, scene, 3.0f, 0.0f), lit,
+                0.02f * lit);
+}
