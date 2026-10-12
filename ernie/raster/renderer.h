@@ -1307,6 +1307,8 @@ class RasterRenderer {
     std::array<std::unique_ptr<ComputePipeline>, 2> skyPipelines_;
     std::vector<std::size_t> modelsInUse_;
     SpectralBands bands_;
+    /// The frame's thermal emission, for the material table.
+    ThermalSettings thermal_;
     std::vector<SensorFilter> filters_;
     VkExtent2D extent_{0, 0};
     std::unique_ptr<OverlayPass> overlays_;
