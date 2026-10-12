@@ -40,6 +40,9 @@ struct CascadeJob {
     // x: 1 to fit to the depths seen, y: how far the eye moved since, z: how far it may move per
     // unit of the nearest depth seen.
     float4 seen;
+    // x, y: the nearest and farthest view depth of the volumes' bounds, which write no depth for
+    // the views to see; y 0 without volumes.
+    float4 volumes;
     // x: its first view, y: views with Shadows blocks, z: flags (1 to write the frame's splits, 2
     // to write into `subframes` rather than the frame's views), w: 1 to write minimal shading's
     // maps.
@@ -151,8 +154,12 @@ void cascadeFitMain(uint3 id : SV_DispatchThreadID) {
     var distance = job.fit.x;
     var splitNear = near;
     // Sample distribution: within the depths seen, with margins, while the eye has moved little.
-    let nearest = asfloat(constants.seen[0]);
-    let farthest = asfloat(constants.seen[1]);
+    var nearest = asfloat(constants.seen[0]);
+    var farthest = asfloat(constants.seen[1]);
+    if (job.volumes.y > 0.0) {
+        nearest = min(nearest, job.volumes.x);
+        farthest = max(farthest, job.volumes.y);
+    }
     if (job.seen.x != 0.0 && farthest > 0.0 && nearest <= farthest &&
         job.seen.y <= job.seen.z * nearest) {
         distance = max(min(distance, 1.1 * farthest), near * 1.01);

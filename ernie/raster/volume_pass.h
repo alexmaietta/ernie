@@ -108,6 +108,14 @@ class VolumePass {
         return active_;
     }
 
+    /// The union of the last `Set`'s volume instances' world boxes,
+    /// relative to its origin; none without volumes. Volumes write no
+    /// depth, so what fits to the depths seen (shadow cascades)
+    /// widens by these.
+    const std::optional<Bounds3>& Bounds() const {
+        return bounds_;
+    }
+
     /// Texels across a light shadow view's volume shadow map, as the
     /// last `Set`'s settings say.
     std::uint32_t ShadowSize() const {
@@ -256,6 +264,7 @@ class VolumePass {
     std::uint32_t seed_ = 0;
     VolumeSettings settings_;
     bool active_ = false;
+    std::optional<Bounds3> bounds_;
 };
 
 }  // namespace ernie

@@ -69,6 +69,7 @@ constexpr DescriptorBinding kBindings[] = {
     {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
 
 /// The motion pass's: the points passes' and 14, the view's
@@ -89,7 +90,33 @@ constexpr DescriptorBinding kMotionBindings[] = {
     {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {14, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
+
+/// Culling's: positions, widths, draws, then jobs, raster views'
+/// Uniforms, light views' matrices, visible chunks and indirect draws
+/// (points.slang's `cullMain`).
+constexpr DescriptorBinding kCullBindings[] = {
+    {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {13, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {18, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {19, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {20, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// Points per chunk culling tests together (points.slang's `kChunk`).
+constexpr std::uint32_t kChunk = 64;
 
 /// Bounds of the box [`low`, `high`] after `transform`.
 Bounds3 TransformBox(const glm::mat4& transform, const glm::vec3& low,
@@ -150,7 +177,9 @@ PointsDrawable::PointsDrawable(RasterRenderer& renderer)
     : renderer_(renderer), context_(renderer.Context()),
       layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       motionLayout_(renderer.Context(), kMotionBindings,
-                    sizeof(DrawConstants)) {
+                    sizeof(DrawConstants)),
+      cullLayout_(renderer.Context(), kCullBindings,
+                  sizeof(DrawConstants)) {
     const ShaderCompiler& compiler = renderer_.Compiler();
     const std::vector<ShaderModuleSource> modules = PointsModules();
     // The descriptions view the code, which must outlive them.
@@ -167,6 +196,9 @@ PointsDrawable::PointsDrawable(RasterRenderer& renderer)
     shadow.depthClamp = true;
     shadowPipeline_ =
         std::make_unique<GraphicsPipeline>(context_, layout_, shadow);
+    cullPipeline_ = std::make_unique<ComputePipeline>(
+        context_, cullLayout_,
+        compiler.CompileSpirv(modules, "cullMain"));
     draws_ = std::make_unique<GpuBuffer>(
         context_, sizeof(GpuPointsDraw),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
@@ -602,12 +634,17 @@ std::map<std::int32_t, Bounds3> PointsDrawable::WorldsBounds() const {
     return bounds;
 }
 
-void PointsDrawable::Prepare(const FrameParams& params,
-                             std::span<const ShadowCascade>) {
+void PointsDrawable::Prepare(
+    const FrameParams& params,
+    std::span<const ShadowCascade> cascades) {
     ERNIE_ZONE("Points prepare");
     // Nothing per view without points to draw: batches of thousands
     // of views pay nothing.
     viewItems_.clear();
+    viewJobs_.clear();
+    shadowJobs_.clear();
+    jobs_.clear();
+    itemJobs_.clear();
     anchored_ = 0;
     if (items_.empty()) {
         return;
@@ -671,6 +708,7 @@ void PointsDrawable::Prepare(const FrameParams& params,
         draw.ids[0] = item.material;
         draw.ids[1] = item.primId;
         draw.ids[2] = item.linkGroup;
+        draw.ids[3] = count;
     }
     const VkDeviceSize bytes = std::max<VkDeviceSize>(
         draws.size() * sizeof(GpuPointsDraw), 16);
@@ -699,28 +737,201 @@ void PointsDrawable::Prepare(const FrameParams& params,
         renderer_.Uploads().Write(*anchorRecords_,
                                   std::as_bytes(std::span(records)));
     }
-    // Each view draws the items of its worlds whose bounds meet its
-    // frustum.
+    // With GPU culling, each still cloud's draw in each view and
+    // shadow view becomes a job testing its chunks there, the views'
+    // matrices read where the GPU keeps them; a cloud moving across
+    // the shutter, or a view swept or seen at sub-frames, draws every
+    // point.
+    const bool gpu = params.culling == Culling::Gpu &&
+                     !params.camera.pushbroom &&
+                     renderer_.Subframes() == 1;
+    const auto still = [&](std::size_t i) {
+        return previous_[i] == items_[i].transform &&
+               !clouds_.at(items_[i].points).moving;
+    };
     viewItems_.assign(params.Views(), {});
+    viewJobs_.assign(params.Views(), {});
+    shadowJobs_.assign(cascades.size(),
+                       std::vector<std::int32_t>(items_.size(), -1));
+    std::uint32_t visible = 0;
+    const auto addJob = [&](std::uint32_t kind, std::uint32_t index,
+                            std::size_t item) {
+        jobs_.emplace_back(kind, index, visible, 0u);
+        const auto count = static_cast<std::uint32_t>(
+            clouds_.at(items_[item].points).count);
+        visible += (count + kChunk - 1) / kChunk;
+        return static_cast<std::int32_t>(jobs_.size() - 1);
+    };
+    // Each view draws the items of its worlds whose bounds meet its
+    // frustum; jobs test them on the GPU instead, an item's together.
+    std::vector<Frustum> frusta;
     for (std::size_t v = 0; v < params.Views(); ++v) {
-        const std::int32_t world = params.ViewWorld(v);
-        const Frustum frustum =
-            Frustum::FromMatrix(params.View(v).ViewProjection());
-        for (std::size_t i = 0; i < items_.size(); ++i) {
-            const PointsItem& item = items_[i];
-            if (clouds_.at(item.points).count == 0 ||
-                (item.world != -1 && world != -1 &&
-                 item.world != world)) {
+        frusta.push_back(
+            Frustum::FromMatrix(params.View(v).ViewProjection()));
+    }
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        const PointsItem& item = items_[i];
+        const std::size_t count = clouds_.at(item.points).count;
+        const bool culled = gpu && still(i) && count > 0;
+        const auto first = static_cast<std::uint32_t>(jobs_.size());
+        const Bounds3 box = ItemBounds(i);
+        for (std::size_t v = 0; v < params.Views(); ++v) {
+            const std::int32_t world = params.ViewWorld(v);
+            if (count == 0 || (item.world != -1 && world != -1 &&
+                               item.world != world)) {
                 continue;
             }
-            const Bounds3 box = ItemBounds(i);
-            if (params.posesOnGpu ||
-                frustum.Intersects(box.first, box.second)) {
+            if (culled) {
                 viewItems_[v].push_back(
                     static_cast<std::uint32_t>(i));
+                viewJobs_[v].push_back(
+                    addJob(0, static_cast<std::uint32_t>(v), i));
+            } else if (params.culling == Culling::Off ||
+                       params.posesOnGpu ||
+                       frusta[v].Intersects(box.first, box.second)) {
+                viewItems_[v].push_back(
+                    static_cast<std::uint32_t>(i));
+                viewJobs_[v].push_back(-1);
             }
         }
+        for (std::size_t c = 0; c < cascades.size() && culled; ++c) {
+            const ShadowCascade& cascade = cascades[c];
+            if (cascade.moving ||
+                (cascade.world && item.world != -1 &&
+                 item.world != *cascade.world) ||
+                ((cascade.shadowMask >> (item.linkGroup & 31u)) &
+                 1u) == 0) {
+                continue;
+            }
+            shadowJobs_[c][i] = addJob(
+                1,
+                cascade.gpuFitted ? cascade.gpuMatrix
+                                  : static_cast<std::uint32_t>(c),
+                i);
+        }
+        itemJobs_.emplace_back(
+            first, static_cast<std::uint32_t>(jobs_.size()) - first);
     }
+    if (jobs_.empty()) {
+        return;
+    }
+    // Each job's indirect draw: six vertices per point, its instances
+    // counted up by the culling.
+    std::vector<VkDrawIndirectCommand> commands(jobs_.size(),
+                                                {6, 0, 0, 0});
+    const auto reserve = [&](std::unique_ptr<GpuBuffer>& buffer,
+                             VkDeviceSize bytes,
+                             VkBufferUsageFlags usage) {
+        bytes = std::max<VkDeviceSize>(bytes, 16);
+        if (buffer == nullptr || buffer->Size() < bytes) {
+            if (buffer != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            buffer = std::make_unique<GpuBuffer>(
+                context_, bytes, usage, BufferMemory::Device);
+        }
+    };
+    reserve(cullJobs_, jobs_.size() * sizeof(glm::uvec4),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    reserve(cullCommands_,
+            commands.size() * sizeof(VkDrawIndirectCommand),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    reserve(visibleChunks_,
+            VkDeviceSize{visible} * sizeof(std::uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    renderer_.Uploads().Write(*cullJobs_,
+                              std::as_bytes(std::span(jobs_)));
+    renderer_.Uploads().Write(*cullCommands_,
+                              std::as_bytes(std::span(commands)));
+}
+
+void PointsDrawable::RecordCull(VkCommandBuffer commands) const {
+    if (jobs_.empty()) {
+        return;
+    }
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      cullPipeline_->Handle());
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        const auto [first, jobs] = itemJobs_[i];
+        if (jobs == 0) {
+            continue;
+        }
+        const Cloud& cloud = clouds_.at(items_[i].points);
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(*cloud.positions),
+            DescriptorResource::Of(*cloud.widths),
+            DescriptorResource::Of(*draws_),
+            DescriptorResource::Of(*cullJobs_),
+            DescriptorResource::Of(renderer_.ViewUniforms()),
+            DescriptorResource::Of(renderer_.LightViewMatrices()),
+            DescriptorResource::Of(*visibleChunks_),
+            DescriptorResource::Of(*cullCommands_)};
+        cullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                         resources);
+        const auto count = static_cast<std::uint32_t>(cloud.count);
+        const std::uint32_t chunks = (count + kChunk - 1) / kChunk;
+        // Past the groups every device dispatches along x, in runs.
+        for (std::uint32_t done = 0; done < chunks; done += 65535) {
+            DrawConstants constants{};
+            constants.first = static_cast<std::uint32_t>(i);
+            constants.instanceOffset = count;
+            constants.indexOffset = first;
+            constants.records = static_cast<std::uint32_t>(
+                RasterRenderer::ViewUniformsStride() / 16);
+            constants.view = done;
+            cullLayout_.PushConstants(commands, &constants,
+                                      sizeof(constants));
+            vkCmdDispatch(commands, std::min(chunks - done, 65535u),
+                          jobs, 1);
+        }
+    }
+    // The renderer's barrier follows for the vertex stages; the
+    // indirect draws read the counts too.
+    VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT |
+                           VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT |
+                            VK_ACCESS_2_SHADER_READ_BIT;
+    VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dependency.memoryBarrierCount = 1;
+    dependency.pMemoryBarriers = &barrier;
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
+std::vector<std::uint32_t> PointsDrawable::CulledPointCounts() const {
+    if (jobs_.empty()) {
+        return {};
+    }
+    std::vector<VkDrawIndirectCommand> drawn(jobs_.size());
+    cullCommands_->Read(std::as_writable_bytes(std::span(drawn)));
+    std::vector<std::uint32_t> counts;
+    for (const VkDrawIndirectCommand& command : drawn) {
+        counts.push_back(command.instanceCount);
+    }
+    return counts;
+}
+
+std::uint32_t PointsDrawable::InstanceOffset(std::int32_t job) const {
+    return job < 0 ? 0u : 1u + jobs_[static_cast<std::size_t>(job)].z;
+}
+
+void PointsDrawable::Draw(VkCommandBuffer commands,
+                          std::uint32_t item,
+                          std::int32_t job) const {
+    if (job < 0) {
+        vkCmdDraw(commands, 6,
+                  static_cast<std::uint32_t>(
+                      clouds_.at(items_[item].points).count),
+                  0, 0);
+        return;
+    }
+    vkCmdDrawIndirect(commands, cullCommands_->Handle(),
+                      static_cast<VkDeviceSize>(job) *
+                          sizeof(VkDrawIndirectCommand),
+                      1, sizeof(VkDrawIndirectCommand));
 }
 
 void PointsDrawable::RecordPrepass(VkCommandBuffer commands) const {
@@ -747,6 +958,12 @@ PointsDrawable::Resources(const RasterFrame& frame,
         resources.push_back(DescriptorResource::Of(*buffer));
     }
     return resources;
+}
+
+DescriptorResource PointsDrawable::VisibleResource() const {
+    // Draws of every point read nothing there: the draws stand in.
+    return DescriptorResource::Of(
+        visibleChunks_ != nullptr ? *visibleChunks_ : *draws_);
 }
 
 void PointsDrawable::RecordMotion(
@@ -793,6 +1010,7 @@ void PointsDrawable::RecordMotion(
         std::vector<DescriptorResource> resources =
             Resources(frame, i);
         resources.push_back(motion);
+        resources.push_back(VisibleResource());
         motionLayout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                            resources);
         DrawConstants constants{};
@@ -806,8 +1024,8 @@ void PointsDrawable::RecordMotion(
 }
 
 void PointsDrawable::RecordShadow(
-    VkCommandBuffer commands, const RasterFrame& frame, std::size_t,
-    const glm::mat4& lightViewProjection,
+    VkCommandBuffer commands, const RasterFrame& frame,
+    std::size_t cascade, const glm::mat4& lightViewProjection,
     const ShadowCasters& casters) const {
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       shadowPipeline_->Handle());
@@ -817,20 +1035,26 @@ void PointsDrawable::RecordShadow(
             !casters.Casts(items_[i].linkGroup)) {
             continue;
         }
+        const std::int32_t job = cascade < shadowJobs_.size()
+                                     ? shadowJobs_[cascade][i]
+                                     : -1;
+        std::vector<DescriptorResource> resources =
+            Resources(frame, i);
+        resources.push_back(VisibleResource());
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                     Resources(frame, i));
+                     resources);
         DrawConstants constants{};
         std::memcpy(constants.lightViewProj,
                     glm::value_ptr(lightViewProjection),
                     sizeof(constants.lightViewProj));
         constants.first = static_cast<std::uint32_t>(i);
+        constants.instanceOffset = InstanceOffset(job);
         constants.shadowFromFrame = frame.shadowFromFrame ? 1u : 0u;
         constants.view = frame.view;
         constants.shadowLayer = frame.shadowLayer;
         layout_.PushConstants(commands, &constants,
                               sizeof(constants));
-        vkCmdDraw(commands, 6, static_cast<std::uint32_t>(count), 0,
-                  0);
+        Draw(commands, static_cast<std::uint32_t>(i), job);
     }
 }
 
@@ -844,18 +1068,21 @@ void PointsDrawable::RecordColor(VkCommandBuffer commands,
     vkCmdBindPipeline(
         commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
         gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
-    for (const std::uint32_t i : viewItems_[view]) {
+    for (std::size_t k = 0; k < viewItems_[view].size(); ++k) {
+        const std::uint32_t i = viewItems_[view][k];
+        const std::int32_t job = viewJobs_[view][k];
+        std::vector<DescriptorResource> resources =
+            Resources(frame, i);
+        resources.push_back(VisibleResource());
         layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                     Resources(frame, i));
+                     resources);
         DrawConstants constants{};
         constants.first = i;
+        constants.instanceOffset = InstanceOffset(job);
         constants.view = frame.view;
         layout_.PushConstants(commands, &constants,
                               sizeof(constants));
-        vkCmdDraw(commands, 6,
-                  static_cast<std::uint32_t>(
-                      clouds_.at(items_[i].points).count),
-                  0, 0);
+        Draw(commands, i, job);
     }
 }
 

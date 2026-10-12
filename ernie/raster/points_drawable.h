@@ -178,6 +178,14 @@ class PointsDrawable : public RasterDrawable {
     /// Poses the items under instances
     /// (`PointsItem::anchorInstancer`) in their draws.
     void RecordPrepass(VkCommandBuffer commands) const override;
+    /// With GPU culling, lists each cloud's chunks of points in each
+    /// view and shadow view that sees them (points.slang's
+    /// `cullMain`), which their draws then draw indirectly.
+    void RecordCull(VkCommandBuffer commands) const override;
+    /// The points the last finished frame's culling jobs kept to draw
+    /// (whole chunks), in job order: per item, its views' and then
+    /// its shadow views'. Reads the GPU back; for tests.
+    std::vector<std::uint32_t> CulledPointCounts() const;
     void RecordShadow(VkCommandBuffer commands,
                       const RasterFrame& frame, std::size_t cascade,
                       const glm::mat4& lightViewProjection,
@@ -231,6 +239,8 @@ class PointsDrawable : public RasterDrawable {
     Bounds3 ItemBounds(std::size_t item) const;
     std::vector<DescriptorResource>
     Resources(const RasterFrame& frame, std::size_t item) const;
+    /// Binding 15: the visible chunks of culled draws.
+    DescriptorResource VisibleResource() const;
 
     RasterRenderer& renderer_;
     const VulkanContext& context_;
@@ -263,6 +273,26 @@ class PointsDrawable : public RasterDrawable {
     std::uint32_t anchored_ = 0;
     /// Per view of the last `Prepare`, the items it draws.
     std::vector<std::vector<std::uint32_t>> viewItems_;
+
+    /// GPU culling: per item its jobs (points.slang's `cullJobs`),
+    /// listed together, and per view and shadow view each item's job,
+    /// -1 for a draw of every point. Clouds that move, pushbrooms and
+    /// frames with motion blur draw every point.
+    PipelineLayout cullLayout_;
+    std::unique_ptr<ComputePipeline> cullPipeline_;
+    std::unique_ptr<GpuBuffer> cullJobs_;
+    std::unique_ptr<GpuBuffer> cullCommands_;
+    std::unique_ptr<GpuBuffer> visibleChunks_;
+    std::vector<glm::uvec4> jobs_;
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> itemJobs_;
+    std::vector<std::vector<std::int32_t>> viewJobs_;
+    std::vector<std::vector<std::int32_t>> shadowJobs_;
+    /// The draw constants' `instanceOffset` for job `job`: 1 + where
+    /// its visible chunks start, 0 for -1.
+    std::uint32_t InstanceOffset(std::int32_t job) const;
+    /// Draws `item`'s points job `job` listed, or with -1 every one.
+    void Draw(VkCommandBuffer commands, std::uint32_t item,
+              std::int32_t job) const;
 };
 
 }  // namespace ernie

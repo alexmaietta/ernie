@@ -1010,9 +1010,10 @@ struct CascadeJob {
     float fit[4];
     float scene[4];
     float seen[4];
+    float volumes[4];
     std::uint32_t out[4];
 };
-static_assert(sizeof(CascadeJob) == 272,
+static_assert(sizeof(CascadeJob) == 288,
               "CascadeJob must match depth_range.slang");
 
 /// depth_range.slang's push constants: the depth range's, then the
@@ -2779,17 +2780,6 @@ void RasterRenderer::WriteLights(
                           ? 1u
                           : 0u;
     }
-    if (cascadeJobCount_ > 0) {
-        if (!cascadeJobBuffer_ ||
-            cascadeJobBuffer_->Size() < cascadeJobs_.size()) {
-            vkDeviceWaitIdle(context_.Device());
-            cascadeJobBuffer_ = std::make_unique<GpuBuffer>(
-                context_, cascadeJobs_.size(),
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
-        uploads_.Write(*cascadeJobBuffer_, cascadeJobs_);
-    }
     if (subframeFitCount_ > 0 &&
         (!subframeFits_ ||
          subframeFits_->Size() <
@@ -3683,6 +3673,7 @@ void RasterRenderer::Update(
                       viewWorlds_, viewProjections, lightViewWorlds,
                       params.volumeSettings, params.frame, uploads_);
     }
+    WriteCascadeJobs();
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.
     motionVectors_ =
@@ -5367,6 +5358,57 @@ void RasterRenderer::AddCascadeJob(const FrameParams& params,
     ++cascadeJobCount_;
 }
 
+VkDeviceSize RasterRenderer::ViewUniformsStride() {
+    return kUniformsStride;
+}
+
+void RasterRenderer::WriteCascadeJobs() {
+    if (cascadeJobCount_ == 0) {
+        return;
+    }
+    // Volumes write no depth for the views to see: their bounds'
+    // depths along the camera's axis, or from its eye for a cube
+    // camera, widen those seen.
+    float volumeNear = 0.0f;
+    float volumeFar = 0.0f;
+    if (const std::optional<Bounds3>& box = volumes_->Bounds();
+        box && cascadeFit_) {
+        const CameraView& view = cascadeFit_->view;
+        volumeNear = std::numeric_limits<float>::max();
+        for (int i = 0; i < 8; ++i) {
+            const glm::vec3 corner(
+                (i & 1) ? box->second.x : box->first.x,
+                (i & 2) ? box->second.y : box->first.y,
+                (i & 4) ? box->second.z : box->first.z);
+            const float depth =
+                cascadeFit_->around > 0.0f
+                    ? glm::length(corner - view.eye)
+                    : glm::dot(corner - view.eye, view.forward);
+            volumeNear = std::min(volumeNear, depth);
+            volumeFar = std::max(volumeFar, depth);
+        }
+        if (cascadeFit_->around > 0.0f &&
+            glm::all(glm::greaterThanEqual(view.eye, box->first)) &&
+            glm::all(glm::lessThanEqual(view.eye, box->second))) {
+            volumeNear = 0.0f;
+        }
+    }
+    for (std::uint32_t j = 0; j < cascadeJobCount_; ++j) {
+        auto* job = reinterpret_cast<CascadeJob*>(
+            cascadeJobs_.data() + j * sizeof(CascadeJob));
+        job->volumes[0] = volumeNear;
+        job->volumes[1] = volumeFar;
+    }
+    if (!cascadeJobBuffer_ ||
+        cascadeJobBuffer_->Size() < cascadeJobs_.size()) {
+        vkDeviceWaitIdle(context_.Device());
+        cascadeJobBuffer_ = std::make_unique<GpuBuffer>(
+            context_, cascadeJobs_.size(),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    }
+    uploads_.Write(*cascadeJobBuffer_, cascadeJobs_);
+}
+
 std::array<float, 4> RasterRenderer::ShadowSplits() const {
     ShadowUniforms uniforms{};
     shadowUniforms_.Read(
@@ -6423,7 +6465,8 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
-void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
+void RasterRenderer::SetVolumeComputeInterop(
+    ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);
 }
 

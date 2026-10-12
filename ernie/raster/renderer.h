@@ -553,6 +553,15 @@ class RasterRenderer {
         return *lightViewMatrices_;
     }
 
+    /// The frame's Uniforms of every raster view (frame.slang's
+    /// `views`), each starting with its view-projection, which the
+    /// GPU poses where it poses the views; `ViewUniformsStride` bytes
+    /// apart.
+    const GpuBuffer& ViewUniforms() const {
+        return uniforms_;
+    }
+    static VkDeviceSize ViewUniformsStride();
+
     /// The camera-to-world poses the last frame with poses on the GPU
     /// in this `BeginFrame`'s slot rendered (a finished frame), if it
     /// had `views` views; otherwise empty. Estimates of the next
@@ -840,6 +849,9 @@ class RasterRenderer {
                        const glm::vec3& towards,
                        std::uint32_t resolution, std::uint32_t first,
                        bool subframe = false);
+    /// Uploads the frame's cascade jobs once its volumes are set,
+    /// each widening the depths seen by the volumes' bounds.
+    void WriteCascadeJobs();
     /// Records the fit of the frame's cascades on the GPU
     /// (`cascadeJobs_`, depth_range.slang's `cascadeFitMain`).
     void RecordCascadeFit(VkCommandBuffer commands) const;

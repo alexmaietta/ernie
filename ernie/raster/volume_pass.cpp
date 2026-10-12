@@ -841,6 +841,14 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
         }
     }
     active_ = !instances.empty();
+    bounds_.reset();
+    for (const auto& [min, max] : boxes) {
+        const Bounds3 box{glm::vec3(min), glm::vec3(max)};
+        bounds_ = bounds_
+                      ? Bounds3{glm::min(bounds_->first, box.first),
+                                glm::max(bounds_->second, box.second)}
+                      : box;
+    }
     if (!active_) {
         return;
     }

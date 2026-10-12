@@ -5,7 +5,14 @@
 // Draw `draw.first` of `draws`; instance `i` of the draw is point `i`, six vertices each.
 //
 // Bindings: frame 0 to 4 (frame.slang), material 5 to 9 (surface.slang), 10 positions (two halves
-// for motion blur), 11 widths, 12 colours, 13 the draws.
+// for motion blur), 11 widths, 12 colours, 13 the draws, 15 the visible chunks of culled draws.
+//
+// Culling on the GPU (`cullMain`, `PointsDrawable::RecordCull`): each job, a cloud in one raster
+// or shadow view, tests its points in chunks of 64 against that view's frustum, taken from its
+// view-projection where the GPU keeps it (the views' Uniforms, the light views' matrices), and
+// lists the chunks with any point in view; its indirect draw then draws 64 instances per chunk
+// listed, which the vertex stages map back to points (`pointOf`), those past the cloud's end
+// drawing nothing.
 //
 // Reference: C. Sigg, T. Weyrich, M. Botsch and M. Gross, "GPU-Based Ray-Casting of Quadratic
 // Surfaces", Eurographics Symposium on Point-Based Graphics, 59-65, 2006.
@@ -24,14 +31,33 @@ struct PointsDraw {
     // x: the half of the positions holding them now, y: at the last frame (points, not floats),
     // z: flags, w: the largest scale of `model`.
     uint4 info;
-    // Material, prim id, light link group.
+    // Material, prim id, light link group, points.
     uint4 ids;
 }
+
+static const uint kChunk = 64;
 
 [[vk::binding(10, 0)]] StructuredBuffer<float> positions;
 [[vk::binding(11, 0)]] StructuredBuffer<float> widths;
 [[vk::binding(12, 0)]] StructuredBuffer<float> colors;
 [[vk::binding(13, 0)]] StructuredBuffer<PointsDraw> draws;
+[[vk::binding(15, 0)]] StructuredBuffer<uint> visibleChunks;
+
+// The point instance `instance` of the draw draws: itself, or for a culled draw (`instanceOffset`
+// 1 + where its visible chunks start) the point of its chunk listed; not `live` past the end.
+uint pointOf(uint instance, out bool live) {
+    live = true;
+    if (draw.instanceOffset == 0) {
+        return instance;
+    }
+    let chunk = visibleChunks[draw.instanceOffset - 1 + instance / kChunk];
+    let point = chunk * kChunk + instance % kChunk;
+    live = point < draws[draw.first].ids.w;
+    return point;
+}
+
+// Off every view: a vertex of a point that is not drawn.
+static const float4 kNowhere = float4(2.0, 2.0, 0.5, 1.0);
 
 float3 load3(StructuredBuffer<float> buffer, uint i) {
     return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
@@ -82,8 +108,16 @@ struct PointsOutput {
 }
 
 [shader("vertex")]
-LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint point : SV_InstanceID) {
+LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint instance : SV_InstanceID) {
     let d = draws[draw.first];
+    bool live;
+    let point = pointOf(instance, live);
+    if (!live) {
+        LayeredVertexOutput none = {};
+        none.position = kNowhere;
+        none.layer = u.flags.z;
+        return none;
+    }
     let sphere = sphereOf(d, point, u.motion.x);
     // A quad facing the eye in the plane through the centre, as wide as the silhouette seen
     // from the eye projects onto that plane: r d / sqrt(d^2 - r^2); facing along the view, r
@@ -193,8 +227,16 @@ float3 lightAxis(uint row) {
 }
 
 [shader("vertex")]
-ShadowVertexLayered shadowVertex(uint vertexIndex : SV_VertexID, uint point : SV_InstanceID) {
+ShadowVertexLayered shadowVertex(uint vertexIndex : SV_VertexID, uint instance : SV_InstanceID) {
     let d = draws[draw.first];
+    bool live;
+    let point = pointOf(instance, live);
+    if (!live) {
+        ShadowVertexLayered none = {};
+        none.position = kNowhere;
+        none.layer = shadowPosition(float3(0.0)).layer;
+        return none;
+    }
     // Where the point is at the pass's sub-frame (Uniforms.motion, 1 without motion blur).
     let sphere = sphereOf(d, point, u.motion.x);
     let corner = cornerOf(vertexIndex);
@@ -219,4 +261,65 @@ float shadowFragment(ShadowVertexOutput in) : SV_Depth {
     let front = in.sphere.xyz + in.sphere.w * (across - sqrt(1.0 - rho2) * lightAxis(2));
     let clip = mul(shadowViewProj(), float4(front, 1.0));
     return clip.z / clip.w;
+}
+
+// Culling: each job's view (x 0 a raster view, its Uniforms in `cullViews`, `draw.records`
+// float4s apart; 1 a light view, its matrix in `cullLights`), y the view's index, z where its
+// visible chunks start; the jobs' indirect draws (vertices, instances, first vertex, first
+// instance), whose instances start at 0.
+[[vk::binding(16, 0)]] StructuredBuffer<uint4> cullJobs;
+[[vk::binding(17, 0)]] StructuredBuffer<float4> cullViews;
+[[vk::binding(18, 0)]] StructuredBuffer<float4> cullLights;
+[[vk::binding(19, 0)]] RWStructuredBuffer<uint> visibleOut;
+[[vk::binding(20, 0)]] RWStructuredBuffer<uint> cullDraws;
+
+groupshared uint chunkSeen;
+
+// One workgroup per chunk of draw `draw.first`'s `draw.instanceOffset` points (x, past chunk
+// `draw.view`) and job (y, from `draw.indexOffset`): a chunk with any point whose sphere meets the
+// view's frustum is listed, and the job's draw takes its 64 instances. Shadow passes clamp depth,
+// so light views test their sides only.
+//
+// Reference: G. Gribb and K. Hartmann, "Fast Extraction of Viewing Frustum Planes from the
+// World-View-Projection Matrix", 2001 (the planes from the matrix's rows).
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void cullMain(uint3 group : SV_GroupID, uint lane : SV_GroupIndex) {
+    let chunk = draw.view + group.x;
+    let jobIndex = draw.indexOffset + group.y;
+    let job = cullJobs[jobIndex];
+    if (lane == 0) {
+        chunkSeen = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    let point = chunk * kChunk + lane;
+    if (point < draw.instanceOffset) {
+        // The view-projection's columns.
+        float4 c[4];
+        for (uint k = 0; k < 4; ++k) {
+            c[k] = job.x == 0 ? cullViews[job.y * draw.records + k] : cullLights[4 * job.y + k];
+        }
+        float4 m[4];
+        for (uint r = 0; r < 4; ++r) {
+            m[r] = float4(c[0][r], c[1][r], c[2][r], c[3][r]);
+        }
+        // Clip space x and y in [-w, w], z in [0, w] (with reverse-Z, far to near).
+        let planes = float4[6](m[3] + m[0], m[3] - m[0], m[3] + m[1], m[3] - m[1], m[2],
+                               m[3] - m[2]);
+        let sphere = sphereOf(draws[draw.first], point, 1.0);
+        var inside = true;
+        for (uint p = 0; p < (job.x == 0 ? 6 : 4); ++p) {
+            let scale = max(length(planes[p].xyz), 1e-30);
+            inside = inside && dot(planes[p].xyz, sphere.xyz) + planes[p].w >= -sphere.w * scale;
+        }
+        if (inside) {
+            InterlockedOr(chunkSeen, 1u);
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (lane == 0 && chunkSeen != 0) {
+        uint listed;
+        InterlockedAdd(cullDraws[4 * jobIndex + 1], kChunk, listed);
+        visibleOut[job.z + listed / kChunk] = chunk;
+    }
 }

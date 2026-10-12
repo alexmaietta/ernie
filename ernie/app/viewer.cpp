@@ -1201,11 +1201,14 @@ struct Viewer::State {
             }
         }
         ImGui::DockBuilderFinish(dockSpace);
-        // A dock opens on the panel docked last; the bottom one on
-        // the Log instead.
-        if (Panel* log = self.FindPanel("Log");
-            log != nullptr && log->IsVisible()) {
-            focusRequests.push_back("Log");
+        // A dock opens on the panel docked last; the right one on the
+        // Stage (Settings and Demos tabbed beside it) and the bottom
+        // one on the Log instead.
+        for (const char* title : {"Stage", "Log"}) {
+            if (Panel* panel = self.FindPanel(title);
+                panel != nullptr && panel->IsVisible()) {
+                focusRequests.push_back(title);
+            }
         }
     }
 

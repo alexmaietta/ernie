@@ -183,6 +183,45 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       GpuCullingDrawsOnlyThePointsChunksInViewAndTheSameImage) {
+    // A row of 640 points 1 m apart along x, of which the camera sees
+    // the 25 about the middle: in chunks 4 and 5 of 64.
+    Scene scene = PointsScene();
+    std::vector<float> points;
+    for (int i = 0; i < 640; ++i) {
+        points.insert(points.end(), {float(i - 320), 0.0f, 0.0f});
+    }
+    ernie::Points(scene, "/World/Grains")
+        .SetPoints(Tensor::Copy<float>(points, {640, 3}))
+        .SetWidths({0.5f});
+    scene.Write("/World/Grains", tokens::kDisplayColor,
+                Tensor::Copy<float>(std::vector<float>(3 * 640, 1.0f),
+                                    {640, 3}));
+    ernie::RenderSettings::Define(scene, "/Render/Settings");
+    std::map<std::string, std::vector<float>> images;
+    for (const std::string_view mode : {tokens::kOff, tokens::kGpu}) {
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetCulling(mode);
+        RasterDelegate delegate(*context_);
+        images[std::string(mode)] =
+            Step(delegate, scene).at("LdrColor");
+        const std::vector<std::uint32_t> kept =
+            delegate.Points().CulledPointCounts();
+        if (mode == tokens::kOff) {
+            EXPECT_TRUE(kept.empty()) << "no jobs without culling";
+            continue;
+        }
+        // The view's job first, then the sun's shadow views'.
+        ASSERT_GE(kept.size(), 2u);
+        EXPECT_EQ(kept[0], 128u);
+        for (std::size_t j = 1; j < kept.size(); ++j) {
+            EXPECT_LE(kept[j], 640u) << "shadow view " << j;
+        }
+    }
+    EXPECT_EQ(images["gpu"], images["off"]);
+}
+
+TEST_F(RasterDelegateTest,
        PointsFromCudaMatchTheHostsAndBlurAsTheyMove) {
     RasterDelegate delegate(*context_);
     std::string why;
