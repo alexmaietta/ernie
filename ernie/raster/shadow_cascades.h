@@ -23,6 +23,9 @@ struct ShadowCascade {
         0.0f;  ///< View-space depth where this cascade ends.
     float texelWorldSize =
         0.0f;  ///< World size of one shadow map texel.
+    /// Texels along each side of its map, drawn into that corner of
+    /// a larger layer; 0 for the whole layer.
+    std::uint32_t resolution = 0;
     /// Fitted on the GPU (a light posed there): `lightViewProjection`
     /// is only the CPU's estimate, so passes neither cull nor select
     /// what they draw by it on the CPU; the fitted matrix is

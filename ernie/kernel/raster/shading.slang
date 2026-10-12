@@ -158,6 +158,11 @@ struct LightGpu {
     float4 patternExtent;
     uint4 patternLayout;
     float4 patternParams[4];
+    // x: texels along each side of its shadow maps, in that corner of their layers of the map
+    // array (`ShadingUniforms::lightShadow.z` texels across); yzw unused.
+    float4 map;
+    // Unused: room for its light and shadow links.
+    uint4 links;
 }
 
 struct MaterialGpu {
@@ -434,10 +439,10 @@ struct LightTap {
     bool inside;
 }
 
-// The world width of a texel of orthographic light view `view`: its map's width over its texels,
-// from the view's first row (2 over the map's width in world units).
-float lightTexelWorld(uint view) {
-    return 2.0 / (sh.lightShadow.z * max(length(lightViews[view][0].xyz), 1e-12));
+// The world width of a texel of orthographic view `view` of `light`: its map's width over its
+// texels, from the view's first row (2 over the map's width in world units).
+float lightTexelWorld(LightGpu light, uint view) {
+    return 2.0 / (light.map.x * max(length(lightViews[view][0].xyz), 1e-12));
 }
 
 // Poisson sample `i` of a disk `radius` wide across a light's ray, turned by `rotation` (cosine,
@@ -455,8 +460,12 @@ LightTap lightTap(LightGpu light, float3 point) {
     let ndc = tap.clip.xyz / max(tap.clip.w, 1e-20);
     // Receivers beyond the far plane compare at it, as the sun's (frame.slang).
     tap.depth = min(ndc.z, 0.99999994);
-    tap.uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
-    tap.inside = tap.clip.w > 0.0 && all(tap.uv >= float2(0.0)) && all(tap.uv <= float2(1.0));
+    let uv = float2(0.5 * ndc.x + 0.5, 0.5 - 0.5 * ndc.y);
+    tap.inside = tap.clip.w > 0.0 && all(uv >= float2(0.0)) && all(uv <= float2(1.0));
+    // In the light's corner of the layer, short of its last texel's far edge, so filtering does
+    // not reach past it.
+    let corner = light.map.x / sh.lightShadow.z;
+    tap.uv = min(uv * corner, float2(corner - 0.5 / sh.lightShadow.z));
     return tap;
 }
 
@@ -486,7 +495,7 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     let orthographic = distant || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
     let distance = orthographic ? 1.0 : length(world - light.position.xyz);
     // A distant light's texels are its cascade's: the world width of its map over its texels.
-    let texelWorld = distant ? lightTexelWorld(lightView(light, world))
+    let texelWorld = distant ? lightTexelWorld(light, lightView(light, world))
                              : light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
     let receiver = world + offset;

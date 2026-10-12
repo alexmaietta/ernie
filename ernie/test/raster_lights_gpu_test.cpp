@@ -36,6 +36,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -244,6 +245,48 @@ TEST_F(RasterDelegateTest, LampsCastShadowsFromSpotAndCubeMaps) {
     }
     EXPECT_EQ(delegate.Renderer().LightShadowViews().size(), 0u)
         << "shadows off";
+}
+
+TEST_F(RasterDelegateTest,
+       LightsMapsShareLayersAtTheirOwnResolutions) {
+    // A lamp's shadow, alone and beside a distant light whose finer
+    // maps widen the layers: the lamp's map, in a corner of its
+    // layer, shadows the same either way.
+    RasterDelegate delegate(*context_);
+    Scene scene = LampScene(10.0, 60.0f);
+    DefineQuad(scene, "/World/Blocker");
+    scene.Set(
+        "/World/Blocker", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
+    const std::array<std::pair<float, float>, 4> points = {
+        {{3.0f, 0.0f}, {6.0f, 6.0f}, {4.5f, 1.0f}, {1.0f, 4.5f}}};
+    std::vector<float> alone;
+    for (const auto [x, y] : points) {
+        alone.push_back(RadianceAt(delegate, scene, x, y));
+    }
+    // Below the ground, so they light none of it.
+    for (const char* path : {"/World/Below", "/World/BelowToo"}) {
+        ernie::DistantLight::Define(scene, path)
+            .SetTransform(
+                ernie::DistantLightTransform({0.3, 0.0, -1.0}));
+    }
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        EXPECT_NEAR(RadianceAt(delegate, scene, points[i].first,
+                               points[i].second),
+                    alone[i], 1e-3f * std::max(alone[i], 1.0f))
+            << "point " << i;
+    }
+    const ernie::RenderSettings settings(scene, "/Render/Settings");
+    std::set<std::uint32_t> resolutions;
+    for (const ernie::ShadowCascade& view :
+         delegate.Renderer().LightShadowViews()) {
+        resolutions.insert(view.resolution);
+    }
+    EXPECT_EQ(resolutions,
+              (std::set<std::uint32_t>{
+                  ernie::ShadowSettings{}.lightResolution,
+                  static_cast<std::uint32_t>(
+                      settings.GetShadowResolution())}));
 }
 
 TEST_F(RasterDelegateTest, OtherDistantLightsAddToTheSun) {

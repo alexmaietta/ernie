@@ -131,8 +131,12 @@ struct LightGpu {
     float patternExtent[4];
     std::uint32_t patternLayout[4];
     float patternParams[16];
+    /// x: texels along each side of its shadow maps, in that corner
+    /// of their layers.
+    float map[4];
+    std::uint32_t links[4];  ///< Unused: room for light linking.
 };
-static_assert(sizeof(LightGpu) == 752,
+static_assert(sizeof(LightGpu) == 784,
               "LightGpu must match shading.slang");
 
 /// A light pattern's integration (`patternNormMain`): its index in
@@ -1695,6 +1699,8 @@ void RasterRenderer::WriteLights(
     ERNIE_ZONE("Lights");
     const std::uint32_t resolution =
         std::max(params.shadows.lightResolution, 1u);
+    const std::uint32_t distantResolution =
+        std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
     std::vector<LightGpu> table(params.lights.size());
     std::vector<glm::vec4>
@@ -1815,10 +1821,17 @@ void RasterRenderer::WriteLights(
             // it, as the sun does, when its maps have room for them;
             // otherwise one map over the whole scene, as a dome's
             // many directions do (`ApplyDomeDirections`).
+            // A distant light's maps are as fine as the sun's
+            // cascades' (`ShadowSettings::resolution`); others',
+            // and a dome's many directions', are
+            // `ShadowSettings::lightResolution` across.
+            const std::uint32_t own = distant && !light.domeDiffuse
+                                          ? distantResolution
+                                          : resolution;
             std::vector<ShadowCascade> views;
             if (distant && light.shadows && !light.posedOnGpu &&
                 !light.domeDiffuse && cascadeFit_ && axis.z > 0.0f) {
-                views = FitViewCascades(axis, resolution);
+                views = FitViewCascades(axis, own);
                 if (lightViews_.size() + views.size() >
                     kMaxLightShadowViews) {
                     views.clear();
@@ -1827,10 +1840,14 @@ void RasterRenderer::WriteLights(
             if (views.empty()) {
                 views = FitLightShadowViews(
                     light, params.Relative(light.position),
-                    bounds->first, bounds->second, resolution);
+                    bounds->first, bounds->second, own);
             }
             if (!views.empty() && lightViews_.size() + views.size() <=
                                       kMaxLightShadowViews) {
+                for (ShadowCascade& view : views) {
+                    view.resolution = own;
+                }
+                entry.map[0] = static_cast<float>(own);
                 entry.cone[2] =
                     static_cast<float>(lightViews_.size());
                 entry.cone[3] = static_cast<float>(views.size());
@@ -2047,6 +2064,7 @@ void RasterRenderer::WriteLights(
         casters_.resolution = resolution;
         casters_.top = top;
         casters_.span = span;
+        view.resolution = resolution;
         lightViews_.push_back(view);
     }
     if (casters_.valid != before.valid ||
@@ -2069,11 +2087,17 @@ void RasterRenderer::WriteLights(
         uploads_.Write(lightViewMatrices_,
                        std::as_bytes(std::span(matrices)));
         uploads_.Write(lightShadowBlocks_, blocks);
+        // Layers as wide as the finest view's; coarser views draw in
+        // a corner of theirs.
         const auto layers =
             static_cast<std::uint32_t>(lightViews_.size());
-        if (resolution != lightResolution_ ||
+        std::uint32_t widest = 1;
+        for (const ShadowCascade& view : lightViews_) {
+            widest = std::max(widest, view.resolution);
+        }
+        if (widest != lightResolution_ ||
             layers > lightShadowMaps_->Desc().layers) {
-            CreateLightShadowMaps(resolution, layers);
+            CreateLightShadowMaps(widest, layers);
         }
     }
     gpuLights_ = static_cast<std::uint32_t>(lightRecords.size() / 2);
@@ -3712,7 +3736,12 @@ void RasterRenderer::RecordShadowMaps(
             RenderingTarget shadow;
             shadow.depth = lightShadowMaps_->LayerView(
                 static_cast<std::uint32_t>(v));
-            shadow.extent = {lightResolution_, lightResolution_};
+            // In its corner of the layer, as wide as its own map.
+            const std::uint32_t texels =
+                lightViews_[v].resolution > 0
+                    ? lightViews_[v].resolution
+                    : lightResolution_;
+            shadow.extent = {texels, texels};
             BeginRendering(commands, shadow);
             // Each view draws with its own Shadows block's matrix,
             // which the light pass fits for lights posed on the GPU.
