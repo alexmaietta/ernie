@@ -97,11 +97,6 @@ static int* activeCounts = meshResources.activeCounts;
 [[vk::binding(25, 0)]] Sampler2D metallicTexture;
 // Opacity, one channel in r, for cutouts (`meshCutoutFragmentMain`, `meshShadowCutoutFragment`).
 [[vk::binding(26, 0)]] Sampler2D opacityTexture;
-// Linear RGB per instance, double-buffered as `scales`, in place of the prototype's colours
-// (`kHasInstanceColors`).
-[[vk::binding(27, 0)]] StructuredBuffer<float> instanceColors;
-// Meshes' points and triangle indices in use, pairs by slot (`MeshDraw.uv.y`).
-[[vk::binding(28, 0)]] StructuredBuffer<int> activeCounts;
 
 // What one draw draws: the draw (`draws` entry), its first instance id and its first index past
 // the mesh's own.
