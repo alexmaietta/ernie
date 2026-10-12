@@ -345,6 +345,22 @@ TEST_F(RasterDelegateTest,
         << "meshes alone enable shadows";
 }
 
+TEST_F(RasterDelegateTest,
+       MinimalShadingOfNoColourDrawsNoShadowMaps) {
+    Scene scene = MeshScene();
+    RasterDelegate delegate(*context_);
+    scene.Set("/Render/Settings", tokens::kMinimalMode,
+              std::string(tokens::kConstantDiffuse));
+    delegate.Render(scene);
+    ASSERT_FALSE(delegate.Renderer().LightShadowViews().empty())
+        << "lit minimal shading has its sun's shadows";
+    scene.Set("/Render/Settings", tokens::kMinimalMode,
+              std::string(tokens::kNone));
+    delegate.Render(scene);
+    EXPECT_TRUE(delegate.Renderer().LightShadowViews().empty())
+        << "nothing lit, nothing to shadow";
+}
+
 TEST_F(RasterDelegateTest, MovesInstancesAndDeformsMeshesInPlace) {
     Scene scene = MeshScene();
     RasterDelegate delegate(*context_);

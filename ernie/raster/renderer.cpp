@@ -2812,7 +2812,10 @@ void RasterRenderer::Update(
     }
     // The lights first: the views' uniforms take minimal shading's
     // main light's maps, and shading the size of the maps they make.
-    WriteLights(params, bounds);
+    // Minimal shading's None mode lights nothing, so it draws no
+    // shadow maps: without bounds, no light fits a view.
+    WriteLights(params, minimal_ == MinimalMode::None ? std::nullopt
+                                                      : bounds);
     // A metering frame counts its luminance for later frames; this
     // slot's last one has finished.
     ReadMeter(uploads_.Slot());
@@ -3517,8 +3520,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 const PushbroomStrip strip = params.Strip(v);
                 CopyMatrix(shading.invViewProj, strip.Packed());
                 const glm::vec4 intrinsics = strip.Intrinsics();
-                std::memcpy(shading.strip,
-                            glm::value_ptr(intrinsics),
+                std::memcpy(shading.strip, glm::value_ptr(intrinsics),
                             sizeof(shading.strip));
             } else {
                 CopyMatrix(shading.invViewProj,
@@ -5667,7 +5669,8 @@ void RasterRenderer::SetOverlayComputeInterop(
     overlays_->SetComputeInterop(compute);
 }
 
-void RasterRenderer::SetVolumeComputeInterop(ComputeInterop* compute) {
+void RasterRenderer::SetVolumeComputeInterop(
+    ComputeInterop* compute) {
     volumes_->SetComputeInterop(compute);
 }
 
