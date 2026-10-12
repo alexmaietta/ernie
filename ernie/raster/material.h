@@ -15,6 +15,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -148,11 +149,14 @@ class RasterMaterial {
     }
 
     /// Sets the material's settings; `brdfParams` are the model's
-    /// resolved values. This and the texture setters write the
-    /// material's uniform, so call them only while no submitted work
-    /// is reading the material.
+    /// resolved values, and `gloss` its roughness and metallic for
+    /// minimal shading's glossy highlights (`MinimalMode::Glossy`),
+    /// none for a model without a roughness. This and the texture
+    /// setters write the material's uniform, so call them only while
+    /// no submitted work is reading the material.
     void Update(const MaterialSettings& settings,
-                std::span<const float> brdfParams);
+                std::span<const float> brdfParams,
+                std::optional<glm::vec2> gloss = std::nullopt);
 
     /// Moves the origin positions are relative to
     /// (`FrameParams::origin`): the albedo map's placement and the
@@ -197,6 +201,7 @@ class RasterMaterial {
     FrameUploads& uploads_;
     MaterialSettings settings_;
     std::vector<float> params_;
+    std::optional<glm::vec2> gloss_;  ///< `Update`'s.
     Spectrum reflectance_ = Spectrum::Constant(1.0);
     float luminance_ = 1.0f;
     GpuBuffer uniform_;

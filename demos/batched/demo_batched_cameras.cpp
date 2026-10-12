@@ -54,8 +54,9 @@ constexpr std::array<Thing, 6> kThings = {{
     {{0.612, 0.573, 0.934}, 0.775, 0.085},
 }};
 
-constexpr std::array<const char*, 4> kMinimalModes = {
-    "off", "none", "constantDiffuse", "texturedDiffuse"};
+constexpr std::array<const char*, 5> kMinimalModes = {
+    "off", "none", "constantDiffuse", "texturedDiffuse",
+    "diffuseGlossyEmission"};
 
 const Path kCamera("/World/Camera");
 const Path kProduct("/Render/BatchCamera");
@@ -394,8 +395,9 @@ class BatchCameraDemo : public app::Demo {
                               kMinimalModes.end(),
                               minimal_) == kMinimalModes.end()) {
                     throw std::invalid_argument(
-                        "--minimal is off, none, constantDiffuse or "
-                        "texturedDiffuse, not " +
+                        "--minimal is off, none, constantDiffuse, "
+                        "texturedDiffuse or diffuseGlossyEmission, "
+                        "not " +
                         minimal_);
                 }
             } else if (extra[i] == "--sweep") {

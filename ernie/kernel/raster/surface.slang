@@ -42,6 +42,11 @@ public struct Surface {
     public float4 opacity;
     // Parameters of the active reflectance model.
     public BrdfParams brdf;
+    // Minimal shading's diffuse, glossy and emission mode (`kMinimalGlossy`): the model's
+    // roughness and metallic, and 1 when it has a roughness (else no highlights); the emission,
+    // linear RGB cd/m^2.
+    public float4 gloss;
+    public float4 emission;
 }
 
 [[vk::binding(5, 0)]] public ConstantBuffer<Surface> surface;
@@ -255,11 +260,12 @@ public uint packSurfaceFlags(uint flags, float slopeVariance, float parameter = 
 }
 
 // Minimal shading (`Uniforms::minimal`), RTX Minimal's modes for throughput: the w mode's low
-// bits are no colour (black, for the other outputs alone), one constant colour, or the surface's
-// diffuse colour.
+// bits are no colour (black, for the other outputs alone), one constant colour, the surface's
+// diffuse colour, or that with glossy highlights and emission.
 public static const uint kMinimalNone = 0;
 public static const uint kMinimalConstant = 1;
 public static const uint kMinimalTextured = 2;
+public static const uint kMinimalGlossy = 3;
 
 // What minimal passes write (`MinimalTargets`): sRGB colour, and the prim id, instance id, unit
 // normal (octahedral, two 16-bit snorm) and surface flags.
@@ -291,31 +297,64 @@ float srgbEncode(float c) {
 // scene's ambient light (`u.motion.yzw`), each as a share of what the brightest gives a white
 // surface facing it, of the constant colour or of the material's linear colour scaled to the
 // albedo (an albedo map's) and modulated (textures, vertex colours, tints); unlit surfaces show
-// that colour as it is. Exposed, clamped and encoded as sRGB.
+// that colour as it is. With glossy highlights and emission (`kMinimalGlossy`), a model with a
+// roughness (`Surface.gloss`) adds each light's GGX highlight, the metal's tinted, its diffuse
+// light falling with its metallic, and every surface its emission (`Surface.emission`) on the
+// lights' scale (`u.minimal.x`). Exposed, clamped and encoded as sRGB.
+//
+// References:
+// - B. Walter, S. R. Marschner, H. Li and K. E. Torrance, "Microfacet Models for Refraction
+//   through Rough Surfaces", EGSR 2007 (GGX).
+// - B. Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 course notes (Schlick's Fresnel
+//   and the Smith term's k = alpha / 2).
 public Minimal minimalShade(GBuffer g, float3 world) {
     Minimal out;
     out.ids = uint4(g.ids.y, g.ids.z, packOctahedral(normalize(g.normal.xyz)), g.ids.w);
-    let mode = uint(u.minimal.w);
+    let mode = uint(u.minimal.w) & 3u;
     float3 color = float3(0.0);
-    if ((mode & 3u) != kMinimalNone) {
+    if (mode != kMinimalNone) {
         var base = u.minimal.rgb;
-        if ((mode & 3u) == kMinimalTextured) {
+        if (mode == kMinimalTextured || mode == kMinimalGlossy) {
             base = surface.albedo.rgb / max(surface.albedo.a, 1e-6) * g.albedo.x * g.albedo.yzw;
         }
+        let glossy = mode == kMinimalGlossy && surface.gloss.z > 0.5;
         if ((g.ids.w & kUnlit) != 0) {
             color = base;
         } else {
+            let n = normalize(g.normal.xyz);
+            let v = normalize(u.eye.xyz - world);
+            let alpha = max(surface.gloss.x * surface.gloss.x, 1e-3);
+            let metallic = glossy ? saturate(surface.gloss.y) : 0.0;
+            let f0 = lerp(float3(0.04), base, metallic);
             var lit = 0.0;
+            var highlight = float3(0.0);
             for (uint i = 0; i < 4; ++i) {
                 let light = u.minimalLights[i];
-                lit += light.w * max(dot(g.normal.xyz, light.xyz), 0.0);
+                let nl = max(dot(n, light.xyz), 0.0);
+                if (light.w <= 0.0 || nl <= 0.0) {
+                    continue;
+                }
+                // The main light (the first) casts the shadows.
+                let shadow = i == 0 ? minimalShadow(world, n) : 1.0;
+                lit += light.w * nl * shadow;
+                if (glossy) {
+                    let h = normalize(light.xyz + v);
+                    let nh = max(dot(n, h), 0.0);
+                    let nv = max(dot(n, v), 1e-4);
+                    let a2 = alpha * alpha;
+                    let d = a2 / (PI * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0));
+                    let k = 0.5 * alpha;
+                    let visibility = 1.0 / ((nl * (1.0 - k) + k) * (nv * (1.0 - k) + k));
+                    let fresnel = f0 + (1.0 - f0) * pow(1.0 - max(dot(v, h), 0.0), 5.0);
+                    // The lights' shares are of a white Lambert surface's pi E / pi, so a BRDF f
+                    // gives pi f nl of them.
+                    highlight += light.w * shadow * PI * 0.25 * d * visibility * fresnel * nl;
+                }
             }
-            let main = u.minimalLights[0];
-            if (main.w > 0.0) {
-                let facing = main.w * max(dot(g.normal.xyz, main.xyz), 0.0);
-                lit -= facing * (1.0 - minimalShadow(world, normalize(g.normal.xyz)));
-            }
-            color = base * (lit + u.motion.yzw);
+            color = base * (1.0 - metallic) * (lit + u.motion.yzw) + highlight;
+        }
+        if (mode == kMinimalGlossy) {
+            color += surface.emission.rgb * u.minimal.x;
         }
         color = saturate(color * u.eye.w);
     }

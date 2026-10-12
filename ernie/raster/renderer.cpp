@@ -1820,8 +1820,25 @@ void RasterRenderer::SetMaterial(std::uint32_t id,
     if (model == nullptr) {
         throw std::invalid_argument("Unknown BRDF: " + settings.brdf);
     }
-    Material(id).Update(
-        settings, ResolveBrdfParams(*model, settings.brdfParams));
+    const std::vector<float> params =
+        ResolveBrdfParams(*model, settings.brdfParams);
+    // Minimal shading's glossy highlights take the model's roughness
+    // and metallic, when it has a roughness.
+    std::optional<glm::vec2> gloss;
+    const auto param =
+        [&](std::string_view name) -> std::optional<float> {
+        for (std::size_t i = 0; i < model->params.size(); ++i) {
+            if (i < params.size() && model->params[i].name == name) {
+                return params[i];
+            }
+        }
+        return std::nullopt;
+    };
+    if (const std::optional<float> roughness = param("roughness")) {
+        gloss =
+            glm::vec2(*roughness, param("metallic").value_or(0.0f));
+    }
+    Material(id).Update(settings, params, gloss);
 }
 
 RasterMaterial& RasterRenderer::Material(std::uint32_t id) {
@@ -3116,7 +3133,23 @@ void RasterRenderer::Update(
             const std::uint32_t mode =
                 params.minimal == MinimalMode::Constant   ? 1u
                 : params.minimal == MinimalMode::Textured ? 2u
+                : params.minimal == MinimalMode::Glossy   ? 3u
                                                           : 0u;
+            // With glossy highlights and emission, which keep no
+            // constant colour, x scales the emission (cd/m^2) to the
+            // lights' shares: per what the brightest gives a white
+            // surface facing it, or 1 without one.
+            if (params.minimal == MinimalMode::Glossy) {
+                const LightParams* brightest =
+                    BrightestDistant(params, bands, world);
+                const double unit =
+                    brightest != nullptr
+                        ? WhiteLuminance(*brightest, bands)
+                        : 0.0;
+                uniforms.minimal[0] =
+                    unit > 0.0 ? static_cast<float>(1.0 / unit)
+                               : 1.0f;
+            }
             uniforms.minimal[3] = static_cast<float>(mode);
         }
         uploads_.Write(uniforms_,

@@ -39,8 +39,13 @@ struct SurfaceUniforms {
     float opacity[4];  ///< Opacity, its cutout threshold, has a
                        ///< texture, unused.
     float params[BrdfRegistry::kMaxParams];
+    /// Minimal shading's diffuse, glossy and emission mode: the
+    /// model's roughness and metallic and 1 when it has a roughness;
+    /// the emission, linear RGB cd/m^2.
+    float gloss[4];
+    float emission[4];
 };
-static_assert(sizeof(SurfaceUniforms) == 432,
+static_assert(sizeof(SurfaceUniforms) == 464,
               "SurfaceUniforms must match Surface in surface.slang");
 
 /// UsdTransform2d as the rows of a 2 x 3 matrix: scale, then rotate
@@ -341,7 +346,9 @@ void RasterMaterial::CheckDetailImage(const Image* image) const {
 }
 
 void RasterMaterial::Update(const MaterialSettings& settings,
-                            std::span<const float> brdfParams) {
+                            std::span<const float> brdfParams,
+                            std::optional<glm::vec2> gloss) {
+    gloss_ = gloss;
     const bool sameSpectrum =
         settings.albedo == settings_.albedo &&
         settings.reflectance.Wavelengths() ==
@@ -456,6 +463,14 @@ void RasterMaterial::WriteUniform() {
         std::memcpy(u.params, brdfParams.data(),
                     count * sizeof(float));
     }
+    if (gloss_) {
+        u.gloss[0] = gloss_->x;
+        u.gloss[1] = gloss_->y;
+        u.gloss[2] = 1.0f;
+    }
+    u.emission[0] = settings.emission.r;
+    u.emission[1] = settings.emission.g;
+    u.emission[2] = settings.emission.b;
     uploads_.Write(uniform_, std::as_bytes(std::span(&u, 1)));
 }
 

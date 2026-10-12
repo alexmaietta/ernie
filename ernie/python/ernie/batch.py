@@ -75,8 +75,10 @@ class BatchCamera:
     `minimal` draws the product with minimal shading
     (`tokens.MINIMAL_MODE`) for throughput: "none" (black, for
     distances, normals and ids alone), "constantDiffuse"
-    (`minimal_color` lit by the sun and ambient) or "texturedDiffuse"
-    (surfaces' diffuse colours so lit), in one forward pass straight
+    (`minimal_color` lit by the sun and ambient), "texturedDiffuse"
+    (surfaces' diffuse colours so lit) or "diffuseGlossyEmission"
+    (those with glossy highlights and emission), in one forward pass
+    straight
     into the observations, which then map to CUDA without a copy.
     """
 

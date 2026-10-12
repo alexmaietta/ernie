@@ -73,7 +73,13 @@ def orbit(views, angle):
     return poses
 
 
-MINIMAL_MODES = ("off", "none", "constantDiffuse", "texturedDiffuse")
+MINIMAL_MODES = (
+    "off",
+    "none",
+    "constantDiffuse",
+    "texturedDiffuse",
+    "diffuseGlossyEmission",
+)
 
 
 def batch_camera(renderer, scene, views, minimal):

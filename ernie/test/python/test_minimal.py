@@ -122,7 +122,12 @@ def assert_geometry_matches(minimal, full):
 
 @pytest.mark.parametrize(
     "mode",
-    [tokens.NONE, tokens.CONSTANT_DIFFUSE, tokens.TEXTURED_DIFFUSE],
+    [
+        tokens.NONE,
+        tokens.CONSTANT_DIFFUSE,
+        tokens.TEXTURED_DIFFUSE,
+        tokens.DIFFUSE_GLOSSY_EMISSION,
+    ],
 )
 def test_geometry_outputs_match_the_full_pipeline(renderer, mode):
     full = outputs(renderer, boxes_scene())
@@ -185,6 +190,49 @@ def test_the_brightest_distant_light_casts_shadows(renderer):
     darker = (shadowed < lit - 20) & hit
     assert darker.sum() > 0.02 * hit.sum(), "the boxes' shadows"
     assert (shadowed <= lit + 2)[hit].all(), "shadows only darken"
+
+
+@pytest.mark.parametrize(
+    "look",
+    [
+        dict(brdf="preview_surface", albedo=(0.5, 0.5, 0.5)),
+        dict(emissive_color=(1e6, 0.0, 0.0)),
+    ],
+)
+def test_diffuse_glossy_emission_adds_highlights_and_emission(
+    renderer, look
+):
+    # A smooth surface's highlight or an emitter's light, on the
+    # middle box, only over textured diffuse; Lambert surfaces
+    # without emission look as they do there. The sun behind the
+    # boxes, where the box tops mirror it to the camera.
+    def colour(mode, looked):
+        scene = boxes_scene(mode)
+        scene.set(
+            "/World/Sun",
+            tokens.TRANSFORM,
+            ernie.distant_light_transform((0.0, 0.91, 0.42)),
+        )
+        if looked:
+            scene.define("/Looks/Look", ernie.Material, **look)
+            scene.set("/Looks/Look", "inputs:roughness", 0.15)
+            scene.set(
+                "/World/Box1",
+                tokens.MATERIAL_BINDING,
+                ernie.Path("/Looks/Look"),
+            )
+        out = outputs(renderer, scene)
+        return out["LdrColor"][..., :3].astype(np.int32)
+
+    np.testing.assert_array_equal(
+        colour(tokens.DIFFUSE_GLOSSY_EMISSION, False),
+        colour(tokens.TEXTURED_DIFFUSE, False),
+    )
+    gained = colour(tokens.DIFFUSE_GLOSSY_EMISSION, True) - colour(
+        tokens.TEXTURED_DIFFUSE, True
+    )
+    assert (gained >= -1).all(), "they only add light"
+    assert (gained.max(axis=-1) > 30).sum() > 20, "they show"
 
 
 def test_a_batch_maps_to_cuda_without_copies(renderer):

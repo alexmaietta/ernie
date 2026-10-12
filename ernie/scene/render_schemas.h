@@ -53,11 +53,13 @@
       (::ernie::AttributeMeta{.label = "Minimal mode",                                             \
                               .doc = "Minimal shading for throughput: no colour (\"none\"), one "  \
                                      "colour or surfaces' diffuse colours, lit by the sun and "    \
-                                     "ambient, without sensor filters.",                           \
+                                     "ambient, with glossy highlights and emission or not, "       \
+                                     "without sensor filters.",                                    \
                               .group = "Minimal",                                                  \
                               .options = {::ernie::tokens::kOff, ::ernie::tokens::kNone,           \
                                           ::ernie::tokens::kConstantDiffuse,                       \
-                                          ::ernie::tokens::kTexturedDiffuse}}))                    \
+                                          ::ernie::tokens::kTexturedDiffuse,                       \
+                                          ::ernie::tokens::kDiffuseGlossyEmission}}))              \
     X(glm::dvec3, MinimalConstantColor, ::ernie::tokens::kMinimalConstantColor, glm::dvec3(1.0),   \
       (::ernie::AttributeMeta{.label = "Constant colour", .doc = "Linear RGB of constantDiffuse.", \
                               .group = "Minimal", .color = true}))

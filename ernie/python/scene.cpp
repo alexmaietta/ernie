@@ -2150,13 +2150,14 @@ void BindScene(nb::module_& m) {
            int octaves, double lacunarity, double gain,
            std::uint32_t seed) {
             const GradientNoise noise(seed);
-            const auto count = static_cast<std::int64_t>(points.shape(0));
+            const auto count =
+                static_cast<std::int64_t>(points.shape(0));
             Tensor values = Tensor::Zeros(DType::Float64, {count});
             double* out = values.As<double>();
             for (std::int64_t i = 0; i < count; ++i) {
                 const double* p = points.data() + 3 * i;
-                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]), octaves,
-                                   lacunarity, gain);
+                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]),
+                                   octaves, lacunarity, gain);
             }
             return ArrayFromTensor(values);
         },
@@ -2178,8 +2179,8 @@ void BindScene(nb::module_& m) {
                 glm::ivec3(static_cast<int>(values.shape(0)),
                            static_cast<int>(values.shape(1)),
                            static_cast<int>(values.shape(2))),
-                voxelSize, glm::dvec3(origin[0], origin[1], origin[2]),
-                name);
+                voxelSize,
+                glm::dvec3(origin[0], origin[1], origin[2]), name);
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 bytes, {static_cast<std::int64_t>(bytes.size())}));
         },
@@ -2584,6 +2585,7 @@ void BindScene(nb::module_& m) {
         {"NONE", tokens::kNone},
         {"CONSTANT_DIFFUSE", tokens::kConstantDiffuse},
         {"TEXTURED_DIFFUSE", tokens::kTexturedDiffuse},
+        {"DIFFUSE_GLOSSY_EMISSION", tokens::kDiffuseGlossyEmission},
         {"OCCLUDERS", tokens::kOccluders},
         {"TWO_PASS", tokens::kTwoPass},
         {"CLEAR_COLOR", tokens::kClearColor},

@@ -668,10 +668,14 @@ MinimalMode MinimalModeOf(const Scene& scene, const Path& prim,
     if (token == tokens::kTexturedDiffuse) {
         return MinimalMode::Textured;
     }
+    if (token == tokens::kDiffuseGlossyEmission) {
+        return MinimalMode::Glossy;
+    }
     throw std::invalid_argument(
         "'" + std::string(tokens::kMinimalMode) + "' of '" +
         prim.String() + "' is '" + token +
-        "', not off, none, constantDiffuse or texturedDiffuse");
+        "', not off, none, constantDiffuse, texturedDiffuse or "
+        "diffuseGlossyEmission");
 }
 
 Wireframe WireframeOf(const Scene& scene, const Path& settings) {

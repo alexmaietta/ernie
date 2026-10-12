@@ -192,6 +192,8 @@ enum class MinimalMode : std::uint32_t {
                    ///< (`FrameParams::minimalColor`).
     Textured = 3,  ///< Surfaces lit in their diffuse colour:
                    ///< material, textures, vertex colours.
+    Glossy = 4,    ///< As `Textured`, with the lights' glossy
+                   ///< highlights and surfaces' emission.
 };
 
 /// Kinds of `LightParams`.

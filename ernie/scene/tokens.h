@@ -1084,8 +1084,10 @@ inline constexpr std::string_view kOverlays = "ernie:overlays";
 /// shading for throughput (`MinimalMode`), after RTX Minimal: "off"
 /// (the full pipeline, the default), "none" (black colour, for depth,
 /// normals and ids alone), "constantDiffuse" (`kMinimalConstantColor`
-/// lit by the sun and ambient) or "texturedDiffuse" (surfaces'
-/// diffuse colours so lit). Its products render LdrColor,
+/// lit by the sun and ambient), "texturedDiffuse" (surfaces'
+/// diffuse colours so lit) or "diffuseGlossyEmission" (those, with
+/// the lights' glossy highlights and surfaces' emission). Its
+/// products render LdrColor,
 /// DistanceToCamera, DistanceToImagePlane, Normal, PrimId and
 /// InstanceId.
 inline constexpr std::string_view kMinimalMode = "ernie:minimal:mode";
@@ -1094,6 +1096,8 @@ inline constexpr std::string_view kConstantDiffuse =
     "constantDiffuse";
 inline constexpr std::string_view kTexturedDiffuse =
     "texturedDiffuse";
+inline constexpr std::string_view kDiffuseGlossyEmission =
+    "diffuseGlossyEmission";
 /// vec3 linear, on a RenderProduct or else its RenderSettings:
 /// "constantDiffuse"'s colour, white by default.
 inline constexpr std::string_view kMinimalConstantColor =
