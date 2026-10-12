@@ -1490,6 +1490,50 @@ void SetPolarization(LightParams& light, double degree,
         glm::normalize(std::cos(angle) * x + std::sin(angle) * y));
 }
 
+/// The pulses of the light at `path` (`tokens::kPulseRate`) into
+/// `light`'s timing: a laser's shape and trigger beside the rate,
+/// width and delay `LaserParamsOf` read; another light's all, its
+/// intensity its level as a pulse starts.
+/// @throws std::invalid_argument for a negative rate, decay or
+/// jitter, pulses that do not fit their rate, or an unknown trigger.
+void SetPulses(const Scene& scene, const Path& path,
+               LightParams& light) {
+    LightParams::Beam& beam = light.beam;
+    std::string trigger;
+    if (light.type == LightType::Laser) {
+        const LaserLight laser(scene, path);
+        beam.pulseDecay = laser.GetPulseDecay();
+        beam.pulseJitter = laser.GetPulseJitter();
+        trigger = laser.GetPulseTrigger();
+    } else {
+        const Light lamp(scene, path);
+        beam.pulseRate = lamp.GetPulseRate();
+        beam.pulseWidth = lamp.GetPulseWidth();
+        beam.pulseDelay = lamp.GetPulseDelay();
+        beam.pulseDecay = lamp.GetPulseDecay();
+        beam.pulseJitter = lamp.GetPulseJitter();
+        beam.pulsePeak = true;
+        trigger = lamp.GetPulseTrigger();
+    }
+    beam.pulseOnExposure = trigger == tokens::kExposureTrigger;
+    const bool fits = beam.pulseOnExposure ||
+                      beam.pulseWidth * beam.pulseRate <= 1.0 + 1e-9;
+    if ((trigger != tokens::kClock && !beam.pulseOnExposure) ||
+        !(beam.pulseRate >= 0.0) || !std::isfinite(beam.pulseRate) ||
+        (beam.Pulsed() && (!(beam.pulseWidth > 0.0) || !fits)) ||
+        !std::isfinite(beam.pulseDelay) ||
+        !(beam.pulseDecay >= 0.0) ||
+        !std::isfinite(beam.pulseDecay) ||
+        !(beam.pulseJitter >= 0.0) ||
+        !std::isfinite(beam.pulseJitter)) {
+        throw std::invalid_argument(
+            "Light '" + path.String() +
+            "' needs a pulse rate, decay and jitter of 0 or more, "
+            "pulses that fit their rate, and a trigger of \"clock\" "
+            "or \"exposure\"");
+    }
+}
+
 LightParams LaserParamsOf(const Scene& scene, const Path& path,
                           const SpectralBands& bands,
                           const glm::dmat4& world) {
@@ -2829,6 +2873,7 @@ FrameParams FrameParamsOf(const Scene& scene,
                                 posed->second)
                 : LightParamsOf(scene, light, params.camera.bands));
         params.lights.back().world = WorldOf(scene, light);
+        SetPulses(scene, light, params.lights.back());
     }
     return params;
 }

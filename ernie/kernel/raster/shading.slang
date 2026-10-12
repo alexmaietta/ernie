@@ -166,7 +166,8 @@ struct LightGpu {
     float4 map;
     // Light linking (`LinkGroups`): x the link groups of the surfaces it lights, y those whose
     // geometry casts its shadows, a bit each (surface.slang's `linkGroupFlags`); z 1 when it casts
-    // shadows at all (volume.slang's volume shadows); w unused.
+    // shadows at all (volume.slang's volume shadows); w 1 for a pulsed light other than a laser,
+    // scaled by its timing (`lightTiming`).
     uint4 links;
     // xyz: its electric field's direction, across the way its light goes; w: the fraction of its
     // light linearly polarized along it.
@@ -2079,6 +2080,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             if (light.shadow.w > 0.0) {
                 scale *= lightProfile(light, direction);
             }
+        }
+        if (type != 5 && light.links.w != 0) {
+            // A strobe or flash: its light over the view's span of the sensor clock.
+            var weight = 0.0;
+            for (uint s = 0; s < kMaxLit; ++s) {
+                weight += lightTiming[(shadedView * kMaxLights + k) * kMaxLit + s].y;
+            }
+            scale *= weight;
         }
         let nDotL = dot(n, toLight);
         if (nDotL <= 0.0 || scale <= 0.0) {

@@ -150,7 +150,8 @@ struct LightGpu {
     /// showing speckle; w: its linewidth, nm.
     float map[4];
     /// Light linking (`LinkGroups`): the groups it lights, then those
-    /// casting its shadows; the rest unused.
+    /// casting its shadows; 1 when it casts shadows at all; 1 for a
+    /// pulsed light other than a laser, scaled by its timing.
     std::uint32_t links[4];
     /// xyz: its electric field's direction (`polarizationAxis`), w:
     /// the fraction of its light polarized along it.
@@ -1730,6 +1731,14 @@ void RasterRenderer::WriteLightTiming(const FrameParams& frame,
                        frame.TimeAt(camera.SubframeTime(0)))
             : 0.0;
     bool timed = false;
+    // Where the frame's exposure opens (its top row's, with
+    // sub-frames the first's), which a flash triggered by it counts
+    // from.
+    const double framePeriod = frame.time - frame.startTime;
+    const double exposure =
+        subframes_ > 1
+            ? frame.TimeAt(camera.SubframeTime(0))
+            : frame.TimeAt(camera.shutterClose) - camera.exposureTime;
     for (std::uint32_t v = 0; v < views; ++v) {
         double start = 0.0;
         double end = 0.0;
@@ -1745,11 +1754,15 @@ void RasterRenderer::WriteLightTiming(const FrameParams& frame,
         for (std::size_t i = 0;
              i < params.lights.size() && i < kMaxLights; ++i) {
             const LightParams& light = params.lights[i];
-            if (light.type != LightType::Laser) {
+            // Lasers' patterns and pulses, and other lights' pulses
+            // (`LightGpu::links` w).
+            if (light.type != LightType::Laser &&
+                !light.beam.Pulsed()) {
                 continue;
             }
             const std::vector<LightParams::Beam::Lit> lit =
-                light.beam.LitBetween(start, end);
+                light.beam.LitBetween(start, end, exposure,
+                                      framePeriod);
             for (std::size_t k = 0; k < lit.size() && k < kLit; ++k) {
                 timing[(v * kMaxLights + i) * kLit + k] = glm::vec2(
                     static_cast<float>(lit[k].frame), lit[k].weight);
@@ -2090,6 +2103,12 @@ void RasterRenderer::WriteLights(
         // Whether it casts shadows at all, which volumes' shadows
         // follow too (volume.slang).
         entry.links[2] = light.shadows ? 1u : 0u;
+        // A pulsed light other than a laser, scaled by its timing
+        // (`WriteLightTiming`); lasers always read theirs.
+        entry.links[3] =
+            light.type != LightType::Laser && light.beam.Pulsed()
+                ? 1u
+                : 0u;
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
         const glm::vec3 where =

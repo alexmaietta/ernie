@@ -327,12 +327,28 @@ struct LightParams {
         double pulseRate = 0.0;
         double pulseWidth = 0.0;
         double pulseDelay = 0.0;
+        /// Each pulse's level falls as exp(-t / `pulseDecay`) over
+        /// its width (0 flat), its start strays uniformly within
+        /// +-`pulseJitter`, and with `pulseOnExposure` one fires a
+        /// frame, `pulseDelay` after the exposure opens
+        /// (`tokens::kPulseTrigger`).
+        double pulseDecay = 0.0;
+        double pulseJitter = 0.0;
+        bool pulseOnExposure = false;
+        /// Its emission is its level as a pulse starts (a lamp's
+        /// intensity), not its average over time (a laser's power).
+        bool pulsePeak = false;
         int sequenceCount = 1;
         double sequencePeriod = 1.0;
         double sequenceDelay = 0.0;
 
         bool IsSpot() const {
             return pattern == "spot";
+        }
+
+        /// Whether it pulses rather than shining continuously.
+        bool Pulsed() const {
+            return pulseRate > 0.0 || pulseOnExposure;
         }
 
         /// One frame of its sequence lit during a span of time, and
@@ -347,11 +363,16 @@ struct LightParams {
         /// What the beam shows over [`start`, `end`] seconds of the
         /// sensor clock: each sequence frame shown then, weighted by
         /// its share of the span times its pulses' energy then over
-        /// their average (1 / duty cycle while a pulse is on, 0
-        /// between them), exactly. A span of no length is its
+        /// their average (1 / duty cycle while a flat pulse is on, 0
+        /// between them), or over a pulse's starting level with
+        /// `pulsePeak`, exactly. A span of no length is its
         /// instant's. Over more than `kMaxLit` frames, `kMaxLit` of
-        /// them spread evenly carry the weight of all.
-        std::vector<Lit> LitBetween(double start, double end) const;
+        /// them spread evenly carry the weight of all. The frame's
+        /// exposure opens at `exposure` (for `pulseOnExposure`), and
+        /// its frames come `framePeriod` seconds apart.
+        std::vector<Lit> LitBetween(double start, double end,
+                                    double exposure = 0.0,
+                                    double framePeriod = 0.0) const;
     };
     Beam beam;
     bool shadows = true;

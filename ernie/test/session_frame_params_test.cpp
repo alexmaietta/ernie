@@ -277,6 +277,57 @@ TEST(LaserTiming, PulsesWeighTheirEnergyOverTheSpan) {
         << "pulses from their delay";
 }
 
+TEST(LaserTiming, FlashesDecayJitterAndFireOnTheExposure) {
+    using Beam = ernie::LightParams::Beam;
+    Beam flash;
+    // A lamp's flash: its intensity is its level as a pulse starts.
+    // 1 ms, flat, each frame 2 ms after the exposure opens at 10 s.
+    flash.pulsePeak = true;
+    flash.pulseOnExposure = true;
+    flash.pulseWidth = 1e-3;
+    flash.pulseDelay = 2e-3;
+    const auto over = [&](double start, double end) {
+        return static_cast<double>(
+            flash.LitBetween(start, end, 10.0, 1.0 / 30.0)[0].weight);
+    };
+    EXPECT_NEAR(over(10.0, 10.005), 0.2, 1e-6)
+        << "a 5 ms exposure holds all of it: a fifth of its level";
+    EXPECT_NEAR(over(10.0, 10.0025), 0.2, 1e-6)
+        << "half of it in 2.5 ms";
+    EXPECT_EQ(over(10.0, 10.002), 0.0) << "over before it fires";
+    EXPECT_EQ(over(10.0025, 10.0025), 1.0) << "an instant of it";
+    // A xenon tube's decay of 0.25 ms: its energy over its
+    // millisecond 0.25 (1 - e^-4) ms.
+    flash.pulseDecay = 2.5e-4;
+    EXPECT_NEAR(over(10.0, 10.005),
+                2.5e-4 * (1.0 - std::exp(-4.0)) / 5e-3, 1e-6);
+    EXPECT_NEAR(over(10.00225, 10.00225), std::exp(-1.0), 1e-6);
+    // Averaged over time (a laser's power), its frame's mean is 1.
+    flash.pulsePeak = false;
+    EXPECT_NEAR(over(10.0, 10.0 + 1.0 / 30.0), 1.0, 1e-5);
+    // Jitter: each pulse starts somewhere in +-0.5 ms, seeded, and a
+    // span still holds all of each inside it (pulses 1 to 99).
+    Beam strobe;
+    strobe.pulsePeak = true;
+    strobe.pulseRate = 100.0;
+    strobe.pulseWidth = 1e-3;
+    strobe.pulseJitter = 5e-4;
+    EXPECT_NEAR(strobe.LitBetween(0.0025, 0.9975)[0].weight,
+                99.0 * 1e-3 / 0.995, 1e-6);
+    double lit = 0.0;
+    for (int n = 0; n < 20; ++n) {
+        // 0.1 ms into pulse n as it would start without jitter: lit
+        // when it starts no later, three times in five.
+        lit += strobe.LitBetween(0.01 * n + 1e-4, 0.01 * n + 1e-4)[0]
+                   .weight;
+    }
+    EXPECT_GT(lit, 6.0) << "some pulses started in time";
+    EXPECT_LT(lit, 18.0) << "some started late";
+    EXPECT_EQ(strobe.LitBetween(0.3, 0.7)[0].weight,
+              strobe.LitBetween(0.3, 0.7)[0].weight)
+        << "the same each time";
+}
+
 TEST(LaserTiming, SequencesShowEachFrameForItsShareOfTheSpan) {
     using Beam = ernie::LightParams::Beam;
     Beam beam;

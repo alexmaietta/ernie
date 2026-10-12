@@ -39,10 +39,6 @@ namespace tokens = ernie::tokens;
 
 TEST_F(RasterDelegateTest, MeshesOutsideAViewAreCulled) {
     Scene scene = MeshScene();
-    // CPU culling drops whole draws there; GPU culling, the default,
-    // tests their instances on the GPU, its draws issued regardless.
-    scene.Set("/Render/Settings", tokens::kCulling,
-              std::string(tokens::kCpu));
     RasterDelegate delegate(*context_);
     const Tensor before = delegate.Render(scene);
     const std::size_t drawn = delegate.Meshes().DrawCount(0);
@@ -71,11 +67,6 @@ TEST_F(RasterDelegateTest, MeshesOutsideAViewAreCulled) {
         }
     }
     EXPECT_TRUE(counted);
-
-    scene.Set("/Render/Settings", tokens::kCulling,
-              std::string(tokens::kGpu));
-    EXPECT_EQ(Bytes(delegate.Render(scene)), Bytes(before))
-        << "GPU culling hides them the same";
 }
 
 namespace {

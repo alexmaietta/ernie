@@ -856,6 +856,38 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       FlashesFiredByTheExposureLightWhatTheyOverlap) {
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    ernie::SphereLight::Define(scene, "/World/Flash")
+        .SetRadius(0.5)
+        .SetIntensity(1e5);
+    scene.Set(
+        "/World/Flash", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 20.0)));
+    // A 5 ms exposure.
+    ernie::Camera(scene, "/World/Camera").SetExposureTime(5e-3);
+    const std::size_t centre =
+        (kVarSize / 2) * kVarSize + kVarSize / 2;
+    const double steady = Band8(delegate, scene)[centre];
+    ASSERT_GT(steady, 0.0);
+    // A 1 ms flash at its full intensity, fired by the exposure.
+    ernie::SphereLight flash(scene, "/World/Flash");
+    flash.SetPulseTrigger(std::string(tokens::kExposureTrigger))
+        .SetPulseWidth(1e-3);
+    const auto at = [&](double delay) {
+        flash.SetPulseDelay(delay);
+        return static_cast<double>(Band8(delegate, scene)[centre]);
+    };
+    EXPECT_NEAR(at(0.0), 0.2 * steady, 2e-3 * steady)
+        << "all of it in the exposure: a fifth of the light";
+    EXPECT_NEAR(at(4.5e-3), 0.1 * steady, 2e-3 * steady)
+        << "late: half of it before the shutter closes";
+    EXPECT_EQ(at(6e-3), 0.0) << "after the exposure";
+}
+
+TEST_F(RasterDelegateTest,
        PatternArrayRegionsReuseTheSpaceTheyLeave) {
     RasterDelegate delegate(*context_);
     std::string why;

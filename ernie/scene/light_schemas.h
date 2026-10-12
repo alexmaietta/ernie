@@ -59,6 +59,42 @@
                                      "shadows, with their descendants.",                           \
                               .group = "Linking"}))
 
+// A pulse's shape and trigger (`tokens::kPulseDecay`), on every light and LaserLight alike.
+#define ERNIE_PULSE_SHAPE_ATTRIBUTES(X)                                                            \
+    X(double, PulseDecay, ::ernie::tokens::kPulseDecay, 0.0,                                       \
+      (::ernie::AttributeMeta{.label = "Pulse decay",                                              \
+                              .doc = "Seconds its level takes to fall by e over a pulse, as a "    \
+                                     "xenon flash's; 0 flat.",                                     \
+                              .group = "Time", .max = 1.0}))                                       \
+    X(double, PulseJitter, ::ernie::tokens::kPulseJitter, 0.0,                                     \
+      (::ernie::AttributeMeta{.label = "Pulse jitter",                                             \
+                              .doc = "Each pulse starts up to this many seconds early or late.",   \
+                              .group = "Time", .max = 1.0}))                                       \
+    X(std::string, PulseTrigger, ::ernie::tokens::kPulseTrigger, "clock",                          \
+      (::ernie::AttributeMeta{.label = "Pulse trigger",                                            \
+                              .doc = "The sensor clock, or the camera's exposure: one pulse a "    \
+                                     "frame, its delay after the exposure opens.",                 \
+                              .group = "Time",                                                     \
+                              .options = {::ernie::tokens::kClock,                                 \
+                                          ::ernie::tokens::kExposureTrigger}}))
+
+// Any light's pulses, a strobe or flash (`tokens::kPulseRate`).
+#define ERNIE_PULSE_ATTRIBUTES(X)                                                                  \
+    X(double, PulseRate, ::ernie::tokens::kPulseRate, 0.0,                                         \
+      (::ernie::AttributeMeta{.label = "Pulse rate",                                               \
+                              .doc = "Pulses per second; 0 continuous. Domes ignore it.",          \
+                              .group = "Time",                                                     \
+                              .max = 1e9}))                                                        \
+    X(double, PulseWidth, ::ernie::tokens::kPulseWidth, 0.0,                                       \
+      (::ernie::AttributeMeta{.label = "Pulse width", .doc = "Each pulse's length, seconds.",      \
+                              .group = "Time", .max = 1.0}))                                       \
+    X(double, PulseDelay, ::ernie::tokens::kPulseDelay, 0.0,                                       \
+      (::ernie::AttributeMeta{.label = "Pulse delay",                                              \
+                              .doc = "When a pulse starts, seconds on the sensor clock or after "  \
+                                     "the exposure opens.",                                        \
+                              .group = "Time", .min = -1.0, .max = 1.0}))                          \
+    ERNIE_PULSE_SHAPE_ATTRIBUTES(X)
+
 #define ERNIE_LIGHT_ATTRIBUTES(X)                                                                  \
     X(double, Intensity, ::ernie::tokens::kIntensity, 1.0,                                         \
       (::ernie::AttributeMeta{.group = "Light", .max = 1e6}))                                      \
@@ -76,6 +112,7 @@
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
       (::ernie::AttributeMeta{.label = "Shadows", .group = "Light"}))                              \
     ERNIE_LIGHT_LINK_ATTRIBUTES(X)                                                                 \
+    ERNIE_PULSE_ATTRIBUTES(X)                                                                      \
     X(bool, Normalize, ::ernie::tokens::kNormalize, false,                                         \
       (::ernie::AttributeMeta{.doc = "Divides the intensity by the light's size (its area, or a "  \
                                      "distant light's projected solid angle), so resizing it "     \
@@ -341,6 +378,7 @@
       (::ernie::AttributeMeta{.label = "Pulse delay",                                              \
                               .doc = "When a pulse starts on the sensor clock, seconds.",          \
                               .group = "Time", .min = -1.0, .max = 1.0}))                          \
+    ERNIE_PULSE_SHAPE_ATTRIBUTES(X)                                                                \
     X(int, SequenceCount, ::ernie::tokens::kLaserSequenceCount, 1,                                 \
       (::ernie::AttributeMeta{.label = "Sequence count",                                           \
                               .doc = "Patterns shown in turn; 1 one pattern.", .group = "Time",    \

@@ -495,6 +495,28 @@ inline constexpr std::string_view kLaserPulseWidth =
     "ernie:laser:pulse:width";
 inline constexpr std::string_view kLaserPulseDelay =
     "ernie:laser:pulse:delay";
+/// Any other light's pulses, a strobe or flash (0 rate: continuous):
+/// `pulse:width` seconds long at `pulse:rate` per second from
+/// `pulse:delay` on the sensor clock; or with `pulse:trigger`
+/// "exposure", one a frame, `pulse:delay` after the camera's
+/// exposure opens (its top row's, with a rolling shutter), as a
+/// camera's strobe output fires a flash. Its intensity is its level
+/// as a pulse starts. Lasers keep `ernie:laser:pulse:*` and take
+/// the rest below.
+inline constexpr std::string_view kPulseRate = "ernie:pulse:rate";
+inline constexpr std::string_view kPulseWidth = "ernie:pulse:width";
+inline constexpr std::string_view kPulseDelay = "ernie:pulse:delay";
+/// A pulse's decay (seconds): its level falls as exp(-t / decay)
+/// over its width, as a xenon flash's; 0 flat, as an LED strobe's.
+inline constexpr std::string_view kPulseDecay = "ernie:pulse:decay";
+/// Each pulse's start strays uniformly within +-`pulse:jitter`
+/// seconds, the trigger's latency spread, seeded per pulse (or per
+/// frame when triggered by the exposure).
+inline constexpr std::string_view kPulseJitter = "ernie:pulse:jitter";
+inline constexpr std::string_view kPulseTrigger =
+    "ernie:pulse:trigger";
+inline constexpr std::string_view kClock = "clock";
+inline constexpr std::string_view kExposureTrigger = "exposure";
 /// A sequence of `sequence:count` patterns (1: one), each shown for
 /// `sequence:period` seconds in turn from `sequence:delay` seconds
 /// into the sensor clock, as structured light's Gray codes and phase

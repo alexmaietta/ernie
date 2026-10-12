@@ -7,7 +7,9 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 
 namespace ernie {
@@ -226,33 +228,98 @@ PushbroomStrip FrameParams::Strip(std::size_t view) const {
 }
 
 std::vector<LightParams::Beam::Lit>
-LightParams::Beam::LitBetween(double start, double end) const {
-    const bool pulsed = pulseRate > 0.0;
-    const double period = pulsed ? 1.0 / pulseRate : 0.0;
-    const double duty =
-        pulsed ? std::min(pulseWidth * pulseRate, 1.0) : 1.0;
-    // The pulses' seconds on from `pulseDelay` to `t`.
-    const auto onUntil = [&](double t) {
-        const double u = t - pulseDelay;
-        const double n = std::floor(u / period);
-        return n * pulseWidth +
-               std::clamp(u - n * period, 0.0, pulseWidth);
-    };
-    // The light's mean over [a, b] over its average.
-    const auto mean = [&](double a, double b) {
-        if (!pulsed) {
-            return 1.0;
-        }
-        if (!(duty > 0.0)) {
+LightParams::Beam::LitBetween(double start, double end,
+                              double exposure,
+                              double framePeriod) const {
+    const bool clocked = pulseRate > 0.0 && !pulseOnExposure;
+    const double period = clocked ? 1.0 / pulseRate : 0.0;
+    // A pulse's level `u` seconds after it starts, 1 as it starts,
+    // and its energy (level times seconds) by then.
+    const auto level = [&](double u) {
+        if (!(u >= 0.0 && u < pulseWidth)) {
             return 0.0;
         }
+        return pulseDecay > 0.0 ? std::exp(-u / pulseDecay) : 1.0;
+    };
+    const auto energy = [&](double u) {
+        const double on = std::clamp(u, 0.0, pulseWidth);
+        return pulseDecay > 0.0
+                   ? pulseDecay * (1.0 - std::exp(-on / pulseDecay))
+                   : on;
+    };
+    // Pulse `n`'s start's stray, uniform in +-`pulseJitter`
+    // (splitmix64 of `n`).
+    const auto jitter = [&](std::uint64_t n) {
+        if (!(pulseJitter > 0.0)) {
+            return 0.0;
+        }
+        std::uint64_t z = n + 0x9E3779B97F4A7C15ull;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+        z ^= z >> 31;
+        const double unit =
+            static_cast<double>(z >> 11) * 0x1.0p-53;  // [0, 1)
+        return pulseJitter * (2.0 * unit - 1.0);
+    };
+    // Over a span of `seconds` (an instant for 0), its light from a
+    // pulse starting at `t`, per second.
+    const auto from = [&](double t, double a, double b) {
+        return b > a ? (energy(b - t) - energy(a - t)) / (b - a)
+                     : level(a - t);
+    };
+    // What the mean is relative to: a pulse's starting level, or
+    // its average over time (a pulse's energy at the pulse rate, or
+    // a frame's).
+    const double pulse = energy(pulseWidth);
+    const double reference = pulsePeak           ? 1.0
+                             : clocked           ? pulse * pulseRate
+                             : framePeriod > 0.0 ? pulse / framePeriod
+                                                 : pulse;
+    // The light's mean over [a, b] over `reference`.
+    const auto mean = [&](double a, double b) {
+        if (!Pulsed()) {
+            return 1.0;
+        }
+        if (!(reference > 0.0)) {
+            return 0.0;
+        }
+        if (!clocked) {
+            // One a frame, its delay after the exposure opens, its
+            // stray seeded by the frame's time.
+            const double t = exposure + pulseDelay +
+                             jitter(std::bit_cast<std::uint64_t>(
+                                 std::round(exposure * 1e6)));
+            return from(t, a, b) / reference;
+        }
+        const double first = std::floor(
+            (a - pulseDelay - pulseJitter - pulseWidth) / period);
+        const double last =
+            std::floor((b - pulseDelay + pulseJitter) / period);
+        if (pulseJitter > 0.0 && last - first < 4096.0) {
+            // Each pulse that may reach the span, at its own start.
+            double sum = 0.0;
+            for (double n = first; n <= last; n += 1.0) {
+                sum += from(pulseDelay + n * period +
+                                jitter(static_cast<std::uint64_t>(
+                                    static_cast<std::int64_t>(n))),
+                            a, b);
+            }
+            return sum / reference;
+        }
+        // Without jitter (or past 4096 pulses, where it averages
+        // out): the pulses' energy from `pulseDelay` to `t`, whole
+        // ones and the last's part.
+        const auto until = [&](double t) {
+            const double u = t - pulseDelay;
+            const double n = std::floor(u / period);
+            return n * pulse + energy(u - n * period);
+        };
         if (!(b > a)) {
             const double u = a - pulseDelay;
-            return u - std::floor(u / period) * period < pulseWidth
-                       ? 1.0 / duty
-                       : 0.0;
+            return level(u - std::floor(u / period) * period) /
+                   reference;
         }
-        return (onUntil(b) - onUntil(a)) / (b - a) / duty;
+        return (until(b) - until(a)) / (b - a) / reference;
     };
     const int count = std::max(sequenceCount, 1);
     if (count == 1) {
