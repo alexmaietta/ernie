@@ -17,6 +17,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -91,7 +92,11 @@ struct ViewportDisplay {
                           ///< and y axes.
     bool selection = true;  ///< The selection's outline.
     bool overlays =
-        true;         ///< The scene's overlays (`Scene::GetOverlay`).
+        true;  ///< The scene's overlays (`Scene::GetOverlay`).
+    /// Scene overlays the viewport leaves out while `overlays` shows
+    /// the others, by name: the eye menu's Scene Overlays submenu
+    /// toggles each.
+    std::set<std::string, std::less<>> hiddenOverlays;
     bool hud = true;  ///< The heads-up display at the top left, with
                       ///< the items below.
     bool hudFps = true;  ///< Frames per second and frame time.

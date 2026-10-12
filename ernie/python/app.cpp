@@ -6,6 +6,7 @@
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/set.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/tuple.h>
@@ -199,6 +200,10 @@ void BindApp(nb::module_& parent) {
                 "The selection's outline.")
         .def_rw("overlays", &ViewportDisplay::overlays,
                 "The scene's overlays.")
+        .def_rw(
+            "hidden_overlays", &ViewportDisplay::hiddenOverlays,
+            "Scene overlays the viewport leaves out, by name, while "
+            "`overlays` shows the others.")
         .def_rw("hud", &ViewportDisplay::hud, "The heads-up display.")
         .def_rw("hud_fps", &ViewportDisplay::hudFps,
                 "Frames per second and frame time.")
@@ -556,7 +561,7 @@ void BindApp(nb::module_& parent) {
                     : level == "warning" ? LogLevel::Warning
                     : level == "info"    ? LogLevel::Info
                                          : throw nb::value_error(
-                                               "level must be \"info\", "
+                                            "level must be \"info\", "
                                                "\"warning\" or "
                                                "\"error\"");
                 viewer.Log(parsed, std::move(text));

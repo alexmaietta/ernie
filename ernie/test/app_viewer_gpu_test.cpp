@@ -800,6 +800,16 @@ TEST_F(ViewerTest, ViewportTogglesShowOverlaysAndHudItemsList) {
     EXPECT_GT(asked, 0);
     EXPECT_FALSE(scene_.GetOverlay("__viewport").Empty())
         << "the grid";
+    // A layer hidden on its own, the others still shown.
+    withGrid.hiddenOverlays = {"labels"};
+    viewer_->SetViewportDisplay(withGrid);
+    viewer_->Step();
+    EXPECT_FALSE(shown().contains("labels"));
+    EXPECT_TRUE(shown().contains("__viewport"));
+    withGrid.hiddenOverlays.clear();
+    viewer_->SetViewportDisplay(withGrid);
+    viewer_->Step();
+    EXPECT_TRUE(shown().contains("labels"));
 
     viewer_->SetViewportToggleShown(toggle, true);
     ViewportDisplay display = viewer_->GetViewportDisplay();

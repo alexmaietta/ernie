@@ -682,7 +682,8 @@ struct Viewer::State {
         }
         for (const std::string& name : names) {
             if (name != kSelectionOverlay &&
-                name != kViewportOverlay && !toggled.contains(name)) {
+                name != kViewportOverlay && !toggled.contains(name) &&
+                !display.hiddenOverlays.contains(name)) {
                 shown += " " + name;
             }
         }
@@ -2390,7 +2391,38 @@ struct Viewer::State {
         ImGui::Separator();
         menu::Check("Selection Outline", &display.selection);
         menu::Check("Grid", &display.grid);
-        menu::Check("Scene Overlays", &display.overlays);
+        // The scene's overlay layers: all of them, then each, but
+        // those an application's own toggles show.
+        if (menu::BeginSubmenu("Scene Overlays")) {
+            menu::Check("Show", &display.overlays);
+            ImGui::BeginDisabled(!display.overlays);
+            std::set<std::string, std::less<>> toggled;
+            for (const ViewportToggle& toggle : viewportToggles) {
+                toggled.insert(toggle.overlay);
+            }
+            bool any = false;
+            for (const std::string& name : scene.OverlayNames()) {
+                if (name == kSelectionOverlay ||
+                    name == kViewportOverlay ||
+                    toggled.contains(name)) {
+                    continue;
+                }
+                if (!any) {
+                    ImGui::Separator();
+                    any = true;
+                }
+                bool shown = !display.hiddenOverlays.contains(name);
+                if (menu::Check(name.c_str(), &shown)) {
+                    if (shown) {
+                        display.hiddenOverlays.erase(name);
+                    } else {
+                        display.hiddenOverlays.insert(name);
+                    }
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
         for (std::size_t i = 0; i < viewportToggles.size(); ++i) {
             bool shown = viewportToggles[i].shown;
             if (menu::Check(viewportToggles[i].label.c_str(),
