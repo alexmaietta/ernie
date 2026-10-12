@@ -2616,7 +2616,8 @@ void MeshDrawable::WriteDraws() {
         }
         draw.motion[2] = PointBase(mesh);
         draw.motion[3] = PointBase(mesh, true);
-        draw.offsets[3] = flags;
+        draw.offsets[3] = flags | (item.linkGroup & 31u)
+                                      << kLinkGroupShift;
         draw.points[0] = mesh.firstVertex;
         draw.points[1] = renderer_.HasMaterial(item.material)
                              ? item.material
