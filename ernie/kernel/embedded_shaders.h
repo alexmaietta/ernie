@@ -77,6 +77,7 @@ extern const char kPointsSlang[];
 /// Hierarchical depth (Hi-Z) pyramid for occlusion culling.
 extern const char kHzbSlang[];
 extern const char kViewsSlang[];
+extern const char kVirtualShadowSlang[];
 
 /// The visible depth range of a view, for sample distribution shadow
 /// maps.

@@ -16,6 +16,7 @@ ernie_add_test_suite(
     raster_poisson_disk_test.cpp
     raster_sensor_plan_test.cpp
     raster_shadow_cascades_test.cpp
+    raster_virtual_shadow_test.cpp
     scene_brdf_test.cpp
     scene_cahvore_test.cpp
     scene_dem_test.cpp
@@ -92,6 +93,7 @@ ernie_add_test_suite(
     raster_standard_filters_gpu_test.cpp
     raster_terrain_drawable_test.cpp
     raster_textures_gpu_test.cpp
+    raster_virtual_shadow_gpu_test.cpp
     raster_volumes_gpu_test.cpp
     raster_zero_copy_gpu_test.cpp
     scene_brdf_vulkan_test.cpp
