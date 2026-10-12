@@ -564,6 +564,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1FieldWriteTarget/"><strong>FieldWriteTarget</strong></a> <br><em>Where a</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s writer (</em><code>RenderDelegate::SetFieldWriter</code> <em>) writes this frame: its (x, y, z) float32 values, z fastest, at device address</em><code>values</code> <em>, which is</em><code>offset</code> <em>bytes into</em><code>buffer</code> <em>(for copies),</em><code>shape</code> <em>of them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1FrameId/"><strong>FrameId</strong></a> <br><em>Where an image sits in the deterministic random streams of</em> <code>sampling.h</code> <em>.</em></td>
 </tr>
 <tr>
@@ -1208,6 +1212,10 @@
 <tr>
 <td style="text-align: right;">typedef int</td>
 <td style="text-align: left;"><a href="#typedef-externalhandle"><strong>ExternalHandle</strong></a>  <br><em>Memory or a semaphore exported for another API, such as CUDA: a POSIX file descriptor, or a Win32 NT handle on Windows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">typedef std::function&lt; void(VkCommandBuffer, const <a href="../structernie_1_1FieldWriteTarget/"><strong>FieldWriteTarget</strong></a> &amp;)&gt;</td>
+<td style="text-align: left;"><a href="#typedef-fieldwriter"><strong>FieldWriter</strong></a>  <br><em>Records GPU work writing a</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s values (</em><code>FieldWriteTarget</code> <em>) into a frame's command buffer, such as a simulation's compute dispatches.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">enum std::uint8_t</td>
@@ -2605,6 +2613,12 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 <h3 id="typedef-externalhandle">typedef ExternalHandle</h3>
 <p><em>Memory or a semaphore exported for another API, such as CUDA: a POSIX file descriptor, or a Win32 NT handle on Windows.</em> </p>
 <pre><code class="language-C++">using ernie::ExternalHandle = typedef int;
+</code></pre>
+<hr>
+
+<h3 id="typedef-fieldwriter">typedef FieldWriter</h3>
+<p><em>Records GPU work writing a</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s values (</em><code>FieldWriteTarget</code> <em>) into a frame's command buffer, such as a simulation's compute dispatches.</em></p>
+<pre><code class="language-C++">using ernie::FieldWriter = typedef std::function&lt;void(VkCommandBuffer, const FieldWriteTarget&amp;)&gt;;
 </code></pre>
 <hr>
 

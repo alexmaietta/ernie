@@ -398,6 +398,13 @@
                               .doc = &quot;Texels along each side of the volumes' shadow map of each &quot;  \
                                      &quot;light shadow view, which surfaces read.&quot;,                    \
                               .group = &quot;Volumes&quot;, .min = 16.0, .max = 2048.0}))                    \
+    X(bool, VolumeLightCache, ::ernie::tokens::kVolumeLightCache, true,                            \
+      (::ernie::AttributeMeta{.label = &quot;Lighting cache&quot;,                                           \
+                              .doc = &quot;Light volumes from their optical depth to the lights, the &quot;  \
+                                     &quot;sky and the ground, found once a frame at a cell per two &quot;   \
+                                     &quot;voxels, rather than marched to at every step; off, for &quot;     \
+                                     &quot;reference images.&quot;,                                          \
+                              .group = &quot;Volumes&quot;}))                                                \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, &quot;approximate&quot;,                  \
       (::ernie::AttributeMeta{.label = &quot;Mode&quot;,                                                     \
                               .doc = &quot;approximate: unoccluded; full: also shadowed; directions: &quot;  \
@@ -423,7 +430,13 @@
     X(std::vector&lt;::ernie::Path&gt;, Filters, ::ernie::tokens::kFilters,                              \
       std::vector&lt;::ernie::Path&gt;{},                                                                \
       (::ernie::AttributeMeta{.doc = &quot;The SensorFilter prims of its sensor chain, in order.&quot;,      \
-                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kSensorFilter}}))
+                              .group = &quot;Image&quot;, .options = {::ernie::tokens::kSensorFilter}}))     \
+    X(bool, OutputsInPlace, ::ernie::tokens::kOutputsInPlace, true,                                \
+      (::ernie::AttributeMeta{.label = &quot;Outputs in place&quot;,                                         \
+                              .doc = &quot;Render vars mapped to GPU tensors are written in place by &quot;  \
+                                     &quot;its later frames, which map without a copy; off, each map &quot;  \
+                                     &quot;copies.&quot;,                                                    \
+                              .group = &quot;Image&quot;}))
 
 #define ERNIE_RENDER_VAR_ATTRIBUTES(X)                                                             \
     X(std::string, SourceName, ::ernie::tokens::kSourceName, ::ernie::tokens::kLdrColor,           \

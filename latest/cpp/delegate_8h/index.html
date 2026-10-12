@@ -214,6 +214,7 @@
 <li><code>#include "ernie/session/frame_params.h"</code></li>
 <li><code>#include "ernie/session/outputs.h"</code></li>
 <li><code>#include "ernie/util/tensor.h"</code></li>
+<li><code>#include &lt;array&gt;</code></li>
 <li><code>#include &lt;cstdint&gt;</code></li>
 <li><code>#include &lt;functional&gt;</code></li>
 <li><code>#include &lt;map&gt;</code></li>
@@ -250,6 +251,10 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1FieldWriteTarget/"><strong>FieldWriteTarget</strong></a> <br><em>Where a</em> <a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>'s writer (</em><code>RenderDelegate::SetFieldWriter</code> <em>) writes this frame: its (x, y, z) float32 values, z fastest, at device address</em><code>values</code> <em>, which is</em><code>offset</code> <em>bytes into</em><code>buffer</code> <em>(for copies),</em><code>shape</code> <em>of them.</em></td>
+</tr>
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1FrameId/"><strong>FrameId</strong></a> <br><em>Where an image sits in the deterministic random streams of</em> <code>sampling.h</code> <em>.</em></td>

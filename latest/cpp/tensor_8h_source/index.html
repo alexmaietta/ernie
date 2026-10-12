@@ -296,6 +296,8 @@ class Tensor {
 
     Tensor Row(std::int64_t index) const;
 
+    Tensor Slice(std::int64_t first, std::int64_t count) const;
+
     bool IsContiguous() const;
 
     Tensor Contiguous() const;

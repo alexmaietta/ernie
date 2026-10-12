@@ -290,6 +290,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setfieldwriter"><strong>SetFieldWriter</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::array&lt; std::uint32_t, 3 &gt; shape, <a href="../namespaceernie/#typedef-fieldwriter"><strong>FieldWriter</strong></a> writer) <br><em>Has</em> <code>writer</code> <em>write the</em><a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>at</em><code>path</code> <em>on the GPU every frame, recorded into the frame before anything samples it: its</em><code>shape</code> <em>(x, y, z) float32 values, z fastest, in place of its</em><code>ernie:values</code> <em>(which may be unset).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-sethighlight"><strong>SetHighlight</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths, glm::vec4 colour) <br><em>Outlines the prims at</em> <code>paths</code> <em>and their descendants in</em><code>Record</code> <em>'s image, as Omniverse Kit outlines its selection, in display colour</em><code>colour</code> <em>(sRGB-encoded rgb, alpha its opacity); none for no paths.</em></td>
 </tr>
 <tr>
@@ -557,6 +561,21 @@
 <p><em>The custom sensor filters registered so far.</em> </p>
 <pre><code class="language-C++">virtual const SensorFilterRegistry &amp; ernie::RenderDelegate::SensorFilters () const = 0
 </code></pre>
+<hr>
+
+<h3 id="function-setfieldwriter">function SetFieldWriter</h3>
+<p><em>Has</em> <code>writer</code> <em>write the</em><a href="../classernie_1_1DenseField/"><em><strong>DenseField</strong></em></a> <em>at</em><code>path</code> <em>on the GPU every frame, recorded into the frame before anything samples it: its</em><code>shape</code> <em>(x, y, z) float32 values, z fastest, in place of its</em><code>ernie:values</code> <em>(which may be unset).</em></p>
+<pre><code class="language-C++">virtual void ernie::RenderDelegate::SetFieldWriter (
+    const Path &amp; path,
+    std::array&lt; std::uint32_t, 3 &gt; shape,
+    FieldWriter writer
+) 
+</code></pre>
+<p>A null writer stops writing. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the backend has no writers. </li>
+</ul>
 <hr>
 
 <h3 id="function-sethighlight">function SetHighlight</h3>

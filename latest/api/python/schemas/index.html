@@ -5027,7 +5027,7 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
                   (<code><span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
-                <p>int32 (2,): the points and triangles in use, first, of those the points and triangle indices</p>
+                <p>int32 (n &gt;= 2,): the points and triangle indices in use, first, of those the points and</p>
               </div>
             </li>
             <li>
@@ -5095,9 +5095,10 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>int32 (2,): the points and triangles in use, first, of those the points and triangle indices
-hold, for topology that changes on the GPU within their capacity; read on the GPU, the rest
-neither drawn nor bounded. USD name <code>ernie:activeCounts</code>.</p>
+        <p>int32 (n &gt;= 2,): the points and triangle indices in use, first, of those the points and
+triangle indices hold, for topology that changes on the GPU within their capacity, as
+simulators count them (more entries are ignored); read on the GPU, the rest neither drawn
+nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 
     </div>
 
@@ -12541,7 +12542,7 @@ connects to.</p>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>Kelvin, of the whole volume when it has no temperature field; 0, no glow. Default 0.0. USD</p>
+                <p>Kelvin, of the whole volume when it has no temperature field, or what the field's 0 is with</p>
               </div>
             </li>
             <li>
@@ -13436,8 +13437,9 @@ lights; 1 is physical, 0 none. Default 1.0. USD name <code>inputs:skyLight</code
 
     <div class="doc doc-contents ">
 
-        <p>Kelvin, of the whole volume when it has no temperature field; 0, no glow. Default 0.0. USD
-name <code>inputs:temperature</code>.</p>
+        <p>Kelvin, of the whole volume when it has no temperature field, or what the field's 0 is with
+one (the ambient air's); 0, no glow without a field. Default 0.0. USD name
+<code>inputs:temperature</code>.</p>
 
     </div>
 
@@ -15053,6 +15055,14 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>volume_light_cache</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Light volumes from their optical depth to the lights, the sky and the ground, found once a</p>
+              </div>
+            </li>
+            <li>
               <b><code>volume_max_octaves</code></b>
                   (<code><span title="int">int</span></code>)
               –
@@ -15883,6 +15893,31 @@ behind them. Default 32. USD name <code>ernie:volumes:airSteps</code>.</p>
 
 
 
+<h3 id="ernie.schema.RenderSettings.volume_light_cache" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_light_cache</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_light_cache: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Light volumes from their optical depth to the lights, the sky and the ground, found once a
+frame at a cell per two voxels, rather than marched to at every step; off, for reference
+images. Default True. USD name <code>ernie:volumes:lightCache</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.RenderSettings.volume_max_octaves" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_max_octaves</span>
 
@@ -16103,6 +16138,7 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     volume_air_steps: int = ...,
     volume_max_octaves: int = ...,
     volume_shadow_resolution: int = ...,
+    volume_light_cache: bool = ...,
     dome_light_mode: str = ...,
     dome_shadow_radius: float = ...,
     dome_directions: int = ...,
@@ -16215,6 +16251,14 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
                 <p>The RenderVars written; none, LdrColor alone. USD name <code>orderedVars</code>.</p>
               </div>
             </li>
+            <li>
+              <b><code>outputs_in_place</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Render vars mapped to GPU tensors are written in place by its later frames, which map</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -16298,6 +16342,30 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderProduct.outputs_in_place" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">outputs_in_place</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">outputs_in_place: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Render vars mapped to GPU tensors are written in place by its later frames, which map
+without a copy; off, each map copies. Default True. USD name <code>ernie:outputs:inPlace</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -16326,6 +16394,7 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     | Schema
     | Sequence[str | Path | Prim | Schema] = ...,
     filters: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
+    outputs_in_place: bool = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",

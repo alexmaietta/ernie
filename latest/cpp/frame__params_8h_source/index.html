@@ -482,6 +482,7 @@ struct VolumeSettings {
     std::uint32_t airSteps = 32;
     std::uint32_t maxOctaves = 8;
     std::uint32_t shadowResolution = 256;
+    bool lightCache = true;
 
     bool operator==(const VolumeSettings&amp;) const = default;
 };

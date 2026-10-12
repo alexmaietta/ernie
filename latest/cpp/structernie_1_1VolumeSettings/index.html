@@ -221,6 +221,10 @@
 <td style="text-align: left;"><a href="#variable-airsteps"><strong>airSteps</strong></a>   = <code>32</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-lightcache"><strong>lightCache</strong></a>   = <code>true</code><br><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>each volume from its lighting cache, its optical depth to the lights, the sky and the ground at a cell per two voxels found once a frame, rather than marching to them every step.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#variable-maxoctaves"><strong>maxOctaves</strong></a>   = <code>8</code><br></td>
 </tr>
@@ -264,6 +268,12 @@
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-airsteps">variable airSteps</h3>
 <pre><code class="language-C++">std::uint32_t ernie::VolumeSettings::airSteps;
+</code></pre>
+<hr>
+
+<h3 id="variable-lightcache">variable lightCache</h3>
+<p><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>each volume from its lighting cache, its optical depth to the lights, the sky and the ground at a cell per two voxels found once a frame, rather than marching to them every step.</em></p>
+<pre><code class="language-C++">bool ernie::VolumeSettings::lightCache;
 </code></pre>
 <hr>
 

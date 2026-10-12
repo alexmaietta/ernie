@@ -286,10 +286,11 @@
                                      &quot;count.&quot;,                                                     \
                               .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))              \
     X(::ernie::Tensor, ActiveCounts, ::ernie::tokens::kActiveCounts, nullptr,                      \
-      (::ernie::AttributeMeta{.doc = &quot;int32 (2,): the points and triangles in use, first, of &quot;     \
-                                     &quot;those the points and triangle indices hold, for topology &quot;   \
-                                     &quot;that changes on the GPU within their capacity; read on the &quot; \
-                                     &quot;GPU, the rest neither drawn nor bounded.&quot;,                   \
+      (::ernie::AttributeMeta{.doc = &quot;int32 (n &gt;= 2,): the points and triangle indices in use, &quot;   \
+                                     &quot;first, of those the points and triangle indices hold, for &quot;  \
+                                     &quot;topology that changes on the GPU within their capacity, &quot;    \
+                                     &quot;as simulators count them (more entries are ignored); read &quot;  \
+                                     &quot;on the GPU, the rest neither drawn nor bounded.&quot;,            \
                               .group = &quot;Geometry&quot;, .integer = true}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \

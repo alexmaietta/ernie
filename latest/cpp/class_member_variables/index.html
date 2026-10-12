@@ -253,7 +253,7 @@
 <li><strong>bands</strong> (<a href="../structernie_1_1BandedAtmosphere/"><strong>ernie::BandedAtmosphere</strong></a>, <a href="../structernie_1_1CameraParams/"><strong>ernie::CameraParams</strong></a>)</li>
 <li><strong>bits</strong> (<a href="../structernie_1_1Change/"><strong>ernie::Change</strong></a>)</li>
 <li><strong>binding</strong> (<a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>)</li>
-<li><strong>buffer</strong> (<a href="../structernie_1_1DescriptorResource/"><strong>ernie::DescriptorResource</strong></a>, <a href="../structernie_1_1FrameImages_1_1LinearVar/"><strong>ernie::FrameImages::LinearVar</strong></a>, <a href="../structernie_1_1NanoVdbGrid/"><strong>ernie::NanoVdbGrid</strong></a>, <a href="../structernie_1_1VolumeFieldParams/"><strong>ernie::VolumeFieldParams</strong></a>, <a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ernie::VulkanContext::ExportedBuffer</strong></a>)</li>
+<li><strong>buffer</strong> (<a href="../structernie_1_1DescriptorResource/"><strong>ernie::DescriptorResource</strong></a>, <a href="../structernie_1_1FieldWriteTarget/"><strong>ernie::FieldWriteTarget</strong></a>, <a href="../structernie_1_1FrameImages_1_1LinearVar/"><strong>ernie::FrameImages::LinearVar</strong></a>, <a href="../structernie_1_1NanoVdbGrid/"><strong>ernie::NanoVdbGrid</strong></a>, <a href="../structernie_1_1VolumeFieldParams/"><strong>ernie::VolumeFieldParams</strong></a>, <a href="../structernie_1_1VulkanContext_1_1ExportedBuffer/"><strong>ernie::VulkanContext::ExportedBuffer</strong></a>)</li>
 <li><strong>bodies</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderPrims/"><strong>ernie::RenderPrims</strong></a>)</li>
 <li><strong>buffer_</strong> (<a href="../classernie_1_1GpuBuffer/"><strong>ernie::GpuBuffer</strong></a>)</li>
 <li><strong>bytes_</strong> (<a href="../classernie_1_1GpuImage/"><strong>ernie::GpuImage</strong></a>)</li>
@@ -658,6 +658,7 @@
 <li><strong>loadDepth</strong> (<a href="../structernie_1_1RenderingTarget/"><strong>ernie::RenderingTarget</strong></a>)</li>
 <li><strong>lightResolution</strong> (<a href="../structernie_1_1ShadowSettings/"><strong>ernie::ShadowSettings</strong></a>)</li>
 <li><strong>linkGroup</strong> (<a href="../structernie_1_1VolumeParams/"><strong>ernie::VolumeParams</strong></a>)</li>
+<li><strong>lightCache</strong> (<a href="../structernie_1_1VolumeSettings/"><strong>ernie::VolumeSettings</strong></a>)</li>
 <li><strong>limits_</strong> (<a href="../classernie_1_1VulkanContext/"><strong>ernie::VulkanContext</strong></a>)</li>
 <li><strong>lastExtent_</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
 <li><strong>loggedArrays_</strong> (<a href="../classernie_1_1app_1_1Demo/"><strong>ernie::app::Demo</strong></a>)</li>
@@ -756,6 +757,7 @@
 <li><strong>optics</strong> (<a href="../structernie_1_1Constituent/"><strong>ernie::Constituent</strong></a>)</li>
 <li><strong>outer</strong> (<a href="../structernie_1_1CubeSphereRegion/"><strong>ernie::CubeSphereRegion</strong></a>)</li>
 <li><strong>open_</strong> (<a href="../classernie_1_1EditHistory/"><strong>ernie::EditHistory</strong></a>, <a href="../classernie_1_1app_1_1FileDialog/"><strong>ernie::app::FileDialog</strong></a>)</li>
+<li><strong>offset</strong> (<a href="../structernie_1_1FieldWriteTarget/"><strong>ernie::FieldWriteTarget</strong></a>)</li>
 <li><strong>occlusion</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
 <li><strong>overlays</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>, <a href="../structernie_1_1app_1_1ViewportDisplay/"><strong>ernie::app::ViewportDisplay</strong></a>)</li>
 <li><strong>overscan</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
@@ -950,7 +952,7 @@
 <li><strong>state_</strong> (<a href="../classernie_1_1CudaInterop/"><strong>ernie::CudaInterop</strong></a>, <a href="../classernie_1_1app_1_1DemoRunner/"><strong>ernie::app::DemoRunner</strong></a>, <a href="../classernie_1_1app_1_1Viewer/"><strong>ernie::app::Viewer</strong></a>)</li>
 <li><strong>samples</strong> (<a href="../structernie_1_1CylindricalDem/"><strong>ernie::CylindricalDem</strong></a>, <a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>, <a href="../structernie_1_1PolarStereographicDem/"><strong>ernie::PolarStereographicDem</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Scalar/"><strong>ernie::app::ViewerLogs::Scalar</strong></a>)</li>
 <li><strong>standardParallelDeg</strong> (<a href="../structernie_1_1CylindricalDem/"><strong>ernie::CylindricalDem</strong></a>)</li>
-<li><strong>shape</strong> (<a href="../structernie_1_1DensityLayer/"><strong>ernie::DensityLayer</strong></a>, <a href="../structernie_1_1OverlayBatch/"><strong>ernie::OverlayBatch</strong></a>, <a href="../structernie_1_1OverlaySprite/"><strong>ernie::OverlaySprite</strong></a>)</li>
+<li><strong>shape</strong> (<a href="../structernie_1_1DensityLayer/"><strong>ernie::DensityLayer</strong></a>, <a href="../structernie_1_1FieldWriteTarget/"><strong>ernie::FieldWriteTarget</strong></a>, <a href="../structernie_1_1OverlayBatch/"><strong>ernie::OverlayBatch</strong></a>, <a href="../structernie_1_1OverlaySprite/"><strong>ernie::OverlaySprite</strong></a>)</li>
 <li><strong>stages</strong> (<a href="../structernie_1_1DescriptorBinding/"><strong>ernie::DescriptorBinding</strong></a>, <a href="../structernie_1_1TimelinePoint/"><strong>ernie::TimelinePoint</strong></a>)</li>
 <li><strong>sh</strong> (<a href="../structernie_1_1DomeParams/"><strong>ernie::DomeParams</strong></a>)</li>
 <li><strong>shadow</strong> (<a href="../structernie_1_1DomeParams/"><strong>ernie::DomeParams</strong></a>)</li>
@@ -1114,6 +1116,7 @@
 <li><strong>version</strong> (<a href="../structernie_1_1ChangeCursor/"><strong>ernie::ChangeCursor</strong></a>, <a href="../structernie_1_1VolumeFieldParams/"><strong>ernie::VolumeFieldParams</strong></a>)</li>
 <li><strong>valuesOffset</strong> (<a href="../structernie_1_1DenseNanoVdbLayout/"><strong>ernie::DenseNanoVdbLayout</strong></a>)</li>
 <li><strong>visible</strong> (<a href="../structernie_1_1DomeParams/"><strong>ernie::DomeParams</strong></a>)</li>
+<li><strong>values</strong> (<a href="../structernie_1_1FieldWriteTarget/"><strong>ernie::FieldWriteTarget</strong></a>, <a href="../structernie_1_1IsdSamples/"><strong>ernie::IsdSamples</strong></a>, <a href="../structernie_1_1Pds3Label/"><strong>ernie::Pds3Label</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>)</li>
 <li><strong>vars</strong> (<a href="../structernie_1_1FrameParams_1_1SensorChain/"><strong>ernie::FrameParams::SensorChain</strong></a>, <a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>, <a href="../structernie_1_1RenderProductOutput/"><strong>ernie::RenderProductOutput</strong></a>, <a href="../structernie_1_1RenderProductSpec/"><strong>ernie::RenderProductSpec</strong></a>)</li>
 <li><strong>volumeSettings</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
 <li><strong>volumes</strong> (<a href="../structernie_1_1FrameParams/"><strong>ernie::FrameParams</strong></a>)</li>
@@ -1121,7 +1124,6 @@
 <li><strong>vertexEntry</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>vertexSpirv</strong> (<a href="../structernie_1_1GraphicsPipelineDesc/"><strong>ernie::GraphicsPipelineDesc</strong></a>)</li>
 <li><strong>vertical</strong> (<a href="../structernie_1_1IesProfile/"><strong>ernie::IesProfile</strong></a>)</li>
-<li><strong>values</strong> (<a href="../structernie_1_1IsdSamples/"><strong>ernie::IsdSamples</strong></a>, <a href="../structernie_1_1Pds3Label/"><strong>ernie::Pds3Label</strong></a>, <a href="../structernie_1_1EditHistory_1_1PrimSnapshot/"><strong>ernie::EditHistory::PrimSnapshot</strong></a>, <a href="../structernie_1_1Scene_1_1PrimData/"><strong>ernie::Scene::PrimData</strong></a>, <a href="../structernie_1_1app_1_1ViewerLogs_1_1Array/"><strong>ernie::app::ViewerLogs::Array</strong></a>)</li>
 <li><strong>velocities</strong> (<a href="../structernie_1_1IsdSensor/"><strong>ernie::IsdSensor</strong></a>)</li>
 <li><strong>vignetting</strong> (<a href="../structernie_1_1LensModel/"><strong>ernie::LensModel</strong></a>)</li>
 <li><strong>voxelSize</strong> (<a href="../structernie_1_1NanoVdbGrid/"><strong>ernie::NanoVdbGrid</strong></a>, <a href="../structernie_1_1VolumeFieldParams/"><strong>ernie::VolumeFieldParams</strong></a>)</li>

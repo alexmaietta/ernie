@@ -217,6 +217,7 @@
 #include &quot;ernie/session/outputs.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
 
+#include &lt;array&gt;
 #include &lt;cstdint&gt;
 #include &lt;functional&gt;
 #include &lt;map&gt;
@@ -257,6 +258,16 @@ struct MeshWriteTarget {
 
 using MeshWriter =
     std::function&lt;void(VkCommandBuffer, const MeshWriteTarget&amp;)&gt;;
+
+struct FieldWriteTarget {
+    VkDeviceAddress values = 0;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceSize offset = 0;
+    std::array&lt;std::uint32_t, 3&gt; shape{};
+};
+
+using FieldWriter =
+    std::function&lt;void(VkCommandBuffer, const FieldWriteTarget&amp;)&gt;;
 
 struct FrameId {
     std::uint64_t frame = 0;
@@ -304,6 +315,10 @@ class RenderDelegate {
 
     virtual void SetMeshWriter(const Path&amp; path, MeshWriter writer,
                                std::optional&lt;Bounds3&gt; bounds = {});
+
+    virtual void SetFieldWriter(const Path&amp; path,
+                                std::array&lt;std::uint32_t, 3&gt; shape,
+                                FieldWriter writer);
 
     virtual std::vector&lt;std::string&gt; ViewVars() const {
         return Info().viewVars;
