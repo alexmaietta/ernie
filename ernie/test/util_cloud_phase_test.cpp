@@ -64,7 +64,7 @@ TEST(CloudPhase, DropletsScatterAsBouthorsEtAlFindOverTheSphere) {
         }
         const double expected =
             mean ? 1.0 : 1.0 / (1.0 - table.forwardFraction);
-        EXPECT_NEAR(total, expected, 0.05 * expected)
+        EXPECT_NEAR(total, expected, (mean ? 0.002 : 0.05) * expected)
             << "row " << row;
         // The forward peak, kept or folded away; the wide forward
         // lobe, the fogbow's rise beyond 120 degrees and the glory at

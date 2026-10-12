@@ -558,6 +558,9 @@ struct VolumeSettings {
     /// The march's resolution against the image's: 1, or 0.5 for a
     /// pixel a 2 x 2 of the image's, upsampled by depth.
     double resolutionScale = 1.0;
+    /// Cloud droplets' multiple scattering by collectors (Bouthors et
+    /// al. 2008) rather than octaves.
+    bool collectors = false;
     /// Steps per pixel far off, at most: the march's steps grow with
     /// distance once a pixel spans more than this many of the
     /// volume's own; 0 keeps them the volume's own everywhere.
@@ -614,6 +617,9 @@ struct VolumeMaterialParams {
     /// micrometres, and the gamma of their size distribution.
     double dropletRadius = 7.0;
     double dropletSpread = 2.0;
+    /// Their surface, the density field's value where it begins, for
+    /// collectors.
+    double surfaceDensity = 0.1;
     /// Orders of scattering approximated, and each order's
     /// scattering, extinction and anisotropy of the one before's
     /// (Wrenninge's a, b and c).

@@ -2869,6 +2869,8 @@ FrameParams FrameParamsOf(const Scene& scene,
         options.GetVolumeTemporalAnimated();
     volumeSettings.resolutionScale =
         options.GetVolumeResolutionScale() < 0.75 ? 0.5 : 1.0;
+    volumeSettings.collectors =
+        options.GetVolumeMultipleScattering() == tokens::kCollectors;
     volumeSettings.temporalBlock =
         options.GetVolumeTemporalBlock() >= 3 ? 4u : 2u;
     volumeSettings.stepsPerPixel =

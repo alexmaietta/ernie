@@ -96,17 +96,13 @@ DropletPhaseTable DropletPhase(double effectiveRadiusUm,
     while (edge + 1 < table.angles && thetas[edge] < cut) {
         ++edge;
     }
+    std::fill(mean, mean + edge, mean[edge]);
     double total = 0.0;
-    for (int i = 0; i < table.angles; ++i) {
-        if (i < edge) {
-            mean[i] = mean[edge];
-        }
-        if (i + 1 < table.angles) {
-            total += 0.5 *
-                     (mean[i] * std::sin(thetas[i]) +
-                      mean[i + 1] * std::sin(thetas[i + 1])) *
-                     (thetas[i + 1] - thetas[i]) * 2.0 * kPi;
-        }
+    for (int i = 0; i + 1 < table.angles; ++i) {
+        total += 0.5 *
+                 (mean[i] * std::sin(thetas[i]) +
+                  mean[i + 1] * std::sin(thetas[i + 1])) *
+                 (thetas[i + 1] - thetas[i]) * 2.0 * kPi;
     }
     for (int i = 0; i < table.angles; ++i) {
         mean[i] = static_cast<float>(mean[i] / total);

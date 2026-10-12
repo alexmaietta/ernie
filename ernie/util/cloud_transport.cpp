@@ -1,0 +1,386 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/util/cloud_transport.h"
+
+#include "ernie/util/disk_cache.h"
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <numbers>
+#include <random>
+#include <string>
+#include <thread>
+
+namespace ernie {
+
+namespace {
+
+constexpr double kPi = std::numbers::pi;
+
+// SplitMix64's uniform doubles in [0, 1).
+struct Random {
+    std::uint64_t state;
+
+    double Next() {
+        std::uint64_t z = (state += 0x9e3779b97f4a7c15ull);
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+        z ^= z >> 31;
+        return static_cast<double>(z >> 11) * 0x1.0p-53;
+    }
+};
+
+// Scattering angles drawn from a phase function's table, by inverting
+// its cumulative distribution over the sphere.
+class PhaseSampler {
+  public:
+    explicit PhaseSampler(const DropletPhaseTable& phase) {
+        const int n = phase.angles;
+        const float* mean =
+            phase.values.data() + phase.values.size() - n;
+        thetas_.resize(n);
+        cdf_.assign(n, 0.0);
+        for (int i = 0; i < n; ++i) {
+            const double u = static_cast<double>(i) / (n - 1);
+            thetas_[i] = 0.5 * kPi * (1.0 - std::cos(kPi * u));
+            if (i > 0) {
+                cdf_[i] =
+                    cdf_[i - 1] +
+                    0.5 *
+                        (mean[i - 1] * std::sin(thetas_[i - 1]) +
+                         mean[i] * std::sin(thetas_[i])) *
+                        (thetas_[i] - thetas_[i - 1]);
+            }
+        }
+        for (double& value : cdf_) {
+            value /= cdf_.back();
+        }
+    }
+
+    double Theta(double xi) const {
+        const auto it =
+            std::upper_bound(cdf_.begin(), cdf_.end(), xi);
+        const int i =
+            std::clamp(static_cast<int>(it - cdf_.begin()) - 1, 0,
+                       static_cast<int>(cdf_.size()) - 2);
+        const double span = cdf_[i + 1] - cdf_[i];
+        const double along = span > 0.0 ? (xi - cdf_[i]) / span : 0.0;
+        return thetas_[i] + (thetas_[i + 1] - thetas_[i]) * along;
+    }
+
+  private:
+    std::vector<double> thetas_;
+    std::vector<double> cdf_;
+};
+
+struct Vec {
+    double x, y, z;
+};
+
+// `direction` turned by scattering angle `theta` about azimuth `phi`.
+Vec Scatter(const Vec& direction, double theta, double phi) {
+    const double cosT = std::cos(theta);
+    const double sinT = std::sin(theta);
+    const double cosP = std::cos(phi);
+    const double sinP = std::sin(phi);
+    const double s =
+        std::sqrt(std::max(0.0, 1.0 - direction.z * direction.z));
+    if (s < 1e-6) {
+        return {sinT * cosP, sinT * sinP,
+                direction.z < 0.0 ? -cosT : cosT};
+    }
+    return {sinT *
+                    (direction.x * direction.z * cosP -
+                     direction.y * sinP) /
+                    s +
+                direction.x * cosT,
+            sinT *
+                    (direction.y * direction.z * cosP +
+                     direction.x * sinP) /
+                    s +
+                direction.y * cosT,
+            -sinT * cosP * s + direction.z * cosT};
+}
+
+// One slab's photons, tallied into `tallies`: per tally set (light
+// scattered once, then the order sets), per depth, view cosine and
+// azimuth, the weights and their entry offsets' sums.
+void SimulateSlab(const CloudTransportShape& shape,
+                  const PhaseSampler& sampler, int light,
+                  int thickness, int photons, std::uint64_t seed,
+                  std::vector<double>& tallies) {
+    const double muL = shape.LightCosine(light);
+    const double tau = shape.Thickness(thickness);
+    std::vector<double> planes(shape.depths);
+    for (int k = 0; k < shape.depths; ++k) {
+        planes[k] = shape.DepthFraction(k) * tau;
+    }
+    const int perDepth = shape.viewCosines * shape.azimuths;
+    const int perSet = shape.depths * perDepth;
+    Random random{seed};
+    for (int p = 0; p < photons; ++p) {
+        Vec position{0.0, 0.0, 0.0};
+        Vec direction{std::sqrt(1.0 - muL * muL), 0.0, muL};
+        int order = 0;
+        while (true) {
+            const double step = -std::log(1.0 - random.Next());
+            const Vec next{position.x + direction.x * step,
+                           position.y + direction.y * step,
+                           position.z + direction.z * step};
+            if (order >= 1 && direction.z != 0.0) {
+                const int set =
+                    order == 1 ? 0 : 1 + CloudOrderSet(order);
+                const double lo = std::min(position.z, next.z);
+                const double hi = std::max(position.z, next.z);
+                const double weight = 1.0 / std::abs(direction.z);
+                const int cosine = std::clamp(
+                    static_cast<int>((direction.z + 1.0) * 0.5 *
+                                     shape.viewCosines),
+                    0, shape.viewCosines - 1);
+                const int azimuth = std::clamp(
+                    static_cast<int>(std::atan2(std::abs(direction.y),
+                                                direction.x) /
+                                     kPi * shape.azimuths),
+                    0, shape.azimuths - 1);
+                const double side = direction.y < 0.0 ? -1.0 : 1.0;
+                for (int k = 0; k < shape.depths; ++k) {
+                    if (!(planes[k] > lo && planes[k] <= hi)) {
+                        continue;
+                    }
+                    const double along =
+                        (planes[k] - position.z) / direction.z;
+                    const double u =
+                        -(position.x + direction.x * along);
+                    const double v =
+                        -(position.y + direction.y * along) * side;
+                    double* tally =
+                        tallies.data() +
+                        (static_cast<std::size_t>(set) * perSet +
+                         k * perDepth + cosine * shape.azimuths +
+                         azimuth) *
+                            4;
+                    tally[0] += weight;
+                    tally[1] += weight * u;
+                    tally[2] += weight * v;
+                    tally[3] += weight * (u * u + v * v);
+                }
+            }
+            if (next.z < 0.0 || next.z > tau) {
+                break;
+            }
+            position = next;
+            ++order;
+            direction =
+                Scatter(direction, sampler.Theta(random.Next()),
+                        2.0 * kPi * random.Next());
+        }
+    }
+}
+
+}  // namespace
+
+int CloudOrderSet(int order) {
+    if (order <= 2) {
+        return 0;
+    }
+    if (order <= 8) {
+        return (order - 1) / 2;
+    }
+    if (order <= 12) {
+        return 4;
+    }
+    if (order <= 18) {
+        return 5;
+    }
+    return order <= 30 ? 6 : 7;
+}
+
+double CloudTransportShape::LightCosine(int i) const {
+    return static_cast<double>(i + 1) / lightCosines;
+}
+
+double CloudTransportShape::Thickness(int i) const {
+    return 0.25 * std::exp2(i);
+}
+
+double CloudTransportShape::DepthFraction(int i) const {
+    const double u = static_cast<double>(i) / (depths - 1);
+    return 0.5 * (1.0 - std::cos(kPi * u));
+}
+
+double CloudTransportShape::ViewCosine(int i) const {
+    return -1.0 + (i + 0.5) * 2.0 / viewCosines;
+}
+
+double CloudTransportShape::Azimuth(int i) const {
+    return (i + 0.5) * kPi / azimuths;
+}
+
+int CloudTransportShape::Cells() const {
+    return lightCosines * thicknesses * depths * viewCosines *
+           azimuths;
+}
+
+int CloudTransportShape::Cell(int light, int thickness, int depth,
+                              int viewCosine, int azimuth) const {
+    return (((light * thicknesses + thickness) * depths + depth) *
+                viewCosines +
+            viewCosine) *
+               azimuths +
+           azimuth;
+}
+
+CloudTransportTable
+SimulateCloudTransport(const DropletPhaseTable& phase,
+                       const CloudTransportOptions& options) {
+    const CloudTransportShape& shape = options.shape;
+    const PhaseSampler sampler(phase);
+    const int perSlab =
+        shape.depths * shape.viewCosines * shape.azimuths;
+    const int slabs = shape.lightCosines * shape.thicknesses;
+    CloudTransportTable table;
+    table.shape = shape;
+    table.values.assign(static_cast<std::size_t>(kCloudOrderSets) *
+                            shape.Cells() * 4,
+                        0.0f);
+    table.single.assign(shape.Cells(), 0.0f);
+    // Each light and thickness's slab on its own; the thickest first,
+    // they take longest.
+    std::atomic<int> next{0};
+    const auto work = [&] {
+        std::vector<double> tallies;
+        for (int job; (job = next.fetch_add(1)) < slabs;) {
+            const int light = job % shape.lightCosines;
+            const int thickness =
+                shape.thicknesses - 1 - job / shape.lightCosines;
+            tallies.assign(
+                static_cast<std::size_t>(kCloudOrderSets + 1) *
+                    perSlab * 4,
+                0.0);
+            SimulateSlab(
+                shape, sampler, light, thickness, options.photons,
+                options.seed * 0x100000001b3ull +
+                    static_cast<std::uint64_t>(job) * 0x9e3779b9ull,
+                tallies);
+            // Radiance from the crossings' weights: each photon
+            // carries the light's flux through the lit face, its
+            // cosine, over the photons; over each bin's solid angle
+            // (both sides of the light's plane).
+            const double solidAngle =
+                2.0 / shape.viewCosines * 2.0 * kPi / shape.azimuths;
+            const double scale = shape.LightCosine(light) /
+                                 (options.photons * solidAngle);
+            const int first = shape.Cell(light, thickness, 0, 0, 0);
+            for (int set = 0; set <= kCloudOrderSets; ++set) {
+                for (int i = 0; i < perSlab; ++i) {
+                    const double* tally =
+                        tallies.data() +
+                        (static_cast<std::size_t>(set) * perSlab +
+                         i) *
+                            4;
+                    const double weight = tally[0];
+                    const float radiance =
+                        static_cast<float>(weight * scale);
+                    if (set == 0) {
+                        table.single[first + i] = radiance;
+                        continue;
+                    }
+                    float* cell = table.values.data() +
+                                  (static_cast<std::size_t>(set - 1) *
+                                       shape.Cells() +
+                                   first + i) *
+                                      4;
+                    cell[0] = radiance;
+                    if (weight > 0.0) {
+                        const double u = tally[1] / weight;
+                        const double v = tally[2] / weight;
+                        cell[1] = static_cast<float>(u);
+                        cell[2] = static_cast<float>(v);
+                        cell[3] = static_cast<float>(std::sqrt(
+                            std::max(0.0, tally[3] / weight - u * u -
+                                              v * v)));
+                    }
+                }
+            }
+        }
+    };
+    const int threads = std::clamp(
+        static_cast<int>(std::thread::hardware_concurrency()) / 2, 1,
+        slabs);
+    std::vector<std::thread> pool;
+    for (int i = 1; i < threads; ++i) {
+        pool.emplace_back(work);
+    }
+    work();
+    for (std::thread& thread : pool) {
+        thread.join();
+    }
+    return table;
+}
+
+CloudTransportTable
+CachedCloudTransport(const CloudTransportOptions& options) {
+    namespace fs = std::filesystem;
+    const CloudTransportShape& shape = options.shape;
+    CloudTransportTable table;
+    table.shape = shape;
+    const std::size_t count =
+        static_cast<std::size_t>(kCloudOrderSets) * shape.Cells() * 4;
+    const std::optional<fs::path> directory =
+        CacheDirectory("ERNIE_CLOUD_CACHE", "clouds");
+    fs::path path;
+    if (directory) {
+        CacheKey key;
+        key.Add("ernie-cloud-transport-1");
+        for (const long long value :
+             {static_cast<long long>(shape.lightCosines),
+              static_cast<long long>(shape.thicknesses),
+              static_cast<long long>(shape.depths),
+              static_cast<long long>(shape.viewCosines),
+              static_cast<long long>(shape.azimuths),
+              static_cast<long long>(options.photons),
+              static_cast<long long>(options.seed)}) {
+            key.Add(std::to_string(value));
+        }
+        path = *directory / (key.Hex() + ".bin");
+        std::ifstream in(path, std::ios::binary);
+        table.values.resize(count);
+        if (in.read(reinterpret_cast<char*>(table.values.data()),
+                    static_cast<std::streamsize>(count *
+                                                 sizeof(float))) &&
+            in.peek() == std::ifstream::traits_type::eof()) {
+            return table;
+        }
+    }
+    table = SimulateCloudTransport(
+        DropletPhase(7.0, 2.0, {400.0, 700.0, 8}, 1024), options);
+    table.single.clear();
+    if (directory) {
+        // Written beside it, then renamed over it, so that no reader
+        // sees a part of it.
+        fs::path partial = path;
+        partial += ".part" + std::to_string(std::random_device{}());
+        std::error_code error;
+        fs::create_directories(*directory, error);
+        {
+            std::ofstream out(partial, std::ios::binary);
+            out.write(
+                reinterpret_cast<const char*>(table.values.data()),
+                static_cast<std::streamsize>(count * sizeof(float)));
+            if (!out) {
+                error = std::make_error_code(std::errc::io_error);
+            }
+        }
+        if (!error) {
+            fs::rename(partial, path, error);
+        }
+        if (error) {
+            fs::remove(partial, error);
+        }
+    }
+    return table;
+}
+
+}  // namespace ernie

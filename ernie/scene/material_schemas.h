@@ -203,6 +203,12 @@
                               .doc = "The gamma of their size distribution: larger, more alike "   \
                                      "in size, their fogbow and glory more coloured.",             \
                               .group = "Volume", .min = 0.5, .max = 20.0}))                        \
+    X(double, SurfaceDensity, ::ernie::tokens::kVolumeSurfaceDensity, 0.1,                         \
+      (::ernie::AttributeMeta{.label = "Surface density",                                          \
+                              .doc = "Cloud droplets' surface, the density field's value where "   \
+                                     "it begins, for multiple scattering by collectors: their "    \
+                                     "light found where it entered there.",                        \
+                              .group = "Volume", .min = 0.0}))                                     \
     X(double, Anisotropy, ::ernie::tokens::kVolumeAnisotropy, 0.0,                                 \
       (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
                                      "backwards.",                                                 \

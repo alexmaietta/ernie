@@ -288,6 +288,17 @@
                                      "faster, upsampled by depth so volumes keep to the edges "    \
                                      "of what stands before them.",                                \
                               .group = "Volumes", .min = 0.5, .max = 1.0}))                        \
+    X(std::string, VolumeMultipleScattering, ::ernie::tokens::kVolumeMultipleScattering,           \
+      "octaves",                                                                                   \
+      (::ernie::AttributeMeta{.label = "Multiple scattering",                                      \
+                              .doc = "Cloud droplets' light scattered more than once: octaves, "   \
+                                     "Wrenninge's along the march; or collectors, Bouthors et "    \
+                                     "al. 2008's, found once per pixel where the view enters a "   \
+                                     "cloud's surface (its material's surface density) from slab " \
+                                     "transport simulated once and cached on disk, the octaves "   \
+                                     "meanwhile.",                                                 \
+                              .group = "Volumes",                                                  \
+                              .options = {"octaves", "collectors"}}))                              \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, "approximate",                  \
       (::ernie::AttributeMeta{.label = "Mode",                                                     \
                               .doc = "approximate: unoccluded; full: also shadowed; directions: "  \

@@ -9,6 +9,7 @@
 #include "ernie/scene/light_pattern.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/cloud_phase.h"
+#include "ernie/util/cloud_transport.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -16,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <chrono>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -100,8 +102,14 @@ struct VolumeResources {
     VkDeviceAddress dropletTables;
     std::uint32_t dropletAngles;
     std::uint32_t dropletBands;
+    VkDeviceAddress transport;
+    VkDeviceAddress lightMaps;
+    std::uint32_t lightMapSize;
+    std::uint32_t collectors;
+    // To the block's 16-byte multiple.
+    std::uint32_t padding[2];
 };
-static_assert(sizeof(VolumeResources) == 176,
+static_assert(sizeof(VolumeResources) == 208,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -179,6 +187,16 @@ constexpr std::uint32_t kHalfResolution = 1024;
 // Angles of each row of the cloud droplets' phase tables
 // (`DropletPhaseTable`).
 constexpr int kDropletAngles = 1024;
+// Texels across a light map at its finest (`lightMapMain`), and a
+// map's float4s: its header's three, then its levels down to one.
+constexpr std::uint32_t kLightMapSize = 128;
+constexpr std::uint64_t kLightMapTexels = [] {
+    std::uint64_t texels = 3;
+    for (std::uint64_t size = kLightMapSize; size > 0; size /= 2) {
+        texels += size * size;
+    }
+    return texels;
+}();
 // volume.slang's flag for writing the volumes' temperature
 // (`RenderTargets::MediaTemperature`).
 constexpr std::uint32_t kMediaTemperature = 512;
@@ -316,8 +334,12 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
         params.phase == tokens::kCloudDroplets
             ? std::bit_cast<float>(dropletOffset)
             : static_cast<float>(std::clamp(params.b, 0.0, 0.99));
+    // Hapke's c, or cloud droplets' surface density (their
+    // collectors' light maps').
     material.phase[2] =
-        static_cast<float>(std::clamp(params.c, -1.0, 1.0));
+        params.phase == tokens::kCloudDroplets
+            ? static_cast<float>(std::max(params.surfaceDensity, 0.0))
+            : static_cast<float>(std::clamp(params.c, -1.0, 1.0));
     material.phase[3] =
         static_cast<float>(std::max(params.skyLight, 0.0));
     // Wrenninge's octaves, a at most b so that each order carries no
@@ -404,7 +426,7 @@ VolumePass::VolumePass(const VulkanContext& context,
         context_, sizeof(VolumeResources),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
     rebuild_ = std::make_unique<GpuBuffer>(
-        context_, 8 * sizeof(std::uint32_t),
+        context_, 12 * sizeof(std::uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
             VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -983,6 +1005,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     }
     PlanDistanceGrids();
     PrepareDropletTables(volumes, bands, uploads);
+    PrepareTransport(volumes, uploads);
+    std::uint64_t lightMapTexels = 0;
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -1103,6 +1127,15 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     std::max(voxel, 1e-9) / settings_.stepsPerVoxel);
                 placed.info[1] = static_cast<std::uint32_t>(world);
                 placed.info[2] = volume.linkGroup;
+                // Cloud droplets' light map, for their collectors.
+                placed.info[3] = kNoCache;
+                if (settings_.collectors &&
+                    volume.material.phase == tokens::kCloudDroplets &&
+                    held.density != nullptr) {
+                    placed.info[3] =
+                        static_cast<std::uint32_t>(lightMapTexels);
+                    lightMapTexels += kLightMapTexels;
+                }
                 Rows(glm::translate(glm::dmat4(1.0), -origin) *
                          transform,
                      placed.toWorld);
@@ -1218,6 +1251,48 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     materialCount_ = static_cast<std::uint32_t>(materials.size());
     cacheCells_ = cacheCells;
     cacheLargest_ = cacheLargest;
+    lightMapTexels_ = lightMapTexels;
+}
+
+std::vector<glm::vec4> VolumePass::LightMaps() const {
+    if (lightMaps_ == nullptr) {
+        return {};
+    }
+    vkDeviceWaitIdle(context_.Device());
+    std::vector<glm::vec4> texels(lightMapTexels_);
+    lightMaps_->Read(std::as_writable_bytes(std::span(texels)));
+    return texels;
+}
+
+void VolumePass::PrepareTransport(
+    std::span<const VolumeParams> volumes, FrameUploads& uploads) {
+    if (transport_ != nullptr || !settings_.collectors ||
+        std::none_of(volumes.begin(), volumes.end(),
+                     [](const VolumeParams& volume) {
+                         return volume.material.phase ==
+                                tokens::kCloudDroplets;
+                     })) {
+        return;
+    }
+    // Read from the cache folder or simulated
+    // (`CachedCloudTransport`) off this thread, the octaves
+    // meanwhile.
+    if (!transportJob_.valid()) {
+        transportJob_ = std::async(std::launch::async, [] {
+            return CachedCloudTransport().values;
+        });
+        return;
+    }
+    if (transportJob_.wait_for(std::chrono::seconds(0)) !=
+        std::future_status::ready) {
+        return;
+    }
+    const std::vector<float> values = transportJob_.get();
+    transport_ = std::make_unique<GpuBuffer>(
+        context_, values.size() * sizeof(float),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    uploads.Write(*transport_, std::as_bytes(std::span(values)));
+    hostChanged_ |= kHostDiscrete;
 }
 
 void VolumePass::Prepare(
@@ -1405,6 +1480,26 @@ void VolumePass::Prepare(
     resources.dropletBands =
         static_cast<std::uint32_t>(dropletBands_.count);
     resources.timing = timing.Address();
+    // Cloud droplets' collectors: their light maps, built again with
+    // the caches, and the transport table once ready.
+    if (lightMapTexels_ > 0) {
+        const VkDeviceSize bytes = 16 * lightMapTexels_;
+        if (lightMaps_ == nullptr || lightMaps_->Size() < bytes) {
+            if (lightMaps_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            lightMaps_ = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            hostChanged_ |= 1;
+        }
+        resources.lightMaps = lightMaps_->Address();
+        resources.lightMapSize = kLightMapSize;
+        if (transport_ != nullptr) {
+            resources.transport = transport_->Address();
+            resources.collectors = 1;
+        }
+    }
     resources.timingWords = static_cast<std::uint32_t>(
         timing.Size() / sizeof(std::uint32_t));
     resources.originShift[0] = originShift_.x;
@@ -1619,6 +1714,54 @@ void VolumePass::Prepare(
         built.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
         built.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
         dependency.pMemoryBarriers = &built;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
+
+    if (lightMapTexels_ > 0) {
+        // Cloud droplets' light maps across their sun, then their
+        // coarser levels, where the caches are built again (each
+        // thread checks).
+        ERNIE_ZONE("Record volume light maps");
+        ERNIE_GPU_ZONE(context_, commands, "Volume light maps");
+        if (lightMapPipeline_ == nullptr ||
+            lightMapPipelinePatterns_ != patterns.Models().size()) {
+            ERNIE_ZONE("Volume light map pipelines");
+            if (lightMapPipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            lightMapPipeline_ = std::make_unique<ComputePipeline>(
+                context_, cacheLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "lightMapMain"));
+            lightMapMipsPipeline_ = std::make_unique<ComputePipeline>(
+                context_, cacheLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "lightMapMipsMain"));
+            lightMapPipelinePatterns_ = patterns.Models().size();
+        }
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*pool_),
+            DescriptorResource::Of(*resources_)};
+        VkMemoryBarrier2 built{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        built.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        built.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                              VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        dependency.pMemoryBarriers = &built;
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          lightMapPipeline_->Handle());
+        cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          buffers);
+        vkCmdDispatch(commands,
+                      (kLightMapSize * kLightMapSize + 63) / 64, 1,
+                      volumeCount_);
+        vkCmdPipelineBarrier2(commands, &dependency);
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          lightMapMipsPipeline_->Handle());
+        cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          buffers);
+        vkCmdDispatch(commands, 1, 1, volumeCount_);
         vkCmdPipelineBarrier2(commands, &dependency);
     }
 

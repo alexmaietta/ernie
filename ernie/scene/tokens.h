@@ -150,6 +150,10 @@ inline constexpr std::string_view kVolumeDropletRadius =
 /// float: the width of their gamma size distribution (its gamma).
 inline constexpr std::string_view kVolumeDropletSpread =
     "inputs:dropletSpread";
+/// Where a cloud's surface lies in its density field, for its
+/// collectors (`ernie:volumes:multipleScattering`).
+inline constexpr std::string_view kVolumeSurfaceDensity =
+    "inputs:surfaceDensity";
 /// Hapke's double Henyey-Greenstein lobe width b and backscatter
 /// weight c (`brdf.cpp`'s hapke model's parameters).
 inline constexpr std::string_view kPhaseB = "inputs:b";
@@ -1315,6 +1319,10 @@ inline constexpr std::string_view kVolumeTemporalAnimated =
     "ernie:volumes:temporalAnimated";
 inline constexpr std::string_view kVolumeResolutionScale =
     "ernie:volumes:resolutionScale";
+inline constexpr std::string_view kVolumeMultipleScattering =
+    "ernie:volumes:multipleScattering";
+inline constexpr std::string_view kOctaves = "octaves";
+inline constexpr std::string_view kCollectors = "collectors";
 inline constexpr std::string_view kVolumeStepsPerPixel =
     "ernie:volumes:stepsPerPixel";
 inline constexpr std::string_view kVolumeThinOpticalDepth =

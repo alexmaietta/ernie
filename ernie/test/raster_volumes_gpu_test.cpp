@@ -11,6 +11,7 @@
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/cloud_phase.h"
+#include "ernie/util/cloud_transport.h"
 #include "ernie/util/nanovdb.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
@@ -19,6 +20,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -135,6 +137,154 @@ TEST_F(RasterDelegateTest, CloudDropletsLetTheirForwardPeakThrough) {
         ASSERT_GT(bare[b], 0.0) << "band " << b;
         EXPECT_NEAR(through[b] / bare[b], expected, 0.02 * expected)
             << "band " << b;
+    }
+}
+
+TEST_F(RasterDelegateTest, CloudLightMapsHoldTheSurfaceTheSunSees) {
+    // Under FlatScene's overhead sun, the cube's light map at its
+    // centre: its top and bottom faces (where the density reaches the
+    // material's surface, 0.1 of the cube's 1) and its optical depth
+    // through, the droplets' forward peak folded away.
+    constexpr double kSigma = 10.0;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetPhaseFunction(std::string(tokens::kCloudDroplets));
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetVolumeMultipleScattering(
+            std::string(tokens::kCollectors));
+    delegate.Step(scene);
+    const std::vector<glm::vec4> maps =
+        delegate.Renderer().Volumes().LightMaps();
+    constexpr std::size_t kSize = 128;
+    ASSERT_GT(maps.size(), 3 + kSize * kSize);
+    // Its header: across the map, its radius (the bounds' sphere
+    // about the centre), and towards the sun, straight up. The grid's
+    // active bounds 1.7 m across, a voxel past its ones'.
+    const double radius = maps[0].w;
+    EXPECT_NEAR(radius, std::sqrt(3.0) * 0.85, 0.01);
+    EXPECT_NEAR(maps[2].z, 1.0, 1e-5);
+    const glm::vec4 centre =
+        maps[3 + (kSize / 2) * kSize + kSize / 2];
+    EXPECT_EQ(centre.w, 1.0f);
+    EXPECT_NEAR(centre.x, radius - 0.8, 0.1) << "its top";
+    EXPECT_NEAR(centre.y, radius + 0.8, 0.1) << "its bottom";
+    const double forward =
+        ernie::DropletPhase(7.0, 2.0, ernie::SpectralBands{}, 1024)
+            .forwardFraction;
+    const double depth = (1.0 - forward) * kSigma * kDepth;
+    EXPECT_NEAR(centre.z, depth, 0.03 * depth);
+    // The cube's square of the map's, its surface about 1.7 m of 2
+    // radii across; its coarsest level the mean, its coverage that
+    // share.
+    std::size_t covered = 0;
+    for (std::size_t i = 0; i < kSize * kSize; ++i) {
+        covered += maps[3 + i].w > 0.5f;
+    }
+    const double side = 1.7 / (2.0 * radius) * kSize;
+    EXPECT_NEAR(double(covered), side * side, 0.05 * side * side);
+    const glm::vec4 coarsest = maps.back();
+    EXPECT_NEAR(coarsest.w, double(covered) / (kSize * kSize), 0.01);
+    // Its edges' columns shallower.
+    EXPECT_NEAR(coarsest.z / coarsest.w, depth, 0.15 * depth);
+}
+
+TEST_F(RasterDelegateTest,
+       CloudCollectorsAddWhatScattersMoreThanOnce) {
+    // A dense white cube of cloud droplets seen from above in
+    // FlatScene's overhead sun: by collectors (Bouthors et al. 2008),
+    // light scattered twice and more adds to its top what the slabs'
+    // canonical transport says, per unit of the sun's irradiance (the
+    // grey ground's, bare, times pi / 0.5).
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(10.0, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kCloudDroplets));
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetVolumeTemporal(false);
+    // Its middle's mean over frames, each step's start jittered.
+    const auto settled = [&] {
+        std::vector<double> mean;
+        constexpr int kFrames = 8;
+        constexpr std::size_t kHalf = 3;
+        for (int frame = 0; frame < kFrames; ++frame) {
+            ernie::RenderProductSetOutputs outputs =
+                delegate.Step(scene);
+            Tensor spectral = outputs.at("/Render/Product")
+                                  .vars.at("SpectralRadiance")
+                                  .Map(ernie::MapDevice::Cpu)
+                                  .tensor;
+            const auto* values =
+                static_cast<const float*>(spectral.Data());
+            const auto bands =
+                static_cast<std::size_t>(spectral.Shape().front());
+            mean.resize(bands, 0.0);
+            constexpr std::size_t kCentre = kVarSize / 2;
+            for (std::size_t b = 0; b < bands; ++b) {
+                for (std::size_t y = kCentre - kHalf;
+                     y <= kCentre + kHalf; ++y) {
+                    for (std::size_t x = kCentre - kHalf;
+                         x <= kCentre + kHalf; ++x) {
+                        mean[b] +=
+                            values[(b * kVarSize + y) * kVarSize +
+                                   x] /
+                            (kFrames * (2 * kHalf + 1) *
+                             (2 * kHalf + 1));
+                    }
+                }
+            }
+        }
+        return mean;
+    };
+    const std::vector<double> once = settled();
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetVolumeMultipleScattering(
+            std::string(tokens::kCollectors));
+    // The transport table read or simulated off the frame's thread.
+    const auto start = std::chrono::steady_clock::now();
+    while (!delegate.Renderer().Volumes().TransportReady() &&
+           std::chrono::steady_clock::now() - start <
+               std::chrono::minutes(2)) {
+        delegate.Step(scene);
+    }
+    ASSERT_TRUE(delegate.Renderer().Volumes().TransportReady());
+    const std::vector<double> collected = settled();
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> ground = settled();
+    // The table's at the cube's top, looking straight down at it lit
+    // straight down, its optical thickness between the lattice's.
+    const ernie::CloudTransportTable table =
+        ernie::CachedCloudTransport();
+    const ernie::CloudTransportShape& shape = table.shape;
+    const double forward =
+        ernie::DropletPhase(7.0, 2.0, ernie::SpectralBands{}, 1024)
+            .forwardFraction;
+    const double thickness = (1.0 - forward) * 10.0 * kDepth;
+    const double at = std::log2(thickness / 0.25);
+    const int low = static_cast<int>(at);
+    double expected = 0.0;
+    for (int set = 0; set < ernie::kCloudOrderSets; ++set) {
+        for (int a = 0; a < shape.azimuths; ++a) {
+            const double thin = table.At(
+                set, shape.Cell(shape.lightCosines - 1, low, 0, 0, a),
+                0);
+            const double thick = table.At(
+                set,
+                shape.Cell(shape.lightCosines - 1, low + 1, 0, 0, a),
+                0);
+            expected +=
+                (thin + (thick - thin) * (at - low)) / shape.azimuths;
+        }
+    }
+    for (std::size_t b = 0; b < once.size(); ++b) {
+        const double irradiance = ground[b] * std::numbers::pi / 0.5;
+        ASSERT_GT(irradiance, 0.0) << "band " << b;
+        const double added = (collected[b] - once[b]) / irradiance;
+        // A little less than a slab's, the cube's sides letting some
+        // go.
+        EXPECT_NEAR(added, expected, 0.1 * expected) << "band " << b;
     }
 }
 

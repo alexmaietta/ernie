@@ -17,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <future>
 #include <map>
 #include <memory>
 #include <optional>
@@ -157,6 +158,16 @@ class VolumePass {
                 const Shading& shading, const ViewLayout& layout,
                 std::uint32_t firstView, std::uint32_t width,
                 std::uint32_t height, bool pushbroom, bool sky) const;
+
+    /// Whether cloud droplets' collectors have their transport table
+    /// yet (`PrepareTransport`), for tests to step until.
+    bool TransportReady() const {
+        return transport_ != nullptr;
+    }
+
+    /// The light maps (`lightMapMain`), read back after the device's
+    /// work, for tests: each instance's header and levels, float4s.
+    std::vector<glm::vec4> LightMaps() const;
 
     /// The grids held, for tests: their count and bytes.
     std::size_t GridCount() const {
@@ -309,6 +320,21 @@ class VolumePass {
     std::vector<float> dropletValues_;
     std::unique_ptr<GpuBuffer> dropletTables_;
     SpectralBands dropletBands_;
+    /// Cloud droplets' multiple scattering by collectors
+    /// (volume.slang's `collectorScattering`): the canonical
+    /// transport table, read or simulated off the frame's thread once
+    /// first asked for, uploaded once ready; and the light maps of
+    /// the instances that use them (`lightMapMain`),
+    /// `lightMapTexels_` float4s in all.
+    void PrepareTransport(std::span<const VolumeParams> volumes,
+                          FrameUploads& uploads);
+    std::future<std::vector<float>> transportJob_;
+    std::unique_ptr<GpuBuffer> transport_;
+    std::uint64_t lightMapTexels_ = 0;
+    mutable std::unique_ptr<GpuBuffer> lightMaps_;
+    mutable std::unique_ptr<ComputePipeline> lightMapPipeline_;
+    mutable std::unique_ptr<ComputePipeline> lightMapMipsPipeline_;
+    mutable std::size_t lightMapPipelinePatterns_ = 0;
     std::unique_ptr<GpuBuffer> distances_;
     std::uint64_t distanceWords_ = 0;
     mutable std::vector<DistanceBuild> distanceBuilds_;
