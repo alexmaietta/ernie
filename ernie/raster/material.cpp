@@ -9,8 +9,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <iterator>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <utility>
 
 namespace ernie {
 
@@ -205,11 +210,10 @@ void CheckImage(const VulkanContext& context, const Image* image) {
 }
 
 /// `image` and its mips (`MipChain`) as 8-bit texels of `format`.
-std::unique_ptr<GpuImage> UploadMips(const VulkanContext& context,
-                                     const Image& image,
-                                     MipFilter filter,
-                                     ImageEncoding encoding,
-                                     VkFormat format) {
+/// `image`'s mips as `UploadMips` stores them, 8 bits a channel.
+std::vector<std::vector<std::uint8_t>>
+EncodeMips(const Image& image, MipFilter filter,
+           ImageEncoding encoding) {
     std::vector<Image> mips = MipChain(image, filter);
     if (filter == MipFilter::NormalSlopes) {
         // Normals stored as n * 127 + 128 in 8 bits, so flat is
@@ -226,20 +230,39 @@ std::unique_ptr<GpuImage> UploadMips(const VulkanContext& context,
             }
         }
     }
-    auto texture = std::make_unique<GpuImage>(
-        context, ImageDesc{image.width, image.height, 1,
-                           static_cast<std::uint32_t>(mips.size()),
-                           format, VK_IMAGE_USAGE_SAMPLED_BIT});
     std::vector<std::vector<std::uint8_t>> data;
-    std::vector<std::span<const std::byte>> spans;
     for (const Image& mip : mips) {
         data.push_back(ToRgba8(mip, encoding));
     }
-    for (const auto& bytes : data) {
+    return data;
+}
+
+/// A texture of `width` x `height` and `mips` (`EncodeMips`'s) in
+/// `format`.
+std::unique_ptr<GpuImage>
+UploadEncoded(const VulkanContext& context, std::uint32_t width,
+              std::uint32_t height,
+              const std::vector<std::vector<std::uint8_t>>& mips,
+              VkFormat format) {
+    auto texture = std::make_unique<GpuImage>(
+        context, ImageDesc{width, height, 1,
+                           static_cast<std::uint32_t>(mips.size()),
+                           format, VK_IMAGE_USAGE_SAMPLED_BIT});
+    std::vector<std::span<const std::byte>> spans;
+    for (const auto& bytes : mips) {
         spans.push_back(Bytes(bytes));
     }
     texture->Upload(spans);
     return texture;
+}
+
+std::unique_ptr<GpuImage> UploadMips(const VulkanContext& context,
+                                     const Image& image,
+                                     MipFilter filter,
+                                     ImageEncoding encoding,
+                                     VkFormat format) {
+    return UploadEncoded(context, image.width, image.height,
+                         EncodeMips(image, filter, encoding), format);
 }
 
 /// A stored texture's format as the device holds it: its own, or its
@@ -311,6 +334,41 @@ FallbackTexture(const VulkanContext& context,
     }
 }
 
+/// The 1 x 1 images a material reads in place of its own, beyond
+/// `FallbackTexture`'s.
+enum class DefaultImage { NoAlbedoMap = 16, WhiteDetail, FlatDetail };
+
+/// The default image `which` (a `MaterialTextureSlot`'s fallback or a
+/// `DefaultImage`), one per device shared by every material while any
+/// holds it: made per material, a scene of hundreds of materials
+/// filled the bindless heap and waited on the device for each.
+std::shared_ptr<const GpuImage> SharedDefault(
+    const VulkanContext& context, int which,
+    const std::function<std::unique_ptr<GpuImage>()>& make) {
+    static std::mutex mutex;
+    static std::map<std::pair<VkDevice, int>,
+                    std::weak_ptr<const GpuImage>>
+        images;
+    const std::lock_guard lock(mutex);
+    std::weak_ptr<const GpuImage>& cached =
+        images[{context.Device(), which}];
+    if (std::shared_ptr<const GpuImage> image = cached.lock()) {
+        return image;
+    }
+    std::shared_ptr<const GpuImage> image = make();
+    cached = image;
+    return image;
+}
+
+/// Waits for the device when `image` is about to go with its last
+/// holder, so that no frame in flight reads it once destroyed.
+void WaitIfLast(const VulkanContext& context,
+                const std::shared_ptr<const GpuImage>& image) {
+    if (image != nullptr && image.use_count() == 1) {
+        vkDeviceWaitIdle(context.Device());
+    }
+}
+
 }  // namespace
 
 std::shared_ptr<const MaterialTexture>
@@ -318,11 +376,25 @@ UploadMaterialTexture(const VulkanContext& context,
                       MaterialTextureSlot slot, const Image& image,
                       const TextureReader& reader) {
     CheckImage(context, &image);
-    auto texture = std::make_shared<MaterialTexture>();
+    return UploadMaterialTexture(
+        context, PrepareMaterialTexture(slot, image, reader));
+}
+
+PreparedTexture PrepareMaterialTexture(MaterialTextureSlot slot,
+                                       const Image& image,
+                                       const TextureReader& reader) {
+    if (image.width == 0 || image.height == 0 ||
+        image.pixels.size() !=
+            static_cast<std::size_t>(image.width) * image.height) {
+        throw std::invalid_argument("Texture is empty");
+    }
+    PreparedTexture prepared;
+    prepared.width = image.width;
+    prepared.height = image.height;
     if (slot == MaterialTextureSlot::Albedo) {
-        texture->image =
-            UploadMips(context, image, MipFilter::Average,
-                       ImageEncoding::Srgb, VK_FORMAT_R8G8B8A8_SRGB);
+        prepared.format = VK_FORMAT_R8G8B8A8_SRGB;
+        prepared.mips = EncodeMips(image, MipFilter::Average,
+                                   ImageEncoding::Srgb);
     } else if (slot == MaterialTextureSlot::Normal) {
         // The reader's scale and bias turn the raw values into
         // normals, stored as n / 2 + 1/2 for
@@ -335,9 +407,9 @@ UploadMaterialTexture(const VulkanContext& context,
                                       : glm::vec3(0.0f, 0.0f, 1.0f);
             texel = glm::vec4(0.5f * n + 0.5f, 0.0f);
         }
-        texture->image = UploadMips(
-            context, normals, MipFilter::NormalSlopes,
-            ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+        prepared.format = VK_FORMAT_R8G8B8A8_UNORM;
+        prepared.mips = EncodeMips(normals, MipFilter::NormalSlopes,
+                                   ImageEncoding::Linear);
     } else {
         Image values = image;
         const int channel = std::clamp(reader.channel, 0, 3);
@@ -348,11 +420,107 @@ UploadMaterialTexture(const VulkanContext& context,
                            0.0f, 1.0f);
             texel = glm::vec4(value, value, value, 1.0f);
         }
-        texture->image = UploadMips(
-            context, values, MipFilter::Average,
-            ImageEncoding::Linear, VK_FORMAT_R8G8B8A8_UNORM);
+        prepared.format = VK_FORMAT_R8G8B8A8_UNORM;
+        prepared.mips = EncodeMips(values, MipFilter::Average,
+                                   ImageEncoding::Linear);
+    }
+    return prepared;
+}
+
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      const PreparedTexture& prepared) {
+    const std::uint32_t maxSize =
+        context.Limits().maxImageDimension2D;
+    if (prepared.width > maxSize || prepared.height > maxSize) {
+        throw std::invalid_argument(
+            "Texture exceeds the device's maximum texture size");
+    }
+    auto texture = std::make_shared<MaterialTexture>();
+    texture->image =
+        UploadEncoded(context, prepared.width, prepared.height,
+                      prepared.mips, prepared.format);
+    return texture;
+}
+
+void CompressPreparedTexture(BlockEncoder& encoder,
+                             PreparedTexture& prepared) {
+    TextureFormat format = TextureFormat::Bc7;
+    VkFormat compressed = VK_FORMAT_BC7_UNORM_BLOCK;
+    if (prepared.format == VK_FORMAT_R8G8B8A8_SRGB) {
+        format = TextureFormat::Bc7Srgb;
+        compressed = VK_FORMAT_BC7_SRGB_BLOCK;
+    } else if (prepared.format != VK_FORMAT_R8G8B8A8_UNORM) {
+        return;
+    }
+    // Every mip encoded before any is replaced, so that a failure
+    // leaves `prepared` whole.
+    std::vector<std::vector<std::uint8_t>> mips;
+    for (std::size_t mip = 0; mip < prepared.mips.size(); ++mip) {
+        const auto shift = static_cast<std::uint32_t>(mip);
+        const std::uint32_t w = std::max(1u, prepared.width >> shift);
+        const std::uint32_t h =
+            std::max(1u, prepared.height >> shift);
+        std::vector<std::uint8_t> blocks(ImageBytes(format, w, h));
+        encoder.Encode(prepared.mips[mip], w, h, format,
+                       reinterpret_cast<std::byte*>(blocks.data()));
+        mips.push_back(std::move(blocks));
+    }
+    prepared.mips = std::move(mips);
+    prepared.format = compressed;
+}
+
+TextureData StoredOf(const PreparedTexture& prepared) {
+    TextureData texture;
+    switch (prepared.format) {
+    case VK_FORMAT_R8G8B8A8_UNORM:
+        texture.format = TextureFormat::Rgba8;
+        break;
+    case VK_FORMAT_R8G8B8A8_SRGB:
+        texture.format = TextureFormat::Rgba8Srgb;
+        break;
+    case VK_FORMAT_BC7_UNORM_BLOCK:
+        texture.format = TextureFormat::Bc7;
+        break;
+    case VK_FORMAT_BC7_SRGB_BLOCK:
+        texture.format = TextureFormat::Bc7Srgb;
+        break;
+    default:
+        throw std::invalid_argument("A prepared texture's format");
+    }
+    texture.width = prepared.width;
+    texture.height = prepared.height;
+    texture.mips = static_cast<std::uint32_t>(prepared.mips.size());
+    for (const std::vector<std::uint8_t>& mip : prepared.mips) {
+        texture.offsets.push_back(texture.bytes.size());
+        const std::span<const std::byte> bytes = Bytes(mip);
+        texture.bytes.insert(texture.bytes.end(), bytes.begin(),
+                             bytes.end());
     }
     return texture;
+}
+
+std::optional<PreparedTexture>
+PreparedOf(const TextureData& texture) {
+    const bool prepared =
+        texture.format == TextureFormat::Rgba8 ||
+        texture.format == TextureFormat::Rgba8Srgb ||
+        texture.format == TextureFormat::Bc7 ||
+        texture.format == TextureFormat::Bc7Srgb;
+    if (!prepared || texture.layers != 1 || texture.cube) {
+        return std::nullopt;
+    }
+    PreparedTexture out;
+    out.width = texture.width;
+    out.height = texture.height;
+    out.format = VkFormatOf(texture.format);
+    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+        const std::span<const std::byte> bytes = texture.Mip(0, mip);
+        const auto* data =
+            reinterpret_cast<const std::uint8_t*>(bytes.data());
+        out.mips.emplace_back(data, data + bytes.size());
+    }
+    return out;
 }
 
 std::shared_ptr<const MaterialTexture>
@@ -451,8 +619,11 @@ RasterMaterial::RasterMaterial(const VulkanContext& context,
     ClearAlbedoMap();
     SetDetailTextures(nullptr, nullptr);
     for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
-        fallbacks_[slot] = FallbackTexture(
-            context, static_cast<MaterialTextureSlot>(slot));
+        const auto kind = static_cast<MaterialTextureSlot>(slot);
+        fallbacks_[slot] =
+            SharedDefault(context, static_cast<int>(slot), [&] {
+                return FallbackTexture(context, kind);
+            });
         samplers_[slot] = TextureSampler(context, TextureReader());
     }
     // With the fallbacks' heap slots.
@@ -502,7 +673,7 @@ void RasterMaterial::SetAlbedoMap(const RasterView& albedo) {
                             VK_IMAGE_USAGE_SAMPLED_BIT});
     const std::span<const std::byte> mips[] = {Bytes(packed)};
     image->Upload(mips);
-    vkDeviceWaitIdle(context_.Device());
+    WaitIfLast(context_, albedoMap_);
     albedoMap_ = std::move(image);
     hasAlbedoMap_ = true;
     albedoGrid_ = glm::dvec4(albedo.originX, albedo.originY,
@@ -512,14 +683,20 @@ void RasterMaterial::SetAlbedoMap(const RasterView& albedo) {
 }
 
 void RasterMaterial::ClearAlbedoMap() {
-    const std::uint32_t none = glm::packHalf2x16(glm::vec2(0.0f));
-    auto image = std::make_unique<GpuImage>(
-        context_, ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16_SFLOAT,
-                            VK_IMAGE_USAGE_SAMPLED_BIT});
-    const std::span<const std::byte> mips[] = {
-        std::as_bytes(std::span(&none, 1))};
-    image->Upload(mips);
-    vkDeviceWaitIdle(context_.Device());
+    std::shared_ptr<const GpuImage> image = SharedDefault(
+        context_, static_cast<int>(DefaultImage::NoAlbedoMap), [&] {
+            const std::uint32_t none =
+                glm::packHalf2x16(glm::vec2(0.0f));
+            auto made = std::make_unique<GpuImage>(
+                context_,
+                ImageDesc{1, 1, 1, 1, VK_FORMAT_R16G16_SFLOAT,
+                          VK_IMAGE_USAGE_SAMPLED_BIT});
+            const std::span<const std::byte> mips[] = {
+                std::as_bytes(std::span(&none, 1))};
+            made->Upload(mips);
+            return made;
+        });
+    WaitIfLast(context_, albedoMap_);
     albedoMap_ = std::move(image);
     hasAlbedoMap_ = false;
     albedoGrid_ = glm::dvec4(0.0);
@@ -537,12 +714,20 @@ void RasterMaterial::SetDetailTextures(const Image* albedo,
 
 void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
     CheckImage(context_, albedo);
-    const Image white(1, 1, glm::vec4(1.0f));
-    auto image =
-        UploadMips(context_, albedo != nullptr ? *albedo : white,
-                   MipFilter::Average, ImageEncoding::Srgb,
-                   VK_FORMAT_R8G8B8A8_SRGB);
-    vkDeviceWaitIdle(context_.Device());
+    const auto upload = [&](const Image& source) {
+        return UploadMips(context_, source, MipFilter::Average,
+                          ImageEncoding::Srgb,
+                          VK_FORMAT_R8G8B8A8_SRGB);
+    };
+    std::shared_ptr<const GpuImage> image =
+        albedo != nullptr
+            ? std::shared_ptr<const GpuImage>(upload(*albedo))
+            : SharedDefault(
+                  context_,
+                  static_cast<int>(DefaultImage::WhiteDetail), [&] {
+                      return upload(Image(1, 1, glm::vec4(1.0f)));
+                  });
+    WaitIfLast(context_, detailAlbedo_);
     detailAlbedo_ = std::move(image);
     hasDetailAlbedo_ = albedo != nullptr;
     detailMean_ = albedo != nullptr ? QuantisedSrgbMean(*albedo)
@@ -585,12 +770,21 @@ void RasterMaterial::SetTemperatureTexture(
 
 void RasterMaterial::SetDetailNormal(const Image* normal) {
     CheckImage(context_, normal);
-    const Image flat(1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    auto image =
-        UploadMips(context_, normal != nullptr ? *normal : flat,
-                   MipFilter::NormalSlopes, ImageEncoding::Linear,
-                   VK_FORMAT_R8G8B8A8_UNORM);
-    vkDeviceWaitIdle(context_.Device());
+    const auto upload = [&](const Image& source) {
+        return UploadMips(context_, source, MipFilter::NormalSlopes,
+                          ImageEncoding::Linear,
+                          VK_FORMAT_R8G8B8A8_UNORM);
+    };
+    std::shared_ptr<const GpuImage> image =
+        normal != nullptr
+            ? std::shared_ptr<const GpuImage>(upload(*normal))
+            : SharedDefault(
+                  context_,
+                  static_cast<int>(DefaultImage::FlatDetail), [&] {
+                      return upload(Image(
+                          1, 1, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)));
+                  });
+    WaitIfLast(context_, detailNormal_);
     detailNormal_ = std::move(image);
     hasDetailNormal_ = normal != nullptr;
     WriteUniform();

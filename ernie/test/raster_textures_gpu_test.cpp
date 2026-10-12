@@ -15,11 +15,13 @@
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
+#include <stb_image_write.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -38,6 +40,24 @@ using namespace ernie::testing;
 namespace tokens = ernie::tokens;
 
 namespace {
+
+/// Sets or unsets an environment variable: setenv and unsetenv are
+/// POSIX's, _putenv_s Windows's (an empty value unsets).
+void SetEnv(const char* name, const char* value) {
+#if defined(_WIN32)
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+}
+
+void UnsetEnv(const char* name) {
+#if defined(_WIN32)
+    _putenv_s(name, "");
+#else
+    unsetenv(name);
+#endif
+}
 
 /// A 16 m quad at the origin under MeshScene's overhead camera, with
 /// texture coordinates (0, 0) to (1, 1) from its corner at (-8, -8)
@@ -852,6 +872,98 @@ TEST_F(RasterDelegateTest, BakedTexturesRenderAsTheirSources) {
                 0.03f);
 }
 
+TEST_F(RasterDelegateTest, ImageFilesUploadAsBc7KeptBetweenRuns) {
+    // A 256 x 256 PNG albedo of the quadrants uploads as BC7, under
+    // half the bytes of its tensor twin's RGBA8, and renders as the
+    // twin does. Its BC7 is kept in the texture cache, from which a
+    // second delegate uploads it: replaced there by black, it renders
+    // black.
+    if (!context_->SupportsTextureCompressionBc()) {
+        GTEST_SKIP() << "The device cannot sample BC7";
+    }
+    const std::filesystem::path cache =
+        std::filesystem::path(::testing::TempDir()) / "texture_cache";
+    std::filesystem::remove_all(cache);
+    SetEnv("ERNIE_TEXTURE_CACHE", cache.string().c_str());
+
+    constexpr int kSide = 256;
+    std::vector<std::uint8_t> texels;
+    for (int y = 0; y < kSide; ++y) {
+        for (int x = 0; x < kSide; ++x) {
+            const bool right = x >= kSide / 2;
+            const bool bottom = y >= kSide / 2;
+            // Red, green on top; blue, white below.
+            texels.push_back(right == bottom ? 255 : 0);
+            texels.push_back(right ? 255 : 0);
+            texels.push_back(bottom ? 255 : 0);
+            texels.push_back(255);
+        }
+    }
+    const std::string png =
+        ::testing::TempDir() + "cached_quadrants.png";
+    ASSERT_NE(stbi_write_png(png.c_str(), kSide, kSide, 4,
+                             texels.data(), kSide * 4),
+              0);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp");
+    const auto quadrants = [&](RasterDelegate& delegate) {
+        Quadrants(delegate, scene);
+        const std::vector<float> rgb = Quadrants(delegate, scene);
+        return std::make_pair(rgb, delegate.Stats().gpuBytes);
+    };
+
+    RasterDelegate twin(*context_);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(
+            Tensor::Copy<std::uint8_t>(texels, {kSide, kSide, 4}));
+    const auto [decoded, rgba8Bytes] = quadrants(twin);
+    scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(png);
+    RasterDelegate first(*context_);
+    const auto [compressed, bc7Bytes] = quadrants(first);
+    // RGBA8's 256 x 256 and mips are 349 524 bytes, BC7's 87 408.
+    EXPECT_LT(bc7Bytes, rgba8Bytes - 200000);
+    for (std::size_t i = 0; i < compressed.size(); ++i) {
+        EXPECT_NEAR(compressed[i], decoded[i],
+                    0.03f * decoded[i] + 1e-3f)
+            << "value " << i;
+    }
+
+    std::vector<std::filesystem::path> entries;
+    for (const auto& entry :
+         std::filesystem::directory_iterator(cache)) {
+        entries.push_back(entry.path());
+    }
+    ASSERT_EQ(entries.size(), 1u);
+    ernie::WriteDdsFile(
+        entries[0],
+        ernie::EncodeTexture(
+            ernie::MipChain(
+                ernie::Image(kSide, kSide, glm::vec4(0, 0, 0, 1)),
+                ernie::MipFilter::Average),
+            ernie::TextureFormat::Bc7Srgb,
+            ernie::ImageEncoding::Srgb));
+    RasterDelegate second(*context_);
+    const std::vector<float> cached = quadrants(second).first;
+    // Black albedo, as a black tensor renders: the surface's specular
+    // reflection alone.
+    scene.Clear("/Looks/M/Tex", tokens::kFile);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(Tensor::Copy<std::uint8_t>(
+            std::vector<std::uint8_t>(kSide * kSide * 4, 0),
+            {kSide, kSide, 4}));
+    const std::vector<float> black = quadrants(twin).first;
+    for (std::size_t i = 0; i < cached.size(); ++i) {
+        EXPECT_NEAR(cached[i], black[i], 1e-3f) << "value " << i;
+    }
+    UnsetEnv("ERNIE_TEXTURE_CACHE");
+    std::filesystem::remove_all(cache);
+}
+
 TEST_F(RasterDelegateTest,
        TemperatureTexturesSetTheTemperatureAcrossAMesh) {
     // The quad's material at 250 K with a 2 x 1 temperature texture
@@ -896,7 +1008,8 @@ TEST_F(RasterDelegateTest,
     EXPECT_EQ(at(6.0f), 0.0f);
 }
 
-TEST_F(RasterDelegateTest, SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
+TEST_F(RasterDelegateTest,
+       SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
     // The quad's points at 300 K on its left edge and 500 K on its
     // right, written as a solver steps: interpolated across it, in
     // place of the prim's own, updated in place from the host and,
@@ -904,14 +1017,17 @@ TEST_F(RasterDelegateTest, SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
     Scene scene = TexturedScene();
     const Path var("/Render/Vars/Temperature");
     ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
-    scene.Set("/Render/Out", tokens::kOrderedVars, std::vector<Path>{var});
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
     ernie::Mesh(scene, "/World/Quad").SetThermalTemperature(250.0);
     RasterDelegate delegate(*context_);
     const auto at = [&](float x) {
         const Tensor kelvin = Render(delegate, scene, "Temperature");
         const glm::vec4 clip =
-            ernie::CameraParamsOf(scene, "/World/Camera", kSize, kSize)
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
+                                  kSize)
                 .RasterView()
                 .ViewProjection() *
             glm::vec4(x, 0.0f, 0.0f, 1.0f);
@@ -919,7 +1035,8 @@ TEST_F(RasterDelegateTest, SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
             (clip.x / clip.w * 0.5f + 0.5f) * kSize);
         return kelvin.As<float>()[(kSize / 2) * kSize + col];
     };
-    EXPECT_EQ(at(0.0f), 250.0f) << "the prim's own without a solver's";
+    EXPECT_EQ(at(0.0f), 250.0f)
+        << "the prim's own without a solver's";
     const auto write = [&](std::array<float, 4> kelvin) {
         scene.Write("/World/Quad", tokens::kThermalTemperatures,
                     Tensor::Copy<float>(kelvin, {4}));
@@ -944,6 +1061,7 @@ TEST_F(RasterDelegateTest, SolverTemperaturesPerPointWriteBackFromHostAndCuda) {
     scene.Write("/World/Quad", tokens::kThermalTemperatures,
                 cuda->Upload(Tensor::Copy<float>(next, {4})));
     EXPECT_NEAR(at(0.0f), 720.0f, 0.01f);
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(false);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(false);
     EXPECT_EQ(at(0.0f), 0.0f);
 }

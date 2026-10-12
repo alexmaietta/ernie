@@ -11,6 +11,7 @@
 #include "ernie/util/image.h"
 #include "ernie/util/raster_view.h"
 #include "ernie/util/spectrum.h"
+#include "ernie/util/texture_bake.h"
 #include "ernie/util/texture_file.h"
 
 #include <glm/glm.hpp>
@@ -66,6 +67,44 @@ std::shared_ptr<const MaterialTexture>
 UploadMaterialTexture(const VulkanContext& context,
                       MaterialTextureSlot slot, const Image& image,
                       const TextureReader& reader);
+
+/// What the overload above makes of an image before the device sees
+/// it: its mips, 8 bits a channel, in `format` (RGBA8, sRGB or
+/// plain), or those as BC7 blocks (`CompressPreparedTexture`).
+struct PreparedTexture {
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    std::vector<std::vector<std::uint8_t>> mips;
+};
+
+/// Encodes `prepared`'s RGBA8 mips to BC7 with `encoder` (the GPU's),
+/// in place: a quarter of the memory, sRGB staying sRGB. Textures
+/// already compressed are left as they are.
+void CompressPreparedTexture(BlockEncoder& encoder,
+                             PreparedTexture& prepared);
+
+/// `prepared` as a DDS file stores it (`TextureCache`).
+TextureData StoredOf(const PreparedTexture& prepared);
+
+/// A texture `StoredOf` stored, prepared again; none for a texture it
+/// does not store (another format, or more than one layer).
+std::optional<PreparedTexture> PreparedOf(const TextureData& texture);
+
+/// The CPU half of uploading `image` (the values `reader` turns it
+/// into, its mips), which any thread may do, so that many textures
+/// prepare at once.
+/// @throws std::invalid_argument if the image is empty.
+PreparedTexture PrepareMaterialTexture(MaterialTextureSlot slot,
+                                       const Image& image,
+                                       const TextureReader& reader);
+
+/// The device half: uploads `prepared`.
+/// @throws std::invalid_argument if it is larger than the device
+/// allows.
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      const PreparedTexture& prepared);
 
 /// As above, for a texture read as stored from a DDS or KTX2 file
 /// (`LoadTextureFile`): the first layer's mips upload as they are,
@@ -269,9 +308,11 @@ class RasterMaterial {
     float luminance_ = 1.0f;
     GpuBuffer uniform_;
     Sampler sampler_;
-    std::unique_ptr<GpuImage> albedoMap_;
-    std::unique_ptr<GpuImage> detailAlbedo_;
-    std::unique_ptr<GpuImage> detailNormal_;
+    /// Shared with other materials while defaults (no albedo map,
+    /// white detail, a flat detail normal).
+    std::shared_ptr<const GpuImage> albedoMap_;
+    std::shared_ptr<const GpuImage> detailAlbedo_;
+    std::shared_ptr<const GpuImage> detailNormal_;
     std::unique_ptr<GpuImage> temperatureTexture_;  ///< R32F kelvin.
     /// By `MaterialTextureSlot`: the texture of `SetTexture`, null
     /// for none; the 1 x 1 one bound in its place (white albedo, a
@@ -279,7 +320,7 @@ class RasterMaterial {
     std::array<std::shared_ptr<const MaterialTexture>,
                kMaterialTextureSlots>
         textures_;
-    std::array<std::unique_ptr<GpuImage>, kMaterialTextureSlots>
+    std::array<std::shared_ptr<const GpuImage>, kMaterialTextureSlots>
         fallbacks_;
     std::array<std::unique_ptr<Sampler>, kMaterialTextureSlots>
         samplers_;

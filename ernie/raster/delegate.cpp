@@ -23,9 +23,12 @@
 #include <cmath>
 #include <filesystem>
 #include <functional>
+#include <future>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 namespace ernie {
 
@@ -162,6 +165,35 @@ Image TextureImageOf(const Scene& scene,
         return ImageOfTensor(*tensor, EncodingOf(reader));
     }
     return LoadImageFile(reader.file, EncodingOf(reader));
+}
+
+/// What `TextureCache` keys hold beyond the upload key: BC7 from the
+/// GPU's encoder; bumped when its output changes.
+constexpr std::string_view kCompressedKey = "|gpu-bc7-1";
+
+/// An image file's texture for `slot` as `RasterDelegate::
+/// UploadPrepared` takes it: from `cache` (when given) under `key`
+/// (`UploadKey`), setting `cached`, else decoded and prepared. Any
+/// thread may call it.
+/// @throws as `TextureImageOf` and `PrepareMaterialTexture`.
+PreparedTexture LoadPrepared(const Scene& scene,
+                             MaterialTextureSlot slot,
+                             const TextureReader& reader,
+                             const TextureCache* cache,
+                             const std::string& key, bool& cached) {
+    if (cache != nullptr) {
+        if (const std::optional<TextureData> stored =
+                cache->Read(key + std::string(kCompressedKey))) {
+            if (std::optional<PreparedTexture> prepared =
+                    PreparedOf(*stored)) {
+                cached = true;
+                return std::move(*prepared);
+            }
+        }
+    }
+    cached = false;
+    return PrepareMaterialTexture(slot, TextureImageOf(scene, reader),
+                                  reader);
 }
 
 std::invalid_argument UploadError(const Path& path,
@@ -616,6 +648,8 @@ void RasterDelegate::SyncMaterials(const Scene& scene) {
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
+    const std::vector<std::shared_ptr<const MaterialTexture>>
+        prefetched = PrefetchTextures(scene);
     for (const Path& path : scene.Prims(kMaterial)) {
         seen.insert(path);
         auto [it, added] = materials_.try_emplace(path);
@@ -734,18 +768,23 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
     if (material.temperatureTexture != temperatureKey) {
         material.temperatureTexture = temperatureKey;
         try {
-            if (const Tensor* tensor = prim.GetThermalTemperatureTexture()) {
+            if (const Tensor* tensor =
+                    prim.GetThermalTemperatureTexture()) {
                 const Tensor kelvin = tensor->Contiguous();
-                const std::vector<std::int64_t> shape = kelvin.Shape();
+                const std::vector<std::int64_t> shape =
+                    kelvin.Shape();
                 if (kelvin.Type() != DType::Float32 ||
                     (shape.size() != 2 &&
                      !(shape.size() == 3 && shape[2] == 1)) ||
                     shape[0] < 1 || shape[1] < 1) {
                     throw std::invalid_argument(
-                        "needs float32 (rows, cols) or (rows, cols, 1)");
+                        "needs float32 (rows, cols) or (rows, cols, "
+                        "1)");
                 }
-                const auto rows = static_cast<std::uint32_t>(shape[0]);
-                const auto cols = static_cast<std::uint32_t>(shape[1]);
+                const auto rows =
+                    static_cast<std::uint32_t>(shape[0]);
+                const auto cols =
+                    static_cast<std::uint32_t>(shape[1]);
                 gpu.SetTemperatureTexture(
                     std::span(kelvin.As<float>(),
                               static_cast<std::size_t>(rows) * cols),
@@ -760,26 +799,156 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
     }
 }
 
+std::vector<std::shared_ptr<const MaterialTexture>>
+RasterDelegate::PrefetchTextures(const Scene& scene) {
+    ERNIE_ZONE("Prefetch textures");
+    struct Job {
+        MaterialTextureSlot slot;
+        TextureReader reader;
+        std::string key;
+    };
+    std::vector<Job> jobs;
+    std::set<std::string> keys;
+    for (const Path& path : scene.Prims(tokens::kMaterial)) {
+        MaterialSettings settings;
+        try {
+            settings =
+                MaterialSettingsOf(scene, path, renderer_.Brdfs());
+        } catch (const std::invalid_argument&) {
+            continue;  // SyncMaterial reports it.
+        }
+        const std::array<const std::optional<TextureReader>*, 5>
+            readers{&settings.albedoTexture, &settings.normalTexture,
+                    &settings.roughnessTexture,
+                    &settings.metallicTexture,
+                    &settings.opacityTexture};
+        for (std::size_t slot = 0; slot < readers.size(); ++slot) {
+            const std::optional<TextureReader>& reader =
+                *readers[slot];
+            // Image files only: DDS and KTX2 upload as stored.
+            if (!reader || !reader->image.empty() ||
+                IsTextureFile(reader->file)) {
+                continue;
+            }
+            const auto textureSlot =
+                static_cast<MaterialTextureSlot>(slot);
+            std::string key = UploadKey(scene, textureSlot, *reader);
+            if (const auto it = sharedTextures_.find(key);
+                (it != sharedTextures_.end() &&
+                 !it->second.expired()) ||
+                !keys.insert(key).second) {
+                continue;
+            }
+            jobs.push_back({textureSlot, *reader, std::move(key)});
+        }
+    }
+    // Decoded and their mips made a few at a time (a decoded 4k
+    // texture is 256 MB of floats), uploaded in order; a file that
+    // fails is left for SyncMaterial to report.
+    std::vector<std::shared_ptr<const MaterialTexture>> uploaded;
+    const std::size_t batch = std::clamp<std::size_t>(
+        std::thread::hardware_concurrency(), 1, 6);
+    const TextureCache* cache =
+        Encoder() != nullptr ? &textureCache_ : nullptr;
+    struct Loaded {
+        PreparedTexture prepared;
+        bool cached = false;
+    };
+    for (std::size_t first = 0; first < jobs.size(); first += batch) {
+        const std::size_t last = std::min(jobs.size(), first + batch);
+        std::vector<std::future<std::optional<Loaded>>> ready;
+        for (std::size_t i = first; i < last; ++i) {
+            ready.push_back(
+                std::async(std::launch::async,
+                           [&scene, &job = jobs[i],
+                            cache]() -> std::optional<Loaded> {
+                               try {
+                                   Loaded loaded;
+                                   loaded.prepared = LoadPrepared(
+                                       scene, job.slot, job.reader,
+                                       cache, job.key, loaded.cached);
+                                   return loaded;
+                               } catch (const std::exception&) {
+                                   return std::nullopt;
+                               }
+                           }));
+        }
+        for (std::size_t i = first; i < last; ++i) {
+            std::optional<Loaded> loaded = ready[i - first].get();
+            if (!loaded) {
+                continue;
+            }
+            try {
+                std::shared_ptr<const MaterialTexture> texture =
+                    UploadPrepared(std::move(loaded->prepared),
+                                   jobs[i].key, loaded->cached);
+                sharedTextures_[jobs[i].key] = texture;
+                uploaded.push_back(std::move(texture));
+            } catch (const std::exception&) {
+                // SyncMaterial reports it.
+            }
+        }
+    }
+    return uploaded;
+}
+
 std::shared_ptr<const MaterialTexture>
 RasterDelegate::SharedTexture(const Scene& scene,
                               MaterialTextureSlot slot,
                               const TextureReader& reader) {
-    std::weak_ptr<const MaterialTexture>& cached =
-        sharedTextures_[UploadKey(scene, slot, reader)];
-    if (auto texture = cached.lock()) {
+    const std::string key = UploadKey(scene, slot, reader);
+    std::weak_ptr<const MaterialTexture>& shared =
+        sharedTextures_[key];
+    if (auto texture = shared.lock()) {
         return texture;
     }
-    // DDS and KTX2 files upload as stored, never decoded.
-    std::shared_ptr<const MaterialTexture> texture =
-        reader.image.empty() && IsTextureFile(reader.file)
-            ? UploadMaterialTexture(context_, slot,
-                                    LoadTextureFile(reader.file),
-                                    reader)
-            : UploadMaterialTexture(context_, slot,
-                                    TextureImageOf(scene, reader),
-                                    reader);
-    cached = texture;
+    std::shared_ptr<const MaterialTexture> texture;
+    if (!reader.image.empty()) {
+        // Tensors, which change as they please, upload uncompressed.
+        texture = UploadMaterialTexture(
+            context_, slot, TextureImageOf(scene, reader), reader);
+    } else if (IsTextureFile(reader.file)) {
+        // DDS and KTX2 files upload as stored.
+        texture = UploadMaterialTexture(
+            context_, slot, LoadTextureFile(reader.file), reader);
+    } else {
+        bool cached = false;
+        PreparedTexture prepared = LoadPrepared(
+            scene, slot, reader,
+            Encoder() != nullptr ? &textureCache_ : nullptr, key,
+            cached);
+        texture = UploadPrepared(std::move(prepared), key, cached);
+    }
+    shared = texture;
     return texture;
+}
+
+BlockEncoder* RasterDelegate::Encoder() {
+    if (!encoderTried_) {
+        encoderTried_ = true;
+        if (context_.SupportsTextureCompressionBc()) {
+            try {
+                encoder_ = std::make_unique<GpuBlockEncoder>(
+                    context_, renderer_.Compiler());
+            } catch (const std::exception&) {
+                // Textures upload uncompressed.
+            }
+        }
+    }
+    return encoder_.get();
+}
+
+std::shared_ptr<const MaterialTexture>
+RasterDelegate::UploadPrepared(PreparedTexture prepared,
+                               const std::string& key, bool cached) {
+    if (!cached) {
+        if (BlockEncoder* encoder = Encoder()) {
+            CompressPreparedTexture(*encoder, prepared);
+            textureCache_.Write(key + std::string(kCompressedKey),
+                                StoredOf(prepared));
+        }
+    }
+    return UploadMaterialTexture(context_, prepared);
 }
 
 void RasterDelegate::SyncHeightfield(const Scene& scene,
@@ -1214,7 +1383,8 @@ void RasterDelegate::SetMeshAttributes(const Scene& scene,
 void RasterDelegate::SetMeshTemperatures(const Scene& scene,
                                          const Path& path,
                                          std::uint32_t handle) {
-    const Tensor* kelvin = scene.Read(path, tokens::kThermalTemperatures);
+    const Tensor* kelvin =
+        scene.Read(path, tokens::kThermalTemperatures);
     if (kelvin == nullptr || kelvin->Empty()) {
         meshes_.SetTemperatures(handle, std::span<const float>());
         return;
@@ -1275,8 +1445,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             key.second[2] = static_cast<std::uint64_t>(
                 scene.Read(path, kFaceVertexIndices)->Elements());
         }
-        // The points and triangles in use, read in place (slot 4), and
-        // the temperatures, written each solver step (slot 5).
+        // The points and triangles in use, read in place (slot 4),
+        // and the temperatures, written each solver step (slot 5).
         const std::array<std::uint64_t, 6> versions{
             scene.AttributeVersion(path, kPoints),
             gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
@@ -1310,7 +1480,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
                         SetMeshAttributes(scene, path, synced.handle);
                     }
                     if (synced.versions[5] != versions[5]) {
-                        SetMeshTemperatures(scene, path, synced.handle);
+                        SetMeshTemperatures(scene, path,
+                                            synced.handle);
                     }
                     synced.versions = versions;
                     continue;
@@ -2913,9 +3084,9 @@ void RasterDelegate::UpdatePrims(
     terrain.temperature =
         prims_.terrain.IsEmpty()
             ? 0.0f
-            : CheckedTemperature(
-                  prims_.terrain,
-                  Gprim(scene, prims_.terrain).GetThermalTemperature());
+            : CheckedTemperature(prims_.terrain,
+                                 Gprim(scene, prims_.terrain)
+                                     .GetThermalTemperature());
     terrain_.SetParams(terrain);
     planet_.SetParams(terrain);
     ground_.SetEnabled(!prims_.ground.IsEmpty());
@@ -2925,8 +3096,8 @@ void RasterDelegate::UpdatePrims(
         ground.primId = PrimIdOf(prims_.ground);
         ground.linkGroup = links_.GroupOf(prims_.ground);
         ground.temperature = CheckedTemperature(
-            prims_.ground,
-            GroundPlane(scene, prims_.ground).GetThermalTemperature());
+            prims_.ground, GroundPlane(scene, prims_.ground)
+                               .GetThermalTemperature());
         ground_.SetParams(ground);
     }
     // The highlighted prims and everything under them, as the prim

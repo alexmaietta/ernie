@@ -4,6 +4,7 @@
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
+#include "ernie/raster/gpu_block_encoder.h"
 #include "ernie/raster/ground_drawable.h"
 #include "ernie/raster/mesh_drawable.h"
 #include "ernie/raster/planet_drawable.h"
@@ -17,6 +18,7 @@
 #include "ernie/session/resolve.h"
 #include "ernie/util/image.h"
 #include "ernie/util/tensor.h"
+#include "ernie/util/texture_cache.h"
 
 #include <array>
 #include <cstdint>
@@ -394,6 +396,21 @@ class RasterDelegate : public RenderDelegate {
     std::shared_ptr<const MaterialTexture>
     SharedTexture(const Scene& scene, MaterialTextureSlot slot,
                   const TextureReader& reader);
+    /// The GPU's BC7 encoder, made at first use; null on a device
+    /// that cannot sample BC7 or make it.
+    BlockEncoder* Encoder();
+    /// Uploads an image file's `prepared` texture, uploaded under
+    /// `key` (`UploadKey`): compressed to BC7 (`Encoder`) and kept in
+    /// `textureCache_` unless it came from there (`cached`).
+    std::shared_ptr<const MaterialTexture>
+    UploadPrepared(PreparedTexture prepared, const std::string& key,
+                   bool cached);
+    /// Uploads the image files the materials read that are not
+    /// uploaded yet, decoding several at once, into
+    /// `sharedTextures_`; returns them, to hold until the materials
+    /// do.
+    std::vector<std::shared_ptr<const MaterialTexture>>
+    PrefetchTextures(const Scene& scene);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -621,6 +638,11 @@ class RasterDelegate : public RenderDelegate {
     std::unordered_map<std::string,
                        std::weak_ptr<const MaterialTexture>>
         sharedTextures_;
+    std::unique_ptr<GpuBlockEncoder> encoder_;
+    bool encoderTried_ = false;
+    /// Image files' textures as `UploadPrepared` compressed them,
+    /// between runs.
+    TextureCache textureCache_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;
