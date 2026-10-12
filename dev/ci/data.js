@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791762179112,
+  "lastUpdate": 1791764206468,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -7898,6 +7898,408 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-gcc-3: ccache miss rate",
             "value": 38.84,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "b228247baa779d4ebc2493c6ce9fcaff0b5b2343",
+          "message": "local_terrain_of one function for either DEM, which the API docs resolve; typed prims' stubs take set_xform; two files formatted",
+          "timestamp": "2026-10-11T23:42:52Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/b228247baa779d4ebc2493c6ce9fcaff0b5b2343"
+        },
+        "date": 1791764204507,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 33.43,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.08,
+            "unit": "min"
+          },
+          {
+            "name": "build (windows-2025): job",
+            "value": 23.47,
+            "unit": "min"
+          },
+          {
+            "name": "build (windows-2025): Build",
+            "value": 5.82,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 2 of 3): job",
+            "value": 12.95,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 2 of 3): Build",
+            "value": 3.65,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 2 of 3): Test on lavapipe",
+            "value": 8.5,
+            "unit": "min"
+          },
+          {
+            "name": "test (clang, Python 3.14, unit and Python tests): job",
+            "value": 32.28,
+            "unit": "min"
+          },
+          {
+            "name": "test (clang, Python 3.14, unit and Python tests): Build",
+            "value": 4.13,
+            "unit": "min"
+          },
+          {
+            "name": "test (clang, Python 3.14, unit and Python tests): Test on lavapipe",
+            "value": 26.85,
+            "unit": "min"
+          },
+          {
+            "name": "build (macos-15): job",
+            "value": 3.62,
+            "unit": "min"
+          },
+          {
+            "name": "build (macos-15): Build",
+            "value": 2.75,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 3 of 3): job",
+            "value": 13.03,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 3 of 3): Build",
+            "value": 3.15,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 3 of 3): Test on lavapipe",
+            "value": 9.23,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 1 of 3): job",
+            "value": 16.08,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 1 of 3): Build",
+            "value": 4.75,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize (part 1 of 3): Test on lavapipe",
+            "value": 10.73,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 3 of 3): job",
+            "value": 9.82,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 3 of 3): Build",
+            "value": 4.68,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 3 of 3): Test on lavapipe",
+            "value": 4,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 2 of 3): job",
+            "value": 14.08,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 2 of 3): Build",
+            "value": 6.67,
+            "unit": "min"
+          },
+          {
+            "name": "test (gcc, part 2 of 3): Test on lavapipe",
+            "value": 6.18,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 7.75,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 6.37,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 6.38,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 6.23,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 5.1,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 4.92,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 5.85,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 5.72,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): job",
+            "value": 10.17,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): wheel build",
+            "value": 9.83,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 0.73,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.17,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 0.95,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.2,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): job",
+            "value": 0.82,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): Build and run an application against them",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 0.75,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.78,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "docs: job",
+            "value": 0.9,
+            "unit": "min"
+          },
+          {
+            "name": "docs: Build",
+            "value": 0.23,
+            "unit": "min"
+          },
+          {
+            "name": "wheel-test (linux-x86_64): job",
+            "value": 2.95,
+            "unit": "min"
+          },
+          {
+            "name": "wheel-test (linux-aarch64): job",
+            "value": 2.35,
+            "unit": "min"
+          },
+          {
+            "name": "wheel-test (windows-amd64): job",
+            "value": 4.15,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compile time",
+            "value": 10.47,
+            "unit": "min"
+          },
+          {
+            "name": "build-macos-15: compiles",
+            "value": 515,
+            "unit": "files"
+          },
+          {
+            "name": "build-windows-2025: compile time",
+            "value": 19.58,
+            "unit": "min"
+          },
+          {
+            "name": "build-windows-2025: compiles",
+            "value": 710,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 18.53,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 411,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 19.27,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 13.87,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 411,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 19.27,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 12.38,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 411,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 19.27,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 15.85,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 717,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 20.67,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 19.16,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 717,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 39.66,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 25.42,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 717,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 39.53,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 17.6,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 717,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 39.66,
             "unit": "%"
           }
         ]
