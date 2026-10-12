@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // A lander hovering over the Moon, its exhaust blowing a sheet of
 // dust outward: a low sun lights the dust, which shades the ground
-// under it.
+// under it. A compute shader writes the dust, streaming out from
+// under the engine, into the renderer's grid each frame
+// (RenderDelegate::SetFieldWriter).
 
 #include "ernie/app/demo.h"
+#include "ernie/app/viewer.h"
+#include "ernie/device/buffer.h"
+#include "ernie/device/pipeline.h"
+#include "ernie/device/shader_compiler.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
@@ -13,15 +19,16 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/scene/xform.h"
-#include "ernie/util/nanovdb.h"
 #include "ernie/util/noise.h"
 #include "util.h"
 
-#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <numbers>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -46,59 +53,166 @@ glm::dvec3 MeanRows(const Tensor& image, std::int64_t top,
     return sum / static_cast<double>((bottom - top) * cols);
 }
 
-/// The dust's density over a 48 m square, 6 m deep, in 0.25 m voxels:
-/// a sheet streaming out from under the engine, streaked along its
-/// rays and billowing, thinning with height and distance.
-std::vector<std::uint8_t> MakeDust() {
-    constexpr double kVoxel = 0.25;
-    const glm::ivec3 shape(192, 192, 24);
-    const glm::dvec3 low(-24.0, -24.0, 0.0);
-    const GradientNoise noise(11);
-    std::vector<float> density(
-        static_cast<std::size_t>(shape.x) * shape.y * shape.z, 0.0f);
-    for (int i = 0; i < shape.x; ++i) {
-        for (int j = 0; j < shape.y; ++j) {
-            for (int k = 0; k < shape.z; ++k) {
-                const glm::dvec3 p =
-                    low + kVoxel * (glm::dvec3(i, j, k) + 0.5);
-                const double r = std::hypot(p.x, p.y);
-                const double theta = std::atan2(p.y, p.x);
-                // Out from 1.5 m, fading over 10 m; thicker further
-                // out.
-                const double radial =
-                    std::clamp((r - 1.5) / 2.0, 0.0, 1.0) *
-                    std::exp(-r / 10.0);
-                const double vertical =
-                    std::exp(-p.z / (0.2 + 0.05 * r));
-                // Streaks along the rays, and billows.
-                const double streaks =
-                    0.5 +
-                    0.5 * noise.Fbm({6.0 * std::cos(theta),
-                                     6.0 * std::sin(theta), 0.15 * r},
-                                    3);
-                const double billows =
-                    0.5 + 0.5 * noise.Fbm(0.6 * p + 17.0, 4);
-                const double value =
-                    radial * vertical *
-                    std::clamp(2.5 * streaks - 1.0, 0.0, 1.0) *
-                    (0.5 + billows);
-                density[(static_cast<std::size_t>(i) * shape.y + j) *
-                            shape.z +
-                        k] =
-                    value > 1e-3 ? static_cast<float>(value) : 0.0f;
-            }
-        }
-    }
-    return DenseNanoVdbGrid(density, shape, kVoxel,
-                            low + 0.5 * kVoxel, "density");
+constexpr std::uint32_t kNx = 192;
+constexpr std::uint32_t kNy = 192;
+constexpr std::uint32_t kNz = 24;
+constexpr double kVoxel = 0.25;
+const Path kDust("/World/Dust");
+
+/// The dust's density `time` seconds in, as the Python twin's Warp
+/// kernel: over a 48 m square, 6 m deep, in 0.25 m voxels, a sheet
+/// streaming out from under the engine at 8 m/s, streaked along its
+/// rays and billowing (GradientNoise's fBm, its permutation `perm`),
+/// thinning with height and distance.
+constexpr const char* kDustSlang = R"(
+static const int kNx = 192;
+static const int kNy = 192;
+static const int kNz = 24;
+
+struct Push {
+    float* out;
+    uint* perm;
+    float time;
 }
+[[vk::push_constant]] ConstantBuffer<Push> push;
+
+float fade(float t) {
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+float gradient(uint hash, float x, float y, float z) {
+    let h = hash & 15u;
+    let u = h < 8u ? x : y;
+    let v = h < 4u ? y : (h == 12u || h == 14u ? x : z);
+    return ((h & 1u) == 0u ? u : -u) + ((h & 2u) == 0u ? v : -v);
+}
+
+float mix(float t, float a, float b) {
+    return a + t * (b - a);
+}
+
+// Perlin's improved noise, as GradientNoise's.
+float noise(float3 p) {
+    let fl = floor(p);
+    let x = uint(int(fl.x) & 255);
+    let y = uint(int(fl.y) & 255);
+    let z = uint(int(fl.z) & 255);
+    let f = p - fl;
+    let u = fade(f.x);
+    let v = fade(f.y);
+    let w = fade(f.z);
+    let a = push.perm[x] + y;
+    let aa = push.perm[a] + z;
+    let ab = push.perm[a + 1] + z;
+    let b = push.perm[x + 1] + y;
+    let ba = push.perm[b] + z;
+    let bb = push.perm[b + 1] + z;
+    return mix(w,
+               mix(v,
+                   mix(u, gradient(push.perm[aa], f.x, f.y, f.z),
+                       gradient(push.perm[ba], f.x - 1.0, f.y, f.z)),
+                   mix(u, gradient(push.perm[ab], f.x, f.y - 1.0, f.z),
+                       gradient(push.perm[bb], f.x - 1.0, f.y - 1.0, f.z))),
+               mix(v,
+                   mix(u, gradient(push.perm[aa + 1], f.x, f.y, f.z - 1.0),
+                       gradient(push.perm[ba + 1], f.x - 1.0, f.y, f.z - 1.0)),
+                   mix(u, gradient(push.perm[ab + 1], f.x, f.y - 1.0, f.z - 1.0),
+                       gradient(push.perm[bb + 1], f.x - 1.0, f.y - 1.0, f.z - 1.0))));
+}
+
+// Fractional Brownian motion, as GradientNoise::Fbm's.
+float fbm(float3 p, int octaves) {
+    float sum = 0.0;
+    float total = 0.0;
+    float amplitude = 1.0;
+    float frequency = 1.0;
+    for (int o = 0; o < octaves; ++o) {
+        sum += amplitude * noise(p * frequency);
+        total += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    return sum / total;
+}
+
+// The dust at each cell, z fastest.
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void dust(uint3 id: SV_DispatchThreadID) {
+    if (id.x >= uint(kNx * kNy * kNz)) {
+        return;
+    }
+    let i = int(id.x) / (kNy * kNz);
+    let j = (int(id.x) / kNz) % kNy;
+    let k = int(id.x) % kNz;
+    let px = -24.0 + 0.25 * (float(i) + 0.5);
+    let py = -24.0 + 0.25 * (float(j) + 0.5);
+    let pz = 0.25 * (float(k) + 0.5);
+    let r = sqrt(px * px + py * py);
+    let c = r > 0.0 ? px / r : 1.0;
+    let s = r > 0.0 ? py / r : 0.0;
+    // Out from 1.5 m, fading over 10 m; thicker further out.
+    let radial = clamp((r - 1.5) / 2.0, 0.0, 1.0) * exp(-r / 10.0);
+    let vertical = exp(-pz / (0.2 + 0.05 * r));
+    // Streaks along the rays, and billows, streaming out.
+    let travelled = 8.0 * push.time;
+    let streaks = 0.5 + 0.5 * fbm(float3(6.0 * c, 6.0 * s, 0.15 * (r - travelled)), 3);
+    let billows =
+        0.5 + 0.5 * fbm(float3(0.6 * (px - travelled * c) + 17.0, 0.6 * (py - travelled * s) + 17.0,
+                               0.6 * pz + 17.0), 4);
+    let value = radial * vertical * clamp(2.5 * streaks - 1.0, 0.0, 1.0) * (0.5 + billows);
+    push.out[id.x] = value > 1e-3 ? value : 0.0;
+}
+)";
+
+/// The dust's shader on one renderer's device, which its writer runs.
+class DustShader {
+  public:
+    explicit DustShader(const VulkanContext& context)
+        : layout_(context, {}, sizeof(Push)),
+          permutation_(context, 512 * sizeof(std::uint32_t),
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                       BufferMemory::Device) {
+        const ShaderCompiler compiler;
+        const std::array<ShaderModuleSource, 1> modules{
+            {{"dust", kDustSlang}}};
+        pipeline_ = std::make_unique<ComputePipeline>(
+            context, layout_, compiler.CompileSpirv(modules, "dust"));
+        const auto& table = GradientNoise(11).Permutation();
+        const std::vector<std::uint32_t> words(table.begin(),
+                                               table.end());
+        permutation_.Write(std::as_bytes(std::span(words)));
+    }
+
+    /// Records the dust at `time` into `target`.
+    void Write(VkCommandBuffer commands,
+               const FieldWriteTarget& target, double time) const {
+        const Push push{target.values, permutation_.Address(),
+                        static_cast<float>(time)};
+        layout_.PushConstants(commands, &push, sizeof(push));
+        pipeline_->Dispatch(commands,
+                            std::span<const DescriptorResource>(),
+                            (kNx * kNy * kNz + 63) / 64);
+    }
+
+  private:
+    struct Push {
+        VkDeviceAddress out;
+        VkDeviceAddress perm;
+        float time;
+    };
+
+    PipelineLayout layout_;
+    std::unique_ptr<ComputePipeline> pipeline_;
+    GpuBuffer permutation_;
+};
 
 class LunarDustDemo : public app::Demo {
   public:
     LunarDustDemo(app::Viewer* viewer,
                   const app::DemoOptions& options)
         : Demo(viewer, options) {
-        numFrames = 1;
+        numFrames = 12;
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
         GroundPlane::Define(scene, "/World/Ground")
@@ -137,16 +251,17 @@ class LunarDustDemo : public app::Demo {
         Material::Define(scene, "/World/Looks/Metal")
             .SetAlbedo(glm::dvec3(0.3));
 
-        // The dust, built here: grains that scatter about half the
-        // light, mostly back towards the sun, as regolith does
+        // The dust, written on the GPU each frame, its first cell at
+        // (-23.875, -23.875, 0.125) m: grains that scatter about half
+        // the light, mostly back towards the sun, as regolith does
         // (Hapke's double Henyey-Greenstein lobes).
-        const std::vector<std::uint8_t> dust = MakeDust();
-        Volume::Define(scene, "/World/Dust")
-            .SetField("density", "/World/Dust/Density")
+        Volume::Define(scene, kDust)
+            .SetField("density", kDust.Child("Density"))
             .SetMaterialBinding("/World/Looks/Dust");
-        NanoVDBField::Define(scene, "/World/Dust/Density")
-            .SetBuffer(Tensor::Copy<std::uint8_t>(
-                dust, {static_cast<std::int64_t>(dust.size())}));
+        DenseField::Define(scene, kDust.Child("Density"))
+            .SetVoxelSize(kVoxel);
+        SetXform(scene, kDust.Child("Density"),
+                 {.translate = glm::dvec3(-23.875, -23.875, 0.125)});
         Material::Define(scene, "/World/Looks/Dust")
             .SetDensity(kDensity)
             .SetVolumeAlbedo(glm::dvec3(0.55))
@@ -174,14 +289,32 @@ class LunarDustDemo : public app::Demo {
             .SetResolution({480, 320})
             .SetAmbient(0.0);
 
+        Write(GetRenderer().Delegate(), GetRenderer().Context());
         Widgets().Slider("Dust density (1/m)", 0.0, 2.0, kDensity,
                          [this](double density) {
                              Material(GetScene(), "/World/Looks/Dust")
                                  .SetDensity(density);
                          });
         if (viewer != nullptr) {
+            Write(viewer->Delegate(), viewer->Context());
             viewer->SetActiveCamera("/World/Camera");
         }
+    }
+
+    void Step() override {
+        time_ += frameDt;
+    }
+
+    /// Stops the writers and waits for the frames that use the
+    /// shaders before they go.
+    void Close() override {
+        for (const Written& written : written_) {
+            written.delegate->SetFieldWriter(
+                kDust.Child("Density"), {kNx, kNy, kNz}, nullptr);
+            written.context->WaitIdle();
+        }
+        written_.clear();
+        shaders_.clear();
     }
 
     void SaveOutput(const std::filesystem::path& path) override {
@@ -219,10 +352,33 @@ class LunarDustDemo : public app::Demo {
 
   private:
     static constexpr double kDensity = 0.3;
+
+    void Write(RenderDelegate& delegate,
+               const VulkanContext& context) {
+        shaders_.push_back(std::make_unique<DustShader>(context));
+        const DustShader* shader = shaders_.back().get();
+        written_.push_back({&delegate, &context});
+        delegate.SetFieldWriter(
+            kDust.Child("Density"), {kNx, kNy, kNz},
+            [this, shader](VkCommandBuffer commands,
+                           const FieldWriteTarget& target) {
+                shader->Write(commands, target, time_);
+            });
+    }
+
+    double time_ = 0.0;
+    std::vector<std::unique_ptr<DustShader>> shaders_;
+    /// The delegates writing the dust, and their devices.
+    struct Written {
+        RenderDelegate* delegate;
+        const VulkanContext* context;
+    };
+    std::vector<Written> written_;
 };
 
 }  // namespace
 
 ERNIE_REGISTER_DEMO(
     LunarDustDemo, "volumes", "lunar_dust",
-    "A lander's exhaust blowing a sheet of lunar dust in a low sun.");
+    "A lander's exhaust blowing a sheet of lunar dust in a low sun, "
+    "streaming out, written on the GPU each frame.");
