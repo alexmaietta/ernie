@@ -40,7 +40,11 @@ struct MotionConstants {
 
 static const uint kBackground = 0xFFFFFFFF;
 
-[[vk::binding(0, 0)]] [[vk::image_format("r32f")]] RWTexture2DArray<float> radiance;
+// The raster radiance in its format (`RasterRenderer::MotionPipeline`), the sum always 32-bit.
+#ifndef ERNIE_RADIANCE_FORMAT
+#define ERNIE_RADIANCE_FORMAT "r32f"
+#endif
+[[vk::binding(0, 0)]] [[vk::image_format(ERNIE_RADIANCE_FORMAT)]] RWTexture2DArray<float> radiance;
 [[vk::binding(1, 0)]] [[vk::image_format("r32f")]] RWTexture2DArray<float> sum;
 [[vk::binding(2, 0)]] Texture2DArray<uint4> ids;
 // The coverage is z of `RenderTargets::Raster`, whose xy are left as they are.

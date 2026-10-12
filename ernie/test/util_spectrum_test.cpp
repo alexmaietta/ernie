@@ -136,6 +136,59 @@ TEST(Spectrum, SigmoidUpsamplingRoundTripsColoursAndKeepsGreysFlat) {
         << "red reflects long wavelengths";
 }
 
+TEST(Spectrum, ColourWeightsKeepColoursAtFewBands) {
+    // Colours sampled at the band centres, as shaders sample them,
+    // and turned back into linear sRGB by the weights, over the
+    // equal-energy white's luminance.
+    for (const int count : {3, 16}) {
+        const SpectralBands bands{380.0, 780.0, count};
+        const std::vector<glm::dvec3> weights =
+            ernie::ColourWeights(bands);
+        glm::dvec3 white(0.0);
+        for (const glm::dvec3& weight : weights) {
+            white += weight;
+        }
+        const double tolerance = count == 3 ? 0.1 : 0.01;
+        for (const glm::dvec3 rgb :
+             {glm::dvec3(0.1, 0.5, 0.2), glm::dvec3(0.8, 0.2, 0.1),
+              glm::dvec3(0.2, 0.3, 0.7), glm::dvec3(0.8, 0.3, 0.5),
+              glm::dvec3(0.9, 0.9, 0.3), glm::dvec3(0.5, 0.5, 0.5)}) {
+            const ernie::SigmoidSpectrum sigmoid =
+                ernie::RgbToSigmoid(rgb);
+            glm::dvec3 xyz(0.0);
+            for (int i = 0; i < count; ++i) {
+                xyz += sigmoid(bands.Centre(i)) *
+                       weights[static_cast<std::size_t>(i)];
+            }
+            const glm::dvec3 back =
+                ernie::EqualEnergyXyzToLinearSrgb(xyz / white.y);
+            EXPECT_NEAR(back.r, rgb.r, tolerance)
+                << count << " bands: " << rgb.r << " " << rgb.g << " "
+                << rgb.b << " came back " << back.r << " " << back.g
+                << " " << back.b;
+            EXPECT_NEAR(back.g, rgb.g, tolerance);
+            EXPECT_NEAR(back.b, rgb.b, tolerance);
+        }
+    }
+
+    // RGB mode's bands are blue, green and red themselves: each
+    // band's weight is its channel alone, and white stays white.
+    const std::vector<glm::dvec3> rgb =
+        ernie::ColourWeights(SpectralBands::Rgb());
+    ASSERT_EQ(rgb.size(), 3u);
+    const glm::dvec3 white =
+        ernie::EqualEnergyXyzToLinearSrgb(rgb[0] + rgb[1] + rgb[2]);
+    for (int band = 0; band < 3; ++band) {
+        const glm::dvec3 channel = ernie::EqualEnergyXyzToLinearSrgb(
+            rgb[static_cast<std::size_t>(band)]);
+        for (int c = 0; c < 3; ++c) {
+            EXPECT_NEAR(channel[c] / white[c],
+                        c == 2 - band ? 1.0 : 0.0, 1e-9)
+                << "band " << band << " channel " << c;
+        }
+    }
+}
+
 TEST(Spectrum, CieDaylightHasTheDaylightLocusChromaticities) {
     // Integrated against the observer, D65 lands on its white point
     // and D50 on its own.

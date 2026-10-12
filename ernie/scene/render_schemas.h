@@ -62,7 +62,15 @@
                                           ::ernie::tokens::kDiffuseGlossyEmission}}))              \
     X(glm::dvec3, MinimalConstantColor, ::ernie::tokens::kMinimalConstantColor, glm::dvec3(1.0),   \
       (::ernie::AttributeMeta{.label = "Constant colour", .doc = "Linear RGB of constantDiffuse.", \
-                              .group = "Minimal", .color = true}))
+                              .group = "Minimal", .color = true}))                                 \
+    X(std::string, SpectralPrecision, ::ernie::tokens::kSpectralPrecision,                         \
+      ::ernie::tokens::kFloat32,                                                                   \
+      (::ernie::AttributeMeta{.label = "Spectral precision",                                       \
+                              .doc = "Each band's radiance between shading and the sensor: "      \
+                                     "float32, or float16 for half the memory and traffic.",      \
+                              .group = "Image",                                                    \
+                              .options = {::ernie::tokens::kFloat32,                               \
+                                          ::ernie::tokens::kFloat16}}))
 
 #define ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)                                                        \
     X(std::vector<::ernie::Path>, Products, ::ernie::tokens::kProducts,                            \

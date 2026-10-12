@@ -744,6 +744,9 @@ struct FrameParams {
     /// (linear RGB).
     MinimalMode minimal = MinimalMode::Off;
     glm::vec3 minimalColor{1.0f};
+    /// Whether each band's radiance is kept as 16-bit floats between
+    /// shading and the sensor (`tokens::kSpectralPrecision`).
+    bool halfRadiance = false;
     glm::vec3 clearColor{0.0f};  ///< Linear display colour of the
                                  ///< background in LdrColor.
     /// The frame number temporal noise derives from (`FrameSeed`):

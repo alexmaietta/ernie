@@ -107,7 +107,8 @@ struct ShadingUniforms {
     /// polarization.
     float atmosphere[2][4];
     /// The scene's ambient light's colour, linear RGB over its
-    /// luminance (its luminance is `sun[3]`'s); w unused.
+    /// luminance (its luminance is `sun[3]`'s); w the scale the
+    /// raster radiance is stored at (`radianceScale_`).
     float ambient[4];
     /// Celestial bodies (km): each centre relative to the frame's
     /// origin and radius, 0 for none; and its normal albedo, linear
@@ -830,9 +831,23 @@ constexpr std::uint32_t kShadeAir = 1;
 constexpr std::uint32_t kShadePolarization = 2;
 constexpr std::uint32_t kShadeLasers = 4;
 constexpr std::uint32_t kShadeLightsShift = 8;
+/// The raster radiance as 16-bit floats
+/// (`FrameParams::halfRadiance`): its storage image's declared
+/// format.
+constexpr std::uint32_t kShadeHalfRadiance = 1u << 16;
+/// RGB mode's bands (`SpectralBands::rgb`): colours carried as linear
+/// sRGB channels rather than sampled from their sigmoid spectra.
+constexpr std::uint32_t kShadeRgb = 1u << 17;
 constexpr std::uint32_t kFullShading =
     kShadeAir | kShadePolarization | kShadeLasers |
     (16u << kShadeLightsShift);
+
+/// The format shaders declare the raster radiance's storage image
+/// with, as a Slang definition: `half` for 16-bit floats.
+std::string RadianceFormatSource(bool half) {
+    return std::string("#define ERNIE_RADIANCE_FORMAT \"") +
+           (half ? "r16f" : "r32f") + "\"\n";
+}
 
 /// `variant`'s constants for shading.slang, ahead of its source.
 std::string ShadingVariantSource(std::uint32_t variant) {
@@ -845,16 +860,22 @@ std::string ShadingVariantSource(std::uint32_t variant) {
            flag(kShadePolarization) +
            ";\nstatic const bool kShadeLasers = " +
            flag(kShadeLasers) +
+           ";\nstatic const bool kShadeRgb = " + flag(kShadeRgb) +
            ";\nstatic const uint kShadeLights = " +
-           std::to_string(variant >> kShadeLightsShift) + ";\n";
+           std::to_string((variant >> kShadeLightsShift) & 0xFFu) +
+           ";\n" +
+           RadianceFormatSource((variant & kShadeHalfRadiance) != 0);
 }
 
 /// The leanest shading variant `params` needs, with polarization when
-/// its frame measures Stokes vectors (`stokes`): lights in powers of
-/// two from 2 up to shading.slang's 16.
-std::uint32_t ShadingVariantOf(const FrameParams& params,
-                               bool stokes) {
-    std::uint32_t variant = 0;
+/// its frame measures Stokes vectors (`stokes`) and 16-bit radiance
+/// with `half`: lights in powers of two from 2 up to shading.slang's
+/// 16.
+std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
+                               bool half) {
+    std::uint32_t variant =
+        (half ? kShadeHalfRadiance : 0u) |
+        (params.camera.bands.rgb ? kShadeRgb : 0u);
     if (params.atmosphere || !params.bodies.empty()) {
         variant |= kShadeAir;
     }
@@ -1709,11 +1730,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     pyramidPipeline_ = std::make_unique<ComputePipeline>(
         context_, hzbLayout_,
         compiler_.CompileSpirv(pyramidModules, "pyramidMain"));
-    const std::vector<ShaderModuleSource> motionModules{
-        {"motion", shaders::kMotionSlang}};
-    motionPipeline_ = std::make_unique<ComputePipeline>(
-        context_, motionLayout_,
-        compiler_.CompileSpirv(motionModules, "motionMain"));
+    MotionPipeline();
     hzbPipeline_ = std::make_unique<ComputePipeline>(
         context_, hzbLayout_,
         compiler_.CompileSpirv(hzbModules, "hzbMain"));
@@ -3949,7 +3966,39 @@ void RasterRenderer::Update(
     orthographic_ = params.camera.orthographic;
     pushbroom_ = params.camera.pushbroom;
     WriteMaterialTable();
-    shadingVariant_ = ShadingVariantOf(params, stokes_);
+    // 16-bit radiance when asked for, but not yet with volumes, whose
+    // pass writes it as 32-bit floats.
+    const bool half = params.halfRadiance && params.volumes.empty();
+    if (half != halfRadiance_) {
+        // The sky and motion blur pipelines declare its format: made
+        // anew for it, once no frame in flight uses them.
+        context_.WaitIdle();
+        halfRadiance_ = half;
+        skyPipelines_ = {};
+        MotionPipeline();
+    }
+    // 16-bit radiance is stored scaled to the exposure, a power of
+    // two near the display gain, so the radiance the image shows lies
+    // in their normal range (6e-5 to 65504) whatever the scene's
+    // units; 32-bit radiance as it is.
+    radianceScale_ = 1.0f;
+    if (halfRadiance_) {
+        const double gain = params.camera.LinearExposureScale() *
+                            static_cast<double>(params.exposure) *
+                            kLuminousEfficacy * LuminanceIntegral();
+        if (gain > 0.0 && std::isfinite(gain)) {
+            radianceScale_ = std::exp2(std::clamp(
+                std::round(std::log2(gain)), -100.0, 100.0));
+        }
+    }
+    if (params.camera.bands.rgb != rgbBands_) {
+        // The sky's colours follow RGB mode too.
+        context_.WaitIdle();
+        rgbBands_ = params.camera.bands.rgb;
+        skyPipelines_ = {};
+    }
+    shadingVariant_ =
+        ShadingVariantOf(params, stokes_, halfRadiance_);
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
     }
@@ -4115,10 +4164,24 @@ void RasterRenderer::SkyPipeline(bool pushbroom) {
         sky = std::make_unique<ComputePipeline>(
             context_, shadingLayout_,
             compiler_.CompileSpirv(
-                ShadingModules(brdfs_.Models().front(),
-                               lightPatterns_, pushbroom),
+                ShadingModules(
+                    brdfs_.Models().front(), lightPatterns_,
+                    pushbroom,
+                    kFullShading |
+                        (halfRadiance_ ? kShadeHalfRadiance : 0u) |
+                        (rgbBands_ ? kShadeRgb : 0u)),
                 "skyMain"));
     }
+}
+
+void RasterRenderer::MotionPipeline() {
+    // Its radiance's storage format the raster radiance's.
+    const std::vector<ShaderModuleSource> modules{
+        {"motion", RadianceFormatSource(halfRadiance_) +
+                       std::string(shaders::kMotionSlang)}};
+    motionPipeline_ = std::make_unique<ComputePipeline>(
+        context_, motionLayout_,
+        compiler_.CompileSpirv(modules, "motionMain"));
 }
 
 void RasterRenderer::WriteMaterialTable() {
@@ -4236,6 +4299,7 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     shading.ambient[0] = ambientColour.r;
     shading.ambient[1] = ambientColour.g;
     shading.ambient[2] = ambientColour.b;
+    shading.ambient[3] = radianceScale_;
     shading.range[0] = static_cast<float>(bands_.minNm);
     shading.range[1] = static_cast<float>(bands_.Width());
     shading.range[2] = static_cast<float>(bands_.count);
@@ -4523,7 +4587,7 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
     sensor.optics[2] = static_cast<float>(camera.focalLengthMm);
     sensor.optics[3] = static_cast<float>(camera.focusDistance);
     sensor.noise[3] = static_cast<std::uint32_t>(params.frame);
-    const std::vector<glm::dvec3> weights = CieWeights(bands_);
+    const std::vector<glm::dvec3> weights = ColourWeights(bands_);
     std::vector<glm::dvec3> colours;
     for (int i = 0; i < bands_.count; ++i) {
         colours.push_back(EqualEnergyXyzToLinearSrgb(
@@ -4559,7 +4623,8 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
             colours[static_cast<std::size_t>(i)] =
                 glm::dvec3(own(0, i));
         }
-    } else if (model.channels.size() == 3) {
+    } else if (model.channels.size() == 3 && !bands_.rgb) {
+        // (RGB mode's bands are the eye's colour already.)
         double eye = 0.0;
         double channels = 0.0;
         for (int i = 0; i < bands_.count; ++i) {
@@ -4587,6 +4652,18 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
             camera.ElectronsPerRadiance(c);
         for (int i = 0; i < bands_.count; ++i) {
             sensor.qe[i][c] = factors[static_cast<std::size_t>(i)];
+        }
+        // RGB mode's bands carry red, green and blue themselves: a
+        // colour sensor's channel collects its own band alone, as
+        // much as it does a flat spectrum, rather than its response
+        // over the other channels' wavelengths, which would mix them.
+        if (bands_.rgb && model.channels.size() == 3) {
+            float flat = 0.0f;
+            for (int i = 0; i < bands_.count; ++i) {
+                flat += factors[static_cast<std::size_t>(i)];
+                sensor.qe[i][c] = 0.0f;
+            }
+            sensor.qe[2 - c][c] = flat;
         }
     }
     // A cube camera's faces: where their image planes land in the
@@ -5313,6 +5390,7 @@ void RasterRenderer::RecordViews(
     }
     // A polarizer's sensor reads the radiance's Stokes planes.
     targets.SetStokes(stokes_);
+    targets.SetHalfRadiance(halfRadiance_);
     if (targets.Faces() != faces_) {
         throw std::invalid_argument(
             "Render targets need " + std::to_string(faces_) +
@@ -6775,7 +6853,7 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
              linear != nullptr
                  ? linear->written >> RenderTargets::LinearVars::kVars
                  : 0u,
-             0u},
+             std::bit_cast<std::uint32_t>(1.0f / radianceScale_)},
             pass.params->Address(),
             normalSlot,
             depthSlot,

@@ -104,7 +104,7 @@ struct ShadingUniforms {
     // unused, w the sky's greatest degree of linear polarization (`skyPolarization`).
     float4 atmosphere[2];
     // xyz: the scene's ambient light's colour, linear RGB over its luminance (`sun.w` its
-    // radiance); w unused.
+    // radiance); w the scale the raster radiance is stored at (`radianceScale`).
     float4 ambient;
     // Celestial bodies, in km: xyz each centre relative to the frame's origin, w its radius (0 for
     // none); and rgb its normal albedo. They fill the views' stride in the buffer, 1280 bytes.
@@ -293,7 +293,12 @@ struct ShadingResources {
 [[vk::binding(2, 0)]] Texture2DArray<float4> gAlbedo;
 [[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
 [[vk::binding(4, 0)]] Texture2DArray<float> gDepth;
-[[vk::image_format("r32f")]] [[vk::binding(8, 0)]] RWTexture2DArray<float> spectral;
+// The raster radiance, as 32-bit or 16-bit floats (`ERNIE_RADIANCE_FORMAT`, from the variant's
+// constants: `ernie:spectral:precision`).
+#ifndef ERNIE_RADIANCE_FORMAT
+#define ERNIE_RADIANCE_FORMAT "r32f"
+#endif
+[[vk::image_format(ERNIE_RADIANCE_FORMAT)]] [[vk::binding(8, 0)]] RWTexture2DArray<float> spectral;
 
 // The resources under the names the pass reads them by: buffers as arrays, textures as the
 // heap's (float4; one-channel ones read as `.x`).
@@ -350,6 +355,12 @@ static uint shadedView;
 #define sh shadingViews[0]
 #define shv (resources.viewBlocks[shadedView])
 
+// The scale `spectral` stores radiance at: for 16-bit floats a power of two near the exposure's
+// display gain, which keeps the image's radiance in their normal range; 1 for 32-bit floats.
+float radianceScale() {
+    return sh.ambient.w;
+}
+
 float bandValue(float4 values[16], uint band) {
     return values[band / 4][band % 4];
 }
@@ -372,16 +383,25 @@ float tintedBand(uint k, uint band) {
 
 // The modulation colour as a spectrum value at `wavelength`: its largest component times the
 // sigmoid spectrum of the colour divided by it (Jakob and Hanika 2019), which reproduces the colour
-// for any brightness, including modulations above 1.
+// for any brightness, including modulations above 1. In RGB mode (`kShadeRgb`) the coefficients
+// are the colour itself, and each band takes its channel: blue, green, red by rising wavelength.
 float modulationAt(float3 coefficients, float scale, float wavelength) {
+    if (kShadeRgb) {
+        let band = clamp(int((wavelength - sh.range.x) / sh.range.y), 0, 2);
+        return scale * coefficients[2 - band];
+    }
     let t = (wavelength - 360.0) / (830.0 - 360.0);
     let x = (coefficients.x * t + coefficients.y) * t + coefficients.z;
     return scale * (0.5 + x / (2.0 * sqrt(1.0 + x * x)));
 }
 
 // Sigmoid spectrum coefficients (Jakob and Hanika 2019) of a linear RGB colour whose largest
-// component is 1, interpolated from the coefficient table.
+// component is 1, interpolated from the coefficient table; in RGB mode the colour itself
+// (`modulationAt`).
 float3 sigmoidCoefficients(float3 colour) {
+    if (kShadeRgb) {
+        return colour;
+    }
     let resolution = float(sh.size.z);
     let uv = (colour.xy * (resolution - 1.0) + 0.5) / resolution;
     let layer = colour.z * (resolution - 1.0);
@@ -2542,16 +2562,17 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let layer = id.z * bands + band;
             let transmittance = kShadeAir ? aerialTransmittance[band] : 1.0;
             let scattered = kShadeAir ? aerialScattered[band] : 0.0;
-            spectral[int3(id.xy, layer)] = radiance[k] * transmittance + scattered;
+            let scale = radianceScale();
+            spectral[int3(id.xy, layer)] = (radiance[k] * transmittance + scattered) * scale;
             if (stokes != 0) {
                 if (band / 4 != airGroup) {
                     airGroup = band / 4;
                     skyPolarization(airGroup, -v, frameX, frameY, airQ, airU);
                 }
                 spectral[int3(id.xy, stokes + layer)] =
-                    q[k] * transmittance + scattered * airQ[band % 4];
+                    (q[k] * transmittance + scattered * airQ[band % 4]) * scale;
                 spectral[int3(id.xy, 2 * stokes + layer)] =
-                    u[k] * transmittance + scattered * airU[band % 4];
+                    (u[k] * transmittance + scattered * airU[band % 4]) * scale;
             }
         }
     }
@@ -2755,8 +2776,9 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     let bands = uint(sh.range.z);
     float radiance[kMaxBands];
     for (uint band = 0; band < kMaxBands; ++band) {
-        radiance[band] =
-            part == kSkyPartDome || band >= bands ? 0.0 : spectral[int3(id.xy, id.z * bands + band)];
+        radiance[band] = part == kSkyPartDome || band >= bands
+                             ? 0.0
+                             : spectral[int3(id.xy, id.z * bands + band)] / radianceScale();
         // Only the atmosphere's part scatters light into the pixel (`writeSky`).
         skyScattered[band] = 0.0;
     }
@@ -2902,10 +2924,11 @@ void writeSky(uint3 id, float radiance[kMaxBands], float2 ndc, float3 d) {
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
             let band = group * 4 + k;
             let layer = id.z * bands + band;
-            spectral[int3(id.xy, layer)] = radiance[band];
+            let scale = radianceScale();
+            spectral[int3(id.xy, layer)] = radiance[band] * scale;
             if (stokes != 0) {
-                spectral[int3(id.xy, stokes + layer)] = skyScattered[band] * q[k];
-                spectral[int3(id.xy, 2 * stokes + layer)] = skyScattered[band] * u[k];
+                spectral[int3(id.xy, stokes + layer)] = skyScattered[band] * q[k] * scale;
+                spectral[int3(id.xy, 2 * stokes + layer)] = skyScattered[band] * u[k] * scale;
             }
         }
     }

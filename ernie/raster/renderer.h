@@ -773,6 +773,9 @@ class RasterRenderer {
     /// Compiles the sky pass for a frame camera, or a pushbroom,
     /// unless it has.
     void SkyPipeline(bool pushbroom);
+    /// The motion blur pass's pipeline, its radiance declared in the
+    /// raster radiance's format (`halfRadiance_`).
+    void MotionPipeline();
     /// Compiles `plan`'s fused sensor kernels, one per segment,
     /// unless already compiled.
     void SensorPipelines(const SensorPlan& plan);
@@ -999,6 +1002,15 @@ class RasterRenderer {
     /// the raster radiance's linear Stokes Q and U
     /// (`RenderTargets::SetStokes`).
     bool stokes_ = false;
+    /// Whether the raster radiance holds 16-bit floats
+    /// (`FrameParams::halfRadiance`, not with volumes).
+    bool halfRadiance_ = false;
+    /// The scale the raster radiance is stored at: a power of two
+    /// near the display gain for 16-bit floats, else 1.
+    float radianceScale_ = 1.0f;
+    /// Whether the frame's bands are RGB mode's
+    /// (`SpectralBands::rgb`), which the sky's pipelines follow.
+    bool rgbBands_ = false;
     /// Whether `lightTable_` holds a copy of the lights per
     /// sub-frame, each posed at its time (`LightParams::previous`),
     /// which its views read (`ShadingUniforms::view`).

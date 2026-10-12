@@ -168,14 +168,19 @@ double ColorTemperature(const Light& light) {
                : 0.0;
 }
 
-/// `shape` averaged over each of `bands` (eight samples per band)
-/// times `scale`.
+/// `shape` averaged over each of `bands` (eight samples per band), or
+/// projected onto RGB mode's channels (`BandValue`), times `scale`.
 template <typename Shape>
 std::vector<float> BinShape(const Shape& shape,
                             const SpectralBands& bands,
                             double scale) {
     std::vector<float> values(static_cast<std::size_t>(bands.count));
     for (int i = 0; i < bands.count; ++i) {
+        if (bands.rgb) {
+            values[static_cast<std::size_t>(i)] = static_cast<float>(
+                scale * BandValue(bands, i, shape));
+            continue;
+        }
         double sum = 0.0;
         for (int k = 0; k < 8; ++k) {
             sum += shape(bands.Lower(i) +
@@ -915,9 +920,7 @@ void CheckBatchCameras(const Scene& scene,
         const CameraParams camera =
             CameraParamsOf(scene, path, width, height, any);
         const glm::mat4 other = camera.RasterView().projection;
-        bool same = camera.bands.count == first.bands.count &&
-                    camera.bands.minNm == first.bands.minNm &&
-                    camera.bands.maxNm == first.bands.maxNm;
+        bool same = camera.bands == first.bands;
         for (int c = 0; c < 4 && same; ++c) {
             for (int r = 0; r < 4 && same; ++r) {
                 same = std::abs(other[c][r] - projection[c][r]) <=
@@ -2795,6 +2798,15 @@ FrameParams FrameParamsOf(const Scene& scene,
     params.minimal = MinimalModeOf(scene, settings, MinimalMode::Off);
     params.minimalColor =
         glm::vec3(options.GetMinimalConstantColor());
+    const std::string precision = options.GetSpectralPrecision();
+    if (precision != tokens::kFloat32 &&
+        precision != tokens::kFloat16) {
+        throw std::invalid_argument(
+            "'" + std::string(tokens::kSpectralPrecision) + "' of '" +
+            settings.String() + "' is '" + precision +
+            "', not float32 or float16");
+    }
+    params.halfRadiance = precision == tokens::kFloat16;
     params.exposure = static_cast<float>(
         std::exp2(options.GetExposureCompensation()));
     params.meter = options.GetMeter();

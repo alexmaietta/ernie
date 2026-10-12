@@ -169,7 +169,8 @@ public struct SensorConstants {
     public uint4 table;
     // x: the layers from a raster radiance layer to its Stokes Q, and on to U, for a polarizer
     // (0 without them); y: the render vars written to linear buffers too (`linear`), a kHolds*
-    // bit each; z: the AOV slots so, a bit each; w unused.
+    // bit each; z: the AOV slots so, a bit each; w: the float bits of 1 over the scale the raster
+    // radiance is stored at (`rasterRadianceAt`).
     public uint4 stokes;
     // The custom filters' parameters, packed in chain order (`SensorPlan::params`), then a lens
     // of rays' table.
@@ -307,9 +308,10 @@ uint linearTexel(uint3 id, uint layer = 0, uint layers = 1) {
     return (((pass.view.x + id.z) * layers + layer) * size.y + id.y) * size.x + id.x;
 }
 
-// The raster radiance and the G-buffer ids, from the bindless heap.
+// The raster radiance and the G-buffer ids, from the bindless heap. The radiance is stored scaled,
+// 16-bit floats by a power of two that keeps them in their normal range (`stokes.w`).
 float rasterRadianceAt(int4 at) {
-    return heapTextureArrays[pass.radianceSlot].Load(at).x;
+    return heapTextureArrays[pass.radianceSlot].Load(at).x * asfloat(pass.stokes.w);
 }
 #define gIds (heapUintTextureArrays[pass.idsSlot])
 [[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;

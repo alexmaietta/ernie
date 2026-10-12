@@ -351,6 +351,14 @@ inline constexpr std::string_view kSpectralRange =
     "ernie:spectral:range";  ///< vec2 nm.
 inline constexpr std::string_view kSpectralBands =
     "ernie:spectral:bands";  ///< int, 1 to 64.
+/// token: "spectral" (the default), bands over `kSpectralRange` as
+/// `kSpectralBands` gives, or "rgb", three bands carrying linear sRGB
+/// blue, green and red (`SpectralBands::Rgb`), which keep colours as
+/// a 3-channel renderer does, faster than many bands.
+inline constexpr std::string_view kSpectralMode =
+    "ernie:spectral:mode";
+inline constexpr std::string_view kSpectral = "spectral";
+inline constexpr std::string_view kRgb = "rgb";
 /// The lens's projection: "perspective" (the default) or "fisheye"
 /// (`LensProjection`).
 inline constexpr std::string_view kLensProjection =
@@ -1177,6 +1185,14 @@ inline constexpr std::string_view kDiffuseGlossyEmission =
 /// "constantDiffuse"'s colour, white by default.
 inline constexpr std::string_view kMinimalConstantColor =
     "ernie:minimal:constantColor";
+/// token, on RenderSettings: the precision the rasterizer keeps each
+/// band's radiance in between shading and the sensor, "float32" (the
+/// default) or "float16", which halves that memory and its traffic
+/// (a 16-bit float's 11 bits of mantissa, to 65504).
+inline constexpr std::string_view kSpectralPrecision =
+    "ernie:spectral:precision";
+inline constexpr std::string_view kFloat32 = "float32";
+inline constexpr std::string_view kFloat16 = "float16";
 /// token: how the rasterizer culls what lies outside a view: "off",
 /// "cpu" (whole draws) or "gpu" (whole draws, then every instance on
 /// the GPU; the default).

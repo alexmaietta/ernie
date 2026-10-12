@@ -33,6 +33,7 @@ std::uint32_t GpuImage::TexelBytes(VkFormat format) {
     case VK_FORMAT_R8_UNORM:
         return 1;
     case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R16_SFLOAT:
         return 2;
     case VK_FORMAT_R8G8B8A8_UNORM:
     case VK_FORMAT_R8G8B8A8_SRGB:

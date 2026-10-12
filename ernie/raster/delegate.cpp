@@ -374,14 +374,19 @@ std::string Describe(const Path& path, std::string_view what,
            error.what();
 }
 
-/// `shape` averaged over each of `bands` (eight samples per band)
-/// times `scale`.
+/// `shape` averaged over each of `bands` (eight samples per band), or
+/// projected onto RGB mode's channels (`BandValue`), times `scale`.
 template <typename Shape>
 std::vector<float> BinShape(const Shape& shape,
                             const SpectralBands& bands,
                             double scale) {
     std::vector<float> values(static_cast<std::size_t>(bands.count));
     for (int i = 0; i < bands.count; ++i) {
+        if (bands.rgb) {
+            values[static_cast<std::size_t>(i)] = static_cast<float>(
+                scale * BandValue(bands, i, shape));
+            continue;
+        }
         double sum = 0.0;
         for (int k = 0; k < 8; ++k) {
             sum += shape(bands.Lower(i) +

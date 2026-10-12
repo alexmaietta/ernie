@@ -31,6 +31,18 @@ struct SpectralBands {
     double minNm = 380.0;
     double maxNm = 780.0;
     int count = 16;
+    /// RGB mode (`Rgb`): the three bands carry linear sRGB blue,
+    /// green and red rather than averages over them, so colours come
+    /// through as a 3-channel renderer's do, where so few spectral
+    /// bands would shift them. Spectra project onto the channels
+    /// (`BandValue`).
+    bool rgb = false;
+
+    /// RGB mode's bands: 400-700 nm in three, centred on blue, green
+    /// and red, for what still reads wavelengths (the air, say).
+    static SpectralBands Rgb() {
+        return {400.0, 700.0, 3, true};
+    }
 
     double Width() const {
         return (maxNm - minNm) / count;
@@ -45,13 +57,20 @@ struct SpectralBands {
     }
 
     /// @throws std::invalid_argument unless 0 < minNm < maxNm and 1
-    /// <= count <= kMaxBands.
+    /// <= count <= kMaxBands, and 3 bands in RGB mode.
     void Check() const;
 
     static constexpr int kMaxBands = 64;
 
     bool operator==(const SpectralBands&) const = default;
 };
+
+/// Band `band`'s value of `spectrum`: its average over the band, or
+/// in RGB mode (`SpectralBands::rgb`) the band's linear sRGB channel
+/// of it relative to the equal-energy white's (a flat spectrum's
+/// value in every channel), at least 0.
+double BandValue(const SpectralBands& bands, int band,
+                 const std::function<double(double)>& spectrum);
 
 /// A spectrum tabulated at increasing wavelengths and linearly
 /// interpolated between them; constant beyond the first and last
@@ -149,6 +168,19 @@ glm::dvec3 CieXyz(double wavelengthNm);
 /// the band width, so that summing them times band values integrates
 /// a spectrum: XYZ = sum_i value_i * weights_i.
 std::vector<glm::dvec3> CieWeights(const SpectralBands& bands);
+
+/// The weights a renderer turns band values into CIE XYZ with:
+/// `CieWeights` for 16 bands or more; for fewer, weights fitted by
+/// least squares so that reflectances upsampled from linear sRGB
+/// (`RgbToSigmoid`) and sampled at the band centres, as shaders do,
+/// give the XYZ their whole spectra have under the equal-energy
+/// illuminant, greys exactly. Wide bands' own averages otherwise mix
+/// colours apart: with 3, green reads as yellow.
+///
+/// Reference: W. Jakob and J. Hanika, "A Low-Dimensional Function
+/// Space for Efficient Spectral Upsampling", Computer Graphics Forum
+/// 38(2):147-155, 2019 (the reflectances fitted over).
+std::vector<glm::dvec3> ColourWeights(const SpectralBands& bands);
 
 /// CIE XYZ of band values (sum of value times `CieWeights`), without
 /// the luminous efficacy.

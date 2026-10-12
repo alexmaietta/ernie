@@ -555,7 +555,17 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path,
     camera.lineOffsetMm = prim.GetPushbroomLineOffset();
 
     const glm::dvec2 range = prim.GetSpectralRange();
-    camera.bands = {range.x, range.y, prim.GetSpectralBands()};
+    const std::string mode = prim.GetSpectralMode();
+    if (mode != kSpectral && mode != kRgb) {
+        throw std::invalid_argument(
+            "Camera '" + path.String() + "' has " +
+            std::string(kSpectralMode) + " '" + mode +
+            "'; use spectral or rgb");
+    }
+    camera.bands = mode == kRgb
+                       ? SpectralBands::Rgb()
+                       : SpectralBands{range.x, range.y,
+                                       prim.GetSpectralBands()};
 
     LensModel& lens = camera.lens;
     // Missing coefficients are 0.

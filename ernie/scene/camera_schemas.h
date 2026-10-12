@@ -163,6 +163,12 @@
       (::ernie::AttributeMeta{.doc = "nm.",.group = "Sensor"}))                                    \
     X(int, SpectralBands, ::ernie::tokens::kSpectralBands, 16,                                     \
       (::ernie::AttributeMeta{.label = "Bands", .group = "Sensor", .min = 1.0, .max = 64.0}))      \
+    X(std::string, SpectralMode, ::ernie::tokens::kSpectralMode, ::ernie::tokens::kSpectral,       \
+      (::ernie::AttributeMeta{.label = "Spectral mode",                                            \
+                              .doc = "spectral: bands over the range; rgb: three bands of linear " \
+                                     "sRGB, colours as a 3-channel renderer keeps them, faster.",  \
+                              .group = "Sensor",                                                   \
+                              .options = {::ernie::tokens::kSpectral, ::ernie::tokens::kRgb}}))    \
     X(std::string, SensorType, ::ernie::tokens::kSensorType, "rgb",                                \
       (::ernie::AttributeMeta{.label = "Type", .group = "Sensor", .options = {"rgb", "mono"}}))    \
     X(bool, SensorNoise, ::ernie::tokens::kSensorNoise, true,                                      \

@@ -158,6 +158,14 @@ class RenderTargets : public FrameImages {
     bool Stokes() const {
         return stokes_;
     }
+
+    /// Whether the raster radiance holds 16-bit floats rather than
+    /// 32-bit (`FrameParams::halfRadiance`); changing it waits for
+    /// the device and makes the image anew.
+    void SetHalfRadiance(bool half);
+    bool HalfRadiance() const {
+        return halfRadiance_;
+    }
     /// The layers from a raster radiance layer to its Stokes Q, and
     /// on to U: one block of every raster layer's bands.
     std::uint32_t StokesOffset() const {
@@ -270,7 +278,8 @@ class RenderTargets : public FrameImages {
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
     std::unique_ptr<GpuImage> radianceSum_;
-    bool stokes_ = false;  ///< See `SetStokes`.
+    bool stokes_ = false;        ///< See `SetStokes`.
+    bool halfRadiance_ = false;  ///< See `SetHalfRadiance`.
     std::unique_ptr<GpuImage> raster_;
     std::unique_ptr<GpuImage> rasterPlaceholder_;
     std::unique_ptr<GpuImage> hzb_;

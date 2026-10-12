@@ -4,8 +4,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
+#include <mutex>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 namespace ernie {
 
@@ -24,9 +29,41 @@ double Lobe(double wavelength, double mean, double below,
 /// 1e-4 relative accuracy with bands up to 100 nm.
 constexpr int kSubSamples = 32;
 
+/// The equal-energy white's linear sRGB, which RGB mode's channels
+/// are relative to.
+glm::dvec3 RgbWhite() {
+    static const glm::dvec3 white = [] {
+        glm::dvec3 xyz(0.0);
+        for (double w = 380.5; w < 780.0; w += 1.0) {
+            xyz += CieXyz(w);
+        }
+        return EqualEnergyXyzToLinearSrgb(xyz);
+    }();
+    return white;
+}
+
+/// The linear sRGB channel RGB-mode band `band` carries of spectrum
+/// `f` (blue, green then red, by rising wavelength), relative to the
+/// equal-energy white's, so a flat spectrum is its value in every
+/// channel; at least 0, for lights more saturated than sRGB holds.
+template <typename Function> double RgbChannel(int band, Function f) {
+    glm::dvec3 xyz(0.0);
+    for (double w = 380.5; w < 780.0; w += 1.0) {
+        xyz += f(w) * CieXyz(w);
+    }
+    const glm::dvec3 rgb =
+        EqualEnergyXyzToLinearSrgb(xyz) / RgbWhite();
+    return std::max(rgb[2 - band], 0.0);
+}
+
 template <typename Function>
 auto BandAverage(const SpectralBands& bands, int band, Function f) {
     using Result = decltype(f(0.0));
+    if constexpr (std::is_same_v<Result, double>) {
+        if (bands.rgb) {
+            return RgbChannel(band, f);
+        }
+    }
     Result sum{};
     for (int k = 0; k < kSubSamples; ++k) {
         sum += f(bands.Lower(band) +
@@ -44,6 +81,14 @@ void SpectralBands::Check() const {
             "A spectral range needs 0 < min < max and 1 to " +
             std::to_string(kMaxBands) + " bands");
     }
+    if (rgb && count != 3) {
+        throw std::invalid_argument("RGB mode has 3 bands");
+    }
+}
+
+double BandValue(const SpectralBands& bands, int band,
+                 const std::function<double(double)>& spectrum) {
+    return BandAverage(bands, band, spectrum);
 }
 
 Spectrum::Spectrum(std::vector<double> wavelengthsNm,
@@ -127,7 +172,11 @@ std::vector<float> Spectrum::Bin(const SpectralBands& bands) const {
     std::vector<float> binned(static_cast<std::size_t>(bands.count));
     for (int i = 0; i < bands.count; ++i) {
         binned[static_cast<std::size_t>(i)] = static_cast<float>(
-            Average(bands.Lower(i), bands.Lower(i) + bands.Width()));
+            bands.rgb
+                ? RgbChannel(i,
+                             [this](double w) { return (*this)(w); })
+                : Average(bands.Lower(i),
+                          bands.Lower(i) + bands.Width()));
     }
     return binned;
 }
@@ -263,6 +312,118 @@ std::vector<glm::dvec3> CieWeights(const SpectralBands& bands) {
             BandAverage(bands, i, CieXyz) * bands.Width();
     }
     return weights;
+}
+
+std::vector<glm::dvec3> ColourWeights(const SpectralBands& bands) {
+    if (bands.rgb) {
+        // Each channel's XYZ, inverting the projection
+        // (`RgbChannel`): band values of 1 give the equal-energy
+        // white's.
+        const glm::dmat3 toRgb(
+            EqualEnergyXyzToLinearSrgb({1.0, 0.0, 0.0}),
+            EqualEnergyXyzToLinearSrgb({0.0, 1.0, 0.0}),
+            EqualEnergyXyzToLinearSrgb({0.0, 0.0, 1.0}));
+        const glm::dmat3 toXyz = glm::inverse(toRgb);
+        const glm::dvec3 white = RgbWhite();
+        std::vector<glm::dvec3> weights(3);
+        for (int band = 0; band < 3; ++band) {
+            glm::dvec3 channel(0.0);
+            channel[2 - band] = white[2 - band];
+            weights[static_cast<std::size_t>(band)] = toXyz * channel;
+        }
+        return weights;
+    }
+    constexpr int kFitBelow = 16;
+    if (bands.count >= kFitBelow) {
+        return CieWeights(bands);
+    }
+    // Fitted once per layout of bands: renderers ask every frame.
+    static std::mutex mutex;
+    static std::map<std::tuple<double, double, int>,
+                    std::vector<glm::dvec3>>
+        fitted;
+    const std::lock_guard lock(mutex);
+    const auto key =
+        std::tuple(bands.minNm, bands.maxNm, bands.count);
+    if (const auto it = fitted.find(key); it != fitted.end()) {
+        return it->second;
+    }
+    const auto n = static_cast<std::size_t>(bands.count);
+    // Normal equations of the least-squares fit: sum over colours of
+    // a a^T and of a XYZ^T, a the colour's band values as shaders
+    // sample them.
+    std::vector<double> normal(n * n, 0.0);
+    std::vector<glm::dvec3> right(n, glm::dvec3(0.0));
+    const auto add = [&](const SigmoidSpectrum& spectrum,
+                         double weight) {
+        std::vector<double> sampled(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            sampled[i] = spectrum(bands.Centre(static_cast<int>(i)));
+        }
+        // The whole spectrum's XYZ, integrated every nanometre.
+        glm::dvec3 xyz(0.0);
+        for (double w = bands.minNm + 0.5; w < bands.maxNm;
+             w += 1.0) {
+            xyz += spectrum(w) * CieXyz(w);
+        }
+        for (std::size_t i = 0; i < n; ++i) {
+            for (std::size_t j = 0; j < n; ++j) {
+                normal[i * n + j] += weight * sampled[i] * sampled[j];
+            }
+            right[i] += weight * sampled[i] * xyz;
+        }
+    };
+    // Colours of every hue and saturation at full brightness (the
+    // fit is linear, so darker ones follow), and white, weighted to
+    // hold greys.
+    constexpr int kSteps = 6;
+    for (int r = 0; r <= kSteps; ++r) {
+        for (int g = 0; g <= kSteps; ++g) {
+            for (int b = 0; b <= kSteps; ++b) {
+                const glm::dvec3 rgb =
+                    glm::dvec3(r, g, b) / static_cast<double>(kSteps);
+                const double top = std::max({rgb.r, rgb.g, rgb.b});
+                if (top < 1.0 ||
+                    top == std::min({rgb.r, rgb.g, rgb.b})) {
+                    continue;
+                }
+                add(RgbToSigmoid(rgb), 1.0);
+            }
+        }
+    }
+    add(SigmoidSpectrum{}, 1e3);
+    // Solved by Gaussian elimination with partial pivoting, for each
+    // of X, Y and Z at once.
+    for (std::size_t col = 0; col < n; ++col) {
+        std::size_t pivot = col;
+        for (std::size_t row = col + 1; row < n; ++row) {
+            if (std::abs(normal[row * n + col]) >
+                std::abs(normal[pivot * n + col])) {
+                pivot = row;
+            }
+        }
+        for (std::size_t k = 0; k < n; ++k) {
+            std::swap(normal[col * n + k], normal[pivot * n + k]);
+        }
+        std::swap(right[col], right[pivot]);
+        for (std::size_t row = col + 1; row < n; ++row) {
+            const double factor =
+                normal[row * n + col] / normal[col * n + col];
+            for (std::size_t k = col; k < n; ++k) {
+                normal[row * n + k] -= factor * normal[col * n + k];
+            }
+            right[row] -= factor * right[col];
+        }
+    }
+    std::vector<glm::dvec3> weights(n);
+    for (std::size_t col = n; col-- > 0;) {
+        glm::dvec3 sum = right[col];
+        for (std::size_t k = col + 1; k < n; ++k) {
+            sum -= normal[col * n + k] * weights[k];
+        }
+        weights[col] = sum / normal[col * n + col];
+    }
+    return fitted.emplace(key, std::move(weights)).first->second;
 }
 
 glm::dvec3 ToXyz(const SpectralBands& bands,

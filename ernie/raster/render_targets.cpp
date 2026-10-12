@@ -185,9 +185,25 @@ void RenderTargets::SetStokes(bool stokes) {
     const auto bandLayers = static_cast<std::uint32_t>(bands_);
     rasterRadiance_ = std::make_unique<GpuImage>(
         context_, ImageDesc{extent_.width, extent_.height, layers, 1,
-                            VK_FORMAT_R32_SFLOAT, kStorage, false,
-                            true, bandLayers});
+                            halfRadiance_ ? VK_FORMAT_R16_SFLOAT
+                                          : VK_FORMAT_R32_SFLOAT,
+                            kStorage, false, true, bandLayers});
     radianceSum_.reset();
+}
+
+void RenderTargets::SetHalfRadiance(bool half) {
+    if (half == halfRadiance_) {
+        return;
+    }
+    vkDeviceWaitIdle(context_.Device());
+    halfRadiance_ = half;
+    const auto bandLayers = static_cast<std::uint32_t>(bands_);
+    rasterRadiance_ = std::make_unique<GpuImage>(
+        context_,
+        ImageDesc{extent_.width, extent_.height,
+                  StokesOffset() * (stokes_ ? 3u : 1u), 1,
+                  half ? VK_FORMAT_R16_SFLOAT : VK_FORMAT_R32_SFLOAT,
+                  kStorage, false, true, bandLayers});
 }
 
 GpuImage& RenderTargets::Raster(bool full) {
