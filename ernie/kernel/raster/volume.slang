@@ -696,17 +696,18 @@ pnanovdb_readaccessor_t accessorOf(FieldGpu field) {
     return accessor;
 }
 
-// Planck's spectral radiance at wavelengths `lambda` (nm) and temperature `kelvin`, W m^-2 sr^-1
-// nm^-1.
-float4 planck(float4 lambda, float kelvin) {
-    // 2 h c^2 in W um^4 m^-2 sr^-1 and h c / k in um K.
-    static const float c1 = 1.191042972e8;
-    static const float c2 = 14387.76877;
-    let um = lambda * 1e-3;
-    let x = c2 / (um * max(kelvin, 1e-3));
-    let scale = c1 / (um * um * um * um * um) * 1e-3;
+// Planck's law: 2 h c^2 in W um^4 m^-2 sr^-1 and h c / k in um K.
+static const float kPlanckC1 = 1.191042972e8;
+static const float kPlanckC2 = 14387.76877;
+
+// Planck's spectral radiance from its parts at each wavelength: `scale` 2 h c^2 / lambda^5 (in W
+// m^-2 sr^-1 nm^-1, times what else multiplies it), `x` h c / (lambda k), and the temperature's
+// reciprocal `inverse`, 1/K.
+float4 planckOf(float4 scale, float4 x, float inverse) {
+    let exponent = x * inverse;
     // exp overflows past 88: the tail is then exp(-x) itself.
-    return select(x > 80.0, scale * exp(-x), scale / (exp(min(x, 80.0)) - 1.0));
+    return select(exponent > 80.0, scale * exp(-exponent),
+                  scale / (exp(min(exponent, 80.0)) - 1.0));
 }
 
 float hash(uint3 p) {
@@ -1790,6 +1791,17 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                               (light.spectrum[g] + light.tinted[g]);
             }
         }
+        // A black body's glow, its parts at each band's wavelength found once for the span: what
+        // the material absorbs times 2 h c^2 / lambda^5, and h c / (lambda k) (`planckOf`).
+        float4 glowScales[kMaxGroups];
+        float4 glowExponents[kMaxGroups];
+        for (uint g = 0; g < groups; ++g) {
+            let um = (range.x + (float4(g * 4) + float4(0.5, 1.5, 2.5, 3.5)) * range.y) * 1e-3;
+            glowScales[g] = glows ? (1.0 - volumeMaterials[materialIndex].albedo[g]) * kPlanckC1 /
+                                        (um * um * um * um * um) * 1e-3
+                                  : float4(0.0);
+            glowExponents[g] = kPlanckC2 / um;
+        }
         let perPixel = pass.stepsPerPixel > 0.0 ? pixelAngle / pass.stepsPerPixel : 0.0;
         var budget = constants.layout.z;
         var start = span.x;
@@ -1874,11 +1886,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                         : kelvinBase;
                 if (kelvin > 0.0) {
                     let scale = weight * sigma * material.params.y;
+                    let inverse = 1.0 / kelvin;
                     for (uint g = 0; g < groups; ++g) {
-                        let lambda =
-                            range.x + (float4(g * 4) + float4(0.5, 1.5, 2.5, 3.5)) * range.y;
-                        emitted[g] += (1.0 - volumeMaterials[materialIndex].albedo[g]) * scale *
-                                      planck(lambda, kelvin);
+                        emitted[g] += scale * planckOf(glowScales[g], glowExponents[g], inverse);
                     }
                 }
             }
