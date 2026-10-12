@@ -40,10 +40,14 @@ struct CascadeJob {
     // x: 1 to fit to the depths seen, y: how far the eye moved since, z: how far it may move per
     // unit of the nearest depth seen.
     float4 seen;
-    // x: its first view, y: views with Shadows blocks, z: 1 to write the frame's splits, w: 1 to
-    // write minimal shading's maps.
+    // x: its first view, y: views with Shadows blocks, z: flags (1 to write the frame's splits, 2
+    // to write into `subframes` rather than the frame's views), w: 1 to write minimal shading's
+    // maps.
     uint4 out;
 }
+
+static const uint kWriteSplits = 1;
+static const uint kSubframe = 2;
 
 struct DepthRangeConstants {
     // xy: image size, z: the first layer, w: 1 when the projection is orthographic (depth linear).
@@ -52,12 +56,14 @@ struct DepthRangeConstants {
     float4 clip;
     // Fitting cascades: the jobs, the depths the last frame saw (`depthRangeMain`'s result),
     // every light view's matrix and their Shadows blocks (the first matrix of each,
-    // `layout.y` float4s apart), and the frame's Shadows block (frame.slang).
+    // `layout.y` float4s apart), the frame's Shadows block (frame.slang), and the matrices of
+    // lights turning across the shutter at each sub-frame, which its shadow passes copy in.
     CascadeJob* jobs;
     uint* seen;
     float4x4* matrices;
     float4* blocks;
     float4* frame;
+    float4x4* subframes;
     // x: jobs, y: Shadows block stride (float4s).
     uint4 layout;
 }
@@ -116,6 +122,12 @@ float3 sliceCorner(CascadeJob job, uint i, float near, float far) {
     return mul(job.cameraToWorld, inView).xyz;
 }
 
+// `depth` rounded to quarter stops, `up` or down.
+float quarterStop(float depth, bool up) {
+    let stops = 4.0 * log2(max(depth, 1e-6));
+    return exp2((up ? ceil(stops) : floor(stops)) / 4.0);
+}
+
 // Split `k` of `count` between `start` and `end`: logarithmic blended with uniform by `lambda`.
 float practicalSplit(float start, float end, float lambda, uint count, uint k) {
     if (k == 0) {
@@ -143,18 +155,17 @@ void cascadeFitMain(uint3 id : SV_DispatchThreadID) {
     let farthest = asfloat(constants.seen[1]);
     if (job.seen.x != 0.0 && farthest > 0.0 && nearest <= farthest &&
         job.seen.y <= job.seen.z * nearest) {
-        // Quantised to quarter stops (powers of 2^(1/4)), outwards, so the cascades keep their
-        // size, and their texel snapping holds, while the depths seen move a little.
-        let seenFar = exp2(ceil(log2(1.1 * farthest) * 4.0) / 4.0);
-        let seenNear = exp2(floor(log2(max(0.9 * nearest, 1e-30)) * 4.0) / 4.0);
-        distance = max(min(distance, seenFar), near * 1.01);
-        splitNear = clamp(seenNear, near, 0.95 * distance);
+        distance = max(min(distance, 1.1 * farthest), near * 1.01);
+        splitNear = clamp(0.9 * nearest, near, 0.95 * distance);
     }
     let count = uint(job.fit.w);
     let lambda = job.fit.y;
     let texels = job.fit.z;
-    let start = max(splitNear, near);
-    let end = max(distance, start * 1.001);
+    // The span in quarter stops (powers of 2^(1/4)), the start down and the distance up, as
+    // `FitCascades` takes it: a span that drifts as the view turns or what it sees changes keeps
+    // the same cascades, whose snapped texels then hold still, until it crosses a step.
+    let start = max(quarterStop(splitNear, false), near);
+    let end = max(quarterStop(distance, true), start * 1.001);
     for (uint c = 0; c < count; ++c) {
         let sliceNear = practicalSplit(start, end, lambda, count, c);
         let sliceFar = practicalSplit(start, end, lambda, count, c + 1);
@@ -189,6 +200,10 @@ void cascadeFitMain(uint3 id : SV_DispatchThreadID) {
             mul(orthographic(x - radius, x + radius, y - radius, y + radius, zNear, zFar),
                 job.lightView);
         let view = job.out.x + c;
+        if ((job.out.z & kSubframe) != 0) {
+            constants.subframes[view] = matrix;
+            continue;
+        }
         constants.matrices[view] = matrix;
         if (view < job.out.y) {
             for (uint column = 0; column < 4; ++column) {
@@ -198,7 +213,7 @@ void cascadeFitMain(uint3 id : SV_DispatchThreadID) {
         }
         // frame.slang's Shadows: lightViewProj[4] (16 float4s), splits, texelWorld.
         if (c < 4) {
-            if (job.out.z != 0) {
+            if ((job.out.z & kWriteSplits) != 0) {
                 constants.frame[16][c] = sliceFar;
             }
             if (job.out.w != 0) {

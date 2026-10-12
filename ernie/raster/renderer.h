@@ -827,9 +827,14 @@ class RasterRenderer {
     /// `cascadeFit_`'s view, `resolution` texels across, as light
     /// views from `first` (`FitViewCascades` their estimate): to the
     /// depths the view saw, for a visible fit.
+    /// With `subframe`, as a light turning across the shutter is at
+    /// one sub-frame: into `subframeFits_` from `first`, which that
+    /// sub-frame's shadow passes copy into the light's views
+    /// (`subframeCopies_`).
     void AddCascadeJob(const FrameParams& params,
                        const glm::vec3& towards,
-                       std::uint32_t resolution, std::uint32_t first);
+                       std::uint32_t resolution, std::uint32_t first,
+                       bool subframe = false);
     /// Records the fit of the frame's cascades on the GPU
     /// (`cascadeJobs_`, depth_range.slang's `cascadeFitMain`).
     void RecordCascadeFit(VkCommandBuffer commands) const;
@@ -1287,6 +1292,14 @@ class RasterRenderer {
     std::vector<std::byte> cascadeJobs_;
     std::uint32_t cascadeJobCount_ = 0;
     std::unique_ptr<GpuBuffer> cascadeJobBuffer_;
+    bool splitsFitted_ = false;  ///< A job writes the frame's splits.
+    /// Lights turning across the shutter, fitted on the GPU at each
+    /// sub-frame: their matrices, and per sub-frame the copies (from
+    /// `subframeFits_`, to light view) its shadow passes make.
+    std::unique_ptr<GpuBuffer> subframeFits_;
+    std::uint32_t subframeFitCount_ = 0;
+    std::vector<std::vector<std::pair<std::uint32_t, std::uint32_t>>>
+        subframeCopies_;
 
     /// Exposure metering (`FrameParams::meter`): each slot's frame
     /// counts its view's log-luminance histogram into its buffer

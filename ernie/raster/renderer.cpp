@@ -1025,7 +1025,7 @@ struct DepthRangeConstants {
     VkDeviceAddress matrices = 0;
     VkDeviceAddress blocks = 0;
     VkDeviceAddress frame = 0;
-    std::uint32_t padding[2]{};
+    VkDeviceAddress subframes = 0;
     std::uint32_t layout[4];
 };
 static_assert(sizeof(DepthRangeConstants) == 96,
@@ -2161,6 +2161,9 @@ void RasterRenderer::WriteLights(
     lightViews_.clear();
     cascadeJobs_.clear();
     cascadeJobCount_ = 0;
+    splitsFitted_ = false;
+    subframeFitCount_ = 0;
+    subframeCopies_.assign(subframes_, {});
     subframeLightViews_.assign(subframes_, {});
     std::vector<std::size_t>
         perWorld;  ///< Lights with per-world maps.
@@ -2338,25 +2341,26 @@ void RasterRenderer::WriteLights(
                     static_cast<float>(lightViews_.size());
                 entry.cone[3] = static_cast<float>(views.size());
                 entry.shadow[0] = views.front().texelWorldSize;
-                // Cascades over the view fitted to the depths it saw
-                // (`ShadowFit::Visible`), unless the light moves
-                // across the shutter (each sub-frame's refitted on
-                // the host), the GPU fits from them, with no wait for
-                // the host to read them; the host's fit, over every
-                // depth, is their estimate. Other fits need nothing
-                // the host lacks.
+                // Cascades over the view the GPU fits, for a visible
+                // fit to the depths the view saw with no wait for the
+                // host to read them; the host's fit is their
+                // estimate, the same but for the depths seen. A light
+                // turning across the shutter is fitted at each
+                // sub-frame.
                 const bool moving =
                     subframes_ > 1 && light.previous &&
                     !light.posedOnGpu && !light.domeDiffuse;
-                const bool gpuCascades =
-                    cascaded && !moving && cascadeFit_->visible;
+                const bool gpuCascades = cascaded && !moving;
                 if (gpuCascades) {
                     AddCascadeJob(params, axis, own,
                                   static_cast<std::uint32_t>(
                                       lightViews_.size()));
                 }
-                // What culls by them follows the GPU's.
-                if (light.posedOnGpu || gpuCascades) {
+                // What culls by them follows the GPU's where it
+                // differs.
+                const bool seenFit =
+                    gpuCascades && cascadeFit_->visible;
+                if (light.posedOnGpu || seenFit) {
                     for (std::size_t v = 0; v < views.size(); ++v) {
                         views[v].gpuFitted = true;
                         views[v].gpuMatrix =
@@ -2376,7 +2380,7 @@ void RasterRenderer::WriteLights(
                 // estimate, the GPU's fit but for the depths seen:
                 // drawing them whole into a cascade shadows flat
                 // ground (as the lights posed on the GPU still do).
-                if (gpuCascades) {
+                if (seenFit) {
                     for (ShadowCascade& view : views) {
                         view.cullViewProjection =
                             view.lightViewProjection;
@@ -2414,16 +2418,31 @@ void RasterRenderer::WriteLights(
                                 glm::normalize(glm::dvec3(then[0])));
                         }
                         // As the frame's were fitted: cascades over
-                        // the view, or one map over the scene.
+                        // the view, on the GPU, copied in by the
+                        // sub-frame's shadow passes, or one map over
+                        // the scene.
+                        if (cascaded) {
+                            AddCascadeJob(params, posed.direction,
+                                          own, subframeFitCount_,
+                                          true);
+                            for (std::size_t v = 0; v < views.size();
+                                 ++v) {
+                                subframeCopies_[k].emplace_back(
+                                    subframeFitCount_ +
+                                        static_cast<std::uint32_t>(v),
+                                    static_cast<std::uint32_t>(
+                                        lightViews_.size() + v));
+                            }
+                            subframeFitCount_ +=
+                                static_cast<std::uint32_t>(
+                                    views.size());
+                            continue;
+                        }
                         const std::vector<ShadowCascade> moved =
-                            cascaded
-                                ? FitViewCascades(posed.direction,
-                                                  own)
-                                : FitLightShadowViews(
-                                      posed,
-                                      params.Relative(posed.position),
-                                      bounds->first, bounds->second,
-                                      own);
+                            FitLightShadowViews(
+                                posed,
+                                params.Relative(posed.position),
+                                bounds->first, bounds->second, own);
                         for (std::size_t v = 0;
                              v < moved.size() && v < views.size();
                              ++v) {
@@ -2770,6 +2789,15 @@ void RasterRenderer::WriteLights(
                 BufferMemory::Device);
         }
         uploads_.Write(*cascadeJobBuffer_, cascadeJobs_);
+    }
+    if (subframeFitCount_ > 0 &&
+        (!subframeFits_ ||
+         subframeFits_->Size() <
+             subframeFitCount_ * sizeof(glm::mat4))) {
+        vkDeviceWaitIdle(context_.Device());
+        subframeFits_ = std::make_unique<GpuBuffer>(
+            context_, subframeFitCount_ * sizeof(glm::mat4),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
@@ -4631,21 +4659,30 @@ void RasterRenderer::RecordShadowMaps(
         DispatchLights(commands, subframe * kMaxLights,
                        subframeShares_[subframe], blendGpuLights_);
     }
-    if (subframe < subframeLightViews_.size() &&
-        !subframeLightViews_[subframe].empty()) {
+    const bool hostMoved = subframe < subframeLightViews_.size() &&
+                           !subframeLightViews_[subframe].empty();
+    const bool gpuMoved = subframe < subframeCopies_.size() &&
+                          !subframeCopies_[subframe].empty();
+    if (hostMoved || gpuMoved) {
         VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
         before.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        // After the reads of the views, and the cascade fit's writes.
         before.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
-                               VK_ACCESS_2_UNIFORM_READ_BIT;
+                               VK_ACCESS_2_UNIFORM_READ_BIT |
+                               VK_ACCESS_2_SHADER_WRITE_BIT;
         before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-        before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                               VK_ACCESS_2_TRANSFER_READ_BIT;
         VkDependencyInfo dependency{
             VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
         dependency.memoryBarrierCount = 1;
         dependency.pMemoryBarriers = &before;
         vkCmdPipelineBarrier2(commands, &dependency);
-        for (const auto& [v, matrix] :
-             subframeLightViews_[subframe]) {
+        for (std::size_t i = 0;
+             hostMoved && i < subframeLightViews_[subframe].size();
+             ++i) {
+            const auto& [v, matrix] =
+                subframeLightViews_[subframe][i];
             matrices[v] = matrix;
             vkCmdUpdateBuffer(commands, lightViewMatrices_->Handle(),
                               v * sizeof(glm::mat4),
@@ -4656,6 +4693,25 @@ void RasterRenderer::RecordShadowMaps(
                     commands, lightShadowBlocks_.Handle(),
                     v * kLightShadowBlockStride, sizeof(glm::mat4),
                     glm::value_ptr(matrix));
+            }
+        }
+        // Cascades the GPU fitted at this sub-frame
+        // (`RecordCascadeFit`).
+        for (std::size_t i = 0;
+             gpuMoved && i < subframeCopies_[subframe].size(); ++i) {
+            const auto& [from, v] = subframeCopies_[subframe][i];
+            const VkBufferCopy matrix{from * sizeof(glm::mat4),
+                                      v * sizeof(glm::mat4),
+                                      sizeof(glm::mat4)};
+            vkCmdCopyBuffer(commands, subframeFits_->Handle(),
+                            lightViewMatrices_->Handle(), 1, &matrix);
+            if (v < firstLayeredView_) {
+                const VkBufferCopy block{from * sizeof(glm::mat4),
+                                         v * kLightShadowBlockStride,
+                                         sizeof(glm::mat4)};
+                vkCmdCopyBuffer(commands, subframeFits_->Handle(),
+                                lightShadowBlocks_.Handle(), 1,
+                                &block);
             }
         }
         VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -5225,7 +5281,8 @@ RasterRenderer::FitViewCascades(const glm::vec3& towards,
 void RasterRenderer::AddCascadeJob(const FrameParams& params,
                                    const glm::vec3& towards,
                                    std::uint32_t resolution,
-                                   std::uint32_t first) {
+                                   std::uint32_t first,
+                                   bool subframe) {
     const CascadeFit& fit = *cascadeFit_;
     const CameraView& view = fit.view;
     const auto [low, high] =
@@ -5293,10 +5350,16 @@ void RasterRenderer::AddCascadeJob(const FrameParams& params,
     }
     job.out[0] = first;
     // Cascades precede the layered views: each has its Shadows block.
-    job.out[1] = std::numeric_limits<std::uint32_t>::max();
+    // A sub-frame's are copied into them (`RecordShadowMaps`).
+    job.out[1] =
+        subframe ? 0u : std::numeric_limits<std::uint32_t>::max();
     // The first cascaded light's splits are the frame's, which the
     // G-buffer passes tint by.
-    job.out[2] = cascadeJobCount_ == 0 ? 1u : 0u;
+    job.out[2] = subframe ? 2u : 0u;
+    if (!subframe && !splitsFitted_) {
+        job.out[2] |= 1u;
+        splitsFitted_ = true;
+    }
     job.out[3] = 0u;
     const auto* bytes = reinterpret_cast<const std::byte*>(&job);
     cascadeJobs_.insert(cascadeJobs_.end(), bytes,
@@ -5326,6 +5389,9 @@ void RasterRenderer::RecordCascadeFit(
     constants.matrices = lightViewMatrices_->Address();
     constants.blocks = lightShadowBlocks_.Address();
     constants.frame = shadowUniforms_.Address();
+    if (subframeFitCount_ > 0) {
+        constants.subframes = subframeFits_->Address();
+    }
     constants.layout[0] = cascadeJobCount_;
     constants.layout[1] = static_cast<std::uint32_t>(
         kLightShadowBlockStride / sizeof(glm::vec4));
