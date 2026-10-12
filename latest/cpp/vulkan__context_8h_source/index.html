@@ -323,12 +323,20 @@ class VulkanContext {
         return depthClamp_;
     }
 
+    bool SupportsFragmentAtomics() const {
+        return fragmentAtomics_;
+    }
+
     bool SupportsAnisotropy() const {
         return anisotropy_;
     }
 
     bool SupportsMultiDrawIndirect() const {
         return multiDrawIndirect_;
+    }
+
+    bool CapturesPipelineStatistics() const {
+        return pipelineStatistics_;
     }
 
     bool SupportsExternalMemory() const {
@@ -424,7 +432,9 @@ class VulkanContext {
     bool rayQuery_ = false;
     bool anisotropy_ = false;
     bool depthClamp_ = false;
+    bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
+    bool pipelineStatistics_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;
     void* gpuProfiler_ =

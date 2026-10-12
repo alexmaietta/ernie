@@ -313,6 +313,11 @@ class RenderDelegate {
                             std::string_view attribute,
                             std::uintptr_t stream = 1);
 
+    virtual Tensor MapOverlay(Scene&amp; scene, std::string_view overlay,
+                              std::size_t batch,
+                              std::string_view array,
+                              std::uintptr_t stream = 1);
+
     virtual void SetMeshWriter(const Path&amp; path, MeshWriter writer,
                                std::optional&lt;Bounds3&gt; bounds = {});
 

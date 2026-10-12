@@ -221,6 +221,10 @@
 <td style="text-align: left;"><a href="#variable-anchor"><strong>anchor</strong></a>   = <code>{0.0}</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">char</td>
+<td style="text-align: left;"><a href="#variable-glyph"><strong>glyph</strong></a>   = <code>0</code><br><em>A character of text (ASCII,</em> <code>OverlayGlyphs</code> <em>) filling</em><code>rect</code> <em>in place of the shape, or 0.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1OverlayItem/"><strong>OverlayItem</strong></a></td>
 <td style="text-align: left;"><a href="#variable-item"><strong>item</strong></a>  <br></td>
 </tr>
@@ -229,16 +233,26 @@
 <td style="text-align: left;"><a href="#variable-rect"><strong>rect</strong></a>   = <code>{0.0f}</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-screen"><strong>screen</strong></a>   = <code>false</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-markershape"><strong>MarkerShape</strong></a></td>
 <td style="text-align: left;"><a href="#variable-shape"><strong>shape</strong></a>   = <code>MarkerShape::Square</code><br></td>
 </tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Markers and label text. </p>
+<p>Markers, text and its backing boxes. A screen sprite's <code>anchor</code> is instead a point of the image, x and y fractions of it from its top left, drawn over everything. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-anchor">variable anchor</h3>
 <pre><code class="language-C++">glm::dvec3 ernie::OverlaySprite::anchor;
+</code></pre>
+<hr>
+
+<h3 id="variable-glyph">variable glyph</h3>
+<p><em>A character of text (ASCII,</em> <code>OverlayGlyphs</code> <em>) filling</em><code>rect</code> <em>in place of the shape, or 0.</em></p>
+<pre><code class="language-C++">char ernie::OverlaySprite::glyph;
 </code></pre>
 <hr>
 
@@ -249,6 +263,11 @@
 
 <h3 id="variable-rect">variable rect</h3>
 <pre><code class="language-C++">glm::vec4 ernie::OverlaySprite::rect;
+</code></pre>
+<hr>
+
+<h3 id="variable-screen">variable screen</h3>
+<pre><code class="language-C++">bool ernie::OverlaySprite::screen;
 </code></pre>
 <hr>
 

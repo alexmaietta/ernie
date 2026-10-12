@@ -329,6 +329,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            map_overlay (ernie.Renderer.map_overlay)" href="#ernie.Renderer.map_overlay">map_overlay</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Maps array <code>array</code> ("points", "ends", "values", "colors", "sizes", "worlds"...) of batch <code>batch</code> of overlay <code>overlay</code> for writing in place on the GPU, without copies: a CUDA array over the renderer's own memory for it, holding its values, which the batch now holds. Write into it on <code>stream</code> (which first waits for frames already submitted); the next frames draw it. The batch must have been drawn once. Map again every step (the same memory, no copy), so the stream waits for the frames still reading it.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            prim_path (ernie.Renderer.prim_path)" href="#ernie.Renderer.prim_path">prim_path</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -845,6 +853,27 @@
     <div class="doc doc-contents ">
 
         <p>Whether light pattern <code>id</code> is registered, built in or added.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.map_overlay" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map_overlay</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map_overlay(
+    scene: Scene, overlay: str, batch: int, array: str, stream: object | None = None
+) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Maps array <code>array</code> ("points", "ends", "values", "colors", "sizes", "worlds"...) of batch <code>batch</code> of overlay <code>overlay</code> for writing in place on the GPU, without copies: a CUDA array over the renderer's own memory for it, holding its values, which the batch now holds. Write into it on <code>stream</code> (which first waits for frames already submitted); the next frames draw it. The batch must have been drawn once. Map again every step (the same memory, no copy), so the stream waits for the frames still reading it.</p>
 
 
     </div>

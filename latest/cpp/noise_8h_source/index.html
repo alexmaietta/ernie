@@ -223,6 +223,10 @@ class GradientNoise {
     double Fbm(const glm::dvec3&amp; p, int octaves = 5,
                double lacunarity = 2.0, double gain = 0.5) const;
 
+    const std::array&lt;std::uint8_t, 512&gt;&amp; Permutation() const {
+        return permutation_;
+    }
+
   private:
     std::array&lt;std::uint8_t, 512&gt; permutation_{};
 };

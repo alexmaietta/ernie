@@ -253,6 +253,10 @@
 <td style="text-align: left;"><a href="#function-maparray-22"><strong>MapArray</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, std::uintptr_t stream=1) <br><em>Maps array</em> <code>attribute</code> <em>written as rows of one array over</em><code>prims</code> <em>(</em><code>Scene::Write</code> <em>of a</em><a href="../classernie_1_1PrimSet/"><em><strong>PrimSet</strong></em></a> <em>), as the single prim's</em><code>MapArray</code> <em>: writes the tensor as those rows, prim i's row i, and returns it.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#function-mapoverlay"><strong>MapOverlay</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::string_view overlay, std::size_t batch, std::string_view array, std::uintptr_t stream=1) <br><em>Maps array</em> <code>array</code> <em>("points", "values"...,</em><code>Overlay::ReplaceBatchArray</code> <em>'s names) of batch</em><code>batch</code> <em>of overlay</em><code>overlay</code> <em>for writing in place on the compute device: a tensor over the renderer's own memory for it, holding its values, which the batch then holds.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual std::optional&lt; double &gt;</td>
 <td style="text-align: left;"><a href="#function-meteredluminance"><strong>MeteredLuminance</strong></a> () const<br><em>The scene's average luminance in cd/m^2 a recent frame measured with metering on (</em> <code>tokens::kMeter</code> <em>), for automatic exposure and meters; none before one has, or from backends that do not meter.</em></td>
 </tr>
@@ -476,6 +480,23 @@
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> as the single prim's. </li>
+</ul>
+<hr>
+
+<h3 id="function-mapoverlay">function MapOverlay</h3>
+<p><em>Maps array</em> <code>array</code> <em>("points", "values"...,</em><code>Overlay::ReplaceBatchArray</code> <em>'s names) of batch</em><code>batch</code> <em>of overlay</em><code>overlay</code> <em>for writing in place on the compute device: a tensor over the renderer's own memory for it, holding its values, which the batch then holds.</em></p>
+<pre><code class="language-C++">virtual Tensor ernie::RenderDelegate::MapOverlay (
+    Scene &amp; scene,
+    std::string_view overlay,
+    std::size_t batch,
+    std::string_view array,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>Write into it on <code>stream</code> (which first waits for the frames already submitted); the next frames draw it without copying. Map again each step (the same memory while the overlay keeps its batches), so the stream waits for the frames still reading it. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the backend maps no arrays, has no compute interop, or has not drawn that batch yet. </li>
 </ul>
 <hr>
 

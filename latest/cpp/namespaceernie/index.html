@@ -812,11 +812,15 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
+<td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates or posed under prims (</em> <code>OverlayStyle::anchor</code> <em>), and text and panels on the image itself (</em><code>Text</code> <em>,</em><code>Rect</code> <em>), drawn over the images of render products that ask for it (</em><code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation, or a physics engine's bodies, contacts and particles: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayGlyph/"><strong>OverlayGlyph</strong></a> <br><em>One character of the font (</em> <code>OverlayGlyphs</code> <em>): rows of</em><code>kOverlayGlyphCell</code> <em>bits, bit x of row y covering the unit square at (x, y) from the pen, y down; the box its bits fill (x0, y0, x1, y1, exclusive), and how far it moves the pen.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -824,7 +828,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> <br><em>A line segment of</em> <code>width</code> <em>pixels.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayNumberFormat/"><strong>OverlayNumberFormat</strong></a> <br><em>How a</em> <code>Numbers</code> <em>batch prints each of its values:</em><code>prefix</code> <em>, the value with</em><code>decimals</code> <em>digits after the point, then</em><code>suffix</code> <em>, in the style's colour and</em><code>size</code> <em>, over its</em><code>background</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> <br><em>A line segment of</em> <code>width</code> <em>pixels, dashed every</em><code>dash</code> <em>pixels (</em><code>OverlayStyle::dash</code> <em>) unless 0.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -993,6 +1001,10 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1ScopedGpuZone/"><strong>ScopedGpuZone</strong></a> <br><em>An</em> <code>ERNIE_GPU_ZONE</code> <em>for Ernie's profiler: timestamps around the rest of the scope's commands.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> <br><em>Where a screen item (</em> <code>Overlay::Text</code> <em>,</em><code>Overlay::Rect</code> <em>) sits on the image, whatever its size: the point</em><code>at</code> <em>(fractions of the image's width and height from its top left corner) moved</em><code>offset</code> <em>pixels (y down), with the item's own point</em><code>align</code> <em>(fractions of its width and height from its top left) there.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -1415,6 +1427,14 @@
 <tr>
 <td style="text-align: right;">constexpr std::size_t</td>
 <td style="text-align: left;"><a href="#variable-knanovdbheadbytes"><strong>kNanoVdbHeadBytes</strong></a>   = <code>1024</code><br><em>The bytes of a grid's start that hold its header, its tree's and its root's (the root's statistics included), as NanoVDB lays them out one after another.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr int</td>
+<td style="text-align: left;"><a href="#variable-koverlayglyphcell"><strong>kOverlayGlyphCell</strong></a>   = <code>16</code><br><em>The font overlay text is drawn in, stb_easy_font's: each printable ASCII character's pixels on a grid of</em> <code>kOverlayGlyphCell</code> <em>units, a line</em><code>kOverlayLineHeight</code> <em>units tall, scaled so a line is the style's</em><code>size</code> <em>pixels.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr float</td>
+<td style="text-align: left;"><a href="#variable-koverlaylineheight"><strong>kOverlayLineHeight</strong></a>   = <code>12.0f</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr double</td>
@@ -2066,6 +2086,14 @@
 <tr>
 <td style="text-align: right;"><a href="./#enum-occlusion"><strong>Occlusion</strong></a></td>
 <td style="text-align: left;"><a href="#function-occlusionof"><strong>OcclusionOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; settings) <br><em>The occlusion culling of the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>settings</code> <em>(</em><code>ernie:occlusion</code> <em>),</em><code>Occlusion::Off</code> <em>when unset.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1OverlayGlyph/"><strong>OverlayGlyph</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-overlayglyphs"><strong>OverlayGlyphs</strong></a> () <br><em>The font's characters from ' ' (32) to '~' (126), in order.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#function-overlaytextsize"><strong>OverlayTextSize</strong></a> (std::string_view text, float size) <br><em>Width and height in pixels of</em> <code>text</code> <em>(lines split at '</em> <em>') in the font at</em><code>size</code> <em>pixels a line.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
@@ -2802,7 +2830,10 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
     Markers,
     Boxes,
     Spheres,
-    Frames
+    Frames,
+    Numbers,
+    Trails,
+    Capsules
 };
 </code></pre>
 <hr>
@@ -3032,6 +3063,17 @@ Rendering", Journal of Computer Graphics Techniques 9(3):21-38, 2020 (pcg3d).</p
 <h3 id="variable-knanovdbheadbytes">variable kNanoVdbHeadBytes</h3>
 <p><em>The bytes of a grid's start that hold its header, its tree's and its root's (the root's statistics included), as NanoVDB lays them out one after another.</em> </p>
 <pre><code class="language-C++">constexpr std::size_t ernie::kNanoVdbHeadBytes;
+</code></pre>
+<hr>
+
+<h3 id="variable-koverlayglyphcell">variable kOverlayGlyphCell</h3>
+<p><em>The font overlay text is drawn in, stb_easy_font's: each printable ASCII character's pixels on a grid of</em> <code>kOverlayGlyphCell</code> <em>units, a line</em><code>kOverlayLineHeight</code> <em>units tall, scaled so a line is the style's</em><code>size</code> <em>pixels.</em></p>
+<pre><code class="language-C++">constexpr int ernie::kOverlayGlyphCell;
+</code></pre>
+<hr>
+
+<h3 id="variable-koverlaylineheight">variable kOverlayLineHeight</h3>
+<pre><code class="language-C++">constexpr float ernie::kOverlayLineHeight;
 </code></pre>
 <hr>
 
@@ -4747,6 +4789,21 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 <ul>
 <li><code>std::invalid_argument</code> for a token other than "off", "occluders" or "twoPass". </li>
 </ul>
+<hr>
+
+<h3 id="function-overlayglyphs">function OverlayGlyphs</h3>
+<p><em>The font's characters from ' ' (32) to '~' (126), in order.</em> </p>
+<pre><code class="language-C++">std::span&lt; const OverlayGlyph &gt; ernie::OverlayGlyphs () 
+</code></pre>
+<hr>
+
+<h3 id="function-overlaytextsize">function OverlayTextSize</h3>
+<p><em>Width and height in pixels of</em> <code>text</code> <em>(lines split at '</em> <em>') in the font at</em><code>size</code> <em>pixels a line.</em></p>
+<pre><code class="language-C++">glm::vec2 ernie::OverlayTextSize (
+    std::string_view text,
+    float size
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-overscanof">function OverscanOf</h3>

@@ -217,12 +217,20 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#variable-anchor"><strong>anchor</strong></a>  <br><em>The prim the items are posed under: their coordinates are in its space, and they follow it as it moves, on the GPU too (a prim posed there).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">glm::vec4</td>
 <td style="text-align: left;"><a href="#variable-background"><strong>background</strong></a>   = <code>/* multi line expression */</code><br><em>Labels' backing box; alpha 0 for none.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::vec4</td>
 <td style="text-align: left;"><a href="#variable-color"><strong>color</strong></a>   = <code>/* multi line expression */</code><br><em>Display (sRGB-encoded) colour and opacity.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-dash"><strong>dash</strong></a>   = <code>0.0f</code><br><em>Lines' dashes and the gaps between them, each this many pixels long; 0 for solid lines.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-overlaydepth"><strong>OverlayDepth</strong></a></td>
@@ -243,6 +251,13 @@
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-anchor">variable anchor</h3>
+<p><em>The prim the items are posed under: their coordinates are in its space, and they follow it as it moves, on the GPU too (a prim posed there).</em> </p>
+<pre><code class="language-C++">Path ernie::OverlayStyle::anchor;
+</code></pre>
+<p>Empty for world coordinates. </p>
+<hr>
+
 <h3 id="variable-background">variable background</h3>
 <p><em>Labels' backing box; alpha 0 for none.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::OverlayStyle::background;
@@ -252,6 +267,12 @@
 <h3 id="variable-color">variable color</h3>
 <p><em>Display (sRGB-encoded) colour and opacity.</em> </p>
 <pre><code class="language-C++">glm::vec4 ernie::OverlayStyle::color;
+</code></pre>
+<hr>
+
+<h3 id="variable-dash">variable dash</h3>
+<p><em>Lines' dashes and the gaps between them, each this many pixels long; 0 for solid lines.</em> </p>
+<pre><code class="language-C++">float ernie::OverlayStyle::dash;
 </code></pre>
 <hr>
 

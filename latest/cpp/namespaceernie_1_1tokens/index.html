@@ -1011,6 +1011,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-klevels"><strong>kLevels</strong></a>   = <code>"levels"</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-klightirradiance"><strong>kLightIrradiance</strong></a>   = <code>/* multi line expression */</code><br><em>Physical sunlight (Ernie): total irradiance at normal incidence in W/m^2, and a spectrum of (wavelength nm, W m^-2 nm^-1) pairs.</em></td>
 </tr>
 <tr>
@@ -1204,6 +1208,10 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-koverlays"><strong>kOverlays</strong></a>   = <code>"ernie:overlays"</code><br><em>string, on a</em> <a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> <em>or else its</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>: the overlays (</em><code>Scene::GetOverlay</code> <em>) drawn over its LdrColor, "*" for all, else names separated by commas or spaces; none by default, so observations stay free of debug drawing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kpages"><strong>kPages</strong></a>   = <code>"pages"</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -1600,6 +1608,22 @@
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kshadowsplitlambda"><strong>kShadowSplitLambda</strong></a>   = <code>/* multi line expression */</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowvirtual"><strong>kShadowVirtual</strong></a>   = <code>/* multi line expression */</code><br><em>bool: the first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>), about a texel a pixel from near to far, rather than its cascades; default off.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowvirtualbias"><strong>kShadowVirtualBias</strong></a>   = <code>/* multi line expression */</code><br><em>float: added to the level a virtual shadow map picks for a point (each level doubles its texels); default 0, about a texel a pixel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowvirtualdebug"><strong>kShadowVirtualDebug</strong></a>   = <code>/* multi line expression */</code><br><em>token: what the virtual shadow map's debugging shows: "off" (the default), "levels" (surfaces tinted by the clipmap level that shadows them) or "pages" (black where no page backs a point: past the pool, or not marked).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kshadowvirtualpages"><strong>kShadowVirtualPages</strong></a>   = <code>/* multi line expression */</code><br><em>int: the virtual shadow map's physical pages of 128² texels (64 KiB each); default 1024.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
@@ -3128,6 +3152,11 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-klevels">variable kLevels</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLevels;
+</code></pre>
+<hr>
+
 <h3 id="variable-klightirradiance">variable kLightIrradiance</h3>
 <p><em>Physical sunlight (Ernie): total irradiance at normal incidence in W/m^2, and a spectrum of (wavelength nm, W m^-2 nm^-1) pairs.</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kLightIrradiance;
@@ -3398,6 +3427,11 @@
 <h3 id="variable-koverlays">variable kOverlays</h3>
 <p><em>string, on a</em> <a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> <em>or else its</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>: the overlays (</em><code>Scene::GetOverlay</code> <em>) drawn over its LdrColor, "*" for all, else names separated by commas or spaces; none by default, so observations stay free of debug drawing.</em></p>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kOverlays;
+</code></pre>
+<hr>
+
+<h3 id="variable-kpages">variable kPages</h3>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kPages;
 </code></pre>
 <hr>
 
@@ -3944,6 +3978,30 @@
 
 <h3 id="variable-kshadowsplitlambda">variable kShadowSplitLambda</h3>
 <pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowSplitLambda;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowvirtual">variable kShadowVirtual</h3>
+<p><em>bool: the first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>), about a texel a pixel from near to far, rather than its cascades; default off.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowVirtual;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowvirtualbias">variable kShadowVirtualBias</h3>
+<p><em>float: added to the level a virtual shadow map picks for a point (each level doubles its texels); default 0, about a texel a pixel.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowVirtualBias;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowvirtualdebug">variable kShadowVirtualDebug</h3>
+<p><em>token: what the virtual shadow map's debugging shows: "off" (the default), "levels" (surfaces tinted by the clipmap level that shadows them) or "pages" (black where no page backs a point: past the pool, or not marked).</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowVirtualDebug;
+</code></pre>
+<hr>
+
+<h3 id="variable-kshadowvirtualpages">variable kShadowVirtualPages</h3>
+<p><em>int: the virtual shadow map's physical pages of 128² texels (64 KiB each); default 1024.</em> </p>
+<pre><code class="language-C++">constexpr std::string_view ernie::tokens::kShadowVirtualPages;
 </code></pre>
 <hr>
 

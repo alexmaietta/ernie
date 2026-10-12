@@ -253,6 +253,22 @@
 <td style="text-align: left;"><a href="#variable-splitlambda"><strong>splitLambda</strong></a>   = <code>/* multi line expression */</code><br><em>Logarithmic weight of the practical split scheme.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-virtualbias"><strong>virtualBias</strong></a>   = <code>0.0f</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-virtualdebug"><strong>virtualDebug</strong></a>   = <code>0</code><br><em>The virtual shadow map's debugging (</em> <code>tokens::kShadowVirtualDebug</code> <em>): 0 off, 1 levels, 2 pages.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-virtualmaps"><strong>virtualMaps</strong></a>   = <code>false</code><br><em>The first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>) of</em><code>virtualPages</code> <em>physical pages, its levels</em><code>virtualBias</code> <em>coarser than a texel a pixel.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-virtualpages"><strong>virtualPages</strong></a>   = <code>1024</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-worldshadowfit"><strong>WorldShadowFit</strong></a></td>
 <td style="text-align: left;"><a href="#variable-worldfit"><strong>worldFit</strong></a>   = <code>/* multi line expression */</code><br><em>What each world's map covers.</em></td>
 </tr>
@@ -336,6 +352,28 @@
 <h3 id="variable-splitlambda">variable splitLambda</h3>
 <p><em>Logarithmic weight of the practical split scheme.</em> </p>
 <pre><code class="language-C++">float ernie::ShadowSettings::splitLambda;
+</code></pre>
+<hr>
+
+<h3 id="variable-virtualbias">variable virtualBias</h3>
+<pre><code class="language-C++">float ernie::ShadowSettings::virtualBias;
+</code></pre>
+<hr>
+
+<h3 id="variable-virtualdebug">variable virtualDebug</h3>
+<p><em>The virtual shadow map's debugging (</em> <code>tokens::kShadowVirtualDebug</code> <em>): 0 off, 1 levels, 2 pages.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::ShadowSettings::virtualDebug;
+</code></pre>
+<hr>
+
+<h3 id="variable-virtualmaps">variable virtualMaps</h3>
+<p><em>The first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>) of</em><code>virtualPages</code> <em>physical pages, its levels</em><code>virtualBias</code> <em>coarser than a texel a pixel.</em></p>
+<pre><code class="language-C++">bool ernie::ShadowSettings::virtualMaps;
+</code></pre>
+<hr>
+
+<h3 id="variable-virtualpages">variable virtualPages</h3>
+<pre><code class="language-C++">std::uint32_t ernie::ShadowSettings::virtualPages;
 </code></pre>
 <hr>
 

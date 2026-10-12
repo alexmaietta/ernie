@@ -205,10 +205,12 @@
 <p><a href="../files/"><strong>FileList</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="./"><strong>overlay.h</strong></a></p>
 <p><a href="../overlay_8h_source/">Go to the source code of this file</a></p>
 <ul>
+<li><code>#include "ernie/scene/path.h"</code></li>
 <li><code>#include "ernie/util/tensor.h"</code></li>
 <li><code>#include &lt;glm/glm.hpp&gt;</code></li>
 <li><code>#include &lt;array&gt;</code></li>
 <li><code>#include &lt;cstdint&gt;</code></li>
+<li><code>#include &lt;optional&gt;</code></li>
 <li><code>#include &lt;span&gt;</code></li>
 <li><code>#include &lt;string&gt;</code></li>
 <li><code>#include &lt;string_view&gt;</code></li>
@@ -240,11 +242,15 @@
 <tbody>
 <tr>
 <td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
+<td style="text-align: left;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> <br><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates or posed under prims (</em> <code>OverlayStyle::anchor</code> <em>), and text and panels on the image itself (</em><code>Text</code> <em>,</em><code>Rect</code> <em>), drawn over the images of render products that ask for it (</em><code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayBatch/"><strong>OverlayBatch</strong></a> <br><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation, or a physics engine's bodies, contacts and particles: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayGlyph/"><strong>OverlayGlyph</strong></a> <br><em>One character of the font (</em> <code>OverlayGlyphs</code> <em>): rows of</em><code>kOverlayGlyphCell</code> <em>bits, bit x of row y covering the unit square at (x, y) from the pen, y down; the box its bits fill (x0, y0, x1, y1, exclusive), and how far it moves the pen.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -252,7 +258,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> <br><em>A line segment of</em> <code>width</code> <em>pixels.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlayNumberFormat/"><strong>OverlayNumberFormat</strong></a> <br><em>How a</em> <code>Numbers</code> <em>batch prints each of its values:</em><code>prefix</code> <em>, the value with</em><code>decimals</code> <em>digits after the point, then</em><code>suffix</code> <em>, in the style's colour and</em><code>size</code> <em>, over its</em><code>background</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> <br><em>A line segment of</em> <code>width</code> <em>pixels, dashed every</em><code>dash</code> <em>pixels (</em><code>OverlayStyle::dash</code> <em>) unless 0.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -265,6 +275,10 @@
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1OverlayTriangle/"><strong>OverlayTriangle</strong></a> <br><em>A filled triangle.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> <br><em>Where a screen item (</em> <code>Overlay::Text</code> <em>,</em><code>Overlay::Rect</code> <em>) sits on the image, whatever its size: the point</em><code>at</code> <em>(fractions of the image's width and height from its top left corner) moved</em><code>offset</code> <em>pixels (y down), with the item's own point</em><code>align</code> <em>(fractions of its width and height from its top left) there.</em></td>
 </tr>
 </tbody>
 </table>

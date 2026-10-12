@@ -207,12 +207,14 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &quot;ernie/scene/path.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;glm/glm.hpp&gt;
 
 #include &lt;array&gt;
 #include &lt;cstdint&gt;
+#include &lt;optional&gt;
 #include &lt;span&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
@@ -239,6 +241,7 @@ struct OverlayStyle {
     glm::vec4 color{
         1.0f};  
     float width = 2.0f;  
+    float dash = 0.0f;
     float size =
         12.0f;  
     OverlayDepth depth = OverlayDepth::Test;
@@ -246,12 +249,24 @@ struct OverlayStyle {
     glm::vec4 background{
         0.0f, 0.0f, 0.0f,
         0.55f};  
+    Path anchor;
+};
+
+struct ScreenPlacement {
+    glm::vec2 at{0.0f};
+    glm::vec2 offset{0.0f};
+    std::optional&lt;glm::vec2&gt; align;
+
+    glm::vec2 Align() const {
+        return align.value_or(at);
+    }
 };
 
 struct OverlayItem {
     glm::vec4 color{1.0f};
     OverlayDepth depth = OverlayDepth::Test;
     std::int32_t world = -1;
+    std::uint32_t anchor = 0;
 };
 
 struct OverlaySegment {
@@ -259,6 +274,7 @@ struct OverlaySegment {
     glm::dvec3 b{0.0};
     float width = 2.0f;
     OverlayItem item;
+    float dash = 0.0f;
 };
 
 struct OverlayTriangle {
@@ -271,7 +287,22 @@ struct OverlaySprite {
     glm::vec4 rect{0.0f};
     MarkerShape shape = MarkerShape::Square;
     OverlayItem item;
+    char glyph = 0;
+    bool screen = false;
 };
+
+inline constexpr int kOverlayGlyphCell = 16;
+inline constexpr float kOverlayLineHeight = 12.0f;
+
+struct OverlayGlyph {
+    std::array&lt;std::uint16_t, kOverlayGlyphCell&gt; rows{};
+    std::array&lt;std::uint8_t, 4&gt; box{};
+    std::uint8_t advance = 0;
+};
+
+std::span&lt;const OverlayGlyph&gt; OverlayGlyphs();
+
+glm::vec2 OverlayTextSize(std::string_view text, float size);
 
 enum class OverlayBatchKind : std::uint8_t {
     Lines,    
@@ -280,26 +311,51 @@ enum class OverlayBatchKind : std::uint8_t {
     Boxes,    
     Spheres,  
     Frames,   
+    Numbers,  
+    Trails,   
+    Capsules,  
+};
+
+struct OverlayNumberFormat {
+    std::string prefix;
+    std::string suffix;
+    int decimals = 2;
+    glm::vec2 align{0.0f};
 };
 
 struct OverlayBatch {
     OverlayBatchKind kind = OverlayBatchKind::Lines;
-    Tensor points;        
-    Tensor ends;          
+    Tensor points;
+    Tensor ends;
     Tensor halfExtents;   
     Tensor orientations;  
     Tensor radii;         
+    Tensor halfHeights;
+    Tensor heads;
+    bool fade = false;
+    bool directions = false;
+    Tensor count;
+    Tensor poses;
+    Tensor poseIndices;  
+    glm::dmat4 poseFrame{1.0};
+    Tensor values;
+    OverlayNumberFormat format;  
+    bool screen = false;
+    ScreenPlacement placement;
+    std::vector&lt;Path&gt; anchors;
     Tensor colors;
     Tensor sizes;
     Tensor worlds;  
     double head = 0.0;
-    double length = 1.0;  
+    double length = 1.0;
     MarkerShape shape = MarkerShape::Circle;
     OverlayStyle style;
     glm::dvec3 origin{0.0};
     std::uintptr_t stream = 1;
 
     std::size_t Count() const;
+
+    std::size_t TrailLength() const;
 };
 
 class Overlay {
@@ -341,6 +397,15 @@ class Overlay {
                     const OverlayStyle&amp; style = {},
                     int segments = 48);
 
+    Overlay&amp; Arc(const glm::dvec3&amp; centre, const glm::dvec3&amp; normal,
+                 const glm::dvec3&amp; from, double radius, double angle,
+                 const OverlayStyle&amp; style = {}, bool filled = false,
+                 int segments = 32);
+
+    Overlay&amp; Curve(const glm::dvec3&amp; p0, const glm::dvec3&amp; p1,
+                   const glm::dvec3&amp; p2, const glm::dvec3&amp; p3,
+                   const OverlayStyle&amp; style = {}, int segments = 32);
+
     Overlay&amp; Sphere(const glm::dvec3&amp; centre, double radius,
                     const OverlayStyle&amp; style = {});
 
@@ -357,6 +422,14 @@ class Overlay {
                        const OverlayStyle&amp; style = {},
                        const glm::dmat4&amp; transform = glm::dmat4(1.0));
 
+    Overlay&amp; Text(const ScreenPlacement&amp; placement,
+                  std::string_view text,
+                  const OverlayStyle&amp; style = {});
+
+    Overlay&amp; Rect(const ScreenPlacement&amp; placement,
+                  const glm::vec2&amp; size,
+                  const OverlayStyle&amp; style = {});
+
     Overlay&amp; Marker(const glm::dvec3&amp; point,
                     const OverlayStyle&amp; style = {},
                     MarkerShape shape = MarkerShape::Circle);
@@ -370,6 +443,13 @@ class Overlay {
                    const OverlayStyle&amp; style = {});
 
     Overlay&amp; Batch(OverlayBatch batch);
+
+    void ReplaceBatchArray(std::size_t batch, std::string_view array,
+                           Tensor values);
+
+    const std::vector&lt;Path&gt;&amp; Anchors() const {
+        return anchors_;
+    }
 
     const std::vector&lt;OverlaySegment&gt;&amp; Segments() const {
         return segments_;
@@ -399,10 +479,18 @@ class Overlay {
                     const OverlayStyle&amp; style,
                     const glm::vec4&amp; color);
 
+    OverlayItem ItemOf(const OverlayStyle&amp; style,
+                       const glm::vec4&amp; color);
+
+    void AddText(const glm::dvec3&amp; anchor, const glm::vec2&amp; corner,
+                 std::string_view text, const OverlayStyle&amp; style,
+                 bool screen);
+
     std::vector&lt;OverlaySegment&gt; segments_;
     std::vector&lt;OverlayTriangle&gt; triangles_;
     std::vector&lt;OverlaySprite&gt; sprites_;
     std::vector&lt;OverlayBatch&gt; batches_;
+    std::vector&lt;Path&gt; anchors_;
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };

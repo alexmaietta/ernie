@@ -302,6 +302,10 @@ struct ShadowSettings {
     WorldShadowFit worldFit =
         WorldShadowFit::Scene;  
     float worldMargin = 1.0f;   
+    bool virtualMaps = false;
+    std::uint32_t virtualPages = 1024;
+    float virtualBias = 0.0f;
+    std::uint32_t virtualDebug = 0;
 };
 
 enum class Wireframe : std::uint32_t {

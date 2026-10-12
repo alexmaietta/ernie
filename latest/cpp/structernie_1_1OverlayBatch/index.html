@@ -203,7 +203,7 @@
               
                 <h1 id="struct-ernieoverlaybatch">Struct ernie::OverlayBatch</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>OverlayBatch</strong></a></p>
-<p><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em><a href="#detailed-description">More...</a></p>
+<p><em>Many overlay items of one kind from arrays on the host or a GPU (</em> <code>Overlay::Batch</code> <em>), such as one per world of a batched simulation, or a physics engine's bodies, contacts and particles: the renderer reads the arrays as they are, without copies to the host, and draws each item from them on the GPU.</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/scene/overlay.h&gt;</code></li>
 </ul>
@@ -217,20 +217,48 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-anchors"><strong>anchors</strong></a>  <br><em>The prims the items are posed under (</em> <code>OverlayStyle::anchor</code> <em>): one for every item, or one per item, such as a link of each world's robot.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#variable-colors"><strong>colors</strong></a>  <br><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
-<td style="text-align: left;"><a href="#variable-ends"><strong>ends</strong></a>  <br><em>(n, 3): lines' and arrows'.</em></td>
+<td style="text-align: left;"><a href="#variable-count"><strong>count</strong></a>  <br><em>(1,) int32: how many of the rows are in use, the first, such as the contacts a simulation found this step (its contact count); the rest are left out, the GPU drawing only those.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-directions"><strong>directions</strong></a>   = <code>false</code><br><code>ends</code> <em>are vectors from the points, scaled by</em><code>length</code> <em>: velocities or forces drawn from a simulation's own arrays.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-ends"><strong>ends</strong></a>  <br><em>(n, 3): lines' and arrows' ends, or with</em> <code>directions</code> <em>vectors from their points.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-fade"><strong>fade</strong></a>   = <code>false</code><br><em>Trails fade from opaque at their newest point to clear at their oldest.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1OverlayNumberFormat/"><strong>OverlayNumberFormat</strong></a></td>
+<td style="text-align: left;"><a href="#variable-format"><strong>format</strong></a>  <br><em>Numbers'.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#variable-halfextents"><strong>halfExtents</strong></a>  <br><em>(n, 3): boxes'.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-halfheights"><strong>halfHeights</strong></a>  <br><em>(n,): capsules' half the length of their cylinders.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-head"><strong>head</strong></a>   = <code>0.0</code><br><em>Arrows' heads' length; 0 makes each a fifth of its arrow.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-heads"><strong>heads</strong></a>  <br><em>(n,) int32: the index in each trail's row of its newest point; without it, the last.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-overlaybatchkind"><strong>OverlayBatchKind</strong></a></td>
@@ -238,23 +266,43 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-length"><strong>length</strong></a>   = <code>1.0</code><br><em>Frames' axis length.</em></td>
+<td style="text-align: left;"><a href="#variable-length"><strong>length</strong></a>   = <code>1.0</code><br><em>Frames' axis length; the scale of</em> <code>directions</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
-<td style="text-align: left;"><a href="#variable-orientations"><strong>orientations</strong></a>  <br><em>(n, 4) quaternions x, y, z, w: boxes' and frames', optional.</em></td>
+<td style="text-align: left;"><a href="#variable-orientations"><strong>orientations</strong></a>  <br><em>(n, 4) quaternions x, y, z, w: boxes', frames' and capsules', optional.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">glm::dvec3</td>
 <td style="text-align: left;"><a href="#variable-origin"><strong>origin</strong></a>   = <code>{0.0}</code><br><em>The point the arrays' coordinates are relative to, so items far from the world's origin keep float32's precision.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a></td>
+<td style="text-align: left;"><a href="#variable-placement"><strong>placement</strong></a>  <br><em>Where screen numbers without points go: item i a line below item i - 1.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#variable-points"><strong>points</strong></a>  <br><em>(n, 3); the number of items.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#variable-poseframe"><strong>poseFrame</strong></a>   = <code>{1.0}</code><br><em>The poses' frame in the world, such as an engine's Y-up model turned Z-up.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
-<td style="text-align: left;"><a href="#variable-radii"><strong>radii</strong></a>  <br><em>(n,): spheres'.</em></td>
+<td style="text-align: left;"><a href="#variable-poseindices"><strong>poseIndices</strong></a>  <br><em>(n,) int32: each item's pose.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-poses"><strong>poses</strong></a>  <br><em>(m, 7) float32 poses, as a physics engine's bodies' (position, then quaternion x, y, z, w; Warp's</em> <code>transform</code> <em>, Newton's</em><code>body_q</code> <em>): the items are posed under them, item i under pose</em><code>poseIndices[i]</code> <em>(or pose i without them), turned and moved on the GPU every frame, then by</em><code>poseFrame</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-radii"><strong>radii</strong></a>  <br><em>(n,): spheres' and capsules'.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-screen"><strong>screen</strong></a>   = <code>false</code><br><em>Numbers drawn on the image rather than in the world, over everything.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-markershape"><strong>MarkerShape</strong></a></td>
@@ -274,6 +322,10 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-values"><strong>values</strong></a>  <br><em>(n,): numbers'; their number when they have no points.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#variable-worlds"><strong>worlds</strong></a>  <br><em>(n,) int32: the world whose views show each.</em></td>
 </tr>
 </tbody>
@@ -289,22 +341,58 @@
 <tbody>
 <tr>
 <td style="text-align: right;">std::size_t</td>
-<td style="text-align: left;"><a href="#function-count"><strong>Count</strong></a> () const<br><em>The number of items.</em></td>
+<td style="text-align: left;"><a href="#function-count"><strong>Count</strong></a> () const<br><em>The number of items: rows, of which</em> <code>count</code> <em>may use fewer.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::size_t</td>
+<td style="text-align: left;"><a href="#function-traillength"><strong>TrailLength</strong></a> () const<br><a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>in each trail's row; 1 for other kinds.</em></td>
 </tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Arrays have one row per item: float32 but <code>worlds</code> (int32), and contiguous; on a GPU, all on the renderer's compute device. Optional ones are empty when absent, the style's value standing for them. </p>
+<p>Arrays have one row per item: float32 but <code>worlds</code>, <code>heads</code>, <code>poseIndices</code> and <code>count</code> (int32), and contiguous; on a GPU, all on the renderer's compute device, read again every frame. Optional ones are empty when absent, the style's value standing for them. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-anchors">variable anchors</h3>
+<p><em>The prims the items are posed under (</em> <code>OverlayStyle::anchor</code> <em>): one for every item, or one per item, such as a link of each world's robot.</em></p>
+<pre><code class="language-C++">std::vector&lt;Path&gt; ernie::OverlayBatch::anchors;
+</code></pre>
+<p>The style's anchor without them. </p>
+<hr>
+
 <h3 id="variable-colors">variable colors</h3>
 <p><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::colors;
 </code></pre>
 <hr>
 
+<h3 id="variable-count">variable count</h3>
+<p><em>(1,) int32: how many of the rows are in use, the first, such as the contacts a simulation found this step (its contact count); the rest are left out, the GPU drawing only those.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::count;
+</code></pre>
+<p>Every row without it. </p>
+<hr>
+
+<h3 id="variable-directions">variable directions</h3>
+<p><code>ends</code> <em>are vectors from the points, scaled by</em><code>length</code> <em>: velocities or forces drawn from a simulation's own arrays.</em></p>
+<pre><code class="language-C++">bool ernie::OverlayBatch::directions;
+</code></pre>
+<hr>
+
 <h3 id="variable-ends">variable ends</h3>
-<p><em>(n, 3): lines' and arrows'.</em> </p>
+<p><em>(n, 3): lines' and arrows' ends, or with</em> <code>directions</code> <em>vectors from their points.</em></p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::ends;
+</code></pre>
+<hr>
+
+<h3 id="variable-fade">variable fade</h3>
+<p><em>Trails fade from opaque at their newest point to clear at their oldest.</em> </p>
+<pre><code class="language-C++">bool ernie::OverlayBatch::fade;
+</code></pre>
+<hr>
+
+<h3 id="variable-format">variable format</h3>
+<p><em>Numbers'.</em> </p>
+<pre><code class="language-C++">OverlayNumberFormat ernie::OverlayBatch::format;
 </code></pre>
 <hr>
 
@@ -314,9 +402,21 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-halfheights">variable halfHeights</h3>
+<p><em>(n,): capsules' half the length of their cylinders.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::halfHeights;
+</code></pre>
+<hr>
+
 <h3 id="variable-head">variable head</h3>
 <p><em>Arrows' heads' length; 0 makes each a fifth of its arrow.</em> </p>
 <pre><code class="language-C++">double ernie::OverlayBatch::head;
+</code></pre>
+<hr>
+
+<h3 id="variable-heads">variable heads</h3>
+<p><em>(n,) int32: the index in each trail's row of its newest point; without it, the last.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::heads;
 </code></pre>
 <hr>
 
@@ -326,13 +426,13 @@
 <hr>
 
 <h3 id="variable-length">variable length</h3>
-<p><em>Frames' axis length.</em> </p>
+<p><em>Frames' axis length; the scale of</em> <code>directions</code> <em>.</em></p>
 <pre><code class="language-C++">double ernie::OverlayBatch::length;
 </code></pre>
 <hr>
 
 <h3 id="variable-orientations">variable orientations</h3>
-<p><em>(n, 4) quaternions x, y, z, w: boxes' and frames', optional.</em> </p>
+<p><em>(n, 4) quaternions x, y, z, w: boxes', frames' and capsules', optional.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::orientations;
 </code></pre>
 <hr>
@@ -343,15 +443,46 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-placement">variable placement</h3>
+<p><em>Where screen numbers without points go: item i a line below item i - 1.</em> </p>
+<pre><code class="language-C++">ScreenPlacement ernie::OverlayBatch::placement;
+</code></pre>
+<hr>
+
 <h3 id="variable-points">variable points</h3>
 <p><em>(n, 3); the number of items.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::points;
 </code></pre>
+<p>Screen items' x and y are fractions of the image (<code>ScreenPlacement::at</code>). Trails' (n, length, 3). </p>
+<hr>
+
+<h3 id="variable-poseframe">variable poseFrame</h3>
+<p><em>The poses' frame in the world, such as an engine's Y-up model turned Z-up.</em> </p>
+<pre><code class="language-C++">glm::dmat4 ernie::OverlayBatch::poseFrame;
+</code></pre>
+<hr>
+
+<h3 id="variable-poseindices">variable poseIndices</h3>
+<p><em>(n,) int32: each item's pose.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::poseIndices;
+</code></pre>
+<hr>
+
+<h3 id="variable-poses">variable poses</h3>
+<p><em>(m, 7) float32 poses, as a physics engine's bodies' (position, then quaternion x, y, z, w; Warp's</em> <code>transform</code> <em>, Newton's</em><code>body_q</code> <em>): the items are posed under them, item i under pose</em><code>poseIndices[i]</code> <em>(or pose i without them), turned and moved on the GPU every frame, then by</em><code>poseFrame</code> <em>.</em></p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::poses;
+</code></pre>
 <hr>
 
 <h3 id="variable-radii">variable radii</h3>
-<p><em>(n,): spheres'.</em> </p>
+<p><em>(n,): spheres' and capsules'.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::radii;
+</code></pre>
+<hr>
+
+<h3 id="variable-screen">variable screen</h3>
+<p><em>Numbers drawn on the image rather than in the world, over everything.</em> </p>
+<pre><code class="language-C++">bool ernie::OverlayBatch::screen;
 </code></pre>
 <hr>
 
@@ -377,6 +508,12 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-values">variable values</h3>
+<p><em>(n,): numbers'; their number when they have no points.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::values;
+</code></pre>
+<hr>
+
 <h3 id="variable-worlds">variable worlds</h3>
 <p><em>(n,) int32: the world whose views show each.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::worlds;
@@ -384,8 +521,14 @@
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-count">function Count</h3>
-<p><em>The number of items.</em> </p>
+<p><em>The number of items: rows, of which</em> <code>count</code> <em>may use fewer.</em></p>
 <pre><code class="language-C++">std::size_t ernie::OverlayBatch::Count () const
+</code></pre>
+<hr>
+
+<h3 id="function-traillength">function TrailLength</h3>
+<p><a href="../classernie_1_1Points/"><em><strong>Points</strong></em></a> <em>in each trail's row; 1 for other kinds.</em></p>
+<pre><code class="language-C++">std::size_t ernie::OverlayBatch::TrailLength () const
 </code></pre>
 <hr>
 

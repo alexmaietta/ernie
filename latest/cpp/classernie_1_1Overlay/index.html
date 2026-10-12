@@ -203,7 +203,7 @@
               
                 <h1 id="class-ernieoverlay">Class ernie::Overlay</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>Overlay</strong></a></p>
-<p><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates, drawn over the images of render products that ask for it (</em> <code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em><a href="#detailed-description">More...</a></p>
+<p><em>A named layer of debug drawing: lines, shapes, markers and labels in world coordinates or posed under prims (</em> <code>OverlayStyle::anchor</code> <em>), and text and panels on the image itself (</em><code>Text</code> <em>,</em><code>Rect</code> <em>), drawn over the images of render products that ask for it (</em><code>tokens::kOverlays</code> <em>), after the sensor filters, so they never reach observations that do not.</em><a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/scene/overlay.h&gt;</code></li>
 </ul>
@@ -216,6 +216,14 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">const std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; &amp;</td>
+<td style="text-align: left;"><a href="#function-anchors"><strong>Anchors</strong></a> () const<br><em>The prims items are posed under, which their</em> <code>OverlayItem::anchor</code> <em>count from 1.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-arc"><strong>Arc</strong></a> (const glm::dvec3 &amp; centre, const glm::dvec3 &amp; normal, const glm::dvec3 &amp; from, double radius, double angle, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, bool filled=false, int segments=32) <br><em>An arc of the circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>in the plane facing</em><code>normal</code> <em>, from direction</em><code>from</code> <em>(projected into that plane) turning</em><code>angle</code> <em>radians about</em><code>normal</code> <em>, counter- clockwise looking down it; with</em><code>filled</code> <em>, the sector it sweeps, in triangles of the style's colour, under the arc.</em></td>
+</tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-arrow"><strong>Arrow</strong></a> (const glm::dvec3 &amp; from, const glm::dvec3 &amp; to, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, double head=0.0) <br><em>A line from</em> <code>from</code> <em>to</em><code>to</code> <em>with a cone for its head,</em><code>head</code> <em>long (a fifth of the arrow when 0).</em></td>
@@ -243,6 +251,10 @@
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-clear"><strong>Clear</strong></a> () <br><em>Removes every item.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-curve"><strong>Curve</strong></a> (const glm::dvec3 &amp; p0, const glm::dvec3 &amp; p1, const glm::dvec3 &amp; p2, const glm::dvec3 &amp; p3, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, int segments=32) <br><em>The cubic Bezier curve from</em> <code>p0</code> <em>to</em><code>p3</code> <em>, pulled toward</em><code>p1</code> <em>and</em><code>p2</code> <em>, in</em><code>segments</code> <em>segments.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -285,6 +297,14 @@
 <td style="text-align: left;"><a href="#function-polyline"><strong>Polyline</strong></a> (std::span&lt; const glm::dvec3 &gt; points, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, bool closed=false) <br><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-rect"><strong>Rect</strong></a> (const <a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> &amp; placement, const glm::vec2 &amp; size, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><em>A filled rectangle of</em> <code>size</code> <em>pixels on the image, as</em><code>Text</code> <em>, in the style's colour: a panel, or a bar.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-replacebatcharray"><strong>ReplaceBatchArray</strong></a> (std::size_t batch, std::string_view array, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> values) <br><em>Replaces array</em> <code>array</code> <em>("points", "ends", "values"...: the field's name) of batch</em><code>batch</code> <em>with</em><code>values</code> <em>of the same type and shape, such as the renderer's own memory for it (</em><code>RenderDelegate::MapOverlay</code> <em>), without a new version: the batch's layout stays.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> &gt; &amp;</td>
 <td style="text-align: left;"><a href="#function-segments"><strong>Segments</strong></a> () const<br></td>
 </tr>
@@ -299,6 +319,10 @@
 <tr>
 <td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlaySprite/"><strong>OverlaySprite</strong></a> &gt; &amp;</td>
 <td style="text-align: left;"><a href="#function-sprites"><strong>Sprites</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-text"><strong>Text</strong></a> (const <a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> &amp; placement, std::string_view text, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><code>text</code> <em>(ASCII; lines split at '</em> <em>')</em><code>style.size</code> <em>pixels a line on the image itself, a heads-up display, over a backing box of</em><code>style.background</code> <em>, drawn over everything in every view (of</em><code>style.world</code> <em>'s world, if set).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
@@ -319,9 +343,34 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Items stay until <code>Clear</code>; a simulation redrawing each step clears and adds again.</p>
+<p>Items stay until <code>Clear</code>; a simulation redrawing each step clears and adds again, or keeps batches of GPU arrays it writes (<code>Batch</code>).</p>
 <p>Every shape reduces to segments, triangles and sprites (<code>Segments</code>, <code>Triangles</code>, <code>Sprites</code>), which the renderer draws as they are. </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-anchors">function Anchors</h3>
+<p><em>The prims items are posed under, which their</em> <code>OverlayItem::anchor</code> <em>count from 1.</em></p>
+<pre><code class="language-C++">inline const std::vector&lt; Path &gt; &amp; ernie::Overlay::Anchors () const
+</code></pre>
+<hr>
+
+<h3 id="function-arc">function Arc</h3>
+<p><em>An arc of the circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>in the plane facing</em><code>normal</code> <em>, from direction</em><code>from</code> <em>(projected into that plane) turning</em><code>angle</code> <em>radians about</em><code>normal</code> <em>, counter- clockwise looking down it; with</em><code>filled</code> <em>, the sector it sweeps, in triangles of the style's colour, under the arc.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Arc (
+    const glm::dvec3 &amp; centre,
+    const glm::dvec3 &amp; normal,
+    const glm::dvec3 &amp; from,
+    double radius,
+    double angle,
+    const OverlayStyle &amp; style={},
+    bool filled=false,
+    int segments=32
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a normal or <code>from</code> of no length in the plane, or fewer than 1 segment. </li>
+</ul>
+<hr>
+
 <h3 id="function-arrow">function Arrow</h3>
 <p><em>A line from</em> <code>from</code> <em>to</em><code>to</code> <em>with a cone for its head,</em><code>head</code> <em>long (a fifth of the arrow when 0).</em></p>
 <pre><code class="language-C++">Overlay &amp; ernie::Overlay::Arrow (
@@ -349,10 +398,10 @@
     OverlayBatch batch
 ) 
 </code></pre>
-<p>The overlay holds the arrays: <code>Touch</code> it after writing into them in place. </p>
+<p>The overlay holds the arrays: GPU ones are read again every frame; <code>Touch</code> it after writing into host ones in place. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> for arrays of the wrong type or shape, rows that differ in number, or ones the kind needs missing. </li>
+<li><code>std::invalid_argument</code> for arrays of the wrong type or shape, rows that differ in number, ones the kind needs missing, or anchors neither one nor one per item. </li>
 </ul>
 <hr>
 
@@ -388,6 +437,23 @@
 <p><em>Removes every item.</em> </p>
 <pre><code class="language-C++">Overlay &amp; ernie::Overlay::Clear () 
 </code></pre>
+<hr>
+
+<h3 id="function-curve">function Curve</h3>
+<p><em>The cubic Bezier curve from</em> <code>p0</code> <em>to</em><code>p3</code> <em>, pulled toward</em><code>p1</code> <em>and</em><code>p2</code> <em>, in</em><code>segments</code> <em>segments.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Curve (
+    const glm::dvec3 &amp; p0,
+    const glm::dvec3 &amp; p1,
+    const glm::dvec3 &amp; p2,
+    const glm::dvec3 &amp; p3,
+    const OverlayStyle &amp; style={},
+    int segments=32
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for fewer than 1 segment. </li>
+</ul>
 <hr>
 
 <h3 id="function-empty">function Empty</h3>
@@ -480,6 +546,30 @@
 </code></pre>
 <hr>
 
+<h3 id="function-rect">function Rect</h3>
+<p><em>A filled rectangle of</em> <code>size</code> <em>pixels on the image, as</em><code>Text</code> <em>, in the style's colour: a panel, or a bar.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Rect (
+    const ScreenPlacement &amp; placement,
+    const glm::vec2 &amp; size,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-replacebatcharray">function ReplaceBatchArray</h3>
+<p><em>Replaces array</em> <code>array</code> <em>("points", "ends", "values"...: the field's name) of batch</em><code>batch</code> <em>with</em><code>values</code> <em>of the same type and shape, such as the renderer's own memory for it (</em><code>RenderDelegate::MapOverlay</code> <em>), without a new version: the batch's layout stays.</em></p>
+<pre><code class="language-C++">void ernie::Overlay::ReplaceBatchArray (
+    std::size_t batch,
+    std::string_view array,
+    Tensor values
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a batch or array that does not exist, or values of another type or shape. </li>
+</ul>
+<hr>
+
 <h3 id="function-segments">function Segments</h3>
 <pre><code class="language-C++">inline const std::vector&lt; OverlaySegment &gt; &amp; ernie::Overlay::Segments () const
 </code></pre>
@@ -505,6 +595,16 @@
 
 <h3 id="function-sprites">function Sprites</h3>
 <pre><code class="language-C++">inline const std::vector&lt; OverlaySprite &gt; &amp; ernie::Overlay::Sprites () const
+</code></pre>
+<hr>
+
+<h3 id="function-text">function Text</h3>
+<p><code>text</code> <em>(ASCII; lines split at '</em> <em>')</em><code>style.size</code> <em>pixels a line on the image itself, a heads-up display, over a backing box of</em><code>style.background</code> <em>, drawn over everything in every view (of</em><code>style.world</code> <em>'s world, if set).</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Text (
+    const ScreenPlacement &amp; placement,
+    std::string_view text,
+    const OverlayStyle &amp; style={}
+) 
 </code></pre>
 <hr>
 

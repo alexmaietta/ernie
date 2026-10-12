@@ -15015,6 +15015,38 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>shadow_virtual</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The sun shadows through a virtual shadow map: about a texel a pixel from near to far.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_virtual_bias</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Levels coarser (+) or finer (-) than a texel a pixel. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_virtual_debug</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>levels: tint by the clipmap level shadowing a point; pages: black where no page backs it.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_virtual_pages</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Physical pages of 128² texels. Default 1024. USD name <code>ernie:shadows:virtualPages</code>.</p>
+              </div>
+            </li>
+            <li>
               <b><code>shadow_world_fit</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -15775,6 +15807,101 @@ shadow maps, from the depths a recent frame saw. Default 'scene'. USD name
 
 
 
+<h3 id="ernie.schema.RenderSettings.shadow_virtual" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_virtual: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The sun shadows through a virtual shadow map: about a texel a pixel from near to far.
+Default False. USD name <code>ernie:shadows:virtual</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.shadow_virtual_bias" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_bias</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_bias: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Levels coarser (+) or finer (-) than a texel a pixel. Default 0.0. USD name
+<code>ernie:shadows:virtualBias</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.shadow_virtual_debug" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_debug</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_debug: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>levels: tint by the clipmap level shadowing a point; pages: black where no page backs it.
+Default 'off'. USD name <code>ernie:shadows:virtualDebug</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.shadow_virtual_pages" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_pages</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_pages: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Physical pages of 128² texels. Default 1024. USD name <code>ernie:shadows:virtualPages</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.RenderSettings.shadow_world_fit" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_world_fit</span>
 
@@ -16131,6 +16258,10 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     shadow_world_fit: str = ...,
     shadow_world_resolution: int = ...,
     shadow_world_margin: float = ...,
+    shadow_virtual: bool = ...,
+    shadow_virtual_pages: int = ...,
+    shadow_virtual_bias: float = ...,
+    shadow_virtual_debug: str = ...,
     volume_steps_per_voxel: float = ...,
     volume_max_steps: int = ...,
     volume_shadow_steps: int = ...,

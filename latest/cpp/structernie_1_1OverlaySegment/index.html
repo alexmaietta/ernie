@@ -203,7 +203,7 @@
               
                 <h1 id="struct-ernieoverlaysegment">Struct ernie::OverlaySegment</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>OverlaySegment</strong></a></p>
-<p><em>A line segment of</em> <code>width</code> <em>pixels.</em></p>
+<p><em>A line segment of</em> <code>width</code> <em>pixels, dashed every</em><code>dash</code> <em>pixels (</em><code>OverlayStyle::dash</code> <em>) unless 0.</em></p>
 <ul>
 <li><code>#include &lt;ernie/scene/overlay.h&gt;</code></li>
 </ul>
@@ -225,6 +225,10 @@
 <td style="text-align: left;"><a href="#variable-b"><strong>b</strong></a>   = <code>{0.0}</code><br></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-dash"><strong>dash</strong></a>   = <code>0.0f</code><br></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1OverlayItem/"><strong>OverlayItem</strong></a></td>
 <td style="text-align: left;"><a href="#variable-item"><strong>item</strong></a>  <br></td>
 </tr>
@@ -242,6 +246,11 @@
 
 <h3 id="variable-b">variable b</h3>
 <pre><code class="language-C++">glm::dvec3 ernie::OverlaySegment::b;
+</code></pre>
+<hr>
+
+<h3 id="variable-dash">variable dash</h3>
+<pre><code class="language-C++">float ernie::OverlaySegment::dash;
 </code></pre>
 <hr>
 
