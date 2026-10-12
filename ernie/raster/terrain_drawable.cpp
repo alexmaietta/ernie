@@ -226,6 +226,10 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
     leafRangePipeline_ = compile("leafRangeMain");
     std::vector<ShaderModuleSource> modules = TerrainModules();
     modules.push_back(
+        {"virtual_shadow", shaders::kVirtualShadowSlang});
+    modules.push_back({"virtual_shadow_caster",
+                       shaders::kVirtualShadowCasterSlang});
+    modules.push_back(
         {"terrain_shadow", shaders::kTerrainShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
         renderer_.Compiler().CompileSpirv(modules, "shadowVertex");
@@ -1093,8 +1097,33 @@ void TerrainDrawable::RecordShadow(
         (view.valid && cascade == view.shadowView)) {
         return;
     }
+    if (frame.virtualShadow && virtualShadowPipeline_ == nullptr) {
+        std::vector<ShaderModuleSource> modules = TerrainModules();
+        modules.push_back(
+            {"virtual_shadow", shaders::kVirtualShadowSlang});
+        modules.push_back({"virtual_shadow_caster",
+                           shaders::kVirtualShadowCasterSlang});
+        modules.push_back(
+            {"terrain_shadow", shaders::kTerrainShadowSlang});
+        const std::vector<std::uint32_t> vertex =
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "shadowVertex");
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(
+                modules, "virtualShadowFragment");
+        GraphicsPipelineDesc desc;
+        desc.vertexSpirv = vertex;
+        desc.fragmentSpirv = fragment;
+        desc.depthFormat = VK_FORMAT_UNDEFINED;
+        desc.depthWrite = false;
+        desc.depthClamp = true;
+        virtualShadowPipeline_ = std::make_unique<GraphicsPipeline>(
+            renderer_.Context(), layout_, desc);
+    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      shadowPipeline_->Handle());
+                      frame.virtualShadow
+                          ? virtualShadowPipeline_->Handle()
+                          : shadowPipeline_->Handle());
     layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                  Resources(frame, 0));
     DrawPatches(commands, cascadeRanges_[cascade],

@@ -165,11 +165,14 @@ float MaxScale(const glm::mat4& m) {
 
 std::vector<ShaderModuleSource>
 PointsModules(bool pushbroom = false) {
-    return {{"brdf", std::string(BrdfSlang())},
-            ProjectionModule(pushbroom),
-            {"frame", shaders::kFrameSlang},
-            {"surface", shaders::kSurfaceSlang},
-            {"points", shaders::kPointsSlang}};
+    return {
+        {"brdf", std::string(BrdfSlang())},
+        ProjectionModule(pushbroom),
+        {"frame", shaders::kFrameSlang},
+        {"surface", shaders::kSurfaceSlang},
+        {"virtual_shadow", shaders::kVirtualShadowSlang},
+        {"virtual_shadow_caster", shaders::kVirtualShadowCasterSlang},
+        {"points", shaders::kPointsSlang}};
 }
 
 }  // namespace
@@ -1058,8 +1061,28 @@ void PointsDrawable::RecordShadow(
     VkCommandBuffer commands, const RasterFrame& frame,
     std::size_t cascade, const glm::mat4& lightViewProjection,
     const ShadowCasters& casters) const {
+    if (frame.virtualShadow && virtualShadowPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules =
+            PointsModules();
+        const std::vector<std::uint32_t> vertex =
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "shadowVertex");
+        const std::vector<std::uint32_t> fragment =
+            renderer_.Compiler().CompileSpirv(
+                modules, "virtualShadowFragment");
+        GraphicsPipelineDesc desc;
+        desc.vertexSpirv = vertex;
+        desc.fragmentSpirv = fragment;
+        desc.depthFormat = VK_FORMAT_UNDEFINED;
+        desc.depthWrite = false;
+        desc.depthClamp = true;
+        virtualShadowPipeline_ = std::make_unique<GraphicsPipeline>(
+            context_, layout_, desc);
+    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      shadowPipeline_->Handle());
+                      frame.virtualShadow
+                          ? virtualShadowPipeline_->Handle()
+                          : shadowPipeline_->Handle());
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const std::size_t count = clouds_.at(items_[i].points).count;
         if (count == 0 || !casters.Draws(items_[i].world) ||

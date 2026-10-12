@@ -385,3 +385,77 @@ TEST_F(VirtualShadowMapTest, TheSunsSizeWidensThePenumbraWithHeight) {
     EXPECT_GT(high, 2 * low);
     EXPECT_GT(high, 3 * point);
 }
+
+namespace {
+
+/// The shadow's dark pixels through the cascades and then through the
+/// virtual map, for a scene seen from above under a sun 30 degrees
+/// off overhead.
+std::pair<std::size_t, std::size_t>
+CascadesThenVirtual(const ernie::VulkanContext& context,
+                    ernie::Scene& scene) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    DistantLight::Define(scene, "/World/Sun");
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({0.5, 0.0, 0.866}));
+    Camera::Define(scene, "/World/Camera").SetSensorNoise(false);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({0.0, -8.0, 24.0}, {-1.0, 0.0, 0.0},
+                              {0.0, 0.0, 1.0}));
+    RenderSettings settings =
+        RenderSettings::Define(scene, "/Render/Settings");
+    settings.SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(64.0, 64.0))
+        .SetAmbient(0.0);
+    RasterDelegate delegate(context);
+    const std::size_t cascades = DarkPixels(delegate.Render(scene));
+    settings.SetShadowVirtual(true);
+    return {cascades, DarkPixels(delegate.Render(scene))};
+}
+
+}  // namespace
+
+// A point cloud's spheres cast into the virtual map as into the
+// cascades.
+TEST_F(VirtualShadowMapTest, PointsCastThroughTheVirtualMap) {
+    using namespace ernie;
+    Scene scene;
+    GroundPlane::Define(scene, "/World/Floor")
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    const std::vector<float> points{0.0f, 0.0f, 3.0f};
+    Points::Define(scene, "/World/Grains")
+        .SetPoints(Tensor::Copy<float>(points, {1, 3}))
+        .SetWidths({4.0f});
+    const auto [cascades, virtualMap] =
+        CascadesThenVirtual(*context_, scene);
+    ASSERT_GT(cascades, 20u);
+    EXPECT_GT(virtualMap, cascades / 2);
+    EXPECT_LT(virtualMap, cascades * 2);
+}
+
+// A terrain's block shadows its own ground through the virtual map as
+// through the cascades.
+TEST_F(VirtualShadowMapTest, TerrainCastsThroughTheVirtualMap) {
+    using namespace ernie;
+    using ernie::testing::TestRaster;
+    TestRaster raster = TestRaster::Centred(33, 33, 1.0);
+    for (std::size_t row = 14; row < 19; ++row) {
+        for (std::size_t col = 14; col < 19; ++col) {
+            raster(col, row) = 4.0f;
+        }
+    }
+    Scene scene;
+    Terrain::Define(scene, "/World/Terrain")
+        .SetHeights(ernie::testing::HeightsOf(raster))
+        .SetOrigin(glm::dvec2(raster.originX, raster.originY))
+        .SetCellSize(1.0)
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    const auto [cascades, virtualMap] =
+        CascadesThenVirtual(*context_, scene);
+    ASSERT_GT(cascades, 20u);
+    EXPECT_GT(virtualMap, cascades / 2);
+    EXPECT_LT(virtualMap, cascades * 2);
+}

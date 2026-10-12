@@ -173,6 +173,10 @@ class PointsDrawable : public RasterDrawable {
     }
     std::optional<Bounds3> Bounds() const override;
 
+    bool DrawsVirtualShadows() const override {
+        return true;
+    }
+
     bool DrawsMinimal() const override {
         return true;
     }
@@ -270,6 +274,8 @@ class PointsDrawable : public RasterDrawable {
     std::array<std::unique_ptr<GraphicsPipeline>, 2>
         minimalPipelines_;
     std::unique_ptr<GraphicsPipeline> shadowPipeline_;
+    /// Made the first time a virtual shadow map's level is drawn.
+    mutable std::unique_ptr<GraphicsPipeline> virtualShadowPipeline_;
     std::map<std::uint32_t, Cloud> clouds_;
     std::uint32_t nextHandle_ = 1;
     std::vector<PointsItem> items_;
