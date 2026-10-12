@@ -292,7 +292,7 @@ TEST(RenderSchemas, RegistryDescribesTheTypes) {
     EXPECT_EQ(settings.Find(tokens::kResolution)->kind,
               AttributeKind::Vec2);
     EXPECT_EQ(
-        settings.Find(tokens::kMinimalMode)->meta.options.size(), 4u);
+        settings.Find(tokens::kMinimalMode)->meta.options.size(), 5u);
     EXPECT_EQ(settings.Find(tokens::kProducts)->kind,
               AttributeKind::Relationships);
     EXPECT_EQ(settings.Find(tokens::kLightsRel)->pyName, "lights");
