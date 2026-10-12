@@ -136,3 +136,34 @@ TEST_F(TextureBake, EncodingRejectsWhatItCannotWrite) {
     EXPECT_THROW(BakeTexture(dir_ / "missing.png", dir_ / "out.dds"),
                  std::runtime_error);
 }
+
+TEST_F(TextureBake, EightBitBakesMatchFloatOnes) {
+    // An 8-bit sRGB PNG (37 x 23, so mips round down at odd edges)
+    // bakes without floats; its mips match the float chain's to
+    // within a step or two of 8-bit rounding.
+    const auto input = Png("eight.png", 37, 23, [](int x, int y) {
+        return glm::u8vec4(x * 7, y * 11, (x * y) % 256,
+                           200 + x % 50);
+    });
+    BakeOptions options;
+    options.format = TextureFormat::Rgba8;
+    const TextureData eight =
+        BakeTexture(input, dir_ / "eight.dds", options);
+    EXPECT_EQ(eight.format, TextureFormat::Rgba8Srgb);
+    const TextureData floats = EncodeTexture(
+        MipChain(ernie::LoadImageFile(input, ImageEncoding::Srgb),
+                 MipFilter::Average),
+        TextureFormat::Rgba8Srgb, ImageEncoding::Srgb);
+    ASSERT_EQ(eight.mips, floats.mips);
+    for (std::uint32_t mip = 0; mip < eight.mips; ++mip) {
+        const auto a = eight.Mip(0, mip);
+        const auto b = floats.Mip(0, mip);
+        ASSERT_EQ(a.size(), b.size());
+        int worst = 0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            worst = std::max(worst, std::abs(static_cast<int>(a[i]) -
+                                             static_cast<int>(b[i])));
+        }
+        EXPECT_LE(worst, 2) << "mip " << mip;
+    }
+}

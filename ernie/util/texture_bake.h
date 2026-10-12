@@ -56,6 +56,11 @@ void WriteDdsFile(const std::filesystem::path& path,
 /// an eighth of the memory of uncompressed RGBA8. Returns the stored
 /// texture.
 ///
+/// 8-bit PNG and JPEG colour and data bake in 8 bits, each mip made
+/// from the last and dropped once encoded (about 4 bytes a texel of
+/// the image beyond the output); normal maps, EXR and 16-bit images
+/// through floats (16 bytes a texel for every mip).
+///
 /// References:
 /// - R. Geldreich, "bc7enc_rdo" (bc7enc and rgbcx).
 ///   https://github.com/richgel999/bc7enc_rdo

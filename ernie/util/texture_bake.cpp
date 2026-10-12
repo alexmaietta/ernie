@@ -3,13 +3,18 @@
 
 #include <bc7enc.h>
 #include <rgbcx.h>
+#include <stb_image.h>
 
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
+#include <cmath>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -108,7 +113,7 @@ void EncodeBlock(TextureFormat format, const std::uint8_t* pixels,
 /// encoded into BC `format` blocks at `out`, rows of blocks shared
 /// among threads.
 void EncodeBlocks(TextureFormat format,
-                  const std::vector<std::uint8_t>& rgba,
+                  std::span<const std::uint8_t> rgba,
                   std::uint32_t width, std::uint32_t height,
                   std::byte* out,
                   const bc7enc_compress_block_params& bc7) {
@@ -157,11 +162,11 @@ void EncodeBlocks(TextureFormat format,
     }
 }
 
-}  // namespace
-
-TextureData EncodeTexture(std::span<const Image> mips,
-                          TextureFormat format,
-                          ImageEncoding encoding, int quality) {
+/// A texture of `format`, `width` x `height` with `mips` mips, its
+/// blocks still to encode.
+/// @throws std::invalid_argument for a format it does not write.
+TextureData Allocate(TextureFormat format, std::uint32_t width,
+                     std::uint32_t height, std::uint32_t mips) {
     using F = TextureFormat;
     constexpr std::array<F, 10> kWritten{
         F::Rgba8,   F::Rgba8Srgb, F::Bc1, F::Bc1Srgb, F::Bc3,
@@ -171,29 +176,25 @@ TextureData EncodeTexture(std::span<const Image> mips,
         throw std::invalid_argument(
             "Textures are not encoded to this format");
     }
-    if (mips.empty()) {
-        throw std::invalid_argument("A texture needs a mip");
-    }
     TextureData texture;
     texture.format = format;
-    texture.width = mips[0].width;
-    texture.height = mips[0].height;
-    texture.mips = static_cast<std::uint32_t>(mips.size());
-    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
-        const std::uint32_t width =
-            std::max(1u, texture.width >> mip);
-        const std::uint32_t height =
-            std::max(1u, texture.height >> mip);
-        if (mips[mip].width != width || mips[mip].height != height) {
-            throw std::invalid_argument(
-                "Mip " + std::to_string(mip) +
-                " does not halve the one before");
-        }
+    texture.width = width;
+    texture.height = height;
+    texture.mips = mips;
+    for (std::uint32_t mip = 0; mip < mips; ++mip) {
         texture.offsets.push_back(texture.bytes.size());
         texture.bytes.resize(texture.bytes.size() +
-                             ImageBytes(format, width, height));
+                             ImageBytes(format,
+                                        std::max(1u, width >> mip),
+                                        std::max(1u, height >> mip)));
     }
+    return texture;
+}
 
+/// BC7's settings for `format` at effort `quality`, the encoders
+/// initialised.
+bc7enc_compress_block_params Bc7Params(TextureFormat format,
+                                       int quality) {
     static std::once_flag initialised;
     std::call_once(initialised, [] {
         bc7enc_compress_block_init();
@@ -201,22 +202,101 @@ TextureData EncodeTexture(std::span<const Image> mips,
     });
     bc7enc_compress_block_params bc7{};
     bc7enc_compress_block_params_init(&bc7);
-    if (format == F::Bc7) {
+    if (format == TextureFormat::Bc7) {
         bc7enc_compress_block_params_init_linear_weights(&bc7);
     }
     bc7.m_uber_level = static_cast<std::uint32_t>(
         std::clamp(quality, 0, BC7ENC_MAX_UBER_LEVEL));
-    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
-        const Image& image = mips[mip];
-        const std::vector<std::uint8_t> rgba =
-            ToRgba8(image, encoding);
-        std::byte* out = texture.bytes.data() + texture.offsets[mip];
-        if (!InfoOf(format).compressed()) {
-            std::memcpy(out, rgba.data(), rgba.size());
-            continue;
+    return bc7;
+}
+
+/// Encodes mip `mip` of `texture` from its RGBA8 texels `rgba`.
+void EncodeMip(TextureData& texture, std::uint32_t mip,
+               std::span<const std::uint8_t> rgba,
+               const bc7enc_compress_block_params& bc7) {
+    const std::uint32_t width = std::max(1u, texture.width >> mip);
+    const std::uint32_t height = std::max(1u, texture.height >> mip);
+    std::byte* out = texture.bytes.data() + texture.offsets[mip];
+    if (!InfoOf(texture.format).compressed()) {
+        std::memcpy(out, rgba.data(), rgba.size());
+        return;
+    }
+    EncodeBlocks(texture.format, rgba, width, height, out, bc7);
+}
+
+/// The next mip of RGBA8 `rgba` (`width` x `height`): each texel the
+/// average of the 2 x 2 above it, clamped at odd edges, as
+/// `MipChain`'s `MipFilter::Average`; with `srgb` its rgb averaged as
+/// linear values.
+std::vector<std::uint8_t>
+HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
+           std::uint32_t height, bool srgb) {
+    static const std::array<float, 256> kLinear = [] {
+        std::array<float, 256> table{};
+        for (int i = 0; i < 256; ++i) {
+            table[static_cast<std::size_t>(i)] =
+                SrgbToLinear(static_cast<float>(i) / 255.0f);
         }
-        EncodeBlocks(format, rgba, image.width, image.height, out,
-                     bc7);
+        return table;
+    }();
+    const std::uint32_t w = std::max(1u, width / 2);
+    const std::uint32_t h = std::max(1u, height / 2);
+    std::vector<std::uint8_t> half(std::size_t{w} * h * 4);
+    for (std::uint32_t y = 0; y < h; ++y) {
+        for (std::uint32_t x = 0; x < w; ++x) {
+            for (std::uint32_t c = 0; c < 4; ++c) {
+                float sum = 0.0f;
+                for (std::uint32_t dy = 0; dy < 2; ++dy) {
+                    for (std::uint32_t dx = 0; dx < 2; ++dx) {
+                        const std::uint32_t sx =
+                            std::min(2 * x + dx, width - 1);
+                        const std::uint32_t sy =
+                            std::min(2 * y + dy, height - 1);
+                        const std::uint8_t value =
+                            rgba[(std::size_t{sy} * width + sx) * 4 +
+                                 c];
+                        sum +=
+                            srgb && c < 3
+                                ? kLinear[value]
+                                : static_cast<float>(value) / 255.0f;
+                    }
+                }
+                float mean = sum / 4.0f;
+                if (srgb && c < 3) {
+                    mean = LinearToSrgb(mean);
+                }
+                half[(std::size_t{y} * w + x) * 4 + c] =
+                    static_cast<std::uint8_t>(std::lround(
+                        std::clamp(mean, 0.0f, 1.0f) * 255.0f));
+            }
+        }
+    }
+    return half;
+}
+
+}  // namespace
+
+TextureData EncodeTexture(std::span<const Image> mips,
+                          TextureFormat format,
+                          ImageEncoding encoding, int quality) {
+    if (mips.empty()) {
+        throw std::invalid_argument("A texture needs a mip");
+    }
+    TextureData texture =
+        Allocate(format, mips[0].width, mips[0].height,
+                 static_cast<std::uint32_t>(mips.size()));
+    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+        if (mips[mip].width != std::max(1u, texture.width >> mip) ||
+            mips[mip].height != std::max(1u, texture.height >> mip)) {
+            throw std::invalid_argument(
+                "Mip " + std::to_string(mip) +
+                " does not halve the one before");
+        }
+    }
+    const bc7enc_compress_block_params bc7 =
+        Bc7Params(format, quality);
+    for (std::uint32_t mip = 0; mip < texture.mips; ++mip) {
+        EncodeMip(texture, mip, ToRgba8(mips[mip], encoding), bc7);
     }
     return texture;
 }
@@ -276,6 +356,59 @@ TextureData BakeTexture(const std::filesystem::path& input,
     format = WithSrgb(format, srgb);
     const ImageEncoding encoding =
         srgb ? ImageEncoding::Srgb : ImageEncoding::Linear;
+    // 8-bit PNG and JPEG colour and data stay 8-bit, each mip made
+    // from the last and dropped once encoded: 4 bytes a texel of the
+    // full size rather than float's 16 for the whole chain, which a
+    // global mosaic needs. Normal maps (their slopes) and EXR and
+    // 16-bit images go through floats.
+    std::string extension = input.extension().string();
+    std::transform(extension.begin(), extension.end(),
+                   extension.begin(), [](unsigned char c) {
+                       return static_cast<char>(std::tolower(c));
+                   });
+    const std::string name = input.string();
+    if (options.role != TextureRole::Normal &&
+        (extension == ".png" || extension == ".jpg" ||
+         extension == ".jpeg") &&
+        stbi_is_16_bit(name.c_str()) == 0) {
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        stbi_uc* data =
+            stbi_load(name.c_str(), &width, &height, &channels, 4);
+        if (data == nullptr) {
+            throw std::runtime_error("Cannot read " + name + ": " +
+                                     stbi_failure_reason());
+        }
+        // Mip 0 is read from the decoder's buffer, freed once halved.
+        std::unique_ptr<stbi_uc, decltype(&stbi_image_free)> decoded(
+            data, &stbi_image_free);
+        auto w = static_cast<std::uint32_t>(width);
+        auto h = static_cast<std::uint32_t>(height);
+        std::vector<std::uint8_t> halved;
+        std::span<const std::uint8_t> rgba(decoded.get(),
+                                           std::size_t{w} * h * 4);
+        std::uint32_t mips = 1;
+        for (std::uint32_t side = std::max(w, h); side > 1;
+             side >>= 1) {
+            ++mips;
+        }
+        TextureData texture = Allocate(format, w, h, mips);
+        const bc7enc_compress_block_params bc7 =
+            Bc7Params(format, options.quality);
+        for (std::uint32_t mip = 0; mip < mips; ++mip) {
+            EncodeMip(texture, mip, rgba, bc7);
+            if (mip + 1 < mips) {
+                halved = HalveRgba8(rgba, w, h, srgb);
+                rgba = halved;
+                decoded.reset();
+                w = std::max(1u, w / 2);
+                h = std::max(1u, h / 2);
+            }
+        }
+        WriteDdsFile(output, texture);
+        return texture;
+    }
     const Image image = LoadImageFile(input, encoding);
     const std::vector<Image> mips =
         MipChain(image, options.role == TextureRole::Normal
