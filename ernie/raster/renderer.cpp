@@ -1844,22 +1844,7 @@ RasterRenderer::EnsurePatternArray(const std::string& key,
     // into a region wait for the frames already submitted, which read
     // what it held before.
     if (found != patternArrayRegions_.end()) {
-        patternArrayFree_.emplace_back(
-            found->second.offset,
-            MipTexels(found->second.width, found->second.height));
-        std::sort(patternArrayFree_.begin(), patternArrayFree_.end());
-        // Neighbours merged.
-        std::vector<std::pair<std::size_t, std::size_t>> merged;
-        for (const auto& [offset, floats] : patternArrayFree_) {
-            if (!merged.empty() &&
-                merged.back().first + merged.back().second ==
-                    offset) {
-                merged.back().second += floats;
-            } else {
-                merged.emplace_back(offset, floats);
-            }
-        }
-        patternArrayFree_ = std::move(merged);
+        FreePatternRegion(found->second);
     }
     const std::size_t floats = MipTexels(width, height);
     auto best = patternArrayFree_.end();
@@ -1885,6 +1870,44 @@ RasterRenderer::EnsurePatternArray(const std::string& key,
     patternArrayRegions_[key] = region;
     EnsurePatternData(patternArrayFloats_ + patternHostFloats_);
     return region;
+}
+
+void RasterRenderer::ReleasePatternArrays(
+    const std::function<bool(const std::string&)>& held) {
+    for (auto it = patternArrayRegions_.begin();
+         it != patternArrayRegions_.end();) {
+        if (held(it->first)) {
+            ++it;
+        } else {
+            FreePatternRegion(it->second);
+            it = patternArrayRegions_.erase(it);
+        }
+    }
+}
+
+void RasterRenderer::FreePatternRegion(
+    const PatternArrayRegion& region) {
+    patternArrayFree_.emplace_back(
+        region.offset, MipTexels(region.width, region.height));
+    std::sort(patternArrayFree_.begin(), patternArrayFree_.end());
+    // Neighbours merged.
+    std::vector<std::pair<std::size_t, std::size_t>> merged;
+    for (const auto& [offset, floats] : patternArrayFree_) {
+        if (!merged.empty() &&
+            merged.back().first + merged.back().second == offset) {
+            merged.back().second += floats;
+        } else {
+            merged.emplace_back(offset, floats);
+        }
+    }
+    // Space at the end is no region's: the host's part starts there.
+    if (!merged.empty() &&
+        merged.back().first + merged.back().second ==
+            patternArrayFloats_) {
+        patternArrayFloats_ = merged.back().first;
+        merged.pop_back();
+    }
+    patternArrayFree_ = std::move(merged);
 }
 
 void RasterRenderer::EnsurePatternData(std::size_t floats) {

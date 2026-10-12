@@ -2308,6 +2308,18 @@ void RasterDelegate::Sync(const Scene& scene) {
     // What casts shadows may have moved: the terrain's horizon over
     // it follows.
     renderer_.MarkCastersChanged();
+    // Lasers' pattern arrays the scene no longer holds on the GPU
+    // give their regions back; hidden ones keep theirs, where their
+    // maps write.
+    renderer_.ReleasePatternArrays([&scene](const std::string& key) {
+        const Path path(key);
+        if (!scene.Has(path)) {
+            return false;
+        }
+        const Tensor* array =
+            scene.Read(path, tokens::kLaserPatternImageArray);
+        return array != nullptr && IsGpu(array->Location().kind);
+    });
     std::vector<std::string> errors;
     const auto attempt = [&errors](auto&& step) {
         try {

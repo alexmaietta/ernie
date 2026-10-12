@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -522,6 +523,12 @@ class RasterRenderer {
     PatternArrayRegion EnsurePatternArray(const std::string& key,
                                           std::uint32_t width,
                                           std::uint32_t height);
+
+    /// Frees the regions of the lasers whose keys `held` no longer
+    /// holds (removed, or their images no longer GPU arrays), for new
+    /// regions to take.
+    void ReleasePatternArrays(
+        const std::function<bool(const std::string&)>& held);
 
     /// The buffer of the lasers' pattern image arrays (and their
     /// other pattern data), shared with the compute device once a
@@ -1219,6 +1226,8 @@ class RasterRenderer {
     /// and merged, which new regions take before the end grows.
     std::vector<std::pair<std::size_t, std::size_t>>
         patternArrayFree_;
+    /// Adds `region`'s space to `patternArrayFree_`, or to the end's.
+    void FreePatternRegion(const PatternArrayRegion& region);
     /// The frame's arrays to read into their regions
     /// (`PatternArrayWrites`), and the regions whose mip levels the
     /// frame builds (`RecordPatternMips`).

@@ -911,6 +911,16 @@ TEST_F(RasterDelegateTest,
     // Nothing fits a larger one: it goes at the end.
     EXPECT_EQ(renderer.EnsurePatternArray("c", 16, 16).offset, 106u);
     EXPECT_GE(renderer.PatternArrays()->Size(), size);
+    // Released, "a" and "b" leave the space before "c" for new ones.
+    renderer.ReleasePatternArrays(
+        [](const std::string& key) { return key == "c"; });
+    EXPECT_EQ(renderer.EnsurePatternArray("d", 8, 8).offset, 0u);
+    EXPECT_EQ(renderer.EnsurePatternArray("c", 16, 16).offset, 106u)
+        << "a held one keeps its region";
+    // "c" released, the space after "d" is the end's again.
+    renderer.ReleasePatternArrays(
+        [](const std::string& key) { return key == "d"; });
+    EXPECT_EQ(renderer.EnsurePatternArray("e", 16, 16).offset, 85u);
 }
 
 TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {
