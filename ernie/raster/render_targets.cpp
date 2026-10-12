@@ -311,6 +311,53 @@ std::span<const std::string_view> RenderTargets::VarNames() {
     return kVarNames;
 }
 
+std::shared_ptr<RenderTargets::LinearVars>
+RenderTargets::MakeLinearVars(const VulkanContext& context,
+                              VkExtent2D extent, std::uint32_t views,
+                              int bands,
+                              std::span<const std::string> names) {
+    auto linear = std::make_shared<LinearVars>();
+    std::array<VkDeviceAddress, LinearVars::kVars> addresses{};
+    for (std::size_t i = 0; i < LinearVars::kVars; ++i) {
+        if (std::find(names.begin(), names.end(), kVarNames[i]) ==
+            names.end()) {
+            continue;
+        }
+        // SpectralRadiance a layer per band, the others one, per
+        // view.
+        const VkDeviceSize layers =
+            VkDeviceSize{views} *
+            (i == 0 ? static_cast<VkDeviceSize>(bands) : 1u);
+        const VkDeviceSize bytes =
+            layers * extent.width * extent.height *
+            GpuImage::TexelBytes(kVarFormats[i]);
+        linear->buffers[i] = std::make_shared<GpuBuffer>(
+            context, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            BufferMemory::Shared);
+        addresses[i] = linear->buffers[i]->Address();
+        linear->held |= 1u << i;
+    }
+    linear->table = std::make_unique<GpuBuffer>(
+        context, sizeof(addresses),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    linear->table->Write(std::as_bytes(std::span(addresses)));
+    return linear;
+}
+
+FrameImages::LinearVar
+RenderTargets::Linear(std::string_view name) const {
+    if (linear_ == nullptr) {
+        return {};
+    }
+    for (std::size_t i = 0; i < LinearVars::kVars; ++i) {
+        if (kVarNames[i] == name &&
+            ((linear_->written >> i) & 1u) != 0) {
+            return {linear_->buffers[i], kVarFormats[i]};
+        }
+    }
+    return {};
+}
+
 std::uint64_t RenderTargets::GpuBytes() const {
     std::uint64_t bytes =
         depth_->Bytes() + rasterRadiance_->Bytes() +

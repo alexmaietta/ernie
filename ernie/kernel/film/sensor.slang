@@ -164,7 +164,8 @@ public struct SensorConstants {
     // them, z and w their columns and rows.
     public uint4 table;
     // x: the layers from a raster radiance layer to its Stokes Q, and on to U, for a polarizer
-    // (0 without them); yzw unused.
+    // (0 without them); y: the render vars written to linear buffers too (`linear`), a kHolds*
+    // bit each; zw unused.
     public uint4 stokes;
     // The custom filters' parameters, packed in chain order (`SensorPlan::params`), then a lens
     // of rays' table.
@@ -172,6 +173,17 @@ public struct SensorConstants {
     // The G-buffer normal's and depth's slots in the bindless heap's `heapTextureArrays`.
     public uint normalSlot;
     public uint depthSlot;
+    // The render vars the frame also holds as linear buffers (`stokes.y`'s kHolds* bits).
+    public SensorLinear* linear;
+}
+
+// The render vars up to MotionVector (kHolds* bits 0 to 10) a frame also holds as linear buffers
+// over all its views (`FrameImages::Linear`), a compute API viewing them in place: each var's
+// address, its texels in its image's format view after view (a band after a band within a view
+// for SpectralRadiance).
+public static const uint kLinearVars = 11;
+public struct SensorLinear {
+    public uint* vars[kLinearVars];
 }
 
 // Binding 0 holds the uniforms every view shares, a SensorUniforms whose per-view fields are
@@ -237,6 +249,32 @@ SensorUniforms viewUniforms(uint view) {
     cam.noise.z = sensorData.Load(base + 176);
     return cam;
 }
+
+// Whether the frame holds the var of kHolds* bit `bit` as a linear buffer too (`SensorLinear`).
+// A bit, not the address: comparing a pointer would need 64-bit integers in the shader.
+bool heldLinear(uint bit) {
+    return bit < kLinearVars && ((pass.stokes.y >> bit) & 1u) != 0;
+}
+
+// Stores `count` words of texel `texel` (its index in the var's layers, view after view) of the
+// var of bit `bit`, when it is held linear.
+void storeLinear(uint bit, uint texel, uint4 words, uint count) {
+    if (!heldLinear(bit)) {
+        return;
+    }
+    let vars = pass.linear.vars[bit];
+    for (uint c = 0; c < count; ++c) {
+        vars[texel * count + c] = words[c];
+    }
+}
+
+// The index of sensor pixel `id` (z: the dispatch's view) in a var of `layers` layers per view,
+// layer `layer`: views follow the dispatch's first (`pass.view.x`).
+uint linearTexel(uint3 id, uint layer = 0, uint layers = 1) {
+    let size = sensorShared[0].size;
+    return (((pass.view.x + id.z) * layers + layer) * size.y + id.y) * size.x + id.x;
+}
+
 [[vk::binding(1, 0)]] Texture2DArray<float> rasterRadiance;
 [[vk::image_format("r32f")]] [[vk::binding(2, 0)]] RWTexture2DArray<float> degreeOfPolarization;
 [[vk::binding(3, 0)]] Texture2DArray<uint4> gIds;
@@ -1014,20 +1052,27 @@ public struct Lens : ISpatialSource {
         value.background = prim == 0;
         value.coverage = coverage;
         let id = pixel.id;
+        let texel = linearTexel(id);
         if ((holds & kHoldsDistanceToImagePlane) != 0) {
             distanceToImagePlane[id] = imagePlane;
+            storeLinear(firstbitlow(kHoldsDistanceToImagePlane), texel, uint4(asuint(imagePlane)),
+                        1);
         }
         if ((holds & kHoldsDistanceToCamera) != 0) {
             distanceToCamera[id] = camera;
+            storeLinear(firstbitlow(kHoldsDistanceToCamera), texel, uint4(asuint(camera)), 1);
         }
         if ((holds & kHoldsNormal) != 0) {
             normalOut[id] = normal;
+            storeLinear(firstbitlow(kHoldsNormal), texel, asuint(normal), 4);
         }
         if ((holds & kHoldsPrimId) != 0) {
             primId[id] = prim;
+            storeLinear(firstbitlow(kHoldsPrimId), texel, uint4(prim), 1);
         }
         if ((holds & kHoldsInstanceId) != 0) {
             instanceId[id] = instance;
+            storeLinear(firstbitlow(kHoldsInstanceId), texel, uint4(instance), 1);
         }
         if ((holds & kHoldsMotionVector) != 0) {
             // Raster pixels to sensor pixels: the raster image is drawn `overscan` times wider,
@@ -1035,9 +1080,10 @@ public struct Lens : ISpatialSource {
             // through the lens's local map onto its face.
             let raster = outside ? float2(0.0) : gRaster[uint3(nearest)].xy;
             let cam = pixel.uniforms();
-            motionVector[id] = kLensCube
-                                   ? faceMotionToSensor(cam, float2(id.xy) + 0.5, int(id.z), raster)
+            let motion = kLensCube ? faceMotionToSensor(cam, float2(id.xy) + 0.5, int(id.z), raster)
                                    : raster * cam.intrinsics.w;
+            motionVector[id] = motion;
+            storeLinear(firstbitlow(kHoldsMotionVector), texel, uint4(asuint(motion), 0, 0), 2);
         }
         if ((holds & kHoldsPolarization) != 0) {
             writePolarization(pixel, holds);
@@ -1155,6 +1201,8 @@ public void writeOutput(PixelContext pixel, uint output, float4 value) {
 // Writes band `band` of SpectralRadiance.
 public void writeSpectral(PixelContext pixel, uint band, float radiance) {
     spectralRadiance[int3(pixel.id.xy, pixel.slice(band))] = radiance;
+    storeLinear(firstbitlow(kHoldsSpectral), linearTexel(pixel.id, band, pixel.bands()),
+                uint4(asuint(radiance)), 1);
 }
 
 // QE: mean electrons per channel, sum over bands of radiance times the channel's per-band factor
@@ -1303,17 +1351,30 @@ public struct Exposure {
 // Writes the integrated and filtered vars of `holds` (kHolds* bits).
 public void writeOutputs(SensorPixel value, PixelContext pixel, uint holds) {
     let id = pixel.id;
+    let texel = linearTexel(id);
     if ((holds & kHoldsElectrons) != 0) {
-        electrons[id] = min(value.electrons, float4(pixel.uniforms().sensor.x));
+        let held = min(value.electrons, float4(sensorShared[0].sensor.x));
+        electrons[id] = held;
+        storeLinear(firstbitlow(kHoldsElectrons), texel, asuint(held), 4);
     }
     if ((holds & kHoldsRawDn) != 0) {
         rawDn[id] = value.digital;
+        // RGBA16UI: two channels a word, the first in the low half.
+        let dn = min(value.digital, uint4(0xFFFF));
+        storeLinear(firstbitlow(kHoldsRawDn), texel,
+                    uint4(dn.x | (dn.y << 16), dn.z | (dn.w << 16), 0, 0), 2);
     }
     if ((holds & kHoldsHdrColor) != 0) {
-        hdrColor[id] = float4(value.rgb, 1.0);
+        let hdr = float4(value.rgb, 1.0);
+        hdrColor[id] = hdr;
+        storeLinear(firstbitlow(kHoldsHdrColor), texel, asuint(hdr), 4);
     }
     if ((holds & kHoldsLdrColor) != 0) {
         ldrColor[id] = value.display;
+        // RGBA8 unorm: red in the low byte, as the image stores it.
+        let bytes = uint4(round(saturate(value.display) * 255.0));
+        storeLinear(firstbitlow(kHoldsLdrColor), texel,
+                    uint4(bytes.x | (bytes.y << 8) | (bytes.z << 16) | (bytes.w << 24)), 1);
     }
 }
 

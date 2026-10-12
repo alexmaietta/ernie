@@ -94,6 +94,11 @@ class ChunkedFrameImages final : public FrameImages {
         return chunks_.front()->Var(name);
     }
 
+    /// The chunks share their linear vars, which span every view.
+    LinearVar Linear(std::string_view name) const override {
+        return chunks_.front()->Linear(name);
+    }
+
     std::uint32_t Views() const override;
 
     std::span<const std::unique_ptr<FrameImages>> Chunks() const {

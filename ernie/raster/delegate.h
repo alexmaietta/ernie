@@ -24,7 +24,9 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
@@ -509,6 +511,11 @@ class RasterDelegate : public RenderDelegate {
     std::map<Path, std::vector<std::shared_ptr<ProductFrame>>>
         frames_;
     std::vector<std::shared_ptr<GpuBuffer>> linearPool_;
+    /// Per product, the render vars mapped to linear GPU tensors,
+    /// which its later frames hold as linear buffers the sensor
+    /// writes (`RenderTargets::LinearVars`), so mapping copies
+    /// nothing.
+    std::map<Path, std::set<std::string, std::less<>>> linearVars_;
     /// Per `FrameUploads` slot, the submission that last used it; the
     /// slot to use next.
     std::array<std::uint64_t, FrameUploads::kSlots>

@@ -202,6 +202,46 @@ class RenderTargets : public FrameImages {
         return held_;
     }
 
+    /// Render vars a frame also holds as linear buffers over all its
+    /// views, which the sensor writes beside the images
+    /// (sensor.slang's `SensorLinear`), so mapping them to a compute
+    /// API copies nothing (`FrameImages::Linear`).
+    struct LinearVars {
+        /// The vars the sensor can write so: `VarNames` up to
+        /// MotionVector (sensor.slang's `kLinearVars`).
+        static constexpr std::size_t kVars = 11;
+        /// Per var, its buffer (shared memory), or none.
+        std::array<std::shared_ptr<GpuBuffer>, kVars> buffers;
+        /// The buffers' addresses, as the sensor reads them.
+        std::unique_ptr<GpuBuffer> table;
+        /// The vars held so, a bit each in `VarNames` order.
+        std::uint32_t held = 0;
+        /// Those the frame's sensor wrote: overlays drawn over
+        /// LdrColor after it leave that out
+        /// (`RasterRenderer::RecordViews`).
+        std::uint32_t written = 0;
+    };
+
+    /// Linear buffers of vars `names` (those `LinearVars` can hold)
+    /// for `views` views of `extent` and `bands` bands, in shared
+    /// memory.
+    static std::shared_ptr<LinearVars>
+    MakeLinearVars(const VulkanContext& context, VkExtent2D extent,
+                   std::uint32_t views, int bands,
+                   std::span<const std::string> names);
+
+    /// Makes the sensor write the vars `linear` holds into its
+    /// buffers too (each chunk of a frame's views shares the
+    /// frame's), or no longer with null.
+    void SetLinearVars(std::shared_ptr<LinearVars> linear) {
+        linear_ = std::move(linear);
+    }
+    LinearVars* GetLinearVars() const {
+        return linear_.get();
+    }
+
+    LinearVar Linear(std::string_view name) const override;
+
     /// Every render var name, in binding order of the filters.
     static std::span<const std::string_view> VarNames();
 
@@ -233,6 +273,7 @@ class RenderTargets : public FrameImages {
     std::array<std::unique_ptr<GpuImage>, kMaxAovs> aovImages_;
     std::array<bool, kMaxAovs> holdsAov_{};
     std::vector<std::string> aovNames_;
+    std::shared_ptr<LinearVars> linear_;  ///< `SetLinearVars`'.
 };
 
 }  // namespace ernie

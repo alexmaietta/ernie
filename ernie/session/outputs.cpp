@@ -113,9 +113,12 @@ std::vector<std::int64_t> RenderVarOutput::Shape() const {
     if (frame_ == nullptr) {
         throw std::invalid_argument("Empty render var");
     }
+    // A var held as a linear buffer alone (a minimal frame's) takes
+    // its shape from its format; one beside its images (the sensor's
+    // in a full frame), as they lay it out.
     if (const FrameImages::LinearVar linear =
             frame_->images->Linear(name_);
-        linear.buffer) {
+        linear.buffer && frame_->images->Var(name_) == nullptr) {
         const VkExtent2D extent = frame_->images->Extent();
         const std::int64_t channels =
             LayoutOf(linear.format).channels;
@@ -240,6 +243,11 @@ MappedRenderVar RenderVarOutput::Map(MapDevice device,
         frame.compute->WaitForVulkan(syncStream);
         ++frame.arrayMaps;
         return mapped;
+    }
+    // This one copies; the product's later frames hold the var as a
+    // linear buffer too, which their maps view in place.
+    if (frame.linearVars != nullptr) {
+        frame.linearVars->insert(name_);
     }
     std::shared_ptr<GpuBuffer> buffer;
     for (const std::shared_ptr<GpuBuffer>& candidate :

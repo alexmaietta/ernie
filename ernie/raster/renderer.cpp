@@ -600,8 +600,11 @@ struct SensorConstants {
     VkDeviceAddress params;
     std::uint32_t normalSlot;
     std::uint32_t depthSlot;
+    /// The frame's linear vars' addresses (sensor.slang's
+    /// `SensorLinear`), those held so a bit each in `stokes[1]`.
+    VkDeviceAddress linear;
 };
-static_assert(sizeof(SensorConstants) == 64,
+static_assert(sizeof(SensorConstants) == 72,
               "SensorConstants must match sensor.slang");
 
 constexpr DescriptorBinding kFilterBindings[] = {
@@ -4632,6 +4635,16 @@ void RasterRenderer::RecordViews(
     if (motionVectors_) {
         RecordMotion(commands, targets, drawables, firstView);
     }
+    // The vars the sensor writes linear too: all the frame holds so
+    // but LdrColor when overlays draw over it afterwards.
+    if (RenderTargets::LinearVars* linear = targets.GetLinearVars()) {
+        const auto ldr = static_cast<std::uint32_t>(
+            std::find(RenderTargets::VarNames().begin(),
+                      RenderTargets::VarNames().end(),
+                      render_vars::kLdrColor) -
+            RenderTargets::VarNames().begin());
+        linear->written = linear->held & ~(overlays ? 1u << ldr : 0u);
+    }
     Filter(commands, targets, firstView);
     if (measureDepth_ && firstView == 0) {
         RecordDepthRange(commands, targets);
@@ -5774,16 +5787,21 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
         // pass's parameters; the layers from the raster radiance to
         // its Stokes Q and on to U (0 without them); the parameters'
         // address, and the normal's and depth's heap slots.
+        // And the vars written to linear buffers too, with their
+        // addresses (`RenderTargets::LinearVars`).
+        const RenderTargets::LinearVars* linear =
+            targets.GetLinearVars();
         const SensorConstants constants{
             {firstView, plan.aovs, state && pass.history ? 1u : 0u,
              state ? plan.states : 0u},
             {pass.tableOffset, lensTable_[1], lensTable_[2],
              lensTable_[3]},
-            {targets.Stokes() ? targets.StokesOffset() : 0u, 0u, 0u,
-             0u},
+            {targets.Stokes() ? targets.StokesOffset() : 0u,
+             linear != nullptr ? linear->written : 0u, 0u, 0u},
             pass.params->Address(),
             sensorSlots_[0].Index(),
-            sensorSlots_[1].Index()};
+            sensorSlots_[1].Index(),
+            linear != nullptr ? linear->table->Address() : 0u};
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {
             std::vector<DescriptorResource> resources = bound;

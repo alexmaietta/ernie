@@ -6,7 +6,10 @@
 #include "ernie/session/outputs.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <set>
+#include <string>
 #include <vector>
 
 namespace ernie {
@@ -28,6 +31,11 @@ struct ProductFrame {
     /// Linear GPU outputs, owned by the delegate; a buffer is reused
     /// once no tensor holds it.
     std::vector<std::shared_ptr<GpuBuffer>>* linearPool = nullptr;
+    /// The product's vars mapped to linear GPU tensors, owned by the
+    /// delegate: a var mapped so by copying joins it, and the
+    /// product's later frames hold it as a linear buffer instead
+    /// (`FrameImages::Linear`).
+    std::set<std::string, std::less<>>* linearVars = nullptr;
 };
 
 }  // namespace ernie

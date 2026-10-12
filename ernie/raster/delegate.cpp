@@ -2860,8 +2860,55 @@ RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
             }
             return stale;
         });
+    // The vars the product's frames hold as linear buffers too: those
+    // mapped to linear GPU tensors before, which the sensor can write
+    // so (`RenderTargets::LinearVars`).
+    std::set<std::string, std::less<>>& linearVars =
+        linearVars_[product];
+    const auto linearize = [&](ProductFrame& frame) {
+        if (minimal || compute_ == nullptr) {
+            return;
+        }
+        frame.linearVars = &linearVars;
+        std::vector<std::string> names;
+        for (const std::string_view name : held) {
+            if (linearVars.contains(name)) {
+                names.emplace_back(name);
+            }
+        }
+        const std::vector<RenderTargets*> targets =
+            TargetsOf(*frame.images);
+        const RenderTargets::LinearVars* current =
+            targets.front()->GetLinearVars();
+        std::uint32_t wanted = 0;
+        const auto all = RenderTargets::VarNames();
+        for (const std::string& name : names) {
+            const auto i = static_cast<std::size_t>(
+                std::find(all.begin(), all.end(), name) -
+                all.begin());
+            if (i < RenderTargets::LinearVars::kVars) {
+                wanted |= 1u << i;
+            }
+        }
+        if ((current != nullptr ? current->held : 0u) == wanted) {
+            return;
+        }
+        // Earlier steps may still write the buffers it drops: rare
+        // (a var's first linear map), so wait for everything.
+        if (current != nullptr) {
+            context_.WaitForSubmissions();
+        }
+        std::shared_ptr<RenderTargets::LinearVars> linear =
+            wanted == 0 ? nullptr
+                        : RenderTargets::MakeLinearVars(
+                              context_, extent, views, bands, names);
+        for (RenderTargets* chunk : targets) {
+            chunk->SetLinearVars(linear);
+        }
+    };
     for (const std::shared_ptr<ProductFrame>& frame : frames) {
         if (frame.use_count() == 1 && frame->arrayMaps == 0) {
+            linearize(*frame);
             return frame;
         }
     }
@@ -2894,6 +2941,7 @@ RasterDelegate::AcquireFrame(const Path& product, VkExtent2D extent,
         frame->images =
             std::make_unique<ChunkedFrameImages>(std::move(chunks));
     }
+    linearize(*frame);
     frames.push_back(frame);
     return frame;
 }

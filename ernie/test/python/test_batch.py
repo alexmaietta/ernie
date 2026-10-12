@@ -182,6 +182,54 @@ def test_cuda_observations_match_cpu_ones(renderer, terrain_scene):
     assert renderer.take_validation_messages() == []
 
 
+LINEAR_VARS = (
+    "SpectralRadiance",
+    "Electrons",
+    "RawDN",
+    "HdrColor",
+    "LdrColor",
+    "DistanceToImagePlane",
+    "DistanceToCamera",
+    "Normal",
+    "PrimId",
+    "InstanceId",
+)
+
+
+def test_cuda_observations_written_in_place_match_cpu_ones(
+    renderer, terrain_scene
+):
+    # The first map to CUDA copies; the frames after it hold the vars
+    # as linear buffers the sensor writes beside the images, which
+    # later maps view in place. Every way gives the same observations.
+    if not renderer.cuda_available:
+        pytest.skip("No CUDA interop on this machine")
+    scene = noiseless(terrain_scene)
+    poses = poses_around(3)
+    camera = BatchCamera(
+        renderer,
+        scene,
+        "/World/Camera",
+        3,
+        resolution=(32, 24),
+        render_vars=LINEAR_VARS,
+    )
+    expected = {
+        name: np.array(array)
+        for name, array in camera.step(poses, device="cpu").items()
+    }
+    for step in range(4):
+        observations = camera.step(poses)
+        for name in LINEAR_VARS:
+            got = np.array(renderer.cuda_download(observations[name]))
+            assert got.shape == expected[name].shape, (name, step)
+            np.testing.assert_array_equal(
+                got, expected[name], err_msg=f"{name}, step {step}"
+            )
+        del observations
+    assert renderer.take_validation_messages() == []
+
+
 def test_minimal_batch_with_poses_mapped_in_place(renderer):
     if not renderer.cuda_available:
         pytest.skip("No CUDA interop on this machine")
