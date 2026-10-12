@@ -19,6 +19,7 @@ Lighting = _ernie.app.Lighting
 Theme = _ernie.app.Theme
 Viewer = _ernie.app.Viewer
 WidgetPanel = _ernie.app.WidgetPanel
+classic_theme = _ernie.app.classic_theme
 dark_theme = _ernie.app.dark_theme
 light_theme = _ernie.app.light_theme
 parse_demo_options = _ernie.app.parse_demo_options
@@ -36,6 +37,7 @@ __all__ = [
     "Theme",
     "Viewer",
     "WidgetPanel",
+    "classic_theme",
     "dark_theme",
     "light_theme",
     "parse_demo_options",

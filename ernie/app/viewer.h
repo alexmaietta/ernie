@@ -66,7 +66,7 @@ struct ViewerOptions {
                          ///< first discrete.
     std::string renderer =
         "raster";  ///< Render backend, one of `Viewer::Renderers()`.
-    Theme theme = DarkTheme();  ///< Colours and metrics of the UI.
+    Theme theme = ClassicTheme();  ///< Colours and metrics of the UI.
     std::filesystem::path
         layout;  ///< Docking layout (ImGui .ini) to load; empty uses
                  ///< the built-in default layout.

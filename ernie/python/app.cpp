@@ -165,9 +165,19 @@ void BindApp(nb::module_& parent) {
                 "Corner radius of frames, tabs and popups.")
         .def_rw("property_label_width", &Theme::propertyLabelWidth,
                 "Width of the label column in the Property panel.");
-    m.def("dark_theme", &app::DarkTheme, "The default dark theme.");
+    ColourProperty<&Theme::border>(themeClass, "border",
+                                   "Frames' and popups' edges.");
+    ColourProperty<&Theme::selection>(themeClass, "selection",
+                                      "Selected and hovered rows.");
+    themeClass.def_rw("frame_border", &Theme::frameBorder,
+                      "Fields' and buttons' edge width in pixels.");
+    m.def("classic_theme", &app::ClassicTheme,
+          "The default theme: a classic scientific desktop look, "
+          "light grey windows with white fields, as PANGU's.");
+    m.def("dark_theme", &app::DarkTheme,
+          "Omniverse Kit's dark theme.");
     m.def("light_theme", &app::LightTheme,
-          "A light theme with the same metrics and accent.");
+          "A light theme with the dark one's metrics and accent.");
 
     nb::class_<FrameInfo>(m, "FrameInfo",
                           "Passed to on_frame callbacks.")

@@ -168,6 +168,10 @@ class SettingsPanel final : public Panel {
             viewer.SetGizmoLocal(local);
         }
         row("Theme");
+        if (ImGui::Button("Classic")) {
+            viewer.SetTheme(ClassicTheme());
+        }
+        ImGui::SameLine();
         if (ImGui::Button("Dark")) {
             viewer.SetTheme(DarkTheme());
         }

@@ -50,6 +50,12 @@ struct Theme {
         0.94f};  ///< Viewport pills, menus, HUD (#25282A).
     glm::vec4 overlayBorder{0.247f, 0.255f, 0.259f,
                             1.0f};  ///< The pills' edge (#3F4142).
+    glm::vec4 checkBox{0.580f, 0.592f, 0.600f,
+                       1.0f};  ///< A checked box (Kit's grey).
+    glm::vec4 checkMark{0.122f, 0.129f, 0.137f,
+                        1.0f};  ///< The check in it.
+    glm::vec4 border{0.055f, 0.059f, 0.063f,
+                     1.0f};  ///< Frames' and popups' edges.
 
     float fontSize =
         14.0f;  ///< Text size in pixels at a content scale of 1.
@@ -59,17 +65,26 @@ struct Theme {
         3.0f;  ///< Corner radius of frames, tabs and popups.
     float pillRounding =
         6.0f;  ///< Corner radius of the viewport's toolbar pills.
+    float frameBorder = 0.0f;  ///< Fields' and buttons' edge width,
+                               ///< in pixels at a content scale of 1.
     glm::vec2 framePadding{6.0f, 3.0f};
     glm::vec2 itemSpacing{6.0f, 4.0f};
     float propertyLabelWidth =
         130.0f;  ///< Width of the label column in the Property panel.
 };
 
-/// The default dark theme.
+/// Omniverse Kit's dark theme.
 Theme DarkTheme();
 
-/// A light theme with the same metrics and accent.
+/// A light theme with the dark theme's metrics and accent.
 Theme LightTheme();
+
+/// The default: a classic scientific desktop look, as Qt's and GTK's
+/// of the 2000s that tools such as PANGU wear: light grey-green
+/// windows (#D4D7D0), white sunken fields and raised buttons with
+/// one-pixel edges, square corners, black text, a navy accent and
+/// pale-blue selection.
+Theme ClassicTheme();
 
 /// Resets `style` and writes `theme`'s colours and metrics into it,
 /// with sizes and fonts scaled by `contentScale`.

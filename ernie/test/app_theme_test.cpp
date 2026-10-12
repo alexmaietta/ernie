@@ -33,13 +33,28 @@ TEST(ThemeTest, LightThemeInvertsContrastAndKeepsAccentAndMetrics) {
     EXPECT_EQ(light.framePadding, dark.framePadding);
 }
 
+TEST(ThemeTest, ClassicThemeIsLightAndFramedWithSquareCorners) {
+    const Theme theme = ClassicTheme();
+    EXPECT_GT(theme.panel.g, 0.8f);
+    EXPECT_EQ(theme.text, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(theme.field, glm::vec4(1.0f));
+    EXPECT_EQ(theme.rounding, 0.0f);
+    ImGuiStyle style;
+    ApplyTheme(theme, 1.0f, style);
+    EXPECT_FLOAT_EQ(style.FrameBorderSize, 1.0f);
+    EXPECT_FLOAT_EQ(style.TabBorderSize, 1.0f);
+    EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_CheckMark].x, 0.0f)
+        << "a black check in a white box";
+}
+
 TEST(ThemeTest, ApplyThemeWritesColoursAndScalesMetrics) {
     Theme theme = DarkTheme();
     theme.accent = {0.1f, 0.2f, 0.3f, 1.0f};
     ImGuiStyle style;
     ApplyTheme(theme, 2.0f, style);
     EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_WindowBg].x, theme.panel.r);
-    EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_CheckMark].z, 0.3f);
+    EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_TextLink].z, 0.3f)
+        << "menus mark their items in the accent";
     EXPECT_FLOAT_EQ(style.Colors[ImGuiCol_Text].y, theme.text.g);
     EXPECT_FLOAT_EQ(style.FramePadding.x,
                     theme.framePadding.x * 2.0f);
@@ -56,10 +71,10 @@ TEST(ThemeTest, ApplyThemeResetsEarlierStyleChanges) {
 }
 
 TEST(ThemeTest,
-     ViewerOptionsDefaultToAVisibleWindowWithTheDarkTheme) {
+     ViewerOptionsDefaultToAVisibleWindowWithTheClassicTheme) {
     const ViewerOptions options;
     EXPECT_FALSE(options.hidden);
     EXPECT_TRUE(options.layout.empty());
     EXPECT_TRUE(options.settings.IsEmpty());
-    EXPECT_EQ(options.theme.panel, DarkTheme().panel);
+    EXPECT_EQ(options.theme.panel, ClassicTheme().panel);
 }
