@@ -182,7 +182,7 @@
     X(double, ShadowWorldMargin, ::ernie::tokens::kShadowWorldMargin, 1.0,                         \
       (::ernie::AttributeMeta{.label = "World margin", .doc = "Metres past the world's casters.",  \
                               .group = "Shadows", .max = 100.0}))                                  \
-    X(bool, ShadowVirtual, ::ernie::tokens::kShadowVirtual, false,                                 \
+    X(bool, ShadowVirtual, ::ernie::tokens::kShadowVirtual, true,                                  \
       (::ernie::AttributeMeta{.label = "Virtual", .doc = "The sun shadows through a virtual "      \
                                      "shadow map: about a texel a pixel from near to far.",        \
                               .group = "Shadows"}))                                                \

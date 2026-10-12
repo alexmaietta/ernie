@@ -27,6 +27,8 @@ public static const uint kVirtualPagesAcross = 128;
 public static const uint kVirtualTexels = kVirtualPageTexels * kVirtualPagesAcross;
 public static const uint kVirtualBacked = 0x80000000u;
 public static const uint kVirtualPageMask = 0xfffffu;
+// The coarser levels marked beside a receiver's own, which filters too wide for its level read.
+public static const uint kVirtualFilterLevels = 4u;
 
 // One clipmap level (`VirtualShadowLevel`).
 public struct VirtualLevel {
@@ -173,12 +175,14 @@ void markMain(uint3 id: SV_DispatchThreadID) {
     if (level >= int(count)) {
         return;  // past the last level: lit
     }
-    let index = uint(max(level, 0));
-    let clip = mul(map.levels[index].viewProjection, float4(world, 1.0));
-    if (any(abs(clip.xy) > 1.0)) {
-        return;
+    // Its level and the next coarser ones, which wide filters read as a mip chain's.
+    let first = uint(max(level, 0));
+    for (uint index = first; index <= min(first + kVirtualFilterLevels, count - 1); ++index) {
+        let clip = mul(map.levels[index].viewProjection, float4(world, 1.0));
+        if (all(abs(clip.xy) <= 1.0)) {
+            markAround(index, virtualTexelAt(clip.xy));
+        }
     }
-    markAround(index, virtualTexelAt(clip.xy));
 }
 
 // One thread per page of every level: flagged pages take the next physical page, in order; the

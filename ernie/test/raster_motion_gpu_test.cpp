@@ -148,6 +148,10 @@ std::vector<double> TrapezoidWeights(int count) {
 void ExpectMotionBlur(RasterDelegate& delegate, Scene& scene,
                       const std::function<void(double)>& move,
                       int samples) {
+    // Sub-frames shadow through cascades, not the virtual shadow map;
+    // so do the sharp steps they are held to.
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetShadowVirtual(false);
     SetShutter(scene, 0.0, 0.0, samples);
     const std::vector<double> weights = TrapezoidWeights(samples);
     std::vector<float> expected;

@@ -578,14 +578,22 @@ LightTap lightTap(LightGpu light, float3 point) {
     return tap;
 }
 
+// The level from `index` on, each twice as coarse, in which `texels` of level `index` span at most
+// `kMaxLightFilterTexels`, up to the coarsest the marking backs (`kVirtualFilterLevels`).
+uint virtualCoarserFor(VirtualShadow* map, uint index, float texels) {
+    let steps = texels > kMaxLightFilterTexels ? ceil(log2(texels / kMaxLightFilterTexels)) : 0.0;
+    return min(index + min(uint(steps), kVirtualFilterLevels), map.levelCount - 1);
+}
+
 // The virtual shadow map's visibility of its distant light from `world` (normal `n`, `nDotL`
 // towards it): the level that suits the point's distance from the camera (about a texel a pixel),
 // a coarser one where a tap's page is not backed; lit past the last level or off every backed page.
 // As `lightVisibility` for a cascade: the receiver offset along its normal, filtered over the
 // light's Poisson disk, and with the light's angular size percentage-closer soft shadows, whose
 // blockers' mean height over the receiver times the tangent of the light's angular radius widens
-// the filter. A level's reversed-Z depth spans 2000 of its radii, so a depth difference is metres
-// times 0.5 / (1000 R).
+// the filter. The search and the filter wider than `kMaxLightFilterTexels` run in coarser levels,
+// as in a mip chain. A level's reversed-Z depth spans 2000 of its radii, so a depth difference is
+// metres times 0.5 / (1000 R).
 //
 // Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
 // https://doi.org/10.1145/1187112.1187153
@@ -615,30 +623,34 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
     // How far the receiver's plane falls towards the light per world unit across it.
     let cosine = clamp(nDotL, 0.05, 1.0);
     let tilt = min(sqrt(1.0 - cosine * cosine) / cosine, 10.0);
-    // A texel and a half of the level used, and more as the receiver's plane tilts.
-    let slack = (1.5 + 1.5 * tilt) * texelWorld;
+    // The comparisons' slack: a texel and a half of the level used, and more as the receiver's
+    // plane tilts.
+    var filterIndex = index;
     var filterTexels = softness;
     let tanRadius = light.extentY.w;
     if (tanRadius > 0.0) {
-        // Blockers up to the level's near plane, 1000 R above the receiver, could shadow it.
-        let reach = 1000.0 * map.levels[index].info.y;
-        let searchTexels =
-            clamp(reach * tanRadius / texelWorld, softness, kMaxLightFilterTexels);
+        // Blockers up to the level's radius above the receiver, searched in a level coarse enough
+        // to span their reach in at most `kMaxLightFilterTexels`.
+        let reach = map.levels[index].info.y * tanRadius;
+        let searchIndex = virtualCoarserFor(map, index, reach / texelWorld);
+        let searchTexel = map.levels[searchIndex].info.x;
+        let searchTexels = clamp(reach / searchTexel, softness, kMaxLightFilterTexels);
+        let searchSlack = (1.5 + 1.5 * tilt) * searchTexel;
         var blockers = 0.0;
         var blockerSum = 0.0;
         for (uint i = 0; i < 16; ++i) {
             let point = receiver + lightDisk(i, rotation, across, across2,
-                                             searchTexels * texelWorld);
+                                             searchTexels * searchTexel);
             float stored;
             float depth;
             uint used;
-            if (!virtualShadowDepth(map, index, point, stored, depth, used)) {
+            if (!virtualShadowDepth(map, searchIndex, point, stored, depth, used)) {
                 continue;
             }
             let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
             let gap = (stored - depth) / perWorld;
-            let drop = length(lightPoisson(i)) * searchTexels * texelWorld * tilt;
-            if (gap > drop + slack) {
+            let drop = length(lightPoisson(i)) * searchTexels * searchTexel * tilt;
+            if (gap > drop + searchSlack) {
                 blockers += 1.0;
                 blockerSum += gap;
             }
@@ -646,25 +658,30 @@ float virtualVisibility(LightGpu light, float3 world, float3 n, float nDotL, flo
         if (blockers == 0.0) {
             return 1.0;
         }
-        filterTexels =
-            clamp(blockerSum / blockers * tanRadius / texelWorld, softness, kMaxLightFilterTexels);
+        // The penumbra filtered in a level coarse enough to span it likewise.
+        let penumbra = blockerSum / blockers * tanRadius;
+        filterIndex = virtualCoarserFor(map, index, penumbra / texelWorld);
+        filterTexels = clamp(penumbra / map.levels[filterIndex].info.x, softness,
+                             kMaxLightFilterTexels);
     }
+    let filterTexel = map.levels[filterIndex].info.x;
+    let filterSlack = (1.5 + 1.5 * tilt) * filterTexel;
     var lit = 0.0;
     for (uint i = 0; i < 16; ++i) {
         let point =
-            receiver + lightDisk(i, rotation, across, across2, filterTexels * texelWorld);
+            receiver + lightDisk(i, rotation, across, across2, filterTexels * filterTexel);
         float stored;
         float depth;
         uint used;
-        if (!virtualShadowDepth(map, index, point, stored, depth, used)) {
+        if (!virtualShadowDepth(map, filterIndex, point, stored, depth, used)) {
             lit += 1.0;
             continue;
         }
         // Compared at the receiver's plane, raised towards the light by the tap's distance across
         // it, with the slack.
         let perWorld = 0.5 / (1000.0 * map.levels[used].info.y);
-        let drop = length(lightPoisson(i)) * filterTexels * texelWorld * tilt;
-        lit += stored <= depth + (drop + slack) * perWorld ? 1.0 : 0.0;
+        let drop = length(lightPoisson(i)) * filterTexels * filterTexel * tilt;
+        lit += stored <= depth + (drop + filterSlack) * perWorld ? 1.0 : 0.0;
     }
     return lit / 16.0;
 }

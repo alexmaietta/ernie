@@ -142,7 +142,7 @@ struct ShadowSettings {
     /// through a virtual shadow map (`VirtualShadowMap`) of
     /// `virtualPages` physical pages, its levels `virtualBias`
     /// coarser than a texel a pixel.
-    bool virtualMaps = false;
+    bool virtualMaps = true;
     std::uint32_t virtualPages = 1024;
     float virtualBias = 0.0f;
     /// The virtual shadow map's debugging

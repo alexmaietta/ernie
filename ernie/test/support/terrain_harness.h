@@ -139,7 +139,7 @@ class TerrainRenderer {
     }
 
     /// The sun's cascades: its light's shadow views.
-    const std::vector<ShadowCascade>& Cascades() const {
+    std::span<const ShadowCascade> Cascades() const {
         return renderer_.LightShadowViews();
     }
 

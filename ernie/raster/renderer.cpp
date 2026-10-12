@@ -2281,6 +2281,7 @@ void RasterRenderer::WriteLights(
     const std::uint32_t distantResolution =
         std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
+    firstVirtualView_ = 0;
     cascadeJobs_.clear();
     cascadeJobCount_ = 0;
     splitsFitted_ = false;
@@ -2882,9 +2883,9 @@ void RasterRenderer::WriteLights(
     virtualLight_ = -1;
     virtualDebug_ = params.shadows.virtualDebug;
     if (params.shadows.enabled && params.shadows.virtualMaps &&
-        outputViews_ == 1 && !posesOnGpu_ && faces_ == 1 &&
-        subframes_ == 1 && !params.camera.pushbroom &&
-        SupportsVirtualShadows()) {
+        params.minimal == MinimalMode::Off && outputViews_ == 1 &&
+        !posesOnGpu_ && faces_ == 1 && subframes_ == 1 &&
+        !params.camera.pushbroom && SupportsVirtualShadows()) {
         for (std::size_t i = 0; i < params.lights.size(); ++i) {
             const LightParams& light = params.lights[i];
             if (light.type == LightType::Distant && light.shadows &&
@@ -2917,14 +2918,18 @@ void RasterRenderer::WriteLights(
         // About a texel a pixel: a level's texel, 2^(level - 11) m,
         // matches a pixel's width 2 d tan(half field) / width at
         // distance d when level = log2 d + log2(4096 tan / width).
+        // Narrower images take a width of `kVirtualMinWidth`'s
+        // texels, whose bias of a few texels would otherwise reach
+        // past casters a pixel or two above their shadows.
         const float tanHalf =
             std::abs(viewProjection[0][0]) > 0.0f
                 ? 1.0f / std::abs(viewProjection[0][0])
                 : 1.0f;
-        const float bias = std::log2(4096.0f * tanHalf /
-                                     static_cast<float>(std::max(
-                                         params.camera.width, 1u))) +
-                           params.shadows.virtualBias;
+        const float bias =
+            std::log2(4096.0f * tanHalf /
+                      static_cast<float>(std::max(
+                          params.camera.width, kVirtualMinWidth))) +
+            params.shadows.virtualBias;
         virtualShadow_->SetLevels(levels, bias, &uploads_);
         virtualBias_ = bias;
         for (const VirtualShadowLevel& level : levels) {
@@ -2945,6 +2950,20 @@ void RasterRenderer::WriteLights(
                 params.lights[static_cast<std::size_t>(virtualLight_)]
                     .shadowMask;
             lightViews_.push_back(cascade);
+        }
+        // Its own cascades then hold no casters, as shading reads the
+        // pages instead, unless volumes march through them: the pages
+        // back only what the G-buffer saw, not the air in front of
+        // it.
+        if (params.volumes.empty()) {
+            const auto first =
+                static_cast<std::size_t>(entry.cone[2]);
+            const auto count =
+                static_cast<std::size_t>(entry.cone[3]);
+            for (std::size_t v = first;
+                 v < first + count && v < firstVirtualView_; ++v) {
+                lightViews_[v].drawn = false;
+            }
         }
     }
     // Shadow linking: each light's views draw only the geometry its
@@ -4985,6 +5004,9 @@ void RasterRenderer::RecordShadowMaps(
         lightShadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
         for (std::size_t v = 0; v < firstLayeredView_; ++v) {
+            if (!lightViews_[v].drawn) {
+                continue;
+            }
             RenderingTarget shadow;
             shadow.depth = lightShadowMaps_->LayerView(
                 static_cast<std::uint32_t>(v));

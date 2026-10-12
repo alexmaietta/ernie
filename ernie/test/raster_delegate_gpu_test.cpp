@@ -1335,8 +1335,10 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
                   scene, "/World/Camera", kSize, kSize)),
               ernie::kCubeFaces);
     delegate.Render(scene);
-    const std::vector<ernie::ShadowCascade> cascades =
+    const std::span<const ernie::ShadowCascade> views =
         delegate.Renderer().LightShadowViews();
+    const std::vector<ernie::ShadowCascade> cascades(views.begin(),
+                                                     views.end());
     ASSERT_FALSE(cascades.empty())
         << "a cube camera's view has cascades of its own";
     const float sceneSplit = delegate.Renderer().ShadowSplits()[0];

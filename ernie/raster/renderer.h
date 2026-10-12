@@ -707,8 +707,14 @@ class RasterRenderer {
     /// Shadow views of the lights fitted by the last `Update`: in
     /// light order, a single view's distant lights' cascades among
     /// them, then a batch's per-world maps.
-    const std::vector<ShadowCascade>& LightShadowViews() const {
-        return lightViews_;
+    std::span<const ShadowCascade> LightShadowViews() const {
+        return std::span(lightViews_).first(firstVirtualView_);
+    }
+
+    /// The virtual shadow map's levels drawn by the last `Update`,
+    /// finest first; none without one.
+    std::span<const ShadowCascade> VirtualShadowViews() const {
+        return std::span(lightViews_).subspan(firstVirtualView_);
     }
 
     /// The far view depth of each of the last frame's cascades as the
@@ -1055,6 +1061,8 @@ class RasterRenderer {
     /// The clipmap's levels: radii 1/8 m to about 8,400 km.
     static constexpr std::int32_t kVirtualFirstLevel = -4;
     static constexpr std::int32_t kVirtualLastLevel = 22;
+    /// The narrowest image width the levels are chosen for.
+    static constexpr std::uint32_t kVirtualMinWidth = 1024;
     /// A per-world map's pass: its casters, and whether it starts as
     /// a copy of its light's shared map at layer `base`.
     struct LayeredPass {

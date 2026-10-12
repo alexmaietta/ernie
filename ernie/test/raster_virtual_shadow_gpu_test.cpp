@@ -76,9 +76,10 @@ std::uint32_t Backed(const std::vector<std::uint32_t>& table) {
 }  // namespace
 
 // A 20 m square of ground seen from 5 m above its centre: its points
-// mark pages in the levels suiting 5 to 15 m, plus the coarsest
-// level's four about the camera; allocation backs each once, in
-// distinct physical pages, and clearing zeroes exactly those.
+// mark pages in the levels suiting 5 to 15 m and the next four, plus
+// the coarsest level's four about the camera; allocation backs each
+// once, in distinct physical pages, and clearing zeroes exactly
+// those.
 TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     ernie::ShaderCompiler compiler;
     VirtualShadowMap map(*context_, compiler, -2, 12, 256);
@@ -111,8 +112,8 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
     EXPECT_EQ(Backed(table), used);
     EXPECT_GT(used, 4u);
     EXPECT_LT(used, 256u);
-    // Only levels 6 and 7 (5 to 15 m, biased by 4) and the coarsest
-    // have pages.
+    // Only levels 6 and 7 (5 to 15 m, biased by 4), the four coarser
+    // that wide filters read, and the coarsest have pages.
     const std::size_t layer = 128 * 128;
     for (std::uint32_t l = 0; l < map.LevelCount(); ++l) {
         const std::vector<std::uint32_t> one(
@@ -120,7 +121,7 @@ TEST_F(VirtualShadowMapTest, MarksBacksAndClearsTheSeenPages) {
             table.begin() +
                 static_cast<std::ptrdiff_t>((l + 1) * layer));
         const int level = -2 + static_cast<int>(l);
-        if (level == 6 || level == 7) {
+        if (level >= 6 && level <= 11) {
             EXPECT_GT(Backed(one), 0u) << "level " << level;
         } else if (level == 12) {
             EXPECT_EQ(Backed(one), 4u) << "level " << level;
