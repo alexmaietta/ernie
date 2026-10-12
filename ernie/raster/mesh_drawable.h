@@ -466,9 +466,10 @@ class MeshDrawable : public RasterDrawable {
                              std::uint32_t firstView,
                              std::uint32_t views) const override;
 
-    /// The instances each GPU culling job of the last frame kept, in
-    /// job order (views, then shadow views; draws in order); waits
-    /// for the device. For tests and statistics.
+    /// The instances each GPU culling job of an instancer's draw of
+    /// the last frame kept, in job order (views, then shadow views;
+    /// draws in order); waits for the device. For tests and
+    /// statistics.
     std::vector<std::uint32_t> CulledInstanceCounts() const;
 
     /// The instances each GPU culling job of the last frame drew at
@@ -769,6 +770,10 @@ class MeshDrawable : public RasterDrawable {
 
     /// Whether item `item`'s material cuts out part of it.
     bool Cutout(std::size_t item) const;
+    /// The levels of detail GPU culling picks among for item `item`:
+    /// its mesh's for an instancer's draws, the full mesh alone for a
+    /// draw of its own.
+    std::uint32_t CullLevels(std::size_t item) const;
 
     std::map<std::uint32_t, Mesh> meshes_;
     std::map<std::uint32_t, Instancer> instancers_;

@@ -148,6 +148,10 @@ TEST_F(RasterDelegateTest, GpuCullingKeepsExactlyTheInstancesInView) {
     EXPECT_GT(inView, 0u);
     EXPECT_LT(inView, 41u);
     EXPECT_EQ(kept[1], inView);
+    EXPECT_EQ(delegate.Meshes().CulledLevelCounts().front(),
+              std::vector<std::uint32_t>{1u})
+        << "the quad culled on the GPU too, a job of its one "
+           "instance";
 }
 
 TEST_F(RasterDelegateTest,

@@ -104,6 +104,9 @@ static const uint kViewStride = 12;
 static const uint kHasOrientations = 1;
 static const uint kHasScales = 2;
 static const uint kMoved = 4;  // the instancer's transform moved since the last frame
+// A draw without an instancer: its one instance is its transform's, with no instance arrays
+// or ids to read.
+static const uint kNoInstances = 8;
 
 static const uint kFrustum = 0;
 static const uint kOccluders = 1;
@@ -137,6 +140,13 @@ Placed placeAt(CullItem item, uint instance, uint base, float4x4 model) {
     let i = base + instance;
     var centre = item.sphere.xyz;
     var scale = item.info.x;
+    if ((flags & kNoInstances) != 0) {
+        Placed only;
+        only.centre = mul(model, float4(centre, 1.0)).xyz;
+        only.radius = item.sphere.w * scale;
+        only.scale = scale;
+        return only;
+    }
     if ((flags & kHasScales) != 0) {
         let s = load3(scales, i);
         centre = centre * s;
@@ -318,7 +328,7 @@ void cullMain(uint3 group : SV_GroupID, uint thread : SV_GroupIndex) {
         uint id = 0;
         uint pick = 0;
         if (k < job.range.z) {
-            id = instanceIds[job.range.y + k];
+            id = (asuint(item.info.y) & kNoInstances) != 0 ? 0u : instanceIds[job.range.y + k];
             let placed = place(item, id);
             var keep = inFrustum(placed, view);
             if (mode == kOccluders) {

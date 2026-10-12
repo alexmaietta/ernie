@@ -214,6 +214,8 @@ constexpr std::uint32_t kCullOrientations = 1;
 constexpr std::uint32_t kCullScales = 2;
 constexpr std::uint32_t kCullMoved =
     4;  ///< The instancer's transform moved since the last frame.
+/// A draw without an instancer: its one instance is its transform's.
+constexpr std::uint32_t kCullNoInstances = 8;
 
 /// Grows `buffer` to hold `bytes`, waiting for the device first if it
 /// replaces one in use.
@@ -644,6 +646,14 @@ void MeshDrawable::CreateMinimalPipelines() {
         minimalPipelines_[i] = std::make_unique<GraphicsPipeline>(
             context_, layout_, desc);
     }
+}
+
+std::uint32_t MeshDrawable::CullLevels(std::size_t item) const {
+    if (!items_[item].instancer) {
+        return 1;
+    }
+    return static_cast<std::uint32_t>(
+        meshes_.at(items_[item].mesh).levels.size());
 }
 
 bool MeshDrawable::Cutout(std::size_t item) const {
@@ -2313,7 +2323,7 @@ void MeshDrawable::Cull(const FrameParams& params,
                                 std::uint32_t count) {
         const std::vector<MeshLevel>& levels =
             meshes_.at(items_[item].mesh).levels;
-        for (std::uint32_t l = 0; l < levels.size(); ++l) {
+        for (std::uint32_t l = 0; l < CullLevels(item); ++l) {
             records.emplace_back(
                 item, ids + l * count - itemIdOffsets_[item],
                 levels[l].first, 0u);
@@ -2415,7 +2425,12 @@ void MeshDrawable::Cull(const FrameParams& params,
             }
             VisibleRange entry{static_cast<std::uint32_t>(i),
                                static_cast<std::uint32_t>(r)};
-            if (culling_ == Culling::Gpu && items_[i].instancer) {
+            // Draws of their own too, without occlusion culling (with
+            // it they draw directly, as occluders): a job of their
+            // one instance, so every view's draws go out indirectly.
+            if (culling_ == Culling::Gpu &&
+                (items_[i].instancer ||
+                 occlusion_ == Occlusion::Off)) {
                 entry.job = static_cast<std::int32_t>(jobs.size());
                 GpuCullJob job{};
                 job.range[0] = entry.item;
@@ -2424,8 +2439,7 @@ void MeshDrawable::Cull(const FrameParams& params,
                 job.range[3] = slot;
                 // A run of the range's count of ids and an indirect
                 // draw per level.
-                const auto levels = static_cast<std::uint32_t>(
-                    meshes_.at(items_[i].mesh).levels.size());
+                const std::uint32_t levels = CullLevels(i);
                 job.output[0] = visible;
                 job.output[1] = draws;
                 jobs.push_back(job);
@@ -2637,9 +2651,6 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
     std::map<std::uint32_t, std::uint32_t> levelsOf;
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const MeshItem& item = items_[i];
-        if (!item.instancer) {
-            continue;
-        }
         const Mesh& mesh = meshes_.at(item.mesh);
         const auto [first, added] = levelsOf.try_emplace(
             item.mesh, static_cast<std::uint32_t>(levels.size()));
@@ -2665,22 +2676,28 @@ void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
         entry.info[0] = MaxScale(transforms_[i]);
         entry.info[2] = MaxScale(item.prototype);
         entry.levels[0] = first->second;
-        entry.levels[1] =
-            static_cast<std::uint32_t>(mesh.levels.size());
-        const Instancer& instancer = instancers_.at(*item.instancer);
-        entry.levels[2] = InstanceBase(instancer);
-        entry.levels[3] = InstanceBase(instancer, true);
+        entry.levels[1] = CullLevels(i);
         std::uint32_t flags = 0;
-        if (instancer.composed ||
-            (instancer.onDevice
-                 ? !instancer.device.orientations.Empty()
-                 : !instancer.data.orientations.empty())) {
-            flags |= kCullOrientations;
-        }
-        if (instancer.composed ||
-            (instancer.onDevice ? !instancer.device.scales.Empty()
-                                : !instancer.data.scales.empty())) {
-            flags |= kCullScales;
+        if (!item.instancer) {
+            // One instance, its transform's.
+            flags |= kCullNoInstances;
+        } else {
+            const Instancer& instancer =
+                instancers_.at(*item.instancer);
+            entry.levels[2] = InstanceBase(instancer);
+            entry.levels[3] = InstanceBase(instancer, true);
+            if (instancer.composed ||
+                (instancer.onDevice
+                     ? !instancer.device.orientations.Empty()
+                     : !instancer.data.orientations.empty())) {
+                flags |= kCullOrientations;
+            }
+            if (instancer.composed ||
+                (instancer.onDevice
+                     ? !instancer.device.scales.Empty()
+                     : !instancer.data.scales.empty())) {
+                flags |= kCullScales;
+            }
         }
         if (previousTransforms_[i] != transforms_[i]) {
             flags |= kCullMoved;
@@ -3021,8 +3038,13 @@ MeshDrawable::CulledLevelCounts() const {
 std::vector<std::uint32_t>
 MeshDrawable::CulledInstanceCounts() const {
     std::vector<std::uint32_t> counts;
-    for (const std::vector<std::uint32_t>& levels :
-         CulledLevelCounts()) {
+    const std::vector<std::vector<std::uint32_t>> jobs =
+        CulledLevelCounts();
+    for (std::size_t j = 0; j < jobs.size(); ++j) {
+        if (!items_[cullJobs_[j].range[0]].instancer) {
+            continue;
+        }
+        const std::vector<std::uint32_t>& levels = jobs[j];
         std::uint32_t sum = 0;
         for (const std::uint32_t count : levels) {
             sum += count;
