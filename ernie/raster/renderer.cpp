@@ -1916,6 +1916,9 @@ void RasterRenderer::WriteLights(
         LightGpu& entry = table[i];
         entry.links[0] = light.lightMask;
         entry.links[1] = light.shadowMask;
+        // Whether it casts shadows at all, which volumes' shadows
+        // follow too (volume.slang).
+        entry.links[2] = light.shadows ? 1u : 0u;
         const glm::vec3 axis = glm::normalize(light.direction);
         const bool distant = light.type == LightType::Distant;
         const glm::vec3 where =
@@ -4191,6 +4194,7 @@ void RasterRenderer::RecordViews(
             lights.tableSampler = &tableSampler_;
             lights.patternNorms = &patternNorms_;
             lights.timing = lightTiming_.get();
+            lights.profiles = &lightProfiles_;
             lights.patternData = patternData_.get();
             lights.patterns = &lightPatterns_;
             volumes_->Record(commands, targets, shadingUniforms_,

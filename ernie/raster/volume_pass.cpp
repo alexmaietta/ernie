@@ -40,6 +40,7 @@ constexpr DescriptorBinding kBindings[] = {
     {14, VK_DESCRIPTOR_TYPE_SAMPLER, kCompute},
     {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     // light_pattern's pattern data.
     {29, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
@@ -559,6 +560,7 @@ void VolumePass::Record(VkCommandBuffer commands,
         DescriptorResource::Of(*lights.tableSampler),
         DescriptorResource::Of(*lights.patternNorms),
         DescriptorResource::Of(*lights.timing),
+        DescriptorResource::Of(*lights.profiles),
         DescriptorResource::Of(*lights.patternData)};
     VolumeConstants constants{};
     constants.layout[0] = firstView;

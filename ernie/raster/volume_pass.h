@@ -54,7 +54,7 @@ class VolumePass {
     };
 
     /// The shading pass's lights and what lights the medium with
-    /// them (volume.slang's bindings 9 to 16 and 29).
+    /// them (volume.slang's bindings 9 to 17 and 29).
     struct Lights {
         const GpuBuffer* table = nullptr;
         const GpuImage* shadowMaps = nullptr;
@@ -64,6 +64,7 @@ class VolumePass {
         const Sampler* tableSampler = nullptr;
         const GpuBuffer* patternNorms = nullptr;
         const GpuBuffer* timing = nullptr;
+        const GpuBuffer* profiles = nullptr;  ///< IES profiles.
         const GpuBuffer* patternData = nullptr;
         const LightPatternRegistry* patterns = nullptr;
     };

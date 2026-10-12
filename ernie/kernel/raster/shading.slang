@@ -167,7 +167,8 @@ struct LightGpu {
     // whose maps are the shared one then one per world (`ShadingUniforms::view.y`); zw unused.
     float4 map;
     // Light linking (`LinkGroups`): x the link groups of the surfaces it lights, y those whose
-    // geometry casts its shadows, a bit each (surface.slang's `linkGroupFlags`); zw unused.
+    // geometry casts its shadows, a bit each (surface.slang's `linkGroupFlags`); z 1 when it casts
+    // shadows at all (volume.slang's volume shadows); w unused.
     uint4 links;
     // xyz: its electric field's direction, across the way its light goes; w: the fraction of its
     // light linearly polarized along it.

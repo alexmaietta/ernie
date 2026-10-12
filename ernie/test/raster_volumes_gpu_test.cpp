@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -154,6 +155,8 @@ namespace {
 std::vector<double> ScatteredOverEach(RasterDelegate& delegate,
                                       Scene scene, double sigma,
                                       double phase) {
+    // The column shadows itself: the sun casts shadows.
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Set("/World/Cube", tokens::kVisibility,
               std::string(tokens::kInvisible));
     const std::vector<double> ground =
@@ -223,10 +226,12 @@ namespace {
 
 // The cube seen side on against the empty background (no ground),
 // from 4 m along -y at its height, a white isotropic scatterer of
-// density `sigma`, lit by FlatScene's sun alone.
+// density `sigma`, lit by FlatScene's sun alone, which casts shadows
+// (volumes' too).
 Scene SideScene(double sigma) {
     Scene scene = VolumeScene(sigma, 0.0);
     scene.Remove("/World/Terrain");
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(true);
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, -4.0, 1.0},
                                      {0.0, 0.0, 1.0},
@@ -378,10 +383,10 @@ TEST_F(RasterDelegateTest, LightLinksHoldForVolumes) {
     RasterDelegate delegate(*context_);
     Scene scene = SideScene(1.0);
     const std::vector<double> sun = CentreSpectrum(delegate, scene);
-    // A second sun overhead, as bright: twice the light, unless its
-    // light link leaves the volume out.
+    // A second sun overhead, as bright and as shadowed: twice the
+    // light, unless its light link leaves the volume out.
     ernie::DistantLight::Define(scene, "/World/Moon")
-        .SetShadowEnable(false);
+        .SetShadowEnable(true);
     scene.Set("/World/Moon", tokens::kTransform,
               ernie::DistantLightTransform({0.0, 0.0, 1.0}));
     const std::vector<double> both = CentreSpectrum(delegate, scene);
@@ -413,4 +418,74 @@ TEST_F(RasterDelegateTest, LightLinksHoldForVolumes) {
         EXPECT_NEAR(unshadowed[b] / sun[b], 1.0, 0.02)
             << "band " << b;
     }
+}
+
+TEST_F(RasterDelegateTest,
+       ALightWithoutShadowsCastsNoneThroughVolumes) {
+    RasterDelegate delegate(*context_);
+    Scene scene = SideScene(1.0);
+    ernie::DistantLight(scene, "/World/Sun").SetShadowEnable(false);
+    const std::vector<double> alone = CentreSpectrum(delegate, scene);
+    ernie::Volume upper =
+        ernie::Volume::Define(scene, "/World/Upper");
+    upper.GetPrim().SetXform({.translate = glm::dvec3(0.0, 0.0, 3.5),
+                              .scale = glm::dvec3(2.0, 2.0, 1.0)});
+    ernie::OpenVDBAsset::Define(scene, "/World/Upper/Density")
+        .SetFilePath(CubeFile());
+    upper.SetField("density", "/World/Upper/Density");
+    const std::vector<double> under = CentreSpectrum(delegate, scene);
+    for (std::size_t b = 0; b < alone.size(); ++b) {
+        EXPECT_NEAR(under[b] / alone[b], 1.0, 0.02) << "band " << b;
+    }
+}
+
+TEST_F(RasterDelegateTest, IesProfilesShapeLampsInAVolume) {
+    // A lamp 9 m above the cube, which it sees within 6 degrees of
+    // its axis: a profile of 50 cd out to 10 degrees against a
+    // uniform 100 cd one.
+    const char* half = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 3 1 1 2 0 0 0
+1 1 10
+0 10 180
+0
+50 50 100
+)";
+    const char* uniform = R"(IESNA:LM-63-2002
+TILT=NONE
+1 -1 1 2 1 1 2 0 0 0
+1 1 10
+0 180
+0
+100 100
+)";
+    const std::filesystem::path directory =
+        std::filesystem::temp_directory_path();
+    const std::filesystem::path files[] = {
+        directory / "ernie_raster_volumes_half.ies",
+        directory / "ernie_raster_volumes_uniform.ies"};
+    std::ofstream(files[0]) << half;
+    std::ofstream(files[1]) << uniform;
+    RasterDelegate delegate(*context_);
+    std::vector<double> spectra[2];
+    for (int i = 0; i < 2; ++i) {
+        Scene scene = SideScene(1.0);
+        scene.Remove("/World/Sun");
+        ernie::SphereLight::Define(scene, "/World/Lamp")
+            .SetIntensity(1.0)
+            .SetShapingIesFile(files[i].string())
+            .SetShadowEnable(false);
+        scene.Set("/World/Lamp", tokens::kTransform,
+                  ernie::LookAtTransform({0.0, 0.0, 10.0},
+                                         {0.0, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+        spectra[i] = CentreSpectrum(delegate, scene);
+    }
+    for (std::size_t b = 0; b < spectra[0].size(); ++b) {
+        ASSERT_GT(spectra[1][b], 0.0) << "band " << b;
+        EXPECT_NEAR(spectra[0][b] / spectra[1][b], 0.5, 0.01)
+            << "band " << b;
+    }
+    std::filesystem::remove(files[0]);
+    std::filesystem::remove(files[1]);
 }

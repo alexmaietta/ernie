@@ -32,8 +32,8 @@
 // of those it marches, then of those that shadow them), 8 the volumes each view sees; then the
 // shading pass's: 9 the lights, 10 their shadow maps, 11 the
 // comparison sampler, 12 their shadow views, 13 the atmosphere's transmittance table, 14 its
-// sampler, 15 the light patterns' norms, 16 the lasers' timing, 29 the patterns' data
-// (light_pattern's binding).
+// sampler, 15 the light patterns' norms, 16 the lasers' timing, 17 the IES profiles, 29 the
+// patterns' data (light_pattern's binding).
 //
 // References:
 // - K. Museth, "NanoVDB: A GPU-Friendly and Portable VDB Data Structure For Real-Time Rendering
@@ -66,6 +66,10 @@ static const uint kShadowSteps = 12;
 static const uint kMaxLights = 16;
 // Per view and light, the (sequence frame, weight) pairs a laser shows (shading.slang's).
 static const uint kMaxLit = 4;
+// Lights' IES profiles (shading.slang's): per slot kProfileRows rows from the light's axis to
+// opposite it, of kProfileColumns columns around it from its +x towards +y.
+static const uint kProfileRows = 129;
+static const uint kProfileColumns = 64;
 // Light types (`LightGpu::position.w`).
 static const uint kDistantLight = 0;
 static const uint kSphereLight = 1;
@@ -172,6 +176,7 @@ struct LightGpu {
 [[vk::binding(14, 0)]] SamplerState tableSampler;
 [[vk::binding(15, 0)]] StructuredBuffer<float> patternNorms;
 [[vk::binding(16, 0)]] StructuredBuffer<float2> lightTiming;
+[[vk::binding(17, 0)]] StructuredBuffer<float> lightProfiles;
 [[vk::push_constant]] ConstantBuffer<VolumeConstants> constants;
 
 static const uint kBackground = 0xFFFFFFFF;
@@ -427,6 +432,28 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
     return irradiance / (along * along);
 }
 
+// A light's IES profile towards unit `direction` from it, bilinear (shading.slang's
+// `lightProfile`).
+float lightProfile(LightGpu light, float3 direction) {
+    let base = (uint(light.shadow.w) - 1) * kProfileRows * kProfileColumns;
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let theta = acos(clamp(dot(direction, light.axis.xyz), -1.0, 1.0));
+    var phi = atan2(dot(direction, y), dot(direction, x));
+    phi = phi < 0.0 ? phi + 2.0 * PI : phi;
+    let r = theta / PI * float(kProfileRows - 1);
+    let c = phi / (2.0 * PI) * float(kProfileColumns);
+    let r0 = min(uint(r), kProfileRows - 2);
+    let c0 = uint(c) % kProfileColumns;
+    let c1 = (c0 + 1) % kProfileColumns;
+    let tr = saturate(r - float(r0));
+    let tc = frac(c);
+    let row0 = base + r0 * kProfileColumns;
+    let row1 = row0 + kProfileColumns;
+    return lerp(lerp(lightProfiles[row0 + c0], lightProfiles[row0 + c1], tc),
+                lerp(lightProfiles[row1 + c0], lightProfiles[row1 + c1], tc), tr);
+}
+
 // How a light reaches a point of the medium: towards it, how far it is, the factor on its
 // `spectrum` (focus included) and on its `tinted` part, before shadows and the air.
 struct LightReach {
@@ -486,6 +513,9 @@ LightReach reachOf(LightGpu light, uint slot, uint view, float3 world, float3x2 
     if (type != kDistantLight && light.shadow.z > 0.0) {
         // UsdLux's focus, by the direction from the light's centre.
         reach.focus = pow(abs(dot(-reach.towards, light.axis.xyz)), light.shadow.z);
+    }
+    if (type != kDistantLight && light.shadow.w > 0.0) {
+        reach.scale *= lightProfile(light, -reach.towards);
     }
     return reach;
 }
@@ -679,8 +709,10 @@ void volumeMain(uint3 id : SV_DispatchThreadID) {
                     let lit = weight * sigma *
                               phaseOf(material, dot(reach.towards, -direction)) * reach.scale *
                               geometryShadow(light, world, viewLights.y, mapTexels) *
-                              volumesShadow(shadowRun, world, reach.towards, reach.far,
-                                            light.links.y);
+                              (light.links.z != 0 ? volumesShadow(shadowRun, world,
+                                                                  reach.towards, reach.far,
+                                                                  light.links.y)
+                                                  : 1.0);
                     if (lit <= 0.0) {
                         continue;
                     }
