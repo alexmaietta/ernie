@@ -69,11 +69,13 @@ jobs:
   # examples) in four parts of every fourth test each (ctest -I part,,4), so the slow GPU tests run
   # side by side; Clang, on the newest Python, runs the unit and Python tests. Tests fail on any
   # validation message, and on a missing driver or layer rather than skipping
-  # (ERNIE_TEST_REQUIRE_VALIDATION).
+  # (ERNIE_TEST_REQUIRE_VALIDATION). Windows (MSVC) runs the unit tests and the GPU tests on
+  # Mesa's lavapipe, without the validation layers; macOS (Apple Clang, MoltenVK), with no Vulkan
+  # driver on its runners, the unit tests. Both build through sccache.
   test:
     name: test (${{ matrix.name }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    runs-on: ${{ matrix.os || 'ubuntu-24.04' }}
+    timeout-minutes: ${{ matrix.os == 'windows-2025' && 75 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -108,34 +110,77 @@ jobs:
             cxx: clang++
             python: "3.14"
             tests: -L "unit|python"
+          - name: windows-2025, part 1 of 2
+            os: windows-2025
+            key: windows-1
+            cc: cl
+            cxx: cl
+            python: "3.12"
+            tests: -L "unit|gpu" --timeout 600 -I 1,,2
+            validation: "0"
+          - name: windows-2025, part 2 of 2
+            os: windows-2025
+            key: windows-2
+            cc: cl
+            cxx: cl
+            python: "3.12"
+            tests: -L "unit|gpu" --timeout 600 -I 2,,2
+            validation: "0"
+          - name: macos-15, unit tests
+            os: macos-15
+            key: macos
+            cc: clang
+            cxx: clang++
+            python: "3.12"
+            tests: -L unit
+            validation: "0"
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
-      ERNIE_TEST_REQUIRE_VALIDATION: "1"
+      ERNIE_TEST_REQUIRE_VALIDATION: ${{ matrix.validation || '1' }}
     steps:
       - uses: actions/checkout@v7
       - name: Install Vulkan (lavapipe, validation layers) and the app's window system headers
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers \
             libvulkan1 xvfb libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libxkbcommon-dev
       - uses: astral-sh/setup-uv@v7
+        if: runner.os == 'Linux'
       - name: Python environment
+        if: runner.os == 'Linux'
         run: |
           uv venv --python ${{ matrix.python }}
           uv pip install numpy pytest pillow nanobind mypy
+      # Windows and macOS: the module's build needs, without the Python tests.
+      - uses: actions/setup-python@v7
+        if: runner.os != 'Linux'
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python packages
+        if: runner.os != 'Linux'
+        run: python -m pip install nanobind numpy
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Install Ninja
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      # A compiler cache: ccache on Linux, sccache (which caches MSVC too) elsewhere.
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: test-${{ matrix.cc }}
+          variant: ${{ runner.os == 'Linux' && 'ccache' || 'sccache' }}
+          key: ${{ runner.os == 'Linux' && format('test-{0}', matrix.cc) || format('build-{0}', matrix.os) }}
       # The fetched dependencies' sources (Slang alone is hundreds of MB), keyed on their pins.
       - uses: actions/cache@v6
         with:
           path: |
             .deps/*-src
             .deps/*-subbuild
-          key: deps-${{ hashFiles('cmake/third_party/**') }}
+          key: deps-${{ runner.os != 'Linux' && format('{0}-', runner.os) || '' }}${{ hashFiles('cmake/third_party/**') }}
       - name: Configure
+        if: runner.os == 'Linux'
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -143,8 +188,20 @@ jobs:
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_INSTALL=ON
           -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
           "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
+      # Windows with debug information for the debugger below, in the
+      # objects (/Z7), which sccache caches as it cannot /Zi's PDBs.
+      - name: Configure
+        if: runner.os != 'Linux'
+        shell: bash
+        run: >
+          cmake -S . -B build
+          ${{ runner.os == 'Windows' && '-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded' || '-DCMAKE_BUILD_TYPE=Release' }}
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
+          -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
       - name: Build
-        run: cmake --build build --parallel "$(nproc)"
+        shell: bash
+        run: cmake --build build --parallel 4
       # The package as built, with its stubs, and the demos ([tool.mypy]): pre-commit's mypy hook
       # needs a build, so the format job skips it.
       - name: Type check
@@ -152,7 +209,7 @@ jobs:
         run: .venv/bin/mypy
       # For the CI metrics (ci-metrics.yml): every compile's and link's time, and ccache's hits.
       - name: Compiler cache statistics
-        if: always()
+        if: always() && runner.os == 'Linux'
         run: ccache --print-stats > build/ccache-stats.tsv || true
       - uses: actions/upload-artifact@v7
         if: always()
@@ -167,15 +224,35 @@ jobs:
       # The data the demos fetch (LOLA's terrain and the like) into their
       # cache, kept between runs rather than downloaded by each.
       - uses: actions/cache@v6
+        if: runner.os == 'Linux'
         with:
           path: ~/.cache/ernie
           key: demo-data-${{ hashFiles('demos/**') }}
           restore-keys: demo-data-
       - name: Test on lavapipe
+        if: runner.os == 'Linux'
         run: |
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           export VK_DRIVER_FILES VK_ICD_FILENAMES=$VK_DRIVER_FILES
           xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 1800 ${{ matrix.tests }}
+      - name: Install Vulkan (lavapipe, Vulkan loader)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: .github/scripts/install-lavapipe-windows.sh
+      - name: Test
+        if: runner.os != 'Linux'
+        shell: bash
+        run: ctest --test-dir build --output-on-failure -j4 ${{ matrix.tests }}
+      # A failing Windows test is run again under the debugger, which prints where it failed.
+      # ctest names a test "ernie_<suite>.<gtest name>", from the program ernie_tests_<suite>.
+      - name: Debug the first failing test
+        if: failure() && runner.os == 'Windows'
+        shell: bash
+        run: |
+          name=$(sed -n '1s/^[0-9]*://p' build/Testing/Temporary/LastTestsFailed.log)
+          suite=${name%%.*}
+          .github/scripts/debug-windows.sh build/bin \
+            "build/bin/ernie_tests_${suite#ernie_}.exe" "--gtest_filter=${name#*.}"
 
   # The C++ tests built with AddressSanitizer and UndefinedBehaviorSanitizer: the unit tests, and the
   # GPU tests on lavapipe (Mesa's own leaks are not Ernie's, so leak checks are off). On pushes to
@@ -240,82 +317,6 @@ jobs:
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           export VK_DRIVER_FILES
           ctest --test-dir build --output-on-failure -j4 --timeout 1800 -I ${{ matrix.part }},,4
-
-  # Windows (MSVC) and macOS (Apple Clang, MoltenVK) built through sccache, and their unit tests
-  # run: the CPU tests, as those runners have no Vulkan driver of their own (the wheel-test job
-  # renders on Windows through Mesa's lavapipe).
-  build:
-    name: build and test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-2025, macos-15]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - name: Python packages
-        run: python -m pip install nanobind numpy
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
-      - name: Install Ninja
-        if: runner.os == 'macOS'
-        run: brew install ninja
-      # A compiler cache, as the Linux jobs' ccache: sccache, which caches MSVC too.
-      - uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          variant: sccache
-          key: build-${{ matrix.os }}
-      - uses: actions/cache@v6
-        with:
-          path: |
-            .deps/*-src
-            .deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ hashFiles('cmake/third_party/**') }}
-      # Windows with debug information for the debugger below, in the
-      # objects (/Z7), which sccache caches as it cannot /Zi's PDBs.
-      - name: Configure
-        shell: bash
-        run: >
-          cmake -S . -B build
-          ${{ runner.os == 'Windows' && '-DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded' || '-DCMAKE_BUILD_TYPE=Release' }}
-          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
-          "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
-          -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
-      - name: Build
-        run: cmake --build build --parallel 4
-      - name: Unit tests
-        run: ctest --test-dir build --output-on-failure -j4 --timeout 900 -L unit
-      # Windows renders too, on Mesa's lavapipe; a failing test is run
-      # again under the debugger, which prints where it failed.
-      - name: Install Vulkan (lavapipe, Vulkan loader)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: .github/scripts/install-lavapipe-windows.sh
-      - name: GPU tests on lavapipe
-        if: runner.os == 'Windows'
-        run: ctest --test-dir build --output-on-failure -j4 --timeout 600 -L gpu
-      # ctest names a test "ernie_<suite>.<gtest name>", from the program
-      # ernie_tests_<suite>.
-      - name: Debug the first failing test
-        if: failure() && runner.os == 'Windows'
-        shell: bash
-        run: |
-          name=$(sed -n '1s/^[0-9]*://p' build/Testing/Temporary/LastTestsFailed.log)
-          suite=${name%%.*}
-          .github/scripts/debug-windows.sh build/bin \
-            "build/bin/ernie_tests_${suite#ernie_}.exe" "--gtest_filter=${name#*.}"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: ninja-log-build-${{ matrix.os }}
-          path: build/.ninja_log
-          include-hidden-files: true
-          if-no-files-found: ignore
-          retention-days: 30
 
   # The release wheels (pyproject.toml, [tool.cibuildwheel]): manylinux_2_34 for x86_64 and
   # aarch64, Windows x86_64, and macOS on Apple silicon with MoltenVK bundled. The wheel-test job
@@ -605,7 +606,7 @@ jobs:
   # main (pip installs them only with --pre), X.Y.Z from release tags. Trusted Publishing: PyPI
   # trusts ci.yml's jobs in the pypi environment (main and v* tags only), so no token is stored.
   publish:
-    needs: [test, build, wheel, wheel-test, sdist]
+    needs: [test, wheel, wheel-test, sdist]
     timeout-minutes: 10
     if: >
       github.event_name == 'push' &&
