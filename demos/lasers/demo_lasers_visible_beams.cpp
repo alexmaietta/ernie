@@ -40,9 +40,13 @@ using demos::Check;
 constexpr glm::ivec2 kResolution{320, 200};
 constexpr double kDensity = 0.15;  // 1/m, the dust's extinction
 constexpr glm::dvec3 kRig{0.0, 0.0, 1.2};  // m, the lasers' aperture
+// The wind's direction, rising a little.
+constexpr glm::dvec3 kGust{1.0, 0.0, 0.15};
 
-/// Billowing dust over 12 m x 12 m, 3 m deep, in 0.2 m voxels.
-std::vector<std::uint8_t> MakeDust() {
+/// Billowing dust over 12 m x 12 m, 3 m deep, in 0.2 m voxels,
+/// carried `drift` m by the wind.
+std::vector<std::uint8_t>
+MakeDust(glm::dvec3 drift = glm::dvec3(0.0)) {
     constexpr double kVoxel = 0.2;
     const glm::ivec3 shape(60, 60, 15);
     const glm::dvec3 low(-6.0, -2.0, 0.0);
@@ -55,9 +59,10 @@ std::vector<std::uint8_t> MakeDust() {
                 const glm::dvec3 p =
                     low + kVoxel * (glm::dvec3(i, j, k) + 0.5);
                 const double value =
-                    std::clamp(0.55 +
-                                   0.6 * noise.Fbm(0.4 * p + 3.0, 4),
-                               0.0, 1.0) *
+                    std::clamp(
+                        0.55 + 0.6 * noise.Fbm(
+                                         0.4 * (p - drift) + 3.0, 4),
+                        0.0, 1.0) *
                     std::exp(-p.z / 2.0);
                 density[(static_cast<std::size_t>(i) * shape.y + j) *
                             shape.z +
@@ -162,6 +167,10 @@ class VisibleBeamsDemo : public app::Demo {
                              Material(GetScene(), "/World/Looks/Dust")
                                  .SetDensity(density);
                          });
+        // Wind carrying the dust through the beams, which then
+        // flicker.
+        Widgets().Slider("Wind (m/s)", 0.0, 3.0, wind_,
+                         [this](double wind) { wind_ = wind; });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->SetLighting(app::Lighting::Stage);
@@ -170,6 +179,16 @@ class VisibleBeamsDemo : public app::Demo {
             display.lights = false;
             display.grid = false;
             viewer->SetViewportDisplay(display);
+        }
+    }
+
+    void Step() override {
+        if (wind_ > 0.0) {
+            drift_ += wind_ * frameDt * kGust;
+            const std::vector<std::uint8_t> dust = MakeDust(drift_);
+            NanoVDBField(GetScene(), "/World/Dust/Density")
+                .SetBuffer(Tensor::Copy<std::uint8_t>(
+                    dust, {static_cast<std::int64_t>(dust.size())}));
         }
     }
 
@@ -203,6 +222,9 @@ class VisibleBeamsDemo : public app::Demo {
     }
 
   private:
+    double wind_ = 0.0;      ///< m/s
+    glm::dvec3 drift_{0.0};  ///< m the wind has carried the dust
+
     /// The radiance over the bands and the prim ids, with the lasers
     /// on or off and the dust at `density`.
     std::pair<std::vector<double>, std::vector<std::uint32_t>>

@@ -681,10 +681,11 @@ float laserIrradiance(LightGpu light, uint slot, float3 world, float3x2 footprin
 }
 
 // Lasers' beams integrated across a pixel's ray exactly (`LightGpu::patternExtent.z`, 1 for a
-// spot, 2 for a grid of beamlets): each beamlet a Gaussian beam from the aperture, of power p and
-// 1/e^2 radius w across the common normal of the ray and its axis there, whose light along the
-// ray, closest d to the axis at angle a, is p sqrt(2 / pi) exp(-2 d^2 / w^2) / (w sin a), averaged
-// over the pixel's width across that normal. A beam millimetres thick then lights the medium
+// spot, 2 for a grid of beamlets, 3 for a line's sheet, `addSheet`): each beamlet a Gaussian beam
+// from the aperture, of power p and 1/e^2 radius w across the common normal of the ray and its
+// axis there, whose light along the ray, closest d to the axis at angle a, is
+// p sqrt(2 / pi) exp(-2 d^2 / w^2) / (w sin a), averaged over the pixel's width across that
+// normal. A beam millimetres thick then lights the medium
 // once per crossing, at the step holding it, not by the chance of a step landing in it.
 //
 // Reference: A. E. Siegman, Lasers, University Science Books, 1986, ch. 17 (the Gaussian beam).
@@ -738,11 +739,17 @@ void addBeamlet(inout BeamCrossings crossings, LightGpu light, uint slot, float2
     if (abs(offset) > 3.0 * radius + width) {
         return;
     }
-    let value = share * beamAverage(offset, radius, width) / sqrt(denom);
+    insertCrossing(crossings, s, share * beamAverage(offset, radius, width) / sqrt(denom), slot,
+                   float4(-u, z));
+}
+
+// Adds a crossing to `crossings`, kept by distance `s` along the ray: of light `value`, laser
+// slot `slot`, `towards` the laser (xyz) and how far (w).
+void insertCrossing(inout BeamCrossings crossings, float s, float value, uint slot,
+                    float4 towards) {
     if (!(value > 0.0) || crossings.count == kMaxBeamCrossings) {
         return;
     }
-    // Insertion by distance.
     var at = crossings.count;
     while (at > 0 && crossings.t[at - 1] > s) {
         crossings.t[at] = crossings.t[at - 1];
@@ -754,8 +761,55 @@ void addBeamlet(inout BeamCrossings crossings, LightGpu light, uint slot, float2
     crossings.t[at] = s;
     crossings.value[at] = value;
     crossings.slot[at] = slot;
-    crossings.towards[at] = float4(-u, z);
+    crossings.towards[at] = towards;
     ++crossings.count;
+}
+
+// Adds to `crossings` where the ray from `origin` along unit `direction` crosses line laser
+// `light`'s sheet (slot `slot`, `share` of its power; light_pattern.cpp's LaserLine: fanned along
+// x, half fan angle p0, flat or Gaussian for p1 = 1, the beam's Gaussian across it). Every ray
+// crosses the sheet's plane once; at fan angle a and distance r from the aperture the sheet
+// carries the fan's power per radian over r per unit length, Gaussian across its thickness, so
+// along a ray at cosine c to its normal it gives that over |c|, whatever its thickness.
+void addSheet(inout BeamCrossings crossings, LightGpu light, uint slot, float share,
+              float3 origin, float3 direction, float3 footprintX, float3 footprintY) {
+    let x = normalize(light.extentX.xyz);
+    let y = cross(x, light.axis.xyz);
+    let crossing = dot(direction, y);
+    if (abs(crossing) < 1e-4) {
+        return;
+    }
+    let s = dot(light.position.xyz - origin, y) / crossing;
+    if (s <= 0.0) {
+        return;
+    }
+    let offset = origin + direction * s - light.position.xyz;
+    let along = dot(offset, light.axis.xyz);
+    if (along <= 0.0) {
+        return;
+    }
+    let r = length(offset);
+    let a = atan(dot(offset, x) / along);
+    // The fan's density per radian, its edges softened by the beam's own width and the pixel's
+    // angle from the aperture (as LaserLine's).
+    let z = along - light.beamExtra.x;
+    let zr = max(light.beam.z, 1e-12);
+    let w = light.beam.x * sqrt(1.0 + (z / zr) * (z / zr));
+    let pixel = 0.5 * (length(footprintX) + length(footprintY)) * s / r;
+    let sigma2 = 0.25 * (w / along) * (w / along) + pixel * pixel / 12.0;
+    let halfFan = light.patternParams[0].x;
+    var density = 0.0;
+    if (light.patternParams[0].y > 0.5) {
+        let spread = sqrt(0.25 * halfFan * halfFan + sigma2);
+        density = exp(-0.5 * a * a / (spread * spread)) / (sqrt(2.0 * PI) * spread);
+    } else {
+        let spread = sqrt(max(sigma2, 1e-20));
+        density = (normalBelow((a + halfFan) / spread) - normalBelow((a - halfFan) / spread)) /
+                  (2.0 * halfFan);
+    }
+    // Looking along the sheet, its thickness bounds the path: at most a hundredth's cosine.
+    insertCrossing(crossings, s, share * density / (r * max(abs(crossing), 0.01)), slot,
+                   float4(-offset / r, r));
 }
 
 // The crossings of the pixel's ray with the beams of the view's lasers integrated across rays:
@@ -782,6 +836,14 @@ BeamCrossings beamCrossingsOf(uint4 viewLights, uint lightCount, uint view, floa
         if (light.patternExtent.z < 1.5) {
             addBeamlet(crossings, light, k, float2(0.0), shown * (light.beamExtra.w + efficiency),
                        origin, direction, footprintX, footprintY);
+            continue;
+        }
+        if (light.patternExtent.z > 2.5) {
+            // A line's sheet, and its zero order.
+            addBeamlet(crossings, light, k, float2(0.0), shown * light.beamExtra.w, origin,
+                       direction, footprintX, footprintY);
+            addSheet(crossings, light, k, shown * efficiency, origin, direction, footprintX,
+                     footprintY);
             continue;
         }
         // A grid: p0 x p1 beamlets p2 and p3 radians apart (light_pattern.cpp's LaserGrid).

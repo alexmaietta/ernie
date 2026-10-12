@@ -21,10 +21,13 @@ from ernie.demo import write_png
 RESOLUTION = (320, 200)
 DENSITY = 0.15  # 1/m, the dust's extinction at its densest
 RIG = (0.0, 0.0, 1.2)  # m, the lasers' aperture
+# The wind's direction, rising a little.
+GUST = np.array([1.0, 0.0, 0.15])
 
 
-def make_dust():
-    """Billowing dust over 12 m x 12 m, 3 m deep, in 0.2 m voxels."""
+def make_dust(drift=(0.0, 0.0, 0.0)):
+    """Billowing dust over 12 m x 12 m, 3 m deep, in 0.2 m voxels,
+    carried `drift` m by the wind."""
     voxel = 0.2
     low = np.array([-6.0, -2.0, 0.0])
     shape = (60, 60, 15)
@@ -35,7 +38,7 @@ def make_dust():
         ],
         indexing="ij",
     )
-    points = 0.4 * np.stack([x, y, z], -1) + 3.0
+    points = 0.4 * (np.stack([x, y, z], -1) - drift) + 3.0
     billows = ernie.fbm_noise(
         points.reshape(-1, 3), octaves=4, seed=5
     )
@@ -122,7 +125,9 @@ class Demo(ernie.demo.Demo):
         dust = world.define(
             "Dust", ernie.Volume, material_binding="/World/Looks/Dust"
         )
-        dust.define("Density", ernie.NanoVDBField, buffer=make_dust())
+        self.dust = dust.define(
+            "Density", ernie.NanoVDBField, buffer=make_dust()
+        )
         dust.set_field("density", "/World/Dust/Density")
         self.dust_look = looks.define(
             "Dust",
@@ -173,6 +178,16 @@ class Demo(ernie.demo.Demo):
             DENSITY,
             on_change=lambda d: self.dust_look.set(density=d),
         )
+        # Wind carrying the dust through the beams, which then flicker.
+        self.wind = 0.0
+        self.drift = np.zeros(3)
+        self.widgets.slider(
+            "Wind (m/s)",
+            0.0,
+            3.0,
+            self.wind,
+            on_change=lambda w: setattr(self, "wind", w),
+        )
         if viewer is not None:
             viewer.active_camera = self.camera.path
             viewer.lighting = ernie.app.Lighting.STAGE
@@ -180,6 +195,11 @@ class Demo(ernie.demo.Demo):
             display.lights = False
             display.grid = False
             viewer.viewport_display = display
+
+    def step(self):
+        if self.wind > 0.0:
+            self.drift += self.wind * self.frame_dt * GUST
+            self.dust.buffer = make_dust(self.drift)
 
     def capture(self, lasers=True, density=DENSITY):
         """The radiance over the bands and the prim ids, with the

@@ -2667,14 +2667,15 @@ void RasterRenderer::WriteLights(
             std::copy(values.begin(), values.end(),
                       entry.patternParams);
             // Beams volumes integrate across rays (volume.slang's
-            // `BeamCrossings`): a spot's, or a grid's of at most 64
-            // beamlets.
+            // `BeamCrossings`): a spot's, a grid's of at most 64
+            // beamlets, or a line's sheet.
             const bool smallGrid = beam.pattern == "grid" &&
                                    values.size() >= 2 &&
                                    values[0] * values[1] <= 64.0f;
-            entry.patternExtent[2] = beam.IsSpot() ? 1.0f
-                                     : smallGrid   ? 2.0f
-                                                   : 0.0f;
+            entry.patternExtent[2] = beam.IsSpot()            ? 1.0f
+                                     : smallGrid              ? 2.0f
+                                     : beam.pattern == "line" ? 3.0f
+                                                              : 0.0f;
             // Its integral to compute (`patternNormMain`), unless
             // it is 1.
             if (!model->normalized) {
