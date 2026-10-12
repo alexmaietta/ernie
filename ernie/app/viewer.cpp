@@ -75,7 +75,7 @@ namespace {
 
 constexpr VkFormat kViewportFormat = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr const char* kViewportTitle = "Viewport";
-constexpr const char* kStatsTitle = "Stats";
+constexpr const char* kInfoTitle = "Info";
 constexpr const char* kDockSpace = "ErnieDockSpace";
 
 /// The session's overlay outlining the selection; overlays named with
@@ -98,7 +98,6 @@ constexpr glm::vec4 kGridColor{0.55f, 0.58f, 0.60f, 0.35f};
 /// Pixels the mouse may move between press and release for a click (a
 /// pick) rather than a drag.
 constexpr float kClickSlop = 3.0f;
-constexpr std::size_t kFrameHistory = 240;
 
 const Path& SessionSettingsPath() {
     static const Path path =
@@ -309,23 +308,32 @@ const char* WireframeName(std::optional<Wireframe> mode) {
     return "";
 }
 
-/// Built-in panel showing the device, frame times, memory and the
-/// last render error.
-class StatsPanel final : public Panel {
+/// Built-in panel showing the device and renderer, and the scene's
+/// scale: its prims by type, the meshes' points, faces and
+/// triangles, the points and instances, and what the last frame drew.
+class InfoPanel final : public Panel {
   public:
-    StatsPanel() : Panel(kStatsTitle, Dock::Bottom) {}
-
-    void Record(float milliseconds) {
-        times_.push_back(milliseconds);
-        if (times_.size() > kFrameHistory) {
-            times_.pop_front();
-        }
-    }
+    InfoPanel() : Panel(kInfoTitle, Dock::Bottom) {}
 
     void Draw(Viewer& viewer) override;
 
   private:
-    std::deque<float> times_;
+    /// The scene's counts, recounted when it changes.
+    struct Counts {
+        std::uint64_t prims = 0;
+        std::vector<std::pair<std::string, std::uint64_t>> types;
+        std::uint64_t meshPoints = 0;
+        std::uint64_t faces = 0;
+        std::uint64_t triangles = 0;
+        std::uint64_t points = 0;     ///< Of Points prims.
+        std::uint64_t instances = 0;  ///< Of PointInstancers.
+    };
+
+    void Count(const Scene& scene);
+
+    const Scene* scene_ = nullptr;
+    std::uint64_t version_ = 0;
+    Counts counts_;
 };
 
 /// Built-in panel listing the scene's overlays (debug drawing
@@ -579,8 +587,10 @@ struct Viewer::State {
     /// at least once.
     std::vector<std::string> focusRequests;
     std::set<std::string, std::less<>> drawnPanels;
-    StatsPanel* stats = nullptr;
     Panel* profilerPanel = nullptr;
+    /// Whether the Profiler panel was drawn last frame: shown, and
+    /// neither collapsed nor behind another tab.
+    bool profilerShown = false;
     bool showControls = false;  ///< Help > Keyboard and Mouse.
     bool showAbout = false;     ///< Help > About Ernie.
     std::size_t builtInPanels =
@@ -1169,6 +1179,12 @@ struct Viewer::State {
             }
         }
         ImGui::DockBuilderFinish(dockSpace);
+        // A dock opens on the panel docked last; the bottom one on
+        // the Log instead.
+        if (Panel* log = self.FindPanel("Log");
+            log != nullptr && log->IsVisible()) {
+            focusRequests.push_back("Log");
+        }
     }
 
     void DrawMenuBar() {
@@ -2796,8 +2812,13 @@ struct Viewer::State {
                 focusRequests.erase(focus);
             }
             bool keepOpen = true;
-            if (ImGui::Begin(panel.Title().c_str(), &keepOpen)) {
+            const bool shown =
+                ImGui::Begin(panel.Title().c_str(), &keepOpen);
+            if (shown) {
                 panel.Draw(self);
+            }
+            if (&panel == profilerPanel) {
+                profilerShown = shown;
             }
             ImGui::End();
             drawnPanels.insert(panel.Title());
@@ -3072,50 +3093,115 @@ struct Viewer::State {
 
 namespace {
 
-void StatsPanel::Draw(Viewer& viewer) {
+void InfoPanel::Count(const Scene& scene) {
+    counts_ = Counts{};
+    std::map<std::string, std::uint64_t> types;
+    const auto rows = [&](const Path& path, std::string_view name) {
+        const Tensor* tensor = scene.Read(path, name);
+        return tensor != nullptr && !tensor->Shape().empty()
+                   ? static_cast<std::uint64_t>(tensor->Shape()[0])
+                   : 0;
+    };
+    for (const Path& path : scene.Prims()) {
+        // Not the viewer's own (/__session).
+        if (path.String().starts_with("/__")) {
+            continue;
+        }
+        ++counts_.prims;
+        const std::string& type = scene.TypeOf(path);
+        ++types[type.empty() ? "(untyped)" : type];
+        if (type == "Mesh") {
+            counts_.meshPoints += rows(path, tokens::kPoints);
+            // Fanned, a face of n corners makes n - 2 triangles.
+            const std::uint64_t faces =
+                rows(path, tokens::kFaceVertexCounts);
+            const std::uint64_t corners =
+                rows(path, tokens::kFaceVertexIndices);
+            counts_.faces += faces;
+            counts_.triangles +=
+                corners >= 2 * faces ? corners - 2 * faces : 0;
+        } else if (type == "Points") {
+            counts_.points += rows(path, tokens::kPoints);
+        } else if (type == "PointInstancer") {
+            counts_.instances += rows(path, tokens::kProtoIndices);
+        }
+    }
+    counts_.types.assign(types.begin(), types.end());
+    std::stable_sort(counts_.types.begin(), counts_.types.end(),
+                     [](const auto& a, const auto& b) {
+                         return a.second > b.second;
+                     });
+}
+
+void InfoPanel::Draw(Viewer& viewer) {
+    const Scene& scene = viewer.GetScene();
+    if (&scene != scene_ || scene.Version() != version_) {
+        Count(scene);
+        scene_ = &scene;
+        version_ = scene.Version();
+    }
     const RenderStats stats = viewer.Stats();
-    ImGui::TextDisabled("Device");
-    ImGui::SameLine(100.0f);
-    ImGui::TextUnformatted(viewer.Context().DeviceName().c_str());
-    ImGui::TextDisabled("Renderer");
-    ImGui::SameLine(100.0f);
-    ImGui::TextUnformatted(viewer.Renderer().c_str());
-    ImGui::TextDisabled("Frame");
-    ImGui::SameLine(100.0f);
-    const float framerate = ImGui::GetIO().Framerate;
-    ImGui::Text("%.2f ms (%.0f fps)",
-                framerate > 0.0f
-                    ? 1000.0 / static_cast<double>(framerate)
-                    : 0.0,
-                static_cast<double>(framerate));
-    const std::uint64_t bytes = stats.gpuBytes;
-    ImGui::TextDisabled("GPU memory");
-    ImGui::SameLine(100.0f);
-    ImGui::Text("%.1f MiB",
-                static_cast<double>(bytes) / (1024.0 * 1024.0));
-    ImGui::TextDisabled("Triangles");
-    ImGui::SameLine(100.0f);
-    ImGui::Text("%llu",
-                static_cast<unsigned long long>(stats.triangles));
-    for (const auto& [name, value] : stats.counters) {
-        ImGui::TextDisabled("%s", name.c_str());
-        ImGui::SameLine(100.0f);
-        ImGui::Text("%llu", static_cast<unsigned long long>(value));
+    constexpr ImGuiTableFlags kFlags =
+        ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg |
+        ImGuiTableFlags_SizingStretchProp;
+    const auto row = [](const char* label, const std::string& value) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s", label);
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(value.c_str());
+    };
+    const auto count = [&](const char* label, std::uint64_t value) {
+        row(label, FormatCount(value));
+    };
+    // Three columns of sections side by side, as the bottom dock is
+    // wide and short.
+    if (!ImGui::BeginTable("##info", 3,
+                           ImGuiTableFlags_SizingStretchSame)) {
+        return;
     }
-    std::vector<float> times(times_.begin(), times_.end());
-    if (!times.empty() &&
-        ImPlot::BeginPlot("##frametimes", ImVec2(-1.0f, 120.0f),
-                          ImPlotFlags_NoLegend |
-                              ImPlotFlags_NoMenus)) {
-        ImPlot::SetupAxes(nullptr, "ms", ImPlotAxisFlags_NoTickLabels,
-                          ImPlotAxisFlags_AutoFit);
-        ImPlot::SetupAxisLimits(ImAxis_X1, 0.0,
-                                static_cast<double>(kFrameHistory),
-                                ImPlotCond_Always);
-        ImPlot::PlotLine("frame", times.data(),
-                         static_cast<int>(times.size()));
-        ImPlot::EndPlot();
+    ImGui::TableNextColumn();
+    ImGui::SeparatorText("Scene");
+    if (ImGui::BeginTable("##scene", 2, kFlags)) {
+        count("Prims", counts_.prims);
+        if (counts_.faces > 0) {
+            count("Mesh points", counts_.meshPoints);
+            count("Mesh faces", counts_.faces);
+            count("Mesh triangles", counts_.triangles);
+        }
+        if (counts_.points > 0) {
+            count("Points", counts_.points);
+        }
+        if (counts_.instances > 0) {
+            count("Instances", counts_.instances);
+        }
+        ImGui::EndTable();
     }
+    ImGui::TableNextColumn();
+    ImGui::SeparatorText("Prims by type");
+    if (ImGui::BeginTable("##types", 2, kFlags)) {
+        for (const auto& [type, number] : counts_.types) {
+            count(type.c_str(), number);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::TableNextColumn();
+    ImGui::SeparatorText("Renderer");
+    if (ImGui::BeginTable("##renderer", 2, kFlags)) {
+        row("Device", viewer.Context().DeviceName());
+        row("Renderer", viewer.Renderer());
+        char memory[32];
+        std::snprintf(memory, sizeof(memory), "%.1f MiB",
+                      static_cast<double>(stats.gpuBytes) /
+                          (1024.0 * 1024.0));
+        row("GPU memory", memory);
+        count("Triangles drawn", stats.triangles);
+        for (const auto& [name, value] : stats.counters) {
+            count(name.c_str(), value);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::EndTable();
 }
 
 }  // namespace
@@ -3146,8 +3232,8 @@ bool Viewer::State::Step() {
         }
     }
     // A profiler frame per viewer frame, recording only while the
-    // Profiler panel shows.
-    if (!profilerPanel->IsVisible()) {
+    // Profiler panel is drawn (its Draw turns recording back on).
+    if (!profilerPanel->IsVisible() || !profilerShown) {
         profiler::SetEnabled(false);
     }
     profiler::BeginFrame();
@@ -3204,9 +3290,6 @@ bool Viewer::State::Step() {
         throw;
     }
     ImGui::Render();
-    if (stats != nullptr) {
-        stats->Record(static_cast<float>(info.delta * 1000.0));
-    }
     RunCallbacks(Stage::PreRender, info);
     ValidateSession();
 
@@ -3275,17 +3358,16 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     }
     s.CreateGpu();
     s.CreateImGui();
-    auto stats = std::make_unique<StatsPanel>();
-    s.stats = stats.get();
-    // Stage above Properties on the right, and Log, Stats and
-    // Overlays at the bottom, opening on Stage, Properties and Log.
+    // Stage above Properties on the right, and Log, Info and
+    // Overlays at the bottom, opening on Stage, Properties and Log
+    // (BuildDefaultLayout).
     s.panels.push_back(MakeStagePanel());
     s.panels.push_back(MakePropertiesPanel());
     s.panels.push_back(MakeSettingsPanel());
     s.panels.push_back(MakeCameraPanel());
-    s.panels.push_back(std::move(stats));
-    s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeLogPanel());
+    s.panels.push_back(std::make_unique<InfoPanel>());
+    s.panels.push_back(std::make_unique<OverlaysPanel>());
     s.panels.push_back(MakeProfilerPanel());
     s.profilerPanel = s.panels.back().get();
     s.builtInPanels = s.panels.size();

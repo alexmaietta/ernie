@@ -412,7 +412,7 @@ TEST_F(ViewerTest, PanelsDockWhereTheyAsk) {
     int draws = 0;
     // Alone in its dock, as tabs hidden behind the built-in bottom
     // panels would not draw.
-    for (const char* title : {"Log", "Stats", "Overlays"}) {
+    for (const char* title : {"Log", "Info", "Overlays"}) {
         viewer_->RemovePanel(title);
     }
     CountingPanel& left = viewer_->AddPanel<CountingPanel>(
@@ -510,7 +510,7 @@ TEST_F(ViewerTest, FunctionPanelsDrawAndPanelsAreFoundByTitle) {
         });
     EXPECT_EQ(panel.GetDock(), Dock::Bottom);
     EXPECT_EQ(viewer_->FindPanel("Function"), &panel);
-    ASSERT_NE(viewer_->FindPanel("Stats"), nullptr);
+    ASSERT_NE(viewer_->FindPanel("Info"), nullptr);
     EXPECT_EQ(viewer_->FindPanel("Missing"), nullptr);
     viewer_->Step();
     EXPECT_EQ(draws, 1);
@@ -524,7 +524,7 @@ TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
     // read during the UI.
     std::map<std::string, bool> front;
     viewer_->OnUi([&](Viewer&, const FrameInfo&) {
-        for (const char* title : {"Stats", "Log"}) {
+        for (const char* title : {"Info", "Log"}) {
             const ImGuiWindow* window =
                 ImGui::FindWindowByName(title);
             front[title] =
@@ -540,13 +540,13 @@ TEST_F(ViewerTest, FocusPanelBringsADockedTabToTheFront) {
         viewer_->Step();
     }
     EXPECT_TRUE(front["Log"]);
-    EXPECT_FALSE(front["Stats"]);
+    EXPECT_FALSE(front["Info"]);
 
-    viewer_->FocusPanel("Stats");
+    viewer_->FocusPanel("Info");
     for (int frame = 0; frame < 2; ++frame) {
         viewer_->Step();
     }
-    EXPECT_TRUE(front["Stats"]);
+    EXPECT_TRUE(front["Info"]);
     EXPECT_FALSE(front["Log"]);
     EXPECT_THROW(viewer_->FocusPanel("Missing"),
                  std::invalid_argument);
@@ -756,8 +756,8 @@ TEST_F(ViewerTest, PanelsAndMenuItemsAreManagedByTitle) {
     viewer_->RemovePanel("Controls");
     EXPECT_THROW(viewer_->RemovePanel("Controls"),
                  std::invalid_argument);
-    viewer_->RemovePanel("Stats");
-    EXPECT_NO_THROW(viewer_->RemovePanel("Stats"));
+    viewer_->RemovePanel("Info");
+    EXPECT_NO_THROW(viewer_->RemovePanel("Info"));
     EXPECT_TRUE(viewer_->Step());
 }
 
@@ -1063,9 +1063,40 @@ TEST_F(ViewerTest, TheProfilerPanelRecordsGpuZonesWhileShown) {
     EXPECT_FALSE(memory::Live().empty())
         << "the renderer's targets are tracked";
 
+    // Behind another tab it is not drawn, and stops recording.
+    viewer_->FocusPanel("Log");
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_TRUE(viewer_->Step());
+    }
+    EXPECT_FALSE(profiler::Enabled());
+    viewer_->FocusPanel("Profiler");
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_TRUE(viewer_->Step());
+    }
+    EXPECT_TRUE(profiler::Enabled());
+
     viewer_->FindPanel("Profiler")->SetVisible(false);
     ASSERT_TRUE(viewer_->Step());
     EXPECT_FALSE(profiler::Enabled());
+}
+
+TEST_F(ViewerTest, TheLogIsTheBottomDocksOpeningTab) {
+    bool front = false;
+    viewer_->OnUi([&](Viewer&, const FrameInfo&) {
+        const ImGuiWindow* window = ImGui::FindWindowByName("Log");
+        front = window != nullptr && window->DockNode != nullptr &&
+                window->DockNode->SelectedTabId == window->TabId;
+    });
+    for (int frame = 0; frame < 3; ++frame) {
+        ASSERT_TRUE(viewer_->Step());
+    }
+    EXPECT_TRUE(front);
+}
+
+TEST_F(ViewerTest, TheInfoPanelCountsTheScene) {
+    viewer_->FocusPanel("Info");
+    EXPECT_TRUE(viewer_->Step());
+    EXPECT_TRUE(viewer_->Step());
 }
 
 TEST(ViewerOptionsTest, RejectsAnEmptyWindowAndUnknownSettings) {
