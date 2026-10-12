@@ -201,7 +201,7 @@ class VirtualBumperDemo : public app::Demo {
             .SetSensorType("mono")
             .SetSensorQeMono(FilteredQe())
             .SetSpectralRange({560.0, 760.0})
-            .SetSpectralBands(20)
+            .SetSpectralBands(8)
             .SetSensorNoise(false)
             .SetExposureFStop(5.6)
             .SetExposureIso(400.0)
@@ -249,7 +249,7 @@ class VirtualBumperDemo : public app::Demo {
               "flat ground at night should show 11 dots");
         std::array<double, kCases.size()> ratios{};
         for (std::size_t c = 0; c < kCases.size(); ++c) {
-            const std::array<Result, 2> results = RunCase(c);
+            const std::array<Result, 2>& results = RunCase(c);
             ratios[c] = results[0].ratio;
             std::printf(
                 "%s: (L_laser + L_sun) / L_sun %.3g, clear path %zu "
@@ -313,12 +313,13 @@ class VirtualBumperDemo : public app::Demo {
     }
 
     /// Sets the shutter so the brightest dot is 90% of white, as
-    /// theirs, and returns the frame.
+    /// theirs, from the case's own (`kShutter`), and returns the
+    /// frame.
     std::pair<Tensor, std::vector<float>> Expose() {
         Camera camera(GetScene(), "/World/Camera");
-        camera.SetExposureTime(0.001);
         for (int i = 0; i < 8; ++i) {
-            const Tensor image = Capture().first;
+            std::pair<Tensor, std::vector<float>> frame = Capture();
+            const Tensor& image = frame.first;
             double peak = 0.0;
             const auto rows =
                 static_cast<std::size_t>(image.Shape()[0]);
@@ -330,7 +331,7 @@ class VirtualBumperDemo : public app::Demo {
                 }
             }
             if (std::abs(peak - 230.0) <= 4.0) {
-                break;
+                return frame;
             }
             // LdrColor is gamma encoded: about the 2.2th root of
             // light.
@@ -344,75 +345,98 @@ class VirtualBumperDemo : public app::Demo {
     }
 
     /// Case `c`'s clear path and rock under one shutter, set on the
-    /// clear path as theirs was per condition.
-    std::array<Result, 2> RunCase(std::size_t c) {
+    /// clear path as theirs was per condition. Each case renders
+    /// once.
+    const std::array<Result, 2>& RunCase(std::size_t c) {
+        if (const auto found = results_.find(c);
+            found != results_.end()) {
+            return found->second;
+        }
         Show(c);
         Scene& scene = GetScene();
         LaserLight laser(scene, "/World/Projector");
         std::array<Result, 2> results;
+        const auto rows = static_cast<std::size_t>(kResolution.y);
+        const auto cols = static_cast<std::size_t>(kResolution.x);
+        std::size_t top = 0;
+        std::size_t bottom = 0;
         for (std::size_t rock = 0; rock < 2; ++rock) {
             scene.Set("/World/Rock", tokens::kVisibility,
                       std::string(rock != 0 ? tokens::kInherited
                                             : tokens::kInvisible));
-            auto [ldr, on] = rock != 0 ? Capture() : Expose();
-            laser.SetPower(0.0);
-            const std::vector<float> off = Capture().second;
-            laser.SetPower(kPower);
-            const auto rows = static_cast<std::size_t>(kResolution.y);
-            const auto cols = static_cast<std::size_t>(kResolution.x);
-            // The dots' row, and the band about it the detector
-            // reads.
-            std::size_t row = 0;
-            float brightest = 0.0f;
-            for (std::size_t i = 0; i < rows * cols; ++i) {
-                if (on[i] - off[i] > brightest) {
-                    brightest = on[i] - off[i];
-                    row = i / cols;
+            double ratio = 0.0;
+            Tensor ldr;
+            if (rock != 0) {
+                // The clear path's dots' row; the ratio is its alone.
+                ldr = Capture().first;
+            } else {
+                auto [image, on] = Expose();
+                ldr = std::move(image);
+                laser.SetPower(0.0);
+                const std::vector<float> off = Capture().second;
+                laser.SetPower(kPower);
+                // The dots' row, and the band about it the detector
+                // reads.
+                std::size_t row = 0;
+                float brightest = 0.0f;
+                for (std::size_t i = 0; i < rows * cols; ++i) {
+                    if (on[i] - off[i] > brightest) {
+                        brightest = on[i] - off[i];
+                        row = i / cols;
+                    }
+                }
+                top = row > 40 ? row - 40 : 0;
+                bottom = std::min(row + 40, rows - 1);
+                std::vector<float> peaks(cols, 0.0f);
+                std::vector<float> ambient;
+                for (std::size_t r = top; r <= bottom; ++r) {
+                    for (std::size_t x = 0; x < cols; ++x) {
+                        const std::size_t i = r * cols + x;
+                        peaks[x] = std::max(peaks[x], on[i] - off[i]);
+                        ambient.push_back(off[i]);
+                    }
+                }
+                std::vector<bool> dotMask(cols);
+                const float topPeak =
+                    *std::max_element(peaks.begin(), peaks.end());
+                for (std::size_t x = 0; x < cols; ++x) {
+                    dotMask[x] = peaks[x] > 0.2f * topPeak;
+                }
+                const auto middle =
+                    ambient.begin() +
+                    static_cast<std::ptrdiff_t>(ambient.size() / 2);
+                std::nth_element(ambient.begin(), middle,
+                                 ambient.end());
+                const double sun =
+                    std::max(static_cast<double>(*middle), 1e-9);
+                bool first = true;
+                for (const double centroid : Clusters(dotMask)) {
+                    double signal = 0.0;
+                    const auto x = static_cast<std::size_t>(centroid);
+                    for (std::size_t r = top; r <= bottom; ++r) {
+                        signal = std::max(
+                            signal,
+                            static_cast<double>(on[r * cols + x]));
+                    }
+                    ratio = first ? signal / sun
+                                  : std::min(ratio, signal / sun);
+                    first = false;
                 }
             }
-            const std::size_t top = row > 40 ? row - 40 : 0;
-            const std::size_t bottom = std::min(row + 40, rows - 1);
-            std::vector<float> peaks(cols, 0.0f);
-            std::vector<float> ambient;
             std::vector<bool> lit(cols, false);
             for (std::size_t r = top; r <= bottom; ++r) {
                 for (std::size_t x = 0; x < cols; ++x) {
-                    const std::size_t i = r * cols + x;
-                    peaks[x] = std::max(peaks[x], on[i] - off[i]);
-                    ambient.push_back(off[i]);
                     lit[x] = lit[x] ||
                              Ldr(ldr, r, x) > kThreshold[c] * 255.0;
                 }
             }
-            std::vector<bool> dotMask(cols);
-            const float topPeak =
-                *std::max_element(peaks.begin(), peaks.end());
-            for (std::size_t x = 0; x < cols; ++x) {
-                dotMask[x] = peaks[x] > 0.2f * topPeak;
-            }
-            const auto middle =
-                ambient.begin() +
-                static_cast<std::ptrdiff_t>(ambient.size() / 2);
-            std::nth_element(ambient.begin(), middle, ambient.end());
-            const double sun =
-                std::max(static_cast<double>(*middle), 1e-9);
-            double ratio = 0.0;
-            bool first = true;
-            for (const double centroid : Clusters(dotMask)) {
-                double signal = 0.0;
-                const auto x = static_cast<std::size_t>(centroid);
-                for (std::size_t r = top; r <= bottom; ++r) {
-                    signal = std::max(signal, static_cast<double>(
-                                                  on[r * cols + x]));
-                }
-                ratio = first ? signal / sun
-                              : std::min(ratio, signal / sun);
-                first = false;
-            }
             results[rock] = {std::move(ldr), ratio, Clusters(lit)};
         }
-        return results;
+        return results_.emplace(c, std::move(results)).first->second;
     }
+
+    std::map<std::size_t, std::array<Result, 2>>
+        results_;  ///< Per case, as `RunCase` renders it.
 
     /// Their decision: fewer dots than beams, or one moved more than
     /// `kDisparity` from where flat ground puts it.

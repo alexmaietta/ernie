@@ -156,7 +156,7 @@ class Demo(ernie.demo.Demo):
             sensor_type="mono",
             sensor_qe_mono=filtered_qe(),
             spectral_range=(560.0, 760.0),
-            spectral_bands=20,
+            spectral_bands=8,
             sensor_noise=False,
             exposure_f_stop=5.6,
             exposure_iso=400.0,
@@ -183,6 +183,7 @@ class Demo(ernie.demo.Demo):
             resolution=RESOLUTION,
             ambient=0.0,
         )
+        self.results = {}  # per case, as `run_case` renders it
         self.show("night")
         self.widgets.combo(
             "Case", CASES, 0, on_change=lambda i: self.show(CASES[i])
@@ -216,13 +217,13 @@ class Demo(ernie.demo.Demo):
 
     def expose(self):
         """Sets the shutter so the brightest dot is 90% of white, as
-        theirs, and returns the frame."""
-        self.camera.exposure_time = 0.001
+        theirs, from the case's own (`SHUTTER`), and returns the
+        frame."""
         for _ in range(8):
-            ldr, _ = self.capture()
-            peak = ldr.max()
+            frame = self.capture()
+            peak = frame[0].max()
             if abs(peak - 230.0) <= 4.0:
-                break
+                return frame
             # LdrColor is gamma encoded: about the 2.2th root of light.
             scale = (
                 (230.0 / max(peak, 1.0)) ** 2.2 if peak < 254 else 0.3
@@ -233,7 +234,10 @@ class Demo(ernie.demo.Demo):
     def run_case(self, case):
         """The case's clear path and rock under one shutter, set on the
         clear path as theirs was per condition: for each (rock or not)
-        the image, the dots' sunlight ratio and the dots found."""
+        the image, the dots' sunlight ratio and the dots found. Each
+        case renders once."""
+        if case in self.results:
+            return self.results[case]
         self.show(case)
         results = {}
         for rock in (False, True):
@@ -241,27 +245,30 @@ class Demo(ernie.demo.Demo):
                 tokens.VISIBILITY,
                 "inherited" if rock else "invisible",
             )
-            ldr, on = self.capture() if rock else self.expose()
-            self.laser.power = 0.0
-            _, off = self.capture()
-            self.laser.power = 0.05
-            laser = on - off
-            row = int(np.argmax(laser.max(axis=1)))
-            band = slice(max(row - 40, 0), row + 41)
-            peaks = laser[band].max(axis=0)
-            dots = clusters(peaks > 0.2 * peaks.max())
-            sun = max(float(np.median(off[band])), 1e-9)
-            ratios = [
-                float(on[band, int(c)].max()) / sun for c in dots
-            ]
+            if rock:
+                # The clear path's dots' row; the ratio is its alone.
+                ldr, _ = self.capture()
+                ratio = 0.0
+            else:
+                ldr, on = self.expose()
+                self.laser.power = 0.0
+                _, off = self.capture()
+                self.laser.power = 0.05
+                laser = on - off
+                row = int(np.argmax(laser.max(axis=1)))
+                band = slice(max(row - 40, 0), row + 41)
+                peaks = laser[band].max(axis=0)
+                dots = clusters(peaks > 0.2 * peaks.max())
+                sun = max(float(np.median(off[band])), 1e-9)
+                ratios = [
+                    float(on[band, int(c)].max()) / sun for c in dots
+                ]
+                ratio = min(ratios) if ratios else 0.0
             found = clusters(
                 (ldr[band] > THRESHOLD[case] * 255.0).any(axis=0)
             )
-            results[rock] = (
-                ldr,
-                min(ratios) if ratios else 0.0,
-                found,
-            )
+            results[rock] = (ldr, ratio, found)
+        self.results[case] = results
         return results
 
     def obstacle(self, found, expected):
