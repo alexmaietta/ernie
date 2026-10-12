@@ -896,27 +896,13 @@ class RasterRenderer {
     /// Reads slot `slot`'s histogram, if its frame metered, into
     /// `meteredLuminance_` and its key's `meteredByKey_`.
     void ReadMeter(std::uint32_t slot);
-    /// Has the GPU fit the cascades of a light towards `towards` over
-    /// `cascadeFit_`'s view, `resolution` texels across, as light
-    /// views from `first` (`FitViewCascades` their estimate): to the
-    /// depths the view saw, for a visible fit.
-    /// With `subframe`, as a light turning across the shutter is at
-    /// one sub-frame: into `subframeFits_` from `first`, which that
-    /// sub-frame's shadow passes copy into the light's views
-    /// (`subframeCopies_`).
-    void AddCascadeJob(const FrameParams& params,
-                       const glm::vec3& towards,
-                       std::uint32_t resolution, std::uint32_t first,
-                       bool subframe = false);
-    /// Uploads the frame's cascade jobs once its volumes are set,
-    /// each widening the depths seen by the volumes' bounds.
-    void WriteCascadeJobs();
-    /// Records the fit of the frame's cascades on the GPU
-    /// (`cascadeJobs_`, depth_range.slang's `cascadeFitMain`).
-    void RecordCascadeFit(VkCommandBuffer commands) const;
+    /// Reads slot `slot`'s depth range, if its frame measured one,
+    /// into `seen_`.
+    void ReadDepthRange(std::uint32_t slot);
     /// Cascades of a light towards `towards` (a unit vector) over
-    /// `cascadeFit_`'s view, `resolution` texels across each: the
-    /// sun's, and other distant lights' in their own maps.
+    /// `cascadeFit_`'s view out to its distance, `resolution` texels
+    /// across each: the sun's, and other distant lights' in their own
+    /// maps.
     std::vector<ShadowCascade>
     FitViewCascades(const glm::vec3& towards,
                     std::uint32_t resolution) const;
@@ -977,20 +963,25 @@ class RasterRenderer {
     std::unique_ptr<GpuImage> shadowMaps_;
     /// What a single view's cascades fit to this frame: its view, a
     /// cube camera's face extent (0 for others), the casters' box
-    /// down to any floor they shadow, the split count and weight, and
-    /// the depths it saw (a visible fit's). None in a batch, without
-    /// bounds, or without a distant light's shadows.
+    /// down to any floor they shadow, the split count and exponent,
+    /// and the depth they reach, which every distant light's share
+    /// (`FitCascadeDistance`). None in a batch, without bounds, or
+    /// without a distant light's shadows.
     struct CascadeFit {
         CameraView view;
         float around = 0.0f;
         glm::vec3 casterLow{0.0f};
         glm::vec3 casterHigh{0.0f};
         int count = 1;
-        float lambda = 0.5f;
-        /// Fitted to the depths the view saw (`ShadowFit::Visible`),
-        /// on the GPU.
-        bool visible = false;
+        float exponent = 3.0f;
+        float distance = 0.0f;
     };
+    /// The depth a single view's cascades reach: as far as the
+    /// casters and their shadows on the floor reach along it, towards
+    /// each shadowed distant light of `params`; within the depths a
+    /// recent frame of the same stream saw from about the same pose
+    /// (`seen_`), and the volumes' bounds, which write no depth.
+    float FitCascadeDistance(const FrameParams& params) const;
     std::optional<CascadeFit> cascadeFit_;
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;
@@ -1409,40 +1400,34 @@ class RasterRenderer {
     /// empty for others.
     std::string faceLens_;
 
-    /// Sample distribution shadow maps (`ShadowFit::Visible`), on the
-    /// GPU: a frame measures its view's visible depth range
-    /// (`RecordDepthRange`) into `depthRangeSums_`, and the next
-    /// fits its distant lights' cascades to it there
-    /// (`RecordCascadeFit`), when it is of the same stream and its
-    /// view close to the measured one, whose pose `lastMeasured_`
-    /// keeps.
+    /// The depths a single view sees, for later frames' cascades
+    /// (`FitCascadeDistance`): each slot's frame measures its view's
+    /// visible depth range (`RecordDepthRange`) into
+    /// `depthRangeSums_`, copied to the slot's `depthRangeReads_`
+    /// with the pose it saw from, and read back by a later frame in
+    /// the slot into `seen_`.
     struct Measured {
         std::uint32_t stream = 0;  ///< `FrameParams::stream`.
         glm::dvec3 eye{0.0};
         glm::vec3 forward{0.0f};
     };
+    struct Seen {
+        Measured pose;
+        float nearest = 0.0f;
+        float farthest = 0.0f;
+    };
     PipelineLayout depthRangeLayout_;
     std::unique_ptr<ComputePipeline> depthRangePipeline_;
-    std::unique_ptr<ComputePipeline> cascadeFitPipeline_;
     /// The depths seen, reduced on the device: atomics on host memory
     /// would cross the bus once per wave.
     std::unique_ptr<GpuBuffer> depthRangeSums_;
-    std::optional<Measured> lastMeasured_;
+    std::array<std::unique_ptr<GpuBuffer>, FrameUploads::kSlots>
+        depthRangeReads_;
+    std::array<std::optional<Measured>, FrameUploads::kSlots>
+        depthRangePoses_;
+    std::optional<Seen> seen_;
     bool measureDepth_ = false;  ///< Whether the last `Update`'s
                                  ///< frame measures its depths.
-    /// The frame's cascades the GPU fits (depth_range.slang's
-    /// `CascadeJob`, raw), and the buffer they go up in.
-    std::vector<std::byte> cascadeJobs_;
-    std::uint32_t cascadeJobCount_ = 0;
-    std::unique_ptr<GpuBuffer> cascadeJobBuffer_;
-    bool splitsFitted_ = false;  ///< A job writes the frame's splits.
-    /// Lights turning across the shutter, fitted on the GPU at each
-    /// sub-frame: their matrices, and per sub-frame the copies (from
-    /// `subframeFits_`, to light view) its shadow passes make.
-    std::unique_ptr<GpuBuffer> subframeFits_;
-    std::uint32_t subframeFitCount_ = 0;
-    std::vector<std::vector<std::pair<std::uint32_t, std::uint32_t>>>
-        subframeCopies_;
 
     /// Exposure metering (`FrameParams::meter`): each slot's frame
     /// counts its view's log-luminance histogram into its buffer

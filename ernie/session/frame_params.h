@@ -77,14 +77,6 @@ enum class WorldShadows : std::uint32_t {
     Merged = 2,
 };
 
-/// What bounds a single view's sun cascades (`ernie:shadows:fit`).
-enum class ShadowFit : std::uint32_t {
-    Scene = 0,    ///< The casters and where their shadows land;
-                  ///< deterministic.
-    Visible = 1,  ///< The depths a recent frame saw (sample
-                  ///< distribution shadow maps).
-};
-
 /// What a world's own shadow map covers (`ernie:shadows:worldFit`).
 enum class WorldShadowFit : std::uint32_t {
     Scene = 0,  ///< The whole scene, as every map of the batch.
@@ -104,10 +96,8 @@ struct ShadowSettings {
         1.5f;  ///< Poisson filter radius, in shadow map texels.
     float normalOffset =
         1.5f;  ///< Receiver offset along the normal, in texels.
-    float splitLambda =
-        0.8f;  ///< Logarithmic weight of the practical split scheme.
-    ShadowFit fit =
-        ShadowFit::Scene;  ///< What bounds a single view's cascades.
+    float splitExponent =
+        3.0f;  ///< Each cascade's depth over the last's.
     bool showCascades =
         false;  ///< Tint fragments by cascade, for tuning.
     std::uint32_t lightResolution =

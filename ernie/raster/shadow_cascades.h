@@ -32,10 +32,6 @@ struct ShadowCascade {
     /// `gpuMatrix` of `RasterRenderer::LightViewMatrices`.
     bool gpuFitted = false;
     std::uint32_t gpuMatrix = 0;
-    /// For a view the GPU fits, a light view-projection whose box
-    /// holds every one the GPU may fit, for culling on the host
-    /// (terrain and planet patches); none to cull nothing there.
-    std::optional<glm::mat4> cullViewProjection;
     /// A batch's map fitted to one world (`WorldShadowFit::World`):
     /// the world whose casters it draws besides the shared ones, so
     /// passes consider only theirs; none for every world's.
@@ -50,18 +46,31 @@ struct ShadowCascade {
     bool moving = false;
 };
 
-/// View-space split depths from `nearPlane` to `farPlane` with the
-/// practical split scheme, which blends logarithmic splits (weight
-/// `lambda`) with uniform splits (weight 1 - `lambda`).
-///
-/// Reference: F. Zhang, H. Sun, L. Xu and L. K. Lun, "Parallel-Split
-/// Shadow Maps for Large-Scale Virtual Environments", Proc. ACM VRCIA
-/// 2006, 311-318. https://doi.org/10.1145/1128923.1128975
+/// The share of each cascade's depth span that it reaches past its
+/// split into the next, where shading cross-fades between the two
+/// (Unreal's `CascadeTransitionFraction`). The last fades out to lit
+/// over as much past its split: Unreal fades it short of its fixed
+/// shadow distance, but a distance fitted to the farthest depth seen
+/// would then lose shadows the view sees.
+inline constexpr float kCascadeTransition = 0.1f;
+/// Texels round each cascade's map that its sphere leaves free, so
+/// filters near its edge stay on it (Unreal's CSM border).
+inline constexpr std::uint32_t kCascadeBorderTexels = 4;
+/// Texels each cascade snaps its centre to a multiple of (Unreal's
+/// `MaxDownsampleFactor`).
+inline constexpr float kCascadeSnapTexels = 4.0f;
+/// Metres of depth a cascade spans at least on either side of its
+/// sphere's centre (Unreal's `DepthRangeClamp`, 5000 cm).
+inline constexpr float kCascadeMinDepthHalf = 50.0f;
+
+/// View-space split depths from `nearPlane` to `farPlane`, each
+/// cascade `exponent` times as deep as the last (Unreal's
+/// `CascadeDistributionExponent`; 1 for uniform splits).
 ///
 /// @return `count + 1` increasing depths, starting at `nearPlane` and
 /// ending at `farPlane`.
-std::vector<float> PracticalSplits(float nearPlane, float farPlane,
-                                   int count, float lambda);
+std::vector<float> CascadeSplits(float nearPlane, float farPlane,
+                                 int count, float exponent);
 
 /// The box from `low` to `high` grown to hold the shadows its
 /// contents cast along `toSun` (unit, towards the light) onto the
@@ -76,28 +85,36 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
                                             float maxLength = 8.0f);
 
 /// Fits one orthographic shadow map per split of the camera frustum
-/// up to `shadowDistance`.
+/// from its near plane to `shadowDistance`, as Unreal Engine's
+/// cascaded shadow maps do.
 ///
-/// Each cascade bounds its frustum slice with a sphere, so its size
-/// does not change as the camera rotates, and snaps its position to
-/// whole shadow map texels, so shadow edges do not shimmer as the
-/// camera moves (Valient 2008). Light-space depth spans the whole
-/// scene box, so casters outside the view still cast into it; with
-/// `clampCasters`, for maps whose pipelines clamp depth, only each
-/// cascade's own sphere within it, casters nearer the light landing
-/// on its near plane ("pancaking"), so a vast scene such as a planet
-/// keeps depth precision.
+/// The splits grow geometrically (`CascadeSplits`). Each cascade
+/// reaches `kCascadeTransition` of its span past its split, where
+/// shading fades into the next (or out), and bounds that slice with
+/// the smallest sphere centred on the view axis, its radius rounded
+/// up to the centimetre, so its size does not change as the camera
+/// turns. The sphere fills the map but for `kCascadeBorderTexels`
+/// round it, and its centre snaps to multiples of
+/// `kCascadeSnapTexels` texels, so shadow edges do not shimmer as the
+/// camera moves. Light-space depth spans the sphere, at least
+/// `kCascadeMinDepthHalf` either way; with `clampCasters`, for maps
+/// whose pipelines clamp depth, casters nearer the light land on its
+/// near plane ("pancaking"), else the depth reaches back to hold the
+/// whole scene box. `shadowDistance` is rounded up to a quarter stop,
+/// so a distance fitted to what the view sees keeps its cascades as
+/// it drifts.
 ///
 /// References:
-/// - W. Engel, "Cascaded Shadow Maps", in ShaderX5, Charles River
-///   Media, 2006.
+/// - Unreal Engine 5, FDirectionalLightSceneProxy::GetSplitDistance,
+///   GetShadowSplitBounds and GetShadowSplitBoundsDepthRange
+///   (DirectionalLightComponent.cpp), and
+///   FProjectedShadowInfo::SetupWholeSceneProjection
+///   (ShadowSetup.cpp).
 /// - M. Valient, "Stable Rendering of Cascaded Shadow Maps", in
 ///   ShaderX6, Charles River Media, 2008.
 ///
 /// @param toSun Unit vector pointing towards the light.
-/// @param splitNear Where the first cascade starts, such as the
-/// nearest depth the view sees (sample distribution shadow maps); 0
-/// for the camera's near plane.
+/// @param exponent Each cascade's depth over the last's.
 /// @param around For a camera rendered on cube faces (wide_view.h),
 /// the faces' extent (the tangent of their half field,
 /// `CubeFaceExtent`), 0 for others: each cascade then bounds every
@@ -109,8 +126,8 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 std::vector<ShadowCascade>
 FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& toSun, const glm::vec3& sceneMin,
-            const glm::vec3& sceneMax, int count, float lambda,
-            std::uint32_t resolution, float splitNear = 0.0f,
-            float around = 0.0f, bool clampCasters = false);
+            const glm::vec3& sceneMax, int count, float exponent,
+            std::uint32_t resolution, float around = 0.0f,
+            bool clampCasters = false);
 
 }  // namespace ernie

@@ -65,8 +65,8 @@ TEST(RenderSchemas, FallbacksAreTheRenderDefaults) {
         static_cast<float>(settings.GetShadowNormalOffset()),
         shadows.normalOffset);
     EXPECT_FLOAT_EQ(
-        static_cast<float>(settings.GetShadowSplitLambda()),
-        shadows.splitLambda);
+        static_cast<float>(settings.GetShadowSplitExponent()),
+        shadows.splitExponent);
     EXPECT_EQ(settings.GetShadowShowCascades(), shadows.showCascades);
     EXPECT_FLOAT_EQ(
         static_cast<float>(settings.GetShadowWorldMargin()),
@@ -75,8 +75,6 @@ TEST(RenderSchemas, FallbacksAreTheRenderDefaults) {
     EXPECT_EQ(shadows.worlds, ernie::WorldShadows::Separate);
     EXPECT_EQ(settings.GetShadowWorldFit(), tokens::kScene);
     EXPECT_EQ(shadows.worldFit, ernie::WorldShadowFit::Scene);
-    EXPECT_EQ(settings.GetShadowFit(), tokens::kScene);
-    EXPECT_EQ(shadows.fit, ernie::ShadowFit::Scene);
 
     // The token options, through the functions that parse them,
     // against their defaults.

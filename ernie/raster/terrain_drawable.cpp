@@ -1025,18 +1025,13 @@ void TerrainDrawable::Prepare(
         }
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
-        // A view the GPU fits culls by the box holding every one it
-        // may fit, when it has one; without, or moving across the
-        // shutter, it draws every patch: its matrix here is only an
-        // estimate, or one of its sub-frames'.
+        // A view the GPU poses, or moving across the shutter, draws
+        // every patch: its matrix here is only an estimate, or one of
+        // its sub-frames'.
         const ShadowCascade& cascade = cascades[c];
         const Frustum light = Shifted(
-            Frustum::FromMatrix(cascade.cullViewProjection.value_or(
-                cascade.lightViewProjection)),
-            local);
-        const bool culls =
-            !cascade.moving &&
-            (!cascade.gpuFitted || cascade.cullViewProjection);
+            Frustum::FromMatrix(cascade.lightViewProjection), local);
+        const bool culls = !cascade.moving && !cascade.gpuFitted;
         tree_.Select(lodEyes_.front(), ranges,
                      culls ? &light : nullptr, params_.exaggeration,
                      patches_);

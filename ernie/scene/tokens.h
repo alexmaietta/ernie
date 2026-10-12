@@ -1323,12 +1323,6 @@ inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =
     "ernie:shadows:worldMargin";
-/// token: what bounds a single view's sun cascades: "scene" (the
-/// default: the casters and where their shadows land, the same every
-/// time a frame renders) or "visible" (sample distribution shadow
-/// maps: the depths a recent frame of the same product saw, tighter
-/// and sharper, but an image then depends on the frames before it).
-inline constexpr std::string_view kShadowFit = "ernie:shadows:fit";
 /// float, stops: exposure compensation on the photographic outputs
 /// (HdrColor's display, LdrColor), on top of the camera's own
 /// exposure; default 0.
@@ -1338,13 +1332,14 @@ inline constexpr std::string_view kExposureCompensation =
 /// automatic exposure and exposure meters, read back from a later
 /// frame (`RenderDelegate::MeteredLuminance`); default off.
 inline constexpr std::string_view kMeter = "ernie:meter";
-inline constexpr std::string_view kVisible = "visible";
 inline constexpr std::string_view kShadowSoftness =
     "ernie:shadows:softness";
 inline constexpr std::string_view kShadowNormalOffset =
     "ernie:shadows:normalOffset";
-inline constexpr std::string_view kShadowSplitLambda =
-    "ernie:shadows:splitLambda";
+/// float: each sun cascade's depth over the last's (Unreal's
+/// `CascadeDistributionExponent`); default 3.
+inline constexpr std::string_view kShadowSplitExponent =
+    "ernie:shadows:splitExponent";
 inline constexpr std::string_view kShadowShowCascades =
     "ernie:shadows:showCascades";
 inline constexpr std::string_view kLodEnable = "ernie:lod:enable";

@@ -46,18 +46,24 @@ std::array<glm::vec3, 8> SliceCorners(const CameraView& camera,
 
 }  // namespace
 
-std::vector<float> PracticalSplits(float nearPlane, float farPlane,
-                                   int count, float lambda) {
+std::vector<float> CascadeSplits(float nearPlane, float farPlane,
+                                 int count, float exponent) {
+    // Unreal's ComputeAccumulatedScale: cascade i spans exponent^i
+    // parts of the sum of them all.
     std::vector<float> splits(static_cast<std::size_t>(count) + 1);
+    float total = 0.0f;
+    float scale = 1.0f;
+    for (int i = 0; i < count; ++i) {
+        total += scale;
+        scale *= exponent;
+    }
+    float reached = 0.0f;
+    scale = 1.0f;
     for (int i = 0; i <= count; ++i) {
-        const float fraction =
-            static_cast<float>(i) / static_cast<float>(count);
-        const float logarithmic =
-            nearPlane * std::pow(farPlane / nearPlane, fraction);
-        const float uniform =
-            nearPlane + (farPlane - nearPlane) * fraction;
         splits[static_cast<std::size_t>(i)] =
-            lambda * logarithmic + (1.0f - lambda) * uniform;
+            nearPlane + reached / total * (farPlane - nearPlane);
+        reached += scale;
+        scale *= exponent;
     }
     splits.front() = nearPlane;
     splits.back() = farPlane;
@@ -90,8 +96,8 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 std::vector<ShadowCascade>
 FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& toSun, const glm::vec3& sceneMin,
-            const glm::vec3& sceneMax, int count, float lambda,
-            std::uint32_t resolution, float splitNear, float around,
+            const glm::vec3& sceneMax, int count, float exponent,
+            std::uint32_t resolution, float around,
             bool clampCasters) {
     const glm::vec3 up = std::fabs(toSun.z) > 0.99f
                              ? glm::vec3(0.0f, 1.0f, 0.0f)
@@ -112,65 +118,90 @@ FitCascades(const CameraView& camera, float shadowDistance,
     const float depthPadding = 0.01f * (sceneFar - sceneNear) + 1e-3f;
 
     const float res = static_cast<float>(resolution);
-    // The span in quarter stops (powers of 2^(1/4)), the start down
-    // and the distance up: a span that drifts as the view turns or
-    // what it sees changes keeps the same cascades, whose snapped
-    // texels then hold still, until it crosses a step.
-    const auto quarterStop = [](float depth, bool up) {
-        const float stops = 4.0f * std::log2(std::max(depth, 1e-6f));
-        return std::exp2((up ? std::ceil(stops) : std::floor(stops)) /
-                         4.0f);
-    };
-    const float start =
-        std::max(quarterStop(splitNear, false), camera.nearPlane);
-    const std::vector<float> splits = PracticalSplits(
+    // The sphere fills the map inside its border.
+    const float inner = std::max(
+        res - 2.0f * static_cast<float>(kCascadeBorderTexels), 1.0f);
+    // The distance up to a quarter stop (a power of 2^(1/4)): one
+    // that drifts as the view turns or what it sees changes keeps the
+    // same cascades, whose snapped texels then hold still, until it
+    // crosses a step.
+    const float stops =
+        4.0f * std::log2(std::max(shadowDistance, 1e-6f));
+    const float start = camera.nearPlane;
+    const std::vector<float> splits = CascadeSplits(
         start,
-        std::max(quarterStop(shadowDistance, true), start * 1.001f),
-        count, lambda);
+        std::max(std::exp2(std::ceil(stops) / 4.0f), start * 1.001f),
+        count, exponent);
+    const float tanY = std::tan(0.5f * camera.verticalFov);
+    const float tanX = tanY * camera.aspect;
+    const glm::vec3 forward =
+        -glm::vec3(glm::inverse(camera.view)[2]);
     std::vector<ShadowCascade> cascades;
     for (int c = 0; c < count; ++c) {
         ShadowCascade cascade;
         cascade.splitNear = splits[static_cast<std::size_t>(c)];
         cascade.splitFar = splits[static_cast<std::size_t>(c) + 1];
+        // Into the next cascade's fade, or the last's fade out.
+        const float sliceFar =
+            cascade.splitFar +
+            kCascadeTransition *
+                (cascade.splitFar - cascade.splitNear);
         glm::vec3 center(0.0f);
         float radius = 0.0f;
+        const auto corners =
+            SliceCorners(camera, cascade.splitNear, sliceFar);
         if (around > 0.0f) {
             center = camera.eye;
-            radius = cascade.splitFar *
-                     std::sqrt(1.0f + 2.0f * around * around);
-        } else {
-            const auto corners = SliceCorners(
-                camera, cascade.splitNear, cascade.splitFar);
+            radius =
+                sliceFar * std::sqrt(1.0f + 2.0f * around * around);
+        } else if (camera.IsOrthographic()) {
             for (const glm::vec3& corner : corners) {
                 center += corner / 8.0f;
             }
+        } else {
+            // The centre on the view axis nearest every corner:
+            // Fx = (Dn^2 - Df^2) / 2L + L / 2 short of the far plane,
+            // Dn and Df the near and far diagonals, L the length.
+            const float length = sliceFar - cascade.splitNear;
+            const float farSq =
+                (tanX * tanX + tanY * tanY) * sliceFar * sliceFar;
+            const float nearSq = (tanX * tanX + tanY * tanY) *
+                                 cascade.splitNear *
+                                 cascade.splitNear;
+            const float offset =
+                (nearSq - farSq) / (2.0f * length) + 0.5f * length;
+            const float along = std::clamp(
+                sliceFar - offset, cascade.splitNear, sliceFar);
+            center = camera.eye + forward * along;
+        }
+        if (around <= 0.0f) {
             for (const glm::vec3& corner : corners) {
                 radius =
                     std::max(radius, glm::length(corner - center));
             }
         }
-        radius = std::ceil(radius * 16.0f) / 16.0f;
-        radius *= res / (res - 2.0f);
-        const float texel = 2.0f * radius / res;
+        // Whole centimetres, at least one.
+        radius = std::max(std::ceil(radius * 100.0f) / 100.0f, 0.01f);
+        const float texel = 2.0f * radius / inner;
+        const float half = 0.5f * res * texel;
 
         const glm::vec3 centerInLight =
             glm::vec3(lightView * glm::vec4(center, 1.0f));
-        const float x = std::floor(centerInLight.x / texel) * texel;
-        const float y = std::floor(centerInLight.y / texel) * texel;
-        // The cascade's receivers lie within its sphere; casters
-        // nearer the light clamp onto the near plane.
-        float zNear = sceneNear - depthPadding;
-        float zFar = sceneFar + depthPadding;
-        if (clampCasters) {
-            const float padding = 0.01f * radius + 1e-3f;
-            zNear =
-                std::max(zNear, -centerInLight.z - radius - padding);
-            zFar =
-                std::min(zFar, -centerInLight.z + radius + padding);
+        const float snap = kCascadeSnapTexels * texel;
+        const float x = std::floor(centerInLight.x / snap) * snap;
+        const float y = std::floor(centerInLight.y / snap) * snap;
+        // The sphere's depth, at least kCascadeMinDepthHalf either
+        // way. Casters nearer the light clamp onto the near plane, or
+        // without clamping the range reaches back to hold them.
+        const float depthHalf =
+            std::max(radius, kCascadeMinDepthHalf);
+        float zNear = -centerInLight.z - depthHalf;
+        const float zFar = -centerInLight.z + depthHalf;
+        if (!clampCasters) {
+            zNear = std::min(zNear, sceneNear - depthPadding);
         }
-        const glm::mat4 projection =
-            glm::orthoRH_ZO(x - radius, x + radius, y - radius,
-                            y + radius, zNear, zFar);
+        const glm::mat4 projection = glm::orthoRH_ZO(
+            x - half, x + half, y - half, y + half, zNear, zFar);
         cascade.lightViewProjection = projection * lightView;
         cascade.texelWorldSize = texel;
         cascades.push_back(cascade);

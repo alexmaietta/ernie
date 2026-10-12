@@ -123,7 +123,9 @@ struct ShadingView {
     float eye[4];
     std::uint32_t view[4];
     float strip[4];
-    float padding[4];
+    /// The view's forward axis and the eye's depth along it, as
+    /// frame.slang's `Uniforms::forward`.
+    float forward[4];
 };
 static_assert(sizeof(ShadingView) == 128,
               "ShadingView must match shading.slang");
@@ -1196,42 +1198,18 @@ static_assert(sizeof(MeterConstants) == 96,
 /// Automatic exposures kept at once, one per metering key.
 constexpr std::uint32_t kMaxExposureStates = 64;
 
-/// How far a view may move from the one whose depths a cascade fit
-/// reuses (`ShadowFit::Visible`): its eye by this fraction of the
-/// nearest depth seen, its direction by this cosine.
+/// How far a view may move from the one whose depths the cascades'
+/// distance reuses (`FitCascadeDistance`): its eye by this fraction
+/// of the nearest depth seen, its direction by this cosine.
 constexpr double kVisibleFitEyeShift = 0.1;
 constexpr float kVisibleFitTurn = 0.995f;
 
-/// depth_range.slang's `CascadeJob`: a distant light's cascades the
-/// GPU fits (`RasterRenderer::AddCascadeJob`), matrices by column.
-struct CascadeJob {
-    float lightView[16];
-    float cameraToWorld[16];
-    float toView[16];
-    float camera[4];
-    float fit[4];
-    float scene[4];
-    float seen[4];
-    float volumes[4];
-    std::uint32_t out[4];
-};
-static_assert(sizeof(CascadeJob) == 288,
-              "CascadeJob must match depth_range.slang");
-
-/// depth_range.slang's push constants: the depth range's, then the
-/// cascade fit's buffers by address.
+/// depth_range.slang's push constants.
 struct DepthRangeConstants {
     std::uint32_t size[4];
     float clip[4];
-    VkDeviceAddress jobs = 0;
-    VkDeviceAddress seen = 0;
-    VkDeviceAddress matrices = 0;
-    VkDeviceAddress blocks = 0;
-    VkDeviceAddress frame = 0;
-    VkDeviceAddress subframes = 0;
-    std::uint32_t layout[4];
 };
-static_assert(sizeof(DepthRangeConstants) == 96,
+static_assert(sizeof(DepthRangeConstants) == 32,
               "DepthRangeConstants must match depth_range.slang");
 
 /// views.slang's camera: parent-to-world, projection and its inverse.
@@ -1865,9 +1843,13 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     depthRangeSums_ = std::make_unique<GpuBuffer>(
         context_, 2 * sizeof(std::uint32_t),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-    cascadeFitPipeline_ = std::make_unique<ComputePipeline>(
-        context_, depthRangeLayout_,
-        compiler_.CompileSpirv(depthRangeModules, "cascadeFitMain"));
+    for (std::unique_ptr<GpuBuffer>& read : depthRangeReads_) {
+        read = std::make_unique<GpuBuffer>(
+            context_, 2 * sizeof(std::uint32_t),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            BufferMemory::Readback);
+    }
     const std::vector<ShaderModuleSource> meterModules{
         {"meter", shaders::kMeterSlang}};
     meterPipeline_ = std::make_unique<ComputePipeline>(
@@ -2450,11 +2432,6 @@ void RasterRenderer::WriteLights(
     const std::uint32_t distantResolution =
         std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
-    cascadeJobs_.clear();
-    cascadeJobCount_ = 0;
-    splitsFitted_ = false;
-    subframeFitCount_ = 0;
-    subframeCopies_.assign(subframes_, {});
     subframeLightViews_.assign(subframes_, {});
     std::vector<std::size_t>
         perWorld;  ///< Lights with per-world maps.
@@ -2635,26 +2612,17 @@ void RasterRenderer::WriteLights(
                     static_cast<float>(lightViews_.size());
                 entry.cone[3] = static_cast<float>(views.size());
                 entry.shadow[0] = views.front().texelWorldSize;
-                // Cascades over the view the GPU fits, for a visible
-                // fit to the depths the view saw with no wait for the
-                // host to read them; the host's fit is their
-                // estimate, the same but for the depths seen. A light
-                // turning across the shutter is fitted at each
-                // sub-frame.
-                const bool moving =
-                    subframes_ > 1 && light.previous &&
-                    !light.posedOnGpu && !light.domeDiffuse;
-                const bool gpuCascades = cascaded && !moving;
-                if (gpuCascades) {
-                    AddCascadeJob(params, axis, own,
-                                  static_cast<std::uint32_t>(
-                                      lightViews_.size()));
+                // Cascades: where each starts and ends along the
+                // view, which shading picks and fades between them by
+                // (shading.slang's `cascadeAt`).
+                if (cascaded) {
+                    for (std::size_t c = 0; c < views.size() && c < 4;
+                         ++c) {
+                        entry.beam[c] = views[c].splitFar;
+                    }
+                    entry.beamExtra[0] = views.front().splitNear;
                 }
-                // What culls by them follows the GPU's where it
-                // differs.
-                const bool seenFit =
-                    gpuCascades && cascadeFit_->visible;
-                if (light.posedOnGpu || seenFit) {
+                if (light.posedOnGpu) {
                     for (std::size_t v = 0; v < views.size(); ++v) {
                         views[v].gpuFitted = true;
                         views[v].gpuMatrix =
@@ -2668,16 +2636,6 @@ void RasterRenderer::WriteLights(
                 if (light.posedOnGpu && subframes_ > 1) {
                     for (ShadowCascade& view : views) {
                         view.moving = true;
-                    }
-                }
-                // Terrain and planets cull each by the host's
-                // estimate, the GPU's fit but for the depths seen:
-                // drawing them whole into a cascade shadows flat
-                // ground (as the lights posed on the GPU still do).
-                if (seenFit) {
-                    for (ShadowCascade& view : views) {
-                        view.cullViewProjection =
-                            view.lightViewProjection;
                     }
                 }
                 // A light moving across the shutter: its views fitted
@@ -2712,31 +2670,17 @@ void RasterRenderer::WriteLights(
                                 glm::normalize(glm::dvec3(then[0])));
                         }
                         // As the frame's were fitted: cascades over
-                        // the view, on the GPU, copied in by the
-                        // sub-frame's shadow passes, or one map over
-                        // the scene.
-                        if (cascaded) {
-                            AddCascadeJob(params, posed.direction,
-                                          own, subframeFitCount_,
-                                          true);
-                            for (std::size_t v = 0; v < views.size();
-                                 ++v) {
-                                subframeCopies_[k].emplace_back(
-                                    subframeFitCount_ +
-                                        static_cast<std::uint32_t>(v),
-                                    static_cast<std::uint32_t>(
-                                        lightViews_.size() + v));
-                            }
-                            subframeFitCount_ +=
-                                static_cast<std::uint32_t>(
-                                    views.size());
-                            continue;
-                        }
+                        // the view, or one map over the scene.
                         const std::vector<ShadowCascade> moved =
-                            FitLightShadowViews(
-                                posed,
-                                params.Relative(posed.position),
-                                bounds->first, bounds->second, own);
+                            cascaded
+                                ? FitViewCascades(
+                                      glm::normalize(posed.direction),
+                                      own)
+                                : FitLightShadowViews(
+                                      posed,
+                                      params.Relative(posed.position),
+                                      bounds->first, bounds->second,
+                                      own);
                         for (std::size_t v = 0;
                              v < moved.size() && v < views.size();
                              ++v) {
@@ -3085,25 +3029,6 @@ void RasterRenderer::WriteLights(
                 entry.map[1] != 0.0f};
         }
     }
-    // The cascades the GPU fits, minimal shading's main light's
-    // written to the frame's Shadows block there too.
-    for (std::uint32_t j = 0; j < cascadeJobCount_; ++j) {
-        auto* job = reinterpret_cast<CascadeJob*>(
-            cascadeJobs_.data() + j * sizeof(CascadeJob));
-        job->out[3] = minimalKey_ && !minimalKey_->perWorld &&
-                              job->out[0] == minimalKey_->first
-                          ? 1u
-                          : 0u;
-    }
-    if (subframeFitCount_ > 0 &&
-        (!subframeFits_ ||
-         subframeFits_->Size() <
-             subframeFitCount_ * sizeof(glm::mat4))) {
-        vkDeviceWaitIdle(context_.Device());
-        subframeFits_ = std::make_unique<GpuBuffer>(
-            context_, subframeFitCount_ * sizeof(glm::mat4),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-    }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
     }
@@ -3241,18 +3166,9 @@ void RasterRenderer::DispatchLights(VkCommandBuffer commands,
 void RasterRenderer::RecordLights(
     VkCommandBuffer commands,
     std::span<const RasterDrawable* const> drawables) const {
-    // Distant lights' cascades fitted on the GPU, then lights posed
-    // there; then the views' cull views follow their matrices.
-    RecordCascadeFit(commands);
+    // Lights posed on the GPU; then the views' cull views follow
+    // their matrices.
     if (gpuLights_ == 0) {
-        if (cascadeJobCount_ > 0) {
-            for (const RasterDrawable* drawable : drawables) {
-                ERNIE_GPU_ZONE_NAMED(context_, commands,
-                                     drawable->ProfileName());
-                drawable->RecordShadowViews(commands);
-            }
-            ShaderBarrier(commands);
-        }
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Lights posed on the GPU");
@@ -3495,11 +3411,11 @@ void RasterRenderer::Update(
             }
         }
         fit.count = std::clamp(shadows.cascades, 1, kMaxCascades);
-        fit.lambda = shadows.splitLambda;
-        if (shadows.fit == ShadowFit::Visible) {
-            fit.visible = true;
-        }
+        fit.exponent = shadows.splitExponent;
         cascadeFit_ = fit;
+        // This slot's last frame has finished: its depths seen count.
+        ReadDepthRange(uploads_.Slot());
+        cascadeFit_->distance = FitCascadeDistance(params);
     }
     // A batch's per-world maps of its distant lights, at the
     // resolution of its worlds' maps: the worlds of its views, and
@@ -3583,12 +3499,12 @@ void RasterRenderer::Update(
     }
     autoExposure_.reset();
     meterKey_.clear();
-    // A visible fit's frame measures what it sees, for later frames'
-    // cascades.
-    measureDepth_ = cascadeFit_.has_value() &&
-                    params.shadows.fit == ShadowFit::Visible;
+    // A frame with cascades over its view measures what it sees, for
+    // later frames' (`FitCascadeDistance`).
+    measureDepth_ = cascadeFit_.has_value();
+    depthRangePoses_[uploads_.Slot()].reset();
     if (measureDepth_) {
-        lastMeasured_ = Measured{
+        depthRangePoses_[uploads_.Slot()] = Measured{
             params.stream, glm::dvec3(params.camera.transform[3]),
             view.forward};
     }
@@ -4043,7 +3959,6 @@ void RasterRenderer::Update(
                       viewWorlds_, viewProjections, lightViewWorlds,
                       volumeSettings, params.frame, uploads_);
     }
-    WriteCascadeJobs();
     // A cube camera's motion is its faces', which the sensor maps
     // through the lens.
     motionVectors_ =
@@ -4599,6 +4514,10 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
             block.eye[0] = view.eye.x;
             block.eye[1] = view.eye.y;
             block.eye[2] = view.eye.z;
+            block.forward[0] = view.forward.x;
+            block.forward[1] = view.forward.y;
+            block.forward[2] = view.forward.z;
+            block.forward[3] = glm::dot(view.eye, view.forward);
         }
         // The lights the view sees: the shared ones and its world's,
         // or all for every world.
@@ -5266,15 +5185,12 @@ void RasterRenderer::RecordShadowMaps(
     }
     const bool hostMoved = subframe < subframeLightViews_.size() &&
                            !subframeLightViews_[subframe].empty();
-    const bool gpuMoved = subframe < subframeCopies_.size() &&
-                          !subframeCopies_[subframe].empty();
-    if (hostMoved || gpuMoved) {
+    if (hostMoved) {
         VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
         before.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        // After the reads of the views, and the cascade fit's writes.
+        // After the reads of the views.
         before.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
-                               VK_ACCESS_2_UNIFORM_READ_BIT |
-                               VK_ACCESS_2_SHADER_WRITE_BIT;
+                               VK_ACCESS_2_UNIFORM_READ_BIT;
         before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
         before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT |
                                VK_ACCESS_2_TRANSFER_READ_BIT;
@@ -5298,25 +5214,6 @@ void RasterRenderer::RecordShadowMaps(
                     commands, lightShadowBlocks_.Handle(),
                     v * kLightShadowBlockStride, sizeof(glm::mat4),
                     glm::value_ptr(matrix));
-            }
-        }
-        // Cascades the GPU fitted at this sub-frame
-        // (`RecordCascadeFit`).
-        for (std::size_t i = 0;
-             gpuMoved && i < subframeCopies_[subframe].size(); ++i) {
-            const auto& [from, v] = subframeCopies_[subframe][i];
-            const VkBufferCopy matrix{from * sizeof(glm::mat4),
-                                      v * sizeof(glm::mat4),
-                                      sizeof(glm::mat4)};
-            vkCmdCopyBuffer(commands, subframeFits_->Handle(),
-                            lightViewMatrices_->Handle(), 1, &matrix);
-            if (v < firstLayeredView_) {
-                const VkBufferCopy block{from * sizeof(glm::mat4),
-                                         v * kLightShadowBlockStride,
-                                         sizeof(glm::mat4)};
-                vkCmdCopyBuffer(commands, subframeFits_->Handle(),
-                                lightShadowBlocks_.Handle(), 1,
-                                &block);
             }
         }
         VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
@@ -5724,9 +5621,8 @@ void RasterRenderer::RecordDepthRange(VkCommandBuffer commands,
     // A cube camera's view 0 is its faces' first layers.
     vkCmdDispatch(commands, (extent_.width + 15) / 16,
                   (extent_.height + 15) / 16, faces_);
-    // The next frame's cascades fit to it on the GPU
-    // (`RecordCascadeFit`).
-    ShaderBarrier(commands);
+    // Read back by a later frame in the slot (`ReadDepthRange`).
+    CopyForHost(commands, range, *depthRangeReads_[uploads_.Slot()]);
 }
 
 void RasterRenderer::RecordMeter(VkCommandBuffer commands,
@@ -5863,172 +5759,87 @@ std::vector<ShadowCascade>
 RasterRenderer::FitViewCascades(const glm::vec3& towards,
                                 std::uint32_t resolution) const {
     const CascadeFit& fit = *cascadeFit_;
-    const CameraView& view = fit.view;
     const auto [low, high] =
         WithShadows(fit.casterLow, fit.casterHigh, towards);
-    // How far the casters reach along the view; a cube camera's faces
-    // look every way.
-    float farthest = 0.0f;
-    for (int i = 0; i < 8; ++i) {
-        const glm::vec3 corner((i & 1) ? high.x : low.x,
-                               (i & 2) ? high.y : low.y,
-                               (i & 4) ? high.z : low.z);
-        farthest =
-            std::max(farthest,
-                     fit.around > 0.0f
-                         ? glm::length(corner - view.eye)
-                         : glm::dot(corner - view.eye, view.forward));
-    }
-    // A margin keeps surfaces at exactly the farthest depth, such as
-    // flat ground under a nadir camera, inside the last cascade. Over
-    // every depth the casters reach: the GPU fits them to those the
-    // view saw (`AddCascadeJob`).
-    const float shadowDistance =
-        std::min(view.farPlane, 1.01f * farthest);
-    return FitCascades(view, shadowDistance, towards, low, high,
-                       fit.count, fit.lambda, resolution,
-                       view.nearPlane, fit.around,
-                       context_.SupportsDepthClamp());
+    return FitCascades(fit.view, fit.distance, towards, low, high,
+                       fit.count, fit.exponent, resolution,
+                       fit.around, context_.SupportsDepthClamp());
 }
 
-void RasterRenderer::AddCascadeJob(const FrameParams& params,
-                                   const glm::vec3& towards,
-                                   std::uint32_t resolution,
-                                   std::uint32_t first,
-                                   bool subframe) {
+float RasterRenderer::FitCascadeDistance(
+    const FrameParams& params) const {
     const CascadeFit& fit = *cascadeFit_;
     const CameraView& view = fit.view;
-    const auto [low, high] =
-        WithShadows(fit.casterLow, fit.casterHigh, towards);
+    // A depth along the view; a cube camera's faces look every way.
+    const auto depthOf = [&](const glm::vec3& point) {
+        return fit.around > 0.0f
+                   ? glm::length(point - view.eye)
+                   : glm::dot(point - view.eye, view.forward);
+    };
+    // How far the casters, and their shadows down to the floor,
+    // reach along the view towards any shadowed distant light.
     float farthest = 0.0f;
-    for (int i = 0; i < 8; ++i) {
-        const glm::vec3 corner((i & 1) ? high.x : low.x,
-                               (i & 2) ? high.y : low.y,
-                               (i & 4) ? high.z : low.z);
-        farthest =
-            std::max(farthest,
-                     fit.around > 0.0f
-                         ? glm::length(corner - view.eye)
-                         : glm::dot(corner - view.eye, view.forward));
+    for (const LightParams& light : params.lights) {
+        if (light.type != LightType::Distant || !light.shadows) {
+            continue;
+        }
+        const auto [low, high] =
+            WithShadows(fit.casterLow, fit.casterHigh,
+                        glm::normalize(light.direction));
+        for (int i = 0; i < 8; ++i) {
+            farthest = std::max(
+                farthest,
+                depthOf(glm::vec3((i & 1) ? high.x : low.x,
+                                  (i & 2) ? high.y : low.y,
+                                  (i & 4) ? high.z : low.z)));
+        }
     }
-    // The light's view and the scene's depths along it, as
-    // `FitCascades` takes them.
-    const glm::vec3 up = std::fabs(towards.z) > 0.99f
-                             ? glm::vec3(0.0f, 1.0f, 0.0f)
-                             : glm::vec3(0.0f, 0.0f, 1.0f);
-    const glm::mat4 lightView =
-        glm::lookAtRH(towards, glm::vec3(0.0f), up);
-    float sceneNear = std::numeric_limits<float>::max();
-    float sceneFar = std::numeric_limits<float>::lowest();
-    for (int i = 0; i < 8; ++i) {
-        const glm::vec3 corner((i & 1) ? high.x : low.x,
-                               (i & 2) ? high.y : low.y,
-                               (i & 4) ? high.z : low.z);
-        const float z = (lightView * glm::vec4(corner, 1.0f)).z;
-        sceneNear = std::min(sceneNear, -z);
-        sceneFar = std::max(sceneFar, -z);
+    // Within the depths a recent frame saw, a tenth past the
+    // farthest, when it was of this stream and its view close to
+    // this one. The volumes write no depth for it to see: their
+    // bounds' depths count too.
+    if (seen_ && seen_->pose.stream == params.stream &&
+        glm::dot(view.forward, seen_->pose.forward) >=
+            kVisibleFitTurn &&
+        glm::length(glm::dvec3(params.camera.transform[3]) -
+                    seen_->pose.eye) <=
+            kVisibleFitEyeShift * seen_->nearest) {
+        float seenFar = seen_->farthest;
+        if (const std::optional<Bounds3>& box = volumes_->Bounds()) {
+            for (int i = 0; i < 8; ++i) {
+                seenFar = std::max(
+                    seenFar,
+                    depthOf(glm::vec3(
+                        (i & 1) ? box->second.x : box->first.x,
+                        (i & 2) ? box->second.y : box->first.y,
+                        (i & 4) ? box->second.z : box->first.z)));
+            }
+        }
+        farthest = std::min(farthest, 1.1f * seenFar);
     }
-    const float padding = 0.01f * (sceneFar - sceneNear) + 1e-3f;
-    CascadeJob job{};
-    std::memcpy(job.lightView, glm::value_ptr(lightView), 64);
-    const glm::mat4 cameraToWorld = glm::inverse(view.view);
-    std::memcpy(job.cameraToWorld, glm::value_ptr(cameraToWorld), 64);
-    const glm::mat4 toView = glm::inverse(view.projection);
-    std::memcpy(job.toView, glm::value_ptr(toView), 64);
-    const float tanY = std::tan(0.5f * view.verticalFov);
-    job.camera[0] = tanY * view.aspect;
-    job.camera[1] = tanY;
-    job.camera[2] = view.nearPlane;
-    job.camera[3] = fit.around;
-    job.fit[0] = std::min(view.farPlane, 1.01f * farthest);
-    job.fit[1] = fit.lambda;
-    job.fit[2] = static_cast<float>(resolution);
-    job.fit[3] = static_cast<float>(fit.count);
-    job.scene[0] = sceneNear - padding;
-    job.scene[1] = sceneFar + padding;
-    job.scene[2] = context_.SupportsDepthClamp() ? 1.0f : 0.0f;
-    job.scene[3] = view.IsOrthographic() ? 1.0f : 0.0f;
-    // The depths the last measured frame saw, when it was of this
-    // stream and its view close to this one; the GPU checks how far
-    // the eye moved against the nearest of them.
-    const glm::dvec3 eye(params.camera.transform[3]);
-    if (fit.visible && lastMeasured_ &&
-        lastMeasured_->stream == params.stream &&
-        glm::dot(params.View().forward, lastMeasured_->forward) >=
-            kVisibleFitTurn) {
-        job.seen[0] = 1.0f;
-        job.seen[1] =
-            static_cast<float>(glm::length(eye - lastMeasured_->eye));
-        job.seen[2] = static_cast<float>(kVisibleFitEyeShift);
+    // A margin keeps surfaces at exactly the farthest depth, such as
+    // flat ground under a nadir camera, inside the last cascade.
+    return std::clamp(1.01f * farthest, view.nearPlane * 1.01f,
+                      view.farPlane);
+}
+
+void RasterRenderer::ReadDepthRange(std::uint32_t slot) {
+    const std::optional<Measured> pose = depthRangePoses_[slot];
+    depthRangePoses_[slot].reset();
+    if (!pose) {
+        return;
     }
-    job.out[0] = first;
-    // Cascades precede the layered views: each has its Shadows block.
-    // A sub-frame's are copied into them (`RecordShadowMaps`).
-    job.out[1] =
-        subframe ? 0u : std::numeric_limits<std::uint32_t>::max();
-    // The first cascaded light's splits are the frame's, which the
-    // G-buffer passes tint by.
-    job.out[2] = subframe ? 2u : 0u;
-    if (!subframe && !splitsFitted_) {
-        job.out[2] |= 1u;
-        splitsFitted_ = true;
+    std::array<float, 2> range{};
+    depthRangeReads_[slot]->Read(
+        std::as_writable_bytes(std::span(range)));
+    // Nothing seen leaves the nearest above the farthest.
+    if (range[1] > 0.0f && range[0] <= range[1]) {
+        seen_ = Seen{*pose, range[0], range[1]};
     }
-    job.out[3] = 0u;
-    const auto* bytes = reinterpret_cast<const std::byte*>(&job);
-    cascadeJobs_.insert(cascadeJobs_.end(), bytes,
-                        bytes + sizeof(job));
-    ++cascadeJobCount_;
 }
 
 VkDeviceSize RasterRenderer::ViewUniformsStride() {
     return kUniformsStride;
-}
-
-void RasterRenderer::WriteCascadeJobs() {
-    if (cascadeJobCount_ == 0) {
-        return;
-    }
-    // Volumes write no depth for the views to see: their bounds'
-    // depths along the camera's axis, or from its eye for a cube
-    // camera, widen those seen.
-    float volumeNear = 0.0f;
-    float volumeFar = 0.0f;
-    if (const std::optional<Bounds3>& box = volumes_->Bounds();
-        box && cascadeFit_) {
-        const CameraView& view = cascadeFit_->view;
-        volumeNear = std::numeric_limits<float>::max();
-        for (int i = 0; i < 8; ++i) {
-            const glm::vec3 corner(
-                (i & 1) ? box->second.x : box->first.x,
-                (i & 2) ? box->second.y : box->first.y,
-                (i & 4) ? box->second.z : box->first.z);
-            const float depth =
-                cascadeFit_->around > 0.0f
-                    ? glm::length(corner - view.eye)
-                    : glm::dot(corner - view.eye, view.forward);
-            volumeNear = std::min(volumeNear, depth);
-            volumeFar = std::max(volumeFar, depth);
-        }
-        if (cascadeFit_->around > 0.0f &&
-            glm::all(glm::greaterThanEqual(view.eye, box->first)) &&
-            glm::all(glm::lessThanEqual(view.eye, box->second))) {
-            volumeNear = 0.0f;
-        }
-    }
-    for (std::uint32_t j = 0; j < cascadeJobCount_; ++j) {
-        auto* job = reinterpret_cast<CascadeJob*>(
-            cascadeJobs_.data() + j * sizeof(CascadeJob));
-        job->volumes[0] = volumeNear;
-        job->volumes[1] = volumeFar;
-    }
-    if (!cascadeJobBuffer_ ||
-        cascadeJobBuffer_->Size() < cascadeJobs_.size()) {
-        vkDeviceWaitIdle(context_.Device());
-        cascadeJobBuffer_ = std::make_unique<GpuBuffer>(
-            context_, cascadeJobs_.size(),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-    }
-    uploads_.Write(*cascadeJobBuffer_, cascadeJobs_);
 }
 
 std::array<float, 4> RasterRenderer::ShadowSplits() const {
@@ -6037,32 +5848,6 @@ std::array<float, 4> RasterRenderer::ShadowSplits() const {
         std::as_writable_bytes(std::span(&uniforms, 1)));
     return {uniforms.splits[0], uniforms.splits[1],
             uniforms.splits[2], uniforms.splits[3]};
-}
-
-void RasterRenderer::RecordCascadeFit(
-    VkCommandBuffer commands) const {
-    if (cascadeJobCount_ == 0) {
-        return;
-    }
-    ERNIE_GPU_ZONE(context_, commands, "Cascade fit");
-    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                      cascadeFitPipeline_->Handle());
-    DepthRangeConstants constants{};
-    constants.jobs = cascadeJobBuffer_->Address();
-    constants.seen = depthRangeSums_->Address();
-    constants.matrices = lightViewMatrices_->Address();
-    constants.blocks = lightShadowBlocks_.Address();
-    constants.frame = shadowUniforms_.Address();
-    if (subframeFitCount_ > 0) {
-        constants.subframes = subframeFits_->Address();
-    }
-    constants.layout[0] = cascadeJobCount_;
-    constants.layout[1] = static_cast<std::uint32_t>(
-        kLightShadowBlockStride / sizeof(glm::vec4));
-    depthRangeLayout_.PushConstants(commands, &constants,
-                                    sizeof(constants));
-    vkCmdDispatch(commands, (cascadeJobCount_ + 63) / 64, 1, 1);
-    ShaderBarrier(commands);
 }
 
 OverlayPass::Target
@@ -6419,6 +6204,8 @@ void RasterRenderer::RecordViewPoses(
     shading.inverseViewProjection =
         offsetof(ShadingView, invViewProj);
     shading.eye = offsetof(ShadingView, eye);
+    shading.forward = offsetof(ShadingView, forward);
+    shading.forwardDepth = true;
     PatchViews(commands, shadingUniforms_, kShadingShared,
                kShadingStride, shading);
     ViewFields sensor;

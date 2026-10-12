@@ -1282,47 +1282,61 @@ TEST_F(RasterDelegateTest,
               expected.size() / 1000);
 }
 
-TEST_F(RasterDelegateTest,
-       VisibleShadowFitsSpanOnlyTheDepthsTheViewSees) {
-    // MeshScene's meshes lie 60 below its camera: fitted to what the
-    // view saw, the sun's first cascade starts near them rather than
-    // at the near plane.
+namespace {
+
+/// How far the sun's cascades reach along the view: their last split.
+float ShadowDistance(RasterDelegate& delegate) {
+    const std::array<float, 4> splits =
+        delegate.Renderer().ShadowSplits();
+    return *std::max_element(splits.begin(), splits.end());
+}
+
+}  // namespace
+
+TEST_F(RasterDelegateTest, ShadowDistancesFitTheDepthsTheViewSees) {
+    // MeshScene's meshes lie 60 below its camera, and a quad 360
+    // below out of its view: once frames have measured what the view
+    // sees, the sun's cascades reach a little past the meshes rather
+    // than as far as the quad.
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
+    ernie::testing::DefineQuad(scene, "/World/Unseen");
+    scene.Set("/World/Unseen", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0),
+                             glm::dvec3(500.0, 0.0, -300.0)));
     delegate.Render(scene);
-    const float sceneSplit = delegate.Renderer().ShadowSplits()[0];
-    ernie::RenderSettings(scene, "/Render/Settings")
-        .SetShadowFit(tokens::kVisible);
-    for (int i = 0; i < 4; ++i) {
+    const float sceneDistance = ShadowDistance(delegate);
+    EXPECT_GT(sceneDistance, 360.0f);
+    for (int i = 0; i < 6; ++i) {
         delegate.Render(scene);
     }
-    // The GPU fits them: its first cascade ends a little past where
-    // it starts, near the meshes.
-    const float fitted = delegate.Renderer().ShadowSplits()[0];
-    EXPECT_GT(fitted, 50.0f);
-    EXPECT_LT(fitted, 70.0f);
-    EXPECT_GT(fitted, 5.0f * sceneSplit);
-    // A view far from the one measured falls back to the scene's fit
-    // until it measures again.
+    const float fitted = ShadowDistance(delegate);
+    EXPECT_GT(fitted, 60.0f);
+    EXPECT_LT(fitted, 80.0f);
+    // A view far from the one measured falls back to the scene's
+    // reach until it measures again, as a first frame there does.
     scene.Set("/World/Camera", tokens::kTransform,
               ernie::LookAtTransform({0.0, 0.0, 30.0},
                                      {0.0, 0.0, 0.0},
                                      {0.0, 1.0, 0.0}));
     delegate.Render(scene);
-    EXPECT_LT(delegate.Renderer().ShadowSplits()[0],
-              2.0f * sceneSplit);
-    ernie::RenderSettings(scene, "/Render/Settings")
-        .SetShadowFit("nearest");
-    EXPECT_THROW(delegate.Render(scene), std::invalid_argument);
+    RasterDelegate fresh(*context_);
+    fresh.Render(scene);
+    EXPECT_EQ(ShadowDistance(delegate), ShadowDistance(fresh));
 }
 
-TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
+TEST_F(RasterDelegateTest, ShadowDistancesFitWhatACubeCameraSees) {
     // MeshScene through an equidistant fisheye reaching 80 degrees
     // off axis, on cube faces: its faces measure the depths they see,
     // and its cascades, which surround the eye to hold every face,
-    // start near the meshes 60 below.
+    // reach a little past the meshes 60 below rather than to a quad
+    // 340 above, which the fisheye does not see.
     RasterDelegate delegate(*context_);
     Scene scene = MeshScene();
+    ernie::testing::DefineQuad(scene, "/World/Unseen");
+    scene.Set(
+        "/World/Unseen", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 400.0)));
     const double aperture = 20.0;
     const double corner = std::sqrt(2.0) * 0.5 * kSize;
     ernie::Camera(scene, "/World/Camera")
@@ -1341,51 +1355,13 @@ TEST_F(RasterDelegateTest, VisibleShadowFitsSurroundACubeCamera) {
                                                      views.end());
     ASSERT_FALSE(cascades.empty())
         << "a cube camera's view has cascades of its own";
-    const float sceneSplit = delegate.Renderer().ShadowSplits()[0];
-    ernie::RenderSettings(scene, "/Render/Settings")
-        .SetShadowFit(tokens::kVisible);
-    for (int i = 0; i < 4; ++i) {
+    EXPECT_GT(ShadowDistance(delegate), 340.0f);
+    for (int i = 0; i < 6; ++i) {
         delegate.Render(scene);
     }
-    // The GPU fits them: its first cascade ends a little past where
-    // it starts, near the meshes.
-    const float fitted = delegate.Renderer().ShadowSplits()[0];
-    EXPECT_GT(fitted, 50.0f);
-    EXPECT_LT(fitted, 70.0f);
-    EXPECT_GT(fitted, 5.0f * sceneSplit);
-}
-
-TEST_F(RasterDelegateTest,
-       GpuFittedCascadesMatchTheHostsWithoutSeenDepths) {
-    // A visible fit's view of the sky sees no depths to fit to: the
-    // GPU fits the sun's cascades as the host does (`FitCascades`),
-    // which is their estimate.
-    RasterDelegate delegate(*context_);
-    Scene scene = MeshScene();
-    ernie::RenderSettings(scene, "/Render/Settings")
-        .SetShadowFit(tokens::kVisible);
-    scene.Set("/World/Camera", tokens::kTransform,
-              ernie::LookAtTransform({0.0, 0.0, 30.0},
-                                     {0.0, 0.0, 100.0},
-                                     {0.0, 1.0, 0.0}));
-    for (int i = 0; i < 3; ++i) {
-        delegate.Render(scene);
-    }
-    const auto& views = delegate.Renderer().LightShadowViews();
-    ASSERT_FALSE(views.empty());
-    std::vector<glm::mat4> gpu(views.size());
-    delegate.Renderer().LightViewMatrices().Read(
-        std::as_writable_bytes(std::span(gpu)));
-    for (std::size_t v = 0; v < views.size(); ++v) {
-        EXPECT_TRUE(views[v].gpuFitted);
-        for (int c = 0; c < 4; ++c) {
-            for (int r = 0; r < 4; ++r) {
-                EXPECT_NEAR(gpu[v][c][r],
-                            views[v].lightViewProjection[c][r],
-                            1e-5f * (1.0f + std::abs(gpu[v][c][r])))
-                    << "view " << v << " column " << c << " row "
-                    << r;
-            }
-        }
-    }
+    // The faces' depths along their own axes: the meshes' corners
+    // are farther than 60 along the side faces.
+    const float fitted = ShadowDistance(delegate);
+    EXPECT_GT(fitted, 60.0f);
+    EXPECT_LT(fitted, 200.0f);
 }

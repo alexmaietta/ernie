@@ -10,11 +10,11 @@
 #include <vector>
 
 using ernie::CameraView;
+using ernie::CascadeSplits;
 using ernie::FitCascades;
 using ernie::LightParams;
 using ernie::LightType;
 using ernie::OrbitController;
-using ernie::PracticalSplits;
 using ernie::ShadowCascade;
 
 namespace {
@@ -60,34 +60,29 @@ glm::vec3 SliceCorner(const CameraView& camera, float depth, int i) {
 
 }  // namespace
 
-TEST(PracticalSplits, SpansNearToFarInIncreasingOrder) {
-    const auto splits = PracticalSplits(1.0f, 1000.0f, 4, 0.7f);
+TEST(CascadeSplits, GrowEachCascadeByTheExponent) {
+    // Exponent 3 over 40 m from 1 m: spans of 1, 3, 9 and 27 parts.
+    const auto splits = CascadeSplits(1.0f, 41.0f, 4, 3.0f);
     ASSERT_EQ(splits.size(), 5u);
-    EXPECT_FLOAT_EQ(splits.front(), 1.0f);
-    EXPECT_FLOAT_EQ(splits.back(), 1000.0f);
-    for (std::size_t i = 1; i < splits.size(); ++i) {
-        EXPECT_GT(splits[i], splits[i - 1]);
-    }
-}
-
-TEST(PracticalSplits, BlendsUniformAndLogarithmicSchemes) {
-    const auto uniform = PracticalSplits(1.0f, 1001.0f, 4, 0.0f);
+    EXPECT_FLOAT_EQ(splits[0], 1.0f);
+    EXPECT_FLOAT_EQ(splits[1], 2.0f);
+    EXPECT_FLOAT_EQ(splits[2], 5.0f);
+    EXPECT_FLOAT_EQ(splits[3], 14.0f);
+    EXPECT_FLOAT_EQ(splits[4], 41.0f);
+    // Exponent 1: uniform.
+    const auto uniform = CascadeSplits(1.0f, 1001.0f, 4, 1.0f);
     EXPECT_FLOAT_EQ(uniform[1], 251.0f);
     EXPECT_FLOAT_EQ(uniform[2], 501.0f);
-
-    const auto logarithmic = PracticalSplits(1.0f, 10000.0f, 4, 1.0f);
-    EXPECT_NEAR(logarithmic[1], 10.0f, 1e-3f);
-    EXPECT_NEAR(logarithmic[2], 100.0f, 1e-2f);
-    EXPECT_NEAR(logarithmic[3], 1000.0f, 1e-1f);
 }
 
-TEST(FitCascades, CoversEveryFrustumSliceAndTheWholeScene) {
+TEST(FitCascades,
+     CoversEveryFrustumSliceAndTheCastersTowardsTheLight) {
     const CameraView camera = TestCamera();
     const glm::vec3 toSun =
         glm::normalize(glm::vec3(0.6f, -0.3f, 0.5f));
     const auto cascades =
         FitCascades(camera, 1200.0f, toSun, kSceneMin, kSceneMax, 4,
-                    0.8f, kResolution);
+                    3.0f, kResolution);
     ASSERT_EQ(cascades.size(), 4u);
     EXPECT_FLOAT_EQ(cascades.front().splitNear, camera.nearPlane);
     // The distance up to the next quarter stop.
@@ -110,8 +105,11 @@ TEST(FitCascades, CoversEveryFrustumSliceAndTheWholeScene) {
                             SliceCorner(camera, depth, i));
                 EXPECT_LE(std::fabs(ndc.x), 1.0f) << "cascade " << c;
                 EXPECT_LE(std::fabs(ndc.y), 1.0f) << "cascade " << c;
+                EXPECT_GE(ndc.z, 0.0f) << "cascade " << c;
+                EXPECT_LE(ndc.z, 1.0f) << "cascade " << c;
             }
         }
+        // Without depth clamping, no caster nearer the light is cut.
         for (int i = 0; i < 8; ++i) {
             const glm::vec3 corner(
                 (i & 1) ? kSceneMax.x : kSceneMin.x,
@@ -120,7 +118,6 @@ TEST(FitCascades, CoversEveryFrustumSliceAndTheWholeScene) {
             const float depth =
                 Project(cascade.lightViewProjection, corner).z;
             EXPECT_GE(depth, 0.0f) << "cascade " << c;
-            EXPECT_LE(depth, 1.0f) << "cascade " << c;
         }
     }
 }
@@ -136,7 +133,7 @@ TEST(FitCascades, SnapsToWholeTexelsSoShadowsDoNotShimmer) {
                                 -shift, shift, 0.0f, 1.0f);
         for (const ShadowCascade& cascade :
              FitCascades(camera, 1000.0f, toSun, kSceneMin, kSceneMax,
-                         3, 0.8f, kResolution)) {
+                         3, 3.0f, kResolution)) {
             const glm::vec3 ndc =
                 Project(cascade.lightViewProjection, glm::vec3(0.0f));
             const float texelX = (0.5f * ndc.x + 0.5f) * kResolution;
@@ -150,12 +147,47 @@ TEST(FitCascades, SnapsToWholeTexelsSoShadowsDoNotShimmer) {
 TEST(FitCascades, HandlesAnOverheadSun) {
     const auto cascades =
         FitCascades(TestCamera(), 800.0f, glm::vec3(0.0f, 0.0f, 1.0f),
-                    kSceneMin, kSceneMax, 2, 0.5f, kResolution);
+                    kSceneMin, kSceneMax, 2, 3.0f, kResolution);
     ASSERT_EQ(cascades.size(), 2u);
     const glm::vec3 ndc = Project(cascades[0].lightViewProjection,
                                   glm::vec3(0.0f, 0.0f, 40.0f));
     EXPECT_TRUE(std::isfinite(ndc.x));
     EXPECT_GE(ndc.z, 0.0f);
+}
+
+// A flat scene straight under the sun spans no depth along it: the
+// cascades still span at least kCascadeMinDepthHalf either way, so
+// receivers in them lie well inside rather than on a clipping plane,
+// clamped or not.
+TEST(FitCascades, FlatScenesUnderAnOverheadSunKeepTheirDepth) {
+    const CameraView camera = TestCamera();
+    const glm::vec3 low(-10.0f, -10.0f, 0.0f);
+    const glm::vec3 high(10.0f, 10.0f, 0.0f);
+    for (const bool clamp : {false, true}) {
+        for (const ShadowCascade& cascade : FitCascades(
+                 camera, 800.0f, glm::vec3(0.0f, 0.0f, 1.0f), low,
+                 high, 3, 3.0f, kResolution, 0.0f, clamp)) {
+            // A receiver on the view's axis, mid-cascade.
+            const glm::vec3 receiver =
+                camera.eye +
+                camera.forward *
+                    (0.5f * (cascade.splitNear + cascade.splitFar));
+            const float a =
+                Project(cascade.lightViewProjection, receiver).z;
+            const float b =
+                Project(cascade.lightViewProjection,
+                        receiver + glm::vec3(0.0f, 0.0f, 1.0f))
+                    .z;
+            EXPECT_GT(a, 0.0f) << "clamp " << clamp;
+            EXPECT_LT(a, 1.0f) << "clamp " << clamp;
+            // A metre towards the light is a small step in depth.
+            EXPECT_LT(a - b,
+                      1.0f / (2.0f * ernie::kCascadeMinDepthHalf) *
+                          1.01f)
+                << "clamp " << clamp;
+            EXPECT_GT(a - b, 0.0f) << "clamp " << clamp;
+        }
+    }
 }
 
 TEST(WithShadows, GrowsTheBoxToWhereItsShadowsLand) {
@@ -275,7 +307,7 @@ TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
     const glm::vec3 planetMax(6.4e6f, 6.4e6f, 40.0f);
     const auto cascades =
         FitCascades(camera, 1200.0f, toSun, planetMin, planetMax, 4,
-                    0.8f, kResolution, 0.0f, 0.0f, true);
+                    3.0f, kResolution, 0.0f, true);
     ASSERT_EQ(cascades.size(), 4u);
     for (std::size_t c = 0; c < cascades.size(); ++c) {
         const ShadowCascade& cascade = cascades[c];
@@ -285,7 +317,9 @@ TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
         const glm::vec3 b =
             Project(cascade.lightViewProjection, toSun);
         const float range = 1.0f / std::fabs(b.z - a.z);
-        EXPECT_LT(range, 4.0f * cascade.splitFar) << "cascade " << c;
+        EXPECT_LT(range, 4.0f * cascade.splitFar +
+                             2.0f * ernie::kCascadeMinDepthHalf)
+            << "cascade " << c;
         for (const float depth :
              {cascade.splitNear, cascade.splitFar}) {
             for (int i = 0; i < 4; ++i) {
@@ -305,7 +339,7 @@ TEST(FitCascades, DriftingDistancesKeepTheCascades) {
         glm::normalize(glm::vec3(0.6f, -0.3f, 0.5f));
     const auto fit = [&](float distance) {
         return FitCascades(camera, distance, toSun, kSceneMin,
-                           kSceneMax, 4, 0.8f, kResolution);
+                           kSceneMax, 4, 3.0f, kResolution);
     };
     const auto a = fit(1030.0f);
     const auto b = fit(1060.0f);

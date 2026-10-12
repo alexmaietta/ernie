@@ -249,8 +249,7 @@ TEST_F(RasterDelegateTest, APlanetsSunlitGroundHasNoShadowAcne) {
              ernie::DistantLightTransform({0.5, 0.0, 0.866}));
     ernie::RenderSettings::Define(scene, "/Render/Settings")
         .SetCamera("/World/Camera")
-        .SetResolution(glm::dvec2(kSize, kSize))
-        .SetShadowFit(std::string(tokens::kVisible));
+        .SetResolution(glm::dvec2(kSize, kSize));
     PlaceCamera(scene, {-1.7, 5.2, 14.7}, {-25.0, 0.0, 1.0},
                 {0.0, 0.0, 1.0}, {1.0, 1e6});
     RasterDelegate delegate(*context_);

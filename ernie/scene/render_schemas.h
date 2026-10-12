@@ -171,13 +171,6 @@
       (::ernie::AttributeMeta{.label = "Freeze LOD", .group = "Culling and LOD"}))                 \
     X(bool, LodShowLevels, ::ernie::tokens::kLodShowLevels, false,                                 \
       (::ernie::AttributeMeta{.label = "Show LOD levels", .group = "Culling and LOD"}))            \
-    X(std::string, ShadowFit, ::ernie::tokens::kShadowFit, ::ernie::tokens::kScene,                \
-      (::ernie::AttributeMeta{.label = "Fit",                                                      \
-                              .doc = "scene: the casters' bounds, an image the same every time; " \
-                                     "visible: sample distribution shadow maps, from the depths a " \
-                                     "recent frame saw.",                                           \
-                              .group = "Shadows",                                                  \
-                              .options = {::ernie::tokens::kScene, ::ernie::tokens::kVisible}}))   \
     X(int, ShadowCascades, ::ernie::tokens::kShadowCascades, 3,                                    \
       (::ernie::AttributeMeta{.label = "Cascades", .group = "Shadows", .min = 1.0, .max = 4.0}))   \
     X(int, ShadowResolution, ::ernie::tokens::kShadowResolution, 2048,                             \
@@ -189,10 +182,10 @@
     X(double, ShadowNormalOffset, ::ernie::tokens::kShadowNormalOffset, 1.5,                       \
       (::ernie::AttributeMeta{.label = "Normal offset", .doc = "Texels along the normal.",         \
                               .group = "Shadows", .max = 8.0}))                                    \
-    X(double, ShadowSplitLambda, ::ernie::tokens::kShadowSplitLambda, 0.8,                         \
-      (::ernie::AttributeMeta{.label = "Split lambda",                                             \
-                              .doc = "Logarithmic weight of the cascades' splits.",                \
-                              .group = "Shadows", .max = 1.0}))                                    \
+    X(double, ShadowSplitExponent, ::ernie::tokens::kShadowSplitExponent, 3.0,                     \
+      (::ernie::AttributeMeta{.label = "Split exponent",                                           \
+                              .doc = "Each cascade's depth over the last's.",                      \
+                              .group = "Shadows", .min = 1.0, .max = 8.0}))                        \
     X(bool, ShadowShowCascades, ::ernie::tokens::kShadowShowCascades, false,                       \
       (::ernie::AttributeMeta{.label = "Show cascades", .group = "Shadows"}))                      \
     X(std::string, ShadowWorlds, ::ernie::tokens::kShadowWorlds, ::ernie::tokens::kSeparate,       \

@@ -2902,22 +2902,14 @@ FrameParams FrameParamsOf(const Scene& scene,
     }
     shadows.worldFit = fit == kWorldFit ? WorldShadowFit::World
                                         : WorldShadowFit::Scene;
-    const std::string viewFit = options.GetShadowFit();
-    if (viewFit != kScene && viewFit != kVisible) {
-        throw std::invalid_argument(
-            "'" + std::string(kShadowFit) + "' of '" +
-            settings.String() + "' must be \"scene\" or \"visible\"");
-    }
-    shadows.fit =
-        viewFit == kVisible ? ShadowFit::Visible : ShadowFit::Scene;
     shadows.worldMargin = std::max(
         static_cast<float>(options.GetShadowWorldMargin()), 0.0f);
     shadows.softness =
         static_cast<float>(options.GetShadowSoftness());
     shadows.normalOffset =
         static_cast<float>(options.GetShadowNormalOffset());
-    shadows.splitLambda =
-        static_cast<float>(options.GetShadowSplitLambda());
+    shadows.splitExponent = std::max(
+        static_cast<float>(options.GetShadowSplitExponent()), 1.0f);
     shadows.showCascades = options.GetShadowShowCascades();
     if (!prims.dome.IsEmpty()) {
         params.dome =

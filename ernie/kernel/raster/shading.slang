@@ -123,7 +123,8 @@ struct ShadingView {
     float4 eye;
     uint4 view;
     float4 strip;
-    float4 padding;
+    // xyz: the view's forward axis, w: the eye's depth along it (frame.slang's `Uniforms::forward`).
+    float4 forward;
 }
 
 // What `skyMain` draws behind the scene.
@@ -541,10 +542,64 @@ float interleavedGradientNoise(float2 pixel) {
     return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
 }
 
+// The share of each cascade's span it reaches past its split, where the next fades in, or after
+// the last, shadows fade out (shadow_cascades.h's `kCascadeTransition`).
+static const float kCascadeTransition = 0.1;
+
+// Whether a light's shadow views are cascades over the view (`RasterRenderer::FitViewCascades`):
+// a distant light's, with its splits along the view (`LightGpu::beam`, from `beamExtra.x`).
+bool hasCascades(LightGpu light) {
+    return light.position.w == 0.0 && light.map.y == 0.0 && light.beamExtra.x > 0.0;
+}
+
+// Which of a light's cascades shadows `world`, as Unreal Engine's cascaded shadow maps pick them by
+// the point's depth along the view: the one whose span holds it, or the one before while within
+// `kCascadeTransition` of its span past its split. `next` is the share the following cascade takes
+// over there; `out` the share past the last split faded out to lit. `cascade` is the count past
+// that, where nothing shadows.
+//
+// Reference: Unreal Engine 5, FDirectionalLightSceneProxy::GetShadowSplitBounds
+// (DirectionalLightComponent.cpp) and ShadowProjectionPixelShader.usf's fade planes.
+struct CascadeAt {
+    uint cascade;
+    float next;
+    float out;
+}
+
+CascadeAt cascadeAt(LightGpu light, float3 world) {
+    let count = uint(light.cone.w);
+    let depth = dot(world, shv.forward.xyz) - shv.forward.w;
+    CascadeAt at;
+    at.next = 0.0;
+    at.out = 0.0;
+    at.cascade = count;
+    for (uint c = 0; c < count; ++c) {
+        if (depth < light.beam[c]) {
+            at.cascade = c;
+            break;
+        }
+    }
+    // Within the one before's reach past its split: still that one, fading into this or out.
+    if (at.cascade > 0) {
+        let split = light.beam[at.cascade - 1];
+        let start = at.cascade > 1 ? light.beam[at.cascade - 2] : light.beamExtra.x;
+        let reach = kCascadeTransition * (split - start);
+        if (depth < split + reach) {
+            let fade = saturate((depth - split) / max(reach, 1e-12));
+            if (at.cascade == count) {
+                at.out = fade;
+            } else {
+                at.next = fade;
+            }
+            at.cascade -= 1;
+        }
+    }
+    return at;
+}
+
 // The shadow view of a light's maps that sees `world`: its only one; for a distant light's
-// cascades over the view (`RasterRenderer::FitViewCascades`), the finest whose map holds it, else
-// the coarsest; or for a cube the face of the dominant axis from the light (faces +x, -x, +y,
-// -y, +z, -z).
+// cascades over the view, the cascade that shadows it (`cascadeAt`), the last past them; or for
+// a cube the face of the dominant axis from the light (faces +x, -x, +y, -y, +z, -z).
 uint lightView(LightGpu light, float3 world) {
     let first = uint(light.cone.z);
     let count = uint(light.cone.w);
@@ -552,14 +607,8 @@ uint lightView(LightGpu light, float3 world) {
         // A batch's distant light: the map of the view's world.
         return first + min(shv.view.y, count - 1);
     }
-    if (light.position.w == 0.0 && count > 1) {
-        for (uint c = 0; c + 1 < count; ++c) {
-            let clip = mul(lightViews[first + c], float4(world, 1.0)).xyz;
-            if (all(abs(clip.xy) <= float2(1.0)) && clip.z >= 0.0 && clip.z <= 1.0) {
-                return first + c;
-            }
-        }
-        return first + count - 1;
+    if (hasCascades(light)) {
+        return first + min(cascadeAt(light, world).cascade, count - 1);
     }
     if (count < 6) {
         return first;
@@ -610,9 +659,10 @@ float3 lightDisk(uint i, float2 rotation, float3 across, float3 across2, float r
     return (q.x * across + q.y * across2) * radius;
 }
 
-LightTap lightTap(LightGpu light, float3 point) {
+// In shadow view `view`, or with a negative one the view that sees `point` (`lightView`).
+LightTap lightTap(LightGpu light, float3 point, int view = -1) {
     LightTap tap;
-    tap.view = lightView(light, point);
+    tap.view = view >= 0 ? uint(view) : lightView(light, point);
     tap.clip = mul(lightViews[tap.view], float4(point, 1.0));
     let ndc = tap.clip.xyz / max(tap.clip.w, 1e-20);
     // Receivers beyond the far plane compare at it, as the sun's (frame.slang).
@@ -640,23 +690,48 @@ LightTap lightTap(LightGpu light, float3 point) {
 // times that tangent. Every tap compares against the receiver's plane, which the disk across the
 // ray meets at a slant, so tilted surfaces do not shadow themselves.
 //
+// A distant light's cascades over the view shadow each point from the one `cascadeAt` picks,
+// cross-fading into the next past its split and out to lit before the last one's.
+//
 // Reference: R. Fernando, "Percentage-Closer Soft Shadows", SIGGRAPH 2005 Sketches.
 // https://doi.org/10.1145/1187112.1187153
 float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel) {
     if (light.cone.w <= 0.0) {
         return 1.0;
     }
+    if (!hasCascades(light)) {
+        return lightVisibilityIn(light, world, n, nDotL, pixel, -1);
+    }
+    let at = cascadeAt(light, world);
+    if (at.cascade >= uint(light.cone.w)) {
+        return 1.0;
+    }
+    let first = int(light.cone.z);
+    var visibility = lightVisibilityIn(light, world, n, nDotL, pixel, first + int(at.cascade));
+    if (at.next > 0.0) {
+        visibility = lerp(visibility,
+                          lightVisibilityIn(light, world, n, nDotL, pixel,
+                                            first + int(at.cascade) + 1),
+                          at.next);
+    }
+    return lerp(visibility, 1.0, at.out);
+}
+
+// `lightVisibility` in shadow view `view`, or with a negative one in the view each tap falls in.
+float lightVisibilityIn(LightGpu light, float3 world, float3 n, float nDotL, float2 pixel,
+                        int view) {
     // Orthographic views (the sun-like distant light's, a laser's along its beam) have texels of
     // one size; perspective ones grow with distance.
     let distant = light.position.w == 0.0;
     let orthographic = distant || (light.position.w == 5.0 && light.beamExtra.y < 0.5);
     let distance = orthographic ? 1.0 : length(world - light.position.xyz);
     // A distant light's texels are its cascade's: the world width of its map over its texels.
-    let texelWorld = distant ? lightTexelWorld(light, lightView(light, world))
+    let texelWorld = distant ? lightTexelWorld(light, view >= 0 ? uint(view)
+                                                                : lightView(light, world))
                              : light.shadow.x * distance;
     let offset = n * sh.lightShadow.y * texelWorld * max(1.0 - clamp(nDotL, 0.0, 1.0), 0.25);
     let receiver = world + offset;
-    let centre = lightTap(light, receiver);
+    let centre = lightTap(light, receiver, view);
     if (!centre.inside) {
         return 1.0;
     }
@@ -694,7 +769,7 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
         for (uint i = 0; i < 16; ++i) {
             let point = receiver + lightDisk(i, rotation, across, across2,
                                              searchTexels * texelWorld);
-            let tap = lightTap(light, point);
+            let tap = lightTap(light, point, view);
             if (!tap.inside) {
                 continue;
             }
@@ -741,7 +816,7 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     for (uint i = 0; i < 16; ++i) {
         let point =
             receiver + lightDisk(i, rotation, across, across2, filterTexels * texelWorld);
-        let tap = lightTap(light, point);
+        let tap = lightTap(light, point, view);
         if (!tap.inside) {
             lit += 1.0;
             continue;
