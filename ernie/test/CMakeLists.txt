@@ -10,6 +10,7 @@ ernie_add_test_suite(
     geometry_lod_quadtree_test.cpp
     geometry_mesh_data_test.cpp
     geometry_primitives_test.cpp
+    geometry_sphere_tessellation_test.cpp
     raster_delegate_test.cpp
     raster_poisson_disk_test.cpp
     raster_sensor_plan_test.cpp

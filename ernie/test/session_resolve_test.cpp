@@ -762,6 +762,26 @@ TEST(PrimitiveMeshOf, ReadsUsdGeomAttributesAndDefaults) {
                  std::invalid_argument);
 }
 
+// A Sphere's tessellation and level choose its mesh, each with
+// texture coordinates for planet maps.
+TEST(PrimitiveMeshOf, TessellatesSpheresAsAsked) {
+    Scene scene;
+    ernie::Sphere::Define(scene, "/Ball");
+    ernie::Sphere::Define(scene, "/Sky")
+        .SetTessellation(std::string(tokens::kHealpix))
+        .SetTessellationLevel(4);
+    ernie::Sphere::Define(scene, "/Bad").SetTessellation("geodesic");
+    const ernie::MeshData ball = ernie::MeshDataOf(scene, "/Ball");
+    EXPECT_EQ(ball.indices.size() / 3, 4u * 24 * 24 - 4 * 24)
+        << "48 meridians by 24 stacks, as before";
+    EXPECT_EQ(ball.uvs.size(), 2 * ball.indices.size());
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Sky").indices.size() / 3,
+              24u * 16)
+        << "12 N_side^2 pixels, two triangles each";
+    EXPECT_THROW(ernie::MeshDataOf(scene, "/Bad"),
+                 std::invalid_argument);
+}
+
 TEST(FrameOf, ReadsTheAuthoredFrame) {
     Scene scene;
     ernie::RenderSettings::Define(scene, "/Render/Settings");

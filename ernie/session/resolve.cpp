@@ -2,6 +2,7 @@
 #include "ernie/session/resolve.h"
 
 #include "ernie/geometry/primitives.h"
+#include "ernie/geometry/sphere_tessellation.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -3198,7 +3199,19 @@ MeshData PrimitiveMeshOf(const Scene& scene, const Path& path) {
         return BoxMesh(glm::vec3(f(Cube(scene, path).GetSize())));
     }
     if (type == kSphere) {
-        return SphereMesh(f(Sphere(scene, path).GetRadius()));
+        const Sphere sphere(scene, path);
+        const std::string name = sphere.GetTessellation();
+        const std::optional<SphereTessellation> tessellation =
+            SphereTessellationNamed(name);
+        if (!tessellation) {
+            throw std::invalid_argument(
+                "'" + path.String() + "' has unknown tessellation '" +
+                name + "'; use uv, icosphere, cubeSphere or healpix");
+        }
+        return TessellatedSphere(
+            f(sphere.GetRadius()), *tessellation,
+            static_cast<std::uint32_t>(
+                std::max(sphere.GetTessellationLevel(), 0)));
     }
     if (type == kCylinder) {
         const Cylinder cylinder(scene, path);

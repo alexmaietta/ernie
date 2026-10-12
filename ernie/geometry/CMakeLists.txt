@@ -7,5 +7,6 @@ ernie_add_library(
     lod_quadtree.cpp
     mesh_data.cpp
     primitives.cpp
+    sphere_tessellation.cpp
     PUBLIC
     ernie_util)

@@ -171,6 +171,17 @@ inline constexpr std::string_view kGeomLength =
     "length";  ///< Plane, default 2.
 inline constexpr std::string_view kAxis =
     "axis";  ///< "X", "Y" or "Z" (default).
+/// token, on a Sphere (Ernie): how it is divided into triangles
+/// (`ernie::SphereTessellation`), and int: its level, 0 for the
+/// default.
+inline constexpr std::string_view kTessellation =
+    "ernie:tessellation";
+inline constexpr std::string_view kTessellationLevel =
+    "ernie:tessellation:level";
+inline constexpr std::string_view kUvSphere = "uv";
+inline constexpr std::string_view kIcosphere = "icosphere";
+inline constexpr std::string_view kCubeSphere = "cubeSphere";
+inline constexpr std::string_view kHealpix = "healpix";
 
 // Material binding (UsdShade MaterialBindingAPI): a Path.
 inline constexpr std::string_view kMaterialBinding =

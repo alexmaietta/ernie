@@ -32,7 +32,21 @@
 
 #define ERNIE_SPHERE_ATTRIBUTES(X)                                                                 \
     X(double, Radius, ::ernie::tokens::kGeomRadius, 1.0,                                           \
-      (::ernie::AttributeMeta{.doc = "Metres.", ERNIE_GEOM_SHAPE_RANGE}))
+      (::ernie::AttributeMeta{.doc = "Metres.", ERNIE_GEOM_SHAPE_RANGE}))                          \
+    X(std::string, Tessellation, ::ernie::tokens::kTessellation, ::ernie::tokens::kUvSphere,       \
+      (::ernie::AttributeMeta{.doc = "uv: latitude rings and meridians; icosphere: a divided "     \
+                                     "icosahedron; cubeSphere: a cube's faces as planet "          \
+                                     "Terrains'; healpix: HEALPix's equal-area pixels. Each "      \
+                                     "has equirectangular texture coordinates.",                   \
+                              .group = "Shape",                                                    \
+                              .options = {::ernie::tokens::kUvSphere, ::ernie::tokens::kIcosphere, \
+                                          ::ernie::tokens::kCubeSphere,                            \
+                                          ::ernie::tokens::kHealpix}}))                            \
+    X(int, TessellationLevel, ::ernie::tokens::kTessellationLevel, 0,                              \
+      (::ernie::AttributeMeta{.label = "Level", .doc = "UV stacks, icosphere subdivisions, cube "  \
+                                     "quads a face edge or HEALPix N_side; 0 for some 2,000 to "   \
+                                     "6,000 triangles.",                                           \
+                              .group = "Shape", .max = 1024.0}))
 
 #define ERNIE_AXIS_SHAPE_ATTRIBUTES(X)                                                             \
     X(std::string, Axis, ::ernie::tokens::kAxis, "Z",                                              \
