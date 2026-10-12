@@ -9,8 +9,10 @@
 #include "ernie/device/vulkan_context.h"
 
 #include "ernie/device/gpu_profile.h"
+#include "ernie/util/log.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -396,14 +398,25 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     c.physicalDevice_ = best.device;
     c.queueFamily_ = best.family;
 
+    VkPhysicalDeviceDriverProperties driver{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES};
     VkPhysicalDeviceIDProperties ids{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+    ids.pNext = &driver;
     VkPhysicalDeviceProperties2 properties{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
     properties.pNext = &ids;
     vkGetPhysicalDeviceProperties2(c.physicalDevice_, &properties);
     c.deviceName_ = properties.properties.deviceName;
     c.limits_ = properties.properties.limits;
+    // Warp's banner, once Ernie runs on a device.
+    const std::uint32_t api = properties.properties.apiVersion;
+    const std::string banner =
+        "Ernie " + std::string(log::Version()) + " initialized:\n" +
+        "   Vulkan " + std::to_string(VK_API_VERSION_MAJOR(api)) +
+        "." + std::to_string(VK_API_VERSION_MINOR(api)) +
+        " device: " + c.deviceName_ + " (" + driver.driverName + " " +
+        driver.driverInfo + ")";
     std::copy(std::begin(ids.deviceUUID), std::end(ids.deviceUUID),
               c.deviceUuid_.begin());
 
@@ -736,6 +749,11 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         c.gpuProfiler_ = profiler;
     }
 #endif
+    // Once a process, as Warp's.
+    static std::atomic<bool> announced{false};
+    if (!announced.exchange(true)) {
+        log::Info(banner);
+    }
     return context;
 }
 
