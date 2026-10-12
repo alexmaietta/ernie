@@ -178,6 +178,8 @@ Planned future examples.
 - A projector's patterns: spot, line, grid, dots, fringes and rings written in Slang (`demo_lasers_patterns`)
 - A pulsed line laser against long, in-step and between-pulse exposures (`demo_lasers_pulsed`)
 - Gray-code structured light decoded to projector columns (`demo_lasers_structured_light`)
+- NASA Ames' virtual bumper: 11 dots at 660 nm finding rocks at night, in Earth daylight and in lunar daylight (`demo_lasers_virtual_bumper`)
+- A projector's pattern drawn by a Warp kernel straight into the renderer's memory every frame (`demo_interop_laser_pattern`, Python)
 
 **Star Field**
 
