@@ -12,9 +12,11 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -453,6 +455,18 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     }
 #endif
 
+    // Pipelines' statistics for profiling shaders, when asked for.
+    const char* statistics = std::getenv("ERNIE_PIPELINE_STATISTICS");
+    c.pipelineStatistics_ =
+        statistics != nullptr && *statistics != '\0' &&
+        std::string_view(statistics) != "0" &&
+        Has(deviceExtensions,
+            VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME);
+    if (c.pipelineStatistics_) {
+        enabled.push_back(
+            VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME);
+    }
+
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationSupport{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
     VkPhysicalDeviceRayQueryFeaturesKHR rayQuerySupport{
@@ -514,6 +528,13 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     features13.synchronization2 = VK_TRUE;
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
     features13.pNext = c.rayQuery_ ? &acceleration : nullptr;
+    VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR executables{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR};
+    if (c.pipelineStatistics_) {
+        executables.pipelineExecutableInfo = VK_TRUE;
+        executables.pNext = features13.pNext;
+        features13.pNext = &executables;
+    }
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
     features12.timelineSemaphore = VK_TRUE;

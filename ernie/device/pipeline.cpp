@@ -2,11 +2,66 @@
 #include "ernie/device/pipeline.h"
 
 #include <array>
+#include <cstdio>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace ernie {
 
 namespace {
+
+/// Prints `pipeline`'s statistics from its driver, each executable's
+/// on a line headed by `label` (`VulkanContext::
+/// CapturesPipelineStatistics`).
+void PrintStatistics(const VulkanContext& context,
+                     VkPipeline pipeline, const std::string& label) {
+    VkPipelineInfoKHR info{VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR};
+    info.pipeline = pipeline;
+    std::uint32_t count = 0;
+    vkGetPipelineExecutablePropertiesKHR(context.Device(), &info,
+                                         &count, nullptr);
+    std::vector<VkPipelineExecutablePropertiesKHR> executables(
+        count,
+        {VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR});
+    vkGetPipelineExecutablePropertiesKHR(context.Device(), &info,
+                                         &count, executables.data());
+    for (std::uint32_t e = 0; e < count; ++e) {
+        VkPipelineExecutableInfoKHR executable{
+            VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR};
+        executable.pipeline = pipeline;
+        executable.executableIndex = e;
+        std::uint32_t statistics = 0;
+        vkGetPipelineExecutableStatisticsKHR(
+            context.Device(), &executable, &statistics, nullptr);
+        std::vector<VkPipelineExecutableStatisticKHR> values(
+            statistics,
+            {VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR});
+        vkGetPipelineExecutableStatisticsKHR(context.Device(),
+                                             &executable, &statistics,
+                                             values.data());
+        std::string line = "Ernie pipeline " + label + " " +
+                           executables[e].name + ":";
+        for (const VkPipelineExecutableStatisticKHR& value : values) {
+            line += std::string(" ") + value.name + "=";
+            switch (value.format) {
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_BOOL32_KHR:
+                line += value.value.b32 ? "true" : "false";
+                break;
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_INT64_KHR:
+                line += std::to_string(value.value.i64);
+                break;
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_UINT64_KHR:
+                line += std::to_string(value.value.u64);
+                break;
+            default:
+                line += std::to_string(value.value.f64);
+                break;
+            }
+        }
+        std::fprintf(stderr, "%s\n", line.c_str());
+    }
+}
 
 VkShaderModule CreateModule(VkDevice device,
                             std::span<const std::uint32_t> spirv) {
@@ -183,11 +238,21 @@ void ComputePipeline::Create(std::span<const std::uint32_t> spirv,
     info.stage.module = module;
     info.stage.pName = entryPoint.c_str();
     info.layout = layout_->Handle();
+    if (context_.CapturesPipelineStatistics()) {
+        info.flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+    }
     const VkResult result =
         vkCreateComputePipelines(context_.Device(), VK_NULL_HANDLE, 1,
                                  &info, nullptr, &pipeline_);
     vkDestroyShaderModule(context_.Device(), module, nullptr);
     CheckVk(result, "vkCreateComputePipelines");
+    if (context_.CapturesPipelineStatistics()) {
+        // Slang names every entry point main: the code's size tells
+        // them apart.
+        PrintStatistics(context_, pipeline_,
+                        "compute (" + std::to_string(spirv.size()) +
+                            " SPIR-V words)");
+    }
 }
 
 ComputePipeline::~ComputePipeline() {
@@ -338,12 +403,21 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context,
     info.pColorBlendState = &blend;
     info.pDynamicState = &dynamic;
     info.layout = layout.Handle();
+    if (context.CapturesPipelineStatistics()) {
+        info.flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+    }
     const VkResult result = vkCreateGraphicsPipelines(
         device, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline_);
     for (VkShaderModule module : modules) {
         vkDestroyShaderModule(device, module, nullptr);
     }
     CheckVk(result, "vkCreateGraphicsPipelines");
+    if (context.CapturesPipelineStatistics()) {
+        PrintStatistics(
+            context, pipeline_,
+            "graphics (" + std::to_string(desc.fragmentSpirv.size()) +
+                " fragment SPIR-V words)");
+    }
 }
 
 GraphicsPipeline::~GraphicsPipeline() {

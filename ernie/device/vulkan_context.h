@@ -184,6 +184,14 @@ class VulkanContext {
         return multiDrawIndirect_;
     }
 
+    /// Whether pipelines capture their drivers' statistics
+    /// (registers, instructions, ...) and print them as they are
+    /// made: with `ERNIE_PIPELINE_STATISTICS` set (not empty or "0")
+    /// on a device with VK_KHR_pipeline_executable_properties.
+    bool CapturesPipelineStatistics() const {
+        return pipelineStatistics_;
+    }
+
     /// Whether buffers can be allocated with `BufferMemory::Shared`:
     /// memory and semaphores exported for CUDA interop, as POSIX file
     /// descriptors (VK_KHR_external_memory_fd and
@@ -338,6 +346,7 @@ class VulkanContext {
     bool depthClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
+    bool pipelineStatistics_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;
     void* gpuProfiler_ =
