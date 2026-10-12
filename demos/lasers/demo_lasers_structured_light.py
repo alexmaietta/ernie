@@ -12,6 +12,7 @@ References:
 import numpy as np
 
 import ernie
+import ernie.app
 import ernie.demo
 from ernie import tokens
 from ernie.demo import side_by_side, write_png
@@ -152,8 +153,11 @@ class Demo(ernie.demo.Demo):
             resolution=(320, 240),
             ambient=0.0,
         )
+        # Through the camera, lit by the projector alone rather than
+        # the viewer's own sun.
         if viewer is not None:
             viewer.active_camera = camera.path
+            viewer.lighting = ernie.app.Lighting.STAGE
 
     def planes(self):
         """The camera's frame in the middle of each plane's showing,

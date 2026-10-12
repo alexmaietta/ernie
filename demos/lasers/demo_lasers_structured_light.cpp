@@ -117,8 +117,11 @@ class StructuredLightDemo : public app::Demo {
             .SetCamera(Path("/World/Camera"))
             .SetResolution({320, 240})
             .SetAmbient(0.0);
+        // Through the camera, lit by the projector alone rather than
+        // the viewer's own sun.
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
+            viewer->SetLighting(app::Lighting::Stage);
         }
     }
 
