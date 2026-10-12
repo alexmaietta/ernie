@@ -105,6 +105,8 @@ extern const char kMeshNormalsSlang[];
 extern const char kInstanceComposeSlang[];
 /// Bounds of instancers' positions written from the compute device.
 extern const char kInstanceBoundsSlang[];
+/// Indirect draws of meshes' triangles in use.
+extern const char kActiveDrawsSlang[];
 /// Views and point clouds posed under prims posed on the GPU.
 extern const char kInstanceAnchorsSlang[];
 /// Lights posed on the GPU: their light table entries, shadow views

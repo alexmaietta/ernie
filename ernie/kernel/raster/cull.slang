@@ -32,7 +32,8 @@
 // (VkDrawIndirectCommand, 4 uints each, one per level), 9 the levels of detail (first index
 // relative to the mesh's, index count, error in mesh units as bits, unused), 10 the views' depth
 // pyramids (one layer per view of the chunk), 11 each view's visibility of each instance in its
-// previous frame, one bit per (view, instance id).
+// previous frame, one bit per (view, instance id), 12 meshes' points and triangles in use (int32
+// pairs by slot, `CullItem.info.w`).
 //
 // References:
 // - U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015 Advances in
@@ -59,7 +60,8 @@ struct CullItem {
     // Bounding sphere of the prototype, its own transform applied: centre xyz, radius w.
     float4 sphere;
     // x: largest scale of `model`; y: flags (bit 0 orientations, bit 1 scales); z: largest
-    // scale of the prototype's transform, for its levels' errors.
+    // scale of the prototype's transform, for its levels' errors; w: as bits, the mesh's slot in
+    // `activeCounts` plus 1, 0 for all its triangles.
     float4 info;
     // x: first level of detail in `lods`, y: level count; z: the instancer's arrays' offset in
     // the double-buffered instance pools now, w: at the last frame (z when it stood still).
@@ -96,6 +98,7 @@ struct CullConstants {
 [[vk::binding(9, 0)]] StructuredBuffer<uint4> lods;
 [[vk::binding(10, 0)]] Texture2DArray<float> hzb;
 [[vk::binding(11, 0)]] RWStructuredBuffer<uint> visibility;
+[[vk::binding(12, 0)]] StructuredBuffer<int> activeCounts;
 [[vk::push_constant]] ConstantBuffer<CullConstants> constants;
 
 static const uint kGroup = 64;
@@ -365,7 +368,13 @@ void cullMain(uint3 group : SV_GroupID, uint thread : SV_GroupIndex) {
     }
     if (thread < levels) {
         let command = 4 * (firstDraw + thread);
-        commands[command] = item.lods.y == 0 ? 0u : lods[item.lods.x + thread].y;
+        var vertices = item.lods.y == 0 ? 0u : lods[item.lods.x + thread].y;
+        // Only the triangles in use, which a mesh with counts holds first, in its one level.
+        let countSlot = asuint(item.info.w);
+        if (countSlot != 0) {
+            vertices = min(vertices, 3 * uint(max(activeCounts[2 * (countSlot - 1) + 1], 0)));
+        }
+        commands[command] = vertices;
         commands[command + 1] = levelCounts[thread];
         commands[command + 2] = 0;
         commands[command + 3] = 0;

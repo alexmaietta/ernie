@@ -109,6 +109,13 @@ constexpr DescriptorBinding kCullBindings[] = {
     {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {10, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kCompute},
     {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+};
+
+/// active_draws.slang's bindings: counts in use and the draws.
+constexpr DescriptorBinding kActiveDrawsBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// mesh_normals.slang's bindings: points, indices, adjacency and the
@@ -526,6 +533,8 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
       normalsLayout_(renderer.Context(), kNormalsBindings, 32),
       composeLayout_(renderer.Context(), kComposeBindings, 32),
       boundsLayout_(renderer.Context(), kBoundsBindings, 20),
+      activeDrawsLayout_(renderer.Context(), kActiveDrawsBindings,
+                         16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       lightCullLayout_(renderer.Context(), kLightCullBindings, 48),
       cullLayout_(renderer.Context(), kCullBindings, 32) {
@@ -547,6 +556,12 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     boundsPipeline_ = std::make_unique<ComputePipeline>(
         context_, boundsLayout_,
         renderer_.Compiler().CompileSpirv(bounds, "boundsMain"));
+    const std::vector<ShaderModuleSource> activeDraws{
+        {"active_draws", shaders::kActiveDrawsSlang}};
+    activeDrawsPipeline_ = std::make_unique<ComputePipeline>(
+        context_, activeDrawsLayout_,
+        renderer_.Compiler().CompileSpirv(activeDraws,
+                                          "activeDrawsMain"));
     const std::vector<ShaderModuleSource> anchors{
         {"instance_anchors", shaders::kInstanceAnchorsSlang}};
     anchorPipeline_ = std::make_unique<ComputePipeline>(
@@ -1026,6 +1041,16 @@ void MeshDrawable::SetActiveCounts(std::uint32_t mesh,
     // Gaining or losing them takes or frees a slot.
     geometryDirty_ = geometryDirty_ ||
                      counts.Empty() != target.activeCounts.Empty();
+    // They count the full mesh's triangles: no levels of detail.
+    if (!counts.Empty()) {
+        target.levelsPending = false;
+        if (target.levels.size() > 1) {
+            target.levels.resize(1);
+            target.lodIndices.clear();
+            target.lodUvs.clear();
+            geometryDirty_ = true;
+        }
+    }
     target.activeCounts = counts;
     target.countsStream = stream;
     target.countsDirty = true;
@@ -1128,6 +1153,44 @@ void MeshDrawable::RecordWriters(VkCommandBuffer commands) const {
     }
     // Before anything reads them: bounds, culling and drawing.
     barrier(VK_ACCESS_2_MEMORY_WRITE_BIT);
+}
+
+void MeshDrawable::RecordActiveDraws(VkCommandBuffer commands) const {
+    if (countSlots_ == 0) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Active draws");
+    const auto barrier = [commands](VkPipelineStageFlags2 dstStage,
+                                    VkAccessFlags2 dstAccess) {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        memory.dstStageMask = dstStage;
+        memory.dstAccessMask = dstAccess;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    // After the counts are uploaded, copied in or written, and the
+    // last frame's draws read.
+    barrier(VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT |
+                VK_ACCESS_2_SHADER_WRITE_BIT);
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      activeDrawsPipeline_->Handle());
+    const DescriptorResource resources[] = {
+        DescriptorResource::Of(*activeCounts_),
+        DescriptorResource::Of(*activeDraws_)};
+    activeDrawsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            resources);
+    const std::uint32_t constants[4] = {countSlots_, 0, 0, 0};
+    activeDrawsLayout_.PushConstants(commands, constants,
+                                     sizeof(constants));
+    vkCmdDispatch(commands, (countSlots_ + 63) / 64, 1, 1);
+    barrier(VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+            VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
 }
 
 void MeshDrawable::CopyDevicePoints(Mesh& mesh) {
@@ -1866,6 +1929,28 @@ void MeshDrawable::RebuildGeometry() {
         mesh.mappedIndices = Tensor();
     }
     activeCounts_ = Pool(std::as_bytes(std::span(counts)));
+    // Each slot's draw, as many triangles as its mesh holds until the
+    // counts are read (`RecordActiveDraws`).
+    countSlots_ = static_cast<std::uint32_t>(counts.size() / 2);
+    std::vector<std::uint32_t> draws(8 * std::size_t{countSlots_}, 0);
+    for (const auto& [handle, mesh] : meshes_) {
+        if (mesh.countSlot != 0) {
+            const auto triangles = static_cast<std::uint32_t>(
+                mesh.data.indices.size() / 3);
+            std::uint32_t* draw = &draws[8 * (mesh.countSlot - 1)];
+            draw[0] = 3 * triangles;
+            draw[1] = 1;
+            draw[4] = triangles;
+        }
+    }
+    activeDraws_ = std::make_unique<GpuBuffer>(
+        context_, std::max<VkDeviceSize>(draws.size() * 4, 32),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        BufferMemory::Device);
+    if (!draws.empty()) {
+        activeDraws_->Write(std::as_bytes(std::span(draws)));
+    }
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
     colors_ = Pool(std::as_bytes(std::span(colors)));
@@ -2460,6 +2545,7 @@ void MeshDrawable::WriteDraws() {
     cullItemsDirty_ = true;
     itemIdOffsets_.clear();
     itemIndices_.clear();
+    itemCountSlots_.clear();
     std::vector<GpuDraw> draws(items_.size());
     std::vector<std::uint32_t> instanceIds;
     itemPipelines_.clear();
@@ -2491,6 +2577,7 @@ void MeshDrawable::WriteDraws() {
         itemIdOffsets_.push_back(draw.offsets[2]);
         itemIndices_.push_back(
             static_cast<std::uint32_t>(mesh.data.indices.size()));
+        itemCountSlots_.push_back(mesh.countSlot);
         std::uint32_t flags = 0;
         flags |= mesh.data.normals.empty() ? 0u : kHasNormals;
         flags |= item.vertexColors && !mesh.data.colors.empty()
@@ -3400,6 +3487,8 @@ void MeshDrawable::WriteCullItems() {
         entry.sphere[3] = 0.5f * glm::length(high - low);
         entry.info[0] = MaxScale(transforms_[i]);
         entry.info[2] = MaxScale(item.prototype);
+        std::memcpy(&entry.info[3], &mesh.countSlot,
+                    sizeof(mesh.countSlot));
         entry.levels[0] = first->second;
         entry.levels[1] = CullLevels(i);
         std::uint32_t flags = 0;
@@ -3491,7 +3580,8 @@ void MeshDrawable::Dispatch(VkCommandBuffer commands, VkImageView hzb,
         DescriptorResource::Of(hzb, VK_IMAGE_LAYOUT_GENERAL),
         DescriptorResource::Of(visibility_ != nullptr
                                    ? *visibility_
-                                   : *cullLevelBuffer_)};
+                                   : *cullLevelBuffer_),
+        DescriptorResource::Of(*activeCounts_)};
     cullLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                      resources);
     // One workgroup per job, spread over y beyond the x limit every
@@ -3603,6 +3693,7 @@ void MeshDrawable::AppendAnchorRecord(std::vector<glm::vec4>& records,
 
 void MeshDrawable::RecordPrepass(VkCommandBuffer commands) const {
     RecordWriters(commands);
+    RecordActiveDraws(commands);
     RecordCompose(commands);
     RecordBounds(commands);
     if (anchorViews_ != 0) {
@@ -3976,7 +4067,17 @@ std::size_t MeshDrawable::Record(
         constants.instanceOffset = range.first;
         constants.indexOffset = 0;
         layout.PushConstants(commands, &constants, sizeof(constants));
-        vkCmdDraw(commands, vertices, range.count, 0, 0);
+        const std::uint32_t countSlot = itemCountSlots_[visible.item];
+        if (countSlot != 0 && range.count == 1) {
+            // Only its triangles in use, as many as the GPU counts.
+            constexpr std::uint32_t kStride =
+                8 * sizeof(std::uint32_t);
+            vkCmdDrawIndirect(commands, activeDraws_->Handle(),
+                              VkDeviceSize{countSlot - 1} * kStride,
+                              1, kStride);
+        } else {
+            vkCmdDraw(commands, vertices, range.count, 0, 0);
+        }
         ++calls;
     }
     flush();

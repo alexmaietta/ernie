@@ -726,6 +726,9 @@ class MeshDrawable : public RasterDrawable {
     void RecordBounds(VkCommandBuffer commands) const;
     /// Records the meshes' writers (`SetWriter`).
     void RecordWriters(VkCommandBuffer commands) const;
+    /// Writes the draws of the meshes' triangles in use
+    /// (`activeDraws_`), which direct draws of them go out as.
+    void RecordActiveDraws(VkCommandBuffer commands) const;
     /// Whether the GPU measures the mesh's points (`RecordBounds`):
     /// device or written points without bounds.
     static bool MeasuresPoints(const Mesh& mesh);
@@ -968,6 +971,15 @@ class MeshDrawable : public RasterDrawable {
                FrameUploads::kSlots>
         boundsJobs_;
     std::uint32_t boundsSlot_ = 0;
+    PipelineLayout activeDrawsLayout_;
+    /// active_draws.slang: meshes' indirect draws of their triangles
+    /// in use.
+    std::unique_ptr<ComputePipeline> activeDrawsPipeline_;
+    /// Per slot of `activeCounts_`, 8 uints: the draw of its
+    /// triangles in use (VkDrawIndirectCommand), then the triangles
+    /// the mesh holds.
+    std::unique_ptr<GpuBuffer> activeDraws_;
+    std::uint32_t countSlots_ = 0;
     /// Composed instancers' raw op arrays (written by the compute
     /// API), their ops (uint4 each), the instance lists of each level
     /// and instancer, and per instance its parent record.
@@ -1033,6 +1045,8 @@ class MeshDrawable : public RasterDrawable {
                          ///< `instanceIds_`.
     std::vector<std::uint32_t>
         itemIndices_;  ///< Per draw, its mesh's index count.
+    std::vector<std::uint32_t>
+        itemCountSlots_;  ///< Per draw, its mesh's `countSlot`.
 
     Culling culling_ = Culling::Gpu;
     bool drawsDirty_ =
