@@ -103,7 +103,11 @@ public struct SensorUniforms {
     // (x right, y up, the camera looking down -z), w 1 for a light, 0 past the last
     // (`PixelContext.sourceInCamera`). In the buffer, in the world's frame.
     public float4 sources[kStraySources];
-    float4 facesPadding[6];
+    // The camera's polarizer: x its angle (radians, from the image's +x towards +y), y 1 for a
+    // mosaic (`polarizerAngle`), z and w its principal transmittances along and across its axis;
+    // k1 = k2 = 1 without one.
+    public float4 polarizer;
+    float4 facesPadding[5];
     // Per band, two to a float4 (`chromaticOf`): the lens's image scale (lateral colour) and focal
     // length shift in millimetres (axial colour).
     public float4 chromatic[32];
@@ -127,6 +131,9 @@ public struct SensorConstants {
     // A lens of rays (`kLensTable`): x their first float in `filterParams`, y the pixels between
     // them, z and w their columns and rows.
     public uint4 table;
+    // x: the layers from a raster radiance layer to its Stokes Q, and on to U, for a polarizer
+    // (0 without them); yzw unused.
+    public uint4 stokes;
 }
 
 // Binding 0 holds the uniforms every view shares, a SensorUniforms whose per-view fields are
@@ -829,12 +836,49 @@ public struct Lens : ISpatialSource {
         }
         // The band's layer in the raster's group: the view's, or its cube face's.
         let slice = int(uint(base.z) * pixel.bands() + band);
+        let intensity = resampled(slice);
+        let stokes = int(pass.stokes.x);
+        if (stokes == 0) {
+            return intensity * falloff;
+        }
+        return analysed(intensity, resampled(slice + stokes), resampled(slice + 2 * stokes),
+                        pixel) *
+               falloff;
+    }
+
+    // Layer `slice` of the raster radiance, bilinearly between the four held texels of `at`.
+    float resampled(int slice) {
         let a = lit.x ? rasterRadiance.Load(int4(base.x, base.y, slice, 0)) : 0.0;
         let b = lit.y ? rasterRadiance.Load(int4(next.x, base.y, slice, 0)) : 0.0;
         let c = lit.z ? rasterRadiance.Load(int4(base.x, next.y, slice, 0)) : 0.0;
         let d = lit.w ? rasterRadiance.Load(int4(next.x, next.y, slice, 0)) : 0.0;
-        let value = lerp(lerp(a, b, weight.x), lerp(c, d, weight.x), weight.y);
-        return value * falloff;
+        return lerp(lerp(a, b, weight.x), lerp(c, d, weight.x), weight.y);
+    }
+
+    // The radiance the camera's polarizer passes of linear Stokes (`intensity`, `q`, `u`),
+    // measured from the image's +x towards +y: a partial polarizer's Mueller matrix, with
+    // principal transmittances k1 along its axis and k2 across it, gives
+    // ((k1 + k2) I + (k1 - k2) (Q cos 2 t + U sin 2 t)) / 2 at its angle t here.
+    //
+    // Reference: E. Collett, "Field Guide to Polarization", SPIE FG05, 2005.
+    static float analysed(float intensity, float q, float u, PixelContext pixel) {
+        let polarizer = sharedUniforms().polarizer;
+        let t = polarizerAngle(pixel);
+        return 0.5 * ((polarizer.z + polarizer.w) * intensity +
+                      (polarizer.z - polarizer.w) * (q * cos(2.0 * t) + u * sin(2.0 * t)));
+    }
+
+    // The polarizer's angle at the pixel: its own, or a mosaic's for its place in its 2 x 2 cell,
+    // 90, 45 degrees over 135, 0 (Sony's IMX250MZR).
+    static float polarizerAngle(PixelContext pixel) {
+        let polarizer = sharedUniforms().polarizer;
+        if (polarizer.y < 0.5) {
+            return polarizer.x;
+        }
+        let row = pixel.id.y % 2;
+        let column = pixel.id.x % 2;
+        let degrees = row == 0 ? (column == 0 ? 90.0 : 45.0) : (column == 0 ? 135.0 : 0.0);
+        return radians(degrees);
     }
 
     // Lateral colour (`kLensChromatic`): band `band`'s image is scaled by s about the principal
@@ -860,11 +904,24 @@ public struct Lens : ISpatialSource {
         let w = clamp(tap.raster - float2(first), float2(0.0), float2(1.0));
         let sky = cam.clear.w > 0.5;
         let slice = int(uint(tap.layer) * pixel.bands() + band);
-        let a = heldRadiance(first, tap.layer, slice, sky);
-        let b = heldRadiance(int2(last.x, first.y), tap.layer, slice, sky);
-        let c = heldRadiance(int2(first.x, last.y), tap.layer, slice, sky);
-        let d = heldRadiance(last, tap.layer, slice, sky);
-        return lerp(lerp(a, b, w.x), lerp(c, d, w.x), w.y) * falloff;
+        let intensity = heldBilinear(first, last, w, tap.layer, slice, sky);
+        let stokes = int(pass.stokes.x);
+        if (stokes == 0) {
+            return intensity * falloff;
+        }
+        return analysed(intensity, heldBilinear(first, last, w, tap.layer, slice + stokes, sky),
+                        heldBilinear(first, last, w, tap.layer, slice + 2 * stokes, sky), pixel) *
+               falloff;
+    }
+
+    // Slice `slice` of layer `layer`'s held raster radiance (`heldRadiance`), bilinearly at
+    // weights `w` between texels `first` and `last`.
+    static float heldBilinear(int2 first, int2 last, float2 w, int layer, int slice, bool sky) {
+        let a = heldRadiance(first, layer, slice, sky);
+        let b = heldRadiance(int2(last.x, first.y), layer, slice, sky);
+        let c = heldRadiance(int2(first.x, last.y), layer, slice, sky);
+        let d = heldRadiance(last, layer, slice, sky);
+        return lerp(lerp(a, b, w.x), lerp(c, d, w.x), w.y);
     }
 
     // The raster radiance of texel `texel` in layer `layer`'s band slice `slice`: zero for a

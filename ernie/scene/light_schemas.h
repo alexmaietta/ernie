@@ -97,7 +97,15 @@
       (::ernie::AttributeMeta{.doc = "(nm, value) pairs of a physical light's spectrum: W m^-2 "   \
                                      "nm^-1 for a distant light, W sr^-1 nm^-1 for a sphere, W "   \
                                      "m^-2 sr^-1 nm^-1 for a rect, disk or dome.",                 \
-                              .group = "Spectrum"}))
+                              .group = "Spectrum"}))                                               \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.0,                       \
+      (::ernie::AttributeMeta{.label = "Polarized",                                                \
+                              .doc = "Fraction of the light linearly polarized, 0 to 1.",          \
+                              .group = "Polarization", .max = 1.0}))                               \
+    X(double, PolarizationAngle, ::ernie::tokens::kPolarizationAngle, 0.0,                         \
+      (::ernie::AttributeMeta{.label = "Angle",                                                    \
+                              .doc = "Its electric field's angle from the light's +x, degrees.",   \
+                              .group = "Polarization", .min = -180.0, .max = 180.0}))
 
 #define ERNIE_BOUNDABLE_LIGHT_ATTRIBUTES(X)                                                        \
     X(double, Power, ::ernie::tokens::kLightPower, 0.0,                                            \
@@ -338,7 +346,16 @@
                               .doc = "When the first pattern shows on the sensor clock, seconds.", \
                               .group = "Time", .min = -10.0, .max = 10.0}))                        \
     X(bool, ShadowEnable, ::ernie::tokens::kShadowEnable, true,                                    \
-      (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))
+      (::ernie::AttributeMeta{.label = "Shadows", .group = "Laser"}))                              \
+    X(double, PolarizationDegree, ::ernie::tokens::kPolarizationDegree, 0.98,                      \
+      (::ernie::AttributeMeta{.label = "Polarized",                                                \
+                              .doc = "Fraction of the beam linearly polarized, 0 to 1: a laser "   \
+                                     "diode's 100:1 is 0.98.",                                     \
+                              .group = "Polarization", .max = 1.0}))                               \
+    X(double, PolarizationAngle, ::ernie::tokens::kPolarizationAngle, 0.0,                         \
+      (::ernie::AttributeMeta{.label = "Angle",                                                    \
+                              .doc = "Its electric field's angle from the laser's +x, degrees.",   \
+                              .group = "Polarization", .min = -180.0, .max = 180.0}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_LASER_LIGHT_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_LASER_LIGHT_ATTRIBUTES(X)

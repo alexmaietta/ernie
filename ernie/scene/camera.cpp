@@ -437,6 +437,15 @@ void CameraParams::Check() const {
     }
 }
 
+double Polarizer::AngleAt(std::uint32_t x, std::uint32_t y) const {
+    if (type != Type::Mosaic) {
+        return angle;
+    }
+    // Rows from the top: 90, 45 then 135, 0 degrees.
+    constexpr double kDegrees[2][2] = {{90.0, 45.0}, {135.0, 0.0}};
+    return glm::radians(kDegrees[y % 2][x % 2]);
+}
+
 int CameraParams::Subframes() const {
     const bool moving =
         shutterClose > shutterOpen || rollingShutter > 0.0;
@@ -574,6 +583,29 @@ CameraParams CameraParamsOf(const Scene& scene, const Path& path,
     }
     lens.vignetting = prim.GetLensVignetting();
     lens.transmission = prim.GetLensTransmission();
+    Polarizer& polarizer = camera.polarizer;
+    const std::string polarizerType = prim.GetPolarizerType();
+    if (polarizerType == tokens::kLinear) {
+        polarizer.type = Polarizer::Type::Linear;
+    } else if (polarizerType == tokens::kMosaic) {
+        polarizer.type = Polarizer::Type::Mosaic;
+    } else if (polarizerType != tokens::kNone &&
+               !polarizerType.empty()) {
+        throw std::invalid_argument(
+            "Camera '" + path.String() + "' has polarizer '" +
+            polarizerType + "'; use none, linear or mosaic");
+    }
+    polarizer.angle = glm::radians(prim.GetPolarizerAngle());
+    polarizer.extinction = prim.GetPolarizerExtinction();
+    polarizer.transmission = prim.GetPolarizerTransmission();
+    if (!(polarizer.extinction >= 1.0) ||
+        !(polarizer.transmission > 0.0) ||
+        polarizer.transmission > 1.0) {
+        throw std::invalid_argument("Camera '" + path.String() +
+                                    "' needs a polarizer extinction "
+                                    "ratio of at least 1 and a "
+                                    "transmission in (0, 1]");
+    }
     // Curves of (wavelength, value) pairs; none when unset.
     lens.chromaticScale =
         Spectrum::FromPairs(prim.GetLensChromaticScale());

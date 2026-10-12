@@ -56,6 +56,11 @@
                                           "black_paint", "olive_paint", "white_coating",           \
                                           "aluminium", "galvanized_steel", "copper", "fine_snow",  \
                                           "granular_snow", "ice", "water"}}))                      \
+    X(double, PolarizationRetention, ::ernie::tokens::kPolarizationRetention, 0.0,                 \
+      (::ernie::AttributeMeta{.label = "Polarization kept",                                        \
+                              .doc = "Share of incident polarization diffuse reflection keeps, 0 " \
+                                     "to 1; dark, single-scattering surfaces keep more.",          \
+                              .group = "Surface", .max = 1.0}))                                    \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = "Use albedo map", .group = "Surface"}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \

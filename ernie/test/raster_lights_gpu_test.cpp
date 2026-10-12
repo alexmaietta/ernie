@@ -1032,6 +1032,65 @@ TEST_F(RasterDelegateTest, LightsMovingAcrossTheShutterSmear) {
     EXPECT_EQ(at(scene, instant, -6.0f), 0.0);
 }
 
+TEST_F(RasterDelegateTest, PolarizersPassPolarizedLightByItsAngle) {
+    RasterDelegate delegate(*context_);
+    double bandWidth = 0.0;
+    // A beam 20 m across, even over the pixels about its axis,
+    // polarized along +x (the image's +x, the camera looking down),
+    // on a floor whose reflection keeps its polarization.
+    Scene scene = LaserScene(20.0, &bandWidth);
+    ernie::LaserLight(scene, "/World/Laser")
+        .SetPolarizationDegree(1.0)
+        .SetPolarizationAngle(0.0);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(1.0);
+    const auto [row, col] = PixelOf(scene, 0.0f, 0.0f);
+    const auto at = [&](std::size_t r, std::size_t c) {
+        return static_cast<double>(
+            Band8(delegate, scene)[r * kVarSize + c]);
+    };
+    const std::vector<float> unpolarized = Band8(delegate, scene);
+    const double open = unpolarized[row * kVarSize + col];
+    ASSERT_GT(open, 0.0);
+
+    // A linear polarizer passes k1 = 0.8 of light along its axis and
+    // k2 = 0.08 across it (an extinction ratio of 10), and their mean
+    // halfway: ((k1 + k2) I + (k1 - k2) Q cos 2t) / 2.
+    ernie::Camera camera(scene, "/World/Camera");
+    camera.SetPolarizerType("linear")
+        .SetPolarizerExtinction(10.0)
+        .SetPolarizerTransmission(0.8);
+    EXPECT_NEAR(at(row, col), 0.8 * open, 0.01 * open) << "along";
+    camera.SetPolarizerAngle(90.0);
+    EXPECT_NEAR(at(row, col), 0.08 * open, 0.01 * open) << "across";
+    camera.SetPolarizerAngle(45.0);
+    EXPECT_NEAR(at(row, col), 0.44 * open, 0.01 * open) << "halfway";
+
+    // A polarization sensor's mosaic: 90 and 45 degrees over 135 and
+    // 0 in each 2 x 2 cell.
+    camera.SetPolarizerType("mosaic");
+    const std::size_t r = row - row % 2;
+    const std::size_t c = col - col % 2;
+    const std::vector<float> mosaic = Band8(delegate, scene);
+    // Each pixel's share of what it sees without one.
+    const auto cell = [&](std::size_t dr, std::size_t dc) {
+        const std::size_t i = (r + dr) * kVarSize + c + dc;
+        return static_cast<double>(mosaic[i]) / unpolarized[i];
+    };
+    EXPECT_NEAR(cell(0, 0), 0.08, 0.01) << "90 degrees";
+    EXPECT_NEAR(cell(1, 1), 0.8, 0.01) << "0 degrees";
+    EXPECT_NEAR(cell(0, 1), 0.44, 0.01) << "45 degrees";
+    EXPECT_NEAR(cell(1, 0), 0.44, 0.01) << "135 degrees";
+
+    // A floor that scatters the light unpolarized passes the mean at
+    // any angle.
+    ernie::Material(scene, "/Looks/Grey")
+        .SetPolarizationRetention(0.0);
+    camera.SetPolarizerType("linear").SetPolarizerAngle(0.0);
+    EXPECT_NEAR(at(row, col), 0.44 * open, 0.01 * open)
+        << "depolarized";
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

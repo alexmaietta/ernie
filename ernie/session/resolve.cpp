@@ -1469,6 +1469,22 @@ PatternImageOfArray(const Scene& scene, const Path& path,
 /// The LaserLight at `path` under transform `world` as a light: its
 /// beam from the waist, divergence and power it gives (`LaserLight`),
 /// its power through its aperture, and a shadow view along its beam.
+/// `light`'s linear polarization: `degree` of its light, its electric
+/// field `degrees` from its +x `x` about `travel`, the way its light
+/// goes, counterclockwise looking along it.
+void SetPolarization(LightParams& light, double degree,
+                     double degrees, const glm::dvec3& travel,
+                     const glm::dvec3& x) {
+    light.polarization =
+        static_cast<float>(std::clamp(degree, 0.0, 1.0));
+    const double angle = glm::radians(degrees);
+    // Looking along `travel` with x to the right, up is x cross
+    // travel, where counterclockwise turns x first.
+    const glm::dvec3 y = glm::cross(x, travel);
+    light.polarizationAxis = glm::vec3(
+        glm::normalize(std::cos(angle) * x + std::sin(angle) * y));
+}
+
 LightParams LaserParamsOf(const Scene& scene, const Path& path,
                           const SpectralBands& bands,
                           const glm::dmat4& world) {
@@ -1491,6 +1507,9 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
     }
     light.direction = glm::vec3(d);
     light.tangent = glm::vec3(glm::normalize(x));
+    SetPolarization(light, laser.GetPolarizationDegree(),
+                    laser.GetPolarizationAngle(), d,
+                    glm::normalize(x));
     const double wavelength = laser.GetWavelength();
     const glm::dvec2 waist = laser.GetWaistRadius();
     const glm::dvec2 quality = laser.GetBeamQuality();
@@ -1714,6 +1733,16 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
         light.direction =
             glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
+        // Its light travels along its -z.
+        const glm::dvec3 travel = -glm::dvec3(light.direction);
+        const glm::dvec3 xAxis(world[0]);
+        const glm::dvec3 across =
+            xAxis - glm::dot(xAxis, travel) * travel;
+        if (glm::length(across) > 0.0) {
+            SetPolarization(light, distant.GetPolarizationDegree(),
+                            distant.GetPolarizationAngle(), travel,
+                            glm::normalize(across));
+        }
         return light;
     }
     if (type == kLaserLight) {
@@ -1746,6 +1775,11 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
                                     "' has a degenerate transform");
     }
     light.tangent = glm::vec3(glm::normalize(x));
+    // About its axis, the way its light mostly goes (an area light's
+    // field across that axis).
+    SetPolarization(light, emitter.GetPolarizationDegree(),
+                    emitter.GetPolarizationAngle(), d,
+                    glm::normalize(x));
     SetFocus(light, emitter, bands);
     light.profile = ProfileOf(emitter, world);
     if (type == kCylinderLight) {
@@ -3213,6 +3247,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
                           : Shader(scene, surface).GetEmissiveColor();
     settings.emission =
         glm::max(glm::vec3(emission), glm::vec3(0.0f));
+    settings.polarizationRetention = static_cast<float>(
+        std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));
     return settings;
 }
 

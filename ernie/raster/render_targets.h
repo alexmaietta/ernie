@@ -141,9 +141,27 @@ class RenderTargets : public FrameImages {
         return *depth_;
     }
 
-    /// Spectral radiance of the raster image, before the lens filter.
+    /// Spectral radiance of the raster image, before the lens filter:
+    /// a group of `Bands` layers per raster layer, and with Stokes
+    /// planes (`SetStokes`) two more blocks of as many, its linear
+    /// Stokes Q then U, each `StokesOffset` layers on.
     GpuImage& RasterRadiance() {
         return *rasterRadiance_;
+    }
+
+    /// Whether the raster radiance holds Stokes Q and U beside its
+    /// intensity, for a camera with a polarizer; changing it waits
+    /// for the device and makes the radiance images anew.
+    /// @throws std::invalid_argument when the three blocks are more
+    /// layers than the device's images hold.
+    void SetStokes(bool stokes);
+    bool Stokes() const {
+        return stokes_;
+    }
+    /// The layers from a raster radiance layer to its Stokes Q, and
+    /// on to U: one block of every raster layer's bands.
+    std::uint32_t StokesOffset() const {
+        return RasterLayers() * static_cast<std::uint32_t>(bands_);
     }
 
     /// With motion blur, the sum of the sub-frames' raster radiance
@@ -200,6 +218,7 @@ class RenderTargets : public FrameImages {
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
     std::unique_ptr<GpuImage> radianceSum_;
+    bool stokes_ = false;  ///< See `SetStokes`.
     std::unique_ptr<GpuImage> raster_;
     std::unique_ptr<GpuImage> rasterPlaceholder_;
     std::unique_ptr<GpuImage> hzb_;

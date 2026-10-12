@@ -885,6 +885,10 @@ class RasterRenderer {
         1;  ///< The frame's own views (`FrameParams::Views`).
     std::uint32_t subframes_ =
         1;  ///< Sub-frames per view: above 1 for motion blur.
+    /// Whether the frame's camera has a polarizer, whose sensor reads
+    /// the raster radiance's linear Stokes Q and U
+    /// (`RenderTargets::SetStokes`).
+    bool stokes_ = false;
     /// Whether `lightTable_` holds a copy of the lights per
     /// sub-frame, each posed at its time (`LightParams::previous`),
     /// which its views read (`ShadingUniforms::view`).

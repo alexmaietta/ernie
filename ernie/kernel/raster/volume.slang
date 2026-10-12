@@ -152,6 +152,7 @@ struct LightGpu {
     float4 patternParams[4];
     float4 map;
     uint4 links;
+    float4 polarization;
 }
 
 [[vk::binding(0, 0)]] ByteAddressBuffer shadingBlocks;

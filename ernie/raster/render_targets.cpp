@@ -159,11 +159,34 @@ GpuImage& RenderTargets::RadianceSum() {
         const auto bandLayers = static_cast<std::uint32_t>(bands_);
         radianceSum_ = std::make_unique<GpuImage>(
             context_, ImageDesc{extent_.width, extent_.height,
-                                RasterLayers() * bandLayers, 1,
-                                VK_FORMAT_R32_SFLOAT, kStorage, false,
-                                true, bandLayers});
+                                StokesOffset() * (stokes_ ? 3u : 1u),
+                                1, VK_FORMAT_R32_SFLOAT, kStorage,
+                                false, true, bandLayers});
     }
     return *radianceSum_;
+}
+
+void RenderTargets::SetStokes(bool stokes) {
+    if (stokes == stokes_) {
+        return;
+    }
+    const std::uint32_t layers = StokesOffset() * (stokes ? 3u : 1u);
+    if (layers > context_.Limits().maxImageArrayLayers) {
+        throw std::invalid_argument(
+            "A polarizer's Stokes planes need " +
+            std::to_string(layers) +
+            " layers of raster radiance, more than the device's " +
+            std::to_string(context_.Limits().maxImageArrayLayers) +
+            ": render fewer views or bands");
+    }
+    vkDeviceWaitIdle(context_.Device());
+    stokes_ = stokes;
+    const auto bandLayers = static_cast<std::uint32_t>(bands_);
+    rasterRadiance_ = std::make_unique<GpuImage>(
+        context_, ImageDesc{extent_.width, extent_.height, layers, 1,
+                            VK_FORMAT_R32_SFLOAT, kStorage, false,
+                            true, bandLayers});
+    radianceSum_.reset();
 }
 
 GpuImage& RenderTargets::Raster(bool full) {

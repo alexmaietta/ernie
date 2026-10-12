@@ -570,6 +570,8 @@ void VolumePass::Record(VkCommandBuffer commands,
     constants.offsets[2] = layout.range;
     constants.offsets[3] = layout.size;
     constants.flags[0] = sky ? 1u : 0u;
+    constants.flags[1] =
+        targets.Stokes() ? targets.StokesOffset() : 0u;
     constants.lights[0] = layout.view;
     constants.lights[1] = layout.lightShadow;
     constants.lights[2] = layout.atmosphere;

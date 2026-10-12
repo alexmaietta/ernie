@@ -591,6 +591,35 @@ inline constexpr std::string_view kEnableColorTemperature =
 inline constexpr std::string_view kLightIrradiance =
     "ernie:irradiance";
 inline constexpr std::string_view kLightSpectrum = "ernie:spectrum";
+/// A light's linear polarization (Ernie): the fraction of its light
+/// polarized, 0 to 1 (a laser diode's 100:1 is 0.98), and the angle
+/// of its electric field from the light's +x about its axis, degrees
+/// counterclockwise looking along its light.
+inline constexpr std::string_view kPolarizationDegree =
+    "ernie:polarization:degree";
+inline constexpr std::string_view kPolarizationAngle =
+    "ernie:polarization:angle";
+/// A material's share of incident polarization its diffuse
+/// reflection keeps, 0 (all scattered into unpolarized light) to 1.
+inline constexpr std::string_view kPolarizationRetention =
+    "ernie:polarization:retention";
+/// A camera's polarizer (Ernie): "none", "linear" (one in front of
+/// the lens, at `ernie:polarizer:angle`) or "mosaic" (a polarization
+/// sensor's 2 x 2 cells of 90, 45 / 135, 0 degree polarizers over its
+/// pixels, as Sony's IMX250MZR); the angle of its transmission axis
+/// from the image's +x towards +y, degrees; its extinction ratio,
+/// the light it passes along that axis over across it; and that
+/// transmission along it.
+inline constexpr std::string_view kPolarizerType =
+    "ernie:polarizer:type";
+inline constexpr std::string_view kPolarizerAngle =
+    "ernie:polarizer:angle";
+inline constexpr std::string_view kPolarizerExtinction =
+    "ernie:polarizer:extinction";
+inline constexpr std::string_view kPolarizerTransmission =
+    "ernie:polarizer:transmission";
+inline constexpr std::string_view kLinear = "linear";
+inline constexpr std::string_view kMosaic = "mosaic";
 /// Physical lamp (Ernie): radiant flux over 360 to 830 nm in W. A
 /// SphereLight emits it equally in every direction of its cone (a
 /// narrower cone concentrates it); a RectLight or DiskLight from its

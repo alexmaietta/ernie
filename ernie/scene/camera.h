@@ -99,6 +99,40 @@ struct LensRayTable {
     glm::dvec3 RayAt(glm::dvec2 pixel) const;
 };
 
+/// A camera's linear polarizer (`tokens::kPolarizerType`): none, one
+/// in front of the lens at `angle` (radians from the image's +x
+/// towards +y), or a polarization sensor's mosaic of 2 x 2 pixels at
+/// 90, 45 / 135, 0 degrees (Sony's IMX250MZR). Light polarized along
+/// its axis passes `transmission`, across it `transmission` over the
+/// extinction ratio: a partial polarizer's Mueller matrix, with
+/// principal transmittances k1 and k2, turns linear Stokes (I, Q, U),
+/// measured from the image's +x, into I' = ((k1 + k2) I + (k1 - k2)
+/// (Q cos 2t + U sin 2t)) / 2 at its angle t.
+///
+/// References:
+/// - E. Collett, "Field Guide to Polarization", SPIE FG05, 2005 (the
+///   Mueller matrix of a linear diattenuator).
+/// - Sony Semiconductor Solutions, "Polarization Image Sensor
+///   IMX250MZR/MYR", 2018 (the 2 x 2 polarizer layout).
+struct Polarizer {
+    enum class Type { None, Linear, Mosaic };
+    Type type = Type::None;
+    double angle = 0.0;
+    double extinction = 1000.0;
+    double transmission = 0.85;
+
+    /// Its angle at sensor pixel (`x`, `y`): `angle`, or the mosaic's
+    /// for that pixel's place in its 2 x 2 cell.
+    double AngleAt(std::uint32_t x, std::uint32_t y) const;
+    /// The principal transmittances k1 (along its axis) and k2.
+    double AlongAxis() const {
+        return transmission;
+    }
+    double AcrossAxis() const {
+        return transmission / extinction;
+    }
+};
+
 /// A lens: its projection, natural vignetting and transmission. A
 /// perspective lens has radial and tangential distortion
 /// (Brown-Conrady, in OpenCV's convention), which maps undistorted
@@ -351,6 +385,7 @@ struct CameraParams {
     SpectralBands bands;
     LensModel lens;
     SensorModel sensor = SensorModel::Rgb();
+    Polarizer polarizer;
 
     /// The camera's position in the world.
     glm::dvec3 Eye() const {

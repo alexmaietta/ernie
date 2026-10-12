@@ -169,11 +169,15 @@ struct LightGpu {
     // Light linking (`LinkGroups`): x the link groups of the surfaces it lights, y those whose
     // geometry casts its shadows, a bit each (surface.slang's `linkGroupFlags`); zw unused.
     uint4 links;
+    // xyz: its electric field's direction, across the way its light goes; w: the fraction of its
+    // light linearly polarized along it.
+    float4 polarization;
 }
 
 struct MaterialGpu {
     // x: model index; y: the parameter a per-pixel value in the G-buffer replaces, plus 1 (0 for
-    // none; `packSurfaceFlags`); z: 1 when the surface emits; w unused.
+    // none; `packSurfaceFlags`); z: 1 when the surface emits; w: the float bits of the share of
+    // incident polarization its diffuse reflection keeps.
     uint4 info;
     BrdfParams params;
     // Reflectance per band normalised to luminance 1 (G-buffer albedo.x scales it), four per
@@ -184,7 +188,9 @@ struct MaterialGpu {
 }
 
 struct ShadingConstants {
-    // x: index of the model this dispatch shades, y: the first view's uniforms, zw unused.
+    // x: index of the model this dispatch shades, y: the first view's uniforms, z: the layers
+    // from a raster radiance layer to its Stokes Q, and on to U, with a polarizer (0 without
+    // them); w unused.
     uint4 model;
     // The terrain's horizon map (`terrainOcclusion`): its north-west corner's x and y relative
     // to the frame's origin, its texel size and the terrain's vertical exaggeration; and its
@@ -1605,6 +1611,21 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // row's pose for a pushbroom.
     let v = viewVector(ndc.xy, world);
     let n = facingNormal(normalize(gNormal.Load(pixel).xyz), v);
+    // With a polarizer, the frame its linear Stokes Q and U are measured in (`pass.model.z`
+    // layers on to Q, as many more to U): the image's +x and +y across the light reaching the eye.
+    let stokes = pass.model.z;
+    float3 frameX = float3(0.0);
+    float3 frameY = float3(0.0);
+    if (stokes != 0) {
+        let step = 2.0 / float2(sh.size.xy);
+        let across = cameraPoint(sh.invViewProj, sh.strip, ndc.xy + float2(step.x, 0.0), ndc.z) -
+                     world;
+        let up = cameraPoint(sh.invViewProj, sh.strip, ndc.xy + float2(0.0, step.y), ndc.z) -
+                 world;
+        frameX = normalize(across - dot(across, v) * v + 1e-12 * n);
+        let upAcross = up - dot(up, v) * v - dot(up, frameX) * frameX;
+        frameY = normalize(upAcross + 1e-12 * cross(v, frameX));
+    }
     let albedo = gAlbedo.Load(pixel);
     let modulation = max(albedo.yzw, float3(0.0));
     let scale = max(modulation.x, max(modulation.y, modulation.z));
@@ -1663,12 +1684,18 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     float3 lightDirections[kMaxLights];
     float lightScales[kMaxLights];
     float lightFocus[kMaxLights];  // |cos|^focus off a focused light's axis, else 1
+    // Per light, with a polarizer: its reflected light's linear Stokes Q and U over I in the
+    // pixel's frame, its polarization as far as the surface's diffuse reflection keeps it, along
+    // its electric field seen across the light reaching the eye.
+    float2 lightStokes[kMaxLights];
+    let retention = stokes != 0 ? saturate(asfloat(material.info.w)) : 0.0;
     float3x2 footprint = float3x2(0.0);  // the pixel's, once a laser wants it
     bool footprinted = false;
     // The surface's light link group: lights whose masks lack it leave it unlit.
     let linkGroup = (ids.w >> 1) & 31u;
     for (uint k = 0; k < lightCount; ++k) {
         lightFocus[k] = 1.0;
+        lightStokes[k] = float2(0.0);
         if (((sh.view.x >> k) & 1u) == 0 ||
             ((lights[sh.view.z + k].links.x >> linkGroup) & 1u) == 0) {
             lightDirections[k] = float3(0.0);
@@ -1755,6 +1782,16 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         }
         lightDirections[k] = toLight;
         lightScales[k] = scale;
+        let polarized = light.polarization.w * retention;
+        if (polarized > 0.0) {
+            let field = light.polarization.xyz;
+            let x = dot(field, frameX);
+            let y = dot(field, frameY);
+            let seen = x * x + y * y;
+            if (seen > 1e-8) {
+                lightStokes[k] = polarized * float2(x * x - y * y, 2.0 * x * y) / seen;
+            }
+        }
     }
     float aerialTransmittance[kMaxBands];
     float aerialScattered[kMaxBands];
@@ -1786,6 +1823,9 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                                 : environmentOf(n, v, bandAlbedo, slopeVariance, params);
         // Unlit surfaces show their colour as a white one facing the brightest distant light.
         var radiance = unlit ? unlitIrradiance / PI * bandAlbedo : float3(0.0);
+        // Its linear Stokes Q and U, with a polarizer: polarized lights' share of it.
+        var q = float3(0.0);
+        var u = float3(0.0);
         if (!unlit && ambient > 0.0) {
             let uniform = environment.diffuse + environment.specular0 + environment.specular1;
             for (uint j = 0; j < 3; ++j) {
@@ -1837,13 +1877,21 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 lights[k].shadow.y > 0.5
                     ? environment.diffuse * max(dot(n, lightDirections[k]), 0.0)
                     : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
-            radiance += lightScales[k] * lightSpectrum / PI * factors;
+            let reflected = lightScales[k] * lightSpectrum / PI * factors;
+            radiance += reflected;
+            q += reflected * lightStokes[k].x;
+            u += reflected * lightStokes[k].y;
         }
         // Through the air to the eye: dimmed, with the sun's light it scatters on the way.
         for (uint k = 0; k < 3 && first + k < bands; ++k) {
             let band = first + k;
-            spectral[int3(id.xy, id.z * bands + band)] =
+            let layer = id.z * bands + band;
+            spectral[int3(id.xy, layer)] =
                 radiance[k] * aerialTransmittance[band] + aerialScattered[band];
+            if (stokes != 0) {
+                spectral[int3(id.xy, stokes + layer)] = q[k] * aerialTransmittance[band];
+                spectral[int3(id.xy, 2 * stokes + layer)] = u[k] * aerialTransmittance[band];
+            }
         }
     }
 }
@@ -2082,7 +2130,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         atmosphereSky(radiance, origin, d,
                       detector * detector * offAxis * offAxis * offAxis);
         for (uint band = 0; band < bands; ++band) {
-            spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
+            writeSky(id, id.z * bands + band, radiance[band]);
         }
         return;
     }
@@ -2104,7 +2152,7 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
         // Each pixel's ray starts on the near plane.
         atmosphereSky(radiance, cameraPoint(sh.invViewProj, sh.strip, ndc, 1.0), d, 0.0);
         for (uint band = 0; band < bands; ++band) {
-            spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
+            writeSky(id, id.z * bands + band, radiance[band]);
         }
         return;
     }
@@ -2142,6 +2190,17 @@ void skyMain(uint3 id : SV_DispatchThreadID) {
     bodiesSky(radiance, sh.eye.xyz, d, 0.5 * pixelAngle);
     atmosphereSky(radiance, sh.eye.xyz, d, solidAngle);
     for (uint band = 0; band < bands; ++band) {
-        spectral[int3(id.xy, id.z * bands + band)] = radiance[band];
+        writeSky(id, id.z * bands + band, radiance[band]);
+    }
+}
+
+// Writes the sky's radiance `value` to layer `layer` of pixel `id`, and with a polarizer its
+// Stokes Q and U: none, the sky's light unpolarized.
+void writeSky(uint3 id, uint layer, float value) {
+    spectral[int3(id.xy, layer)] = value;
+    let stokes = pass.model.z;
+    if (stokes != 0) {
+        spectral[int3(id.xy, stokes + layer)] = 0.0;
+        spectral[int3(id.xy, 2 * stokes + layer)] = 0.0;
     }
 }

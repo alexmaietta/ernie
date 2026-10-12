@@ -108,6 +108,9 @@ struct MaterialSettings {
     /// surface emits, in cd/m^2 for white (the photometric units of
     /// lights' luminance), upsampled to a spectrum.
     glm::vec3 emission{0.0f};
+    /// How much of incident polarization its diffuse reflection
+    /// keeps (`tokens::kPolarizationRetention`), 0 to 1.
+    float polarizationRetention = 0.0f;
     /// UsdPreviewSurface's opacity, a constant or one texture
     /// channel, and its opacityThreshold: above 0, surfaces whose
     /// opacity falls below it are cut out (alpha testing), in shadows

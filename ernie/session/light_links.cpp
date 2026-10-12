@@ -32,6 +32,11 @@ bool LinkCollection::Contains(const Path& path) const {
 }
 
 LinkCollection LightLinkOf(const Scene& scene, const Path& path) {
+    // A LaserLight (Ernie's own schema) has no link collections: it
+    // lights everything, as USD's default does.
+    if (scene.TypeOf(path) == tokens::kLaserLight) {
+        return {true, {}, {}};
+    }
     const Light light(scene, path);
     return {light.GetLightLinkIncludeRoot(),
             light.GetLightLinkIncludes(),
@@ -39,6 +44,9 @@ LinkCollection LightLinkOf(const Scene& scene, const Path& path) {
 }
 
 LinkCollection ShadowLinkOf(const Scene& scene, const Path& path) {
+    if (scene.TypeOf(path) == tokens::kLaserLight) {
+        return {true, {}, {}};
+    }
     const Light light(scene, path);
     return {light.GetShadowLinkIncludeRoot(),
             light.GetShadowLinkIncludes(),

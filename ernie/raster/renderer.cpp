@@ -150,8 +150,11 @@ struct LightGpu {
     /// Light linking (`LinkGroups`): the groups it lights, then those
     /// casting its shadows; the rest unused.
     std::uint32_t links[4];
+    /// xyz: its electric field's direction (`polarizationAxis`), w:
+    /// the fraction of its light polarized along it.
+    float polarization[4];
 };
-static_assert(sizeof(LightGpu) == 784,
+static_assert(sizeof(LightGpu) == 800,
               "LightGpu must match shading.slang");
 
 /// With `subframes` above 1, a copy of `table` (`params`' lights) per
@@ -199,7 +202,8 @@ SubframeLights(const FrameParams& params,
                 const glm::vec3 where =
                     params.Relative(glm::dvec3(then[3]));
                 for (float* vector :
-                     {entry.axis, entry.extentX, entry.extentY}) {
+                     {entry.axis, entry.extentX, entry.extentY,
+                      entry.polarization}) {
                     const glm::vec3 turned =
                         turn *
                         glm::vec3(vector[0], vector[1], vector[2]);
@@ -411,7 +415,11 @@ struct SensorUniforms {
     /// each in the view's camera frame; w 1 for a light, 0 past the
     /// last.
     float sources[kStraySources][4];
-    float facesPadding[24];
+    /// The camera's polarizer (`Polarizer`): its angle (radians), 1
+    /// for a mosaic (its angle per pixel), and its principal
+    /// transmittances k1 and k2; k1 = k2 = 1 for none.
+    float polarizer[4];
+    float facesPadding[20];
     /// Per band, two to a float4: the lens's image scale (lateral
     /// colour) and focal length shift in millimetres (axial colour);
     /// 1 and 0 without chromatic aberration.
@@ -481,7 +489,8 @@ VolumePass::ViewLayout VolumeLayout() {
                       offsetof(LightGpu, patternParams) == 688 &&
                       offsetof(LightGpu, map) == 752 &&
                       offsetof(LightGpu, links) == 768 &&
-                      sizeof(LightGpu) == 784,
+                      offsetof(LightGpu, polarization) == 784 &&
+                      sizeof(LightGpu) == 800,
                   "volume.slang's LightGpu must match");
     return {
         static_cast<Offset>(kShadingStride),
@@ -1185,7 +1194,7 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
       poisson_(PoissonDisk(16)),
       shadingLayout_(context, kShadingBindings,
                      sizeof(ShadingConstants)),
-      filterLayout_(context, kFilterBindings, 32),
+      filterLayout_(context, kFilterBindings, 48),
       presentLayout_(context, kPresentBindings, 32),
       hzbLayout_(context, kHzbBindings, 16),
       motionLayout_(context, kMotionBindings, 48),
@@ -1921,6 +1930,10 @@ void RasterRenderer::WriteLights(
         entry.axis[1] = axis.y;
         entry.axis[2] = axis.z;
         entry.axis[3] = light.radius;
+        entry.polarization[0] = light.polarizationAxis.x;
+        entry.polarization[1] = light.polarizationAxis.y;
+        entry.polarization[2] = light.polarizationAxis.z;
+        entry.polarization[3] = light.polarization;
         const glm::vec3 x = glm::normalize(light.tangent);
         const glm::vec3 y = glm::cross(x, axis);
         const glm::vec2 half = light.type == LightType::Disk
@@ -2300,8 +2313,8 @@ void RasterRenderer::WriteLights(
     }
     // Shadow linking: each light's views draw only the geometry its
     // shadow link holds.
-    for (std::size_t i = 0; i < table.size() && i < params.lights.size();
-         ++i) {
+    for (std::size_t i = 0;
+         i < table.size() && i < params.lights.size(); ++i) {
         const auto first = static_cast<std::size_t>(table[i].cone[2]);
         const auto count = static_cast<std::size_t>(table[i].cone[3]);
         for (std::size_t v = first;
@@ -2475,6 +2488,13 @@ void RasterRenderer::Update(
     // views the faces' and its camera theirs; the sensor keeps
     // `params`' camera, following its lens's rays onto them.
     faces_ = static_cast<std::uint32_t>(CubeFacesOf(frame.camera));
+    stokes_ = frame.camera.polarizer.type != Polarizer::Type::None;
+    if (stokes_ && faces_ > 1) {
+        throw std::invalid_argument(
+            "A polarizer needs a camera drawn in one view, not on "
+            "cube "
+            "faces, whose Stokes frames differ");
+    }
     std::optional<FrameParams> facesOf;
     if (faces_ > 1) {
         facesOf = params.Faces(static_cast<int>(faces_));
@@ -3000,8 +3020,10 @@ void RasterRenderer::Update(
         faceLens_ = sensorPasses_.front().plan.LensSource();
         if (!overlays_->Empty()) {
             if (overlayLensLayout_ == nullptr) {
+                // As the sensor's constants (sensor.slang), of which
+                // it pushes the first 32 bytes.
                 overlayLensLayout_ = std::make_unique<PipelineLayout>(
-                    context_, kOverlayLensBindings, 32);
+                    context_, kOverlayLensBindings, 48);
             }
             LensPipeline(faceLens_, "overlayLensMain",
                          *overlayLensLayout_);
@@ -3009,7 +3031,7 @@ void RasterRenderer::Update(
         if (RollsFaces()) {
             if (faceRowsLayout_ == nullptr) {
                 faceRowsLayout_ = std::make_unique<PipelineLayout>(
-                    context_, kFaceRowsBindings, 32);
+                    context_, kFaceRowsBindings, 48);
             }
             LensPipeline(faceLens_, "faceRowsClearMain",
                          *faceRowsLayout_);
@@ -3172,6 +3194,8 @@ void RasterRenderer::WriteMaterialTable() {
                 static_cast<std::uint32_t>(settings.metallicParam) +
                 1;
         }
+        entry.info[3] = std::bit_cast<std::uint32_t>(
+            settings.polarizationRetention);
         models.insert(index);
         const std::vector<float>& params = material->Params();
         std::copy_n(params.begin(),
@@ -3613,6 +3637,16 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
         }
         sensor.sources[s][3] = 1.0f;
     }
+    // The polarizer, which reads the raster's Stokes planes.
+    const Polarizer& polarizer = camera.polarizer;
+    const bool polarized = polarizer.type != Polarizer::Type::None;
+    sensor.polarizer[0] = static_cast<float>(polarizer.angle);
+    sensor.polarizer[1] =
+        polarizer.type == Polarizer::Type::Mosaic ? 1.0f : 0.0f;
+    sensor.polarizer[2] =
+        polarized ? static_cast<float>(polarizer.AlongAxis()) : 1.0f;
+    sensor.polarizer[3] =
+        polarized ? static_cast<float>(polarizer.AcrossAxis()) : 1.0f;
     sensor.faces[0] = static_cast<float>(faces_);
     if (faces_ > 1) {
         const glm::dvec3 face = FrameParams::FaceIntrinsics(
@@ -4053,6 +4087,8 @@ void RasterRenderer::RecordViews(
         throw std::invalid_argument(
             "Render targets need the camera's extent and band count");
     }
+    // A polarizer's sensor reads the radiance's Stokes planes.
+    targets.SetStokes(stokes_);
     if (targets.Faces() != faces_) {
         throw std::invalid_argument(
             "Render targets need " + std::to_string(faces_) +
@@ -4154,9 +4190,10 @@ void RasterRenderer::RecordViews(
             lights.timing = lightTiming_.get();
             lights.patternData = patternData_.get();
             lights.patterns = &lightPatterns_;
-            volumes_->Record(commands, targets, shadingUniforms_, lights,
-                             VolumeLayout(), first, extent_.width,
-                             extent_.height, pushbroom_, sky_ != 0);
+            volumes_->Record(commands, targets, shadingUniforms_,
+                             lights, VolumeLayout(), first,
+                             extent_.width, extent_.height,
+                             pushbroom_, sky_ != 0);
             ShaderBarrier(commands);
         }
         if (subframes_ > 1) {
@@ -4983,6 +5020,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             ShadingConstants constants{};
             constants.model[0] = model;
             constants.model[1] = firstView;
+            constants.model[2] =
+                targets.Stokes() ? targets.StokesOffset() : 0u;
             if (terrainHorizon_.image != nullptr) {
                 std::copy(terrainHorizon_.grid.begin(),
                           terrainHorizon_.grid.end(),
@@ -5089,13 +5128,14 @@ void RasterRenderer::Accumulate(VkCommandBuffer commands,
                 {shutter_[0], shutter_[1], shutter_[2], shutter_[3]},
                 {shutter_[4],
                  RollsFaces() ? static_cast<float>(faces_) : 0.0f,
-                 0.0f, 0.0f}};
+                 static_cast<float>(targets.StokesOffset()), 0.0f}};
     motionLayout_.PushConstants(commands, &constants,
                                 sizeof(constants));
-    vkCmdDispatch(commands, Groups(extent_.width),
-                  Groups(extent_.height),
-                  targets.RasterLayers() *
-                      static_cast<std::uint32_t>(bands_.count));
+    // Every layer of the radiance: its intensity, and with a
+    // polarizer its Stokes Q and U.
+    vkCmdDispatch(
+        commands, Groups(extent_.width), Groups(extent_.height),
+        targets.StokesOffset() * (targets.Stokes() ? 3u : 1u));
     ShaderBarrier(commands);
 }
 
@@ -5159,8 +5199,9 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
         // The AOV slots the frame holds, which filters' `writeOutput`
         // writes; whether the state holds history, and its slots per
         // view. And a lens of rays' table, at its place in this
-        // pass's parameters.
-        const std::uint32_t constants[8] = {
+        // pass's parameters; and the layers from the raster radiance
+        // to its Stokes Q and on to U (0 without them).
+        const std::uint32_t constants[12] = {
             firstView,
             plan.aovs,
             state && pass.history ? 1u : 0u,
@@ -5168,7 +5209,11 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             pass.tableOffset,
             lensTable_[1],
             lensTable_[2],
-            lensTable_[3]};
+            lensTable_[3],
+            targets.Stokes() ? targets.StokesOffset() : 0u,
+            0u,
+            0u,
+            0u};
         for (std::uint32_t segment = 0; segment < plan.segments;
              ++segment) {
             std::vector<DescriptorResource> resources = bound;

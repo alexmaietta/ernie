@@ -33,7 +33,8 @@ struct MotionConstants {
     // all in frames.
     float4 times;
     // x: the rolling readout, in frames; y: the cube faces whose rows `faceRows` holds, 0 for
-    // none.
+    // none; z: the layers of each of the radiance's blocks (its intensity, and with a polarizer
+    // its Stokes Q then U after it); w unused.
     float4 rolling;
 }
 
@@ -85,7 +86,10 @@ void motionMain(uint3 id : SV_DispatchThreadID) {
     let k = constants.frame.x;
     let count = constants.frame.y;
     let bands = constants.frame.z;
-    let view = id.z / bands;
+    // The layer's place in its block: Stokes Q and U follow the intensity's layers.
+    let block = uint(constants.rolling.z);
+    let inBlock = block > 0 ? id.z % block : id.z;
+    let view = inBlock / bands;
     // The row's exposure, the top row's `rolling` frames before the bottom row's.
     var row = (float(id.y) + 0.5) / float(height);
     let faces = uint(constants.rolling.y);
@@ -103,7 +107,7 @@ void motionMain(uint3 id : SV_DispatchThreadID) {
     } else {
         radiance[id] = total;
     }
-    if (id.z % bands == 0) {
+    if (id.z % bands == 0 && id.z == inBlock) {
         let at = uint3(id.xy, view);
         var texel = coverage[at];
         texel.z = (k == 0 ? 0.0 : texel.z) + (covered ? w : 0.0);

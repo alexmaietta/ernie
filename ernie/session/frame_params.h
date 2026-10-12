@@ -388,6 +388,14 @@ struct LightParams {
     /// for its first frame or a light posed on the GPU.
     std::optional<Pose> previous;
 
+    /// The fraction of its light linearly polarized
+    /// (`tokens::kPolarizationDegree`), and its electric field's
+    /// direction, a unit vector across the light's direction of
+    /// travel (its +x turned by `tokens::kPolarizationAngle` about
+    /// its axis).
+    float polarization = 0.0f;
+    glm::vec3 polarizationAxis{1.0f, 0.0f, 0.0f};
+
     /// Cones up to this half angle (degrees) get one perspective
     /// shadow map, wider ones a cube.
     static constexpr float kMaxSpotConeDegrees = 75.0f;
