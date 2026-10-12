@@ -969,6 +969,69 @@ TEST_F(RasterDelegateTest, LaserPulsesAndSequencesFollowTheClock) {
     std::filesystem::remove(file);
 }
 
+TEST_F(RasterDelegateTest, LightsMovingAcrossTheShutterSmear) {
+    double bandWidth = 0.0;
+    const auto aimed = [](Scene& scene, double x) {
+        scene.Set("/World/Laser", tokens::kTransform,
+                  ernie::LookAtTransform({x, 0.0, 10.0},
+                                         {x, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+    };
+    const auto at = [&](const Scene& scene,
+                        const std::vector<float>& band, float x) {
+        const auto [row, col] = PixelOf(scene, x, 0.0f);
+        return static_cast<double>(band[row * kVarSize + col]);
+    };
+    const auto total = [](const std::vector<float>& band) {
+        double sum = 0.0;
+        for (const float value : band) {
+            sum += value;
+        }
+        return sum;
+    };
+    // A 30 cm spot, still at x = 6 m.
+    Scene scene = LaserScene(0.3, &bandWidth);
+    aimed(scene, 6.0);
+    RasterDelegate still(*context_);
+    const std::vector<float> fixed = Band8(still, scene);
+    const double peak = at(scene, fixed, 6.0f);
+    ASSERT_GT(peak, 0.0);
+
+    // Swept from -6 m to 6 m over a frame the shutter stays open
+    // through, in 8 sub-frames: the spot lights where it passes, and
+    // keeps its power. The sub-frames sample the shutter's 7
+    // intervals by the trapezoid rule, so each end holds half of one,
+    // 1/14.
+    ernie::Camera(scene, "/World/Camera")
+        .SetShutterOpen(-1.0)
+        .SetShutterClose(0.0)
+        .SetShutterSamples(8);
+    RasterDelegate delegate(*context_);
+    aimed(scene, -6.0);
+    Band8(delegate, scene);
+    aimed(scene, 6.0);
+    const std::vector<float> swept = Band8(delegate, scene);
+    EXPECT_NEAR(at(scene, swept, -6.0f), peak / 14.0, 0.02 * peak)
+        << "the first sub-frame lights where the laser was";
+    EXPECT_NEAR(at(scene, swept, 6.0f), peak / 14.0, 0.02 * peak)
+        << "the last where it is";
+    EXPECT_NEAR(at(scene, swept, -6.0f + 24.0f / 7.0f), peak / 7.0,
+                0.02 * peak)
+        << "sub-frame 2, a whole interval's";
+    EXPECT_NEAR(total(swept), total(fixed), 0.03 * total(fixed));
+
+    // With the shutter closed, it lights only where it is.
+    ernie::Camera(scene, "/World/Camera")
+        .SetShutterOpen(0.0)
+        .SetShutterClose(0.0);
+    aimed(scene, -6.0);
+    Band8(delegate, scene);
+    aimed(scene, 6.0);
+    const std::vector<float> instant = Band8(delegate, scene);
+    EXPECT_NEAR(at(scene, instant, 6.0f), peak, 0.02 * peak);
+    EXPECT_EQ(at(scene, instant, -6.0f), 0.0);
+}
+
 TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     RasterDelegate delegate(*context_);
     double bandWidth = 0.0;

@@ -79,6 +79,9 @@ struct ShadingUniforms {
     float poisson[32];
     float domeSh[9][4];
     float dome[SpectralBands::kMaxBands];
+    /// The lights the view sees (a bit each), its world's slot among
+    /// the per-world maps, and where its lights start in
+    /// `lightTable_`.
     std::uint32_t view[4];
     float toDome[3][4];       ///< Rows of the rotation from world
                               ///< directions to the dome's frame.
@@ -148,6 +151,69 @@ struct LightGpu {
 };
 static_assert(sizeof(LightGpu) == 784,
               "LightGpu must match shading.slang");
+
+/// With `subframes` above 1, a copy of `table` (`params`' lights) per
+/// sub-frame, `RasterRenderer::kMaxLights` apart: each light that
+/// moved since the last frame (`LightParams::previous`) posed where
+/// it is at the sub-frame's time, as the views are
+/// (`FrameParams::Subframes`). Empty when none moved, when one is
+/// posed on the GPU (the light pass poses the frame's copy alone) or
+/// past `RasterRenderer::kMaxLightSubframes`. Distant lights stay
+/// put, and every light's shadow views stay the frame's.
+std::vector<LightGpu>
+SubframeLights(const FrameParams& params,
+               const std::vector<LightGpu>& table,
+               std::uint32_t subframes) {
+    const std::vector<LightParams>& lights = params.lights;
+    const auto moves = [](const LightParams& light) {
+        return light.previous && light.type != LightType::Distant;
+    };
+    const auto onGpu = [](const LightParams& light) {
+        return light.posedOnGpu;
+    };
+    if (subframes < 2 ||
+        subframes > RasterRenderer::kMaxLightSubframes ||
+        std::none_of(lights.begin(), lights.end(), moves) ||
+        std::any_of(lights.begin(), lights.end(), onGpu)) {
+        return {};
+    }
+    std::vector<LightGpu> copies(subframes *
+                                 RasterRenderer::kMaxLights);
+    for (std::uint32_t k = 0; k < subframes; ++k) {
+        // The last frame is at time -1, this one at 0.
+        const double s =
+            1.0 + params.camera.SubframeTime(static_cast<int>(k));
+        for (std::size_t i = 0; i < table.size(); ++i) {
+            LightGpu entry = table[i];
+            const LightParams& light = lights[i];
+            if (moves(light)) {
+                const glm::dmat4 now =
+                    LightParams::Pose{light.position, light.direction,
+                                      light.tangent}
+                        .Matrix();
+                const glm::dmat4 then =
+                    InterpolatePose(light.previous->Matrix(), now, s);
+                const glm::mat3 turn(then * glm::inverse(now));
+                const glm::vec3 where =
+                    params.Relative(glm::dvec3(then[3]));
+                for (float* vector :
+                     {entry.axis, entry.extentX, entry.extentY}) {
+                    const glm::vec3 turned =
+                        turn *
+                        glm::vec3(vector[0], vector[1], vector[2]);
+                    vector[0] = turned.x;
+                    vector[1] = turned.y;
+                    vector[2] = turned.z;
+                }
+                entry.position[0] = where.x;
+                entry.position[1] = where.y;
+                entry.position[2] = where.z;
+            }
+            copies[k * RasterRenderer::kMaxLights + i] = entry;
+        }
+    }
+    return copies;
+}
 
 /// A light pattern's integration (`patternNormMain`): its index in
 /// the registry and light slot, its half extents, wavelength and
@@ -1092,9 +1158,9 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                        BufferMemory::Device),
       sensorUniforms_(context, kSensorStride, kViewUniformUsage,
                       BufferMemory::Device),
-      lightTable_(context, kMaxLights * sizeof(LightGpu),
-                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                  BufferMemory::Device),
+      lightTable_(
+          context, kMaxLightSubframes * kMaxLights * sizeof(LightGpu),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device),
       lightProfiles_(context, kMaxLights * kProfileBytes,
                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                      BufferMemory::Device),
@@ -1752,7 +1818,7 @@ void RasterRenderer::WriteLights(
                 static_cast<std::uint32_t>(array.Shape()[0]));
         }
     }
-    const std::size_t base = patternArrayFloats_;
+    const std::size_t hostStart = patternArrayFloats_;
     // Per light slot, its pattern's integral where known (1 for a
     // normalized pattern); the pattern pass writes the others.
     std::vector<float> patternNorms(params.lights.size(), 1.0f);
@@ -1955,8 +2021,8 @@ void RasterRenderer::WriteLights(
                 static_cast<float>(std::max(beam.sequenceCount, 1));
             entry.patternExtent[0] = beam.extent.x;
             entry.patternExtent[1] = beam.extent.y;
-            entry.patternLayout[0] =
-                static_cast<std::uint32_t>(base + patternData.size());
+            entry.patternLayout[0] = static_cast<std::uint32_t>(
+                hostStart + patternData.size());
             entry.patternLayout[1] =
                 static_cast<std::uint32_t>(beam.patternData.size());
             patternData.insert(patternData.end(),
@@ -1965,7 +2031,7 @@ void RasterRenderer::WriteLights(
             if (const LightPatternImage* image =
                     beam.patternImage.get()) {
                 entry.patternLayout[2] = static_cast<std::uint32_t>(
-                    base + patternData.size());
+                    hostStart + patternData.size());
                 entry.patternLayout[3] =
                     image->width | (image->height << 16);
                 patternData.insert(patternData.end(),
@@ -2044,15 +2110,15 @@ void RasterRenderer::WriteLights(
     // The host's pattern data and images after the arrays' regions,
     // when they change or move.
     patternHostFloats_ = patternData.size();
-    EnsurePatternData(base + patternData.size());
+    EnsurePatternData(hostStart + patternData.size());
     if ((patternDataHeld != patternDataHeld_ ||
-         base != patternDataBase_) &&
+         hostStart != patternDataBase_) &&
         !patternData.empty()) {
         uploads_.Write(*patternData_,
                        std::as_bytes(std::span(patternData)),
-                       base * sizeof(float));
+                       hostStart * sizeof(float));
     }
-    patternDataBase_ = base;
+    patternDataBase_ = hostStart;
     patternDataHeld_ = std::move(patternDataHeld);
     if (!patternMipRegions_.empty() &&
         patternMipPipeline_ == nullptr) {
@@ -2197,6 +2263,14 @@ void RasterRenderer::WriteLights(
     }
     if (!table.empty()) {
         uploads_.Write(lightTable_, std::as_bytes(std::span(table)));
+    }
+    // With sub-frames, a copy of the lights per sub-frame, those that
+    // moved since the last frame posed at its time.
+    const std::vector<LightGpu> moving =
+        SubframeLights(params, table, subframes_);
+    lightSubframes_ = !moving.empty();
+    if (lightSubframes_) {
+        uploads_.Write(lightTable_, std::as_bytes(std::span(moving)));
     }
     std::vector<glm::mat4> matrices;
     std::vector<std::byte> blocks(firstLayeredView_ *
@@ -3210,6 +3284,11 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
         const auto slot = worldSlots_.find(world);
         shading.view[1] =
             slot != worldSlots_.end() ? slot->second : 0;
+        // Its sub-frame's lights, when they move between sub-frames
+        // (`SubframeLights`).
+        const std::size_t subframe = v / (outputViews_ * faces_);
+        shading.view[2] = static_cast<std::uint32_t>(
+            lightSubframes_ ? subframe * kMaxLights : 0);
         viewShading.push_back(shading);
     }
     uploads_.Write(shadingUniforms_,

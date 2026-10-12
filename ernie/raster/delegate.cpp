@@ -2481,6 +2481,27 @@ void RasterDelegate::UpdatePrims(
          i < frame.lights.size() && i < anchoredLights.size(); ++i) {
         frame.lights[i].posedOnGpu = anchoredLights[i];
     }
+    // The lights' poses at the last frame of `stateKey`, for motion
+    // blur: none for a light's first frame or one posed on the GPU.
+    {
+        std::map<Path, LightParams::Pose>& last =
+            lastLightPoses_[stateKey];
+        std::map<Path, LightParams::Pose> current;
+        for (std::size_t i = 0;
+             i < frame.lights.size() && i < prims_.lights.size();
+             ++i) {
+            LightParams& light = frame.lights[i];
+            const auto found = last.find(prims_.lights[i]);
+            if (found != last.end() && !light.posedOnGpu) {
+                light.previous = found->second;
+            }
+            current.emplace(prims_.lights[i],
+                            LightParams::Pose{light.position,
+                                              light.direction,
+                                              light.tangent});
+        }
+        last = std::move(current);
+    }
     ApplyDomeSun(frame);
     ApplyDomeDirections(frame);
     ApplyAutoExposure(scene, stateKey, frame);

@@ -464,6 +464,8 @@ class RasterDelegate : public RenderDelegate {
     /// Per product (or the settings for the view), its views' camera
     /// poses at its last frame, for motion blur.
     std::map<Path, std::vector<glm::dmat4>> lastPoses_;
+    /// And its lights' poses at its last frame, by light.
+    std::map<Path, std::map<Path, LightParams::Pose>> lastLightPoses_;
     /// Per product (or the settings for the view) exposed
     /// automatically, the stops it adds to its camera's exposure.
     std::map<Path, double> autoStops_;

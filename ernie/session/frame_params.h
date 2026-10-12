@@ -366,6 +366,23 @@ struct LightParams {
     /// spectrum keep the estimate's scale.
     bool posedOnGpu = false;
 
+    /// Where a light is: its `position`, `direction` and `tangent`.
+    struct Pose {
+        glm::dvec3 position{0.0};
+        glm::vec3 direction{0.0f, 0.0f, 1.0f};
+        glm::vec3 tangent{1.0f, 0.0f, 0.0f};
+
+        /// As a rigid transform: x along `tangent`, z against
+        /// `direction` (the light emits along its -z), at `position`.
+        glm::dmat4 Matrix() const;
+    };
+
+    /// Its pose at the last frame, for motion blur: with sub-frames
+    /// (`CameraParams::Subframes`) a light that moved lights each
+    /// from where it was then, between this pose and its own. Empty
+    /// for its first frame or a light posed on the GPU.
+    std::optional<Pose> previous;
+
     /// Cones up to this half angle (degrees) get one perspective
     /// shadow map, wider ones a cube.
     static constexpr float kMaxSpotConeDegrees = 75.0f;

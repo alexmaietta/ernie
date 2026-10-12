@@ -83,7 +83,8 @@ struct ShadingUniforms {
     float4 dome[16];
     // x: the lights this view sees, a bit per light (a batch's views see their world's and the
     // shared ones); y: its world's slot among a distant light's per-world maps (0 the shared
-    // one); zw unused.
+    // one); z: where its lights start in `lights` (its sub-frame's copy when they move across
+    // the shutter); w unused.
     uint4 view;
     // Rows of the rotation from world directions to the dome's frame, and to the star catalogue's.
     float4 toDome[3];
@@ -1669,7 +1670,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             lightScales[k] = 0.0;
             continue;
         }
-        let light = lights[k];
+        // The view's sub-frame's copy, where lights move across the shutter.
+        let light = lights[sh.view.z + k];
         var shadowPoint = world;  // where its shadow map is read
         var toLight = light.position.xyz;
         var scale = 1.0;

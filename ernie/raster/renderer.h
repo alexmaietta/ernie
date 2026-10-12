@@ -122,6 +122,9 @@ class RasterRenderer {
     /// shadows.
     static constexpr std::size_t kMaxLights = 16;
     static constexpr std::size_t kMaxLightShadowViews = 24;
+    /// Sub-frames whose lights move (`LightParams::previous`); more
+    /// light them all from the frame's poses.
+    static constexpr std::size_t kMaxLightSubframes = 64;
 
     /// Material 0, which always exists and drawables use by default:
     /// Lambert with albedo 1.
@@ -876,6 +879,10 @@ class RasterRenderer {
         1;  ///< The frame's own views (`FrameParams::Views`).
     std::uint32_t subframes_ =
         1;  ///< Sub-frames per view: above 1 for motion blur.
+    /// Whether `lightTable_` holds a copy of the lights per
+    /// sub-frame, each posed at its time (`LightParams::previous`),
+    /// which its views read (`ShadingUniforms::view`).
+    bool lightSubframes_ = false;
     std::uint32_t faces_ =
         1;  ///< Raster layers per view: a cube camera's faces.
     /// Whether the last `Update`'s frame holds the MotionVector var,
@@ -937,9 +944,9 @@ class RasterRenderer {
     std::vector<LayeredPass> layeredPasses_;
     /// Minimal shading's main light, the frame's brightest distant
     /// light, when it has shadow maps: its index in the frame's
-    /// lights, its first map in `lightViews_`, how many (its cascades,
-    /// or a batch's shared map and one per world), and whether per
-    /// world.
+    /// lights, its first map in `lightViews_`, how many (its
+    /// cascades, or a batch's shared map and one per world), and
+    /// whether per world.
     struct MinimalKey {
         std::size_t light = 0;
         std::uint32_t first = 0;

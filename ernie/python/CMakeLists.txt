@@ -81,15 +81,6 @@ configure_file(ernie/schema.py "${ernie_package_dir}/schema.py"
                COPYONLY)
 configure_file(ernie/__main__.py "${ernie_package_dir}/__main__.py"
                COPYONLY)
-# ernie.integrations: Ernie as other simulators' backend, such as Newton's viewer.
-file(
-    GLOB_RECURSE ernie_integration_sources CONFIGURE_DEPENDS
-    RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/ernie"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ernie/integrations/*.py")
-foreach(source ${ernie_integration_sources})
-    configure_file("ernie/${source}" "${ernie_package_dir}/${source}"
-                   COPYONLY)
-endforeach()
 # ernie.demos: the Python demos (demos/<category>/<name>.py) and the ISDs they read, run by
 # `python -m ernie.demos`.
 file(
@@ -153,13 +144,6 @@ if(SKBUILD)
         FILES ernie/demos/__init__.py ernie/demos/__main__.py
         DESTINATION ernie/demos
         COMPONENT python)
-    foreach(source ${ernie_integration_sources})
-        get_filename_component(directory "${source}" DIRECTORY)
-        install(
-            FILES "ernie/${source}"
-            DESTINATION ernie/${directory}
-            COMPONENT python)
-    endforeach()
     foreach(source ${ernie_demo_sources})
         get_filename_component(category "${source}" DIRECTORY)
         install(
