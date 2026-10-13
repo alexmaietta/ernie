@@ -7,6 +7,7 @@
 #include "support/vulkan_fixture.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -70,6 +71,12 @@ void main(uint3 id : SV_DispatchThreadID) {
     s.cosPsi = c.geometry.w;
     s.albedo = c.albedo.rgb;
     s.slopeVariance = c.albedo.a;
+    // The light in the plane at azimuth ROTATION from the tangent, the viewer psi further round.
+    let sinI = sqrt(max(1.0 - s.mu0 * s.mu0, 0.0));
+    let sinE = sqrt(max(1.0 - s.mu * s.mu, 0.0));
+    let psi = acos(clamp(s.cosPsi, -1.0, 1.0));
+    s.light = float3(sinI * cos(ROTATION), sinI * sin(ROTATION), s.mu0);
+    s.view = float3(sinE * cos(ROTATION + psi), sinE * sin(ROTATION + psi), s.mu);
     // The RGB slots as bands of these wavelengths, the model's colours their RGB.
     s.wavelengths = float3(610.0, 550.0, 465.0);
     for (uint k = 0; k < kBrdfColours; ++k) {
@@ -127,13 +134,15 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
     /// environment response's diffuse plus its specular lobes for a
     /// viewer at cos(e) mu. `features`, when given, is the
     /// BRDF_FEATURES the model is compiled with (a renderer's union
-    /// over its materials).
+    /// over its materials). The surface's frame is turned `rotation`
+    /// radians about its normal from the plane of incidence.
     std::vector<glm::dvec3>
     Evaluate(const std::string& id, const std::vector<float>& values,
              const std::vector<Geometry>& cases,
              double slopeVariance = 0.0,
              const std::string& mode = "radiance",
-             std::optional<std::uint32_t> features = std::nullopt) {
+             std::optional<std::uint32_t> features = std::nullopt,
+             double rotation = 0.0) {
         const BrdfModel* model = registry_.Find(id);
         if (model == nullptr) {
             throw std::invalid_argument(id);
@@ -153,6 +162,10 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
                        std::to_string(reds[c] + 2) + "));\n    ";
         }
         harness.replace(harness.find("COLOURS"), 7, colours);
+        for (std::size_t at = harness.find("ROTATION");
+             at != std::string::npos; at = harness.find("ROTATION")) {
+            harness.replace(at, 8, std::to_string(rotation));
+        }
         const std::string evaluation =
             mode == "specular"
                 ? "model.specularReflection(s, params[0]).factor"
@@ -870,4 +883,29 @@ TEST_F(BrdfSamplingTest,
                 << roughness << " " << degrees;
         }
     }
+}
+
+TEST_F(BrdfVulkanTest,
+       OpenPbrAnisotropyStretchesTheHighlightAlongTheTangent) {
+    // A half vector tilted along the tangent, where the lobe is
+    // stretched, is likelier than one tilted across it; without
+    // anisotropy the surface's frame does not matter.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    const std::vector<Geometry> cases = {
+        {std::cos(glm::radians(30.0)), std::cos(glm::radians(50.0)),
+         std::cos(glm::radians(80.0)), -1.0, glm::dvec3(0.9)}};
+    const std::vector<float> metal =
+        OpenPbrParams(model, {{1, 1.0f}, {4, 0.3f}});
+    const std::vector<float> brushed =
+        OpenPbrParams(model, {{1, 1.0f}, {4, 0.3f}, {24, 0.8f}});
+    const auto at = [&](const std::vector<float>& params,
+                        double rotation) {
+        return Evaluate("open_pbr", params, cases, 0.0, "radiance",
+                        std::nullopt, rotation)[0]
+            .g;
+    };
+    EXPECT_NEAR(at(metal, 0.0), at(metal, glm::half_pi<double>()),
+                1e-4 * at(metal, 0.0));
+    EXPECT_GT(at(brushed, 0.0),
+              1.5 * at(brushed, glm::half_pi<double>()));
 }

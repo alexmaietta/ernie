@@ -233,6 +233,9 @@ struct ShadingConstants {
     uint4 heightsSize;
     // The heights above the ground the horizon map's levels see from, in height units.
     float4 horizonLevels;
+    // x: the G-buffer's tangents' heap slot (`heapTextureArrays`, gbuffer.slang's `packTangent`),
+    // 0 without them.
+    uint4 gbuffer;
 }
 
 // A material's temperature model (the renderer's `TemperatureMaterialGpu`): its index in the
@@ -1084,27 +1087,44 @@ float3 facingNormal(float3 n, float3 v) {
     return facing >= kMinFacing ? n : normalize(n + (kMinFacing - facing) * v);
 }
 
-// Three bands' wavelengths and the active model's colour parameters at them (`BrdfInput`'s).
+// Three bands' wavelengths and the active model's colour parameters at them (`BrdfInput`'s), and
+// the pixel's tangent (0 for none).
 struct Bands {
     float3 wavelengths;
     float3 colours[kBrdfColours];
+    float3 tangent;
 }
 
 // Bands of 550 nm and white colours, for what depends on neither (a lobe's roughness, the
-// facets' index).
-Bands neutralBands() {
+// facets' index), and the pixel's `tangent`.
+Bands neutralBands(float3 tangent = float3(0.0)) {
     Bands b;
     b.wavelengths = float3(550.0);
     for (uint c = 0; c < kBrdfColours; ++c) {
         b.colours[c] = float3(1.0);
     }
+    b.tangent = tangent;
     return b;
 }
 
-// The `BrdfInput` of `brdfInputOf` with the pixel's unresolved slopes and the bands'.
+// The tangent the G-buffer holds at `pixel`, for a model that reads it (`kBrdfTangents`, which
+// the renderer sets where a material's features have `BrdfRegistry::kTangentsFeature`); 0 for
+// none.
+float3 pixelTangent(int4 pixel) {
+    if (!kBrdfTangents || pass.gbuffer.x == 0) {
+        return float3(0.0);
+    }
+    return unpackTangent(heapTextureArrays[pass.gbuffer.x].Load(pixel).xy);
+}
+
+// The `BrdfInput` of `brdfInputOf` with the pixel's unresolved slopes and the bands', in the
+// frame of the pixel's tangent made perpendicular to n where it has one.
 BrdfInput bandInputOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
                       Bands bands) {
-    var input = brdfInputOf(n, l, v, albedo);
+    let along = bands.tangent - dot(bands.tangent, n) * n;
+    var input = dot(along, along) > 1e-12
+                    ? brdfInputIn(normalize(along), cross(n, normalize(along)), n, l, v, albedo)
+                    : brdfInputOf(n, l, v, albedo);
     input.slopeVariance = slopeVariance;
     input.wavelengths = bands.wavelengths;
     input.colours = bands.colours;
@@ -2863,6 +2883,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     }
     float4 spectra[kBrdfColours];
     colourSpectra(params, spectra);
+    let tangent = pixelTangent(pixel);
     // The dome lighting mode: its shadowing (the full mode, from the occlusion passes) and its
     // diffuse light (none in the limited one). The visibility darkens the ambient term too, and
     // the diffuse dome is looked up towards the bent normal, as far as the sky is hidden
@@ -2880,7 +2901,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // roughness does not depend on the albedo, so one probe finds them for every band.
     float4 lobes[2] = {float4(0.0), float4(0.0)};
     if (domeLit) {
-        let probe = environmentOf(n, v, float3(1.0), slopeVariance, params, neutralBands());
+        let probe = environmentOf(n, v, float3(1.0), slopeVariance, params, neutralBands(tangent));
         let mirror = 2.0 * dot(n, v) * n - v;
         if (any(probe.specular0 > 0.0)) {
             lobes[0] = domeLobe(mirror, probe.roughness0);
@@ -2897,7 +2918,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     if (stokes != 0 && (lobes[0].w > 0.0 || lobes[1].w > 0.0)) {
         let mirror = 2.0 * dot(n, v) * n - v;
         let facets =
-            specularOf(n, mirror, v, float3(albedo.x), slopeVariance, params, neutralBands());
+            specularOf(n, mirror, v, float3(albedo.x), slopeVariance, params, neutralBands(tangent));
         mirrorStokes = specularStokes(mirror, v, 0.0, float3(0.0), facets.ior, frameX, frameY);
     }
 
@@ -3051,7 +3072,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 unlitIrradiance = float3(0.0);
-        var context = neutralBands();
+        var context = neutralBands(tangent);
         for (uint k = 0; k < 3; ++k) {
             let band = min(first + k, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;

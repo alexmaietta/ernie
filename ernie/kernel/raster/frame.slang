@@ -271,13 +271,16 @@ public float minimalShadow(float3 world, float3 normal) {
 //           (the lights' shadows are the shading pass's);
 //   albedo: x scale on the material's reflectance (albedo map over its luminance), yzw linear RGB
 //           modulation of it (detail albedo, tints, vertex colours, debug overlays);
-//   ids: material, prim id, instance id, flags (kUnlit: light without shading or shadows).
+//   ids: material, prim id, instance id, flags (kUnlit: light without shading or shadows);
+//   tangent: the surface's tangent as gbuffer.slang's `packTangent`, 0 for none, discarded
+//            unless a material reads it (`RenderTargets::SetTangents`).
 public static const uint kUnlit = 1;
 
 public struct GBuffer {
     public float4 normal : SV_Target0;
     public float4 albedo : SV_Target1;
     public uint4 ids : SV_Target2;
+    public float2 tangent : SV_Target3;
 }
 
 // Whether the wireframe is hidden line: surfaces are drawn unlit (kUnlit) in the material's

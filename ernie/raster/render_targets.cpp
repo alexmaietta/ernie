@@ -66,10 +66,14 @@ RenderTargets::RenderTargets(const VulkanContext& context,
     const std::uint32_t layers = views * faces;
     for (std::size_t i = 0; i < gbuffer_.size(); ++i) {
         // Arrays even for one view, so shading reads every view's
-        // layer in one dispatch.
+        // layer in one dispatch; the tangents a texel until wanted,
+        // where passes may leave them unbound.
+        const bool held = i != 3 || tangents_ ||
+                          !context.SupportsUnusedAttachments();
         gbuffer_[i] = std::make_unique<GpuImage>(
             context,
-            ImageDesc{extent.width, extent.height, layers, 1,
+            ImageDesc{held ? extent.width : 1,
+                      held ? extent.height : 1, layers, 1,
                       kGBufferFormats[i],
                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                           VK_IMAGE_USAGE_SAMPLED_BIT |
@@ -280,18 +284,38 @@ RenderingTarget RenderTargets::GBufferTarget(bool load) const {
     RenderingTarget target;
     target.loadColor = load;
     target.loadDepth = load;
-    for (const std::unique_ptr<GpuImage>& image : gbuffer_) {
-        target.colors.push_back(image->View());
+    for (std::size_t i = 0; i < gbuffer_.size(); ++i) {
+        target.colors.push_back(
+            i != 3 || tangents_ ||
+                    !context_.SupportsUnusedAttachments()
+                ? gbuffer_[i]->View()
+                : VK_NULL_HANDLE);
     }
     VkClearColorValue background{};
     background.uint32[0] = 0xFFFFFFFFu;
     target.clearColors = {VkClearColorValue{}, VkClearColorValue{},
-                          background};
+                          background, VkClearColorValue{}};
     target.depth = depth_->View();
     target.clearDepth = kDepthClear;
     target.extent = extent_;
     target.layers = RasterLayers();
     return target;
+}
+
+void RenderTargets::SetTangents(bool tangents) {
+    if (tangents == tangents_) {
+        return;
+    }
+    tangents_ = tangents;
+    const GpuImage& placeholder = *gbuffer_[3];
+    if (tangents && placeholder.Desc().width != extent_.width) {
+        // Nothing in flight reads the placeholder's texel.
+        vkDeviceWaitIdle(context_.Device());
+        ImageDesc desc = placeholder.Desc();
+        desc.width = extent_.width;
+        desc.height = extent_.height;
+        gbuffer_[3] = std::make_unique<GpuImage>(context_, desc);
+    }
 }
 
 void RenderTargets::PrepareCompute(VkCommandBuffer commands) {

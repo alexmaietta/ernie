@@ -2086,6 +2086,54 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       AnisotropicMaterialsStretchHighlightsAlongTheTexturesU) {
+    // A brushed metal quad seen from straight above, its texture's u
+    // along x: a sun tilted along x, its half vector tilted along the
+    // stretched lobe, lights it more than one tilted along y, which
+    // an isotropic metal does not tell apart. The G-buffer holds
+    // tangents for it alone.
+    Scene scene = FlatScene();
+    DefineQuad(scene, "/World/Plate", 30.0f);
+    scene.Set(
+        "/World/Plate", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 1.0)));
+    const std::array<float, 8> st{0, 0, 1, 0, 1, 1, 0, 1};
+    scene.Write("/World/Plate", "primvars:st",
+                Tensor::Copy<float>(st, {4, 2}));
+    ernie::Mesh(scene, "/World/Plate")
+        .SetMaterialBinding("/Looks/Brushed");
+    ernie::Material metal =
+        ernie::Material::Define(scene, "/Looks/Brushed");
+    metal.SetAlbedo(glm::dvec3(0.9)).SetBrdf("open_pbr");
+    scene.Set("/Looks/Brushed", "inputs:base_metalness", 1.0);
+    scene.Set("/Looks/Brushed", "inputs:specular_roughness", 0.3);
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto litFrom = [&](glm::dvec3 sun) {
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(glm::normalize(sun)));
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return At<float>(vars.at("HdrColor"), c, c, 1);
+    };
+    const glm::dvec3 alongU(std::sin(0.35), 0.0, std::cos(0.35));
+    const glm::dvec3 alongV(0.0, std::sin(0.35), std::cos(0.35));
+    // The pixel's half-texel offset from the axis tells the narrow
+    // isotropic lobe's two tilts a little apart.
+    const float isotropicU = litFrom(alongU);
+    const float isotropicV = litFrom(alongV);
+    ASSERT_GT(isotropicU, 0.0f);
+    EXPECT_NEAR(isotropicU / isotropicV, 1.0f, 0.15f);
+    EXPECT_FALSE(delegate.Renderer().ReadsTangents());
+    scene.Set("/Looks/Brushed",
+              "inputs:specular_roughness_anisotropy", 0.8);
+    const float brushedU = litFrom(alongU);
+    const float brushedV = litFrom(alongV);
+    EXPECT_TRUE(delegate.Renderer().ReadsTangents());
+    EXPECT_GT(brushedU / brushedV, 1.5f * isotropicU / isotropicV);
+}
+
+TEST_F(RasterDelegateTest,
        TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
     // FlatScene's floor and a 6 m cube under a uniform dome. In the
     // directions mode the dome's diffuse light comes from 16 shadowed

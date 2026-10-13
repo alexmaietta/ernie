@@ -727,8 +727,10 @@ struct ShadingConstants {
     float heightsGrid[4];
     std::uint32_t heightsSize[4];
     float horizonLevels[4];
+    /// x: the G-buffer's tangents' bindless slot, 0 without them.
+    std::uint32_t gbuffer[4];
 };
-static_assert(sizeof(ShadingConstants) == 96,
+static_assert(sizeof(ShadingConstants) == 112,
               "ShadingConstants must match shading.slang");
 
 /// sensor.slang's SensorConstants, which the sensor kernels and the
@@ -978,7 +980,8 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
 /// for its colours (`BrdfParam::colour`): how many, their red
 /// parameters, which of them a material with those features reads,
 /// and the feature each needs (0 for none), so shading uplifts at
-/// each band only those the pixel's material reads.
+/// each band only those the pixel's material reads; and whether it
+/// reads the G-buffer's tangents (`BrdfRegistry::kTangentsFeature`).
 std::string BrdfModuleSource(const BrdfModel& brdf,
                              std::uint32_t features) {
     if (!brdf.features) {
@@ -1012,7 +1015,11 @@ std::string BrdfColourSource(const BrdfModel& brdf,
            params +
            ");\nstatic const uint4 kBrdfColourUsed = uint4(" + used +
            ");\nstatic const uint4 kBrdfColourFeatures = uint4(" +
-           bits + ");\n";
+           bits + ");\nstatic const bool kBrdfTangents = " +
+           ((features & BrdfRegistry::kTangentsFeature) != 0
+                ? "true"
+                : "false") +
+           ";\n";
 }
 
 /// The modules of the shading and sky passes with `brdf` as the
@@ -4372,6 +4379,10 @@ void RasterRenderer::WriteMaterialTable() {
         }
     }
     modelsInUse_.assign(models.begin(), models.end());
+    tangents_ = std::ranges::any_of(
+        modelFeatures_, [](std::uint32_t features) {
+            return (features & BrdfRegistry::kTangentsFeature) != 0;
+        });
     // The temperature models' table and data, when any material has
     // one, the records' data offsets made addresses.
     temperatureModelsInUse_ =
@@ -5562,6 +5573,8 @@ void RasterRenderer::RecordViews(
         }
         // One layered pass for all the views: each view's draws go to
         // its layer (`Uniforms::flags`).
+        // The surfaces' tangents, while a material reads them.
+        targets.SetTangents(tangents_);
         const auto draw = [&](DrawPhase phase, bool load) {
             targets.PrepareGBuffer(commands);
             BeginRendering(commands, targets.GBufferTarget(load));
@@ -6612,6 +6625,15 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             }
         }
         WriteShadingResources(commands);
+        // The surfaces' tangents, where a material reads them.
+        std::uint32_t tangentSlot = 0;
+        if (targets.Tangents()) {
+            shadingSlots_.push_back(context_.Bindless().AddImage(
+                BindlessHeap::Kind::Texture2DArray,
+                targets.GBuffer(3).View(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+            tangentSlot = shadingSlots_.back().Index();
+        }
         const DescriptorResource shading[] = {
             DescriptorResource::Of(*shadingResources_),
             sampled(targets.GBuffer(0)),
@@ -6632,6 +6654,7 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             constants.model[1] = firstView;
             constants.model[2] =
                 targets.Stokes() ? targets.StokesOffset() : 0u;
+            constants.gbuffer[0] = tangentSlot;
             if (terrainHorizon_.image != nullptr) {
                 std::copy(terrainHorizon_.grid.begin(),
                           terrainHorizon_.grid.end(),

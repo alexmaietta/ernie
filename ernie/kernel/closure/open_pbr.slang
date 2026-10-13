@@ -14,7 +14,8 @@ import brdf;
 // 6-8 specular_color, 9 coat_weight, 10 fuzz_weight, 11 thin_film_weight, 12 coat_roughness,
 // 13 coat_ior, 14 coat_darkening, 15 fuzz_roughness; past the first 16, read only for a layer
 // the material has: 16-18 coat_color, 19-21 fuzz_color, 22 thin_film_thickness (um),
-// 23 thin_film_ior. Colours arrive uplifted at the bands (`BrdfInput::colours`: specular_color,
+// 23 thin_film_ior, 24 specular_roughness_anisotropy (along the surface's tangent,
+// `BrdfInput::light` and `view`'s frame). Colours arrive uplifted at the bands (`BrdfInput::colours`: specular_color,
 // coat_color, fuzz_color), and the film's interference is at the bands' wavelengths.
 //
 // Layers cost nothing where no material has them: the renderer defines BRDF_FEATURES as the
@@ -35,6 +36,9 @@ import brdf;
 //   reflectance, here per band rather than in its Fourier form, the bands being wavelengths).
 // - C. Kulla and A. Conty, "Revisiting Physically Based Shading at Imageworks", SIGGRAPH 2017
 //   course (albedo scaling, mean Fresnel).
+// - B. Burley, "Physically-Based Shading at Disney", SIGGRAPH 2012 course, and E. Heitz,
+//   "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), 2014
+//   (anisotropic GGX and its height-correlated Smith visibility).
 
 #ifndef BRDF_FEATURES
 #define BRDF_FEATURES 0xFFFFFFFFu
@@ -44,6 +48,22 @@ import brdf;
 public static const uint kOpenPbrCoat = 1u;
 public static const uint kOpenPbrFuzz = 2u;
 public static const uint kOpenPbrThinFilm = 4u;
+// Anisotropy reads the surface's tangent: `BrdfRegistry::kTangentsFeature`.
+public static const uint kOpenPbrAnisotropy = 0x80000000u;
+
+// Anisotropic GGX's distribution D(h) for the half vector `h` in the surface's frame (x along the
+// tangent) and roughnesses `at` and `ab` along the tangent and bitangent.
+float ggxAnisotropic(float3 h, float at, float ab) {
+    let d = h.x * h.x / (at * at) + h.y * h.y / (ab * ab) + h.z * h.z;
+    return 1.0 / (PI * at * ab * d * d);
+}
+
+// Its height-correlated Smith visibility G / (4 mu0 mu) for light `l` and view `v` in that frame.
+float smithVisibilityAnisotropic(float3 l, float3 v, float at, float ab) {
+    let lambdaV = l.z * length(float3(at * v.x, ab * v.y, v.z));
+    let lambdaL = v.z * length(float3(at * l.x, ab * l.y, l.z));
+    return 0.5 / max(lambdaV + lambdaL, 1e-8);
+}
 
 // Whether this material has layer `bit`: never where no material of the scene does.
 bool hasLayer(BrdfParams p, uint bit) {
@@ -162,6 +182,7 @@ public struct OpenPbr : IBrdf {
         float diffuseRoughness;
         float specularWeight;
         float specularRoughness;  // roughened under the coat, before unresolved slopes
+        float anisotropy;  // specular_roughness_anisotropy, 0 without the feature
         float specularIor;
         float3 tint;
         float ambient;  // the base's surrounding index: the coat's as far as it covers it
@@ -186,6 +207,7 @@ public struct OpenPbr : IBrdf {
         m.specularRoughness = saturate(p.get(4));
         m.specularIor = max(p.get(5), 1e-3);
         m.tint = max(s.colours[0], float3(0.0));
+        m.anisotropy = hasLayer(p, kOpenPbrAnisotropy) ? saturate(p.get(24)) : 0.0;
         m.ambient = 1.0;
         m.coatWeight = 0.0;
         m.coatRoughness = 0.0;
@@ -292,9 +314,23 @@ public struct OpenPbr : IBrdf {
         let unresolved = 2.0 * max(s.slopeVariance, 0.0);
 
         let alpha = m.specularRoughness * m.specularRoughness;
-        let a2 = clamp(alpha * alpha + unresolved, 1e-6, 1.0);
+        var a2 = clamp(alpha * alpha + unresolved, 1e-6, 1.0);
+        var microfacet = 0.0;
+        if (m.anisotropy > 0.0) {
+            // OpenPBR's split of the roughness along the tangent and across it, each widened by
+            // the unresolved slopes; compensated as their geometric mean.
+            let along = alpha * sqrt(2.0 / (1.0 + (1.0 - m.anisotropy) * (1.0 - m.anisotropy)));
+            let at = sqrt(clamp(along * along + unresolved, 1e-6, 1.0));
+            let across = (1.0 - m.anisotropy) * along;
+            let ab = sqrt(clamp(across * across + unresolved, 1e-6, 1.0));
+            let h = normalize(s.light + s.view);
+            microfacet = ggxAnisotropic(h, at, ab) *
+                         smithVisibilityAnisotropic(s.light, s.view, at, ab);
+            a2 = at * ab;
+        } else {
+            microfacet = ggx(nDotH, a2) * smithVisibility(mu0, mu, a2);
+        }
         let roughness = sqrt(sqrt(a2));
-        let microfacet = ggx(nDotH, a2) * smithVisibility(mu0, mu, a2);
         float3 dielectric;
         float3 metal;
         fresnels(m, vDotH, s.wavelengths, dielectric, metal);
@@ -361,7 +397,12 @@ public struct OpenPbr : IBrdf {
     public override EnvironmentResponse environment(BrdfInput s, BrdfParams p) {
         let m = materialOf(s, p);
         let mu = saturate(s.mu);
-        let roughness = widenedRoughness(m.specularRoughness, s.slopeVariance);
+        // An anisotropic lobe prefiltered as an isotropic one of its alphas' geometric mean,
+        // alpha k sqrt(1 - anisotropy), k the stretch along the tangent.
+        let across = 1.0 - m.anisotropy;
+        let k = sqrt(2.0 / (1.0 + across * across));
+        let roughness = widenedRoughness(m.specularRoughness * sqrt(k * sqrt(across)),
+                                         s.slopeVariance);
         let ab = environmentBrdf(roughness, mu);
         let f0 = dielectricF0(m);
         var dielectricF0s = m.specularWeight * m.tint * f0;

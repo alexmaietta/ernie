@@ -90,6 +90,11 @@ class BrdfRegistry {
     /// Most colour parameters (`BrdfParam::colour`) a model may
     /// declare.
     static constexpr std::size_t kMaxColours = 4;
+    /// The feature bit (`BrdfModel::features`) of a material that
+    /// reads the surface's tangent (`BrdfInput`'s frame), such as an
+    /// anisotropic one: the renderer keeps the G-buffer's tangents
+    /// only while a material has it.
+    static constexpr std::uint32_t kTangentsFeature = 1u << 31;
 
     /// An empty registry.
     BrdfRegistry() = default;

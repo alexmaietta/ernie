@@ -32,10 +32,12 @@ namespace ernie {
 class RenderTargets : public FrameImages {
   public:
     /// G-buffer attachment formats: normal and visibility, albedo
-    /// scale and modulation, ids.
-    static constexpr std::array<VkFormat, 3> kGBufferFormats{
+    /// scale and modulation, ids, and the surface's tangent
+    /// (gbuffer.slang's `packTangent`), held only where a material
+    /// reads it (`SetTangents`).
+    static constexpr std::array<VkFormat, 4> kGBufferFormats{
         VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_FORMAT_R32G32B32A32_UINT};
+        VK_FORMAT_R32G32B32A32_UINT, VK_FORMAT_R16G16_UNORM};
     static constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
     /// Camera views' depth is reverse-Z (`CameraView`): cleared to 0,
     /// the far plane, nearer surfaces greater; the motion passes
@@ -106,8 +108,22 @@ class RenderTargets : public FrameImages {
     /// Every view's G-buffer and depth attachments for one layered
     /// `BeginRendering`, each view drawing into its layer, clearing
     /// the ids to "background", or keeping what an earlier pass drew
-    /// with `load`.
+    /// with `load`. Without tangents (`SetTangents`), their
+    /// attachment is a null view, which takes no writes, where the
+    /// device allows (`VulkanContext::SupportsUnusedAttachments`).
     RenderingTarget GBufferTarget(bool load = false) const;
+
+    /// Whether the G-buffer holds the surfaces' tangents, which
+    /// anisotropic materials read: their image is made at the
+    /// targets' size the first time, a one-texel placeholder until
+    /// then, so frames whose materials read none neither store nor
+    /// clear them (on devices that cannot leave an attachment
+    /// unbound, they are always held and written).
+    void SetTangents(bool tangents);
+
+    bool Tangents() const {
+        return tangents_;
+    }
 
     /// The views' hierarchical depth (Hi-Z) for occlusion culling,
     /// created on first use: per view, mips of the farthest depth
@@ -287,7 +303,8 @@ class RenderTargets : public FrameImages {
     std::uint32_t views_;
     std::uint32_t faces_ = 1;
     bool shared_;
-    std::array<std::unique_ptr<GpuImage>, 3> gbuffer_;
+    std::array<std::unique_ptr<GpuImage>, 4> gbuffer_;
+    bool tangents_ = false;  ///< See `SetTangents`.
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
     std::unique_ptr<GpuImage> mediaTemperature_;

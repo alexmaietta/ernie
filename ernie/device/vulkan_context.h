@@ -230,6 +230,13 @@ class VulkanContext {
         return pipelineStatistics_;
     }
 
+    /// Whether passes may render to null colour attachments their
+    /// pipelines have formats for, which take no writes
+    /// (VK_EXT_dynamic_rendering_unused_attachments).
+    bool SupportsUnusedAttachments() const {
+        return unusedAttachments_;
+    }
+
     /// Whether buffers can be allocated with `BufferMemory::Shared`:
     /// memory and semaphores exported for CUDA interop, as POSIX file
     /// descriptors (VK_KHR_external_memory_fd and
@@ -396,6 +403,7 @@ class VulkanContext {
     bool depthBiasClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
+    bool unusedAttachments_ = false;
     bool pipelineStatistics_ = false;
     bool validation_ = false;
     mutable std::mutex submitMutex_;

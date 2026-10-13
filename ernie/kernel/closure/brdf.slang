@@ -32,6 +32,12 @@ public struct BrdfInput {
     // spectral uplift of its RGB at the three bands, as the albedo is: white where the host has
     // none, and for colours past `kBrdfColours`.
     public float3 colours[kBrdfColours];
+    // The directions towards the light and the viewer in the surface's frame: x its tangent (the
+    // host's, along which its texture coordinates' u grows, where it has one), y its bitangent,
+    // z its normal, so z is mu0 and mu. For anisotropic models; isotropic ones need only the
+    // angles above.
+    public float3 light;
+    public float3 view;
 }
 
 // The most colour parameters a host uplifts into `BrdfInput::colours`.
@@ -122,8 +128,17 @@ public interface IBrdf {
 // The geometry of unit directions towards the light l and the viewer v about the unit normal n,
 // any frame, with the given albedo input. mu0 <= 0 means the light is below the horizon, where
 // models are not evaluated; mu is clamped to at least 1e-3 so views grazing or just below the
-// horizon (as with interpolated shading normals) stay finite.
+// horizon (as with interpolated shading normals) stay finite. The surface's frame is
+// `orthonormalBasis`'s about n (`brdfInputIn` for a tangent's).
 public BrdfInput brdfInputOf(float3 n, float3 l, float3 v, float3 albedo) {
+    float3 t;
+    float3 b;
+    orthonormalBasis(n, t, b);
+    return brdfInputIn(t, b, n, l, v, albedo);
+}
+
+// `brdfInputOf` in the surface frame of unit tangent t, bitangent b and normal n.
+public BrdfInput brdfInputIn(float3 t, float3 b, float3 n, float3 l, float3 v, float3 albedo) {
     let mu0 = dot(n, l);
     let mu = dot(n, v);
     let lPlane = l - n * mu0;
@@ -143,6 +158,8 @@ public BrdfInput brdfInputOf(float3 n, float3 l, float3 v, float3 albedo) {
     for (uint c = 0; c < kBrdfColours; ++c) {
         input.colours[c] = float3(1.0);
     }
+    input.light = float3(dot(l, t), dot(l, b), mu0);
+    input.view = float3(dot(v, t), dot(v, b), input.mu);
     return input;
 }
 

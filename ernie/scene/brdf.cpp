@@ -280,7 +280,11 @@ BrdfModel OpenPbr() {
          {"thin_film_thickness", "Thin film thickness", "um", 0.5f,
           0.0f, 2.0f, false, "The film's thickness."},
          {"thin_film_ior", "Thin film IOR", "", 1.4f, 1.0f, 3.0f,
-          false, "The film's index of refraction."}},
+          false, "The film's index of refraction."},
+         {"specular_roughness_anisotropy", "Specular anisotropy", "",
+          0.0f, 0.0f, 1.0f, false,
+          "Stretches the specular lobe along the surface's tangent, "
+          "along which its texture coordinates' u grows."}},
         "OpenPbr",
         shaders::kBrdfOpenPbrSlang};
     // A layer where its weight is above 0.
@@ -289,6 +293,10 @@ BrdfModel OpenPbr() {
         bits |= p.size() > 9 && p[9] > 0.0f ? kOpenPbrCoat : 0u;
         bits |= p.size() > 10 && p[10] > 0.0f ? kOpenPbrFuzz : 0u;
         bits |= p.size() > 11 && p[11] > 0.0f ? kOpenPbrThinFilm : 0u;
+        // Anisotropy reads the surface's tangents.
+        bits |= p.size() > 24 && p[24] > 0.0f
+                    ? BrdfRegistry::kTangentsFeature
+                    : 0u;
         return bits;
     };
     return model;

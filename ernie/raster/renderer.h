@@ -168,6 +168,13 @@ class RasterRenderer {
         return *volumes_;
     }
 
+    /// Whether a material reads the surfaces' tangents
+    /// (`BrdfRegistry::kTangentsFeature`), so the G-buffer holds
+    /// them (`RenderTargets::SetTangents`).
+    bool ReadsTangents() const {
+        return tangents_;
+    }
+
     const BrdfRegistry& Brdfs() const {
         return brdfs_;
     }
@@ -1391,6 +1398,10 @@ class RasterRenderer {
     /// (`BrdfModel::features`), which its shading pipeline compiles
     /// in.
     std::vector<std::uint32_t> modelFeatures_;
+    /// Whether a material reads the surfaces' tangents
+    /// (`BrdfRegistry::kTangentsFeature`), for the G-buffer to hold
+    /// them.
+    bool tangents_ = false;
     /// Models' parameters past `BrdfRegistry::kCoreParams`, each
     /// material's after its features (`BrdfParams::extended`).
     std::unique_ptr<GpuBuffer> brdfExtended_;

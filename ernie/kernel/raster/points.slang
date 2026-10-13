@@ -123,6 +123,7 @@ struct PointsOutput {
     float4 normal : SV_Target0;
     float4 albedo : SV_Target1;
     uint4 ids : SV_Target2;
+    float2 tangent : SV_Target3;  // none
     float depth : SV_Depth;
 }
 
@@ -194,6 +195,7 @@ PointsOutput shadePoint(VertexOutput in, out float3 hit) {
     out.normal = packNormal(normal, d.thermal.x);
     out.albedo = float4(surfaceAlbedoScale(hit), cascadeTint(in.color, hit));
     out.ids = uint4(d.ids.x, d.ids.y, in.point, packSurfaceFlags(linkGroupFlags(d.ids.z), 0.0));
+    out.tangent = float2(0.0);
     out.depth = saturate(clip.z / clip.w);
     return out;
 }
@@ -219,6 +221,7 @@ PointsMinimalOutput minimalFragmentMain(VertexOutput in) {
     g.normal = point.normal;
     g.albedo = point.albedo;
     g.ids = point.ids;
+    g.tangent = float2(0.0);
     let shaded = minimalShade(g, hit);
     PointsMinimalOutput out;
     out.color = shaded.color;

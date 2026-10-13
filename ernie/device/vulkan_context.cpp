@@ -133,6 +133,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL OnDebugMessage(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT,
     const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) {
+    // Fragment outputs to attachments a pass leaves null, which
+    // VK_EXT_dynamic_rendering_unused_attachments discards (the
+    // G-buffer's tangents without anisotropic materials): advice,
+    // not an error.
+    if (data->pMessageIdName != nullptr &&
+        std::string_view(data->pMessageIdName) ==
+            "Undefined-Value-ShaderOutputNotConsumed-"
+            "DynamicRendering") {
+        return VK_FALSE;
+    }
     if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         const std::string message =
             data->pMessage != nullptr ? data->pMessage : "";
@@ -508,6 +518,16 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         supported12.pNext = &accelerationSupport;
         accelerationSupport.pNext = &rayQuerySupport;
     }
+    VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT
+        unusedSupport{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT};
+    const bool unusedExtension = Has(
+        deviceExtensions,
+        VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+    if (unusedExtension) {
+        unusedSupport.pNext = supported.pNext;
+        supported.pNext = &unusedSupport;
+    }
     vkGetPhysicalDeviceFeatures2(c.physicalDevice_, &supported);
     if (supported12.bufferDeviceAddress != VK_TRUE ||
         supported12.scalarBlockLayout != VK_TRUE ||
@@ -562,6 +582,21 @@ VulkanContext::Create(const VulkanContextOptions& options) {
         executables.pipelineExecutableInfo = VK_TRUE;
         executables.pNext = features13.pNext;
         features13.pNext = &executables;
+    }
+    // Attachments rendered to as null views where a pass has no use
+    // for them (the G-buffer's tangents without anisotropic
+    // materials), with the pipelines kept.
+    VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT unused{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT};
+    c.unusedAttachments_ =
+        unusedExtension &&
+        unusedSupport.dynamicRenderingUnusedAttachments == VK_TRUE;
+    if (c.unusedAttachments_) {
+        enabled.push_back(
+            VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+        unused.dynamicRenderingUnusedAttachments = VK_TRUE;
+        unused.pNext = features13.pNext;
+        features13.pNext = &unused;
     }
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};

@@ -86,5 +86,6 @@ GBuffer fragmentMain(VertexOutput in) {
     out.albedo = float4(scale, wireframe(modulation, in.barycentric));
     out.ids = uint4(t.ids.x, t.ids.y, 0,
                     packSurfaceFlags(flags | linkGroupFlags(t.ids.z), detail.slopeVariance));
+    out.tangent = float2(0.0);  // none
     return out;
 }

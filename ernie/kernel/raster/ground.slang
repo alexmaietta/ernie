@@ -57,6 +57,7 @@ struct GroundOutput {
     float4 normal : SV_Target0;
     float4 albedo : SV_Target1;
     uint4 ids : SV_Target2;
+    float2 tangent : SV_Target3;  // none
     float depth : SV_Depth;
 }
 
@@ -116,6 +117,7 @@ GroundOutput shadeGround(VertexOutput in) {
     out.albedo = float4(surfaceAlbedoScale(world), cascadeTint(modulation, world));
     out.ids = uint4(g.ids.x, g.ids.y, 0,
                     packSurfaceFlags(linkGroupFlags(g.ids.z), detail.slopeVariance));
+    out.tangent = float2(0.0);
     // Reverse-Z: kept above the cleared 0 out to the horizon, past any far plane.
     out.depth = clamp(clip.z / clip.w, 1.17549435e-38, 1.0);
     return out;
@@ -163,6 +165,7 @@ GroundMinimalOutput minimalFragmentMain(VertexOutput in) {
     g.normal = ground.normal;
     g.albedo = ground.albedo;
     g.ids = ground.ids;
+    g.tangent = float2(0.0);
     float t;
     float3 origin;
     float3 direction;

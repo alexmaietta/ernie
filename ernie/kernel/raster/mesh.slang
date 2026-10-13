@@ -462,6 +462,20 @@ UvSample uvTextures(float2 st, float3 world, inout float3 normal) {
     return s;
 }
 
+// The surface's tangent at texture coordinates `st`, along which u grows: the cotangent frame's
+// (as `uvTextures`' normal map's), up to scale, which anisotropic materials orient their
+// highlights by.
+float3 uvTangent(float2 st, float3 world, float3 normal) {
+    let dpdx = ddx(world);
+    let dpdy = ddy(world);
+    let dudx = ddx(st.x);
+    let dudy = ddy(st.x);
+    let dp2perp = cross(dpdy, normal);
+    let dp1perp = cross(normal, dpdx);
+    let handedness = dot(dpdx, dp2perp) < 0.0 ? -1.0 : 1.0;
+    return handedness * (dp2perp * dudx + dp1perp * dudy);
+}
+
 // Meshes are two-sided: normals turn towards the viewer. Without authored normals each triangle
 // is lit flat with the normal of its plane. The albedo modulation is the mesh's vertex colours or
 // tint times the albedo texture and the detail albedo; the normal map then the detail normals
@@ -607,6 +621,8 @@ GBuffer meshGBuffer(VertexOutput in) {
                      : normalize(flat);
     normal = twoSided(normal, flat, toEye);
     var shadingNormal = normal;
+    // Derivatives outside the branch on texture coordinates.
+    let tangent = uvTangent(in.uv, in.world, normal);
     let textured = uvTextures(in.uv, in.world, shadingNormal);
     let detail = triplanarDetail(in.world, shadingNormal);
     let modulation = textureLoadingTint(
@@ -630,5 +646,6 @@ GBuffer meshGBuffer(VertexOutput in) {
                                          linkGroupFlags((d.offsets.w >> kLinkGroupShift) & 31u),
                                      textured.slopeVariance + detail.slopeVariance,
                                      textured.metallic));
+    out.tangent = (d.offsets.w & kHasUvs) != 0 ? packTangent(tangent) : float2(0.0);
     return out;
 }
