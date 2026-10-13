@@ -7,6 +7,7 @@ ernie_add_library(
     delegate.cpp
     gpu_block_encoder.cpp
     ground_drawable.cpp
+    long_range_shadows.cpp
     material.cpp
     mesh_drawable.cpp
     minimal_targets.cpp

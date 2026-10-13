@@ -85,6 +85,7 @@ extern const char kViewsSlang[];
 /// The visible depth range of a view, for sample distribution shadow
 /// maps.
 extern const char kDepthRangeSlang[];
+extern const char kLongRangeSlang[];
 
 /// A view's log-luminance histogram, for exposure metering.
 extern const char kMeterSlang[];

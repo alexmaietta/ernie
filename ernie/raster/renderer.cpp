@@ -733,8 +733,12 @@ struct ShadingResources {
     VkDeviceAddress viewBlocks;
     /// Each material's temperature model (`TemperatureMaterialGpu`).
     VkDeviceAddress temperatureMaterials;
+    /// The distant lights' long-range visibility maps
+    /// (`LongRangeShadows::Visibility`, an array).
+    std::uint32_t longRangeVisibility;
+    std::uint32_t padding;
 };
-static_assert(sizeof(ShadingResources) == 168 &&
+static_assert(sizeof(ShadingResources) == 176 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
                   offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
@@ -1858,6 +1862,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
     atmosphere_ =
         std::make_unique<AtmosphereLuts>(context_, compiler_);
     volumes_ = std::make_unique<VolumePass>(context_, compiler_);
+    longRange_ =
+        std::make_unique<LongRangeShadows>(context_, compiler_);
     tableSamplerSlot_ =
         context_.Bindless().AddSampler(tableSampler_.Handle());
     clampSamplerSlot_ =
@@ -2531,6 +2537,7 @@ void RasterRenderer::WriteLights(
     const std::uint32_t distantResolution =
         std::max(params.shadows.resolution, 1u);
     lightViews_.clear();
+    longRangeViews_.clear();
     subframeLightViews_.assign(subframes_, {});
     std::vector<std::size_t>
         perWorld;  ///< Lights with per-world maps.
@@ -2793,6 +2800,86 @@ void RasterRenderer::WriteLights(
                 }
                 lightViews_.insert(lightViews_.end(), views.begin(),
                                    views.end());
+                // Its casters far towards it, such as moons: its
+                // long-range view after the cascades, its index plus
+                // 1 in `map[2]` (shading.slang's `longRangeView`).
+                if (cascaded &&
+                    lightViews_.size() < kMaxLightShadowViews) {
+                    atmospherePlanet_.reset();
+                    if (params.atmosphere) {
+                        atmospherePlanet_ =
+                            params.atmosphere->planetCentre;
+                    }
+                    const Bounds3 receivers =
+                        LongRangeReceivers(params);
+                    if (std::optional<ShadowCascade> far =
+                            FitLongRangeView(
+                                receivers.first, receivers.second,
+                                axis, bounds->first, bounds->second,
+                                entry.extentY[3], own)) {
+                        far->shadowMask = light.shadowMask;
+                        entry.map[2] = static_cast<float>(
+                            lightViews_.size() + 1);
+                        // Its visibility's layer, and what
+                        // integrating the disc over it takes: the
+                        // light's angular radius in map widths (2 /
+                        // |row 0|) per unit of depth (1 / |row 2|),
+                        // and the receivers' middle's depth, past the
+                        // far plane.
+                        entry.map[3] = static_cast<float>(
+                            longRangeViews_.size());
+                        const glm::mat4& m = far->lightViewProjection;
+                        const float perWorld = glm::length(
+                            glm::vec3(m[0][2], m[1][2], m[2][2]));
+                        const float acrossWorld = glm::length(
+                            glm::vec3(m[0][0], m[1][0], m[2][0]));
+                        const glm::vec3 middle =
+                            0.5f *
+                            (receivers.first + receivers.second);
+                        // The receivers' square of the map, a texel
+                        // of the visibility map more each way, which
+                        // it spans (`beamExtra` yzw for shading).
+                        glm::vec2 low(1.0f);
+                        glm::vec2 high(0.0f);
+                        for (int c = 0; c < 8; ++c) {
+                            const glm::vec4 clip =
+                                m *
+                                glm::vec4((c & 1) ? receivers.second.x
+                                                  : receivers.first.x,
+                                          (c & 2) ? receivers.second.y
+                                                  : receivers.first.y,
+                                          (c & 4) ? receivers.second.z
+                                                  : receivers.first.z,
+                                          1.0f);
+                            const glm::vec2 uv(0.5f * clip.x + 0.5f,
+                                               0.5f - 0.5f * clip.y);
+                            low = glm::min(low, uv);
+                            high = glm::max(high, uv);
+                        }
+                        const float side =
+                            std::max(high.x - low.x, high.y - low.y) *
+                            (1.0f +
+                             2.0f / static_cast<float>(
+                                        LongRangeShadows::
+                                            kVisibilityTexels));
+                        const glm::vec2 corner =
+                            0.5f * (low + high) - 0.5f * side;
+                        entry.beamExtra[1] = corner.x;
+                        entry.beamExtra[2] = corner.y;
+                        entry.beamExtra[3] = side;
+                        longRangeViews_.push_back(
+                            LongRangeShadows::View{
+                                static_cast<std::uint32_t>(
+                                    lightViews_.size()),
+                                own,
+                                entry.extentY[3] * acrossWorld /
+                                    (2.0f *
+                                     std::max(perWorld, 1e-30f)),
+                                (m * glm::vec4(middle, 1.0f)).z,
+                                glm::vec3(corner, side)});
+                        lightViews_.push_back(*far);
+                    }
+                }
             }
         }
         // A focused light's emission is spectrum x (1 - tint) x
@@ -3587,6 +3674,9 @@ void RasterRenderer::Update(
     // shadow maps: without bounds, no light fits a view.
     WriteLights(params, minimal_ == MinimalMode::None ? std::nullopt
                                                       : bounds);
+    // The long-range views' images as large as they need, before
+    // shading takes their slots.
+    longRange_->Prepare(longRangeViews_);
     // A metering frame counts its luminance for later frames; this
     // slot's last one has finished.
     ReadMeter(uploads_.Slot());
@@ -5622,6 +5712,9 @@ void RasterRenderer::RecordShadowMaps(
             // Only the geometry its light's shadow link holds.
             ShadowCasters casters = lightCasters_;
             casters.linkGroups = lightViews_[v].shadowMask;
+            if (lightViews_[v].longRange) {
+                casters.skipPlanet = atmospherePlanet_;
+            }
             for (const RasterDrawable* drawable : drawables) {
                 ERNIE_GPU_ZONE_NAMED(context_, commands,
                                      drawable->ProfileName());
@@ -5633,6 +5726,13 @@ void RasterRenderer::RecordShadowMaps(
         RecordLayeredLightShadows(commands, frame, drawables);
         lightShadowMaps_->Transition(
             commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        // The long-range views' casters' share of their lights'
+        // discs.
+        if (!longRangeViews_.empty()) {
+            ERNIE_GPU_ZONE(context_, commands, "Long-range shadows");
+            longRange_->Record(commands, *lightShadowMaps_,
+                               longRangeViews_);
+        }
     }
 }
 
@@ -6247,14 +6347,67 @@ float RasterRenderer::FitCascadeDistance(
         farthest = std::min(farthest, 1.1f * seenFar);
     }
     // No farther than a set distance, as Unreal's
-    // DynamicShadowDistance, beyond which nothing is shadowed.
+    // DynamicShadowDistance, beyond which nothing is shadowed; nor
+    // than the casters the cascades hold reach, a moon in view
+    // aside, which the long-range view shadows by
+    // (`kLongRangeStart`).
     if (params.shadows.distance > 0.0f) {
         farthest = std::min(farthest, params.shadows.distance);
     }
+    farthest = std::min(farthest, kLongRangeStart);
     // A margin keeps surfaces at exactly the farthest depth, such as
     // flat ground under a nadir camera, inside the last cascade.
     return std::clamp(1.01f * farthest, view.nearPlane * 1.01f,
                       view.farPlane);
+}
+
+Bounds3
+RasterRenderer::LongRangeReceivers(const FrameParams& params) const {
+    const CascadeFit& fit = *cascadeFit_;
+    const CameraView& view = fit.view;
+    // Both atmospheres' presets reach 100 km up (ernie/util/
+    // atmosphere.cpp), as far as the sky marches.
+    constexpr double kAtmosphereTop = 100e3;
+    std::optional<Bounds3> shell;
+    float reach = std::max(fit.distance, kLongRangeStart);
+    if (params.atmosphere) {
+        const glm::vec3 centre(params.atmosphere->planetCentre -
+                               params.origin);
+        const auto top = static_cast<float>(
+            params.atmosphere->planetRadius + kAtmosphereTop);
+        shell =
+            Bounds3{centre - glm::vec3(top), centre + glm::vec3(top)};
+        reach = glm::length(view.eye - centre) + top;
+    }
+    Bounds3 box{view.eye, view.eye};
+    const auto add = [&](const glm::vec3& p) {
+        box.first = glm::min(box.first, p);
+        box.second = glm::max(box.second, p);
+    };
+    if (fit.around > 0.0f || view.IsOrthographic()) {
+        // A cube camera looks every way; an orthographic one's box is
+        // as wide as it is deep, near enough for this.
+        add(view.eye - glm::vec3(reach));
+        add(view.eye + glm::vec3(reach));
+    } else {
+        const glm::mat4 cameraToWorld = glm::inverse(view.view);
+        const float tanY = std::tan(0.5f * view.verticalFov);
+        const float tanX = tanY * view.aspect;
+        for (int i = 0; i < 4; ++i) {
+            add(glm::vec3(
+                cameraToWorld *
+                glm::vec4((i & 1 ? 1.0f : -1.0f) * tanX * reach,
+                          (i & 2 ? 1.0f : -1.0f) * tanY * reach,
+                          -reach, 1.0f)));
+        }
+    }
+    if (shell) {
+        box.first =
+            glm::clamp(box.first, shell->first, shell->second);
+        box.second =
+            glm::clamp(box.second, shell->first, shell->second);
+    }
+    return box;
 }
 
 void RasterRenderer::ReadDepthRange(std::uint32_t slot) {
@@ -6814,6 +6967,8 @@ void RasterRenderer::WriteShadingResources(
             ? texture(Kind::Texture2DArray, *volumeShadows)
             : 0xFFFFFFFFu;
     resources.volumeShadowSize = volumes_->ShadowSize();
+    resources.longRangeVisibility =
+        texture(Kind::Texture2DArray, longRange_->Visibility());
 
     // In the command stream, after the dispatches reading the last
     // and before those reading this.

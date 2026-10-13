@@ -219,8 +219,12 @@ struct ShadingResources {
     uint atmosphereRefraction;
     uint volumeShadows;
     uint volumeShadowSize;
-    // Each view's own uniforms, not read here.
+    // Each view's own uniforms and the materials' temperature models, not read here.
     uint2 viewBlocks;
+    uint2 temperatureMaterials;
+    // The distant lights' long-range visibility maps (an array).
+    uint longRangeVisibility;
+    uint padding0;
 }
 
 // The pass's own buffers (`VolumePass`): the volumes, their materials, each view's runs of
@@ -980,6 +984,76 @@ float geometryShadow(LightGpu light, float3 world, uint worldSlot, float mapTexe
     let at = min(uv * corner, float2(corner - 0.5 / mapTexels));
     return lightShadowMaps.SampleCmpLevelZero(lightShadowSampler, float3(at, float(view)),
                                               min(ndc.z, 0.99999994));
+}
+
+// The share of distant light `light`'s disc its long-range view's casters (such as moons) leave
+// `world`, at a band group's `wavelengths` (nm): shading.slang's `longRangeGroup`.
+static const float4 kLongRangeWavelengths = float4(300.0, 450.0, 800.0, 2400.0);
+
+float4 longRangeGroup(LightGpu light, float3 world, float4 wavelengths) {
+    if (light.position.w != 0.0 || light.map.z <= 0.0) {
+        return float4(1.0);
+    }
+    let clip = mul(lightViews[uint(light.map.z) - 1], float4(world, 1.0));
+    let uv = (float2(0.5 * clip.x + 0.5, 0.5 - 0.5 * clip.y) - light.beamExtra.yz) /
+             max(light.beamExtra.w, 1e-30);
+    if (clip.z < 1.0 || any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return float4(1.0);
+    }
+    let held = heapTextureArrays[shading.longRangeVisibility].SampleLevel(
+        tableSampler, float3(uv, light.map.w), 0.0);
+    float4 alphas;
+    for (uint i = 0; i < 4; ++i) {
+        alphas[i] = limbDarkening(kLongRangeWavelengths[i]);
+    }
+    float4 result;
+    for (uint k = 0; k < 4; ++k) {
+        let alpha = limbDarkening(wavelengths[k]);
+        result[k] = alpha >= alphas.x ? held.x : held.w;
+        for (uint i = 0; i < 3; ++i) {
+            if (alpha < alphas[i] && alpha >= alphas[i + 1]) {
+                result[k] = lerp(held[i + 1], held[i],
+                                 (alpha - alphas[i + 1]) / (alphas[i] - alphas[i + 1]));
+            }
+        }
+    }
+    return result;
+}
+
+// `longRangeGroup` for the air's marches (atmosphere.slang's `IAirShadow`): the long-range
+// shadows alone, the scene's near shadows left out of the air in front of the volumes.
+// Points km from the planet's centre `centre` (km from the frame's origin), the lights in
+// `slots` (`skyLightsOf`'s order).
+struct VolumeFarCasters : IAirShadow {
+    uint slots[kSkyLights];
+    float3 centre;
+
+    float atPoint(uint light, float3 point) {
+        return 1.0;
+    }
+
+    float4 eclipseAt(uint light, float3 point, float4 wavelengths) {
+        let world = (point + centre) * 1e3;
+        return longRangeGroup(shading.lights[slots[light]], world, wavelengths);
+    }
+}
+
+// The view's sky lights' (`skyLightsOf`'s order) long-range shadows in the air about the planet
+// centred `centre` (km).
+VolumeFarCasters volumeFarCasters(uint4 viewLights, uint lightCount, float3 centre) {
+    VolumeFarCasters casters;
+    casters.centre = centre;
+    uint count = 0;
+    for (uint k = 0; k < lightCount && count < kSkyLights; ++k) {
+        let light = shading.lights[viewLights.z + k];
+        if ((viewLights.x & (1u << k)) == 0 || uint(light.position.w) != kDistantLight ||
+            light.shadow.y >= 0.5) {
+            continue;
+        }
+        casters.slots[count] = viewLights.z + k;
+        ++count;
+    }
+    return casters;
 }
 
 // A laser's irradiance at `world` per unit of its spectrum, across a footprint of `footprint`
@@ -2205,13 +2279,19 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                     if (lit <= 0.0) {
                         continue;
                     }
-                    // A distant light through the air (not refracted, nor eclipsed).
+                    // A distant light through the air (not refracted, nor eclipsed by the
+                    // celestial bodies), and past the casters far towards it, such as moons
+                    // (`longRangeGroup`).
                     let throughAir =
                         uint(light.position.w) == kDistantLight && air[1].y != 0.0;
                     let tangent = light.extentY.w;
                     let sunSine = tangent * rsqrt(1.0 + tangent * tangent);
                     for (uint g = 0; g < groups; ++g) {
-                        var spectrum = light.spectrum[g] * reach.focus + light.tinted[g];
+                        var spectrum = (light.spectrum[g] * reach.focus + light.tinted[g]) *
+                                       longRangeGroup(light, world,
+                                                      range.x + (float4(g * 4) +
+                                                                 float4(0.5, 1.5, 2.5, 3.5)) *
+                                                                    range.y);
                         if (throughAir) {
                             spectrum *= sunTransmittance(atmosphereTransmittance, tableSampler,
                                                          world * 1e-3 - air[0].xyz,
@@ -2271,12 +2351,17 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         float start;
         float end;
         if (clipSegment(p, direction, front * 1e-3, top, start, end)) {
+            // Eclipsed by the casters far towards the lights (`longRangeGroup`).
+            let far = volumeFarCasters(viewLights, lightCount, air[0].xyz);
             for (uint g = 0; g < groups; ++g) {
-                scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                                   atmosphereTransmittance, atmosphereMultiple, tableSampler, p,
-                                   direction, max(start, 0.0), end,
-                                   skyLightsOf(viewLights, lightCount, g), noEclipse(), g,
-                                   airSteps(), airLight[g], airThrough[g]);
+                var eclipse = noEclipse();
+                eclipse.wavelengths =
+                    range.x + (float4(g * 4) + float4(0.5, 1.5, 2.5, 3.5)) * range.y;
+                scatterAlongLightsShadowed(
+                    atmosphereMedium, atmosphereDensities, atmospherePhases,
+                    atmosphereTransmittance, atmosphereMultiple, tableSampler, p, direction,
+                    max(start, 0.0), end, skyLightsOf(viewLights, lightCount, g), eclipse, g,
+                    airSteps(), far, airLight[g], airThrough[g]);
             }
         }
     }

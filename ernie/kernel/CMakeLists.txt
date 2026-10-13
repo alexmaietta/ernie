@@ -52,6 +52,7 @@ set(ernie_shaders
     raster/atmosphere_luts.slang=kAtmosphereLutsSlang
     raster/cull.slang=kCullSlang
     raster/depth_range.slang=kDepthRangeSlang
+    raster/long_range.slang=kLongRangeSlang
     raster/hzb.slang=kHzbSlang
     raster/instance_compose.slang=kInstanceComposeSlang
     raster/instance_bounds.slang=kInstanceBoundsSlang

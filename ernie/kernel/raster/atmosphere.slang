@@ -511,15 +511,21 @@ public struct SkyLights {
 }
 
 // What the scene lets of a sky light through to a point of the air (km from the planet's centre),
-// its shadows' (`scatterAlongLightsShadowed`): light shafts.
+// its shadows' (`scatterAlongLightsShadowed`): light shafts, `atPoint`, which dim the light's
+// single scattering; and the share of the light's disc that casters far towards it, such as moons,
+// leave at `wavelengths` (nm), `eclipseAt`, which dims all its light there.
 public interface IAirShadow {
     public float atPoint(uint light, float3 point);
+    public float4 eclipseAt(uint light, float3 point, float4 wavelengths);
 }
 
 // The air in no shadow.
 public struct NoAirShadow : IAirShadow {
     public float atPoint(uint light, float3 point) {
         return 1.0;
+    }
+    public float4 eclipseAt(uint light, float3 point, float4 wavelengths) {
+        return float4(1.0);
     }
 }
 
@@ -596,7 +602,8 @@ public void scatterAlongLightsShadowed<S : IAirShadow>(
                 multipleScattering(multipleTable, linear, r, dot(up, sun), group, bottom, top);
             source += lights.irradiance[i] *
                       (phased * toSun * shadow.atPoint(i, point) + scattering * multiple) *
-                      eclipseVisibility(eclipse, point, sun, sunSine);
+                      eclipseVisibility(eclipse, point, sun, sunSine) *
+                      shadow.eclipseAt(i, point, eclipse.wavelengths);
         }
         let sample = exp(-extinction * step);
         let fraction = select(extinction > 0.0, (1.0 - sample) / max(extinction, 1e-20),

@@ -330,6 +330,10 @@ struct ShadingResources {
     ShadingView* viewBlocks;
     // Each material's temperature model (`TemperatureMaterial`).
     TemperatureMaterial* temperatureMaterials;
+    // The distant lights' long-range visibility maps (long_range.slang's `visibilityMain`, an
+    // array), a layer each in `LightGpu::map.w`.
+    uint longRangeVisibility;
+    uint padding0;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -738,6 +742,61 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
             lerp(visibility, cascadeVisibility(light, first + at.cascade + 1, world, n), at.next);
     }
     return lerp(visibility, 1.0, at.out);
+}
+
+// The wavelengths (nm) the long-range visibility maps hold (`LongRangeShadows::kWavelengths`), and
+// their limb darkening exponents, between which a band's is interpolated.
+static const float4 kLongRangeWavelengths = float4(300.0, 450.0, 800.0, 2400.0);
+
+// The share of distant light `light`'s disc its long-range view's casters (such as moons) leave
+// `world`, at the visibility map's wavelengths (`longRangeAt` a band's): read from its visibility
+// map (long_range.slang), bilinear. 1 without a long-range view, off its map, or within its
+// casters' depths, a caster itself.
+float4 longRangeLight(LightGpu light, float3 world) {
+    if (light.position.w != 0.0 || light.map.z <= 0.0) {
+        return float4(1.0);
+    }
+    let clip = mul(lightViews[uint(light.map.z) - 1], float4(world, 1.0));
+    // In the visibility map's square of the view's (`beamExtra` yzw).
+    let uv = (float2(0.5 * clip.x + 0.5, 0.5 - 0.5 * clip.y) - light.beamExtra.yz) /
+             max(light.beamExtra.w, 1e-30);
+    if (clip.z < 1.0 || any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return float4(1.0);
+    }
+    return heapTextureArrays[resources.longRangeVisibility].SampleLevel(
+        tableSampler, float3(uv, light.map.w), 0.0);
+}
+
+// `longRangeLight` at a band group's `wavelengths` (nm).
+float4 longRangeGroup(LightGpu light, float3 world, float4 wavelengths) {
+    let held = longRangeLight(light, world);
+    if (all(held == float4(1.0))) {
+        return float4(1.0);
+    }
+    float4 result;
+    for (uint k = 0; k < 4; ++k) {
+        result[k] = longRangeAt(held, wavelengths[k]);
+    }
+    return result;
+}
+
+// The long-range visibility `held` at the maps' wavelengths, at `wavelength` (nm): linear in the
+// limb darkening exponent, on which the disc's weighting depends.
+float longRangeAt(float4 held, float wavelength) {
+    let alpha = limbDarkening(wavelength);
+    float4 alphas;
+    for (uint i = 0; i < 4; ++i) {
+        alphas[i] = limbDarkening(kLongRangeWavelengths[i]);
+    }
+    if (alpha >= alphas.x) {
+        return held.x;
+    }
+    for (uint i = 0; i < 3; ++i) {
+        if (alpha >= alphas[i + 1]) {
+            return lerp(held[i + 1], held[i], (alpha - alphas[i + 1]) / (alphas[i] - alphas[i + 1]));
+        }
+    }
+    return held.w;
 }
 
 // Unreal Engine's cascaded shadow maps' filtering, its defaults (shadow_cascades.h): comparisons
@@ -1899,8 +1958,9 @@ void bodiesSky(inout float radiance[kMaxBands], float3 eye, float3 d, float pixe
 // without an atmosphere. The sky lights it as isotropically over the part of the sky it faces,
 // (1 + cos tilt) / 2, of the sky's irradiance on level ground (the sky irradiance table); the
 // ground, Lambertian with the atmosphere's ground albedo and lit by the sun and the sky, over the
-// rest. Both dim as the celestial bodies eclipse the sun here, as if they eclipsed it for all the
-// air around: in a total eclipse's umbra this leaves out the twilight scattered in from beyond it.
+// rest. Both dim as the celestial bodies, and casters far towards the sun such as a moon of real
+// geometry, eclipse the sun here, as if they eclipsed it for all the air around: in a total
+// eclipse's umbra this leaves out the twilight scattered in from beyond it.
 //
 // References:
 // - B. Y. H. Liu and R. C. Jordan, "The long-term average performance of flat-plate solar-energy
@@ -1922,6 +1982,7 @@ void skyLight(float3 world, float3 normal, float visibility, out float light[kMa
     let r = max(length(p), bottom);
     let up = normalize(p);
     let facing = 0.5 * (1.0 + dot(normal, up));
+    let far = farCasters();
     for (uint group = 0; group * 4 < bands; ++group) {
         let sources = skyLights(group);
         let eclipse = bodiesEclipse(group, float3(0.0));
@@ -1937,8 +1998,11 @@ void skyLight(float3 world, float3 normal, float visibility, out float light[kMa
             let toSun = sunTransmittance(atmosphereTransmittance, tableSampler, up * bottom,
                                          towards, sine, group, bottom, top);
             let ground = albedo * (toSun * max(muSun, 0.0) + sky);
+            // Eclipsed as the bodies and the casters far towards the light (`farCasters`)
+            // eclipse it here.
             surround += sources.irradiance[i] * (sky * facing + ground * (1.0 - facing)) *
-                        eclipseVisibility(eclipse, world * 1e-3, towards, sine);
+                        eclipseVisibility(eclipse, world * 1e-3, towards, sine) *
+                        far.eclipseAt(i, p, groupWavelengths(group));
         }
         surround *= visibility / PI;
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
@@ -2082,6 +2146,32 @@ struct SunShafts : IAirShadow {
         let world = (point + sh.atmosphere[0].xyz) * 1e3;
         return airSunVisibility(lights[slots[light]], world);
     }
+
+    float4 eclipseAt(uint light, float3 point, float4 wavelengths) {
+        let world = (point + sh.atmosphere[0].xyz) * 1e3;
+        return longRangeGroup(lights[slots[light]], world, wavelengths);
+    }
+}
+
+// `SunShafts` without the shafts: the long-range shadows alone, for marches that leave the scene's
+// near shadows out, such as a refracted ray's along the horizon.
+struct FarCasters : IAirShadow {
+    uint slots[kSkyLights];
+
+    float atPoint(uint light, float3 point) {
+        return 1.0;
+    }
+
+    float4 eclipseAt(uint light, float3 point, float4 wavelengths) {
+        let world = (point + sh.atmosphere[0].xyz) * 1e3;
+        return longRangeGroup(lights[slots[light]], world, wavelengths);
+    }
+}
+
+FarCasters farCasters() {
+    FarCasters casters;
+    casters.slots = sunShafts().slots;
+    return casters;
 }
 
 SunShafts sunShafts() {
@@ -2465,25 +2555,31 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
                     !grazingGround) {
                     float4 light;
                     float4 through;
-                    scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                                       atmosphereTransmittance, atmosphereMultiple, tableSampler,
-                                       p, along, grazingStart, grazingEnd, sources, eclipse, group,
-                                       kSkySteps, light, through);
+                    scatterAlongLightsShadowed(
+                        atmosphereMedium, atmosphereDensities, atmospherePhases,
+                        atmosphereTransmittance, atmosphereMultiple, tableSampler, p, along,
+                        grazingStart, grazingEnd, sources, eclipse, group, kSkySteps,
+                        farCasters(), light, through);
                     scattered = select(escapes, light, scattered);
                     transmittance = select(escapes, through, transmittance);
                 }
             }
         }
-        // A light's disc smaller than the pixel shows dimmed by the bodies as a whole, from the
-        // eye; a larger one shows where no body covers it.
+        // A light's disc smaller than the pixel shows dimmed by the bodies, and the casters far
+        // towards it (`longRangeGroup`), as a whole, from the eye; a larger one shows where no
+        // body covers it, and the casters drawn before it hide it.
         bool resolved[kSkyLights];
         float4 eyeVisible[kSkyLights];
+        let far = farCasters();
         for (uint i = 0; i < sources.count; ++i) {
             let sine = sources.towards[i].w;
             resolved[i] = pixelSolidAngle <= PI * sine * sine;
             eyeVisible[i] = resolved[i] || !anyBodies()
                                 ? float4(1.0)
                                 : eclipseVisibility(eclipse, p, sources.towards[i].xyz, sine);
+            if (!resolved[i]) {
+                eyeVisible[i] *= far.eclipseAt(i, p, eclipse.wavelengths);
+            }
         }
         for (uint k = 0; k < 4; ++k) {
             let band = group * 4 + k;
@@ -3213,12 +3309,16 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 continue;
             }
             float3 lightSpectrum;
+            // Past the casters far towards it, such as moons (`longRangeLight`).
+            let farCasters = longRangeLight(lights[shv.view.z + k], world);
             for (uint j = 0; j < 3; ++j) {
                 let band = min(first + j, bands - 1);
                 lightSpectrum[j] = spectrumBand(k, band) * lightFocus[k] + tintedBand(k, band);
                 if (throughAir && any(apparentLights[k] != 0.0)) {
                     lightSpectrum[j] *= distantLightThrough(k, world, apparentLights[k], band);
                 }
+                lightSpectrum[j] *=
+                    longRangeAt(farCasters, sh.range.x + (float(band) + 0.5) * sh.range.y);
             }
             // A dome's direction stands for its diffuse light alone: the model's diffuse
             // response to surrounding light times cos(i), as a Lambertian radiance factor (the

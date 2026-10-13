@@ -8,6 +8,7 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/raster/atmosphere_luts.h"
 #include "ernie/raster/drawable.h"
+#include "ernie/raster/long_range_shadows.h"
 #include "ernie/raster/material.h"
 #include "ernie/raster/minimal_targets.h"
 #include "ernie/raster/overlay_pass.h"
@@ -1037,6 +1038,16 @@ class RasterRenderer {
     /// recent frame of the same stream saw from about the same pose
     /// (`seen_`), and the volumes' bounds, which write no depth.
     float FitCascadeDistance(const FrameParams& params) const;
+    /// The box of what `cascadeFit_`'s view may see shadowed by the
+    /// long-range views (`FitLongRangeView`): with an atmosphere, the
+    /// view's frustum through its shell, whose sky and aerial
+    /// perspective march the air; without, out to the cascades'
+    /// casters' reach (`kLongRangeStart`).
+    Bounds3 LongRangeReceivers(const FrameParams& params) const;
+    /// The world centre of the planet whose atmosphere shadows its
+    /// own light (`ShadowCasters::skipPlanet`), out of the long-range
+    /// views; none without an atmosphere.
+    std::optional<glm::dvec3> atmospherePlanet_;
     std::optional<CascadeFit> cascadeFit_;
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;
@@ -1413,6 +1424,12 @@ class RasterRenderer {
         atmosphere_;  ///< The planet's atmosphere and its tables.
     std::unique_ptr<VolumePass>
         volumes_;  ///< The Volumes and their grids.
+    /// The distant lights' long-range views' casters' share of their
+    /// discs (`LongRangeShadows`), and the frame's views to
+    /// integrate, a visibility layer each, in the lights'
+    /// `LightGpu::map.w`.
+    std::unique_ptr<LongRangeShadows> longRange_;
+    std::vector<LongRangeShadows::View> longRangeViews_;
     std::unique_ptr<ComputePipeline> occlusionPipeline_;
     std::unique_ptr<ComputePipeline> occlusionFilterPipeline_;
     mutable std::array<std::unique_ptr<GpuImage>, 2> occlusion_;
