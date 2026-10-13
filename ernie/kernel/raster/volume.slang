@@ -2090,9 +2090,10 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                 lerp(behindT, t,
                                      saturate((material.phase.z - behindRho) /
                                               max(rho - behindRho, 1e-6)));
-                            scattered = collectorScattering(volume, lightMapFrameOf(volume),
-                                                            origin + direction * tSurface,
-                                                            -direction, depth, litSurface);
+                            scattered = collectorScattering(
+                                volume, lightMapFrameOf(volume), origin + direction * tSurface,
+                                -direction, depth, hasCache(volume, slot) ? slot : kNoSun,
+                                litSurface);
                             declined = scattered < 0.0;
                             scattered = declined ? 0.0
                                                  : scattered * transmittance *
@@ -3103,6 +3104,11 @@ bool slabAt(LightMapFrame frame, float3 p, float3 toEye, float sunDepth, float3 
     slab.depth = clamp(depth, 0.0, slab.thickness) / max(slab.thickness, 1e-6);
     slab.foot = p - inward * (depth / slab.kappa);
     slab.muV = dot(toEye, inward);
+    // The eye sees `p` from outside the cloud, so on the slab's face towards it: the far face
+    // where it looks from beyond the slab, the lit one where from the light's side (as computed
+    // where it looks along the slab).
+    slab.depth = slab.muV > 0.0 ? max(slab.depth, smoothstep(0.0, 0.25, slab.muV))
+                                : min(slab.depth, 1.0 - smoothstep(0.0, 0.25, -slab.muV));
     var alongLight = -frame.towards - slab.muL * inward;
     let alongLength = length(alongLight);
     slab.along = alongLength > 1e-4 ? alongLight / alongLength
@@ -3123,7 +3129,66 @@ bool slabAt(LightMapFrame frame, float3 p, float3 toEye, float sunDepth, float3 
 // `sunDepth` is `p`'s optical depth towards the light; `lit` the lit surface straight towards the
 // light from `p`, for what shadows it.
 float collectorScattering(VolumeGpu volume, LightMapFrame frame, float3 p, float3 toEye,
-                          float sunDepth, out float3 lit) {
+                          float sunDepth, uint slot, out float3 lit) {
+    // `p`'s own piece of cloud: towards the light as far as a gap (the density below half the
+    // surface's), its optical depth that far; what lies past the gap (another cloud) only
+    // shadows it, letting through what a conservative slab of its depth does, diffusely, and
+    // blurred across the light over ten mean free paths (with the lighting cache, `slot`), as
+    // light scattered many times spreads past its shadow's edge.
+    let local = localDepth(volume, p, frame.towards, sunDepth);
+    float through = shadowThrough(sunDepth - local);
+    if (slot != kNoSun) {
+        let reach = 10.0 / max(volume.params.x, 1e-9);
+        for (uint k = 0; k < 4; ++k) {
+            let across = ((k & 1u) != 0 ? -reach : reach) * ((k & 2u) != 0 ? frame.e2 : frame.e1);
+            let tap = cachedDepth(volume, slot, localOf(volume, p + across));
+            through += shadowThrough(max(tap - local, 0.0));
+        }
+        through /= 5.0;
+    }
+    return collectorsOfPiece(volume, frame, p, toEye, local, lit) * through;
+}
+
+// What a conservative cloud of optical depth `depth` lets through: straight, or diffusely
+// (`kDiffuseTransport`), the more.
+float shadowThrough(float depth) {
+    return max(exp(-depth), 1.0 / (1.0 + kDiffuseTransport * depth));
+}
+
+// The diffusion approximation's 3 / 4 (1 - g) for cloud droplets' phase function, its forward
+// peak folded away (g about 0.85): a conservative slab of optical depth tau lets through
+// 1 / (1 + it tau).
+//
+// Reference: J. H. Joseph, W. J. Wiscombe and J. A. Weinman, "The delta-Eddington approximation
+// for radiative flux transfer", Journal of the Atmospheric Sciences 33(12), 1976.
+static const float kDiffuseTransport = 0.11;
+
+// The optical depth from `p` (relative to the frame's origin) along unit `towards` through
+// instance `volume`'s density as far as its first gap (two steps below half its material's
+// surface density), or `whole` (its optical depth through everything) without one near.
+float localDepth(VolumeGpu volume, float3 p, float3 towards, float whole) {
+    let surface = volumeMaterials[volume.info.x].phase.z;
+    var accessor = accessorOf(volume.density);
+    let o = localOf(volume, p);
+    let d = float3(dot(volume.toLocal[0].xyz, towards), dot(volume.toLocal[1].xyz, towards),
+                   dot(volume.toLocal[2].xyz, towards));
+    let dt = 2.0 * volume.params.w;
+    float depth = 0.0;
+    uint below = 0;
+    for (uint i = 1; i <= 64; ++i) {
+        let rho = max(sampleField(volume.density, o + d * (float(i) * dt), accessor), 0.0);
+        below = rho < 0.5 * surface ? below + 1 : 0;
+        if (below >= 2) {
+            return min(depth, whole);
+        }
+        depth += rho * volume.params.x * dt;
+    }
+    return whole;
+}
+
+// `collectorScattering` for `p`'s own piece of cloud, `sunDepth` its optical depth in it.
+float collectorsOfPiece(VolumeGpu volume, LightMapFrame frame, float3 p, float3 toEye,
+                        float sunDepth, out float3 lit) {
     let texel = 2.0 * frame.radius / float(frame.size);
     let rel = p - frame.centre;
     let at = float2(dot(rel, frame.e1), dot(rel, frame.e2));
