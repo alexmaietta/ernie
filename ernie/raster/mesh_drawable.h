@@ -38,6 +38,10 @@ struct DeviceInstanceData {
     Tensor orientations;
     Tensor scales;
     Tensor colors;
+    /// Kelvin per instance, and whether each is drawn (0 hides it):
+    /// one float each, as `InstanceData`'s.
+    Tensor temperatures;
+    Tensor visible;
     /// Bounds of the instances in the instancer's frame, prototypes
     /// included, as USD's `extent`; without them the positions and
     /// scales are copied to the host to compute bounds.
@@ -930,6 +934,8 @@ class MeshDrawable : public RasterDrawable {
     /// Whether an instancer colours its instances, in place of its
     /// prototypes' colours; composed ones do not.
     static bool HasInstanceColors(const Instancer& instancer);
+    static bool HasInstanceTemperatures(const Instancer& instancer);
+    static bool HasInstanceVisibility(const Instancer& instancer);
     /// What draws and cull items read of `instancer` besides its
     /// halves' bases: its first slot, and which arrays it has.
     static std::uint64_t LayoutOf(const Instancer& instancer);
@@ -1306,6 +1312,9 @@ class MeshDrawable : public RasterDrawable {
     /// Linear RGB per instance, laid out as `scales_`; 1 where an
     /// instancer has none.
     std::shared_ptr<GpuBuffer> instanceColors_;
+    /// Instances' temperatures and visibility, halves as the others'.
+    std::shared_ptr<GpuBuffer> instanceTemperatures_;
+    std::shared_ptr<GpuBuffer> instanceVisible_;
     /// Meshes' points and triangle indices in use (int32 pairs), by
     /// `Mesh::countSlot`; read by the vertex and bounds shaders.
     std::shared_ptr<GpuBuffer> activeCounts_;

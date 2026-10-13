@@ -1486,3 +1486,53 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
     ASSERT_EQ(drawn.Elements(), alone.Elements());
     EXPECT_LE(near(drawn, alone), 2);
 }
+
+TEST_F(RasterDelegateTest, ColumnsOfVisibilityHideAndShowInstances) {
+    const std::vector<Path> cubes = {"/World/Cube0", "/World/Cube1",
+                                     "/World/Cube2"};
+    const auto scene = [&](bool column, bool middleHidden) {
+        Scene built = MeshScene();
+        std::vector<float> rows;
+        for (int i = 0; i < 3; ++i) {
+            const auto cube = cubes[static_cast<std::size_t>(i)];
+            ernie::Cube::Define(built, cube).SetSize(4.0);
+            const glm::dvec3 at(-8.0 + 8.0 * i, -6.0, 0.0);
+            ernie::SetXform(built, cube, {.translate = at});
+            rows.insert(rows.end(), {static_cast<float>(at.x),
+                                     static_cast<float>(at.y), 0.0f});
+        }
+        if (column) {
+            built.GetColumn(ernie::PrimSet(cubes), tokens::kTranslate)
+                .Write(Tensor::Copy<float>(rows, {3, 3}));
+            const std::vector<float> shown = {1.0f,
+                                              middleHidden ? 0.0f : 1.0f,
+                                              1.0f};
+            built.GetColumn(ernie::PrimSet(cubes), tokens::kVisibility)
+                .Write(Tensor::Copy<float>(shown, {3}));
+        } else if (middleHidden) {
+            ernie::Cube(built, cubes[1]).SetVisibility(tokens::kInvisible);
+        }
+        return built;
+    };
+    const auto worst = [](const Tensor& a, const Tensor& b) {
+        int most = 0;
+        for (std::int64_t i = 0; i < a.Elements(); ++i) {
+            most = std::max(most, std::abs(int{a.As<std::uint8_t>()[i]} -
+                                           int{b.As<std::uint8_t>()[i]}));
+        }
+        return most;
+    };
+    // Hidden by its row, then shown again by the column written anew.
+    Scene columns = scene(true, true);
+    RasterDelegate delegate(*context_);
+    const Tensor hidden = delegate.Render(columns);
+    RasterDelegate alone(*context_);
+    EXPECT_LE(worst(hidden, alone.Render(scene(false, true))), 2);
+    const std::vector<float> all = {1.0f, 1.0f, 1.0f};
+    columns.GetColumn(ernie::PrimSet(cubes), tokens::kVisibility)
+        .Write(Tensor::Copy<float>(all, {3}));
+    const Tensor shown = delegate.Render(columns);
+    RasterDelegate every(*context_);
+    EXPECT_LE(worst(shown, every.Render(scene(false, false))), 2);
+    EXPECT_GT(worst(hidden, shown), 50) << "the middle cube came back";
+}

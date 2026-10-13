@@ -41,6 +41,10 @@ constexpr std::uint32_t kHasTemperatures = 256;
 /// (`SetNodeIds`, `SetNodeTemperatures`).
 constexpr std::uint32_t kHasNodes = 512;
 constexpr std::uint32_t kHasTangents = 1024;
+/// Instanced: temperatures per instance in place of the draw's own,
+/// and whether each instance is drawn.
+constexpr std::uint32_t kHasInstanceTemperatures = 2048;
+constexpr std::uint32_t kHasInstanceVisibility = 4096;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -419,8 +423,12 @@ struct MeshResources {
     /// Smooth tangents per point of the meshes an anisotropic
     /// material shades (`MeshDrawable::tangents_`).
     VkDeviceAddress tangents;
+    /// Instances' temperatures and visibility
+    /// (`MeshDrawable::instanceTemperatures_`, `instanceVisible_`).
+    VkDeviceAddress instanceTemperatures;
+    VkDeviceAddress instanceVisible;
 };
-static_assert(sizeof(MeshResources) == 136,
+static_assert(sizeof(MeshResources) == 152,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -480,6 +488,14 @@ void CheckInstances(const InstanceData& data) {
     if (!data.colors.empty() && data.colors.size() != 3 * count) {
         throw std::invalid_argument(
             "Instance colours must have 3 values per instance");
+    }
+    if (!data.temperatures.empty() && data.temperatures.size() != count) {
+        throw std::invalid_argument(
+            "Instance temperatures must have 1 value per instance");
+    }
+    if (!data.visible.empty() && data.visible.size() != count) {
+        throw std::invalid_argument(
+            "Instance visibility must have 1 value per instance");
     }
 }
 
@@ -2089,6 +2105,18 @@ bool MeshDrawable::HasInstanceColors(const Instancer& instancer) {
                               : !instancer.data.colors.empty();
 }
 
+bool MeshDrawable::HasInstanceTemperatures(const Instancer& instancer) {
+    return !instancer.composed &&
+           (instancer.onDevice ? !instancer.device.temperatures.Empty()
+                               : !instancer.data.temperatures.empty());
+}
+
+bool MeshDrawable::HasInstanceVisibility(const Instancer& instancer) {
+    return !instancer.composed &&
+           (instancer.onDevice ? !instancer.device.visible.Empty()
+                               : !instancer.data.visible.empty());
+}
+
 std::uint32_t MeshDrawable::AddInstancer(InstanceData data) {
     CheckInstances(data);
     const std::uint32_t handle = nextHandle_++;
@@ -2189,6 +2217,17 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
             3 * count) {
             throw std::invalid_argument(
                 "Instance colours must have 3 values per instance");
+        }
+    }
+    for (const auto& [array, what] :
+         {std::pair{&data.temperatures, "Instance temperatures"},
+          std::pair{&data.visible, "Instance visibility"}}) {
+        if (!array->Empty()) {
+            CheckDeviceTensor(*array, 1, what);
+            if (static_cast<std::size_t>(array->Elements()) != count) {
+                throw std::invalid_argument(
+                    std::string(what) + " must have 1 value per instance");
+            }
         }
     }
     Instancer& target = it->second;
@@ -2760,6 +2799,8 @@ void MeshDrawable::RebuildInstances() {
     std::vector<float> orientations;
     std::vector<float> scales;
     std::vector<float> colors;
+    std::vector<float> temperatures;
+    std::vector<float> visible;
     for (auto& [handle, instancer] : instancers_) {
         instancer.first =
             static_cast<std::uint32_t>(positions.size() / 3);
@@ -2792,19 +2833,35 @@ void MeshDrawable::RebuildInstances() {
         } else {
             colors.resize(colors.size() + 3 * count, 1.0f);
         }
+        if (host && data.temperatures.size() == count) {
+            temperatures.insert(temperatures.end(),
+                                data.temperatures.begin(),
+                                data.temperatures.end());
+        } else {
+            temperatures.resize(temperatures.size() + count, 0.0f);
+        }
+        if (host && data.visible.size() == count) {
+            visible.insert(visible.end(), data.visible.begin(),
+                           data.visible.end());
+        } else {
+            visible.resize(visible.size() + count, 1.0f);
+        }
     }
     vkDeviceWaitIdle(context_.Device());
     // Both halves start with the arrays; each instancer's are in half
     // 0 and stand still.
     instanceTotal_ = static_cast<std::uint32_t>(positions.size() / 3);
     for (std::vector<float>* array :
-         {&positions, &orientations, &scales, &colors}) {
+         {&positions, &orientations, &scales, &colors, &temperatures,
+          &visible}) {
         array->insert(array->end(), array->begin(), array->end());
     }
     positions_ = Pool(std::as_bytes(std::span(positions)));
     orientations_ = Pool(std::as_bytes(std::span(orientations)));
     scales_ = Pool(std::as_bytes(std::span(scales)));
     instanceColors_ = Pool(std::as_bytes(std::span(colors)));
+    instanceTemperatures_ = Pool(std::as_bytes(std::span(temperatures)));
+    instanceVisible_ = Pool(std::as_bytes(std::span(visible)));
     for (auto& [handle, instancer] : instancers_) {
         instancer.set = 0;
         instancer.moving = false;
@@ -3137,6 +3194,15 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
                                    first * 3 * sizeof(float),
                                    device.stream);
         }
+        if (!device.temperatures.Empty()) {
+            compute_->CopyToBuffer(device.temperatures,
+                                   *instanceTemperatures_,
+                                   first * sizeof(float), device.stream);
+        }
+        if (!device.visible.Empty()) {
+            compute_->CopyToBuffer(device.visible, *instanceVisible_,
+                                   first * sizeof(float), device.stream);
+        }
         instancer.inPlace = {};
         return;
     }
@@ -3158,6 +3224,16 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
         uploads.Write(*instanceColors_,
                       std::as_bytes(std::span(data.colors)),
                       first * 3 * sizeof(float));
+    }
+    if (!data.temperatures.empty()) {
+        uploads.Write(*instanceTemperatures_,
+                      std::as_bytes(std::span(data.temperatures)),
+                      first * sizeof(float));
+    }
+    if (!data.visible.empty()) {
+        uploads.Write(*instanceVisible_,
+                      std::as_bytes(std::span(data.visible)),
+                      first * sizeof(float));
     }
 }
 
@@ -3476,6 +3552,11 @@ void MeshDrawable::WriteDraws() {
             flags |= item.vertexColors && HasInstanceColors(instancer)
                          ? kHasInstanceColors
                          : 0u;
+            flags |= HasInstanceTemperatures(instancer)
+                         ? kHasInstanceTemperatures
+                         : 0u;
+            flags |= HasInstanceVisibility(instancer) ? kHasInstanceVisibility
+                                                      : 0u;
             const std::uint32_t first = instancer.first;
             draw.points[3] = first;
             for (const std::uint32_t instance : item.instances) {
@@ -3847,7 +3928,9 @@ void MeshDrawable::WriteResources() {
             address(temperatures_),
             address(nodeIds_),
             address(nodeTemperatures_),
-            address(tangents_)};
+            address(tangents_),
+            address(instanceTemperatures_),
+            address(instanceVisible_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);
@@ -4500,7 +4583,9 @@ std::uint64_t MeshDrawable::LayoutOf(const Instancer& instancer) {
            std::uint64_t{orientations} << 0 |
            std::uint64_t{scales} << 1 |
            std::uint64_t{HasInstanceColors(instancer)} << 2 |
-           std::uint64_t{instancer.composed} << 3;
+           std::uint64_t{instancer.composed} << 3 |
+           std::uint64_t{HasInstanceTemperatures(instancer)} << 4 |
+           std::uint64_t{HasInstanceVisibility(instancer)} << 5;
 }
 
 bool MeshDrawable::CullItemsKept() const {

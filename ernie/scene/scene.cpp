@@ -1331,9 +1331,15 @@ bool Scene::IsVisible(const Path& path) const {
     const Value* visibility = Get(path, tokens::kVisibility);
     const std::string* token =
         visibility != nullptr ? visibility->Get<std::string>() : nullptr;
+    // As a column's row, 0 hides it.
+    double row = 1.0;
+    const bool hidden = token != nullptr
+                            ? *token == tokens::kInvisible
+                            : GetRow(*this, path, tokens::kVisibility,
+                                     {&row, 1}) &&
+                                  row == 0.0;
     const Path parent = path.Parent();
-    prim.visible = !(token != nullptr && *token == tokens::kInvisible) &&
-                   (parent.IsEmpty() || IsVisible(parent));
+    prim.visible = !hidden && (parent.IsEmpty() || IsVisible(parent));
     prim.visibleAt = version_;
     return prim.visible;
 }

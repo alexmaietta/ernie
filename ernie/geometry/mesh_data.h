@@ -73,6 +73,11 @@ struct InstanceData {
     std::vector<float> colors;  ///< Empty, or linear RGB per
                                 ///< instance, in place of the
                                 ///< prototypes' colours.
+    /// Empty, or kelvin per instance, in place of the prototypes' own
+    /// temperatures.
+    std::vector<float> temperatures;
+    /// Empty, or per instance whether it is drawn (0 hides it).
+    std::vector<float> visible;
 };
 
 }  // namespace ernie

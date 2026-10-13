@@ -17,8 +17,9 @@
 
 // clang-format off
 #define ERNIE_IMAGEABLE_ATTRIBUTES(X)                                                              \
-    X(std::string, Visibility, ::ernie::tokens::kVisibility, "inherited",                          \
-      (::ernie::AttributeMeta{.doc = "\"invisible\" hides the prim and its descendants.",          \
+    X(::ernie::OrArray<std::string>, Visibility, ::ernie::tokens::kVisibility, "inherited",        \
+      (::ernie::AttributeMeta{.doc = "\"invisible\" hides the prim and its descendants; as an "    \
+                                     "array (a column's row), 0 hides them.",                      \
                               .group = "Prim",                                                     \
                               .options = {::ernie::tokens::kInherited,                             \
                                           ::ernie::tokens::kInvisible},                            \

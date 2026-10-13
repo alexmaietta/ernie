@@ -27,6 +27,11 @@ static const uint kHasTemperatures = 256;
 static const uint kHasNodes = 512;
 // Smooth tangents per point, for anisotropic materials, in place of a triangle's own.
 static const uint kHasTangents = 1024;
+// Instanced: kelvin per instance in place of the draw's own (`instanceTemperatures`).
+static const uint kHasInstanceTemperatures = 2048;
+// Instanced: whether each instance is drawn (`instanceVisible`); a hidden one's triangles have
+// no area.
+static const uint kHasInstanceVisibility = 4096;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -87,6 +92,10 @@ struct MeshResources {
     float* nodeTemperatures;
     // Smooth tangents per point (`kHasTangents`), as `normals`.
     float* tangents;
+    // Kelvin per instance (`kHasInstanceTemperatures`), and whether each instance is drawn
+    // (`kHasInstanceVisibility`, 0 hides it), double-buffered as `scales`.
+    float* instanceTemperatures;
+    float* instanceVisible;
 }
 [[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
 static float* points = meshResources.points;
@@ -106,6 +115,8 @@ static float* temperatures = meshResources.temperatures;
 static uint* nodeIds = meshResources.nodeIds;
 static float* nodeTemperatures = meshResources.nodeTemperatures;
 static float* tangents = meshResources.tangents;
+static float* instanceTemperatures = meshResources.instanceTemperatures;
+static float* instanceVisible = meshResources.instanceVisible;
 // The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
 // normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
 // the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
@@ -238,11 +249,15 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
         dead = at / 3 >= uint(max(activeCounts[2 * slot + 1], 0)) / 3 || indices[first] >= points ||
                indices[first + 1] >= points || indices[first + 2] >= points;
     }
-    let corner = dead ? 0u : indices[d.offsets.x + call.indexOffset + vertexIndex];
-    let index = d.offsets.y + corner;
     let instance = (flags & kInstanced) != 0
                        ? instanceIds[d.offsets.z + call.instanceOffset + instanceIndex]
                        : 0u;
+    // A hidden instance draws as dead triangles.
+    if ((flags & kHasInstanceVisibility) != 0 && instanceVisible[d.motion.x + instance] == 0.0) {
+        dead = true;
+    }
+    let corner = dead ? 0u : indices[d.offsets.x + call.indexOffset + vertexIndex];
+    let index = d.offsets.y + corner;
     let now = placeVertex(d, corner, instance, d.motion.z, d.motion.x, d.model);
     MeshVertex v;
     v.world = now.world;
@@ -264,6 +279,8 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
         v.kelvin = temperatures[index];
     } else if ((flags & kHasNodes) != 0) {
         v.kelvin = nodeTemperatures[d.uv.w + nodeIds[index]];
+    } else if ((flags & kHasInstanceTemperatures) != 0) {
+        v.kelvin = instanceTemperatures[d.motion.x + instance];
     }
     v.uv = float2(0.0);
     if ((flags & kHasUvs) != 0) {
@@ -647,11 +664,13 @@ GBuffer meshGBuffer(VertexOutput in) {
         cascadeTint(in.color * textured.albedo * detail.albedo, in.world));
     let unlit = hiddenLine();
     GBuffer out;
-    // Its temperature: its points' or their nodes' (a solver's), else its own, else its material's
+    // Its temperature: its points' or their nodes' (a solver's), or its instance's, else its own,
+    // else its material's
     // thermal texture's (`thermalTextureSlot`: a thermal inertia below 0), else 0 for the
     // material's.
     let thermal = (d.offsets.w & kThermal) != 0;
-    let solved = (d.offsets.w & (kHasTemperatures | kHasNodes)) != 0;
+    let solved =
+        (d.offsets.w & (kHasTemperatures | kHasNodes | kHasInstanceTemperatures)) != 0;
     var kelvin = thermal && solved && in.kelvin > 0.0 ? in.kelvin : d.tint.a;
     if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs)) {
         kelvin = thermalTextureSlot(imageUv(in.uv));

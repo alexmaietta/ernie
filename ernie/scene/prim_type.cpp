@@ -124,8 +124,11 @@ glm::dvec4 AttributeTraits<glm::dvec4>::Read(const Scene& scene,
                                              std::string_view name,
                                              glm::dvec4 fallback) {
     const Value* value = scene.Get(path, name);
-    return value != nullptr ? From(*value).value_or(fallback)
-                            : fallback;
+    if (value == nullptr) {
+        glm::dvec4 row = fallback;
+        return GetRow(scene, path, name, {&row[0], 4}) ? row : fallback;
+    }
+    return From(*value).value_or(fallback);
 }
 
 std::optional<glm::dvec4>
@@ -144,8 +147,14 @@ glm::dquat AttributeTraits<glm::dquat>::Read(const Scene& scene,
                                              std::string_view name,
                                              glm::dquat fallback) {
     const Value* value = scene.Get(path, name);
-    return value != nullptr ? From(*value).value_or(fallback)
-                            : fallback;
+    if (value == nullptr) {
+        // A row as arrays of quaternions hold them: x, y, z, w.
+        std::array<double, 4> row{};
+        return GetRow(scene, path, name, row)
+                   ? glm::dquat(row[3], row[0], row[1], row[2])
+                   : fallback;
+    }
+    return From(*value).value_or(fallback);
 }
 
 std::optional<glm::dquat>
@@ -520,7 +529,18 @@ void CheckValue(const AttributeDef& def, const PrimTypeDef* type,
             ": " + std::string(message));
     };
     if (value == nullptr) {
-        if (def.kind != AttributeKind::Tensor && !def.meta.array) {
+        // Numbers take an array of their own numbers too: a column's
+        // row (`Column`), which their readers read (`GetRow`).
+        const bool numbers =
+            def.kind == AttributeKind::Bool ||
+            def.kind == AttributeKind::Int ||
+            def.kind == AttributeKind::Double ||
+            def.kind == AttributeKind::Vec2 ||
+            def.kind == AttributeKind::Vec3 ||
+            def.kind == AttributeKind::Vec4 ||
+            def.kind == AttributeKind::Quat;
+        if (def.kind != AttributeKind::Tensor && !def.meta.array &&
+            !numbers) {
             fail("'" + std::string(def.name) +
                  "' takes one value, not an array; set it");
         }

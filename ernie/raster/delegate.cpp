@@ -388,6 +388,19 @@ void SetBetween(InstanceParent& parent, const glm::dmat4& between) {
 
 /// Whether `change` is to a camera or render prim, or to the stage's
 /// metadata, which the frame resolves anew anyway.
+bool IsViewChange(const Scene& scene, const Change& change);
+
+/// Whether `rows` can be a posed group's instance channel of
+/// `attribute` (`GpuXformGroup::Channels`): contiguous float32, a row
+/// of 3 per instance for colours, of 1 for temperatures and
+/// visibility.
+bool IsInstanceChannel(const Tensor& rows, std::string_view attribute) {
+    const std::int64_t width = attribute == tokens::kDisplayColor ? 3 : 1;
+    return rows.Type() == DType::Float32 && rows.IsContiguous() &&
+           rows.Rank() >= 1 && rows.Rank() <= 2 &&
+           (rows.Rank() == 2 ? rows.Shape()[1] == width : width == 1);
+}
+
 bool IsViewChange(const Scene& scene, const Change& change) {
     // The stage's metadata on the root, such as the time code a
     // timeline plays every frame: read each frame, or not at all.
@@ -2940,25 +2953,23 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
         Path path;
         GpuXform pose;
     };
-    // The members' constant colours as rows of one array (a column),
-    // each at its pose's row: the group's instance colours.
-    const auto columnColors = [&scene](const std::vector<Member>& members) {
+    // The members' `attribute` as rows of one array (a column), each
+    // at its pose's row: one of the group's instance channels.
+    const auto columnChannel = [&scene](const std::vector<Member>& members,
+                                        std::string_view attribute) {
         const Tensor* whole = nullptr;
         for (const Member& member : members) {
             const std::pair<Tensor, std::int64_t>* row =
-                scene.RowOf(member.path, tokens::kDisplayColor);
+                scene.RowOf(member.path, attribute);
             if (row == nullptr || row->second != member.pose.row ||
                 (whole != nullptr && row->first.Data() != whole->Data())) {
                 return Tensor();
             }
             whole = &row->first;
         }
-        if (whole == nullptr || whole->Type() != DType::Float32 ||
-            whole->Rank() != 2 || whole->Shape()[1] != 3 ||
-            !whole->IsContiguous()) {
-            return Tensor();
-        }
-        return *whole;
+        return whole != nullptr && IsInstanceChannel(*whole, attribute)
+                   ? *whole
+                   : Tensor();
     };
     // Prims sharing arrays (one `Scene::Write` of many paths), then
     // each group by its first prim.
@@ -3098,7 +3109,7 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
                 }
                 for (const std::string_view attribute :
                      {kXformOpOrder, kXformExtent, kQuaternionOrder,
-                      kDisplayColor}) {
+                      kDisplayColor, kThermalTemperature, kVisibility}) {
                     version += scene.AttributeVersion(member.path,
                                                       attribute);
                 }
@@ -3155,7 +3166,10 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
             for (const auto& [op, whole] : first.ops) {
                 group.ops.push_back(op);
             }
-            group.colors = composed ? Tensor() : columnColors(members);
+            for (const auto& [attribute, channel] : group.Channels()) {
+                *channel =
+                    composed ? Tensor() : columnChannel(members, attribute);
+            }
             // Versions count within one scene: another scene's prims
             // at the same paths upload.
             if (version != group.version || group.version == 0 ||
@@ -3242,12 +3256,16 @@ void RasterDelegate::UploadGpuXformGroup(GpuXformGroup& group,
     data.extent = group.extent;
     data.stream = pose.stream;
     data.orientationsWFirst = pose.wFirst;
-    // Its prims' constant colours, a column of them, as instance colours.
-    if (!group.colors.Empty()) {
-        data.colors = group.colors.Location().kind == DeviceKind::Cpu
-                          ? compute.Upload(group.colors)
-                          : group.colors;
-    }
+    // Its prims' colours, temperatures and visibility, columns of
+    // them, as instance channels.
+    const auto onDevice = [&compute](const Tensor& channel) {
+        return channel.Empty() || channel.Location().kind != DeviceKind::Cpu
+                   ? channel
+                   : compute.Upload(channel);
+    };
+    data.colors = onDevice(group.colors);
+    data.temperatures = onDevice(group.temperatures);
+    data.visible = onDevice(group.visible);
     if (group.handle == 0) {
         group.handle = meshes_.AddInstancer({});
     }
@@ -3480,18 +3498,20 @@ bool RasterDelegate::RefreshGpuXforms(
             return false;
         }
         Touched& seen = touched[&group];
-        if (column.attribute == tokens::kDisplayColor) {
-            // The group's instance colours, taken whole.
+        // One of the group's instance channels, taken whole.
+        const auto channels = group.Channels();
+        const auto channel = std::ranges::find(
+            channels, column.attribute,
+            &std::pair<std::string_view, Tensor*>::first);
+        if (channel != channels.end()) {
             const std::pair<Tensor, std::int64_t>* row =
                 scene.RowOf(paths.front(), column.attribute);
             if (group.composed || row == nullptr ||
-                row->first.Type() != DType::Float32 ||
-                row->first.Rank() != 2 || row->first.Shape()[1] != 3 ||
                 row->first.Shape()[0] != group.rows ||
-                !row->first.IsContiguous()) {
+                !IsInstanceChannel(row->first, column.attribute)) {
                 return false;
             }
-            group.colors = row->first;
+            *channel->second = row->first;
             if (seen.path == nullptr) {
                 seen.path = &paths.front();
             }
@@ -4225,11 +4245,22 @@ RasterDelegate::Items(const Scene& scene,
     };
 
     // Each mesh's own draw, none when hidden or in a prototype.
-    const auto build =
-        [&](const Path& path,
-            const SyncedMesh& synced) -> std::optional<MeshItem> {
-        if (synced.handle == 0 || inPrototypes_.contains(path) ||
-            !scene.IsVisible(path)) {
+    const auto build = [&](const Path& path, const SyncedMesh& synced)
+        -> std::optional<MeshItem> {
+        if (synced.handle == 0 || inPrototypes_.contains(path)) {
+            return std::nullopt;
+        }
+        // Under a group whose visibility is a column, hidden on the GPU
+        // (`GpuXformGroup::visible`), so drawn while what is above its
+        // prim shows it.
+        const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path);
+        const auto posed =
+            anchor ? gpuPosed_.find(anchor->at) : gpuPosed_.end();
+        const bool channelled = posed != gpuPosed_.end() &&
+                                !posed->second.group->visible.Empty();
+        if (channelled ? !anchor->at.Parent().IsEmpty() &&
+                             !scene.IsVisible(anchor->at.Parent())
+                       : !scene.IsVisible(path)) {
             return std::nullopt;
         }
         // Drawn by `spheres_` (`UpdatePrims`).
@@ -4238,8 +4269,7 @@ RasterDelegate::Items(const Scene& scene,
         }
         MeshItem item;
         item.mesh = synced.handle;
-        if (const std::optional<GpuAnchor> anchor =
-                GpuAnchorOf(scene, path)) {
+        if (anchor) {
             // Under a prim posed on the GPU: an instance of its group
             // (composed under any GPU-posed prims above it), between
             // the world transform of its frame (on the CPU) and the

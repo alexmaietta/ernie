@@ -11,11 +11,38 @@
 
 namespace ernie {
 
+bool GetRow(const Scene& scene, const Path& path,
+            std::string_view attribute, std::span<double> numbers) {
+    const Tensor* tensor = scene.Read(path, attribute);
+    if (tensor == nullptr || tensor->Location().kind != DeviceKind::Cpu ||
+        static_cast<std::size_t>(tensor->Elements()) != numbers.size()) {
+        return false;
+    }
+    const Tensor row = tensor->Contiguous();
+    for (std::size_t i = 0; i < numbers.size(); ++i) {
+        switch (row.Type()) {
+        case DType::Float32:
+            numbers[i] = row.As<float>()[i];
+            break;
+        case DType::Float64:
+            numbers[i] = row.As<double>()[i];
+            break;
+        case DType::Int32:
+            numbers[i] = row.As<std::int32_t>()[i];
+            break;
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
 double GetNumber(const Scene& scene, const Path& path,
                  std::string_view attribute, double fallback) {
     const Value* value = scene.Get(path, attribute);
     if (value == nullptr) {
-        return fallback;
+        double row = fallback;
+        return GetRow(scene, path, attribute, {&row, 1}) ? row : fallback;
     }
     if (const auto* d = value->Get<double>()) {
         return *d;
@@ -33,7 +60,9 @@ bool GetBool(const Scene& scene, const Path& path,
              std::string_view attribute, bool fallback) {
     const Value* value = scene.Get(path, attribute);
     if (value == nullptr) {
-        return fallback;
+        double row = 0.0;
+        return GetRow(scene, path, attribute, {&row, 1}) ? row != 0.0
+                                                         : fallback;
     }
     if (const auto* b = value->Get<bool>()) {
         return *b;
@@ -48,7 +77,9 @@ glm::dvec2 GetVec2(const Scene& scene, const Path& path,
                    std::string_view attribute, glm::dvec2 fallback) {
     const Value* value = scene.Get(path, attribute);
     if (value == nullptr) {
-        return fallback;
+        glm::dvec2 row = fallback;
+        return GetRow(scene, path, attribute, {&row[0], 2}) ? row
+                                                            : fallback;
     }
     if (const auto* d = value->Get<glm::dvec2>()) {
         return *d;
@@ -66,7 +97,9 @@ glm::dvec3 GetVec3(const Scene& scene, const Path& path,
                    std::string_view attribute, glm::dvec3 fallback) {
     const Value* value = scene.Get(path, attribute);
     if (value == nullptr) {
-        return fallback;
+        glm::dvec3 row = fallback;
+        return GetRow(scene, path, attribute, {&row[0], 3}) ? row
+                                                            : fallback;
     }
     if (const auto* d = value->Get<glm::dvec3>()) {
         return *d;

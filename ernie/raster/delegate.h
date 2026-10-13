@@ -13,6 +13,7 @@
 #include "ernie/raster/renderer.h"
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/light_links.h"
 #include "ernie/session/outputs.h"
@@ -425,9 +426,20 @@ class RasterDelegate : public RenderDelegate {
         /// under and the CPU transforms between.
         bool composed = false;
         std::vector<InstanceParent> parents;
-        /// Its prims' constant colours as rows of one array (a column
-        /// of `primvars:displayColor`), if they are: instance colours.
+        /// Its prims' constant colours, temperatures and visibility as
+        /// rows of one array each (columns of `primvars:displayColor`,
+        /// `ernie:thermal:temperature`, `visibility`), if they are:
+        /// instance channels.
         Tensor colors;
+        Tensor temperatures;
+        Tensor visible;
+
+        /// Each channel by the attribute its column is of.
+        std::array<std::pair<std::string_view, Tensor*>, 3> Channels() {
+            return {{{tokens::kDisplayColor, &colors},
+                     {tokens::kThermalTemperature, &temperatures},
+                     {tokens::kVisibility, &visible}}};
+        }
     };
     /// A prim posed on the GPU: its group (in `gpuXformGroups_`), its
     /// instancer and its row there, and the prim whose world

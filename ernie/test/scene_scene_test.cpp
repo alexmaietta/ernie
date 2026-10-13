@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/scene.h"
+#include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 
@@ -456,6 +457,39 @@ TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
                                 tokens::kTranslate)
                      .Map({ernie::DeviceKind::Cuda, 0}),
                  std::invalid_argument);
+}
+
+TEST(Scene, ColumnsOfAnyNumberReadAsTheirPrimsValues) {
+    Scene scene;
+    for (const char* path : {"/A", "/A/Child", "/B"}) {
+        scene.Define(path, tokens::kCube);
+    }
+    const ernie::PrimSet cubes({"/A", "/B"});
+    // A number, a vector and visibility, each a column.
+    const std::array<float, 2> kelvin{300.0f, 450.0f};
+    scene.GetColumn(cubes, tokens::kThermalTemperature)
+        .Write(Tensor::Copy<float>(kelvin, {2}));
+    const std::array<float, 6> colours{1, 0, 0, 0, 0, 1};
+    scene.GetColumn(cubes, tokens::kDisplayColor)
+        .Write(Tensor::Copy<float>(colours, {2, 3}));
+    const std::array<float, 2> shown{0.0f, 1.0f};
+    scene.GetColumn(cubes, tokens::kVisibility)
+        .Write(Tensor::Copy<float>(shown, {2}));
+    EXPECT_DOUBLE_EQ(ernie::GetNumber(scene, "/B",
+                                      tokens::kThermalTemperature, 0.0),
+                     450.0);
+    EXPECT_EQ(ernie::GetVec3(scene, "/B", tokens::kDisplayColor,
+                             glm::dvec3(0.5)),
+              glm::dvec3(0.0, 0.0, 1.0));
+    EXPECT_FALSE(scene.IsVisible("/A"));
+    EXPECT_FALSE(scene.IsVisible("/A/Child")) << "hiding its descendants";
+    EXPECT_TRUE(scene.IsVisible("/B"));
+    // Written again whole, read anew.
+    const std::array<float, 2> swapped{1.0f, 0.0f};
+    scene.GetColumn(cubes, tokens::kVisibility)
+        .Write(Tensor::Copy<float>(swapped, {2}));
+    EXPECT_TRUE(scene.IsVisible("/A/Child"));
+    EXPECT_FALSE(scene.IsVisible("/B"));
 }
 
 TEST(Scene, RemovalsAndRetypesAreReported) {
