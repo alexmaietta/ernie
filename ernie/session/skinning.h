@@ -62,6 +62,11 @@ std::optional<SkinBinding> SkinBindingOf(const Scene& scene,
 /// A Skeleton posed at a time.
 struct SkeletonPose {
     std::vector<std::string> joints;
+    /// Each joint's parent's index in `joints`, or -1 for a root.
+    std::vector<int> parents;
+    /// Each joint's posed transform in the skeleton's space, as the
+    /// viewport's skeleton overlay draws it.
+    std::vector<glm::mat4> skelSpace;
     /// Each joint's skinning transform (skeleton space).
     std::vector<glm::mat4> skinning;
     glm::dmat4 world{1.0};

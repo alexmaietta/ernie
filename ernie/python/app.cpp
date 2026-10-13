@@ -256,6 +256,9 @@ void BindApp(nb::module_& parent) {
                 "Every light's gizmo.")
         .def_rw("cameras", &ViewportDisplay::cameras,
                 "Every scene camera's frustum.")
+        .def_rw("skeletons", &ViewportDisplay::skeletons,
+                "Every Skeleton's bones and joints, posed at the "
+                "time code.")
         .def_rw("grid", &ViewportDisplay::grid,
                 "A grid on the ground (z = 0).")
         .def_rw("selection", &ViewportDisplay::selection,

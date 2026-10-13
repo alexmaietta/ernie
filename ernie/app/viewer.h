@@ -91,8 +91,11 @@ struct ViewportDisplay {
     bool lights = false;  ///< Every light's gizmo: its shape and the
                           ///< direction it shines; off by default.
     bool cameras = true;  ///< Every scene camera's frustum.
-    bool grid = false;    ///< A grid on the ground (z = 0) with the x
-                          ///< and y axes.
+    bool skeletons = false;  ///< Every Skeleton's bones and joints,
+                             ///< posed at the time code; off by
+                             ///< default.
+    bool grid = false;  ///< A grid on the ground (z = 0) with the x
+                        ///< and y axes.
     bool selection = true;  ///< The selection's outline.
     bool overlays =
         true;  ///< The scene's overlays (`Scene::GetOverlay`).

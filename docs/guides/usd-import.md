@@ -107,6 +107,8 @@ The file's `startTimeCode`, `endTimeCode`, `timeCodesPerSecond` and `framesPerSe
 
 Ernie poses skinned meshes on the GPU at the stage's `ernie:timeCode`: the CPU samples each skeleton's animation once a frame, and a compute pass adds the weighted blend shapes and blends the joints' transforms, linearly (`classicLinear`) or as dual quaternions (`dualQuaternion`), as UsdSkel defines them. A skinned subdivision surface is posed at its control points, then refined by weights OpenSubdiv gives once, so it stays the limit surface of its posed cage. Normals follow from the posed triangles. `ernie::SkinnedPoints` (`ernie/session/skinning.h`) does the same on the CPU.
 
+The viewer's eye menu shows skeletons under Show By Type (`ViewportDisplay.skeletons`, off by default): each Skeleton's bones, as octahedra from each joint's parent to the joint, and a dot on each joint, posed at the time code and drawn over the meshes they move. A selected skeleton, or one under a selected prim, draws brighter.
+
 ## Time samples
 
 Animated attributes come in as their time samples in Ernie's Scene, which holds each attribute's value at the stage's time code: transforms (a character's root motion, a moving part), visibility, point caches (a mesh's sampled `points`), and every other attribute the Ernie prim declares, such as a camera's focal length and apertures, a light's intensity and colour, a shape's size or a shader's inputs. An animated attribute Ernie's prim lacks is read at one time, with a warning.

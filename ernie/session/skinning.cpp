@@ -185,7 +185,8 @@ SkeletonPose SkeletonPoseOf(const Scene& scene,
     const Skeleton skeleton(scene, skeletonPath);
     SkeletonPose pose;
     pose.joints = skeleton.GetJoints();
-    const std::vector<int> parents = JointParents(pose.joints);
+    pose.parents = JointParents(pose.joints);
+    const std::vector<int>& parents = pose.parents;
     const std::vector<glm::mat4> binds = MatricesOf(
         FloatsOf(scene, skeletonPath, tokens::kBindTransforms));
     if (binds.size() != pose.joints.size()) {
@@ -243,8 +244,8 @@ SkeletonPose SkeletonPoseOf(const Scene& scene,
             pose.blendShapeIndex.emplace(pose.blendShapes[s], s);
         }
     }
-    pose.skinning = SkinningTransforms(
-        SkelSpaceTransforms(parents, locals), binds);
+    pose.skelSpace = SkelSpaceTransforms(parents, locals);
+    pose.skinning = SkinningTransforms(pose.skelSpace, binds);
     pose.world = scene.WorldTransform(skeletonPath);
     return pose;
 }

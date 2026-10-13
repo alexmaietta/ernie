@@ -8,6 +8,7 @@
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/skel_schemas.h"
 #include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/util/profiler.h"
@@ -1485,4 +1486,54 @@ TEST_F(ViewerTest, LoadingKeepsAViewTheApplicationAimed) {
     EXPECT_GT(glm::distance(eyeOf(), glm::dvec3(30.0, 0.0, 5.0)), 1.0)
         << "framed, not left where the last view was";
     EXPECT_LT(glm::length(eyeOf()), 30.0);
+}
+
+TEST_F(ViewerTest, SkeletonsDrawPosedAtTheTimeCode) {
+    // A root and a tip 2 above it; the root slides 3 along x from
+    // time code 0 to 10.
+    const std::vector<float> identity = {1, 0, 0, 0, 0, 1, 0, 0,
+                                         0, 0, 1, 0, 0, 0, 0, 1};
+    std::vector<float> binds = identity;
+    binds.insert(binds.end(), identity.begin(), identity.end());
+    binds[30] = 2.0f;  // the tip's translation z
+    ernie::Skeleton::Define(scene_, "/World/Skel")
+        .SetJoints({"Root", "Root/Tip"})
+        .SetBindTransforms(Tensor::Copy<float>(binds, {2, 4, 4}))
+        .SetAnimationSource("/World/Skel/Slide");
+    ernie::SkelAnimation::Define(scene_, "/World/Skel/Slide")
+        .SetJoints({"Root", "Root/Tip"})
+        .SetTimes(
+            Tensor::Copy<float>(std::vector<float>{0.0f, 10.0f}, {2}))
+        .SetTranslations(Tensor::Copy<float>(
+            std::vector<float>{0, 0, 0, 0, 0, 2, 3, 0, 0, 0, 0, 2},
+            {2, 2, 3}))
+        .SetRotations(Tensor::Copy<float>(
+            std::vector<float>{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0,
+                               0, 0, 1},
+            {2, 2, 4}))
+        .SetScales(Tensor::Copy<float>(std::vector<float>(12, 1.0f),
+                                       {2, 2, 3}));
+    ViewportDisplay display = viewer_->GetViewportDisplay();
+    display.grid = display.lights = display.cameras = false;
+    viewer_->SetViewportDisplay(display);
+    viewer_->Step();
+    EXPECT_TRUE(scene_.GetOverlay("__viewport").Empty())
+        << "skeletons are off by default";
+
+    display.skeletons = true;
+    viewer_->SetViewportDisplay(display);
+    const auto tipDrawnAt = [&](const glm::dvec3& tip) {
+        const Overlay& overlay = scene_.GetOverlay("__viewport");
+        return std::ranges::any_of(
+            overlay.Segments(), [&](const OverlaySegment& segment) {
+                return glm::distance(segment.b, tip) < 1e-4;
+            });
+    };
+    viewer_->Step();
+    EXPECT_TRUE(tipDrawnAt({0.0, 0.0, 2.0}));
+    ernie::Stage(scene_).SetTimeCode(10.0);
+    viewer_->Step();
+    EXPECT_TRUE(tipDrawnAt({3.0, 0.0, 2.0}))
+        << "the bones follow the time code";
+    EXPECT_FALSE(tipDrawnAt({0.0, 0.0, 2.0}));
 }

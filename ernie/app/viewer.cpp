@@ -30,6 +30,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
+#include "ernie/session/skinning.h"
 #include "ernie/util/disk_cache.h"
 #include "ernie/util/image.h"
 #include "ernie/util/log.h"
@@ -100,6 +101,8 @@ constexpr glm::vec4 kLampColor{0.98f, 0.82f, 0.30f, 1.0f};
 constexpr glm::vec4 kLampDimColor{0.78f, 0.68f, 0.36f, 0.75f};
 /// Camera frusta's grey, and the grid's.
 constexpr glm::vec4 kCameraGizmoColor{0.72f, 0.76f, 0.78f, 0.8f};
+constexpr glm::vec4 kBoneColor{0.46f, 0.70f, 0.94f, 0.75f};
+constexpr glm::vec4 kSelectedBoneColor{0.70f, 0.88f, 1.0f, 1.0f};
 constexpr glm::vec4 kGridColor{0.55f, 0.58f, 0.60f, 0.35f};
 
 /// Pixels the mouse may move between press and release for a click (a
@@ -587,6 +590,7 @@ struct Viewer::State {
         bool grid = false;
         bool lights = false;
         bool cameras = false;
+        bool skeletons = false;
         bool selection = false;
         std::vector<Path> selected;
         Path camera;
@@ -2071,7 +2075,8 @@ struct Viewer::State {
     /// selection's outline draws selected lights brighter.
     void UpdateViewportOverlay() {
         Overlay& overlay = scene.GetOverlay(kViewportOverlay);
-        if (!display.grid && !display.lights && !display.cameras) {
+        if (!display.grid && !display.lights && !display.cameras &&
+            !display.skeletons) {
             if (!overlay.Empty()) {
                 overlay.Clear();
             }
@@ -2079,17 +2084,13 @@ struct Viewer::State {
         }
         // Drawn again only when what it shows may have changed, so a
         // still view changes nothing (eco mode, `EcoPause`).
-        ViewportOverlayKey key{scene.Version(),
-                               overlay.Version(),
-                               display.grid,
-                               display.lights,
-                               display.cameras,
-                               display.selection,
-                               selection,
-                               activeCamera,
-                               contentScale,
-                               controller.target,
-                               controller.distance};
+        ViewportOverlayKey key{
+            scene.Version(),   overlay.Version(),
+            display.grid,      display.lights,
+            display.cameras,   display.skeletons,
+            display.selection, selection,
+            activeCamera,      contentScale,
+            controller.target, controller.distance};
         if (key == viewportOverlayKey) {
             return;
         }
@@ -2127,6 +2128,9 @@ struct Viewer::State {
                     DrawCameraFrustum(overlay, path, style);
                 }
             }
+        }
+        if (display.skeletons) {
+            DrawSkeletons(overlay);
         }
         key.overlay = overlay.Version();
         viewportOverlayKey = std::move(key);
@@ -2172,6 +2176,82 @@ struct Viewer::State {
             style.color = {0.42f, 0.72f, 0.34f, 0.8f};
             overlay.Line({0.0, centre.y - half, 0.0},
                          {0.0, centre.y + half, 0.0}, style);
+        }
+    }
+
+    /// Every Skeleton posed at the time code, as usdview and Blender
+    /// draw them: an octahedral bone from each joint's parent to the
+    /// joint, and a dot on each joint, over the meshes they move.
+    /// Those selected, or under a selected prim, draw brighter.
+    void DrawSkeletons(Overlay& overlay) {
+        const double time = ernie::Stage(scene).GetTimeCode();
+        OverlayStyle style;
+        style.width = 1.0f * contentScale;
+        style.size = 5.0f * contentScale;
+        style.depth = OverlayDepth::Always;
+        std::vector<glm::dvec3> joints;
+        std::vector<glm::dvec3> endpoints;
+        for (const Path& path : scene.Prims(tokens::kSkeleton)) {
+            if (IsSessionPath(path)) {
+                continue;
+            }
+            SkeletonPose pose;
+            try {
+                pose = SkeletonPoseOf(scene, path, time);
+            } catch (const std::exception&) {
+                continue;  // a skeleton that cannot pose draws
+                           // nothing
+            }
+            joints.clear();
+            for (const glm::mat4& joint : pose.skelSpace) {
+                joints.emplace_back(pose.world *
+                                    glm::dmat4(joint)[3]);
+            }
+            endpoints.clear();
+            for (std::size_t j = 0; j < joints.size(); ++j) {
+                if (pose.parents[j] >= 0) {
+                    AddBone(endpoints,
+                            joints[static_cast<std::size_t>(
+                                pose.parents[j])],
+                            joints[j]);
+                }
+            }
+            const bool selected =
+                display.selection &&
+                std::ranges::any_of(selection, [&](const Path& s) {
+                    return path.HasPrefix(s);
+                });
+            style.color = selected ? kSelectedBoneColor : kBoneColor;
+            overlay.Lines(endpoints, style);
+            overlay.Markers(joints, style);
+        }
+    }
+
+    /// An octahedral bone's edges from `head` to `tail`: its waist a
+    /// tenth of the way along, a tenth of its length across.
+    static void AddBone(std::vector<glm::dvec3>& endpoints,
+                        const glm::dvec3& head,
+                        const glm::dvec3& tail) {
+        const glm::dvec3 along = tail - head;
+        const double length = glm::length(along);
+        if (length <= 0.0) {
+            return;
+        }
+        const glm::dvec3 axis = along / length;
+        const glm::dvec3 other = std::abs(axis.z) < 0.9
+                                     ? glm::dvec3(0.0, 0.0, 1.0)
+                                     : glm::dvec3(1.0, 0.0, 0.0);
+        const glm::dvec3 u =
+            0.1 * length * glm::normalize(glm::cross(axis, other));
+        const glm::dvec3 v = glm::cross(axis, u);
+        const glm::dvec3 waist = head + 0.1 * along;
+        const glm::dvec3 corners[] = {waist + u, waist + v, waist - u,
+                                      waist - v};
+        for (std::size_t k = 0; k < 4; ++k) {
+            endpoints.insert(endpoints.end(),
+                             {head, corners[k], corners[k],
+                              corners[(k + 1) % 4], corners[k],
+                              tail});
         }
     }
 
@@ -2741,6 +2821,7 @@ struct Viewer::State {
         if (menu::BeginSubmenu("Show By Type")) {
             menu::Check("Lights", &display.lights);
             menu::Check("Cameras", &display.cameras);
+            menu::Check("Skeletons", &display.skeletons);
             ImGui::EndMenu();
         }
         ImGui::Separator();
