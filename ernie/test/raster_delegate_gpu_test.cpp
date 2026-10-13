@@ -1418,3 +1418,54 @@ TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
     ernie::Xform(scene, "/World/Group").SetWorld(1);
     expectFresh("its group's world");
 }
+
+TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
+    const auto scene = [](bool column, float lift) {
+        Scene built = MeshScene();
+        std::vector<Path> cubes;
+        std::vector<float> rows;
+        for (int i = 0; i < 3; ++i) {
+            const Path cube("/World/Cube" + std::to_string(i));
+            ernie::Cube::Define(built, cube).SetSize(4.0);
+            const glm::dvec3 at(-8.0 + 8.0 * i, -6.0,
+                                static_cast<double>(lift) * i);
+            ernie::SetXform(built, cube, {.translate = at});
+            cubes.push_back(cube);
+            rows.insert(rows.end(), {static_cast<float>(at.x),
+                                     static_cast<float>(at.y),
+                                     static_cast<float>(at.z)});
+        }
+        if (column) {
+            built.GetColumn(ernie::PrimSet(cubes), tokens::kTranslate)
+                .Write(Tensor::Copy<float>(rows, {3, 3}));
+        }
+        return built;
+    };
+    const auto near = [](const Tensor& a, const Tensor& b) {
+        int worst = 0;
+        for (std::int64_t i = 0; i < a.Elements(); ++i) {
+            worst = std::max(worst, std::abs(int{a.As<std::uint8_t>()[i]} -
+                                             int{b.As<std::uint8_t>()[i]}));
+        }
+        return worst;
+    };
+    // Written as a column twice, kept in step with the second.
+    Scene columns = scene(true, 0.0f);
+    RasterDelegate delegate(*context_);
+    delegate.Render(columns);
+    std::vector<float> lifted;
+    for (int i = 0; i < 3; ++i) {
+        lifted.insert(lifted.end(), {-8.0f + 8.0f * static_cast<float>(i),
+                                     -6.0f, 2.0f * static_cast<float>(i)});
+    }
+    columns
+        .GetColumn(ernie::PrimSet({"/World/Cube0", "/World/Cube1",
+                                   "/World/Cube2"}),
+                   tokens::kTranslate)
+        .Write(Tensor::Copy<float>(lifted, {3, 3}));
+    const Tensor drawn = delegate.Render(columns);
+    RasterDelegate fresh(*context_);
+    const Tensor alone = fresh.Render(scene(false, 2.0f));
+    ASSERT_EQ(drawn.Elements(), alone.Elements());
+    EXPECT_LE(near(drawn, alone), 2);
+}
