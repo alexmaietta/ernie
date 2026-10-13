@@ -601,7 +601,8 @@ class RasterDelegate : public RenderDelegate {
     /// new arrays and returns true; false when a full `Sync` is
     /// needed.
     bool RefreshGpuXforms(const Scene& scene,
-                          std::span<const Change> changes);
+                          std::span<const Change> changes,
+                          std::span<const ColumnChange> columns = {});
     /// The views of `cameras` as views posed under GPU-posed prims
     /// (`AnchoredView`), one per camera; none when no camera is under
     /// a GPU-posed prim (their transforms are on the CPU).

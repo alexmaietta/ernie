@@ -3173,7 +3173,8 @@ RasterDelegate::AnchoredViewsOf(const Scene& scene,
 }
 
 bool RasterDelegate::RefreshGpuXforms(
-    const Scene& scene, std::span<const Change> changes) {
+    const Scene& scene, std::span<const Change> changes,
+    std::span<const ColumnChange> columns) {
     ERNIE_ZONE("Refresh GPU transforms");
     // Thousands of prims change every step: each costs a few lookups,
     // and only one prim of each group is checked in full.
@@ -3231,6 +3232,44 @@ bool RasterDelegate::RefreshGpuXforms(
         } else if (!IsViewChange(scene, change)) {
             return false;
         }
+    }
+    // Columns written whole: a group's transform op, its rows in the
+    // group's order (its first and last prims checked), all of them.
+    for (const ColumnChange& column : columns) {
+        const std::vector<Path>& paths = *column.paths;
+        const auto first = gpuPosed_.find(paths.front());
+        const auto last = gpuPosed_.find(paths.back());
+        if (column.bits != Dirty::Transform || first == gpuPosed_.end() ||
+            last == gpuPosed_.end() ||
+            first->second.group != last->second.group) {
+            return false;
+        }
+        GpuXformGroup& group = *first->second.group;
+        const auto op = std::ranges::find(group.ops, column.attribute);
+        if (op == group.ops.end() || group.members != paths.size() ||
+            first->second.row != 0 ||
+            std::size_t{last->second.row} + 1 != paths.size() ||
+            scene.AttributeVersion(paths.front(), tokens::kXformOpOrder) >
+                syncedVersion_) {
+            return false;
+        }
+        Touched& seen = touched[&group];
+        const auto index =
+            static_cast<std::size_t>(op - group.ops.begin());
+        const std::pair<Tensor, std::int64_t>* row =
+            scene.RowOf(paths.front(), column.attribute);
+        if (row == nullptr || index >= seen.arrays.size()) {
+            return false;
+        }
+        if (seen.path != nullptr && seen.arrays[index] != nullptr &&
+            seen.arrays[index] != row->first.Data()) {
+            return false;
+        }
+        seen.arrays[index] = row->first.Data();
+        if (seen.path == nullptr) {
+            seen.path = &paths.front();
+        }
+        seen.rewritten = std::max(seen.rewritten, paths.size());
     }
     // Every prim of each touched group rewritten, from arrays of the
     // group's rows (checked in full for one prim): its draws stand as
@@ -3682,8 +3721,11 @@ void RasterDelegate::Sync(const Scene& scene) {
         sceneId_ = scene.Id();
         cursor_.version = scene.Version();
     } else {
+        // Columns written whole (a simulation's bodies every step) come
+        // whole, expanded only when a full sync needs their prims.
+        std::vector<ColumnChange> columns;
         const std::vector<Change>& changes =
-            changed.emplace(scene.Changes(cursor_));
+            changed.emplace(scene.Changes(cursor_, columns));
         // Changes only to cameras and render prims, such as a batch's
         // poses and worlds every step, leave the synced materials,
         // terrain, meshes and draws as they are (lights and settings
@@ -3692,18 +3734,26 @@ void RasterDelegate::Sync(const Scene& scene) {
             (skinned_ || sampledInstancers_) &&
             scene.AttributeVersion(Path::Root(), tokens::kTimeCode) !=
                 posedTimeCode_;
-        if (!posing && std::all_of(changes.begin(), changes.end(),
-                                   [&scene](const Change& change) {
-                                       return IsViewChange(scene,
-                                                           change);
-                                   })) {
+        const auto view = [&scene](const Change& change) {
+            return IsViewChange(scene, change);
+        };
+        if (!posing && std::ranges::all_of(changes, view) &&
+            std::ranges::all_of(columns, [&](const ColumnChange& column) {
+                return std::ranges::all_of(*column.paths,
+                                           [&](const Path& path) {
+                                               return view({path, column.bits});
+                                           });
+            })) {
             return;
         }
         // So does a simulation step that only rewrites the arrays of
         // prims posed on the GPU: the drawable takes the new arrays.
-        if (!posing && RefreshGpuXforms(scene, changes)) {
+        if (!posing && RefreshGpuXforms(scene, changes, columns)) {
             renderer_.MarkCastersChanged();
             return;
+        }
+        if (!columns.empty()) {
+            *changed = scene.ExpandColumns(changes, columns);
         }
         // Posing moves meshes the changes do not name.
         if (posing) {

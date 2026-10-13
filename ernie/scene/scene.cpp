@@ -262,7 +262,80 @@ void Scene::Stamp(const Path& path, PrimData& prim,
     if (TargetDirties().contains(attribute)) {
         dependentsStale_ = true;
     }
+    // Written alone, a column's row is the prim's own again.
+    if (!prim.bound.empty()) {
+        if (const auto bound = prim.bound.find(attribute);
+            bound != prim.bound.end()) {
+            const std::uint64_t column = bound->second.column;
+            prim.bound.erase(bound);
+            BreakColumn(column);
+        }
+    }
     Stamp(path, prim, DirtyOf(attribute), IsInherited(attribute));
+}
+
+void Scene::Refresh(const PrimData& prim,
+                    std::string_view attribute) const {
+    if (prim.bound.empty()) {
+        return;
+    }
+    const auto bound = prim.bound.find(attribute);
+    if (bound == prim.bound.end()) {
+        return;
+    }
+    const auto found = columns_.find(bound->second.column);
+    if (found == columns_.end() ||
+        bound->second.seen >= found->second.version) {
+        return;
+    }
+    const Column& column = found->second;
+    const std::int64_t row = bound->second.row;
+    const auto assign = [&](auto& map, auto value) {
+        if (const auto it = map.find(attribute); it != map.end()) {
+            it->second = std::move(value);
+        } else {
+            map.emplace(std::string(attribute), std::move(value));
+        }
+    };
+    assign(prim.tensors, column.rows.Row(row));
+    assign(prim.streams, column.stream);
+    assign(prim.rows, std::pair(column.rows, row));
+    bound->second.seen = column.version;
+}
+
+void Scene::BreakColumn(std::uint64_t id) {
+    const auto found = columns_.find(id);
+    if (found == columns_.end()) {
+        return;
+    }
+    const Column column = std::move(found->second);
+    columns_.erase(found);
+    columnOf_.erase(column.key);
+    const Dirty bit = DirtyOf(column.attribute);
+    const bool descendants = IsInherited(column.attribute);
+    for (const Path& path : *column.paths) {
+        const auto it = prims_.find(path);
+        if (it == prims_.end()) {
+            continue;
+        }
+        PrimData& prim = it->second;
+        const auto bound = prim.bound.find(column.attribute);
+        if (bound == prim.bound.end() || bound->second.column != id) {
+            continue;
+        }
+        // Its row as the column last held it, its own from now.
+        if (bound->second.seen < column.version) {
+            prim.tensors[column.attribute] =
+                column.rows.Row(bound->second.row);
+            prim.streams[column.attribute] = column.stream;
+            prim.rows[column.attribute] =
+                std::pair(column.rows, bound->second.row);
+        }
+        prim.bound.erase(bound);
+        std::uint64_t& version = prim.versions[column.attribute];
+        version = std::max(version, column.version);
+        Stamp(path, prim, bit, descendants);
+    }
 }
 
 Scene::PrimData& Scene::CreateIfMissing(const Path& path) {
@@ -286,6 +359,15 @@ Prim Scene::Define(const Path& path, std::string_view type) {
     PrimData& prim = CreateIfMissing(path);
     if (prim.type != type) {
         if (existed) {
+            // Its rows of columns gone, the columns end.
+            std::vector<std::uint64_t> columns;
+            for (const auto& [name, bound] : prim.bound) {
+                columns.push_back(bound.column);
+            }
+            prim.bound.clear();
+            for (const std::uint64_t column : columns) {
+                BreakColumn(column);
+            }
             prim.values.clear();
             prim.tensors.clear();
             prim.versions.clear();
@@ -588,9 +670,29 @@ void Scene::Unmap(const Path& path, std::string_view attribute,
     Stamp(path, prim, attribute);
 }
 
+Scene::Column* Scene::ColumnOf(const PrimSet& prims,
+                               std::string_view attribute) {
+    if (prims.id_ == 0 || prims.sceneId_ != Id() ||
+        prims.removals_ != removals_ ||
+        prims.prims_.size() != prims.Size()) {
+        return nullptr;
+    }
+    const auto of =
+        columnOf_.find(std::pair(prims.id_, std::string(attribute)));
+    return of != columnOf_.end() ? &columns_.at(of->second) : nullptr;
+}
+
 void Scene::Unmap(const PrimSet& prims, std::string_view attribute,
                   std::uintptr_t stream) {
     ERNIE_ZONE("Scene unmap rows");
+    // A column written in place: its rows changed, at once.
+    if (Column* column = ColumnOf(prims, attribute)) {
+        ++version_;
+        column->stream = stream;
+        column->version = version_;
+        columnStamps_[StampIndex(DirtyOf(attribute))] = version_;
+        return;
+    }
     for (const Path& path : prims.Paths()) {
         if (!Find(path).tensors.contains(attribute)) {
             throw std::invalid_argument(
@@ -609,6 +711,7 @@ std::uintptr_t Scene::WriteStream(const Path& path,
         return 1;
     }
     const PrimData& prim = Find(path);
+    Refresh(prim, attribute);
     const auto it = prim.streams.find(attribute);
     return it != prim.streams.end() ? it->second : 1;
 }
@@ -627,6 +730,16 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
         rows.Shape()[0] != static_cast<std::int64_t>(prims.Size())) {
         throw std::invalid_argument(
             "Scene::Write needs one tensor row per path");
+    }
+    // The same prims' column again: replaced whole, its prims' rows
+    // taken when read (`Refresh`), the change one `ColumnChange`.
+    if (Column* column = ColumnOf(prims, attribute)) {
+        ++version_;
+        column->rows = rows;
+        column->stream = stream;
+        column->version = version_;
+        columnStamps_[StampIndex(DirtyOf(attribute))] = version_;
+        return;
     }
     if (prims.sceneId_ != Id() || prims.removals_ != removals_ ||
         prims.prims_.size() != prims.Size()) {
@@ -660,6 +773,32 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
                     attribute, rows.Row(row), stream,
                     std::pair(rows, row), true);
     }
+    // From now one column, which the next write of the same prims
+    // replaces whole (and `Unmap` of them marks changed whole).
+    if (prims.id_ == 0) {
+        static std::atomic<std::uint64_t> next{1};
+        prims.id_ = next++;
+    }
+    const std::uint64_t id = nextColumn_++;
+    Column column;
+    column.paths = std::make_shared<const std::vector<Path>>(prims.Paths());
+    column.sorted = prims.Paths();
+    std::ranges::sort(column.sorted);
+    column.attribute = std::string(attribute);
+    column.rows = rows;
+    column.stream = stream;
+    column.version = version_;
+    column.boundAt = version_;
+    column.key = {prims.id_, std::string(attribute)};
+    for (std::size_t i = 0; i < prims.Size(); ++i) {
+        static_cast<PrimData*>(prims.prims_[i])
+            ->bound.insert_or_assign(
+                std::string(attribute),
+                PrimData::Bound{id, static_cast<std::int64_t>(i),
+                                version_});
+    }
+    columnOf_[column.key] = id;
+    columns_.emplace(id, std::move(column));
 }
 
 const std::pair<Tensor, std::int64_t>*
@@ -668,13 +807,25 @@ Scene::RowOf(const Path& path, std::string_view attribute) const {
     if (prim == prims_.end()) {
         return nullptr;
     }
+    Refresh(prim->second, attribute);
     const auto it = prim->second.rows.find(attribute);
     return it != prim->second.rows.end() ? &it->second : nullptr;
 }
 
 std::uint64_t Scene::OwnTransformVersion(const Path& path) const {
     const auto prim = prims_.find(path);
-    return prim != prims_.end() ? prim->second.ownTransform : 0;
+    if (prim == prims_.end()) {
+        return 0;
+    }
+    // Ops that are rows of columns change with them.
+    std::uint64_t version = prim->second.ownTransform;
+    for (const auto& [attribute, bound] : prim->second.bound) {
+        if (const auto column = columns_.find(bound.column);
+            column != columns_.end() && IsXformAttribute(attribute)) {
+            version = std::max(version, column->second.version);
+        }
+    }
+    return version;
 }
 
 const Tensor* Scene::Read(const Path& path,
@@ -683,6 +834,7 @@ const Tensor* Scene::Read(const Path& path,
     if (prim == prims_.end()) {
         return nullptr;
     }
+    Refresh(prim->second, attribute);
     const auto it = prim->second.tensors.find(attribute);
     if (it == prim->second.tensors.end()) {
         return nullptr;
@@ -748,7 +900,19 @@ Scene::AttributeVersion(const Path& path,
         return 0;
     }
     const auto it = prim->second.versions.find(attribute);
-    return it != prim->second.versions.end() ? it->second : 0;
+    const std::uint64_t own =
+        it != prim->second.versions.end() ? it->second : 0;
+    // A column's row changes with the column.
+    if (!prim->second.bound.empty()) {
+        if (const auto bound = prim->second.bound.find(attribute);
+            bound != prim->second.bound.end()) {
+            if (const auto column = columns_.find(bound->second.column);
+                column != columns_.end()) {
+                return std::max(own, column->second.version);
+            }
+        }
+    }
+    return own;
 }
 
 glm::dmat4 Scene::LocalTransform(const Path& path) const {
@@ -761,7 +925,8 @@ glm::dmat4 Scene::WorldTransform(const Path& path) const {
     // above it stamps it too (`Stamp`).
     const PrimData& prim = Find(path);
     if (prim.worldAt != 0 &&
-        prim.worldAt >= prim.stamps[StampIndex(Dirty::Transform)]) {
+        prim.worldAt >= prim.stamps[StampIndex(Dirty::Transform)] &&
+        prim.worldAt >= columnStamps_[StampIndex(Dirty::Transform)]) {
         return prim.world;
     }
     glm::dmat4 world = ComposeXformOps(*this, path);
@@ -998,7 +1163,8 @@ bool Scene::IsVisible(const Path& path) const {
     // Kept as `WorldTransform` keeps its matrix.
     const PrimData& prim = Find(path);
     if (prim.visibleAt != 0 &&
-        prim.visibleAt >= prim.stamps[StampIndex(Dirty::Visibility)]) {
+        prim.visibleAt >= prim.stamps[StampIndex(Dirty::Visibility)] &&
+        prim.visibleAt >= columnStamps_[StampIndex(Dirty::Visibility)]) {
         return prim.visible;
     }
     const Value* visibility = Get(path, tokens::kVisibility);
@@ -1042,6 +1208,91 @@ Scene::Dependents() const {
 }
 
 std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
+    return Collect(cursor, nullptr);
+}
+
+std::vector<Change>
+Scene::Changes(ChangeCursor& cursor,
+               std::vector<ColumnChange>& columns) const {
+    return Collect(cursor, &columns);
+}
+
+void Scene::AddColumn(std::map<Path, Dirty>& changed,
+                      const std::vector<Path>& paths,
+                      std::string_view attribute) const {
+    const Dirty bit = DirtyOf(attribute);
+    const bool descends = bit == Dirty::Transform ||
+                          bit == Dirty::Visibility ||
+                          IsInherited(attribute);
+    // A prim added since reports `Added` alone.
+    const auto add = [&changed, bit](const Path& path) {
+        Dirty& bits = changed[path];
+        if (!Any(bits, Dirty::Added)) {
+            bits |= bit;
+        }
+    };
+    for (const Path& path : paths) {
+        const auto it = prims_.find(path);
+        if (it == prims_.end()) {
+            continue;
+        }
+        add(path);
+        if (descends) {
+            for (auto below = std::next(it);
+                 below != prims_.end() && below->first.HasPrefix(path);
+                 ++below) {
+                add(below->first);
+            }
+        }
+    }
+}
+
+void Scene::Forward(std::map<Path, Dirty>& changed) const {
+    // Changes at or under a relationship's targets reach the prims
+    // holding it, as a material's reach the prims bound to it, and on
+    // through theirs (an animation, its skeleton, the skinned meshes).
+    const auto& dependents = Dependents();
+    for (bool more = !dependents.empty() && !changed.empty(); more;) {
+        more = false;
+        for (const auto& [target, sources] : dependents) {
+            const auto at = changed.lower_bound(target);
+            if (at == changed.end() || !at->first.HasPrefix(target)) {
+                continue;
+            }
+            for (const auto& [source, bit] : sources) {
+                if (prims_.contains(source)) {
+                    Dirty& bits = changed[source];
+                    more = more || !Any(bits, bit);
+                    bits |= bit;
+                }
+            }
+        }
+    }
+}
+
+std::vector<Change>
+Scene::ExpandColumns(std::span<const Change> changes,
+                     std::span<const ColumnChange> columns) const {
+    ERNIE_ZONE("Scene expand columns");
+    std::map<Path, Dirty> changed;
+    for (const Change& change : changes) {
+        changed[change.path] |= change.bits;
+    }
+    for (const ColumnChange& column : columns) {
+        AddColumn(changed, *column.paths, column.attribute);
+    }
+    Forward(changed);
+    std::vector<Change> merged;
+    merged.reserve(changed.size());
+    for (auto& [path, bits] : changed) {
+        merged.push_back({path, bits});
+    }
+    return merged;
+}
+
+std::vector<Change>
+Scene::Collect(ChangeCursor& cursor,
+               std::vector<ColumnChange>* columns) const {
     ERNIE_ZONE("Scene changes");
     std::map<Path, Dirty> changed;
     for (const auto& [path, when] : removed_) {
@@ -1071,26 +1322,41 @@ std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
             changed[path] |= bits;
         }
     }
-    // Changes at or under a relationship's targets reach the prims
-    // holding it, as a material's reach the prims bound to it, and on
-    // through theirs (an animation, its skeleton, the skinned meshes).
+    // Columns written whole since the cursor (the write binding one
+    // stamped its prims): whole for a consumer that takes them so,
+    // unless some relationship's target is at, under or above their
+    // prims, else as their prims' changes.
     const auto& dependents = Dependents();
-    for (bool more = !dependents.empty() && !changed.empty(); more;) {
-        more = false;
+    const auto reaches = [&dependents](const Column& column) {
         for (const auto& [target, sources] : dependents) {
-            const auto at = changed.lower_bound(target);
-            if (at == changed.end() || !at->first.HasPrefix(target)) {
-                continue;
+            // A row's prim at or under the target...
+            const auto under = std::ranges::lower_bound(column.sorted, target);
+            if (under != column.sorted.end() && under->HasPrefix(target)) {
+                return true;
             }
-            for (const auto& [source, bit] : sources) {
-                if (prims_.contains(source)) {
-                    Dirty& bits = changed[source];
-                    more = more || !Any(bits, bit);
-                    bits |= bit;
+            // ...or the target under one.
+            for (Path at = target.Parent(); !at.IsEmpty() && !at.IsRoot();
+                 at = at.Parent()) {
+                if (std::ranges::binary_search(column.sorted, at)) {
+                    return true;
                 }
             }
         }
+        return false;
+    };
+    for (const auto& [id, column] : columns_) {
+        if (column.version <= cursor.version ||
+            column.version == column.boundAt) {
+            continue;
+        }
+        if (columns != nullptr && !reaches(column)) {
+            columns->push_back({column.paths, column.attribute,
+                                DirtyOf(column.attribute)});
+        } else {
+            AddColumn(changed, *column.paths, column.attribute);
+        }
     }
+    Forward(changed);
     cursor.version = version_;
     std::vector<Change> changes;
     changes.reserve(changed.size());

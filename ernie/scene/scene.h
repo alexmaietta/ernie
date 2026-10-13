@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <span>
 #include <string>
@@ -70,6 +71,16 @@ Dirty DirtyOf(std::string_view attribute);
 /// A prim's changes since a consumer last looked.
 struct Change {
     Path path;
+    Dirty bits = Dirty::None;
+};
+
+/// One attribute of many prims written whole as rows of one tensor
+/// (`Scene::Write` of a `PrimSet` again, or `Scene::Unmap` of it)
+/// since a cursor, as `Scene::Changes` reports it to a consumer that
+/// takes the rows whole.
+struct ColumnChange {
+    std::shared_ptr<const std::vector<Path>> paths;  ///< In row order.
+    std::string attribute;
     Dirty bits = Dirty::None;
 };
 
@@ -173,6 +184,9 @@ class PrimSet {
     mutable std::vector<void*> prims_;
     mutable std::uint64_t sceneId_ = 0;
     mutable std::uint64_t removals_ = 0;
+    // Its own, for the columns scenes keep of it (`Scene::Write`);
+    // copies share it, as they share its prims. 0 until first used.
+    mutable std::uint64_t id_ = 0;
 };
 
 /// A lightweight, USD-shaped scene for Ernie: a tree of typed prims
@@ -455,6 +469,21 @@ class Scene {
     /// was removed meanwhile), since consumers rebuild new prims
     /// fully. A default cursor sees every prim as added.
     std::vector<Change> Changes(ChangeCursor& cursor) const;
+    /// As `Changes`, but an attribute written whole as rows of one
+    /// tensor since the cursor (a `PrimSet`'s `Write` again, or its
+    /// `Unmap`) comes as one `ColumnChange` in `columns`, not as its
+    /// prims' changes, their descendants' and their dependents': a
+    /// consumer taking the rows whole, as a renderer posing a
+    /// simulation's bodies, visits none of them. `ExpandColumns`
+    /// gives the rest when it cannot. Columns whose prims have
+    /// dependents (`AttributeMeta::targetDirty`) come expanded.
+    std::vector<Change> Changes(ChangeCursor& cursor,
+                                std::vector<ColumnChange>& columns) const;
+    /// `changes` with `columns`' prims, their descendants and their
+    /// dependents merged in, as `Changes` without columns reports.
+    std::vector<Change>
+    ExpandColumns(std::span<const Change> changes,
+                  std::span<const ColumnChange> columns) const;
 
     /// The overlay (debug drawing layer) named `name`, created empty
     /// if missing. Overlays are not prims: their edits leave
@@ -502,12 +531,14 @@ class Scene {
         /// samples either side and how far between.
         mutable std::map<std::string, SampleBracket, std::less<>>
             pending;
-        std::map<std::string, std::uintptr_t, std::less<>>
-            streams;  ///< CUDA tensors' streams.
+        /// CUDA tensors' streams; mutable as `tensors`, refreshed from
+        /// a column when read (`Refresh`).
+        mutable std::map<std::string, std::uintptr_t, std::less<>>
+            streams;
         /// Tensors written as rows of one tensor (`Write` of many
         /// paths): that tensor and the row.
-        std::map<std::string, std::pair<Tensor, std::int64_t>,
-                 std::less<>>
+        mutable std::map<std::string, std::pair<Tensor, std::int64_t>,
+                         std::less<>>
             rows;
         std::map<std::string, std::uint64_t, std::less<>> versions;
         /// Sampled attributes' samples, in time order (`SetAt`).
@@ -525,7 +556,50 @@ class Scene {
         mutable std::uint64_t worldAt = 0;
         mutable bool visible = true;
         mutable std::uint64_t visibleAt = 0;
+        /// Attributes that are rows of a column (`columns_`): which,
+        /// its row, and the column's version its tensors last took
+        /// (`Refresh`), so a column written whole costs its prims
+        /// nothing until read.
+        struct Bound {
+            std::uint64_t column = 0;
+            std::int64_t row = 0;
+            std::uint64_t seen = 0;
+        };
+        mutable std::map<std::string, Bound, std::less<>> bound;
     };
+
+    /// Rows of one tensor that many prims' attribute is (`Write` of a
+    /// `PrimSet`), written again or unmapped whole in one step.
+    struct Column {
+        std::shared_ptr<const std::vector<Path>> paths;  ///< Rows.
+        std::vector<Path> sorted;  ///< `paths` in order, for lookups.
+        std::string attribute;
+        Tensor rows;
+        std::uintptr_t stream = 1;
+        std::uint64_t version = 0;  ///< Its last whole write.
+        /// Its first write, which stamped its prims one by one.
+        std::uint64_t boundAt = 0;
+        std::pair<std::uint64_t, std::string> key;  ///< `columnOf_`'s.
+    };
+    /// The column `prims`' `attribute` is, if they are resolved in
+    /// this scene and still its rows; null otherwise.
+    Column* ColumnOf(const PrimSet& prims, std::string_view attribute);
+    /// Brings `prim`'s `attribute`, a column's row, up to the column's
+    /// latest tensor.
+    void Refresh(const PrimData& prim, std::string_view attribute) const;
+    /// Ends column `id`: its prims keep their rows as their own
+    /// tensors, stamped as written now, so no change goes unseen.
+    void BreakColumn(std::uint64_t id);
+    /// Adds the prims of `paths` changed by `attribute` to `changed`,
+    /// their descendants with them for what descends.
+    void AddColumn(std::map<Path, Dirty>& changed,
+                   const std::vector<Path>& paths,
+                   std::string_view attribute) const;
+    /// Adds to `changed` the dependents of what it holds
+    /// (`AttributeMeta::targetDirty`), on through theirs.
+    void Forward(std::map<Path, Dirty>& changed) const;
+    std::vector<Change> Collect(ChangeCursor& cursor,
+                                std::vector<ColumnChange>* columns) const;
 
     PrimData& Find(const Path& path);
     const PrimData& Find(const Path& path) const;
@@ -580,6 +654,14 @@ class Scene {
     mutable std::map<Path, std::vector<std::pair<Path, Dirty>>>
         dependents_;
     mutable bool dependentsStale_ = true;
+    /// The columns, by id, and of each `PrimSet` and attribute; the
+    /// version of the latest column write of each dirty bit (for the
+    /// world transform and visibility caches).
+    std::map<std::uint64_t, Column> columns_;
+    std::map<std::pair<std::uint64_t, std::string>, std::uint64_t>
+        columnOf_;
+    std::uint64_t nextColumn_ = 1;
+    std::array<std::uint64_t, kStampCount> columnStamps_{};
     std::map<std::string, std::set<Path>, std::less<>> byType_;
     std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;

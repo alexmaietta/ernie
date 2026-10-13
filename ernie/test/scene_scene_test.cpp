@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/scene/xform.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
@@ -332,6 +333,70 @@ TEST(Scene, DeclaredInheritanceAndRelationshipsReachDependents) {
     scene.Remove("/Looks/Grey");
     EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rover/Wheel"),
               Dirty::Material);
+}
+
+TEST(Scene, ColumnsWriteManyPrimsWhole) {
+    Scene scene;
+    for (const char* path : {"/A", "/B", "/C"}) {
+        scene.Define(path, tokens::kXform);
+        ernie::SetXform(scene, path, {.translate = {0, 0, 0}});
+    }
+    scene.Define("/A/Mesh", tokens::kMesh);
+    const ernie::PrimSet bodies({"/A", "/B", "/C"});
+    const auto rows = [](float x) {
+        const std::array<float, 9> values{x, 0, 0, x + 1, 0, 0,
+                                          x + 2, 0, 0};
+        return Tensor::Copy<float>(values, {3, 3});
+    };
+    ChangeCursor cursor;
+    scene.Write(bodies, tokens::kTranslate, rows(1));
+    scene.Changes(cursor);
+
+    // Written again: whole, its rows read as they are now.
+    scene.Write(bodies, tokens::kTranslate, rows(10));
+    EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kTranslate)->As<float>()[0],
+                    11.0f);
+    EXPECT_DOUBLE_EQ(scene.WorldTransform("/A/Mesh")[3][0], 10.0);
+    EXPECT_EQ(scene.AttributeVersion("/C", tokens::kTranslate),
+              scene.Version());
+    const std::vector<Change> expanded = scene.Changes(cursor);
+    EXPECT_EQ(BitsOf(expanded, "/B"), Dirty::Transform);
+    EXPECT_EQ(BitsOf(expanded, "/A/Mesh"), Dirty::Transform);
+
+    // To a consumer taking columns whole: one change, expandable.
+    scene.Write(bodies, tokens::kTranslate, rows(20));
+    std::vector<ernie::ColumnChange> columns;
+    const std::vector<Change> rest = scene.Changes(cursor, columns);
+    EXPECT_TRUE(rest.empty());
+    ASSERT_EQ(columns.size(), 1u);
+    EXPECT_EQ(columns[0].paths->size(), 3u);
+    EXPECT_EQ(columns[0].bits, Dirty::Transform);
+    EXPECT_EQ(BitsOf(scene.ExpandColumns(rest, columns), "/A/Mesh"),
+              Dirty::Transform);
+    scene.Unmap(bodies, tokens::kTranslate);
+    columns.clear();
+    scene.Changes(cursor, columns);
+    EXPECT_EQ(columns.size(), 1u) << "unmapped whole";
+
+    // A copy keeps its own rows.
+    const Scene copy = scene;
+    scene.Write(bodies, tokens::kTranslate, rows(30));
+    EXPECT_FLOAT_EQ(copy.Read("/A", tokens::kTranslate)->As<float>()[0],
+                    20.0f);
+
+    // One prim written alone ends the column, its rows kept and none
+    // of its changes lost; the next write binds anew.
+    scene.Set("/B", tokens::kTranslate, glm::dvec3(5.0, 0.0, 0.0));
+    EXPECT_FLOAT_EQ(scene.Read("/A", tokens::kTranslate)->As<float>()[0],
+                    30.0f);
+    columns.clear();
+    const std::vector<Change> broken = scene.Changes(cursor, columns);
+    EXPECT_TRUE(columns.empty());
+    EXPECT_EQ(BitsOf(broken, "/C"), Dirty::Transform);
+    scene.Write(bodies, tokens::kTranslate, rows(40));
+    scene.Write(bodies, tokens::kTranslate, rows(50));
+    EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kTranslate)->As<float>()[0],
+                    51.0f);
 }
 
 TEST(Scene, RemovalsAndRetypesAreReported) {
