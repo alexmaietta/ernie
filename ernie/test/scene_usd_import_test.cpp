@@ -1097,6 +1097,67 @@ def Xform "Shot"
     }
 }
 
+TEST_F(UsdImportTest, MaterialXNetworksComeInAsTheyAre) {
+    const std::filesystem::path file = dir_ / "mtlx.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Asset"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Asset"
+{
+    def Sphere "Ball" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </Asset/Looks/Gold>
+    }
+    def Scope "Looks"
+    {
+        def Material "Gold"
+        {
+            token outputs:mtlx:surface.connect = </Asset/Looks/Gold/Surface.outputs:out>
+
+            def Shader "Surface"
+            {
+                uniform token info:id = "ND_standard_surface_surfaceshader"
+                float inputs:metalness = 1
+                color3f inputs:base_color.connect = </Asset/Looks/Gold/Tint.outputs:out>
+                token outputs:out
+            }
+            def Shader "Tint"
+            {
+                uniform token info:id = "ND_constant_color3"
+                color3f inputs:value = (0.94, 0.78, 0.37)
+                color3f outputs:out
+            }
+        }
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Asset"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    EXPECT_EQ(Token("/World/Asset/Looks/Gold",
+                    "outputs:mtlx:surface.connect"),
+              "/World/Asset/Looks/Gold/Surface.outputs:out");
+    EXPECT_EQ(Token("/World/Asset/Looks/Gold/Surface", "info:id"),
+              "ND_standard_surface_surfaceshader");
+    EXPECT_EQ(Token("/World/Asset/Looks/Gold/Surface",
+                    "inputs:base_color.connect"),
+              "/World/Asset/Looks/Gold/Tint.outputs:out");
+    EXPECT_DOUBLE_EQ(
+        scene_.Get<double>(Path("/World/Asset/Looks/Gold/Surface"),
+                           "inputs:metalness", 0.0),
+        1.0);
+    const glm::dvec3 tint =
+        scene_.Get<glm::dvec3>(Path("/World/Asset/Looks/Gold/Tint"),
+                               "inputs:value", glm::dvec3(0.0));
+    EXPECT_NEAR(tint.y, 0.78, 1e-6);
+}
+
 TEST_F(UsdImportTest, MissingFilesThrow) {
     EXPECT_THROW(ernie::ImportUsd(scene_, Path("/World/none"),
                                   dir_ / "missing.usda"),

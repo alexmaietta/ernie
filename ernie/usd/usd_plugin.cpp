@@ -2951,6 +2951,31 @@ class Importer {
             return "";
         }
         Mapped(source, path);
+        // A MaterialX network (the mtlx render context), its nodes
+        // and connections as they are, on outputs:mtlx:surface beside
+        // any other surface.
+        const HdMaterialNetworkSchema mtlx =
+            material.GetMaterialNetwork(TfToken("mtlx"));
+        const HdMaterialConnectionSchema mtlxSurface =
+            mtlx.GetTerminals().Get(
+                HdMaterialTerminalTokens->surface);
+        bool materialx = false;
+        if (const std::string node = NodeName(mtlxSurface);
+            !node.empty() &&
+            TfStringStartsWith(IdOf(mtlx, node), "ND_")) {
+            const std::string shader =
+                TranslateNode(mtlx, node, source);
+            if (!shader.empty()) {
+                materialx = true;
+                Call(path, [&] {
+                    sink_.SetToken(
+                        path.c_str(), "outputs:mtlx:surface.connect",
+                        (shader +
+                         ".outputs:" + OutputName(mtlxSurface))
+                            .c_str());
+                });
+            }
+        }
         // UsdPreviewSurface (the universal render context) first,
         // then MDL, approximated.
         const HdMaterialNetworkSchema universal =
@@ -2978,10 +3003,10 @@ class Importer {
                            material.GetMaterialNetwork(TfToken("mdl"))
                                .GetNodes()
                                .Get(TfToken(mdlNode)));
-        } else {
+        } else if (!materialx) {
             Warn(source.GetString() +
-                 " has no UsdPreviewSurface or MDL surface; its "
-                 "prims keep their displayColor");
+                 " has no MaterialX, UsdPreviewSurface or MDL "
+                 "surface; its prims keep their displayColor");
         }
         materials_[source] = path;
         return path;
