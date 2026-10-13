@@ -4,6 +4,7 @@ ernie_add_library(
     SOURCES
     astronomy.cpp
     atmosphere.cpp
+    cloud_noise.cpp
     cloud_phase.cpp
     cloud_transport.cpp
     disk_cache.cpp

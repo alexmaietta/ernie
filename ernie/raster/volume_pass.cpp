@@ -8,6 +8,7 @@
 #include "ernie/raster/render_targets.h"
 #include "ernie/scene/light_pattern.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/cloud_noise.h"
 #include "ernie/util/cloud_phase.h"
 #include "ernie/util/cloud_transport.h"
 #include "ernie/util/profile.h"
@@ -106,10 +107,12 @@ struct VolumeResources {
     VkDeviceAddress lightMaps;
     std::uint32_t lightMapSize;
     std::uint32_t collectors;
+    VkDeviceAddress cloudNoise;
+    VkDeviceAddress cloudLayers;
     // To the block's 16-byte multiple.
     std::uint32_t padding[2];
 };
-static_assert(sizeof(VolumeResources) == 208,
+static_assert(sizeof(VolumeResources) == 224,
               "VolumeResources must match volume.slang");
 
 constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
@@ -188,6 +191,60 @@ constexpr std::uint32_t kHalfResolution = 1024;
 // Angles of each row of the cloud droplets' phase tables
 // (`DropletPhaseTable`).
 constexpr std::uint32_t kDropletAngles = 1024;
+// volume.slang's grid type of cloud layers (`FieldGpu::grid.y`) and
+// their block's float4s (`cloudLayersDensity`).
+constexpr std::uint32_t kCloudLayersGrid = 0xC10D5u;
+constexpr std::size_t kCloudLayerBlock = 16;
+
+// A cloud layers field's block: its noise's tiles, then each of up to
+// four layers' bottom, top, density, shape and detail amounts,
+// weather exponent, shape bias, coverage filter width, profile and
+// channel.
+std::array<float, 4 * kCloudLayerBlock>
+CloudBlockOf(const CloudLayersParams& layers) {
+    std::array<float, 4 * kCloudLayerBlock> block{};
+    block[0] =
+        static_cast<float>(std::clamp(layers.coverage, 0.0, 1.0));
+    block[1] = static_cast<float>(layers.turbulenceDisplacement);
+    block[2] =
+        static_cast<float>(std::max(layers.weatherTileSize, 1e-3));
+    block[3] =
+        static_cast<float>(std::max(layers.shapeTileSize, 1e-3));
+    block[4] =
+        static_cast<float>(std::max(layers.detailTileSize, 1e-3));
+    block[5] =
+        static_cast<float>(std::max(layers.turbulenceTileSize, 1e-3));
+    block[6] = static_cast<float>(layers.weatherOffset.x);
+    block[7] = static_cast<float>(layers.weatherOffset.y);
+    const auto at = [](const std::vector<float>& values,
+                       std::size_t i, float otherwise) {
+        return i < values.size() ? values[i] : otherwise;
+    };
+    for (std::size_t l = 0; l < 4; ++l) {
+        const float height = at(layers.heights, l, 0.0f);
+        const float bottom = at(layers.altitudes, l, 0.0f);
+        // A layer without height none: below its bottom, never in it.
+        block[8 + l] = height > 0.0f ? bottom : 1e30f;
+        block[12 + l] = height > 0.0f ? bottom + height : -1e30f;
+        block[16 + l] = at(layers.densities, l, 0.0f);
+        block[20 + l] = at(layers.shapeAmounts, l, 1.0f);
+        block[24 + l] = at(layers.detailAmounts, l, 1.0f);
+        block[28 + l] = at(layers.weatherExponents, l, 1.0f);
+        block[32 + l] = at(layers.shapeBiases, l, 0.35f);
+        block[36 + l] =
+            std::max(at(layers.filterWidths, l, 0.6f), 1e-3f);
+        block[40 + l] = at(layers.profiles, 4 * l, 0.0f);
+        block[44 + l] = at(layers.profiles, 4 * l + 1, 0.0f);
+        block[48 + l] = at(layers.profiles, 4 * l + 2, 0.75f);
+        block[52 + l] = at(layers.profiles, 4 * l + 3, 0.25f);
+        const float channel = at(layers.channels, l, 4.0f);
+        block[56 + l] =
+            std::bit_cast<float>(static_cast<std::uint32_t>(
+                channel >= 0.0f && channel < 4.0f ? channel : 4.0f));
+    }
+    return block;
+}
+
 // Texels across a light map at its finest (`lightMapMain`), a power
 // of two about two voxels of its density each, within these.
 constexpr std::uint32_t kMinLightMapSize = 32;
@@ -982,13 +1039,17 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
         const LoadedGrid* density = nullptr;
         const LoadedGrid* temperature = nullptr;
         const LoadedGrid* emission = nullptr;
+        /// A procedural density (`cloudLayersDensity`), not loaded.
+        const VolumeFieldParams* layers = nullptr;
     };
     std::vector<Fields> fields(volumes.size());
     {
         ERNIE_ZONE("Volume fields");
         for (std::size_t i = 0; i < volumes.size(); ++i) {
             const VolumeParams& volume = volumes[i];
-            if (volume.density) {
+            if (volume.density && volume.density->cloudLayers) {
+                fields[i].layers = &*volume.density;
+            } else if (volume.density) {
                 fields[i].density =
                     Load(*volume.density, volume.prim);
             }
@@ -1033,6 +1094,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
+    // Cloud layers fields' blocks (`cloudLayersDensity`).
+    std::vector<std::array<float, 4 * kCloudLayerBlock>> cloudBlocks;
     // Each instance's world and its bounds relative to the origin.
     std::vector<std::int32_t> worlds;
     std::vector<std::pair<glm::dvec3, glm::dvec3>> boxes;
@@ -1067,6 +1130,38 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                 Transform(field->toVolume, min, max);
                 lo = glm::min(lo, min);
                 hi = glm::max(hi, max);
+            }
+            // Cloud layers': their reach across, from their lowest
+            // bottom to their highest top.
+            std::uint32_t layersBlock = kNoGrid;
+            if (held.layers != nullptr) {
+                const CloudLayersParams& layers =
+                    *held.layers->cloudLayers;
+                double bottom =
+                    std::numeric_limits<double>::infinity();
+                double top = -bottom;
+                for (std::size_t l = 0; l < layers.altitudes.size() &&
+                                        l < layers.heights.size();
+                     ++l) {
+                    if (layers.heights[l] > 0.0f) {
+                        bottom = std::min(
+                            bottom, double(layers.altitudes[l]));
+                        top =
+                            std::max(top, double(layers.altitudes[l] +
+                                                 layers.heights[l]));
+                    }
+                }
+                if (bottom < top) {
+                    glm::dvec3 min(-layers.extent, -layers.extent,
+                                   bottom);
+                    glm::dvec3 max(layers.extent, layers.extent, top);
+                    Transform(held.layers->toVolume, min, max);
+                    lo = glm::min(lo, min);
+                    hi = glm::max(hi, max);
+                    layersBlock = static_cast<std::uint32_t>(
+                        cloudBlocks.size());
+                    cloudBlocks.push_back(CloudBlockOf(layers));
+                }
             }
             if (glm::any(glm::greaterThan(lo, hi))) {
                 continue;
@@ -1110,6 +1205,13 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     static_cast<std::uint32_t>(loaded->grid.type);
                 slot.grid[2] = loaded->distances;
             }
+            if (layersBlock != kNoGrid) {
+                Rows(glm::inverse(held.layers->toVolume),
+                     gpu.density.toIndex);
+                gpu.density.grid[0] = layersBlock;
+                gpu.density.grid[1] = kCloudLayersGrid;
+                gpu.density.grid[2] = kNoGrid;
+            }
             gpu.params[0] = static_cast<float>(
                 volume.material.density * (1.0 - droplet.forward));
             gpu.params[1] =
@@ -1125,8 +1227,15 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                 held.density != nullptr    ? all[0]
                 : held.emission != nullptr ? all[2]
                                            : all[1];
+            // Cloud layers' steps, as a grid's voxels.
             const glm::dmat4 voxelToLocal =
-                stepField->toVolume * stepGrid->grid.indexToGrid;
+                stepGrid != nullptr
+                    ? stepField->toVolume * stepGrid->grid.indexToGrid
+                    : held.layers->toVolume *
+                          glm::scale(
+                              glm::dmat4(1.0),
+                              glm::dvec3(held.layers->cloudLayers
+                                             ->stepSize));
             const std::vector<glm::dmat4> placements =
                 volume.instances.empty()
                     ? std::vector<glm::dmat4>{volume.transform}
@@ -1156,7 +1265,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                 placed.info[3] = kNoCache;
                 if (settings_.collectors &&
                     volume.material.phase == tokens::kCloudDroplets &&
-                    held.density != nullptr) {
+                    (held.density != nullptr ||
+                     held.layers != nullptr)) {
                     const glm::dvec3 half = 0.5 * (hi - lo);
                     double radius = 0.0;
                     for (int c = 0; c < 4; ++c) {
@@ -1298,6 +1408,44 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     cacheLargest_ = cacheLargest;
     lightMapTexels_ = lightMapTexels;
     lightMapLargest_ = lightMapLargest;
+    // Cloud layers: their noise textures, made or read once, and
+    // their blocks.
+    if (!cloudBlocks.empty()) {
+        if (cloudNoise_ == nullptr) {
+            ERNIE_ZONE("Cloud noise");
+            const CloudNoise noise = CachedCloudNoise();
+            std::vector<float> all;
+            for (const std::vector<float>* part :
+                 {&noise.shape, &noise.detail, &noise.weather,
+                  &noise.turbulence}) {
+                all.insert(all.end(), part->begin(), part->end());
+            }
+            cloudNoise_ = std::make_unique<GpuBuffer>(
+                context_, all.size() * sizeof(float),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            uploads.Write(*cloudNoise_,
+                          std::as_bytes(std::span(all)));
+        }
+        const VkDeviceSize bytes =
+            cloudBlocks.size() * sizeof(cloudBlocks[0]);
+        if (cloudLayers_ == nullptr || cloudLayers_->Size() < bytes) {
+            if (cloudLayers_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            cloudLayers_ = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            cloudBlocks_.clear();
+        }
+        // Built again only when they change.
+        if (cloudBlocks != cloudBlocks_) {
+            uploads.Write(*cloudLayers_,
+                          std::as_bytes(std::span(cloudBlocks)));
+            cloudBlocks_ = cloudBlocks;
+            hostChanged_ |= 3 | kHostDiscrete;
+        }
+    }
 }
 
 std::vector<glm::vec4> VolumePass::LightMaps() const {
@@ -1526,6 +1674,10 @@ void VolumePass::Prepare(
     resources.dropletBands =
         static_cast<std::uint32_t>(dropletBands_.count);
     resources.timing = timing.Address();
+    resources.cloudNoise =
+        cloudNoise_ != nullptr ? cloudNoise_->Address() : 0;
+    resources.cloudLayers =
+        cloudLayers_ != nullptr ? cloudLayers_->Address() : 0;
     // Cloud droplets' collectors: their light maps, built again with
     // the caches, and the transport table once ready.
     if (lightMapTexels_ > 0) {

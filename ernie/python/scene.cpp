@@ -2836,6 +2836,7 @@ void BindScene(nb::module_& m) {
         {"NANOVDB_FIELD", tokens::kNanoVDBField},
         {"NANOVDB_BUFFER", tokens::kNanoVdbBuffer},
         {"DENSE_FIELD", tokens::kDenseField},
+        {"CLOUD_LAYERS_FIELD", tokens::kCloudLayersField},
         {"DENSE_VALUES", tokens::kDenseValues},
         {"VOXEL_SIZE", tokens::kVoxelSize},
         {"HENYEY_GREENSTEIN", tokens::kHenyeyGreenstein},

@@ -441,6 +441,54 @@ TEST_F(RasterDelegateTest, AVolumeScattersTheSun) {
     }
 }
 
+TEST_F(RasterDelegateTest, CloudLayersFormWhereTheirCoverageLets) {
+    // three-geospatial's default layers over FlatScene, seen from
+    // below in its overhead sun: clouds dim and brighten the view
+    // above where the coverage lets them form, none at all without
+    // it.
+    RasterDelegate delegate(*context_);
+    Scene scene = FlatScene();
+    scene.Set("/World/Camera", tokens::kTransform,
+              ernie::LookAtTransform({0.0, 0.0, 100.0},
+                                     {300.0, 0.0, 2000.0},
+                                     {0.0, 0.0, 1.0}));
+    ernie::Volume::Define(scene, "/World/Clouds")
+        .SetField("density", "/World/Clouds/Layers")
+        .SetMaterialBinding("/Looks/Cloud");
+    ernie::CloudLayersField::Define(scene, "/World/Clouds/Layers")
+        .SetCoverage(0.0);
+    ernie::Material::Define(scene, "/Looks/Cloud")
+        .SetDensity(1.0)
+        .SetVolumeAlbedo(glm::dvec3(1.0));
+    const auto mean = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        Tensor spectral = outputs.at("/Render/Product")
+                              .vars.at("SpectralRadiance")
+                              .Map(ernie::MapDevice::Cpu)
+                              .tensor;
+        const auto* values =
+            static_cast<const float*>(spectral.Data());
+        double sum = 0.0;
+        for (std::int64_t i = 0; i < spectral.Elements(); ++i) {
+            EXPECT_TRUE(std::isfinite(values[i])) << "value " << i;
+            sum += double(values[i]);
+        }
+        return sum / double(spectral.Elements());
+    };
+    scene.Set("/World/Clouds", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const double clear = mean();
+    scene.Set("/World/Clouds", tokens::kVisibility,
+              std::string(tokens::kInherited));
+    EXPECT_NEAR(mean(), clear, 1e-3 * clear)
+        << "no coverage, no clouds";
+    ernie::CloudLayersField(scene, "/World/Clouds/Layers")
+        .SetCoverage(0.7);
+    const double cloudy = mean();
+    EXPECT_GT(std::abs(cloudy - clear), 0.05 * clear)
+        << "clouds form";
+}
+
 TEST_F(RasterDelegateTest, DualLobesAndPowderShapeWhatScatters) {
     // three-geospatial's clouds' phase function, two
     // Henyey-Greenstein lobes (0.7 and -0.2 by halves), straight

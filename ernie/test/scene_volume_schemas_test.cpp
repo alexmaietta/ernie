@@ -114,9 +114,14 @@ TEST(VolumeSchemas, TypesAreRegistered) {
         ernie::GetPrimType(tokens::kDenseField);
     EXPECT_TRUE(dense.IsA(ernie::GetPrimType(tokens::kFieldBase)));
     EXPECT_EQ(dense.Find(tokens::kVoxelSize)->meta.min, 1e-9);
-    ASSERT_EQ(types.size(), 6u);
+    const PrimTypeDef& clouds =
+        ernie::GetPrimType(tokens::kCloudLayersField);
+    EXPECT_TRUE(clouds.IsA(ernie::GetPrimType(tokens::kFieldBase)));
+    EXPECT_EQ(clouds.Find(tokens::kCloudCoverage)->meta.max, 1.0);
+    ASSERT_EQ(types.size(), 7u);
     EXPECT_EQ(types[2], &asset);
     EXPECT_EQ(types[3], &array);
     EXPECT_EQ(types[4], &dense);
-    EXPECT_EQ(types[5], &volume);
+    EXPECT_EQ(types[5], &clouds);
+    EXPECT_EQ(types[6], &volume);
 }

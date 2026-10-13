@@ -91,6 +91,43 @@ inline constexpr std::string_view kNanoVdbBuffer =
     "ernie:buffer";  ///< array: the grids, back to back.
 /// Ernie's field of a dense array of values, such as a grid solver's.
 inline constexpr std::string_view kDenseField = "DenseField";
+/// Procedural cloud layers (three-geospatial's), a Volume's density.
+inline constexpr std::string_view kCloudLayersField =
+    "CloudLayersField";
+inline constexpr std::string_view kCloudCoverage = "coverage";
+inline constexpr std::string_view kCloudExtent = "extent";
+inline constexpr std::string_view kCloudStepSize = "stepSize";
+inline constexpr std::string_view kCloudWeatherTileSize =
+    "weatherTileSize";
+inline constexpr std::string_view kCloudWeatherOffset =
+    "weatherOffset";
+inline constexpr std::string_view kCloudShapeTileSize =
+    "shapeTileSize";
+inline constexpr std::string_view kCloudDetailTileSize =
+    "detailTileSize";
+inline constexpr std::string_view kCloudTurbulenceTileSize =
+    "turbulenceTileSize";
+inline constexpr std::string_view kCloudTurbulenceDisplacement =
+    "turbulenceDisplacement";
+inline constexpr std::string_view kCloudLayerAltitudes =
+    "layerAltitudes";
+inline constexpr std::string_view kCloudLayerHeights = "layerHeights";
+inline constexpr std::string_view kCloudLayerDensities =
+    "layerDensities";
+inline constexpr std::string_view kCloudLayerShapeAmounts =
+    "layerShapeAmounts";
+inline constexpr std::string_view kCloudLayerDetailAmounts =
+    "layerDetailAmounts";
+inline constexpr std::string_view kCloudLayerWeatherExponents =
+    "layerWeatherExponents";
+inline constexpr std::string_view kCloudLayerShapeBiases =
+    "layerShapeBiases";
+inline constexpr std::string_view kCloudLayerCoverageFilterWidths =
+    "layerCoverageFilterWidths";
+inline constexpr std::string_view kCloudLayerDensityProfiles =
+    "layerDensityProfiles";
+inline constexpr std::string_view kCloudLayerChannels =
+    "layerChannels";
 inline constexpr std::string_view kDenseValues =
     "ernie:values";  ///< array: (x, y, z) float32.
 inline constexpr std::string_view kVoxelSize =

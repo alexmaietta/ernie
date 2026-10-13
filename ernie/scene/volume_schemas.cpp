@@ -31,6 +31,12 @@ ERNIE_DEFINE_SCHEMA(
     "A dense array of values (a grid solver's), which a "
     "device array fills in place on the GPU.",
     ERNIE_DENSE_FIELD_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(
+    CloudLayersField, tokens::kCloudLayersField,
+    &FieldBase::Definition(), false,
+    "Procedural cloud layers over a weather map, carved from "
+    "tileable noise on the GPU (three-geospatial's clouds).",
+    ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES)
 ERNIE_DEFINE_OPEN_SCHEMA(
     Volume, tokens::kVolume, &Gprim::Definition(), false,
     "A participating medium: fields named by field:<name> "
@@ -74,9 +80,11 @@ std::vector<std::string> Volume::FieldNames() const {
 }
 
 std::vector<const PrimTypeDef*> VolumeSchemaTypes() {
-    return {&FieldBase::Definition(),    &FieldAsset::Definition(),
-            &OpenVDBAsset::Definition(), &NanoVDBField::Definition(),
-            &DenseField::Definition(),   &Volume::Definition()};
+    return {
+        &FieldBase::Definition(),    &FieldAsset::Definition(),
+        &OpenVDBAsset::Definition(), &NanoVDBField::Definition(),
+        &DenseField::Definition(),   &CloudLayersField::Definition(),
+        &Volume::Definition()};
 }
 
 }  // namespace ernie

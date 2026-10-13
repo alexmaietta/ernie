@@ -336,6 +336,11 @@ class VolumePass {
     mutable std::unique_ptr<ComputePipeline> lightMapPipeline_;
     mutable std::unique_ptr<ComputePipeline> lightMapMipsPipeline_;
     mutable std::size_t lightMapPipelinePatterns_ = 0;
+    /// Cloud layers fields' noise textures (`CachedCloudNoise`, made
+    /// once) and blocks (volume.slang's `cloudLayersDensity`).
+    std::unique_ptr<GpuBuffer> cloudNoise_;
+    std::unique_ptr<GpuBuffer> cloudLayers_;
+    std::vector<std::array<float, 64>> cloudBlocks_;
     std::unique_ptr<GpuBuffer> distances_;
     std::uint64_t distanceWords_ = 0;
     mutable std::vector<DistanceBuild> distanceBuilds_;

@@ -577,6 +577,33 @@ struct VolumeSettings {
 
 /// A field a volume shades with (`VolumesOf`): a grid of a NanoVDB
 /// file, an OpenVDBAsset's, or of a NanoVDBField's array (`buffer`).
+/// A CloudLayersField's: its layers and the noise they're carved from
+/// (`volume_schemas.h`), each layer's values in order.
+struct CloudLayersParams {
+    double coverage = 0.3;
+    double extent = 20000.0;
+    double stepSize = 50.0;
+    double weatherTileSize = 100000.0;
+    glm::dvec2 weatherOffset{0.0};
+    double shapeTileSize = 3333.0;
+    double detailTileSize = 166.7;
+    double turbulenceTileSize = 5000.0;
+    double turbulenceDisplacement = 350.0;
+    std::vector<float> altitudes;
+    std::vector<float> heights;
+    std::vector<float> densities;
+    std::vector<float> shapeAmounts;
+    std::vector<float> detailAmounts;
+    std::vector<float> weatherExponents;
+    std::vector<float> shapeBiases;
+    std::vector<float> filterWidths;
+    /// Four per layer: a, b, c, d.
+    std::vector<float> profiles;
+    std::vector<float> channels;
+
+    bool operator==(const CloudLayersParams&) const = default;
+};
+
 struct VolumeFieldParams {
     std::string file;      ///< `filePath`, as authored.
     std::string gridName;  ///< `fieldName`; empty for any grid.
@@ -595,13 +622,16 @@ struct VolumeFieldParams {
     /// `voxelSize` apart, rather than NanoVDB grids.
     bool dense = false;
     double voxelSize = 1.0;
+    /// A CloudLayersField's, evaluated on the GPU rather than loaded.
+    std::optional<CloudLayersParams> cloudLayers;
 
     bool operator==(const VolumeFieldParams& other) const {
         return file == other.file && gridName == other.gridName &&
                gridIndex == other.gridIndex &&
                toVolume == other.toVolume && array == other.array &&
                version == other.version && dense == other.dense &&
-               voxelSize == other.voxelSize;
+               voxelSize == other.voxelSize &&
+               cloudLayers == other.cloudLayers;
     }
 };
 

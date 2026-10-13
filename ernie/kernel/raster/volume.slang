@@ -279,6 +279,10 @@ struct VolumeResources {
     float4* lightMaps;
     uint lightMapSize;
     uint collectors;
+    // Procedural cloud layers (`cloudLayersDensity`): their noise textures (`CloudNoise`'s, one after
+    // another) and each field's block of `kCloudLayerBlock` float4s, a field's from its `grid.x`.
+    float* cloudNoise;
+    float4* cloudLayers;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -362,6 +366,9 @@ float valueAt(uint type, pnanovdb_coord_t ijk, inout pnanovdb_readaccessor_t acc
 }
 
 float sampleField(FieldGpu field, float3 local, inout pnanovdb_readaccessor_t accessor) {
+    if (isCloudLayers(field)) {
+        return cloudLayersDensity(field, local);
+    }
     let index = float3(dot(field.toIndex[0], float4(local, 1.0)),
                        dot(field.toIndex[1], float4(local, 1.0)),
                        dot(field.toIndex[2], float4(local, 1.0)));
@@ -417,6 +424,9 @@ float sampleField(FieldGpu field, float3 local, inout pnanovdb_readaccessor_t ac
 //   OpenVDB", SIGGRAPH 2014 Talks. https://doi.org/10.1145/2614106.2614136
 uint stepAfterEmptyTile(FieldGpu field, float3 index, float3 origin, float3 step, float start,
                         float dt, float jitter, inout pnanovdb_readaccessor_t accessor) {
+    if (isCloudLayers(field)) {
+        return stepAfterClearSky(field, index, origin, step, start, dt, jitter);
+    }
     pnanovdb_coord_t ijk;
     let cell = int3(floor(index));
     ijk.x = cell.x;
@@ -709,7 +719,7 @@ void brickDistanceMain(uint3 id: SV_DispatchThreadID) {
 
 pnanovdb_readaccessor_t accessorOf(FieldGpu field) {
     pnanovdb_grid_handle_t grid;
-    grid.address.byte_offset = field.grid.x == kNoGrid ? 0 : field.grid.x;
+    grid.address.byte_offset = field.grid.x == kNoGrid || isCloudLayers(field) ? 0 : field.grid.x;
     let root = pnanovdb_tree_get_root(grids, pnanovdb_grid_get_tree(grids, grid));
     pnanovdb_readaccessor_t accessor;
     pnanovdb_readaccessor_init(accessor, root);
@@ -3255,4 +3265,193 @@ float collectorsOfPiece(VolumeGpu volume, LightMapFrame frame, float3 p, float3 
         total += found > 0.0 ? sum / found : radiance;
     }
     return total;
+}
+
+// Procedural cloud layers (a CloudLayersField, `VolumePass`'s): up to four layers of cumulus and
+// the like over a weather map's coverage, carved from tileable Perlin-Worley shapes and Worley
+// details (ernie/util/cloud_noise.h) at each sample, rather than read from a grid.
+//
+// References:
+// - A. Schneider and N. Vos, "The Real-Time Volumetric Cloudscapes of Horizon: Zero Dawn",
+//   SIGGRAPH 2015 Advances in Real-Time Rendering.
+// - takram, three-geospatial's clouds (packages/clouds/src/shaders/clouds.glsl's sampleWeather and
+//   sampleMedia), 2024, MIT, Copyright (c) 2024 Shota Matsuda: the coverage, shape and detail
+//   remaps and density profiles here; their coverage after Skybolt's
+//   (https://github.com/Prograda/Skybolt, Assets/Core/Shaders/Clouds.h).
+
+// A field's grid type for cloud layers (`FieldGpu::grid.y`), and its block's float4s: x (coverage,
+// turbulence displacement, weather tile, shape tile), (detail tile, turbulence tile, weather
+// offset x, y), then per layer: bottoms, tops, density scales, shape amounts, detail amounts,
+// weather exponents, shape biases, coverage filter widths, the density profile's a, b, c, d (a
+// e^(b h) + c h + d over its height fraction h) and the weather channels (asuint, 4 none).
+static const uint kCloudLayersGrid = 0xC10D5u;
+static const uint kCloudLayerBlock = 16;
+// The noise textures' sizes and where each starts in `pass.cloudNoise` (`CloudNoise`'s order).
+static const uint kShapeSize = 128;
+static const uint kDetailSize = 32;
+static const uint kWeatherSize = 512;
+static const uint kTurbulenceSize = 128;
+static const uint kDetailStart = kShapeSize * kShapeSize * kShapeSize;
+static const uint kWeatherStart = kDetailStart + kDetailSize * kDetailSize * kDetailSize;
+static const uint kTurbulenceStart = kWeatherStart + kWeatherSize * kWeatherSize * 4;
+
+bool isCloudLayers(FieldGpu field) {
+    return field.grid.y == kCloudLayersGrid;
+}
+
+int3 wrapCell(int3 i, int size) {
+    return ((i % size) + size) % size;
+}
+
+// A tileable 3D noise texture of `size`^3 values from `start`, trilinear at `uvw` (repeating each
+// 1).
+float noise3(uint start, uint size, float3 uvw) {
+    let p = uvw * float(size) - 0.5;
+    let b = floor(p);
+    let f = p - b;
+    let i0 = wrapCell(int3(b), int(size));
+    let i1 = wrapCell(i0 + 1, int(size));
+    float c[8];
+    for (int k = 0; k < 8; ++k) {
+        let x = (k & 1) != 0 ? i1.x : i0.x;
+        let y = (k & 2) != 0 ? i1.y : i0.y;
+        let z = (k & 4) != 0 ? i1.z : i0.z;
+        c[k] = pass.cloudNoise[start + (uint(z) * size + uint(y)) * size + uint(x)];
+    }
+    return lerp(lerp(lerp(c[0], c[1], f.x), lerp(c[2], c[3], f.x), f.y),
+                lerp(lerp(c[4], c[5], f.x), lerp(c[6], c[7], f.x), f.y), f.z);
+}
+
+// A tileable 2D noise texture of `size`^2 texels of `channels` values from `start`, bilinear at
+// `uv` (repeating each 1), its first four channels.
+float4 noise2(uint start, uint size, uint channels, float2 uv) {
+    let p = uv * float(size) - 0.5;
+    let b = floor(p);
+    let f = p - b;
+    let i0 = wrapCell(int3(int2(b), 0), int(size)).xy;
+    let i1 = wrapCell(int3(i0 + 1, 0), int(size)).xy;
+    float4 c[4];
+    for (int k = 0; k < 4; ++k) {
+        let x = (k & 1) != 0 ? i1.x : i0.x;
+        let y = (k & 2) != 0 ? i1.y : i0.y;
+        let at = start + (uint(y) * size + uint(x)) * channels;
+        c[k] = float4(pass.cloudNoise[at], pass.cloudNoise[at + 1], pass.cloudNoise[at + 2],
+                      channels > 3 ? pass.cloudNoise[at + 3] : 0.0);
+    }
+    return lerp(lerp(c[0], c[1], f.x), lerp(c[2], c[3], f.x), f.y);
+}
+
+float4 remapClamped(float4 x, float4 low, float4 high) {
+    return saturate((x - low) / (high - low));
+}
+
+// The layers' coverage at field point `p` before their shapes carve it (0 outside them), and each
+// layer's height fraction there.
+float4 cloudCoverage(float4* block, float3 p, out float4 heightFraction) {
+    let bottoms = block[2];
+    let tops = block[3];
+    heightFraction = float4(0.0);
+    if (!any(p.z > bottoms && p.z < tops)) {
+        return float4(0.0);
+    }
+    let general = block[0];
+    let tiles = block[1];
+    let coverage = general.x;
+    // Each layer's height fraction, and its coverage from its channel of the weather map, rounded
+    // towards its top and its bottom (Schneider and Vos's height gradient, a semicircle).
+    let heightFraction = saturate((p.z - bottoms) / max(tops - bottoms, 1e-6));
+    let uv = (p.xy + tiles.zw) / general.z;
+    let weather = noise2(kWeatherStart, kWeatherSize, 4, uv);
+    let channels = asuint(block[14]);
+    float4 local4;
+    for (uint l = 0; l < 4; ++l) {
+        local4[l] = channels[l] < 4 ? weather[channels[l]] : 0.0;
+    }
+    let lw = pow(max(local4, 0.0), block[7]);
+    let biased = pow(heightFraction, block[8]);
+    let x = clamp(biased * 2.0 - 1.0, -1.0, 1.0);
+    let heightScale = 1.0 - x * x;
+    let factor = 1.0 - coverage * heightScale;
+    let widths = block[9];
+    return remapClamped(lerp(lw, float4(1.0), widths), factor, factor + widths) *
+           float4(p.z > bottoms && p.z < tops);
+}
+
+// A cloud layers field's density at its volume's local point `local`, summed over its layers.
+float cloudLayersDensity(FieldGpu field, float3 local) {
+    let p = float3(dot(field.toIndex[0], float4(local, 1.0)),
+                   dot(field.toIndex[1], float4(local, 1.0)),
+                   dot(field.toIndex[2], float4(local, 1.0)));
+    let block = pass.cloudLayers + field.grid.x * kCloudLayerBlock;
+    let general = block[0];
+    let tiles = block[1];
+    float4 heightFraction;
+    var density = cloudCoverage(block, p, heightFraction);
+    if (all(density <= 0.0)) {
+        return 0.0;
+    }
+    // Turbulence: curl noise displacing the shapes, more so low in a layer.
+    let curl = noise2(kTurbulenceStart, kTurbulenceSize, 3, p.xy / tiles.y).xyz * 2.0 - 1.0;
+    let turbulence = general.y * curl *
+                     dot(density, remapClamped(heightFraction, float4(0.3), float4(0.0)));
+    // The shape, then the detail eroding its edges: fluffy at the top, wispy at the bottom.
+    let shape = noise3(0, kShapeSize, (p + turbulence) / general.w);
+    density = remapClamped(density, (1.0 - shape) * block[5], float4(1.0));
+    let detail = noise3(kDetailStart, kDetailSize, (p + turbulence) / tiles.x);
+    let modifier = lerp(float4(pow(detail, 6.0)), float4(1.0 - detail),
+                        remapClamped(heightFraction, float4(0.2), float4(0.4))) *
+                   block[6];
+    density = remapClamped(density * 2.0, modifier * 0.5, float4(1.0));
+    // Each layer's density scale and profile over its height.
+    let profile = block[10] * exp(block[11] * heightFraction) + block[12] * heightFraction +
+                  block[13];
+    density = saturate(density * block[4] * profile);
+    return density.x + density.y + density.z + density.w;
+}
+
+// Empty-space skipping through cloud layers (`stepAfterEmptyTile`'s), from field point `index` on
+// the ray `origin` + `step` t (steps `dt` from `start`, offset by `jitter`): between layers, the
+// step where the ray next enters one; in one where the weather lets no cloud form, the step half a
+// weather texel on across (no further than the layer's top or bottom); else 0.
+//
+// Reference: takram, three-geospatial's clouds (clouds.frag's march), 2024, MIT, Copyright (c)
+//   2024 Shota Matsuda (the layers' height intervals and the weather's test before the shapes').
+uint stepAfterClearSky(FieldGpu field, float3 index, float3 origin, float3 step, float start,
+                       float dt, float jitter) {
+    let block = pass.cloudLayers + field.grid.x * kCloudLayerBlock;
+    let bottoms = block[2];
+    let tops = block[3];
+    let t = dot(index - origin, step) / max(dot(step, step), 1e-30);
+    let z = index.z;
+    float next = t;
+    if (!any(z > bottoms && z < tops)) {
+        float enter = 1e30;
+        for (uint l = 0; l < 4; ++l) {
+            if (bottoms[l] >= tops[l]) {
+                continue;
+            }
+            if (step.z > 0.0 && z <= bottoms[l]) {
+                enter = min(enter, (bottoms[l] - origin.z) / step.z);
+            } else if (step.z < 0.0 && z >= tops[l]) {
+                enter = min(enter, (tops[l] - origin.z) / step.z);
+            }
+        }
+        next = enter;
+    } else {
+        float4 heightFraction;
+        if (any(cloudCoverage(block, index, heightFraction) > 0.0)) {
+            return 0;
+        }
+        let across = length(step.xy);
+        var ahead = across > 1e-9 ? 0.5 * block[0].z / float(kWeatherSize) / across : 1e30;
+        // No further than out of the layers it is in.
+        for (uint l = 0; l < 4; ++l) {
+            if (z > bottoms[l] && z < tops[l] && step.z != 0.0) {
+                let leave = ((step.z > 0.0 ? tops[l] : bottoms[l]) - origin.z) / step.z;
+                ahead = min(ahead, max(leave - t, 0.0));
+            }
+        }
+        next = t + ahead;
+    }
+    return uint(clamp(ceil((next - start) / dt - jitter), 0.0, 1e9));
 }

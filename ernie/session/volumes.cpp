@@ -37,6 +37,34 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         return std::nullopt;
     }
     const PrimTypeDef* type = PrimTypeOf(scene, target);
+    if (type != nullptr &&
+        type->IsA(CloudLayersField::Definition())) {
+        const CloudLayersField clouds(scene, target);
+        VolumeFieldParams field;
+        field.toVolume = toLocal * scene.WorldTransform(target);
+        CloudLayersParams& layers = field.cloudLayers.emplace();
+        layers.coverage = clouds.GetCoverage();
+        layers.extent = clouds.GetExtent();
+        layers.stepSize = clouds.GetStepSize();
+        layers.weatherTileSize = clouds.GetWeatherTileSize();
+        layers.weatherOffset = clouds.GetWeatherOffset();
+        layers.shapeTileSize = clouds.GetShapeTileSize();
+        layers.detailTileSize = clouds.GetDetailTileSize();
+        layers.turbulenceTileSize = clouds.GetTurbulenceTileSize();
+        layers.turbulenceDisplacement =
+            clouds.GetTurbulenceDisplacement();
+        layers.altitudes = clouds.GetLayerAltitudes();
+        layers.heights = clouds.GetLayerHeights();
+        layers.densities = clouds.GetLayerDensities();
+        layers.shapeAmounts = clouds.GetLayerShapeAmounts();
+        layers.detailAmounts = clouds.GetLayerDetailAmounts();
+        layers.weatherExponents = clouds.GetLayerWeatherExponents();
+        layers.shapeBiases = clouds.GetLayerShapeBiases();
+        layers.filterWidths = clouds.GetLayerCoverageFilterWidths();
+        layers.profiles = clouds.GetLayerDensityProfiles();
+        layers.channels = clouds.GetLayerChannels();
+        return field;
+    }
     if (type != nullptr && type->IsA(DenseField::Definition())) {
         const DenseField dense(scene, target);
         const Tensor* values = dense.GetValues();
