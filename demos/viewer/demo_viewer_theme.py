@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""The viewer restyled while it runs: a light, a dark and a
-high-contrast theme, then the accent, background and text colours,
-text size, corner rounding and spacing each changed live. The Demos
-panel puts the viewer's own theme back when another demo starts.
+"""The viewer restyled while it runs: it opens in a synthwave theme,
+with a light, a dark and a high-contrast one to choose, then the
+accent, background and text colours, text size, corner rounding and
+spacing each changed live. Reset Theme puts the viewer's own back, as
+the Demos panel does when another demo starts.
 
 References:
 - W3C, "Web Content Accessibility Guidelines (WCAG) 2.1", 2018,
@@ -58,11 +59,50 @@ HIGH_CONTRAST = {
     "frame_border": 2.0,
     "font_size": 16.0,
 }
-PRESETS = {"Light": {}, "Dark": DARK, "High contrast": HIGH_CONTRAST}
+# What the demo opens in: magenta and cyan on deep purple, rounded and
+# roomy, as far from the default as a theme goes.
+SYNTHWAVE = {
+    "background": (0.10, 0.04, 0.18, 1.0),
+    "panel": (0.15, 0.06, 0.25, 1.0),
+    "header": (0.30, 0.08, 0.45, 1.0),
+    "field": (0.08, 0.03, 0.14, 1.0),
+    "field_hovered": (0.20, 0.08, 0.32, 1.0),
+    "button": (0.45, 0.10, 0.55, 1.0),
+    "button_lit": (0.95, 0.25, 0.65, 1.0),
+    "separator": (0.95, 0.25, 0.65, 1.0),
+    "border": (0.15, 0.85, 0.95, 1.0),
+    "text": (0.98, 0.92, 1.0, 1.0),
+    "text_muted": (0.70, 0.60, 0.85, 1.0),
+    "selection": (0.55, 0.15, 0.60, 1.0),
+    "accent": (0.15, 0.95, 0.95, 1.0),
+    "outline": (1.0, 0.85, 0.10, 1.0),
+    "overlay": (0.15, 0.06, 0.25, 0.9),
+    "overlay_border": (0.15, 0.85, 0.95, 1.0),
+    "check_box": (0.08, 0.03, 0.14, 1.0),
+    "check_mark": (0.15, 0.95, 0.95, 1.0),
+    "rounding": 10.0,
+    "pill_rounding": 16.0,
+    "font_size": 17.0,
+    "frame_border": 2.0,
+    "frame_padding": (10.0, 5.0),
+    "item_spacing": (10.0, 8.0),
+}
+PRESETS = {
+    "Light": {},
+    "Dark": DARK,
+    "High contrast": HIGH_CONTRAST,
+    "Synthwave": SYNTHWAVE,
+}
+START = "Synthwave"
 # The contrast each preset's text needs against its panels: WCAG's AA
 # for body text, AAA for the high-contrast theme, and 3 for muted
 # labels.
-CONTRAST = {"Light": 4.5, "Dark": 4.5, "High contrast": 7.0}
+CONTRAST = {
+    "Light": 4.5,
+    "Dark": 4.5,
+    "High contrast": 7.0,
+    "Synthwave": 4.5,
+}
 MUTED_CONTRAST = 3.0
 
 
@@ -115,16 +155,17 @@ class Demo(ernie.demo.Demo):
             tokens.TRANSFORM,
             ernie.look_at_transform((0.0, -7.0, 3.0), (0.0, 0.0, 0.6)),
         )
-        self.preset = "Light"
+        self.preset = START
         self.theme = themed(self.preset)
         w = self.widgets
         presets = list(PRESETS)
-        w.combo(
+        self.presets = w.combo(
             "Preset",
             presets,
-            0,
+            presets.index(START),
             on_change=lambda index: self.choose(presets[index]),
         )
+        w.button("Reset Theme", lambda: self.choose("Light"))
         w.separator()
         self.accent = w.color(
             "Accent", self.theme.accent[:3],
@@ -158,10 +199,12 @@ class Demo(ernie.demo.Demo):
         self.apply()
 
     def choose(self, preset):
-        """Starts again from `preset`, its controls showing it."""
+        """Starts again from `preset`, its controls showing it; Light
+        is the viewer's own theme, which Reset Theme puts back."""
         self.preset = preset
         self.theme = themed(preset)
         w = self.widgets
+        w.set(self.presets, list(PRESETS).index(preset))
         w.set(self.accent, self.theme.accent[:3])
         w.set(self.background, self.theme.panel[:3])
         w.set(self.text, self.theme.text[:3])
@@ -203,10 +246,18 @@ class Demo(ernie.demo.Demo):
         def near(a, b):
             return all(abs(x - y) < 1e-6 for x, y in zip(a, b))
 
+        assert near(self.theme.accent, SYNTHWAVE["accent"]), (
+            "the demo should open in its synthwave theme"
+        )
         self.choose("Dark")
         self.paint("accent", (0.9, 0.5, 0.1))
         assert near(self.theme.accent, (0.9, 0.5, 0.1, 1.0))
         assert near(self.theme.panel, DARK["panel"])
+        # Reset Theme: the viewer's own.
+        self.choose("Light")
+        default = Theme()
+        assert near(self.theme.panel, default.panel)
+        assert self.theme.font_size == default.font_size
 
 
 if __name__ == "__main__":

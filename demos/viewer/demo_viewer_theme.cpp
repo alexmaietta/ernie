@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// The viewer restyled while it runs: a light, a dark and a
-// high-contrast theme, then the accent, background and text colours,
-// text size, corner rounding and spacing each changed live. The Demos
-// panel puts the viewer's own theme back when another demo starts.
+// The viewer restyled while it runs: it opens in a synthwave theme,
+// with a light, a dark and a high-contrast one to choose, then the
+// accent, background and text colours, text size, corner rounding and
+// spacing each changed live. Reset Theme puts the viewer's own back,
+// as the Demos panel does when another demo starts.
 //
 // References:
 // - W3C, "Web Content Accessibility Guidelines (WCAG) 2.1", 2018,
@@ -33,12 +34,15 @@ namespace {
 using namespace ernie;
 using demos::Check;
 
-const std::vector<std::string> kPresets = {"Light", "Dark",
-                                           "High contrast"};
+const std::vector<std::string> kPresets = {
+    "Light", "Dark", "High contrast", "Synthwave"};
+// The preset the demo opens in, and Light, the viewer's own.
+constexpr std::size_t kStart = 3;
+constexpr std::size_t kLight = 0;
 // The contrast each preset's text needs against its panels: WCAG's AA
 // for body text, AAA for the high-contrast theme, and 3 for muted
 // labels.
-constexpr std::array<double, 3> kContrast = {4.5, 4.5, 7.0};
+constexpr std::array<double, 4> kContrast = {4.5, 4.5, 7.0, 4.5};
 constexpr double kMutedContrast = 3.0;
 
 /// The viewer's default theme with preset `index`'s colours (sRGB,
@@ -85,6 +89,33 @@ app::Theme Themed(std::size_t index) {
         theme.checkMark = {0.0f, 0.0f, 0.0f, 1.0f};
         theme.frameBorder = 2.0f;
         theme.fontSize = 16.0f;
+    } else if (index == 3) {
+        // Magenta and cyan on deep purple, rounded and roomy, as far
+        // from the default as a theme goes.
+        theme.background = {0.10f, 0.04f, 0.18f, 1.0f};
+        theme.panel = {0.15f, 0.06f, 0.25f, 1.0f};
+        theme.header = {0.30f, 0.08f, 0.45f, 1.0f};
+        theme.field = {0.08f, 0.03f, 0.14f, 1.0f};
+        theme.fieldHovered = {0.20f, 0.08f, 0.32f, 1.0f};
+        theme.button = {0.45f, 0.10f, 0.55f, 1.0f};
+        theme.buttonLit = {0.95f, 0.25f, 0.65f, 1.0f};
+        theme.separator = {0.95f, 0.25f, 0.65f, 1.0f};
+        theme.border = {0.15f, 0.85f, 0.95f, 1.0f};
+        theme.text = {0.98f, 0.92f, 1.0f, 1.0f};
+        theme.textMuted = {0.70f, 0.60f, 0.85f, 1.0f};
+        theme.selection = {0.55f, 0.15f, 0.60f, 1.0f};
+        theme.accent = {0.15f, 0.95f, 0.95f, 1.0f};
+        theme.outline = {1.0f, 0.85f, 0.10f, 1.0f};
+        theme.overlay = {0.15f, 0.06f, 0.25f, 0.9f};
+        theme.overlayBorder = {0.15f, 0.85f, 0.95f, 1.0f};
+        theme.checkBox = {0.08f, 0.03f, 0.14f, 1.0f};
+        theme.checkMark = {0.15f, 0.95f, 0.95f, 1.0f};
+        theme.rounding = 10.0f;
+        theme.pillRounding = 16.0f;
+        theme.fontSize = 17.0f;
+        theme.frameBorder = 2.0f;
+        theme.framePadding = {10.0f, 5.0f};
+        theme.itemSpacing = {10.0f, 8.0f};
     }
     return theme;
 }
@@ -138,10 +169,12 @@ class ThemeDemo : public app::Demo {
             .SetFocalLength(24.0)
             .SetTransform(LookAtTransform(
                 {0.0, -7.0, 3.0}, {0.0, 0.0, 0.6}, {0.0, 0.0, 1.0}));
-        theme_ = Themed(0);
+        theme_ = Themed(kStart);
         app::WidgetPanel& w = Widgets();
-        w.Combo("Preset", kPresets, 0,
-                [this](std::size_t index) { Choose(index); });
+        presets_ =
+            w.Combo("Preset", kPresets, kStart,
+                    [this](std::size_t index) { Choose(index); });
+        w.Button("Reset Theme", [this] { Choose(kLight); });
         w.Separator();
         accent_ = w.Color("Accent", Rgb(theme_.accent),
                           [this](const std::array<double, 3>& rgb) {
@@ -199,6 +232,8 @@ class ThemeDemo : public app::Demo {
             Check(muted >= kMutedContrast,
                   kPresets[i] + "'s labels should read");
         }
+        Check(theme_.accent == Themed(kStart).accent,
+              "the demo should open in its synthwave theme");
         // Changing the accent keeps the rest of the theme.
         Choose(1);
         Paint(theme_.accent, {0.9, 0.5, 0.1});
@@ -209,13 +244,21 @@ class ThemeDemo : public app::Demo {
               "the accent should change");
         Check(theme_.panel == Themed(1).panel,
               "the panels should keep the dark theme's colour");
+        // Reset Theme: the viewer's own.
+        Choose(kLight);
+        const app::Theme defaults;
+        Check(theme_.panel == defaults.panel &&
+                  theme_.fontSize == defaults.fontSize,
+              "Reset Theme should give the viewer's own theme");
     }
 
   private:
-    /// Starts again from preset `index`, its controls showing it.
+    /// Starts again from preset `index`, its controls showing it;
+    /// Light is the viewer's own theme, which Reset Theme puts back.
     void Choose(std::size_t index) {
         theme_ = Themed(index);
         app::WidgetPanel& w = Widgets();
+        w.Set(presets_, index);
         w.Set(accent_, Rgb(theme_.accent));
         w.Set(background_, Rgb(theme_.panel));
         w.Set(text_, Rgb(theme_.text));
@@ -245,6 +288,7 @@ class ThemeDemo : public app::Demo {
     }
 
     app::Theme theme_;
+    app::WidgetPanel::Id presets_ = 0;
     app::WidgetPanel::Id accent_ = 0;
     app::WidgetPanel::Id background_ = 0;
     app::WidgetPanel::Id text_ = 0;
