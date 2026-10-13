@@ -205,7 +205,7 @@ struct MaterialGpu {
     // float4.
     float4 reflectance[16];
     // Emitted spectral radiance per band (W m^-2 sr^-1 nm^-1), four per float4: its colour's, in
-    // the visible; thermal emission is `thermalBand`'s.
+    // the visible; thermal emission is `planckBand`'s times the pixel's emissivity.
     float4 emission[16];
     // Thermal emissivity per band, four per float4.
     float4 emissivity[16];
@@ -3279,7 +3279,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                                (material.info.z == 2 ? bandAlbedo[j] : 1.0);
             }
             if (kelvin > 0.0 && !unlit) {
-                radiance[j] += thermalBand(ids.x, band, kelvin);
+                // Kirchhoff's emissivity from the pixel's own reflectance, which its albedo
+                // textures scale from the material's.
+                let own = reflectanceBand(ids.x, band) * material.transparency.y;
+                let relative = material.transparency.z > 0.5 && own > 0.0
+                                   ? bandAlbedo[j] / own
+                                   : 1.0;
+                let emissivity = 1.0 - (1.0 - emissivityBand(ids.x, band)) * relative;
+                radiance[j] += saturate(emissivity) * planckBand(band, kelvin);
             }
             // The atmosphere's sky and ground around it, diffusely; the dome's.
             let around = (kShadeAir ? surround[band] : 0.0) +
@@ -3648,10 +3655,10 @@ float planck(float wavelength, float kelvin) {
     return 1.1910430e20 * r * r * r * r * r / (exp(kPlanckC2 * r / kelvin) - 1.0);
 }
 
-// Material `id`'s thermal emission in band `band` at `kelvin`: its emissivity times Planck's
-// radiance averaged over the band by four-point Gauss-Legendre quadrature (RGB mode's bands as
-// spans of the visible, where only glowing surfaces emit).
-float thermalBand(uint id, uint band, float kelvin) {
+// A black body's radiance in band `band` at `kelvin`, which thermal emission takes times a pixel's
+// emissivity: Planck's radiance averaged over the band by four-point Gauss-Legendre quadrature
+// (RGB mode's bands as spans of the visible, where only glowing surfaces emit).
+float planckBand(uint band, float kelvin) {
     static const float2 kNodes[2] = { float2(0.3399810, 0.6521452), float2(0.8611363, 0.3478548) };
     let centre = sh.range.x + (float(band) + 0.5) * sh.range.y;
     var sum = 0.0;
@@ -3659,7 +3666,7 @@ float thermalBand(uint id, uint band, float kelvin) {
         let offset = 0.5 * sh.range.y * kNodes[k].x;
         sum += kNodes[k].y * (planck(centre - offset, kelvin) + planck(centre + offset, kelvin));
     }
-    return emissivityBand(id, band) * 0.5 * sum;
+    return 0.5 * sum;
 }
 
 // A black body's spectral radiance at `wavelength` (nm) over its value at 555 nm.

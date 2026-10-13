@@ -469,7 +469,10 @@ struct MaterialGpu {
     /// (`BrdfParams::extended`), 0 for none.
     std::uint64_t extended;
     /// Its opacity, a transparent surface's share of what reaches
-    /// the eye (`transmitMain`), 1 for opaque ones; three unused.
+    /// the eye (`transmitMain`), 1 for opaque ones; the luminance its
+    /// albedo is relative to; 1 when its emissivity is Kirchhoff's
+    /// (1 minus its reflectance), which pixels then take from their
+    /// own albedo; one unused.
     float transparency[4];
     /// How far the light it scatters beneath its surface spreads,
     /// per linear RGB channel in scene units, and 1 when it does
@@ -4532,6 +4535,12 @@ void RasterRenderer::WriteMaterialTable() {
         entry.transparency[0] =
             transparent ? std::clamp(settings.opacity, 0.0f, 1.0f)
                         : 1.0f;
+        // For a pixel's own emissivity (`thermalMain`): the luminance
+        // its albedo is relative to, and whether its emissivity is
+        // Kirchhoff's.
+        entry.transparency[1] = material->Luminance();
+        entry.transparency[2] =
+            settings.emissivity.Empty() ? 1.0f : 0.0f;
         if (params.size() > BrdfRegistry::kCoreParams) {
             entry.extended = extended.size() + 1;
             extended.push_back(std::bit_cast<float>(features));
@@ -4576,7 +4585,7 @@ void RasterRenderer::WriteMaterialTable() {
             }
         }
         // Thermal emission, when the frame has it on, which shading
-        // computes (shading.slang's `thermalBand`) at its
+        // computes (shading.slang's `planckBand`) at its
         // temperature, else the frame's default, or a pixel's own:
         // its emissivity, or 1 minus its reflectance (Kirchhoff), per
         // band, weighted by Planck's radiance at that temperature
