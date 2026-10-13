@@ -32,6 +32,8 @@ static const uint kHasInstanceTemperatures = 2048;
 // Instanced: whether each instance is drawn (`instanceVisible`); a hidden one's triangles have
 // no area.
 static const uint kHasInstanceVisibility = 4096;
+// Normals per triangle corner (`cornerNormals`, face-varying or uniform) in place of per point.
+static const uint kHasCornerNormals = 8192;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -56,6 +58,8 @@ struct MeshDraw {
     // `indices`); y: its slot in `activeCounts` plus 1, 0 for all its triangles drawn; z: with a
     // slot, the points it holds; w its thermal network's first node in `nodeTemperatures`.
     uint4 uv;
+    // x: the mesh's first corner in `cornerNormals` (as `uv.x` in `uvs`); yzw unused.
+    uint4 corners;
 }
 
 // The passes' buffers' addresses (renderer's `MeshResources`, mesh_drawable.cpp).
@@ -96,6 +100,9 @@ struct MeshResources {
     // (`kHasInstanceVisibility`, 0 hides it), double-buffered as `scales`.
     float* instanceTemperatures;
     float* instanceVisible;
+    // Normals per corner of every mesh's triangles (`kHasCornerNormals`), its levels of detail's
+    // too.
+    float* cornerNormals;
 }
 [[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
 static float* points = meshResources.points;
@@ -117,6 +124,7 @@ static float* nodeTemperatures = meshResources.nodeTemperatures;
 static float* tangents = meshResources.tangents;
 static float* instanceTemperatures = meshResources.instanceTemperatures;
 static float* instanceVisible = meshResources.instanceVisible;
+static float* cornerNormals = meshResources.cornerNormals;
 // The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
 // normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
 // the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
@@ -197,10 +205,12 @@ struct Placed {
 }
 
 Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint instanceBase,
-                   float4x4 model) {
+                   float4x4 model, uint triangleCorner) {
     let flags = d.offsets.w;
     var p = load3(points, pointBase + d.points.x + corner);
-    var n = (flags & kHasNormals) != 0 ? load3(normals, d.offsets.y + corner) : float3(0.0);
+    var n = (flags & kHasCornerNormals) != 0 ? load3(cornerNormals, d.corners.x + triangleCorner)
+            : (flags & kHasNormals) != 0     ? load3(normals, d.offsets.y + corner)
+                                             : float3(0.0);
     // A tangent lies in the surface, so moves as its points do (without their translation).
     var t = (flags & kHasTangents) != 0 ? load3(tangents, d.offsets.y + corner) : float3(0.0);
     if ((flags & kInstanced) != 0) {
@@ -258,13 +268,15 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
     }
     let corner = dead ? 0u : indices[d.offsets.x + call.indexOffset + vertexIndex];
     let index = d.offsets.y + corner;
-    let now = placeVertex(d, corner, instance, d.motion.z, d.motion.x, d.model);
+    let triangleCorner = call.indexOffset + vertexIndex;
+    let now = placeVertex(d, corner, instance, d.motion.z, d.motion.x, d.model, triangleCorner);
     MeshVertex v;
     v.world = now.world;
     v.normal = now.normal;
     v.tangent = now.tangent;
     if (motion != 1.0) {
-        let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous);
+        let before =
+            placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous, triangleCorner);
         v.world = lerp(before.world, now.world, motion);
         v.normal = lerp(before.normal, now.normal, motion);
         v.tangent = lerp(before.tangent, now.tangent, motion);
@@ -371,7 +383,8 @@ MotionVertexOutput meshMotionVertex(uint vertexIndex : SV_VertexID, uint instanc
     let instance = (d.offsets.w & kInstanced) != 0
                        ? instanceIds[d.offsets.z + call.instanceOffset + instanceIndex]
                        : 0u;
-    let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous);
+    let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous,
+                             call.indexOffset + vertexIndex);
     MotionVertexOutput out;
     out.layer = u.flags.z;
     out.position = projectWorld(v.world);
@@ -555,7 +568,8 @@ float3 twoSided(float3 normal, float3 flat, float3 toEye) {
 Minimal meshIds(VertexOutput in) {
     let d = draws[in.item];
     let flat = cross(ddx(in.world), ddy(in.world));
-    let normal = twoSided((d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
+    let normal = twoSided((d.offsets.w & (kHasNormals | kHasCornerNormals)) != 0 &&
+                                  dot(in.normal, in.normal) > 0.0
                               ? normalize(in.normal)
                               : normalize(flat),
                           flat, towardsViewer(in.world));
@@ -651,7 +665,8 @@ GBuffer meshGBuffer(VertexOutput in) {
     let d = draws[in.item];
     let toEye = towardsViewer(in.world);
     let flat = cross(ddx(in.world), ddy(in.world));
-    var normal = (d.offsets.w & kHasNormals) != 0 && dot(in.normal, in.normal) > 0.0
+    var normal = (d.offsets.w & (kHasNormals | kHasCornerNormals)) != 0 &&
+                         dot(in.normal, in.normal) > 0.0
                      ? normalize(in.normal)
                      : normalize(flat);
     normal = twoSided(normal, flat, toEye);

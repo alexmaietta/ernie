@@ -851,6 +851,67 @@ TEST_F(RasterDelegateTest, MeshesWithoutNormalsShadeSmooth) {
         << "the slopes still differ";
 }
 
+// The ridge with a normal per face (uniform): a hard edge, each slope
+// as flat as its foot; then the same as an indexed face-varying
+// primvar, which takes the place of `normals`.
+TEST_F(RasterDelegateTest,
+       UniformAndFaceVaryingNormalsMakeHardEdges) {
+    Scene scene = MeshScene();
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    const std::array<float, 18> points{-4, -4, 0,    0,  -4, 1.5f,
+                                       0,  4,  1.5f, -4, 4,  0,
+                                       4,  -4, 0,    4,  4,  0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const float slope = 1.5f / std::hypot(1.5f, 4.0f);
+    const float rise = 4.0f / std::hypot(1.5f, 4.0f);
+    const std::array<float, 6> faces{-slope, 0, rise, slope, 0, rise};
+    ernie::Mesh::Define(scene, "/World/Ridge")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetNormals(Tensor::Copy<float>(faces, {2, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetMaterialBinding("/Looks/Red");
+    RasterDelegate delegate(*context_);
+    const auto red = [&](const Tensor& image, float x) {
+        const float z = 1.5f * (1.0f - std::abs(x) / 4.0f);
+        return static_cast<int>(TexelAt(scene, image, {x, 0, z})[0]);
+    };
+    const Tensor uniform = delegate.Render(scene);
+    EXPECT_GT(red(uniform, 0.3f), red(uniform, -0.3f) + 30)
+        << "a hard edge";
+    EXPECT_NEAR(red(uniform, -0.3f), red(uniform, -3.5f), 4);
+    EXPECT_NEAR(red(uniform, 0.3f), red(uniform, 3.5f), 4);
+
+    scene.Clear("/World/Ridge", tokens::kNormals);
+    const std::string primvar = "primvars:normals";
+    const std::array<float, 6> swapped{slope,  0, rise,
+                                       -slope, 0, rise};
+    const std::array<std::int32_t, 8> which{1, 1, 1, 1, 0, 0, 0, 0};
+    scene.Write("/World/Ridge", primvar,
+                Tensor::Copy<float>(swapped, {2, 3}));
+    scene.Write("/World/Ridge", primvar + ":indices",
+                Tensor::Copy<std::int32_t>(which, {8}));
+    scene.Set("/World/Ridge", primvar + ":interpolation",
+              std::string("faceVarying"));
+    const Tensor faceVarying = delegate.Render(scene);
+    for (const float x : {-3.5f, -0.3f, 0.3f, 3.5f}) {
+        EXPECT_NEAR(red(faceVarying, x), red(uniform, x), 3)
+            << "face-varying as uniform at " << x;
+    }
+    // One normal for the mesh (constant), straight up: both slopes
+    // lit alike, as no triangle's own normal would have them.
+    scene.Clear("/World/Ridge", primvar + ":indices");
+    scene.Clear("/World/Ridge", primvar + ":interpolation");
+    const std::array<float, 3> up{0, 0, 1};
+    scene.Write("/World/Ridge", primvar,
+                Tensor::Copy<float>(up, {1, 3}));
+    const Tensor constant = delegate.Render(scene);
+    EXPECT_NEAR(red(constant, -3.5f), red(constant, 3.5f), 3);
+}
+
 TEST_F(RasterDelegateTest,
        CudaPointsOfDetailedPrototypesDrawAsHostOnes) {
     RasterDelegate delegate(*context_);

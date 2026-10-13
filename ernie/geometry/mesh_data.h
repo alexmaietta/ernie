@@ -14,6 +14,10 @@ struct MeshData {
     std::vector<std::uint32_t>
         indices;  ///< Three vertex indices per triangle.
     std::vector<float> normals;  ///< Empty, or x, y, z per vertex.
+    /// Empty, or normals x, y, z per triangle corner (per entry of
+    /// `indices`), for face-varying and uniform normals: hard edges
+    /// without split vertices. In place of `normals`.
+    std::vector<float> cornerNormals;
     std::vector<float>
         colors;  ///< Empty, or linear r, g, b per vertex.
     /// Empty, or texture coordinates s, t per triangle corner (per
@@ -37,6 +41,9 @@ struct MeshData {
     std::vector<std::uint32_t> lodIndices;
     /// Empty, or s, t per entry of `lodIndices` (with `uvs`).
     std::vector<float> lodUvs;
+    /// Empty, or x, y, z per entry of `lodIndices` (with
+    /// `cornerNormals`).
+    std::vector<float> lodCornerNormals;
 };
 
 /// Where each corner of `TriangulateFaces`' triangles comes from: its

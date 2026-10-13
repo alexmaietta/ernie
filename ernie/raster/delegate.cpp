@@ -2101,8 +2101,21 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         const Tensor* colours = scene.Read(path, kDisplayColor);
         const bool constantColour =
             colours == nullptr || colours->Elements() == 3;
-        const bool gpuColors = onGpu(kDisplayColor) && !constantColour;
+        const bool gpuColors =
+            onGpu(kDisplayColor) && !constantColour;
         key.second[3] = gpuNormals ? 1 : key.second[3];
+        // Normals on the host may be the primvar's, perhaps indexed,
+        // per corner by their interpolation (slot 3 too).
+        if (!gpuNormals) {
+            for (const std::string_view attribute :
+                 {"normals:interpolation", "primvars:normals",
+                  "primvars:normals:indices",
+                  "primvars:normals:interpolation"}) {
+                key.second[3] =
+                    key.second[3] * 0x100000001b3ull ^
+                    scene.AttributeVersion(path, attribute);
+            }
+        }
         key.second[4] = gpuColors ? 1 : key.second[4];
         if (constantColour) {
             key.second[4] = 0;

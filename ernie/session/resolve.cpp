@@ -3260,23 +3260,26 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
     return "st";
 }
 
-/// Texture coordinates `primvars:<name>` of the Mesh at `mesh` per
-/// face corner (per entry of `faceIndices`), whatever their
-/// interpolation, or empty without them.
-std::vector<float>
-TexCoordsOf(const Scene& scene, const Path& mesh,
-            const std::string& name, std::size_t points,
-            std::span<const std::int64_t> faceCounts,
-            std::span<const std::int64_t> faceIndices) {
+/// The values of `attribute` of the Mesh at `mesh`, `components`
+/// floats each, per face corner (per entry of `faceIndices`),
+/// whatever their interpolation (its `:interpolation`, else from
+/// their count, one per point read as `vertex` first when
+/// `vertexFirst`), and their interpolation; empty without them.
+std::pair<std::vector<float>, std::string>
+CornerValuesOf(const Scene& scene, const Path& mesh,
+               const std::string& attribute, std::size_t components,
+               std::size_t points,
+               std::span<const std::int64_t> faceCounts,
+               std::span<const std::int64_t> faceIndices,
+               bool vertexFirst = false) {
     using namespace tokens;
-    const std::string attribute = std::string(kPrimvarsPrefix) + name;
     const std::optional<std::vector<float>> values =
-        FloatAttribute(scene, mesh, attribute, 2);
+        FloatAttribute(scene, mesh, attribute, components);
     const std::size_t faceVertexCount = faceIndices.size();
     if (!values || faceVertexCount == 0) {
         return {};
     }
-    const std::size_t valueCount = values->size() / 2;
+    const std::size_t valueCount = values->size() / components;
     std::vector<std::int64_t> lookup;
     const std::string indicesName =
         attribute + std::string(kIndicesSuffix);
@@ -3297,8 +3300,9 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
         GetToken(scene, mesh,
                  attribute + std::string(kInterpolationSuffix), "");
     if (interpolation.empty()) {
-        interpolation = elements == faceVertexCount ? "faceVarying"
-                        : elements == points        ? "vertex"
+        interpolation = vertexFirst && elements == points ? "vertex"
+                        : elements == faceVertexCount ? "faceVarying"
+                        : elements == points          ? "vertex"
                         : elements == faceCounts.size() ? "uniform"
                         : elements == 1                 ? "constant"
                                                         : "";
@@ -3318,7 +3322,7 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
             (interpolation.empty() ? ""
                                    : " (" + interpolation + ")"));
     }
-    std::vector<float> uvs(2 * faceVertexCount);
+    std::vector<float> corners(components * faceVertexCount);
     std::size_t face = 0;
     std::size_t faceEnd =
         faceCounts.empty() ? 0
@@ -3336,10 +3340,27 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
         const auto value = static_cast<std::size_t>(
             indices != nullptr ? lookup[element]
                                : static_cast<std::int64_t>(element));
-        uvs[2 * c] = (*values)[2 * value];
-        uvs[2 * c + 1] = (*values)[2 * value + 1];
+        std::copy_n(values->begin() + static_cast<std::ptrdiff_t>(
+                                          components * value),
+                    components,
+                    corners.begin() +
+                        static_cast<std::ptrdiff_t>(components * c));
     }
-    return uvs;
+    return {std::move(corners), interpolation};
+}
+
+/// Texture coordinates `primvars:<name>` of the Mesh at `mesh` per
+/// face corner (per entry of `faceIndices`), whatever their
+/// interpolation, or empty without them.
+std::vector<float>
+TexCoordsOf(const Scene& scene, const Path& mesh,
+            const std::string& name, std::size_t points,
+            std::span<const std::int64_t> faceCounts,
+            std::span<const std::int64_t> faceIndices) {
+    return CornerValuesOf(scene, mesh,
+                          std::string(tokens::kPrimvarsPrefix) + name,
+                          2, points, faceCounts, faceIndices)
+        .first;
 }
 
 /// `data`'s control mesh (its points and colours, of `faceCounts` and
@@ -3889,10 +3910,46 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
             data.points.size()) {
             data.normals.assign(data.points.size(), 0.0f);
         }
-    } else if (std::optional<std::vector<float>> normals =
-                   FloatAttribute(scene, mesh, kNormals, 3)) {
-        if (normals->size() == data.points.size()) {
-            data.normals = std::move(*normals);
+    }
+    // Host normals, `primvars:normals` over `normals`: one per point,
+    // or per face corner (faceVarying, uniform or constant, perhaps
+    // indexed), which the triangles' corners carry; ignored when of
+    // another count.
+    std::vector<float> faceCornerNormals;
+    if (normalsTensor == nullptr ||
+        !IsGpu(normalsTensor->Location().kind)) {
+        const std::string primvar =
+            std::string(kPrimvarsPrefix) + std::string(kNormals);
+        const std::string attribute =
+            scene.Read(mesh, primvar) != nullptr ||
+                    scene.Get(mesh, primvar) != nullptr
+                ? primvar
+                : std::string(kNormals);
+        const std::string interpolation = GetToken(
+            scene, mesh,
+            attribute + std::string(kInterpolationSuffix), "");
+        const bool indexed =
+            scene.Read(mesh,
+                       attribute + std::string(kIndicesSuffix)) !=
+            nullptr;
+        if (std::optional<std::vector<float>> normals =
+                FloatAttribute(scene, mesh, attribute, 3)) {
+            if (!indexed &&
+                (interpolation.empty() ||
+                 interpolation == "vertex") &&
+                normals->size() == data.points.size()) {
+                data.normals = std::move(*normals);
+            } else if (!gpuIndices && !faceIndices.empty()) {
+                try {
+                    faceCornerNormals =
+                        CornerValuesOf(scene, mesh, attribute, 3,
+                                       count, faceCounts, faceIndices,
+                                       true)
+                            .first;
+                } catch (const std::invalid_argument&) {
+                    // Of no count it could be: ignored.
+                }
+            }
         }
     }
     if (const Tensor* colors = view.ReadDisplayColor()) {
@@ -3919,13 +3976,27 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
                                   cornerUvs, *level,
                                   options.stencils);
     }
-    if (!cornerUvs.empty()) {
+    if (!cornerUvs.empty() || !faceCornerNormals.empty()) {
         const std::vector<std::uint32_t> faceVertices =
             TriangulatedCorners(faceCounts).faceVertices;
-        data.uvs.resize(2 * faceVertices.size());
-        for (std::size_t c = 0; c < faceVertices.size(); ++c) {
-            data.uvs[2 * c] = cornerUvs[2 * faceVertices[c]];
-            data.uvs[2 * c + 1] = cornerUvs[2 * faceVertices[c] + 1];
+        if (!cornerUvs.empty()) {
+            data.uvs.resize(2 * faceVertices.size());
+            for (std::size_t c = 0; c < faceVertices.size(); ++c) {
+                data.uvs[2 * c] = cornerUvs[2 * faceVertices[c]];
+                data.uvs[2 * c + 1] =
+                    cornerUvs[2 * faceVertices[c] + 1];
+            }
+        }
+        if (!faceCornerNormals.empty()) {
+            data.cornerNormals.resize(3 * faceVertices.size());
+            for (std::size_t c = 0; c < faceVertices.size(); ++c) {
+                std::copy_n(faceCornerNormals.begin() +
+                                static_cast<std::ptrdiff_t>(
+                                    3 * faceVertices[c]),
+                            3,
+                            data.cornerNormals.begin() +
+                                static_cast<std::ptrdiff_t>(3 * c));
+            }
         }
     }
     return data;

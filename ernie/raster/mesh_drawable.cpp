@@ -45,6 +45,9 @@ constexpr std::uint32_t kHasTangents = 1024;
 /// and whether each instance is drawn.
 constexpr std::uint32_t kHasInstanceTemperatures = 2048;
 constexpr std::uint32_t kHasInstanceVisibility = 4096;
+/// Normals per triangle corner (face-varying or uniform), in place of
+/// per point.
+constexpr std::uint32_t kHasCornerNormals = 8192;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -65,8 +68,10 @@ struct GpuDraw {
                           ///< coordinate pool, its slot of active
                           ///< counts plus 1 (0 for none) and the
                           ///< points it holds; unused.
+    /// The mesh's first corner in the corner normal pool; unused.
+    std::uint32_t corners[4];
 };
-static_assert(sizeof(GpuDraw) == 272,
+static_assert(sizeof(GpuDraw) == 288,
               "GpuDraw must match MeshDraw in mesh.slang");
 
 struct DrawConstants {
@@ -430,8 +435,10 @@ struct MeshResources {
     /// (`MeshDrawable::instanceTemperatures_`, `instanceVisible_`).
     VkDeviceAddress instanceTemperatures;
     VkDeviceAddress instanceVisible;
+    /// Normals per corner (`MeshDrawable::cornerNormals_`).
+    VkDeviceAddress cornerNormals;
 };
-static_assert(sizeof(MeshResources) == 152,
+static_assert(sizeof(MeshResources) == 160,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -689,6 +696,62 @@ LodUvs(const std::vector<std::vector<glm::vec2>>& pointUvs,
     return uvs;
 }
 
+/// Per point of `data`, the distinct corner normals at it.
+std::vector<std::vector<glm::vec3>>
+PointNormals(const MeshData& data) {
+    std::vector<std::vector<glm::vec3>> normals(data.points.size() /
+                                                3);
+    for (std::size_t c = 0; c < data.indices.size(); ++c) {
+        const glm::vec3 n(data.cornerNormals[3 * c],
+                          data.cornerNormals[3 * c + 1],
+                          data.cornerNormals[3 * c + 2]);
+        std::vector<glm::vec3>& at = normals[data.indices[c]];
+        if (std::find(at.begin(), at.end(), n) == at.end()) {
+            at.push_back(n);
+        }
+    }
+    return normals;
+}
+
+/// Normals for the corners of simplified triangles `lodIndices`,
+/// whose corners are `points` of the full mesh: a point's own, or on
+/// a hard edge (several), the one nearest the simplified triangle's
+/// own normal, so each triangle keeps its side of the edge.
+std::vector<float> LodCornerNormals(
+    const std::vector<std::vector<glm::vec3>>& pointNormals,
+    std::span<const float> points,
+    std::span<const std::uint32_t> lodIndices) {
+    const auto point = [&](std::uint32_t i) {
+        return glm::vec3(points[3 * i], points[3 * i + 1],
+                         points[3 * i + 2]);
+    };
+    std::vector<float> normals;
+    normals.reserve(3 * lodIndices.size());
+    for (std::size_t t = 0; t + 2 < lodIndices.size(); t += 3) {
+        const glm::vec3 a = point(lodIndices[t]);
+        const glm::vec3 face =
+            glm::cross(point(lodIndices[t + 1]) - a,
+                       point(lodIndices[t + 2]) - a);
+        for (std::size_t k = 0; k < 3; ++k) {
+            const std::vector<glm::vec3>& at =
+                pointNormals[lodIndices[t + k]];
+            glm::vec3 best(0.0f);
+            float nearest = -std::numeric_limits<float>::infinity();
+            for (const glm::vec3& n : at) {
+                const float length = glm::length(n);
+                const float facing =
+                    length > 0.0f ? glm::dot(n, face) / length : 0.0f;
+                if (facing > nearest) {
+                    nearest = facing;
+                    best = n;
+                }
+            }
+            normals.insert(normals.end(), {best.x, best.y, best.z});
+        }
+    }
+    return normals;
+}
+
 }  // namespace
 
 MeshDrawable::MeshDrawable(RasterRenderer& renderer)
@@ -938,6 +1001,13 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
             "Mesh level texture coordinates must come one pair per "
             "corner");
     }
+    if (!data.cornerNormals.empty() &&
+        (data.cornerNormals.size() != 3 * data.indices.size() ||
+         (!data.levels.empty() && data.lodCornerNormals.size() !=
+                                      3 * data.lodIndices.size()))) {
+        throw std::invalid_argument(
+            "Mesh corner normals must come one per corner");
+    }
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
     mesh.data = std::move(data);
@@ -946,7 +1016,9 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     // (`mesh_normals.slang`) once and again whenever its points move.
     // Device triangles (`SetIndices`) leave them 0, which draws each
     // triangle's own.
-    if (mesh.data.normals.empty() && !mesh.data.indices.empty()) {
+    if (mesh.data.normals.empty() &&
+        mesh.data.cornerNormals.empty() &&
+        !mesh.data.indices.empty()) {
         mesh.data.normals.assign(mesh.data.points.size(), 0.0f);
         mesh.recomputeNormals = true;
         mesh.generatedNormals = true;
@@ -972,11 +1044,13 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     return handle;
 }
 
-void MeshDrawable::DropGeneratedNormals(Mesh& mesh) {
+void MeshDrawable::ForgetTriangleNormals(Mesh& mesh) {
     if (mesh.generatedNormals) {
         mesh.data.normals.clear();
         mesh.generatedNormals = false;
     }
+    mesh.data.cornerNormals.clear();
+    mesh.lodCornerNormals.clear();
 }
 
 void MeshDrawable::BuildLevels(Mesh& mesh) const {
@@ -987,6 +1061,7 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
         {0, static_cast<std::uint32_t>(data.indices.size()), 0.0f});
     mesh.lodIndices.clear();
     mesh.lodUvs.clear();
+    mesh.lodCornerNormals.clear();
     // Levels the mesh comes with (a subdivision surface's coarser
     // tessellations), taken as they are.
     if (!data.levels.empty()) {
@@ -1013,18 +1088,40 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
                 data.lodUvs.begin() +
                     static_cast<std::ptrdiff_t>(2 * end));
         }
+        if (!data.cornerNormals.empty()) {
+            mesh.lodCornerNormals.assign(
+                data.lodCornerNormals.begin(),
+                data.lodCornerNormals.begin() +
+                    static_cast<std::ptrdiff_t>(3 * end));
+        }
         mesh.data.levels = {};
         mesh.data.lodIndices = {};
         mesh.data.lodUvs = {};
+        mesh.data.lodCornerNormals = {};
         return;
     }
+    // Points on a seam or a hard edge (several texture coordinates or
+    // normals at them) stay as they are, so the levels keep both.
     std::vector<std::vector<glm::vec2>> pointUvs;
+    std::vector<std::vector<glm::vec3>> pointNormals;
     std::vector<unsigned char> locked;
+    if (!data.uvs.empty() || !data.cornerNormals.empty()) {
+        locked.assign(data.points.size() / 3, 0);
+    }
     if (!data.uvs.empty()) {
         pointUvs = PointUvs(data);
-        for (const std::vector<glm::vec2>& at : pointUvs) {
-            locked.push_back(
-                at.size() > 1 ? meshopt_SimplifyVertex_Lock : 0);
+        for (std::size_t p = 0; p < pointUvs.size(); ++p) {
+            if (pointUvs[p].size() > 1) {
+                locked[p] = meshopt_SimplifyVertex_Lock;
+            }
+        }
+    }
+    if (!data.cornerNormals.empty()) {
+        pointNormals = PointNormals(data);
+        for (std::size_t p = 0; p < pointNormals.size(); ++p) {
+            if (pointNormals[p].size() > 1) {
+                locked[p] = meshopt_SimplifyVertex_Lock;
+            }
         }
     }
     for (const MeshLevel& level : SimplifiedLevels<MeshLevel>(
@@ -1034,6 +1131,10 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
     }
     if (!data.uvs.empty()) {
         mesh.lodUvs = LodUvs(pointUvs, mesh.lodIndices);
+    }
+    if (!data.cornerNormals.empty()) {
+        mesh.lodCornerNormals = LodCornerNormals(
+            pointNormals, data.points, mesh.lodIndices);
     }
 }
 
@@ -1160,6 +1261,12 @@ void MeshDrawable::SetNormals(std::uint32_t mesh,
         geometryDirty_ = true;
     }
     target.generatedNormals = false;
+    // Normals per point from now on, in place of any per corner.
+    if (!target.data.cornerNormals.empty()) {
+        target.data.cornerNormals.clear();
+        target.lodCornerNormals.clear();
+        geometryDirty_ = true;
+    }
     target.deviceNormals = normals;
     target.normalsStream = stream;
     target.normalsDirty = true;
@@ -1337,13 +1444,14 @@ void MeshDrawable::SetIndices(std::uint32_t mesh,
     // Levels simplified from the host's placeholder zeros mean
     // nothing; nor do triangles around the points from them.
     target.levelsPending = false;
-    if (target.levels.size() > 1 || target.recomputeNormals) {
+    if (target.levels.size() > 1 || target.recomputeNormals ||
+        !target.data.cornerNormals.empty()) {
         target.levels.resize(1);
         target.lodIndices.clear();
         target.lodUvs.clear();
         target.recomputeNormals = false;
         target.adjacency.clear();
-        DropGeneratedNormals(target);
+        ForgetTriangleNormals(target);
         geometryDirty_ = true;
     }
     // The view `MapIndices` gave out, handed back: the triangles are
@@ -1465,13 +1573,14 @@ void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
         writers_.insert(mesh);
         // Levels simplified from the placeholders mean nothing.
         target.levelsPending = false;
-        if (target.levels.size() > 1 || target.recomputeNormals) {
+        if (target.levels.size() > 1 || target.recomputeNormals ||
+            !target.data.cornerNormals.empty()) {
             target.levels.resize(1);
             target.lodIndices.clear();
             target.lodUvs.clear();
             target.recomputeNormals = false;
             target.adjacency.clear();
-            DropGeneratedNormals(target);
+            ForgetTriangleNormals(target);
             geometryDirty_ = true;
         }
     } else {
@@ -2616,6 +2725,7 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
     std::vector<float> uvs;
+    std::vector<float> cornerNormals;
     // Smooth tangents, per point of every mesh, where an anisotropic
     // material shades one (none held otherwise).
     const bool tangents =
@@ -2678,6 +2788,14 @@ void MeshDrawable::RebuildGeometry() {
         uvs.insert(uvs.end(), mesh.data.uvs.begin(),
                    mesh.data.uvs.end());
         uvs.insert(uvs.end(), mesh.lodUvs.begin(), mesh.lodUvs.end());
+        mesh.firstCornerNormal =
+            static_cast<std::uint32_t>(cornerNormals.size() / 3);
+        cornerNormals.insert(cornerNormals.end(),
+                             mesh.data.cornerNormals.begin(),
+                             mesh.data.cornerNormals.end());
+        cornerNormals.insert(cornerNormals.end(),
+                             mesh.lodCornerNormals.begin(),
+                             mesh.lodCornerNormals.end());
         mesh.firstIndex = static_cast<std::uint32_t>(indices.size());
         mesh.firstVertex =
             static_cast<std::uint32_t>(points.size() / 3);
@@ -2795,6 +2913,7 @@ void MeshDrawable::RebuildGeometry() {
     // Shared, as triangles may be copied in from the compute device.
     indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
+    cornerNormals_ = StorageBuffer(context_, cornerNormals);
     adjacency_ = StorageBuffer(context_, adjacency);
     pendingNormals_.clear();
     pendingSkins_.clear();
@@ -3562,12 +3681,15 @@ void MeshDrawable::WriteDraws() {
                      ? kHasColors
                      : 0u;
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
+        flags |=
+            mesh.data.cornerNormals.empty() ? 0u : kHasCornerNormals;
         flags |= mesh.tangents ? kHasTangents : 0u;
         flags |= thermal_ ? kThermal : 0u;
         flags |= mesh.hasTemperatures ? kHasTemperatures : 0u;
         flags |= !mesh.nodeIds.empty() && mesh.hasNodeTemperatures
                      ? kHasNodes
                      : 0u;
+        draw.corners[0] = mesh.firstCornerNormal;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
         draw.uv[2] =
@@ -3975,7 +4097,8 @@ void MeshDrawable::WriteResources() {
             address(nodeTemperatures_),
             address(tangents_),
             address(instanceTemperatures_),
-            address(instanceVisible_)};
+            address(instanceVisible_),
+            address(cornerNormals_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);

@@ -845,7 +845,7 @@ class MeshDrawable : public RasterDrawable {
         /// come from the device.
         bool recomputeNormals = false;
         /// Whether its normals are ours, made for a mesh added
-        /// without any (`DropGeneratedNormals`).
+        /// without any (`ForgetTriangleNormals`).
         bool generatedNormals = false;
         /// Whether an anisotropic material shades it
         /// (`RasterRenderer::MaterialReadsTangents`), and whether it
@@ -880,6 +880,10 @@ class MeshDrawable : public RasterDrawable {
         /// start in the texture coordinate pool, in corners.
         std::vector<float> lodUvs;
         std::uint32_t firstUv = 0;
+        /// As `lodUvs` and `firstUv` for normals per corner
+        /// (`MeshData::cornerNormals`), in corners.
+        std::vector<float> lodCornerNormals;
+        std::uint32_t firstCornerNormal = 0;
     };
 
     struct Instancer {
@@ -1003,11 +1007,12 @@ class MeshDrawable : public RasterDrawable {
     /// Simplifies a mesh's coarser levels of detail from its host
     /// data.
     void BuildLevels(Mesh& mesh) const;
-    /// Forgets normals made for a mesh added without any, once its
-    /// triangles come from the GPU (a writer, device indices), where
-    /// none around its points are known: it shades each triangle's
-    /// own again and a writer sees no normals.
-    static void DropGeneratedNormals(Mesh& mesh);
+    /// Forgets the normals that follow the host's triangles once a
+    /// mesh's triangles come from the GPU (a writer, device indices):
+    /// those made for a mesh added without any, and normals per
+    /// corner. It shades each triangle's own then, and a writer sees
+    /// no normals.
+    static void ForgetTriangleNormals(Mesh& mesh);
     void RebuildInstances();
     /// Lays out the composed instancers: their raw arrays' and
     /// parents' offsets, their ops, and each instance's level, in
@@ -1228,6 +1233,9 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GpuBuffer>
         uvs_;  ///< Meshes' texture coordinates per corner
                ///< (`Mesh::firstUv`).
+    std::unique_ptr<GpuBuffer>
+        cornerNormals_;  ///< Meshes' normals per corner
+                         ///< (`Mesh::firstCornerNormal`).
     /// Every recomputing mesh's `Mesh::adjacency`, one after another.
     std::unique_ptr<GpuBuffer> adjacency_;
     PipelineLayout normalsLayout_;

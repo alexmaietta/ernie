@@ -94,9 +94,11 @@
                               .group = "Geometry", .integer = true,                                \
                               .dirty = ::ernie::Dirty::Topology}))                                 \
     X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
-      (::ernie::AttributeMeta{.doc = "(n, 3) normals, one per point; ignored when of another "     \
-                                     "count. Without them, smooth ones from the triangles, "       \
-                                     "computed on the GPU.",                                       \
+      (::ernie::AttributeMeta{.doc = "(n, 3) normals: one per point, or per face vertex, face or "  \
+                                     "mesh (normals:interpolation as USD's, else by count) for "   \
+                                     "hard edges; primvars:normals, perhaps indexed, in their "    \
+                                     "place; ignored when of another count. Without them, smooth " \
+                                     "ones from the triangles, computed on the GPU.",              \
                               .group = "Geometry", .dirty = ::ernie::Dirty::Points}))              \
     X(::ernie::Tensor, ActiveCounts, ::ernie::tokens::kActiveCounts, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "int32 (n >= 2,): the points and triangle indices in use, "   \

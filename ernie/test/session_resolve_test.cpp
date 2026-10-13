@@ -258,6 +258,57 @@ TEST(MeshDataOf, ReadsPointsTopologyNormalsAndVertexColours) {
                  std::invalid_argument);
 }
 
+// Two quads sharing an edge: normals per face (uniform) reach every
+// corner of each face's two triangles, an indexed face-varying
+// primvar takes the place of `normals`, a constant one reaches every
+// corner, and one per point stays per point.
+TEST(MeshDataOf, ReadsNormalsPerCornerWithAnyInterpolation) {
+    Scene scene;
+    const std::array<float, 18> points{0, 0, 0, 1, 0, 0, 1, 1, 0,
+                                       0, 1, 0, 2, 0, 0, 2, 1, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const std::array<float, 6> faces{1, 0, 0, 0, 1, 0};
+    ernie::Mesh::Define(scene, "/Mesh")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetNormals(Tensor::Copy<float>(faces, {2, 3}));
+    ernie::MeshData data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_TRUE(data.normals.empty());
+    ASSERT_EQ(data.cornerNormals.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerNormals[0], 1.0f) << "face 0's";
+    EXPECT_EQ(data.cornerNormals[3 * 6 + 1], 1.0f) << "face 1's";
+
+    const std::array<float, 6> pair{0, 0, 1, 0, 0, -1};
+    const std::array<std::int32_t, 8> which{1, 1, 1, 1, 0, 0, 0, 0};
+    scene.Write("/Mesh", "primvars:normals",
+                Tensor::Copy<float>(pair, {2, 3}));
+    scene.Write("/Mesh", "primvars:normals:indices",
+                Tensor::Copy<std::int32_t>(which, {8}));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    ASSERT_EQ(data.cornerNormals.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerNormals[2], -1.0f) << "face 0's, indexed";
+    EXPECT_EQ(data.cornerNormals[3 * 6 + 2], 1.0f);
+
+    const std::array<float, 3> up{0, 0, 1};
+    scene.Clear("/Mesh", "primvars:normals:indices");
+    scene.Write("/Mesh", "primvars:normals",
+                Tensor::Copy<float>(up, {1, 3}));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    ASSERT_EQ(data.cornerNormals.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerNormals[3 * 11 + 2], 1.0f) << "constant";
+
+    const std::array<float, 18> perPoint{0, 0, 1, 0, 0, 1, 0, 0, 1,
+                                         0, 0, 1, 0, 0, 1, 0, 0, 1};
+    scene.Write("/Mesh", "primvars:normals",
+                Tensor::Copy<float>(perPoint, {6, 3}));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_EQ(data.normals.size(), 18u);
+    EXPECT_TRUE(data.cornerNormals.empty());
+}
+
 TEST(MeshDataOf,
      ReadsTextureCoordinatesPerTriangleCornerWithAnyInterpolation) {
     // Two triangles over four points: 6 face vertices, 2 faces.
