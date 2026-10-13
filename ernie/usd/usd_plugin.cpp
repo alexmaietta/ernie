@@ -892,6 +892,9 @@ class Importer {
             TranslateInstancer(source, ds, path);
         } else if (type == HdPrimTypeTokens->camera) {
             TranslateCamera(ds, path);
+            if (usd) {
+                CameraExposure(usd, path);
+            }
         } else if (HdPrimTypeIsLight(type)) {
             TranslateLight(ds, path);
             if (usd) {
@@ -1579,6 +1582,26 @@ class Importer {
         }
         ConstantColor(ds, path);
         Bind(ds, path);
+    }
+
+    /// A camera's exposure (its stops, shutter time, ISO, f-stop and
+    /// responsivity) and shutter interval as the file authors them,
+    /// under the same names in Ernie: unauthored, Ernie's defaults
+    /// (USD's fallbacks too) stand, where Hydra would give fallbacks.
+    void CameraExposure(const UsdPrim& camera,
+                        const std::string& path) {
+        for (const char* name :
+             {"exposure", "exposure:time", "exposure:iso",
+              "exposure:fStop", "exposure:responsivity",
+              "shutter:open", "shutter:close"}) {
+            const UsdAttribute attribute =
+                camera.GetAttribute(TfToken(name));
+            VtValue value;
+            if (attribute && attribute.HasAuthoredValue() &&
+                attribute.Get(&value, time_)) {
+                Call(path, [&] { SetValue(path, name, value); });
+            }
+        }
     }
 
     void TranslateCamera(const HdContainerDataSourceHandle& ds,

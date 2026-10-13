@@ -1041,6 +1041,57 @@ def Xform "Set"
     }
 }
 
+TEST_F(UsdImportTest, CamerasKeepTheirExposureAndShutter) {
+    const std::filesystem::path file = dir_ / "exposure.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Shot"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Shot"
+{
+    def Camera "Day"
+    {
+        float exposure = -1.5
+        float exposure:time.timeSamples = { 1: 0.002, 24: 0.004 }
+        float exposure:iso = 400
+        float exposure:fStop = 8
+        float exposure:responsivity = 0.5
+        double shutter:open = -0.25
+        double shutter:close = 0.25
+    }
+    def Camera "Plain"
+    {
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Shot"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    const Path day("/World/Shot/Day");
+    const auto number = [&](const Path& path,
+                            std::string_view attribute) {
+        return scene_.Get<double>(path, attribute, -100.0);
+    };
+    EXPECT_DOUBLE_EQ(number(day, tokens::kCameraExposure), -1.5);
+    EXPECT_DOUBLE_EQ(number(day, tokens::kExposureIso), 400.0);
+    EXPECT_DOUBLE_EQ(number(day, tokens::kExposureFStop), 8.0);
+    EXPECT_DOUBLE_EQ(number(day, tokens::kExposureResponsivity), 0.5);
+    EXPECT_DOUBLE_EQ(number(day, tokens::kShutterOpen), -0.25);
+    EXPECT_DOUBLE_EQ(number(day, tokens::kShutterClose), 0.25);
+    EXPECT_EQ(scene_.SamplesOf(day, tokens::kExposureTime).size(), 2u)
+        << "the shutter time, sampled";
+    // Unauthored: Ernie's defaults, not Hydra's fallbacks written in.
+    const Path plain("/World/Shot/Plain");
+    for (const std::string_view attribute :
+         {tokens::kCameraExposure, tokens::kExposureTime,
+          tokens::kExposureIso, tokens::kShutterClose}) {
+        EXPECT_EQ(scene_.Get(plain, attribute), nullptr) << attribute;
+    }
+}
+
 TEST_F(UsdImportTest, MissingFilesThrow) {
     EXPECT_THROW(ernie::ImportUsd(scene_, Path("/World/none"),
                                   dir_ / "missing.usda"),
