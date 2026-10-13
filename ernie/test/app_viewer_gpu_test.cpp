@@ -1464,3 +1464,25 @@ TEST_F(ViewerTest, InfoPanelDrawsTheSensors) {
     }
     EXPECT_NE(viewer_->FindPanel("Info"), nullptr);
 }
+
+TEST_F(ViewerTest, LoadingKeepsAViewTheApplicationAimed) {
+    // As a demo loads: the scene cleared and rebuilt, then the
+    // session reset. Aimed with LookAt, the view stays; untouched, it
+    // frames the scene, the cube in the middle of the view.
+    const auto eyeOf = [&] {
+        return glm::dvec3(viewer_->GetScene().WorldTransform(
+            Viewer::PerspectiveCamera())[3]);
+    };
+    viewer_->ClearScene();
+    Cube::Define(viewer_->GetScene(), "/World/Cube").SetSize(2.0);
+    viewer_->LookAt({30.0, 0.0, 5.0}, {0.0, 0.0, 0.0});
+    viewer_->ResetSession();
+    EXPECT_NEAR(glm::distance(eyeOf(), glm::dvec3(30.0, 0.0, 5.0)),
+                0.0, 1e-4);
+    viewer_->ClearScene();
+    Cube::Define(viewer_->GetScene(), "/World/Cube").SetSize(2.0);
+    viewer_->ResetSession();
+    EXPECT_GT(glm::distance(eyeOf(), glm::dvec3(30.0, 0.0, 5.0)), 1.0)
+        << "framed, not left where the last view was";
+    EXPECT_LT(glm::length(eyeOf()), 30.0);
+}

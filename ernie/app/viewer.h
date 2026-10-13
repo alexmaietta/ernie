@@ -530,13 +530,15 @@ class Viewer {
     const Path& ActiveCamera() const;
 
     /// Looks through the Camera prim at `camera`, the viewer's or the
-    /// scene's.
+    /// scene's; a scene camera orbits where it looks into the scene.
     /// @throws std::invalid_argument if `camera` is not a Camera
     /// prim.
     void SetActiveCamera(Path camera);
 
     /// Frames `paths` (the whole scene when empty) with the active
-    /// camera (the F key).
+    /// camera (the F key). After it, or `LookAt`, the view stays as
+    /// set when a demo or scene finishes loading (`ResetSession`),
+    /// which otherwise frames the scene.
     void Frame(std::span<const Path> paths = {});
 
     /// Puts the active camera at `eye` looking at `target` (z up),

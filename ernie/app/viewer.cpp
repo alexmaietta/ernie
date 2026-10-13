@@ -674,6 +674,10 @@ struct Viewer::State {
     /// What the application chose since the scene was last cleared
     /// (`ClearScene`), which `ResetSession` keeps.
     bool cameraChosen = false;
+    /// Whether the application aimed the view itself (`LookAt`,
+    /// `Frame`) since the scene was cleared, which `ResetSession`
+    /// then keeps.
+    bool viewChosen = false;
     bool lightingChosen = false;
     bool settingsChosen = false;
     std::vector<std::unique_ptr<Panel>> panels;
@@ -1100,10 +1104,14 @@ struct Viewer::State {
                                              : Lighting::Default;
         }
         delegate->Sync(scene);
+        // Framing the scene unless the application aimed the view
+        // itself (`LookAt`, `Frame`) or chose a camera.
         if (!cameraChosen || !scene.Has(activeCamera)) {
             orthographicView = -1;
             activeCamera = PerspectiveCamera();
-            FrameBounds(SceneBounds());
+            if (!viewChosen) {
+                FrameBounds(SceneBounds());
+            }
         }
     }
 
@@ -1231,6 +1239,28 @@ struct Viewer::State {
                         : requestedViewport.height;
     }
 
+    /// How far ahead of a camera at `world` the view orbits: to where
+    /// it looks into the scene's box (its centre's depth along the
+    /// view, at least a tenth of the box), or the box's size when it
+    /// looks away; the last distance without a box.
+    double PivotDistance(const glm::dmat4& world) const {
+        const std::optional<Bounds3> bounds = SceneBounds();
+        if (!bounds) {
+            return controller.distance;
+        }
+        const glm::dvec3 centre = 0.5 * (glm::dvec3(bounds->first) +
+                                         glm::dvec3(bounds->second));
+        const double size =
+            std::max(glm::length(glm::dvec3(bounds->second) -
+                                 glm::dvec3(bounds->first)),
+                     1e-3);
+        const glm::dvec3 eye(world[3]);
+        const glm::dvec3 forward =
+            -glm::normalize(glm::dvec3(world[2]));
+        const double depth = glm::dot(centre - eye, forward);
+        return depth > 0.0 ? std::max(depth, 0.1 * size) : size;
+    }
+
     void SetActive(const Path& camera) {
         activeCamera = camera;
         if (camera != PerspectiveCamera()) {
@@ -1238,9 +1268,9 @@ struct Viewer::State {
                 CameraParamsOf(scene, camera, ViewportWidth(),
                                ViewportHeight())
                     .VerticalFov());
-            controller =
-                ControllerFromTransform(scene.WorldTransform(camera),
-                                        controller.distance, fov);
+            const glm::dmat4 world = scene.WorldTransform(camera);
+            controller = ControllerFromTransform(
+                world, PivotDistance(world), fov);
         } else if (scene.Has(camera)) {
             const CameraParams current = CameraParamsOf(
                 scene, camera, ViewportWidth(), ViewportHeight());
@@ -3139,6 +3169,30 @@ struct Viewer::State {
     /// the active camera's lens and exposure in place, its focal
     /// length, focus distance, f-stop and ISO, and automatic
     /// exposure.
+    /// `text` over the viewport's image as one frame-high item,
+    /// readable on light and dark pictures alike: light grey with a
+    /// dark outline.
+    void ImageLabel(const char* text) {
+        const ImVec2 cursor = ImGui::GetCursorScreenPos();
+        const ImVec2 at(cursor.x,
+                        cursor.y + ImGui::GetStyle().FramePadding.y);
+        const ImVec2 size = ImGui::CalcTextSize(text);
+        ImGui::Dummy(ImVec2(size.x, ImGui::GetFrameHeight()));
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const float step = std::max(1.0f, std::round(contentScale));
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx != 0 || dy != 0) {
+                    draw->AddText(
+                        ImVec2(at.x + static_cast<float>(dx) * step,
+                               at.y + static_cast<float>(dy) * step),
+                        IM_COL32(0, 0, 0, 220), text);
+                }
+            }
+        }
+        draw->AddText(at, IM_COL32(225, 225, 225, 255), text);
+    }
+
     void DrawCameraBar() {
         if (ImGui::Button(cameraBarOpen ? "<<" : ">>")) {
             cameraBarOpen = !cameraBarOpen;
@@ -3158,8 +3212,7 @@ struct Viewer::State {
                                double value, float speed, float low,
                                float high, const char* format) {
             ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%s", label);
+            ImageLabel(label);
             ImGui::SameLine();
             float shown = static_cast<float>(value);
             ImGui::SetNextItemWidth(width);
@@ -3178,10 +3231,16 @@ struct Viewer::State {
               0.05f, 0.0f, 64.0f, "%.1f");
         ImGui::SameLine();
         bool automatic = AutoExposing();
-        if (ImGui::Checkbox("AE", &automatic)) {
+        if (ImGui::Checkbox("##ae", &automatic)) {
             exposure = automatic ? Viewer::Exposure::Auto
                                  : Viewer::Exposure::Camera;
         }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Automatic exposure, in the viewport "
+                              "only");
+        }
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImageLabel("AE");
         field("ISO", "##iso", tokens::kExposureIso,
               camera.GetExposureIso(), 1.0f, 1.0f, 409600.0f, "%.0f");
     }
@@ -4637,6 +4696,7 @@ void Viewer::ClearScene() {
     s.activeCamera = PerspectiveCamera();
     s.settingsSource = {};
     s.cameraChosen = s.lightingChosen = s.settingsChosen = false;
+    s.viewChosen = false;
 }
 
 std::uint64_t Viewer::NewScope() {
@@ -4863,6 +4923,7 @@ void Viewer::Frame(std::span<const Path> paths) {
     } else {
         s.FrameBounds(s.SceneBounds());
     }
+    s.viewChosen = true;
 }
 
 void Viewer::LookAt(const glm::dvec3& eye, const glm::dvec3& target) {
@@ -4871,6 +4932,7 @@ void Viewer::LookAt(const glm::dvec3& eye, const glm::dvec3& target) {
         LookAtTransform(eye, target, {0.0, 0.0, 1.0}),
         glm::distance(eye, target), s.controller.verticalFov);
     s.WriteActiveCamera();
+    s.viewChosen = true;
 }
 
 Path Viewer::CameraFromView(const Path& path) {
