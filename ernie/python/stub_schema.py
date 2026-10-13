@@ -20,6 +20,7 @@ _TYPES = {
     AttributeKind.VEC3: "tuple[float, float, float]",
     AttributeKind.VEC4: "tuple[float, float, float, float]",
     AttributeKind.TOKEN: "str",
+    AttributeKind.TOKEN_ARRAY: "list[str]",
     AttributeKind.RELATIONSHIP: "Path | None",
     AttributeKind.RELATIONSHIPS: "list[Path]",
     AttributeKind.FLOAT_ARRAY: "list[float]",
@@ -65,7 +66,10 @@ def _doc(text, indent):
 def _attribute_doc(attribute):
     parts = [attribute.doc] if attribute.doc else []
     default = attribute.default
-    if default not in (None, "", []):
+    # Defaults may be arrays, which do not compare as one truth value.
+    if default is not None and not (
+        hasattr(default, "__len__") and len(default) == 0
+    ):
         parts.append(f"Default {default!r}.")
     parts.append(f"USD name `{attribute.name}`.")
     return " ".join(parts)
