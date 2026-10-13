@@ -397,6 +397,54 @@ std::string VertexDataFill(const std::string& variable,
     return {};
 }
 
+/// The bridge functions MaterialX shaders call (`MaterialXShader`),
+/// declared extern: the shading pass that imports the generated
+/// module defines them (`export`), and Slang links the two.
+constexpr const char* kBridgeDeclarations =
+    R"(// Ernie's bridge (ernie/session/materialx.h, MaterialXShader).
+extern float3 ernieMxPositionWorld();
+extern float3 ernieMxNormalWorld();
+extern float3 ernieMxTangentWorld();
+extern float3 ernieMxBitangentWorld();
+extern float3 ernieMxPositionObject();
+extern float3 ernieMxNormalObject();
+extern float3 ernieMxTangentObject();
+extern float3 ernieMxBitangentObject();
+extern float2 ernieMxTexcoord(int set);
+extern float4 ernieMxColor(int set);
+extern float ernieMxGeomPropFloat(int id);
+extern float2 ernieMxGeomPropFloat2(int id);
+extern float3 ernieMxGeomPropFloat3(int id);
+extern float4 ernieMxGeomPropFloat4(int id);
+extern int ernieMxGeomPropInt(int id);
+extern float3 ernieMxViewPosition();
+extern float ernieMxTime();
+extern float ernieMxFrame();
+extern float4x4 ernieMxWorldMatrix();
+extern float4x4 ernieMxWorldInverseMatrix();
+extern float4x4 ernieMxViewMatrix();
+extern float4x4 ernieMxViewInverseMatrix();
+extern float4x4 ernieMxProjectionMatrix();
+extern float ernieMxLoadFloat(uint offset);
+extern int ernieMxLoadInt(uint offset);
+extern float2 ernieMxLoadFloat2(uint offset);
+extern float3 ernieMxLoadFloat3(uint offset);
+extern float4 ernieMxLoadFloat4(uint offset);
+extern float3x3 ernieMxLoadFloat3x3(uint offset);
+extern float4x4 ernieMxLoadFloat4x4(uint offset);
+extern float4 ernieMxSample(uint slot, float2 uv);
+extern float4 ernieMxSampleLevel(uint slot, float2 uv, float lod);
+extern float4 ernieMxSampleGrad(uint slot, float2 uv, float2 dx, float2 dy);
+extern int2 ernieMxTextureSize(uint slot, int level);
+extern int ernieMxTextureLevels(uint slot);
+extern int ernieMxLightCount();
+extern float3 ernieMxLightDirection(int light);
+extern void ernieMxLightResponse(int light, float3 response);
+extern float3 ernieMxEnvironmentRadiance(float3 direction, float alpha);
+extern float3 ernieMxEnvironmentIrradiance(float3 normal);
+
+)";
+
 /// Corrects what MaterialX 1.39.5's Slang generation leaves invalid
 /// in `code`, where it turns its shared GLSL into Slang token by
 /// token (SlangShaderGenerator::SlangSyntaxFromGlsl):
@@ -449,6 +497,7 @@ class ErnieSlangShaderGenerator : public mx::SlangShaderGenerator {
                         mx::GenContext& context,
                         mx::ShaderStage& stage) const override {
         emitDirectives(context, stage);
+        emitString(kBridgeDeclarations, stage);
         emitTextures(stage);
         emitTypeDefinitions(context, stage);
         emitConstants(context, stage);
