@@ -578,6 +578,26 @@ void meshShadowCutoutFragment(ShadowCutoutOutput in) {
     }
 }
 
+// `color` coloured by texture loading when its debug view is on (`Uniforms::flags.y`): magenta
+// while the material's albedo texture loads; on a virtual one, green where its tiles are as fine
+// as wanted, through yellow a mip coarser to red three or more.
+float3 textureLoadingTint(float3 color) {
+    if (u.flags.y == 0) {
+        return color;
+    }
+    if (surface.detailMean.a > 0.5) {
+        return lerp(color, float3(1.0, 0.0, 1.0), 0.7);
+    }
+    if (surface.textures.x > 1.5) {
+        let coarser = saturate(virtualAlbedoCoarseness() / 3.0);
+        let heat = coarser < 0.5
+                       ? lerp(float3(0.1, 0.9, 0.1), float3(1.0, 0.9, 0.1), coarser * 2.0)
+                       : lerp(float3(1.0, 0.9, 0.1), float3(1.0, 0.1, 0.1), coarser * 2.0 - 1.0);
+        return lerp(color, heat, 0.6);
+    }
+    return color;
+}
+
 GBuffer meshGBuffer(VertexOutput in) {
     let d = draws[in.item];
     let toEye = towardsViewer(in.world);
@@ -589,7 +609,8 @@ GBuffer meshGBuffer(VertexOutput in) {
     var shadingNormal = normal;
     let textured = uvTextures(in.uv, in.world, shadingNormal);
     let detail = triplanarDetail(in.world, shadingNormal);
-    let modulation = cascadeTint(in.color * textured.albedo * detail.albedo, in.world);
+    let modulation = textureLoadingTint(
+        cascadeTint(in.color * textured.albedo * detail.albedo, in.world));
     let unlit = hiddenLine();
     GBuffer out;
     // Its temperature: its points' or their nodes' (a solver's), else its own, else its material's

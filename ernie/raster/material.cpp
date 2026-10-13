@@ -658,12 +658,15 @@ RasterMaterial::RasterMaterial(const VulkanContext& context,
 void RasterMaterial::SetTexture(
     MaterialTextureSlot slot,
     std::shared_ptr<const MaterialTexture> texture,
-    const TextureReader& reader) {
+    const TextureReader& reader, bool loading) {
     auto sampler = TextureSampler(context_, reader);
     vkDeviceWaitIdle(context_.Device());
     const auto index = static_cast<std::size_t>(slot);
     textures_[index] = std::move(texture);
     samplers_[index] = std::move(sampler);
+    if (slot == MaterialTextureSlot::Albedo) {
+        albedoLoading_ = loading;
+    }
     WriteUniform();
 }
 
@@ -873,6 +876,7 @@ void RasterMaterial::WriteUniform() {
     u.detailMean[0] = detailMean_.r;
     u.detailMean[1] = detailMean_.g;
     u.detailMean[2] = detailMean_.b;
+    u.detailMean[3] = albedoLoading_ ? 1.0f : 0.0f;
     u.hex[0] = detail.hexTiling ? 1.0f : 0.0f;
     u.hex[1] = std::clamp(detail.hexRotation, 0.0f, 1.0f);
     u.hex[2] = std::clamp(detail.hexContrast, 0.0f, 1.0f);

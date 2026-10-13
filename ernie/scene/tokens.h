@@ -1026,7 +1026,8 @@ inline constexpr std::string_view kThermalTemperatureTexture =
 /// registered one), its pixels' temperature computed as they render;
 /// empty for none. Its float parameters in the model's order (missing
 /// ones its defaults), and float data it reads (a diurnal table).
-inline constexpr std::string_view kThermalModel = "ernie:thermal:model";
+inline constexpr std::string_view kThermalModel =
+    "ernie:thermal:model";
 inline constexpr std::string_view kThermalModelParams =
     "ernie:thermal:model:params";
 inline constexpr std::string_view kThermalModelData =
@@ -1049,6 +1050,11 @@ inline constexpr std::string_view kThermalNodeTemperatures =
 /// textures' placeholders).
 inline constexpr std::string_view kTextureLoading =
     "ernie:textureLoading";
+/// RenderSettings' debug view of texture loading (Ernie): surfaces
+/// magenta while their albedo texture loads, virtual ones green to
+/// red by how much coarser their tiles are than wanted.
+inline constexpr std::string_view kTextureLoadingDebug =
+    "ernie:textureLoading:debug";
 inline constexpr std::string_view kComplete = "complete";
 inline constexpr std::string_view kAsync = "async";
 /// RenderSettings' thermal emission (Ernie): whether materials glow

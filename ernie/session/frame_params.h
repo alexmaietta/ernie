@@ -737,6 +737,9 @@ struct FrameParams {
     float meshLodError = 1.0f;
     Wireframe wireframe =
         Wireframe::Off;  ///< How triangle edges are drawn.
+    /// Surfaces coloured by their textures' loading
+    /// (`ernie:textureLoading:debug`).
+    bool textureLoadingDebug = false;
     ShadowSettings shadows;
     VolumeSettings volumeSettings;  ///< How finely volumes render.
     /// The sensor filters to run, with their inputs

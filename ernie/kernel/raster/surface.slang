@@ -18,7 +18,8 @@ public struct Surface {
     public float4 albedoMapSize;
     // Detail albedo strength, detail normal strength, has detail albedo, has detail normal.
     public float4 detail;
-    // rgb: mean linear colour of the detail albedo texture, a: unused.
+    // rgb: mean linear colour of the detail albedo texture, a: 1 while the albedo texture loads
+    // (a placeholder in its place, `ernie:textureLoading` async).
     public float4 detailMean;
     // Hex tiling: enabled, rotation strength, luminance contrast, blend exponent.
     public float4 hex;
@@ -145,6 +146,15 @@ void virtualRequest(uint2 size, float lod, float2 wrapped) {
     }
 }
 
+// How many mips coarser than its footprint asked for the last virtual albedo sample read (0 when
+// as fine, or without a virtual texture): the texture loading debug view's (`ernie:textureLoading:
+// debug`, mesh.slang's `textureLoadingTint`).
+static float virtualCoarseness = 0.0;
+
+public float virtualAlbedoCoarseness() {
+    return virtualCoarseness;
+}
+
 // The virtual albedo texture on a sparse image (`textures.x` 2) at `uv`: requests its
 // footprint's tile, then samples no finer than the min-LOD map says is resident around it, so
 // filtering spans tiles in hardware and never reads an unbound one.
@@ -158,6 +168,7 @@ float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv)
     let minLod = heapTextures[surfaceSlot(14)].Load(int3(int2(tile0), 0)).r;
     // Gradients scaled up by 2^(minLod - lod) raise the level of detail to minLod and no further,
     // keeping anisotropic filtering, without the MinLod capability devices may lack.
+    virtualCoarseness = max(minLod - max(lod, 0.0), 0.0);
     let scale = exp2(max(minLod - lod, 0.0));
     return texture.SampleGrad(filter, uv, ddx(uv) * scale, ddy(uv) * scale);
 }
@@ -178,11 +189,13 @@ float4 virtualPageSample(uint2 size, uint mip, float2 wrapped, SamplerState filt
         let tile = virtualTileAt(size, m, wrapped, texel);
         let page = table[virtualFirstTile(size, m) + tile.y * virtualTiles(size, m).x + tile.x];
         if (page != 0) {
+            virtualCoarseness = max(virtualCoarseness, float(m - mip));
             let local = texel - float2(tile * surface.virtualTile) + kPageBorder;
             return heapTextureArrays[surfaceSlot(14)].SampleLevel(
                 clampSampler(), float3(local / kPageTexels, float(page - 1)), 0.0);
         }
     }
+    virtualCoarseness = max(virtualCoarseness, float(max(mip, tail) - mip));
     return heapTextures[surfaceSlot(4)].SampleLevel(filter, wrapped,
                                                     float(max(mip, tail) - tail));
 }
@@ -197,6 +210,7 @@ float4 virtualPagedTexture(SamplerState filter, float2 uv) {
     let dy = ddy(uv) * float2(size);
     let lod = max(0.5 * log2(max(max(dot(dx, dx), dot(dy, dy)), 1e-12)), 0.0);
     virtualRequest(size, lod, wrapped);
+    virtualCoarseness = 0.0;
     let mip = min(uint(floor(lod)), surface.virtualAlbedo.y - 1);
     let next = min(mip + 1, surface.virtualAlbedo.y - 1);
     return lerp(virtualPageSample(size, mip, wrapped, filter),

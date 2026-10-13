@@ -1703,11 +1703,12 @@ LightParams LaserParamsOf(const Scene& scene, const Path& path,
         const glm::dvec2 frequencies = laser.GetScanFrequencies();
         if (!(fov.x >= 0.0) || !(fov.y >= 0.0) ||
             !(fov.x < glm::radians(170.0)) ||
-            !(fov.y < glm::radians(170.0)) || !(frequencies.x >= 0.0) ||
-            !(frequencies.y >= 0.0)) {
+            !(fov.y < glm::radians(170.0)) ||
+            !(frequencies.x >= 0.0) || !(frequencies.y >= 0.0)) {
             throw std::invalid_argument(
                 "LaserLight '" + path.String() +
-                "' needs a scan's field of view of 0 or more and below "
+                "' needs a scan's field of view of 0 or more and "
+                "below "
                 "170 degrees and frequencies of 0 or more");
         }
         const glm::dvec2 half = glm::tan(0.5 * fov);
@@ -1810,9 +1811,11 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
             glm::vec3(glm::normalize(glm::dvec3(world[2])));
         light.spectrum = SunIrradianceOf(scene, path, bands);
         // Its irradiance over sunlight's wavelengths, 250 to 4000 nm.
-        const SpectralBands broad{250.0, 4000.0, SpectralBands::kMaxBands};
+        const SpectralBands broad{250.0, 4000.0,
+                                  SpectralBands::kMaxBands};
         double total = 0.0;
-        for (const float value : SunIrradianceOf(scene, path, broad)) {
+        for (const float value :
+             SunIrradianceOf(scene, path, broad)) {
             total += static_cast<double>(value) * broad.Width();
         }
         light.totalIrradiance = static_cast<float>(total);
@@ -2823,6 +2826,7 @@ FrameParams FrameParamsOf(const Scene& scene,
     params.domeDirections = static_cast<std::uint32_t>(
         std::clamp(options.GetDomeDirections(), 1, 1024));
     params.wireframe = WireframeOf(scene, settings);
+    params.textureLoadingDebug = options.GetTextureLoadingDebug();
     params.overlays = options.GetOverlays();
     params.minimal = MinimalModeOf(scene, settings, MinimalMode::Off);
     params.minimalColor =

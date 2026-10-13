@@ -178,6 +178,13 @@ class BlueMarbleDemo : public app::Demo {
                                            "/Render/Settings")
                                 .SetTextureLoading(kLoading[index]);
                         });
+        // Magenta while loading; green to red by how coarse its tiles
+        // are.
+        Widgets().Checkbox(
+            "Texture loading view", false, [this](bool on) {
+                RenderSettings(GetScene(), "/Render/Settings")
+                    .SetTextureLoadingDebug(on);
+            });
         Place();
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");

@@ -3576,6 +3576,7 @@ void RasterRenderer::Update(
             uniforms.eye[3] = params.exposure;
             uniforms.flags[0] =
                 static_cast<std::uint32_t>(params.wireframe);
+            uniforms.flags[1] = params.textureLoadingDebug ? 1u : 0u;
             // Its layer of the render targets it draws into: a frame
             // of more views renders them in chunks of
             // `RenderTargets::MaxViews`, and each sub-frame into the

@@ -117,6 +117,13 @@
                               .group = "Image",                                                    \
                               .options = {::ernie::tokens::kAuto, ::ernie::tokens::kComplete,      \
                                           ::ernie::tokens::kAsync}}))                              \
+    X(bool, TextureLoadingDebug, ::ernie::tokens::kTextureLoadingDebug, false,                     \
+      (::ernie::AttributeMeta{.label = "Texture loading view",                                     \
+                              .doc = "Surfaces coloured by their textures' loading: magenta "      \
+                                     "while the albedo texture loads; virtual ones green where "   \
+                                     "their tiles are as fine as wanted, yellow a mip coarser, "   \
+                                     "red three or more.",                                         \
+                              .group = "Image"}))                                                  \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = "Background", .doc = "Linear display colour of LdrColor's " \
                                                             "background.",                         \

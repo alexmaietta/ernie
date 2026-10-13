@@ -1019,7 +1019,18 @@ TEST_F(RasterDelegateTest,
         EXPECT_NEAR(loaded[i], orange[i], 0.03f * orange[i] + 1e-3f)
             << "value " << i;
     }
-    std::vector<std::filesystem::path> entries;
+    // The texture loading debug view: green, its tiles as fine as the
+    // complete frame wanted.
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetTextureLoadingDebug(true);
+    const std::vector<float> green = render(first);
+    for (std::size_t i = 0; i < green.size(); i += 3) {
+        EXPECT_GT(green[i + 1], green[i]) << "texel " << i / 3;
+        EXPECT_GT(green[i + 1], green[i + 2]) << "texel " << i / 3;
+    }
+    ernie::RenderSettings(scene, "/Render/Settings")
+        std::vector<std::filesystem::path>
+            entries;
     for (const auto& entry :
          std::filesystem::directory_iterator(cache)) {
         entries.push_back(entry.path());
@@ -1087,6 +1098,27 @@ TEST_F(RasterDelegateTest,
                     0.02f * placeholder[i]);
         EXPECT_NEAR(placeholder[i + 2], placeholder[i],
                     0.02f * placeholder[i]);
+    }
+    // The texture loading debug view: magenta while it loads (another
+    // delegate's first frame, of another copy of the file).
+    {
+        const std::string copy =
+            ::testing::TempDir() + "loading_red_debug.png";
+        std::filesystem::copy_file(
+            png, copy,
+            std::filesystem::copy_options::overwrite_existing);
+        ernie::Shader(scene, "/Looks/M/Tex").SetFile(copy);
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetTextureLoadingDebug(true);
+        RasterDelegate debug(*context_);
+        const std::vector<float> magenta = Quadrants(debug, scene);
+        for (std::size_t i = 0; i < magenta.size(); i += 3) {
+            EXPECT_GT(magenta[i], 2.0f * magenta[i + 1]);
+            EXPECT_GT(magenta[i + 2], 2.0f * magenta[i + 1]);
+        }
+        ernie::RenderSettings(scene, "/Render/Settings")
+            .SetTextureLoadingDebug(false);
+        ernie::Shader(scene, "/Looks/M/Tex").SetFile(png);
     }
 
     ernie::RenderSettings(scene, "/Render/Settings")

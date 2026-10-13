@@ -20,7 +20,8 @@ public struct Uniforms {
     public float4 forward;
     // xyz: camera position, w: unused.
     public float4 eye;
-    // x: wireframe (0 off, 1 overlay, 2 hidden line), y unused, z: the view's layer of the render
+    // x: wireframe (0 off, 1 overlay, 2 hidden line), y: 1 for the texture loading debug view
+    // (`ernie:textureLoading:debug`), z: the view's layer of the render
     // targets, which G-buffer vertex shaders draw into (SV_RenderTargetArrayIndex), w: 1 when the
     // projection is orthographic, every ray along `forward` (`towardsViewer`).
     public uint4 flags;

@@ -730,7 +730,8 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
                            material.pending[slot].empty()
                                ? std::move(texture)
                                : LoadingTexture(textureSlot),
-                           material.readers[slot]);
+                           material.readers[slot],
+                           !material.pending[slot].empty());
         } catch (const std::exception& error) {
             throw UploadError(path, kInputs[slot], error.what());
         }

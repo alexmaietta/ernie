@@ -238,10 +238,12 @@ class RasterMaterial {
     /// with other materials) for `slot` through mesh texture
     /// coordinates, wrapping as `reader` says; nullptr removes it.
     /// Its scale, bias and coordinate transform come from the
-    /// settings of `Update`.
+    /// settings of `Update`. `loading` marks it a placeholder for a
+    /// texture still loading, for the texture loading debug view.
     void SetTexture(MaterialTextureSlot slot,
                     std::shared_ptr<const MaterialTexture> texture,
-                    const TextureReader& reader);
+                    const TextureReader& reader,
+                    bool loading = false);
 
     bool HasTexture(MaterialTextureSlot slot) const {
         return textures_[static_cast<std::size_t>(slot)] != nullptr;
@@ -353,6 +355,7 @@ class RasterMaterial {
     bool hasAlbedoMap_ = false;
     bool hasDetailAlbedo_ = false;
     bool hasDetailNormal_ = false;
+    bool albedoLoading_ = false;
     glm::vec3 detailMean_{1.0f};
     glm::dvec4 albedoGrid_{
         0.0};  ///< Origin x, origin y, pixel size, unused.
