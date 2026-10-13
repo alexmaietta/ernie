@@ -3993,7 +3993,13 @@ void RasterDelegate::SyncLinks(const Scene& scene) {
     for (const Path& path : scene.Prims(tokens::kVolume)) {
         geometry.push_back(path);
     }
+    linkPrims_.clear();
+    linksFound_ = false;
     links_ = LinkGroupsOf(scene, prims.lights, geometry);
+    linksFound_ = true;
+    linkPrims_.insert(prims.lights.begin(), prims.lights.end());
+    linkPrims_.insert(prims.terrain);
+    linkPrims_.insert(prims.ground);
 }
 
 void RasterDelegate::Sync(const Scene& scene) {
@@ -4123,8 +4129,18 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] { SyncPoints(scene); });
     // Light linking's groups of what is drawn, before the draws that
     // carry them.
+    // They change only with the lights' links and with the prims
+    // there are.
     const bool linked = !links_.groups.empty();
-    attempt([&] { SyncLinks(scene); });
+    const bool relink =
+        !changed || !linksFound_ ||
+        std::ranges::any_of(*changed, [this](const Change& change) {
+            return Any(change.bits, Dirty::Added | Dirty::Removed) ||
+                   linkPrims_.contains(change.path);
+        });
+    if (relink) {
+        attempt([&] { SyncLinks(scene); });
+    }
     attempt([&] { points_.SetItems(PointsItems(scene)); });
     // The draws, so the meshes' bounds are known as soon as the scene
     // syncs: only those of the meshes changed, when the changes reach
@@ -4142,9 +4158,7 @@ void RasterDelegate::Sync(const Scene& scene) {
             touched.reset();
         }
     }
-    attempt([&] {
-        meshes_.SetItems(Items(scene, touched ? &*touched : nullptr));
-    });
+    attempt([&] { SyncItems(scene, touched ? &*touched : nullptr); });
     // The draws under GPU-posed prims are built as they are posed now.
     gpuPosedChanged_ = false;
     syncedVersion_ = scene.Version();
@@ -4194,9 +4208,19 @@ RasterDelegate::TouchedMeshes(const Scene& scene,
     return touched;
 }
 
-std::vector<MeshItem>
-RasterDelegate::Items(const Scene& scene,
-                      const std::set<Path>* touched) {
+void RasterDelegate::ShadeItem(const Scene& scene, const Path& mesh,
+                               const SyncedMesh& synced,
+                               MeshItem& item) const {
+    item.material = MaterialOf(scene, mesh);
+    const bool bound = item.material != RasterRenderer::kDefaultMaterial;
+    item.tint = bound ? glm::vec3(1.0f) : synced.tint;
+    item.vertexColors = !bound;
+    item.temperature = CheckedTemperature(
+        mesh, Gprim(scene, mesh).GetThermalTemperature());
+}
+
+void RasterDelegate::SyncItems(const Scene& scene,
+                               const std::set<Path>* touched) {
     ERNIE_ZONE("Sync items");
     // Instancers' prototypes, and the meshes of each, which may be a
     // mesh or a subtree of them (as USD's are), by their nearest
@@ -4258,18 +4282,6 @@ RasterDelegate::Items(const Scene& scene,
             }
         }
     }
-    const auto shade = [this, &scene](const Path& mesh,
-                                      const SyncedMesh& synced,
-                                      MeshItem& item) {
-        item.material = MaterialOf(scene, mesh);
-        const bool bound =
-            item.material != RasterRenderer::kDefaultMaterial;
-        item.tint = bound ? glm::vec3(1.0f) : synced.tint;
-        item.vertexColors = !bound;
-        item.temperature = CheckedTemperature(
-            mesh, Gprim(scene, mesh).GetThermalTemperature());
-    };
-
     // Each mesh's own draw, none when hidden or in a prototype.
     const auto build = [&](const Path& path, const SyncedMesh& synced)
         -> std::optional<MeshItem> {
@@ -4310,7 +4322,7 @@ RasterDelegate::Items(const Scene& scene,
         item.primId = PrimIdOf(path);
         item.linkGroup = links_.GroupOf(path);
         item.world = WorldOf(scene, path);
-        shade(path, synced, item);
+        ShadeItem(scene, path, synced, item);
         return item;
     };
     if (touched == nullptr) {
@@ -4330,14 +4342,57 @@ RasterDelegate::Items(const Scene& scene,
             }
         }
     }
+    std::vector<MeshItem> instanced = InstancerItems(scene);
+    // The same draws, a few edited: patched where they are, by their
+    // index at the last full setting, with the instancers' after them.
+    if (touched != nullptr && meshItemCount_ &&
+        *meshItemCount_ + instanced.size() == meshes_.ItemCount()) {
+        std::vector<std::pair<std::size_t, MeshItem>> changed;
+        bool same = true;
+        for (const std::set<Path>* paths : rebuilt) {
+            for (const Path& path : *paths) {
+                const auto at = itemIndex_.find(path);
+                const auto item = meshItems_.find(path);
+                const bool drawn =
+                    item != meshItems_.end() && item->second;
+                if (drawn != (at != itemIndex_.end())) {
+                    same = false;
+                } else if (drawn) {
+                    changed.emplace_back(at->second, *item->second);
+                }
+            }
+        }
+        for (std::size_t k = 0; k < instanced.size(); ++k) {
+            changed.emplace_back(*meshItemCount_ + k,
+                                 std::move(instanced[k]));
+        }
+        if (same && meshes_.UpdateItems(changed)) {
+            remeshed_.clear();
+            return;
+        }
+        // Not patched: built again below, the instancers' too.
+        instanced = InstancerItems(scene);
+    }
     remeshed_.clear();
     std::vector<MeshItem> items;
-    items.reserve(meshItems_.size());
+    items.reserve(meshItems_.size() + instanced.size());
+    itemIndex_.clear();
+    meshItemCount_.reset();
     for (const auto& [path, item] : meshItems_) {
         if (item) {
+            itemIndex_.emplace(path, items.size());
             items.push_back(*item);
         }
     }
+    const std::size_t meshItems = items.size();
+    std::ranges::move(instanced, std::back_inserter(items));
+    meshes_.SetItems(std::move(items));
+    meshItemCount_ = meshItems;
+}
+
+std::vector<MeshItem>
+RasterDelegate::InstancerItems(const Scene& scene) const {
+    std::vector<MeshItem> items;
     for (const auto& [path, synced] : instancers_) {
         if (synced.handle == 0 || !scene.IsVisible(path)) {
             continue;
@@ -4403,7 +4458,7 @@ RasterDelegate::Items(const Scene& scene,
                     }
                 }
                 item.instances = instances;
-                shade(meshPath, mesh->second, item);
+                ShadeItem(scene, meshPath, mesh->second, item);
                 items.push_back(std::move(item));
             }
         }

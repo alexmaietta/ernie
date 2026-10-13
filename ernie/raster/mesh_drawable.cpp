@@ -2543,6 +2543,65 @@ void MeshDrawable::RemoveInstancer(std::uint32_t instancer) {
     instancesDirty_ = true;
 }
 
+namespace {
+
+/// Whether draw `a` keeps `b`'s layout: only moved, retinted or
+/// reheated.
+bool SameLayout(const MeshItem& a, const MeshItem& b) {
+    return a.mesh == b.mesh && a.instancer == b.instancer &&
+           a.instances == b.instances && a.world == b.world &&
+           a.instanceWorlds == b.instanceWorlds &&
+           a.material == b.material && a.primId == b.primId &&
+           a.linkGroup == b.linkGroup &&
+           a.vertexColors == b.vertexColors;
+}
+
+}  // namespace
+
+void MeshDrawable::PatchItem(std::size_t i, MeshItem item) {
+    MeshItem& was = items_[i];
+    if (item.transform == was.transform &&
+        item.prototype == was.prototype && item.tint == was.tint &&
+        item.temperature == was.temperature) {
+        return;
+    }
+    // Moved from where it was; retinted or reheated, its bounds stay.
+    if (item.transform != was.transform) {
+        const auto relative = [&](glm::dmat4 world) {
+            world[3] -= glm::dvec4(origin_, 0.0);
+            return glm::mat4(world);
+        };
+        previous_[i] = was.transform;
+        previousTransforms_[i] = relative(was.transform);
+        transforms_[i] = relative(item.transform);
+        itemsMoving_ = true;
+        movedItems_.push_back(i);
+    }
+    if (item.transform != was.transform ||
+        item.prototype != was.prototype) {
+        ForgetItemBounds(i);
+    }
+    was = std::move(item);
+    posedItems_.push_back(i);
+}
+
+bool MeshDrawable::UpdateItems(
+    std::span<std::pair<std::size_t, MeshItem>> items) {
+    if (drawsDirty_ ||
+        drawBytes_.size() != items_.size() * sizeof(GpuDraw)) {
+        return false;
+    }
+    for (const auto& [i, item] : items) {
+        if (i >= items_.size() || !SameLayout(item, items_[i])) {
+            return false;
+        }
+    }
+    for (auto& [i, item] : items) {
+        PatchItem(i, std::move(item));
+    }
+    return true;
+}
+
 void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     for (const MeshItem& item : items) {
         if (!meshes_.contains(item.mesh)) {
@@ -2579,41 +2638,11 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     // The same draws only moved, retinted or reheated (a few prims
     // edited): their entries are patched (`PatchItems`), the layout,
     // its cull lists and the other draws kept.
-    const auto sameLayout = [](const MeshItem& a, const MeshItem& b) {
-        return a.mesh == b.mesh && a.instancer == b.instancer &&
-               a.instances == b.instances && a.world == b.world &&
-               a.instanceWorlds == b.instanceWorlds &&
-               a.material == b.material && a.primId == b.primId &&
-               a.linkGroup == b.linkGroup &&
-               a.vertexColors == b.vertexColors;
-    };
     if (!drawsDirty_ && items.size() == items_.size() &&
         drawBytes_.size() == items_.size() * sizeof(GpuDraw) &&
-        std::ranges::equal(items, items_, sameLayout)) {
-        const auto relative = [&](glm::dmat4 world) {
-            world[3] -= glm::dvec4(origin_, 0.0);
-            return glm::mat4(world);
-        };
+        std::ranges::equal(items, items_, SameLayout)) {
         for (std::size_t i = 0; i < items.size(); ++i) {
-            MeshItem& item = items[i];
-            MeshItem& was = items_[i];
-            if (item.transform == was.transform &&
-                item.prototype == was.prototype && item.tint == was.tint &&
-                item.temperature == was.temperature) {
-                continue;
-            }
-            // Moved from where it was.
-            if (item.transform != was.transform) {
-                previous_[i] = was.transform;
-                previousTransforms_[i] = relative(was.transform);
-                transforms_[i] = relative(item.transform);
-                itemsMoving_ = true;
-            }
-            was = std::move(item);
-            posedItems_.push_back(i);
-        }
-        if (!posedItems_.empty()) {
-            ForgetBounds();
+            PatchItem(i, std::move(items[i]));
         }
         return;
     }
@@ -2661,6 +2690,8 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
     itemPipelines_.clear();
     drawsDirty_ = true;
     itemsMoving_ = true;
+    movedAll_ = true;
+    movedItems_.clear();
     UpdateTransforms();
 }
 
@@ -2668,14 +2699,27 @@ void MeshDrawable::SettleMotion() {
     if (itemsMoving_) {
         itemsMoving_ = false;
         // Those that moved stand still: their entries patched
-        // (`PatchItems`).
-        for (std::size_t i = 0; i < items_.size(); ++i) {
-            if (previous_[i] != items_[i].transform) {
+        // (`PatchItems`), and their bounds no longer reach back.
+        const auto settle = [this](std::size_t i) {
+            if (i < items_.size() &&
+                previous_[i] != items_[i].transform) {
                 previous_[i] = items_[i].transform;
                 previousTransforms_[i] = transforms_[i];
                 posedItems_.push_back(i);
+                worldsBounds_.reset();
+            }
+        };
+        if (movedAll_) {
+            for (std::size_t i = 0; i < items_.size(); ++i) {
+                settle(i);
+            }
+        } else {
+            for (const std::size_t i : movedItems_) {
+                settle(i);
             }
         }
+        movedAll_ = false;
+        movedItems_.clear();
     }
     // Points and instance arrays that moved stand still until written
     // again.
@@ -3998,12 +4042,15 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
     for (std::size_t n = 0; n < items_.size(); ++n) {
         const MeshItem& item = items_[n];
         const glm::mat4& transform = transforms_[n];
-        const Mesh& mesh = meshes_.at(item.mesh);
-        if (mesh.data.points.empty()) {
+        if (!item.instancer) {
+            const ItemBox& plain = PlainBox(n);
+            if (plain.hostPoints) {
+                add(plain.box);
+            }
             continue;
         }
-        if (!item.instancer) {
-            add(TransformBox(transform, mesh.low, mesh.high));
+        const Mesh& mesh = meshes_.at(item.mesh);
+        if (mesh.data.points.empty()) {
             continue;
         }
         const Instancer& instancer = instancers_.at(*item.instancer);
@@ -4139,10 +4186,44 @@ void MeshDrawable::WriteResources() {
     }
 }
 
+const MeshDrawable::ItemBox&
+MeshDrawable::PlainBox(std::size_t item) const {
+    if (itemBoxes_.size() != items_.size()) {
+        itemBoxes_.assign(items_.size(), ItemBox{});
+    }
+    ItemBox& plain = itemBoxes_[item];
+    if (!plain.known) {
+        const Mesh& mesh = meshes_.at(items_[item].mesh);
+        plain.hostPoints = !mesh.data.points.empty();
+        plain.anyPoints =
+            plain.hostPoints || !mesh.devicePoints.Empty();
+        plain.box = TransformBox(transforms_[item], mesh.low, mesh.high);
+        plain.known = true;
+    }
+    return plain;
+}
+
 std::optional<Bounds3>
 MeshDrawable::RangeBounds(std::size_t item,
                           const WorldRange& range) const {
     const MeshItem& draw = items_[item];
+    // A plain draw's box as it is found once, with where it was at
+    // the last frame while it moves.
+    if (!draw.instancer) {
+        const ItemBox& plain = PlainBox(item);
+        if (!plain.anyPoints) {
+            return std::nullopt;
+        }
+        Bounds3 box = plain.box;
+        if (previousTransforms_[item] != transforms_[item]) {
+            const Mesh& mesh = meshes_.at(draw.mesh);
+            const Bounds3 was = TransformBox(previousTransforms_[item],
+                                             mesh.low, mesh.high);
+            box = {glm::min(box.first, was.first),
+                   glm::max(box.second, was.second)};
+        }
+        return box;
+    }
     const Mesh& mesh = meshes_.at(draw.mesh);
     if (mesh.data.points.empty() && mesh.devicePoints.Empty()) {
         return std::nullopt;
@@ -4161,9 +4242,6 @@ MeshDrawable::RangeBounds(std::size_t item,
         }
         return box;
     };
-    if (!draw.instancer) {
-        return transformBox(mesh.low, mesh.high);
-    }
     const Instancer& instancer = instancers_.at(*draw.instancer);
     if (instancer.onDevice && instancer.device.extent) {
         return transformBox(instancer.device.extent->first,

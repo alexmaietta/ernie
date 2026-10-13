@@ -39,6 +39,7 @@
 #include <thread>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ernie {
@@ -687,13 +688,18 @@ class RasterDelegate : public RenderDelegate {
     /// as the material's in `materialPrims_` when it has none yet.
     std::uint32_t MaterialOf(const Scene& scene,
                              const Path& prim) const;
-    /// The draws of the synced meshes and instancers. With `touched`,
-    /// only those meshes' draws (and those `SyncMeshes` re-added or
-    /// dropped) are built again, the rest kept from the last;
-    /// without, all are.
-    std::vector<MeshItem>
-    Items(const Scene& scene,
-          const std::set<Path>* touched = nullptr);
+    /// Sets the draws of the synced meshes and instancers. With
+    /// `touched`, only those meshes' draws (and those `SyncMeshes`
+    /// re-added or dropped) are built again, the rest kept from the
+    /// last, and patched in place (`MeshDrawable::UpdateItems`) while
+    /// the same draws stay; without, all are.
+    void SyncItems(const Scene& scene,
+                   const std::set<Path>* touched = nullptr);
+    /// The instancers' draws, after the meshes' own.
+    std::vector<MeshItem> InstancerItems(const Scene& scene) const;
+    /// What a mesh's draw takes from its material and the mesh.
+    void ShadeItem(const Scene& scene, const Path& mesh,
+                   const SyncedMesh& synced, MeshItem& item) const;
     /// The meshes whose draws a sync's `changes` may change, or null
     /// when they may change draws beyond their own prims' meshes (a
     /// material, a light linking, an ancestor's world...), so that
@@ -951,6 +957,11 @@ class RasterDelegate : public RenderDelegate {
     /// re-added or dropped since, whose draws are built again.
     std::map<Path, std::optional<MeshItem>> meshItems_;
     std::set<Path> remeshed_;
+    /// Each drawn mesh's index among the drawable's draws as
+    /// `SyncItems` last set them all, and their number; none until
+    /// it has.
+    std::unordered_map<Path, std::size_t> itemIndex_;
+    std::optional<std::size_t> meshItemCount_;
     /// The stage's subdivision level's version at the last mesh sync,
     /// which every subdivision surface's key reads.
     std::uint64_t subdivisionVersion_ = 0;
@@ -964,6 +975,11 @@ class RasterDelegate : public RenderDelegate {
     /// The drawn geometry's light link groups and the lights' masks
     /// over them, as of the last `Sync`.
     LinkGroups links_;
+    /// The lights, terrain and ground they were found for: their
+    /// changes, or prims added or removed, find them again. Empty
+    /// until found (or when finding them failed), as is every prim.
+    std::unordered_set<Path> linkPrims_;
+    bool linksFound_ = false;
     std::map<GpuXformKey, GpuXformGroup> gpuXformGroups_;
     /// Whether the GPU poses of the product being updated are
     /// positions and quaternions (`PosesAreQuaternions`), for

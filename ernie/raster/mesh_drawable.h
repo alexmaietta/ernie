@@ -617,6 +617,20 @@ class MeshDrawable : public RasterDrawable {
     /// its old one over the frame (`Uniforms::motion`).
     void SetItems(std::vector<MeshItem> items);
 
+    /// Replaces the draws at the given indices of the last `SetItems`
+    /// with draws of the same layout (mesh, instances, world,
+    /// material, prim id, link group and vertex colours), moved,
+    /// retinted or reheated, as `SetItems` patches a few edited draws
+    /// without visiting the others. False, changing nothing, when any
+    /// differs in layout or an index is out of range, or while the
+    /// draws wait to be written whole: then `SetItems` all of them.
+    bool UpdateItems(std::span<std::pair<std::size_t, MeshItem>> items);
+
+    /// The draws, as set.
+    std::size_t ItemCount() const {
+        return items_.size();
+    }
+
     /// Starts a frame's motion: draws that `SetItems` does not move
     /// again, and points and instance arrays not written again,
     /// before the next `Prepare` stand still. Points and instance
@@ -1007,7 +1021,28 @@ class MeshDrawable : public RasterDrawable {
     void ForgetBounds() {
         bounds_.reset();
         worldsBounds_.reset();
+        itemBoxes_.clear();
     }
+    /// Forgets the bounds as one draw moved: its box and the totals.
+    void ForgetItemBounds(std::size_t item) {
+        bounds_.reset();
+        worldsBounds_.reset();
+        if (item < itemBoxes_.size()) {
+            itemBoxes_[item].known = false;
+        }
+    }
+    /// A plain (uninstanced) draw's box where it is, found once until
+    /// it moves or the meshes change.
+    struct ItemBox {
+        Bounds3 box{};
+        bool known = false;
+        bool hostPoints = false;  ///< Its mesh has points on the host.
+        bool anyPoints = false;   ///< Or on the device.
+    };
+    const ItemBox& PlainBox(std::size_t item) const;
+    /// Patches draw `i` with `item` of the same layout (`SetItems`,
+    /// `UpdateItems`).
+    void PatchItem(std::size_t i, MeshItem item);
     void RebuildGeometry();
     /// Simplifies a mesh's coarser levels of detail from its host
     /// data.
@@ -1429,6 +1464,7 @@ class MeshDrawable : public RasterDrawable {
     /// their transforms, points or instances change
     /// (`ForgetBounds`).
     mutable std::optional<std::optional<Bounds3>> bounds_;
+    mutable std::vector<ItemBox> itemBoxes_;  ///< `PlainBox`'s.
     mutable std::optional<std::map<std::int32_t, Bounds3>>
         worldsBounds_;
     /// Meshes with work for the next frame or to settle after it:
@@ -1438,8 +1474,11 @@ class MeshDrawable : public RasterDrawable {
     /// writer), the only ones `ReadBounds` may measure.
     std::set<std::uint32_t> gpuPointMeshes_;
     /// Whether `SetItems` may have moved items `SettleMotion` has yet
-    /// to settle.
+    /// to settle: those patched (`movedItems_`), or every one after
+    /// `SetItems` laid them out anew (`movedAll_`).
     bool itemsMoving_ = false;
+    std::vector<std::size_t> movedItems_;
+    bool movedAll_ = false;
     /// A draw range: its item and its index in the item's ranges.
     using RangeIndex = std::pair<std::size_t, std::size_t>;
     /// Every draw range in item order, and each world's (-1 the
