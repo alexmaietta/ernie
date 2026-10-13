@@ -378,6 +378,12 @@ class RasterDelegate : public RenderDelegate {
         std::uint32_t anchorInstancer = 0;
         std::uint32_t anchorRow = 0;
         glm::dmat4 anchorBelow{1.0};
+        /// Blended from time samples on the GPU: the samples it was
+        /// given (their arrays and times), each sample's positions'
+        /// bounds, and the largest scale of any.
+        std::uint64_t samplesKey = 0;
+        std::vector<Bounds3> sampleBounds;
+        float sampleScale = 1.0f;
     };
 
     struct SyncedPoints {
@@ -578,6 +584,12 @@ class RasterDelegate : public RenderDelegate {
     void PoseSkins(const Scene& scene,
                    std::vector<std::string>& errors);
     void SyncInstancers(const Scene& scene);
+    /// Syncs the PointInstancer `path` when its positions,
+    /// orientations or scales have time samples (at the same times):
+    /// they go to the GPU once and blend there at the stage's time
+    /// code. False when it has none, for the usual sync.
+    bool SyncSampledInstancer(const Scene& scene, const Path& path,
+                              SyncedInstancer& synced);
     /// Hands the meshes' drawable the arrays of prims posed on the
     /// GPU that changed, one instancer per group of prims sharing
     /// arrays; the meshes under those prims draw as their instances
@@ -780,6 +792,7 @@ class RasterDelegate : public RenderDelegate {
     /// time code they were last posed at: a new time code poses them
     /// again.
     bool skinned_ = false;
+    bool sampledInstancers_ = false;
     std::uint64_t posedTimeCode_ = 0;
     RenderPrims prims_;
     std::optional<Key> heightfield_;

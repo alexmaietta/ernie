@@ -109,7 +109,7 @@ Ernie poses skinned meshes on the GPU at the stage's `ernie:timeCode`: the CPU s
 
 ## Time samples
 
-Animated transforms (a character's root motion, a moving part), visibility and point caches (a mesh's sampled `points`) come in as the attributes' time samples in Ernie's Scene, which holds each attribute's value at the stage's time code:
+Animated attributes come in as their time samples in Ernie's Scene, which holds each attribute's value at the stage's time code: transforms (a character's root motion, a moving part), visibility, point caches (a mesh's sampled `points`), and every other attribute the Ernie prim declares, such as a camera's focal length and apertures, a light's intensity and colour, a shape's size or a shader's inputs. An animated attribute Ernie's prim lacks is read at one time, with a warning.
 
 ```python
 scene.set("/World/Arm", ernie.tokens.TRANSFORM, matrix, time=24.0)  # a sample
@@ -117,11 +117,11 @@ scene.sample_times("/World/Arm", ernie.tokens.TRANSFORM)             # [..., 24.
 ernie.Stage.at(scene, "/").time_code = 12.0  # every sampled attribute at 12
 ```
 
-Between samples, numbers, vectors and matrices interpolate linearly (matrices by element, as USD does), quaternions spherically, and tokens, ints and paths hold; beyond the first and last sample the end value holds. Setting an attribute without a time clears its samples. Arrays blend lazily: a CPU array is blended only when read, and the renderer blends a mesh's point cache on the GPU from samples it uploads once, refining a subdivision surface's blended control points there too, so playing it back costs the CPU nothing per frame. Samples save with the scene (`$timeSamples` in scene JSON).
+Between samples, numbers, vectors and matrices interpolate linearly (matrices by element, as USD does), quaternions spherically, and tokens, ints and paths hold; beyond the first and last sample the end value holds. Setting an attribute without a time clears its samples. Arrays blend lazily: a CPU array is blended only when read. The renderer blends a mesh's point cache, and a PointInstancer's sampled positions, orientations and scales, on the GPU from samples it copies in once (from CUDA arrays without leaving the GPU), refining a subdivision surface's blended control points there too, so playing them back costs the CPU nothing per frame. Samples save with the scene (`$timeSamples` in scene JSON). `demo_animation_baked_simulation` bakes a simulation this way: Warp integrates on CUDA and writes each frame's arrays as samples, which the timeline then scrubs.
 
 ## Not yet
 
-- Time samples of attributes other than transforms, visibility, points and skeletal animation (a light's intensity, a camera's focal length) are read at one time.
+- Time samples of arrays per element other than points (normals, texture coordinates, per-vertex colours) are read at one time.
 - Blend shapes' normal offsets: a skinned mesh's normals are recomputed from its posed triangles.
 - Subdivision surfaces refine to one level everywhere: no refinement by distance or screen size yet. Their points written on the GPU draw the control mesh.
 - `BasisCurves`, `NurbsPatch` and volumes.

@@ -366,6 +366,10 @@ class MeshDrawable : public RasterDrawable {
         /// samples, which each pose blends two of.
         std::vector<float> restPoints;
         std::size_t restSamples = 1;
+        /// In place of `restPoints`, each sample as a device tensor,
+        /// copied in on the device once (on `restStream`).
+        std::vector<Tensor> deviceRest;
+        std::uintptr_t restStream = 1;
         /// Each point's influences from starts[point] to
         /// starts[point + 1]; with `constantInfluences`, one range
         /// (two starts) for every point.
@@ -408,6 +412,41 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument for an unknown mesh or arrays
     /// that disagree with it.
     void SetSkin(std::uint32_t mesh, Skin skin);
+
+    /// An instancer's time samples (a simulation's bodies, say): each
+    /// sampled array's `samples` rows of the instancer's instances,
+    /// one after another, as host floats or as device tensors (one
+    /// per sample, copied in on the device). Arrays without samples
+    /// keep what `SetInstances` gave.
+    struct InstanceSamples {
+        std::size_t positionSamples = 0;
+        std::size_t orientationSamples = 0;  ///< x, y, z, w.
+        std::size_t scaleSamples = 0;
+        std::vector<float> positions;
+        std::vector<float> orientations;
+        std::vector<float> scales;
+        std::vector<Tensor> devicePositions;
+        std::vector<Tensor> deviceOrientations;
+        std::vector<Tensor> deviceScales;
+        std::uintptr_t stream = 1;  ///< Device samples' stream.
+    };
+
+    /// Blends instancer `instancer`'s arrays on the GPU each frame
+    /// from `samples` (`SetInstanceBlend`) rather than copying them.
+    /// @throws std::invalid_argument for an unknown instancer, arrays
+    /// of the wrong size, or device samples without compute interop.
+    void SetInstanceSamples(std::uint32_t instancer,
+                            InstanceSamples samples);
+
+    /// The samples instancer `instancer` blends next frame: `alpha`
+    /// of the way from `lower` to `upper`; `positions` bounds its
+    /// instances' positions then and `scale` their largest scale.
+    /// @throws std::invalid_argument for an instancer without
+    /// samples.
+    void SetInstanceBlend(std::uint32_t instancer,
+                          std::uint32_t lower, std::uint32_t upper,
+                          float alpha, const Bounds3& positions,
+                          float scale);
 
     /// The pose mesh `mesh`'s skin takes next frame.
     /// @throws std::invalid_argument for an unknown or unskinned
@@ -857,6 +896,18 @@ class MeshDrawable : public RasterDrawable {
         std::optional<Bounds3> gpuPositions;
         std::optional<Bounds3> lastGpuPositions;
         float gpuScale = 1.0f;
+        /// Blended from time samples on the GPU
+        /// (`SetInstanceSamples`): the samples, where each array
+        /// starts in them (bytes), each array's number of samples,
+        /// this frame's blend (lower, upper, alpha's bits), and its
+        /// positions' bounds and largest scale.
+        bool sampled = false;
+        std::unique_ptr<GpuBuffer> sampleData;
+        std::array<VkDeviceSize, 3> sampleOffsets{};
+        std::array<std::uint32_t, 3> sampleCounts{};
+        std::array<std::uint32_t, 3> blend{};
+        Bounds3 sampledPositions{};
+        float sampledScale = 1.0f;
     };
 
     /// Whether an instancer colours its instances, in place of its
@@ -1201,6 +1252,10 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<ComputePipeline> skinPipeline_;
     std::unique_ptr<ComputePipeline> refinePipeline_;
     std::vector<std::uint32_t> pendingSkins_;
+    /// Sampled instancers the next frame blends
+    /// (`blendInstancesMain`).
+    std::unique_ptr<ComputePipeline> instanceBlendPipeline_;
+    std::vector<std::uint32_t> pendingBlends_;
     /// Records the pending skins' dispatches (`RecordCull`).
     void RecordSkins(VkCommandBuffer commands) const;
     std::shared_ptr<GpuBuffer> positions_;

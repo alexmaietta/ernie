@@ -163,3 +163,74 @@ void refineMain(uint3 id : SV_DispatchThreadID) {
     refine.output[3 * point + 1] = sum.y;
     refine.output[3 * point + 2] = sum.z;
 }
+
+struct InstanceBlendConstants {
+    // x: instances; y, z, w: the samples of positions, orientations and scales (0 for an array
+    // not sampled, left as it is).
+    uint4 info;
+    // x: the lower sample, y: the upper, z: how far between them (a float's bits).
+    uint4 blend;
+    float* positions;
+    float* orientations;
+    float* scales;
+    // The instancer's arrays in the instance pools' current half.
+    float* outPositions;
+    float* outOrientations;
+    float* outScales;
+}
+
+[[vk::push_constant]] ConstantBuffer<InstanceBlendConstants> instances;
+
+// A sampled instancer's arrays at the time code, a thread an instance: positions and scales
+// blended linearly, orientations normalized after blending the shorter way (nlerp).
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void blendInstancesMain(uint3 id : SV_DispatchThreadID) {
+    let i = id.x;
+    let n = instances.info.x;
+    if (i >= n) {
+        return;
+    }
+    let alpha = asfloat(instances.blend.z);
+    if (instances.info.y != 0) {
+        let lo = 3 * (min(instances.blend.x, instances.info.y - 1) * n + i);
+        let hi = 3 * (min(instances.blend.y, instances.info.y - 1) * n + i);
+        let p = lerp(float3(instances.positions[lo], instances.positions[lo + 1],
+                            instances.positions[lo + 2]),
+                     float3(instances.positions[hi], instances.positions[hi + 1],
+                            instances.positions[hi + 2]),
+                     alpha);
+        instances.outPositions[3 * i] = p.x;
+        instances.outPositions[3 * i + 1] = p.y;
+        instances.outPositions[3 * i + 2] = p.z;
+    }
+    if (instances.info.z != 0) {
+        let lo = 4 * (min(instances.blend.x, instances.info.z - 1) * n + i);
+        let hi = 4 * (min(instances.blend.y, instances.info.z - 1) * n + i);
+        let a = float4(instances.orientations[lo], instances.orientations[lo + 1],
+                       instances.orientations[lo + 2], instances.orientations[lo + 3]);
+        var b = float4(instances.orientations[hi], instances.orientations[hi + 1],
+                       instances.orientations[hi + 2], instances.orientations[hi + 3]);
+        if (dot(a, b) < 0.0) {
+            b = -b;
+        }
+        let q = lerp(a, b, alpha);
+        let length = sqrt(dot(q, q));
+        let unit = length > 0.0 ? q / length : float4(0.0, 0.0, 0.0, 1.0);
+        instances.outOrientations[4 * i] = unit.x;
+        instances.outOrientations[4 * i + 1] = unit.y;
+        instances.outOrientations[4 * i + 2] = unit.z;
+        instances.outOrientations[4 * i + 3] = unit.w;
+    }
+    if (instances.info.w != 0) {
+        let lo = 3 * (min(instances.blend.x, instances.info.w - 1) * n + i);
+        let hi = 3 * (min(instances.blend.y, instances.info.w - 1) * n + i);
+        let s = lerp(float3(instances.scales[lo], instances.scales[lo + 1],
+                            instances.scales[lo + 2]),
+                     float3(instances.scales[hi], instances.scales[hi + 1], instances.scales[hi + 2]),
+                     alpha);
+        instances.outScales[3 * i] = s.x;
+        instances.outScales[3 * i + 1] = s.y;
+        instances.outScales[3 * i + 2] = s.z;
+    }
+}

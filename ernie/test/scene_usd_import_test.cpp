@@ -3,6 +3,7 @@
 
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/tokens.h"
 
 #include <glm/glm.hpp>
@@ -415,6 +416,78 @@ TEST_F(UsdImportTest, VariantsAreSelectedBeforeTranslating) {
     EXPECT_EQ(Floats(scene_.Read(Path("/World/blue/Ball"),
                                  "primvars:displayColor")),
               (std::vector<float>{0.0f, 0.0f, 1.0f}));
+}
+
+// Animated attributes come in as the scene's time samples:
+// transforms, a camera's focal length, a light's intensity, a shape's
+// size, a constant displayColor and visibility; the file's range
+// becomes the stage's.
+TEST_F(UsdImportTest, AnimatedAttributesBecomeTimeSamples) {
+    const std::filesystem::path file = dir_ / "animated.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Shot"
+    metersPerUnit = 1
+    upAxis = "Z"
+    startTimeCode = 1
+    endTimeCode = 24
+    timeCodesPerSecond = 24
+)
+def Xform "Shot"
+{
+    def Camera "Camera"
+    {
+        float focalLength.timeSamples = { 1: 20, 24: 66 }
+    }
+    def SphereLight "Lamp"
+    {
+        float inputs:intensity.timeSamples = { 1: 1, 24: 47 }
+    }
+    def Cube "Box"
+    {
+        double size.timeSamples = { 1: 1, 24: 3 }
+        color3f[] primvars:displayColor.timeSamples = { 1: [(1, 0, 0)], 24: [(0, 0, 1)] }
+        token visibility.timeSamples = { 1: "inherited", 24: "invisible" }
+        double3 xformOp:translate.timeSamples = { 1: (0, 0, 0), 24: (0, 23, 0) }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Shot"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    ASSERT_TRUE(result.timeCodeRange.has_value());
+    EXPECT_EQ(result.timeCodeRange->y, 24.0);
+    const auto at = [&](const char* path, std::string_view attribute,
+                        double time) {
+        const ernie::Value value =
+            scene_.GetAt(Path(path), attribute, time);
+        if (const auto* d = value.Get<double>()) {
+            return *d;
+        }
+        return value.Get<float>() != nullptr
+                   ? static_cast<double>(*value.Get<float>())
+                   : -1.0;
+    };
+    EXPECT_NEAR(at("/World/Shot/Camera", tokens::kFocalLength, 12.5),
+                43.0, 1e-4);
+    EXPECT_NEAR(at("/World/Shot/Lamp", tokens::kIntensity, 12.5),
+                24.0, 1e-4);
+    EXPECT_NEAR(at("/World/Shot/Box", tokens::kSize, 12.5), 2.0,
+                1e-4);
+    EXPECT_EQ(
+        scene_
+            .SamplesOf(Path("/World/Shot/Box"), tokens::kDisplayColor)
+            .size(),
+        2u);
+    EXPECT_EQ(
+        scene_.SamplesOf(Path("/World/Shot/Box"), tokens::kVisibility)
+            .size(),
+        2u);
+    ernie::Stage(scene_, Path::Root()).SetTimeCode(12.5);
+    EXPECT_NEAR(scene_.WorldTransform(Path("/World/Shot/Box"))[3].y,
+                11.5, 1e-6);
 }
 
 TEST_F(UsdImportTest, MissingFilesThrow) {

@@ -19,7 +19,7 @@
 namespace ernie::usd_plugin {
 
 /// Bumped whenever `Sink` or `Request` change.
-inline constexpr std::uint32_t kAbiVersion = 3;
+inline constexpr std::uint32_t kAbiVersion = 4;
 
 /// Where the plugin authors what it translates; Ernie implements it
 /// over a Scene, coercing values to each attribute's declared type.
@@ -68,6 +68,10 @@ class Sink {
                                const std::int32_t* values,
                                const std::size_t* shape,
                                std::size_t rank) = 0;
+    /// Whether the prim at `path`'s type declares `attribute` (or an
+    /// open namespace of it, such as a shader's `inputs:`).
+    virtual bool Declares(const char* path,
+                          const char* attribute) = 0;
     /// Time samples (`Scene::SetAt`, `Scene::WriteAt`): as
     /// `SetNumbers`, `SetToken` and `WriteFloatArray`, at time code
     /// `time`.

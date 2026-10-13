@@ -239,6 +239,9 @@ SkeletonPose SkeletonPoseOf(const Scene& scene,
         }
         pose.blendShapeWeights = sample.blendShapeWeights;
         pose.blendShapeWeights.resize(pose.blendShapes.size(), 0.0f);
+        for (std::size_t s = 0; s < pose.blendShapes.size(); ++s) {
+            pose.blendShapeIndex.emplace(pose.blendShapes[s], s);
+        }
     }
     pose.skinning = SkinningTransforms(
         SkelSpaceTransforms(parents, locals), binds);
@@ -249,6 +252,12 @@ SkeletonPose SkeletonPoseOf(const Scene& scene,
 SkinPose SkinPoseOf(const Scene& scene, const Path& mesh,
                     const SkinBinding& binding,
                     const SkeletonPose& skeleton) {
+    return SkinPoseOf(scene.WorldTransform(mesh), binding, skeleton);
+}
+
+SkinPose SkinPoseOf(const glm::dmat4& meshWorld,
+                    const SkinBinding& binding,
+                    const SkeletonPose& skeleton) {
     SkinPose pose;
     for (const int j : binding.joints) {
         pose.skinning.push_back(
@@ -257,29 +266,18 @@ SkinPose SkinPoseOf(const Scene& scene, const Path& mesh,
                 ? glm::mat4(1.0f)
                 : skeleton.skinning[static_cast<std::size_t>(j)]);
     }
-    pose.skelToMesh =
-        glm::inverse(scene.WorldTransform(mesh)) * skeleton.world;
+    pose.skelToMesh = glm::inverse(meshWorld) * skeleton.world;
     pose.subShapeWeights.assign(binding.subShapes.size(), 0.0f);
-    const std::vector<std::string> names = [&] {
-        std::vector<std::string> out;
-        for (const SkinBinding::Shape& shape : binding.shapes) {
-            out.push_back(shape.name);
-        }
-        return out;
-    }();
-    const std::vector<int> weightOf =
-        NameMapping(names, skeleton.blendShapes);
-    for (std::size_t i = 0; i < binding.shapes.size(); ++i) {
-        const int at = weightOf[i];
+    // Each shape's weight by the animation's index of its name.
+    for (const SkinBinding::Shape& shape : binding.shapes) {
+        const auto at = skeleton.blendShapeIndex.find(shape.name);
         const float weight =
-            at < 0
+            at == skeleton.blendShapeIndex.end()
                 ? 0.0f
-                : skeleton.blendShapeWeights[static_cast<std::size_t>(
-                      at)];
+                : skeleton.blendShapeWeights[at->second];
         if (weight == 0.0f) {
             continue;
         }
-        const SkinBinding::Shape& shape = binding.shapes[i];
         for (const auto& [sub, subWeight] :
              SubShapeWeights(weight, shape.inbetweenWeights)) {
             pose.subShapeWeights[shape.first +

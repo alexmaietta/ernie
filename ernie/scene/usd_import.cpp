@@ -168,6 +168,33 @@ class SceneSink final : public usd_plugin::Sink {
             time);
     }
 
+    bool Declares(const char* path, const char* attribute) override {
+        const Path prim(path);
+        if (!scene_.Has(prim)) {
+            return false;
+        }
+        const PrimTypeDef* type = PrimTypeOf(scene_, prim);
+        if (type == nullptr) {
+            return false;
+        }
+        const std::string_view name(attribute);
+        if (type->Find(name) != nullptr) {
+            return true;
+        }
+        for (const PrimTypeDef* level = type; level != nullptr;
+             level = level->base) {
+            for (const std::string_view open :
+                 level->openNamespaces) {
+                if (name.starts_with(open) &&
+                    name.size() > open.size() &&
+                    name[open.size()] == ':') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     void SetTokenAt(const char* path, const char* attribute,
                     double time, const char* value) override {
         Set(path, attribute, Value(std::string(value)), time);

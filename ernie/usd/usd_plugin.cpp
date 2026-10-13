@@ -554,6 +554,7 @@ class Importer {
                 TranslateTree(child.GetPath());
             }
         }
+        SampledAttributes();
         if (!mark.IsClean()) {
             for (const TfError& error : mark) {
                 Warn("USD: " + error.GetCommentary());
@@ -763,7 +764,7 @@ class Importer {
             })) {
             return false;
         }
-        sink_.MapSource(source.GetText(), path.c_str());
+        Mapped(source, path);
         const HdSceneIndexPrim local = input_->GetPrim(source);
         Transform(source, local.dataSource, path);
         Visibility(local.dataSource, path);
@@ -868,6 +869,107 @@ class Importer {
         }
         if (matrix != GfMatrix4d(1.0)) {
             Call(path, [&] { SetMatrix(path, matrix); });
+        }
+    }
+
+    /// Records that the USD prim `source` became the Ernie prim
+    /// `path`.
+    void Mapped(const SdfPath& source, const std::string& path) {
+        sink_.MapSource(source.GetText(), path.c_str());
+        mapped_.emplace_back(source, path);
+    }
+
+    /// Sets `value` as the time sample at `time` of `name` on `path`,
+    /// if it is of a kind Ernie holds as a single value.
+    bool SetValueAt(const std::string& path, const std::string& name,
+                    double time, const VtValue& value) {
+        const char* p = path.c_str();
+        const char* n = name.c_str();
+        if (value.IsHolding<bool>()) {
+            const double number =
+                value.UncheckedGet<bool>() ? 1.0 : 0.0;
+            sink_.SetNumbersAt(p, n, time, &number, 1);
+        } else if (value.IsHolding<int>()) {
+            const double number = value.UncheckedGet<int>();
+            sink_.SetNumbersAt(p, n, time, &number, 1);
+        } else if (value.IsHolding<TfToken>()) {
+            sink_.SetTokenAt(p, n, time,
+                             value.UncheckedGet<TfToken>().GetText());
+        } else if (value.IsHolding<std::string>()) {
+            sink_.SetTokenAt(
+                p, n, time,
+                value.UncheckedGet<std::string>().c_str());
+        } else if (const auto numbers = NumbersOf(value)) {
+            sink_.SetNumbersAt(p, n, time, numbers->data(),
+                               numbers->size());
+        } else if (value.IsHolding<VtVec3fArray>() &&
+                   value.UncheckedGet<VtVec3fArray>().size() == 1) {
+            // A constant primvar, such as displayColor.
+            const GfVec3f& v = value.UncheckedGet<VtVec3fArray>()[0];
+            const double numbers[] = {v[0], v[1], v[2]};
+            sink_.SetNumbersAt(p, n, time, numbers, 3);
+        } else if (value.IsHolding<VtFloatArray>()) {
+            const VtFloatArray& a =
+                value.UncheckedGet<VtFloatArray>();
+            const std::size_t shape[] = {a.size()};
+            sink_.WriteFloatArrayAt(p, n, time, a.cdata(), shape, 1);
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    /// Every other time-sampled attribute of the translated prims
+    /// that their Ernie prims declare (a camera's focal length, a
+    /// light's intensity, a shader's inputs), as time samples;
+    /// transforms, visibility, points and skeletal animation come
+    /// their own ways, and arrays per element (normals, primvars of
+    /// many values) are read at one time.
+    void SampledAttributes() {
+        static const std::set<std::string> kHandled{
+            "points",     "normals",          "visibility",
+            "extent",     "faceVertexCounts", "faceVertexIndices",
+            "velocities", "accelerations",    "xformOpOrder"};
+        for (const auto& [source, path] : mapped_) {
+            const UsdPrim prim = stage_->GetPrimAtPath(source);
+            if (!prim) {
+                continue;
+            }
+            for (const UsdAttribute& attribute :
+                 prim.GetAttributes()) {
+                const std::string name =
+                    attribute.GetName().GetString();
+                if (kHandled.contains(name) ||
+                    TfStringStartsWith(name, "xformOp:") ||
+                    TfStringStartsWith(name, "skel:") ||
+                    TfStringStartsWith(name, "primvars:skel:")) {
+                    continue;
+                }
+                std::vector<double> times;
+                if (!attribute.GetTimeSamples(&times) ||
+                    times.size() < 2) {
+                    continue;
+                }
+                if (!sink_.Declares(path.c_str(), name.c_str())) {
+                    Warn(path + ": its animated " + name +
+                         " has no Ernie attribute; it is not "
+                         "animated");
+                    continue;
+                }
+                Call(path, [&] {
+                    for (const double time : times) {
+                        VtValue value;
+                        attribute.Get(&value, time);
+                        if (!SetValueAt(path, name, time, value)) {
+                            Warn(path + ": " + name + " is a " +
+                                 value.GetTypeName() +
+                                 ", whose samples Ernie does not "
+                                 "take");
+                            return;
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -1456,7 +1558,7 @@ class Importer {
                 })) {
                 continue;
             }
-            sink_.MapSource(child.GetText(), childPath.c_str());
+            Mapped(child, childPath);
             const MeshOut out = BuildMesh(source, list);
             WriteMesh(childPath, out, source);
             if (skinned != skinning_.end()) {
@@ -1612,7 +1714,7 @@ class Importer {
         animations_.emplace(source, path);
         Call(path, [&] {
             DefinePrim(path.c_str(), "SkelAnimation");
-            sink_.MapSource(source.GetText(), path.c_str());
+            Mapped(source, path);
             TranslateAnimation(anim, path);
         });
         return path;
@@ -1840,7 +1942,7 @@ class Importer {
             };
             Call(shapePath, [&] {
                 DefinePrim(shapePath.c_str(), "BlendShape");
-                sink_.MapSource(target.GetText(), shapePath.c_str());
+                Mapped(target, shapePath);
                 const char* p = shapePath.c_str();
                 const std::vector<float> moved = gather(offsets);
                 sink_.WriteFloats(p, "offsets", moved.data(),
@@ -2168,7 +2270,7 @@ class Importer {
             })) {
             return "";
         }
-        sink_.MapSource(source.GetText(), path.c_str());
+        Mapped(source, path);
         // UsdPreviewSurface (the universal render context) first,
         // then MDL, approximated.
         const HdMaterialNetworkSchema universal =
@@ -2262,7 +2364,7 @@ class Importer {
                   [&] { DefinePrim(path.c_str(), "Shader"); })) {
             return "";
         }
-        sink_.MapSource(source.GetText(), path.c_str());
+        Mapped(source, path);
         const HdMaterialNodeSchema node =
             network.GetNodes().Get(TfToken(name));
         const std::string id = IdOf(network, name);
@@ -2508,6 +2610,8 @@ class Importer {
     std::set<SdfPath> trees_;
     std::unordered_set<std::string>
         defined_;  ///< Ernie prims defined.
+    /// Each translated USD prim and its Ernie prim (`Mapped`).
+    std::vector<std::pair<SdfPath, std::string>> mapped_;
     UsdSkelCache skelCache_;
     std::unordered_map<SdfPath, Skinned, SdfPath::Hash> skinning_;
     std::unordered_map<SdfPath, std::string, SdfPath::Hash>

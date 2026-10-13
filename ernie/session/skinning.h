@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /// Skinned meshes resolved from the scene as UsdSkel defines them, in
@@ -66,6 +67,8 @@ struct SkeletonPose {
     glm::dmat4 world{1.0};
     std::vector<std::string> blendShapes;  ///< The animation's names.
     std::vector<float> blendShapeWeights;
+    /// Each of `blendShapes` by name, for the meshes' lookups.
+    std::unordered_map<std::string, std::size_t> blendShapeIndex;
 };
 
 /// The Skeleton `skeleton` at `timeCode`: its animation's joints over
@@ -86,6 +89,12 @@ struct SkinPose {
 };
 
 SkinPose SkinPoseOf(const Scene& scene, const Path& mesh,
+                    const SkinBinding& binding,
+                    const SkeletonPose& skeleton);
+
+/// `SkinPoseOf` for a mesh whose world transform is `meshWorld`, as a
+/// caller posing many meshes under one parent finds it once.
+SkinPose SkinPoseOf(const glm::dmat4& meshWorld,
                     const SkinBinding& binding,
                     const SkeletonPose& skeleton);
 

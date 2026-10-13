@@ -156,6 +156,17 @@ struct SkinConstants {
 static_assert(sizeof(SkinConstants) == 112,
               "SkinConstants must match skinning.slang");
 
+struct InstanceBlendConstants {
+    std::uint32_t info[4];
+    std::uint32_t blend[4];
+    VkDeviceAddress positions = 0;
+    VkDeviceAddress orientations = 0;
+    VkDeviceAddress scales = 0;
+    VkDeviceAddress outPositions = 0;
+    VkDeviceAddress outOrientations = 0;
+    VkDeviceAddress outScales = 0;
+};
+
 struct RefineConstants {
     std::uint32_t info[4];
     VkDeviceAddress control = 0;
@@ -589,6 +600,10 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     refinePipeline_ = std::make_unique<ComputePipeline>(
         context_, skinLayout_,
         renderer_.Compiler().CompileSpirv(skinning, "refineMain"));
+    instanceBlendPipeline_ = std::make_unique<ComputePipeline>(
+        context_, skinLayout_,
+        renderer_.Compiler().CompileSpirv(skinning,
+                                          "blendInstancesMain"));
     const std::vector<ShaderModuleSource> normals{
         {"mesh_normals", shaders::kMeshNormalsSlang}};
     normalsPipeline_ = std::make_unique<ComputePipeline>(
@@ -1330,6 +1345,24 @@ void MeshDrawable::SetSkin(std::uint32_t mesh, Skin skin) {
     }
     Mesh& target = it->second;
     const std::size_t points = target.data.points.size() / 3;
+    // Device samples are copied in on the device below.
+    const bool deviceRest = !skin.deviceRest.empty();
+    if (deviceRest) {
+        for (const Tensor& sample : skin.deviceRest) {
+            CheckDeviceTensor(sample, 3, "Skin rest samples");
+            if (sample.Elements() !=
+                skin.deviceRest.front().Elements()) {
+                throw std::invalid_argument(
+                    "A skin's rest samples need one size");
+            }
+        }
+        skin.restSamples = skin.deviceRest.size();
+        skin.restPoints.assign(
+            skin.restSamples *
+                static_cast<std::size_t>(
+                    skin.deviceRest.front().Elements()),
+            0.0f);
+    }
     if (skin.restSamples == 0 ||
         skin.restPoints.size() % (3 * skin.restSamples) != 0) {
         throw std::invalid_argument("A skin's rest samples disagree");
@@ -1393,8 +1426,19 @@ void MeshDrawable::SetSkin(std::uint32_t mesh, Skin skin) {
     append(9, std::span<const float>(skin.stencils.weights));
     target.skinData = std::make_unique<GpuBuffer>(
         context_, std::max<VkDeviceSize>(bytes.size(), 16),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        deviceRest ? BufferMemory::Shared : BufferMemory::Device);
     target.skinData->Write(bytes);
+    for (std::size_t s = 0; deviceRest && s < skin.deviceRest.size();
+         ++s) {
+        compute_->CopyToBuffer(skin.deviceRest[s], *target.skinData,
+                               target.skinOffsets[0] +
+                                   s * 3 * controls * sizeof(float),
+                               skin.restStream);
+    }
+    skin.deviceRest.clear();
+    skin.restPoints.clear();
+    skin.restPoints.resize(3 * controls * skin.restSamples);
     const std::size_t rows =
         24 + (skin.dualQuaternion ? 20 : 12) * skin.joints;
     target.skinPose = std::make_unique<GpuBuffer>(
@@ -1455,6 +1499,114 @@ void MeshDrawable::SetSkinPose(std::uint32_t mesh, SkinPose pose) {
     target.pointsBounded = true;
     target.pointsDirty = true;
     activeMeshes_.insert(mesh);
+    ForgetBounds();
+}
+
+void MeshDrawable::SetInstanceSamples(std::uint32_t instancer,
+                                      InstanceSamples samples) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end()) {
+        throw std::invalid_argument("Unknown instancer " +
+                                    std::to_string(instancer));
+    }
+    Instancer& target = it->second;
+    const std::size_t n = target.count;
+    struct Array {
+        std::size_t samples;
+        const std::vector<float>* host;
+        const std::vector<Tensor>* device;
+        std::size_t width;
+        const char* what;
+    };
+    const std::array<Array, 3> arrays{{
+        {samples.positionSamples, &samples.positions,
+         &samples.devicePositions, 3, "Instance position samples"},
+        {samples.orientationSamples, &samples.orientations,
+         &samples.deviceOrientations, 4,
+         "Instance orientation samples"},
+        {samples.scaleSamples, &samples.scales, &samples.deviceScales,
+         3, "Instance scale samples"},
+    }};
+    bool device = false;
+    VkDeviceSize size = 0;
+    for (std::size_t k = 0; k < arrays.size(); ++k) {
+        const Array& a = arrays[k];
+        target.sampleOffsets[k] = size;
+        target.sampleCounts[k] =
+            static_cast<std::uint32_t>(a.samples);
+        if (a.samples == 0) {
+            continue;
+        }
+        if (!a.device->empty()) {
+            device = true;
+            if (a.device->size() != a.samples) {
+                throw std::invalid_argument(
+                    std::string(a.what) +
+                    " need a tensor per sample");
+            }
+            for (const Tensor& tensor : *a.device) {
+                CheckDeviceTensor(tensor, a.width, a.what);
+                if (static_cast<std::size_t>(tensor.Elements()) !=
+                    n * a.width) {
+                    throw std::invalid_argument(
+                        std::string(a.what) +
+                        " need a row per instance");
+                }
+            }
+        } else if (a.host->size() != a.samples * n * a.width) {
+            throw std::invalid_argument(
+                std::string(a.what) +
+                " need a row per instance and sample");
+        }
+        size +=
+            (a.samples * n * a.width * sizeof(float) + 15) / 16 * 16;
+    }
+    target.sampleData = std::make_unique<GpuBuffer>(
+        context_, std::max<VkDeviceSize>(size, 16),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        device ? BufferMemory::Shared : BufferMemory::Device);
+    for (std::size_t k = 0; k < arrays.size(); ++k) {
+        const Array& a = arrays[k];
+        if (a.samples == 0) {
+            continue;
+        }
+        if (a.device->empty()) {
+            target.sampleData->Write(
+                std::as_bytes(std::span(*a.host)),
+                target.sampleOffsets[k]);
+            continue;
+        }
+        // Copied on the device, once.
+        for (std::size_t s = 0; s < a.samples; ++s) {
+            compute_->CopyToBuffer((*a.device)[s], *target.sampleData,
+                                   target.sampleOffsets[k] +
+                                       s * n * a.width *
+                                           sizeof(float),
+                                   samples.stream);
+        }
+    }
+    target.sampled = true;
+    target.dirty = true;
+}
+
+void MeshDrawable::SetInstanceBlend(std::uint32_t instancer,
+                                    std::uint32_t lower,
+                                    std::uint32_t upper, float alpha,
+                                    const Bounds3& positions,
+                                    float scale) {
+    const auto it = instancers_.find(instancer);
+    if (it == instancers_.end() || !it->second.sampled) {
+        throw std::invalid_argument("Instancer " +
+                                    std::to_string(instancer) +
+                                    " has no samples");
+    }
+    Instancer& target = it->second;
+    target.blend = {lower, upper,
+                    std::bit_cast<std::uint32_t>(alpha)};
+    target.sampledPositions = positions;
+    target.sampledScale = scale;
+    target.dirty = true;
     ForgetBounds();
 }
 
@@ -2496,7 +2648,9 @@ void MeshDrawable::RebuildInstances() {
         // Arrays mapped into the old pools copy across from there.
         instancer.inPlace = {};
         instancer.mapped = {};
-        if (instancer.onDevice) {
+        if (instancer.sampled) {
+            pendingBlends_.push_back(handle);
+        } else if (instancer.onDevice) {
             WriteInstancer(instancer, false);
         }
         instancer.dirty = false;
@@ -2960,12 +3114,19 @@ void MeshDrawable::Prepare(const FrameParams& params,
         drawsChanged = true;
     }
     const bool rebuildInstances = instancesDirty_;
+    pendingBlends_.clear();
     if (instancesDirty_) {
         RebuildInstances();
     } else {
         for (auto& [handle, instancer] : instancers_) {
             if (instancer.dirty) {
-                WriteInstancer(instancer, true);
+                // Sampled ones blend on the GPU into the other half.
+                if (instancer.sampled) {
+                    FlipInstancer(instancer);
+                    pendingBlends_.push_back(handle);
+                } else {
+                    WriteInstancer(instancer, true);
+                }
                 instancer.dirty = false;
             }
         }
@@ -3372,6 +3533,13 @@ std::optional<Bounds3> MeshDrawable::Bounds() const {
             TransformBox(item.prototype, mesh.low, mesh.high);
         const float radius =
             glm::length(glm::max(glm::abs(low), glm::abs(high)));
+        if (instancer.sampled) {
+            const glm::vec3 reach(radius * instancer.sampledScale);
+            add(TransformBox(
+                transform, instancer.sampledPositions.first - reach,
+                instancer.sampledPositions.second + reach));
+            continue;
+        }
         if (const auto measured = instancer.onDevice
                                       ? MeasuredPositions(instancer)
                                       : std::nullopt) {
@@ -4298,7 +4466,7 @@ void MeshDrawable::RecordAnchors(VkCommandBuffer commands,
 }
 
 void MeshDrawable::RecordSkins(VkCommandBuffer commands) const {
-    if (pendingSkins_.empty()) {
+    if (pendingSkins_.empty() && pendingBlends_.empty()) {
         return;
     }
     ERNIE_GPU_ZONE(context_, commands, "Mesh skinning");
@@ -4318,6 +4486,49 @@ void MeshDrawable::RecordSkins(VkCommandBuffer commands) const {
     // After the poses' uploads and the last frame's reads of the
     // points; the control points, then the refined ones.
     barrier();
+    // Sampled instancers' arrays at the time code.
+    if (!pendingBlends_.empty()) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          instanceBlendPipeline_->Handle());
+        for (const std::uint32_t handle : pendingBlends_) {
+            const Instancer& instancer = instancers_.at(handle);
+            const auto count =
+                static_cast<std::uint32_t>(instancer.count);
+            if (count == 0) {
+                continue;
+            }
+            const VkDeviceSize first =
+                VkDeviceSize{InstanceBase(instancer)} +
+                instancer.first;
+            const VkDeviceAddress data =
+                instancer.sampleData->Address();
+            InstanceBlendConstants blend;
+            blend.info[0] = count;
+            blend.info[1] = instancer.sampleCounts[0];
+            blend.info[2] = instancer.sampleCounts[1];
+            blend.info[3] = instancer.sampleCounts[2];
+            blend.blend[0] = instancer.blend[0];
+            blend.blend[1] = instancer.blend[1];
+            blend.blend[2] = instancer.blend[2];
+            blend.blend[3] = 0;
+            blend.positions = data + instancer.sampleOffsets[0];
+            blend.orientations = data + instancer.sampleOffsets[1];
+            blend.scales = data + instancer.sampleOffsets[2];
+            blend.outPositions =
+                positions_->Address() + first * 3 * sizeof(float);
+            blend.outOrientations =
+                orientations_->Address() + first * 4 * sizeof(float);
+            blend.outScales =
+                scales_->Address() + first * 3 * sizeof(float);
+            SkinConstants push{};
+            static_assert(sizeof(InstanceBlendConstants) <=
+                          sizeof(SkinConstants));
+            std::memcpy(&push, &blend, sizeof(blend));
+            skinLayout_.PushConstants(commands, &push, sizeof(push));
+            vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
+        }
+        barrier();
+    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                       skinPipeline_->Handle());
     bool refining = false;

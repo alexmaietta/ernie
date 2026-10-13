@@ -427,7 +427,8 @@ std::optional<Bounds3> XformExtentOf(const Scene& scene,
 }
 
 /// Whether the Mesh at `path` is a point cache the GPU blends: two or
-/// more samples of `points`, float32 CPU arrays of one size.
+/// more samples of `points`, float32 arrays of one size, all on the
+/// CPU or all on the device.
 bool IsPointCache(const Scene& scene, const Path& path) {
     if (scene.TypeOf(path) != tokens::kMesh) {
         return false;
@@ -440,7 +441,8 @@ bool IsPointCache(const Scene& scene, const Path& path) {
     return std::ranges::all_of(
         samples, [&](const TimeSample& sample) {
             return sample.tensor.Type() == DType::Float32 &&
-                   sample.tensor.Location().kind == DeviceKind::Cpu &&
+                   sample.tensor.Location().kind ==
+                       samples.front().tensor.Location().kind &&
                    sample.tensor.Elements() ==
                        samples.front().tensor.Elements();
         });
@@ -1859,10 +1861,11 @@ std::optional<std::vector<Path>>
 RasterDelegate::ChangedMeshes(const Scene& scene,
                               std::span<const Change> changes) const {
     using namespace tokens;
-    // Skinned meshes are posed every sync, and read their skeletons.
-    if (skinned_ || scene.AttributeVersion(Path::Root(),
-                                           kSubdivisionRefineLevel) !=
-                        subdivisionVersion_) {
+    // Skinned meshes are posed every sync whatever changed
+    // (`PoseSkins`); a new refine level refines every surface.
+    if (scene.AttributeVersion(Path::Root(),
+                               kSubdivisionRefineLevel) !=
+        subdivisionVersion_) {
         return std::nullopt;
     }
     std::vector<Path> meshes;
@@ -1873,6 +1876,15 @@ RasterDelegate::ChangedMeshes(const Scene& scene,
         }
         const std::string_view type =
             scene.Has(path) ? scene.TypeOf(path) : std::string_view();
+        // A synced mesh only moved or hidden (a character's root
+        // motion, say) keeps its data: its draws follow (`Items`).
+        constexpr auto kMoved = static_cast<std::uint32_t>(
+            Dirty::Transform | Dirty::Visibility);
+        if (syncedMeshes_.contains(path) &&
+            (static_cast<std::uint32_t>(change.bits) & ~kMoved) ==
+                0) {
+            continue;
+        }
         if (IsMeshType(type) || syncedMeshes_.contains(path)) {
             meshes.push_back(path);
         }
@@ -2090,7 +2102,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
                                   writer->second.writer,
                                   writer->second.bounds);
             }
-            if (onGpu(kPoints)) {
+            // A posed mesh's points come from its skin.
+            if (onGpu(kPoints) && !deformed) {
                 SetMeshPoints(scene, path, synced.handle);
             }
             if (gpuNormals || gpuColors) {
@@ -2134,10 +2147,12 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         }
     }
     meshes_.RemoveMeshes(dropped);
-    // Only meshes without skins sync in part (`ChangedMeshes`).
+    // A partial sync (`ChangedMeshes`) keeps the skins it did not
+    // see.
     skinned_ = only != nullptr ? skinned_ || skinned : skinned;
     posedTimeCode_ = scene.AttributeVersion(Path::Root(), kTimeCode);
-    if (skinned) {
+    // Every skinned mesh, changed or not, at the time code.
+    if (skinned_) {
         PoseSkins(scene, errors);
     }
     if (!errors.empty()) {
@@ -2155,16 +2170,26 @@ void RasterDelegate::AddSkin(const Scene& scene, const Path& path,
     MeshDrawable::Skin skin;
     // Its control points, as the scene holds them: each sample of a
     // point cache, one after another.
-    const auto append = [&](const Tensor& points) {
-        const Tensor packed = points.Contiguous();
-        if (packed.Type() != DType::Float32 ||
-            packed.Location().kind != DeviceKind::Cpu) {
+    const auto append = [&](const Tensor& points,
+                            std::uintptr_t stream) {
+        // A device sample is copied in on the device; its bounds are
+        // read once.
+        const bool device = IsGpu(points.Location().kind);
+        const Tensor packed =
+            (device ? RequireCompute().Download(points) : points)
+                .Contiguous();
+        if (packed.Type() != DType::Float32) {
             throw std::invalid_argument(
-                "a posed mesh's points must be float32 on the CPU");
+                "a posed mesh's points must be float32");
         }
         const float* first = packed.As<float>();
-        skin.restPoints.insert(skin.restPoints.end(), first,
-                               first + packed.Elements());
+        if (device) {
+            skin.deviceRest.push_back(points);
+            skin.restStream = stream;
+        } else {
+            skin.restPoints.insert(skin.restPoints.end(), first,
+                                   first + packed.Elements());
+        }
         Bounds3 box{glm::vec3(std::numeric_limits<float>::max()),
                     glm::vec3(std::numeric_limits<float>::lowest())};
         for (std::int64_t i = 0; i + 2 < packed.Elements(); i += 3) {
@@ -2179,16 +2204,20 @@ void RasterDelegate::AddSkin(const Scene& scene, const Path& path,
         scene.SamplesOf(path, tokens::kPoints);
     if (IsPointCache(scene, path)) {
         for (const TimeSample& sample : samples) {
-            append(sample.tensor);
+            append(sample.tensor, sample.stream);
         }
         skin.restSamples = samples.size();
     } else if (const Tensor* points =
                    scene.Read(path, tokens::kPoints)) {
-        append(*points);
+        append(*points, scene.WriteStream(path, tokens::kPoints));
     }
     synced.deformed = true;
     const std::size_t controls =
-        skin.restPoints.size() / 3 / skin.restSamples;
+        skin.deviceRest.empty()
+            ? skin.restPoints.size() / 3 / skin.restSamples
+            : static_cast<std::size_t>(
+                  skin.deviceRest.front().Elements()) /
+                  3;
     const std::size_t perPoint = binding.perPoint;
     if (perPoint == 0 || binding.constant) {
         skin.constantInfluences = true;
@@ -2291,6 +2320,24 @@ void RasterDelegate::PoseSkins(const Scene& scene,
     ERNIE_ZONE("Pose skins");
     const double time = Stage(scene, Path::Root()).GetTimeCode();
     std::map<Path, SkeletonPose> skeletons;
+    // World transforms, each prim's found once: a character's meshes
+    // share their ancestors.
+    std::map<Path, glm::dmat4> worlds;
+    const std::function<glm::dmat4(const Path&)> WorldOf =
+        [&](const Path& path) -> glm::dmat4 {
+        if (path.IsRoot()) {
+            return scene.LocalTransform(path);
+        }
+        if (const auto it = worlds.find(path); it != worlds.end()) {
+            return it->second;
+        }
+        const glm::dmat4 local = scene.LocalTransform(path);
+        const glm::dmat4 world = ResetsXformStack(scene, path)
+                                     ? local
+                                     : WorldOf(path.Parent()) * local;
+        worlds.emplace(path, world);
+        return world;
+    };
     // A 3x4 transform's rows, as skinning.slang reads them.
     const auto rows = [](const glm::mat4& m,
                          std::vector<float>& out) {
@@ -2329,7 +2376,7 @@ void RasterDelegate::PoseSkins(const Scene& scene,
                                                     time))
                             .first;
                 }
-                pose = SkinPoseOf(scene, path, binding,
+                pose = SkinPoseOf(WorldOf(path), binding,
                                   skeleton->second);
             }
             const glm::mat4 bind = binding.geomBindTransform;
@@ -2397,13 +2444,188 @@ void RasterDelegate::PoseSkins(const Scene& scene,
     }
 }
 
+bool RasterDelegate::SyncSampledInstancer(const Scene& scene,
+                                          const Path& path,
+                                          SyncedInstancer& synced) {
+    using namespace tokens;
+    constexpr std::array<std::string_view, 3> kNames{
+        kPositions, kOrientations, kScales};
+    constexpr std::array<std::size_t, 3> kWidths{3, 4, 3};
+    std::array<std::span<const TimeSample>, 3> samples;
+    std::span<const TimeSample> timing;
+    for (std::size_t k = 0; k < kNames.size(); ++k) {
+        const std::span<const TimeSample> each =
+            scene.SamplesOf(path, kNames[k]);
+        if (each.size() < 2 || !each.front().isTensor) {
+            continue;
+        }
+        if (!timing.empty() &&
+            !std::ranges::equal(timing, each, {}, &TimeSample::time,
+                                &TimeSample::time)) {
+            return false;  // Arrays sampled at other times: on the
+                           // CPU.
+        }
+        timing = each;
+        samples[k] = each;
+    }
+    if (timing.empty() || GpuAnchorOf(scene, path)) {
+        return false;
+    }
+    std::uint64_t key = 1469598103934665603ull;
+    for (const std::span<const TimeSample>& each : samples) {
+        for (const TimeSample& sample : each) {
+            key = (key ^ reinterpret_cast<std::uintptr_t>(
+                             sample.tensor.Data())) *
+                      0x100000001b3ull ^
+                  std::bit_cast<std::uint64_t>(sample.time);
+        }
+        key = key * 0x100000001b3ull + each.size();
+    }
+    if (synced.handle == 0 || synced.samplesKey != key) {
+        // A sample's floats on the host: downloaded once when on the
+        // device, for its bounds.
+        const auto host = [&](const Tensor& tensor) {
+            const Tensor packed =
+                (IsGpu(tensor.Location().kind)
+                     ? RequireCompute().Download(tensor)
+                     : tensor)
+                    .Contiguous();
+            if (packed.Type() != DType::Float32) {
+                throw std::invalid_argument(
+                    "its sampled arrays must be float32");
+            }
+            return std::vector<float>(packed.As<float>(),
+                                      packed.As<float>() +
+                                          packed.Elements());
+        };
+        MeshDrawable::InstanceSamples out;
+        InstanceData data;
+        std::array<std::vector<float>*, 3> firsts{
+            &data.positions, &data.orientations, &data.scales};
+        std::array<std::vector<float>*, 3> hosts{
+            &out.positions, &out.orientations, &out.scales};
+        std::array<std::vector<Tensor>*, 3> devices{
+            &out.devicePositions, &out.deviceOrientations,
+            &out.deviceScales};
+        std::array<std::size_t*, 3> counts{&out.positionSamples,
+                                           &out.orientationSamples,
+                                           &out.scaleSamples};
+        synced.sampleBounds.clear();
+        synced.sampleScale = 1.0f;
+        for (std::size_t k = 0; k < kNames.size(); ++k) {
+            if (samples[k].empty()) {
+                // As it is, on the host.
+                if (const std::optional<std::vector<float>> values =
+                        FloatAttribute(scene, path, kNames[k],
+                                       kWidths[k])) {
+                    *firsts[k] = *values;
+                }
+                continue;
+            }
+            *counts[k] = samples[k].size();
+            const bool device =
+                IsGpu(samples[k].front().tensor.Location().kind);
+            if (device) {
+                out.stream = samples[k].front().stream;
+            }
+            for (const TimeSample& sample : samples[k]) {
+                if (device) {
+                    devices[k]->push_back(sample.tensor);
+                }
+                // Positions' bounds and the largest scale need them
+                // on the host; the rest only the first.
+                if (k == 1 && device && !firsts[k]->empty()) {
+                    continue;
+                }
+                const std::vector<float> values = host(sample.tensor);
+                if (firsts[k]->empty()) {
+                    *firsts[k] = values;
+                }
+                if (!device) {
+                    hosts[k]->insert(hosts[k]->end(), values.begin(),
+                                     values.end());
+                }
+                if (k == 0) {
+                    Bounds3 box{
+                        glm::vec3(std::numeric_limits<float>::max()),
+                        glm::vec3(
+                            std::numeric_limits<float>::lowest())};
+                    for (std::size_t i = 0; i + 2 < values.size();
+                         i += 3) {
+                        const glm::vec3 p(values[i], values[i + 1],
+                                          values[i + 2]);
+                        box.first = glm::min(box.first, p);
+                        box.second = glm::max(box.second, p);
+                    }
+                    synced.sampleBounds.push_back(box);
+                } else if (k == 2) {
+                    for (const float s : values) {
+                        synced.sampleScale =
+                            std::max(synced.sampleScale, std::abs(s));
+                    }
+                }
+            }
+        }
+        if (samples[0].empty()) {
+            Bounds3 box{
+                glm::vec3(std::numeric_limits<float>::max()),
+                glm::vec3(std::numeric_limits<float>::lowest())};
+            for (std::size_t i = 0; i + 2 < data.positions.size();
+                 i += 3) {
+                const glm::vec3 p(data.positions[i],
+                                  data.positions[i + 1],
+                                  data.positions[i + 2]);
+                box.first = glm::min(box.first, p);
+                box.second = glm::max(box.second, p);
+            }
+            synced.sampleBounds.push_back(box);
+        }
+        if (const std::optional<std::vector<float>> colors =
+                FloatAttribute(scene, path, kDisplayColor, 3)) {
+            data.colors = *colors;
+        }
+        if (synced.handle == 0) {
+            synced.handle = meshes_.AddInstancer(std::move(data));
+        } else {
+            meshes_.SetInstances(synced.handle, std::move(data));
+        }
+        meshes_.SetInstanceSamples(synced.handle, std::move(out));
+        synced.samplesKey = key;
+        synced.key =
+            Key{};  // The usual sync starts afresh without samples.
+    }
+    const SampleBracket bracket = BracketOf(timing, scene.TimeCode());
+    const Bounds3& a = synced.sampleBounds[std::min(
+        bracket.lower, synced.sampleBounds.size() - 1)];
+    const Bounds3& b = synced.sampleBounds[std::min(
+        bracket.upper, synced.sampleBounds.size() - 1)];
+    meshes_.SetInstanceBlend(
+        synced.handle, static_cast<std::uint32_t>(bracket.lower),
+        static_cast<std::uint32_t>(bracket.upper),
+        static_cast<float>(bracket.alpha),
+        {glm::min(a.first, b.first), glm::max(a.second, b.second)},
+        synced.sampleScale);
+    return true;
+}
+
 void RasterDelegate::SyncInstancers(const Scene& scene) {
     ERNIE_ZONE("Sync instancers");
     using namespace tokens;
     std::set<Path> seen;
     std::vector<std::string> errors;
+    sampledInstancers_ = false;
     for (const Path& path : scene.Prims(kPointInstancer)) {
         seen.insert(path);
+        try {
+            if (SyncSampledInstancer(scene, path,
+                                     instancers_[path])) {
+                sampledInstancers_ = true;
+                continue;
+            }
+        } catch (const std::invalid_argument& error) {
+            errors.push_back(Describe(path, "instancer", error));
+            continue;
+        }
         const Key key = KeyOf(
             scene, path,
             {kPositions, kOrientations, kScales, kDisplayColor});
@@ -3465,7 +3687,7 @@ void RasterDelegate::Sync(const Scene& scene) {
         // terrain, meshes and draws as they are (lights and settings
         // resolve every frame); a new time code poses skinned meshes.
         const bool posing =
-            skinned_ &&
+            (skinned_ || sampledInstancers_) &&
             scene.AttributeVersion(Path::Root(), tokens::kTimeCode) !=
                 posedTimeCode_;
         if (!posing && std::all_of(changes.begin(), changes.end(),

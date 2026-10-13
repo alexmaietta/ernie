@@ -164,6 +164,108 @@ TEST_F(RasterDelegateTest, PointCachesBlendOnTheGpuAsOnTheCpu) {
     }
 }
 
+// An instancer's time-sampled positions, orientations and scales
+// blend on the GPU as a static instancer of the same blend draws.
+TEST_F(RasterDelegateTest, SampledInstancersBlendOnTheGpu) {
+    constexpr int kCount = 4;
+    // Two samples: bars side by side, then moved, turned and shrunk.
+    std::array<std::vector<float>, 2> positions, orientations, scales;
+    for (std::size_t s = 0; s < 2; ++s) {
+        const glm::quat turn = glm::angleAxis(
+            glm::radians(50.0f * static_cast<float>(s)),
+            glm::vec3(0, 0, 1));
+        for (int i = 0; i < kCount; ++i) {
+            positions[s].insert(
+                positions[s].end(),
+                {6.0f * static_cast<float>(s),
+                 -12.0f + 8.0f * static_cast<float>(i), 0.0f});
+            orientations[s].insert(orientations[s].end(),
+                                   {turn.x, turn.y, turn.z, turn.w});
+            scales[s].insert(
+                scales[s].end(),
+                {0.4f - 0.2f * static_cast<float>(s), 0.4f, 0.4f});
+        }
+    }
+    const auto rows = [](const std::vector<float>& values,
+                         std::int64_t width) {
+        return Tensor::Copy<float>(values, {kCount, width});
+    };
+    // The bar as the instancer's prototype.
+    const auto instancerScene = [&] {
+        Scene scene = BarScene();
+        const Tensor points =
+            *scene.Read("/World/Bar", tokens::kPoints);
+        const Tensor counts =
+            *scene.Read("/World/Bar", tokens::kFaceVertexCounts);
+        const Tensor indices =
+            *scene.Read("/World/Bar", tokens::kFaceVertexIndices);
+        scene.Remove("/World/Bar");
+        ernie::PointInstancer::Define(scene, "/World/Rocks");
+        ernie::Mesh::Define(scene, "/World/Rocks/Rock")
+            .SetPoints(points)
+            .SetFaceVertexCounts(counts)
+            .SetFaceVertexIndices(indices)
+            .SetMaterialBinding("/Looks/Red");
+        scene.Set("/World/Rocks", tokens::kPrototypes,
+                  std::vector<Path>{"/World/Rocks/Rock"});
+        return scene;
+    };
+    Scene sampled = instancerScene();
+    for (std::size_t s = 0; s < 2; ++s) {
+        const double time = 10.0 * static_cast<double>(s);
+        sampled.WriteAt("/World/Rocks", tokens::kPositions, time,
+                        rows(positions[s], 3));
+        sampled.WriteAt("/World/Rocks", tokens::kOrientations, time,
+                        rows(orientations[s], 4));
+        sampled.WriteAt("/World/Rocks", tokens::kScales, time,
+                        rows(scales[s], 3));
+    }
+    RasterDelegate delegate(*context_);
+    std::vector<std::uint8_t> previous;
+    for (const double time : {0.0, 3.0, 10.0}) {
+        ernie::Stage(sampled, Path::Root()).SetTimeCode(time);
+        const std::vector<std::uint8_t> gpu =
+            Bytes(delegate.Render(sampled));
+        // The blend at `time`, orientations normalized after.
+        const auto alpha = static_cast<float>(time / 10.0);
+        std::vector<float> p, q, k;
+        for (std::size_t i = 0; i < positions[0].size(); ++i) {
+            p.push_back(positions[0][i] +
+                        (positions[1][i] - positions[0][i]) * alpha);
+            k.push_back(scales[0][i] +
+                        (scales[1][i] - scales[0][i]) * alpha);
+        }
+        for (std::size_t i = 0; i < orientations[0].size(); i += 4) {
+            glm::vec4 blended(0.0f);
+            for (std::size_t c = 0; c < 4; ++c) {
+                blended[static_cast<int>(c)] =
+                    orientations[0][i + c] +
+                    (orientations[1][i + c] -
+                     orientations[0][i + c]) *
+                        alpha;
+            }
+            blended = glm::normalize(blended);
+            q.insert(q.end(),
+                     {blended.x, blended.y, blended.z, blended.w});
+        }
+        Scene reference = instancerScene();
+        reference.Write("/World/Rocks", tokens::kPositions,
+                        rows(p, 3));
+        reference.Write("/World/Rocks", tokens::kOrientations,
+                        rows(q, 4));
+        reference.Write("/World/Rocks", tokens::kScales, rows(k, 3));
+        RasterDelegate cpu(*context_);
+        EXPECT_LE(BytesDiffering(gpu, Bytes(cpu.Render(reference))),
+                  gpu.size() / 200)
+            << "at " << time;
+        if (!previous.empty()) {
+            EXPECT_GT(BytesDiffering(gpu, previous), gpu.size() / 200)
+                << "the instances should move at " << time;
+        }
+        previous = gpu;
+    }
+}
+
 // The GPU poses a skinned mesh as the CPU reference does: linearly
 // and as dual quaternions, a subdivision surface refined after, posed
 // again as the time code moves.
