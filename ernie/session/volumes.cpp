@@ -122,6 +122,10 @@ VolumeMaterialParams MaterialOf(const Scene& scene,
     params.density = material.GetDensity();
     params.albedo = material.GetVolumeAlbedo();
     params.anisotropy = material.GetAnisotropy();
+    params.secondAnisotropy = material.GetSecondAnisotropy();
+    params.lobeMix = material.GetLobeMix();
+    params.powder = material.GetPowder();
+    params.powderLength = material.GetPowderLength();
     params.phase = material.GetPhaseFunction();
     // Hapke's b and c, as its BRDF reads them (with its defaults).
     params.b = GetNumber(scene, bound, tokens::kPhaseB, params.b);

@@ -86,6 +86,7 @@ static const uint kDoubleHenyeyGreenstein = 1;
 static const uint kRayleigh = 2;
 static const uint kIsotropic = 3;
 static const uint kCloudDroplets = 4;
+static const uint kDualHenyeyGreenstein = 5;
 
 // One field of a volume: rows of the affine map from the volume's local frame to the grid's index
 // space, and the grid: its byte offset in `grids` (kNoGrid for none) and PNANOVDB_GRID_TYPE_*.
@@ -135,6 +136,9 @@ struct VolumeMaterialGpu {
     // Wrenninge's multiple-scattering octaves: x their count (1, single scattering), y each one's
     // scattering of the one before's (a), z its extinction (b), w its anisotropy (c).
     float4 scattering;
+    // x: the powder effect's strength (0 none), y its length (world units): in-scattered light
+    // dimmed by 1 - x e^(-sigma y) where the medium is thin, as at clouds' edges.
+    float4 extras;
 }
 
 struct VolumeConstants {
@@ -759,6 +763,11 @@ float phaseOf(VolumeMaterialGpu material, float cosG, float spread = 1.0) {
         return lerp(1.0 / (4.0 * PI), dropletAt(material, pass.dropletBands, cosG), spread);
     case kDoubleHenyeyGreenstein:
         return doubleHenyeyGreenstein(material.phase.y * spread, material.phase.z, cosG) /
+               (4.0 * PI);
+    case kDualHenyeyGreenstein:
+        // Two lobes, g (params.x) and g2 (phase.y), the second's share phase.z.
+        return lerp(henyeyGreenstein(material.params.x * spread, cosG),
+                    henyeyGreenstein(material.phase.y * spread, cosG), material.phase.z) /
                (4.0 * PI);
     case kRayleigh:
         return lerp(1.0, 0.75 * (1.0 + cosG * cosG), spread) / (4.0 * PI);
@@ -2022,6 +2031,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                 rho = max(sampleFieldAt(volume.density, local, level, densityAccessor), 0.0);
             }
             let sigma = rho * volume.params.x;
+            // The powder effect (`VolumeMaterialGpu::extras`) on the light scattered in.
+            let powdered = 1.0 - material.extras.x * exp(-sigma * material.extras.y);
             let opacity = 1.0 - exp(-sigma * stepDt);
             // The transmittance integrated over the step, from its start.
             let weight = sigma > 1e-6 ? transmittance * opacity / sigma : transmittance * stepDt;
@@ -2109,7 +2120,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                             a *= material.scattering.y;
                             b *= material.scattering.z;
                         }
-                        let lit = weight * sigma *
+                        let lit = weight * sigma * powdered *
                                   geometryShadow(shading.lights[slot], world, viewLights.y,
                                                  mapTexels);
                         if (lit > 0.0 || scattered > 0.0) {
@@ -2148,7 +2159,7 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                     ? cachedDepth(volume, slot, local)
                                     : volumesDepth(shadowRun, world, reach.towards, reach.far,
                                                    light.links.y, shadowSteps());
-                    let lit = weight * sigma *
+                    let lit = weight * sigma * powdered *
                               octavesOf(material, dot(reach.towards, -direction), depth) *
                               reach.scale *
                               geometryShadow(light, world, viewLights.y, mapTexels);
@@ -2184,7 +2195,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                          exp(-cachedDepth(volume, pass.lightCount + 1, local)));
                     }
                     emitSkyLight(emitted, materialIndex, world, shadowRun, viewLights, lightCount,
-                                 volume.info.z, air, groups, weight * sigma * material.phase.w,
+                                 volume.info.z, air, groups,
+                                 weight * sigma * powdered * material.phase.w,
                                  visible);
                 }
             }

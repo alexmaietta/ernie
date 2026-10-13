@@ -616,6 +616,12 @@ struct VolumeMaterialParams {
     std::string phase = "henyeyGreenstein";
     double b = 0.25;
     double c = 0.5;
+    /// The dual Henyey-Greenstein's second lobe's g and share.
+    double secondAnisotropy = -0.2;
+    double lobeMix = 0.5;
+    /// The powder effect's strength and length (world units).
+    double powder = 0.0;
+    double powderLength = 150.0;
     /// Cloud droplets' (`cloudDroplets`): effective radius,
     /// micrometres, and the gamma of their size distribution.
     double dropletRadius = 7.0;

@@ -189,6 +189,7 @@
                               .group = "Volume",                                                   \
                               .options = {::ernie::tokens::kHenyeyGreenstein,                      \
                                           ::ernie::tokens::kDoubleHenyeyGreenstein,                \
+                                          ::ernie::tokens::kDualHenyeyGreenstein,                  \
                                           ::ernie::tokens::kRayleigh,                              \
                                           ::ernie::tokens::kIsotropic,                             \
                                           ::ernie::tokens::kCloudDroplets}}))                      \
@@ -213,6 +214,29 @@
       (::ernie::AttributeMeta{.doc = "Henyey-Greenstein g: above 0 scatters forwards, below 0 "    \
                                      "backwards.",                                                 \
                               .group = "Volume", .min = -0.99, .max = 0.99}))                      \
+    X(double, SecondAnisotropy, ::ernie::tokens::kVolumeSecondAnisotropy, -0.2,                    \
+      (::ernie::AttributeMeta{.label = "Second anisotropy",                                        \
+                              .doc = "The dual Henyey-Greenstein phase function's second lobe's "  \
+                                     "g, backwards below 0 (clouds' 0.7 and -0.2 by halves, "      \
+                                     "three-geospatial's).",                                       \
+                              .group = "Volume", .min = -0.99, .max = 0.99}))                      \
+    X(double, LobeMix, ::ernie::tokens::kVolumeLobeMix, 0.5,                                       \
+      (::ernie::AttributeMeta{.label = "Lobe mix",                                                 \
+                              .doc = "The second lobe's share of the dual Henyey-Greenstein "      \
+                                     "phase function.",                                            \
+                              .group = "Volume", .min = 0.0, .max = 1.0}))                         \
+    X(double, Powder, ::ernie::tokens::kVolumePowder, 0.0,                                         \
+      (::ernie::AttributeMeta{.label = "Powder",                                                   \
+                              .doc = "The powder effect's strength: light scattered in dimmed by " \
+                                     "1 - powder e^(-sigma length), darkening thin edges facing "  \
+                                     "the light as light scattered many times has yet to build "   \
+                                     "up there (Schneider and Vos 2015). 0, none.",                \
+                              .group = "Volume", .min = 0.0, .max = 1.0}))                         \
+    X(double, PowderLength, ::ernie::tokens::kVolumePowderLength, 150.0,                           \
+      (::ernie::AttributeMeta{.label = "Powder length",                                            \
+                              .doc = "The powder effect's length (world units) times the "         \
+                                     "extinction: over how much medium it fades.",                 \
+                              .group = "Volume", .min = 0.0}))                                     \
     X(int, ScatteringOctaves, ::ernie::tokens::kVolumeScatteringOctaves, 1,                        \
       (::ernie::AttributeMeta{.doc = "Orders of scattering approximated, after Wrenninge et al. "  \
                                      "(2013): 1 is single scattering; dense media such as clouds " \

@@ -149,8 +149,9 @@ struct VolumeMaterialGpu {
     float params[4];
     float phase[4];
     float scattering[4];
+    float extras[4];
 };
-static_assert(sizeof(VolumeMaterialGpu) == 560,
+static_assert(sizeof(VolumeMaterialGpu) == 576,
               "VolumeMaterialGpu must match volume.slang");
 
 struct VolumeConstants {
@@ -228,6 +229,9 @@ float PhaseOf(const std::string& phase) {
     }
     if (phase == tokens::kCloudDroplets) {
         return 4.0f;
+    }
+    if (phase == tokens::kDualHenyeyGreenstein) {
+        return 5.0f;
     }
     return 0.0f;
 }
@@ -344,8 +348,19 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
         params.phase == tokens::kCloudDroplets
             ? static_cast<float>(std::max(params.surfaceDensity, 0.0))
             : static_cast<float>(std::clamp(params.c, -1.0, 1.0));
+    // The dual Henyey-Greenstein's second lobe: its g and share.
+    if (params.phase == tokens::kDualHenyeyGreenstein) {
+        material.phase[1] = static_cast<float>(
+            std::clamp(params.secondAnisotropy, -0.99, 0.99));
+        material.phase[2] =
+            static_cast<float>(std::clamp(params.lobeMix, 0.0, 1.0));
+    }
     material.phase[3] =
         static_cast<float>(std::max(params.skyLight, 0.0));
+    material.extras[0] =
+        static_cast<float>(std::clamp(params.powder, 0.0, 1.0));
+    material.extras[1] =
+        static_cast<float>(std::max(params.powderLength, 0.0));
     // Wrenninge's octaves, a at most b so that each order carries no
     // more energy than its extinction lets through.
     const double extinction =

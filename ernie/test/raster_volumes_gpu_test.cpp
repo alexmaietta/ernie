@@ -441,6 +441,41 @@ TEST_F(RasterDelegateTest, AVolumeScattersTheSun) {
     }
 }
 
+TEST_F(RasterDelegateTest, DualLobesAndPowderShapeWhatScatters) {
+    // three-geospatial's clouds' phase function, two
+    // Henyey-Greenstein lobes (0.7 and -0.2 by halves), straight
+    // back: each lobe's (1 - g^2) / (1 + g)^3 by its share. And the
+    // powder effect on an isotropic scatterer, its light dimmed by 1
+    // - powder e^(-sigma length) throughout the uniform cube.
+    constexpr double kSigma = 1.0;
+    constexpr double kFourPi = 4.0 * std::numbers::pi;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kDualHenyeyGreenstein))
+        .SetAnisotropy(0.7)
+        .SetSecondAnisotropy(-0.2)
+        .SetLobeMix(0.5);
+    const double lobes = 0.5 * (1.0 - 0.49) / std::pow(1.7, 3.0) +
+                         0.5 * (1.0 - 0.04) / std::pow(0.8, 3.0);
+    for (const double ratio : ScatteredOverEach(
+             delegate, scene, kSigma, lobes / kFourPi)) {
+        EXPECT_NEAR(ratio, 1.0, 0.03) << "dual lobes";
+    }
+    scene = VolumeScene(kSigma, 0.0);
+    ernie::Material(scene, "/Looks/Gas")
+        .SetVolumeAlbedo(glm::dvec3(1.0))
+        .SetPhaseFunction(std::string(tokens::kIsotropic))
+        .SetPowder(0.5)
+        .SetPowderLength(1.0);
+    const double powdered = 1.0 - 0.5 * std::exp(-kSigma * 1.0);
+    for (const double ratio : ScatteredOverEach(
+             delegate, scene, kSigma, powdered / kFourPi)) {
+        EXPECT_NEAR(ratio, 1.0, 0.03) << "powder";
+    }
+}
+
 namespace {
 
 // The cube seen side on against the empty background (no ground),

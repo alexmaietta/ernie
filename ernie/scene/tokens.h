@@ -139,6 +139,18 @@ inline constexpr std::string_view kHenyeyGreenstein =
     "henyeyGreenstein";
 inline constexpr std::string_view kDoubleHenyeyGreenstein =
     "doubleHenyeyGreenstein";
+/// Two Henyey-Greenstein lobes, `inputs:anisotropy` and
+/// `inputs:secondAnisotropy`, the second's share `inputs:lobeMix`.
+inline constexpr std::string_view kDualHenyeyGreenstein =
+    "dualHenyeyGreenstein";
+inline constexpr std::string_view kVolumeSecondAnisotropy =
+    "inputs:secondAnisotropy";
+inline constexpr std::string_view kVolumeLobeMix = "inputs:lobeMix";
+/// The powder effect: light scattered in dimmed where the medium is
+/// thin, by `inputs:powder`, over `inputs:powderLength`.
+inline constexpr std::string_view kVolumePowder = "inputs:powder";
+inline constexpr std::string_view kVolumePowderLength =
+    "inputs:powderLength";
 inline constexpr std::string_view kRayleigh = "rayleigh";
 inline constexpr std::string_view kIsotropic = "isotropic";
 /// Cloud droplets' Mie scattering (`DropletPhase`), by
