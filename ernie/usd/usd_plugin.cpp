@@ -81,6 +81,7 @@
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/pointBased.h>
+#include <pxr/usd/usdGeom/primvarsAPI.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
 #include <pxr/usd/usdLux/lightAPI.h>
@@ -577,6 +578,7 @@ class Importer {
             RenderPrims();
         }
         LightLinks();
+        ScenePartitions();
         SampledAttributes();
         if (!mark.IsClean()) {
             for (const TfError& error : mark) {
@@ -865,6 +867,7 @@ class Importer {
         const HdSceneIndexPrim local = input_->GetPrim(source);
         Transform(source, local.dataSource, path);
         Visibility(local.dataSource, path);
+        Partition(usd, path);
         TimeSamples(source, path);
         const HdContainerDataSourceHandle& ds = prim.dataSource;
         // A native instance: drawn by the instancer UsdImaging
@@ -886,11 +889,14 @@ class Importer {
         } else if (type == HdPrimTypeTokens->points) {
             TranslatePoints(ds, path);
         } else if (type == HdPrimTypeTokens->instancer) {
-            TranslateInstancer(ds, path);
+            TranslateInstancer(source, ds, path);
         } else if (type == HdPrimTypeTokens->camera) {
             TranslateCamera(ds, path);
         } else if (HdPrimTypeIsLight(type)) {
             TranslateLight(ds, path);
+            if (usd) {
+                OmniverseLight(usd, path);
+            }
             if (usd && usd.HasAPI<UsdLuxLightAPI>()) {
                 lights_.emplace_back(source, path);
             }
@@ -1206,6 +1212,292 @@ class Importer {
         return world;
     }
 
+    /// The scene partition `prim` authors itself (RTX's
+    /// `omni:scenePartition`, or the primvar of that name), or none.
+    static std::optional<std::string>
+    PartitionOf(const UsdPrim& prim) {
+        static const TfToken kAttribute("omni:scenePartition");
+        const auto text =
+            [](const VtValue& value) -> std::optional<std::string> {
+            if (value.IsHolding<TfToken>()) {
+                return value.UncheckedGet<TfToken>().GetString();
+            }
+            if (value.IsHolding<std::string>()) {
+                return value.UncheckedGet<std::string>();
+            }
+            return std::nullopt;
+        };
+        if (!prim) {
+            return std::nullopt;
+        }
+        VtValue value;
+        if (const UsdAttribute attribute =
+                prim.GetAttribute(kAttribute);
+            attribute && attribute.HasAuthoredValue() &&
+            attribute.Get(&value)) {
+            if (auto partition = text(value)) {
+                return partition;
+            }
+        }
+        if (const UsdGeomPrimvar primvar =
+                UsdGeomPrimvarsAPI(prim).GetPrimvar(kAttribute);
+            primvar && primvar.HasAuthoredValue() &&
+            primvar.GetInterpolation() == UsdGeomTokens->constant &&
+            primvar.Get(&value)) {
+            return text(value);
+        }
+        return std::nullopt;
+    }
+
+    /// The scene partition of the stage prim at `path`: its own or
+    /// its nearest ancestor's, as partitions apply to what is
+    /// beneath.
+    std::optional<std::string>
+    InheritedPartitionOf(SdfPath path) const {
+        for (; !path.IsEmpty() && path != SdfPath::AbsoluteRootPath();
+             path = path.GetParentPath()) {
+            if (auto partition =
+                    PartitionOf(stage_->GetPrimAtPath(path))) {
+                return partition;
+            }
+        }
+        return std::nullopt;
+    }
+
+    /// The world of scene partition `partition`: its index among the
+    /// stage's partitions in the order first met.
+    int WorldOfPartition(const std::string& partition) {
+        const auto [it, added] = partitions_.try_emplace(
+            partition, static_cast<int>(partitionNames_.size()));
+        if (added) {
+            partitionNames_.push_back(partition);
+        }
+        return it->second;
+    }
+
+    /// RTX's scene partitions (`omni:scenePartition`, RTX 110), which
+    /// restrict a camera to the prims of its partition and those of
+    /// none, as Ernie's worlds: a prim, light or camera authoring one
+    /// takes its world as `ernie:world`, which its descendants
+    /// inherit.
+    void Partition(const UsdPrim& prim, const std::string& path) {
+        if (const auto partition = PartitionOf(prim)) {
+            const int world = WorldOfPartition(*partition);
+            Call(path, [&] {
+                sink_.SetInt(path.c_str(), "ernie:world", world);
+            });
+        }
+    }
+
+    /// Each instance's world, as `ernie:worlds`, when instances are
+    /// in partitions: a PointInstancer's per-instance partition
+    /// primvar, or the partitions of the prims a native instancer's
+    /// instances stand for; others take the instancer's own.
+    template <typename Value>
+    void InstancePartitions(const SdfPath& source,
+                            const HdInstancerTopologySchema& topology,
+                            const Value& value, std::size_t count,
+                            const std::string& path) {
+        std::vector<std::optional<std::string>> partitions(count);
+        const VtValue primvar = value(TfToken("omni:scenePartition"));
+        if (primvar.IsHolding<VtTokenArray>()) {
+            const VtTokenArray& tokens =
+                primvar.UncheckedGet<VtTokenArray>();
+            for (std::size_t i = 0; i < count && i < tokens.size();
+                 ++i) {
+                partitions[i] = tokens[i].GetString();
+            }
+        } else if (primvar.IsHolding<VtStringArray>()) {
+            const VtStringArray& strings =
+                primvar.UncheckedGet<VtStringArray>();
+            for (std::size_t i = 0; i < count && i < strings.size();
+                 ++i) {
+                partitions[i] = strings[i];
+            }
+        } else if (const HdPathArrayDataSourceHandle locations =
+                       topology.GetInstanceLocations()) {
+            const VtArray<SdfPath> paths =
+                locations->GetTypedValue(0.0f);
+            for (std::size_t i = 0; i < count && i < paths.size();
+                 ++i) {
+                partitions[i] = InheritedPartitionOf(paths[i]);
+            }
+        }
+        if (std::ranges::none_of(partitions,
+                                 [](const auto& partition) {
+                                     return partition.has_value();
+                                 })) {
+            return;
+        }
+        const std::optional<std::string> own =
+            InheritedPartitionOf(source);
+        std::vector<std::int32_t> worlds(count, -1);
+        for (std::size_t i = 0; i < count; ++i) {
+            if (const auto& partition =
+                    partitions[i] ? partitions[i] : own) {
+                worlds[i] = WorldOfPartition(*partition);
+            }
+        }
+        Call(path, [&] {
+            sink_.WriteInts(path.c_str(), "ernie:worlds",
+                            worlds.data(), count);
+        });
+    }
+
+    /// The partitions' names by world, on the import's root prim as
+    /// `ernie:usd:scenePartitions`, for mapping worlds back to them.
+    void ScenePartitions() {
+        if (partitionNames_.empty()) {
+            return;
+        }
+        const std::string root =
+            default_.IsEmpty() ? root_ : Map(default_);
+        std::vector<const char*> names;
+        for (const std::string& name : partitionNames_) {
+            names.push_back(name.c_str());
+        }
+        Call(root, [&] {
+            sink_.SetTokens(root.c_str(), "ernie:usd:scenePartitions",
+                            names.data(), names.size());
+        });
+    }
+
+    /// The API schemas applied to `prim` as authored, Omniverse's
+    /// among them though this OpenUSD has no definitions of them.
+    static std::set<std::string> AppliedApisOf(const UsdPrim& prim) {
+        std::set<std::string> names;
+        for (const TfToken& name :
+             prim.GetPrimTypeInfo().GetAppliedAPISchemas()) {
+            names.insert(name.GetString());
+        }
+        for (const TfToken& name : prim.GetAppliedSchemas()) {
+            names.insert(name.GetString());
+        }
+        return names;
+    }
+
+    /// Omniverse's light schemas, which Ernie's lights declare as
+    /// they do: the photometric APIs
+    /// (omni.usd.schema.physical_lighting), which put a light in
+    /// photometric units with their defaults when applied,
+    /// PhysicalLightIlluminantAPI's spectrum, and a light's
+    /// `visibleInPrimaryRay`. Without its API, an authored
+    /// photometric value is left out, as RTX ignores it.
+    ///
+    /// References:
+    /// - NVIDIA, omni.usd.schema.physical_lighting 0.1.0
+    ///   (PhysicalLightIlluminantAPI, PhotometricAreaLightAPI,
+    ///   PhotometricDistantLightAPI, PhotometricDomeLightAPI).
+    /// - NVIDIA, omni.usd.schema.omni_dome_light 1.0.0
+    ///   (OmniFiniteDomeLightAPI).
+    void OmniverseLight(const UsdPrim& prim,
+                        const std::string& path) {
+        const std::set<std::string> applied = AppliedApisOf(prim);
+        const auto has = [&](const char* api) {
+            return applied.contains(api);
+        };
+        const auto authored = [&](const char* name) -> VtValue {
+            VtValue value;
+            if (const UsdAttribute attribute =
+                    prim.GetAttribute(TfToken(name));
+                attribute && attribute.HasAuthoredValue() &&
+                attribute.Get(&value, time_)) {
+                return value;
+            }
+            return {};
+        };
+        const auto number =
+            [&](const char* name,
+                double fallback) -> std::optional<double> {
+            const VtValue value = authored(name);
+            if (value.IsHolding<float>()) {
+                return value.UncheckedGet<float>();
+            }
+            if (value.IsHolding<double>()) {
+                return value.UncheckedGet<double>();
+            }
+            return fallback;
+        };
+        const auto setNumber = [&](const char* name, double value) {
+            Call(path, [&] {
+                sink_.SetNumbers(path.c_str(), name, &value, 1);
+            });
+        };
+
+        const bool area = has("PhotometricAreaLightAPI");
+        const bool distant = has("PhotometricDistantLightAPI");
+        const bool dome = has("PhotometricDomeLightAPI");
+        // The photometric APIs include the illuminant's.
+        if (area || distant || dome ||
+            has("PhysicalLightIlluminantAPI")) {
+            const VtValue illuminant =
+                authored("physical:illuminant");
+            const std::string shape =
+                illuminant.IsHolding<TfToken>()
+                    ? illuminant.UncheckedGet<TfToken>().GetString()
+                    : "white";
+            Call(path, [&] {
+                sink_.SetToken(path.c_str(), "physical:illuminant",
+                               shape.c_str());
+            });
+            if (const VtValue custom =
+                    authored("physical:customIlluminant");
+                custom.IsHolding<VtVec2fArray>()) {
+                const VtVec2fArray& pairs =
+                    custom.UncheckedGet<VtVec2fArray>();
+                std::vector<float> flat;
+                for (const GfVec2f& pair : pairs) {
+                    flat.insert(flat.end(), {pair[0], pair[1]});
+                }
+                Call(path, [&] {
+                    sink_.WriteFloats(path.c_str(),
+                                      "physical:customIlluminant",
+                                      flat.data(), flat.size(), 1);
+                });
+            }
+        }
+        if (area) {
+            setNumber("photometric:power",
+                      *number("photometric:power", 1600.0));
+            const double illuminance =
+                *number("photometric:illuminance", 0.0);
+            const double distance =
+                *number("photometric:illuminance:distance", 0.0);
+            if (illuminance > 0.0 && distance > 0.0) {
+                setNumber("photometric:illuminance", illuminance);
+                setNumber("photometric:illuminance:distance",
+                          distance);
+            }
+        } else if (distant || dome) {
+            setNumber("photometric:illuminance",
+                      *number("photometric:illuminance", 10000.0));
+        } else if (!authored("photometric:power").IsEmpty() ||
+                   !authored("photometric:illuminance").IsEmpty()) {
+            Warn(
+                path +
+                ": photometric values without a Photometric*LightAPI "
+                "are ignored, as RTX ignores them");
+        }
+        if (const VtValue visible = authored("visibleInPrimaryRay");
+            visible.IsHolding<bool>()) {
+            Call(path, [&] {
+                sink_.SetBool(path.c_str(), "visibleInPrimaryRay",
+                              visible.UncheckedGet<bool>());
+            });
+        }
+        if (has("OmniFiniteDomeLightAPI")) {
+            const VtValue mode = authored("omni:rtx:domeLight:mode");
+            if (mode.IsHolding<TfToken>() &&
+                mode.UncheckedGet<TfToken>() != TfToken("infinite")) {
+                Warn(
+                    path +
+                    ": finite dome lights (omni:rtx:domeLight:mode " +
+                    mode.UncheckedGet<TfToken>().GetString() +
+                    ") are not supported; the dome is infinite");
+            }
+        }
+    }
+
     void Visibility(const HdContainerDataSourceHandle& local,
                     const std::string& path) {
         const HdVisibilitySchema visibility =
@@ -1349,12 +1641,14 @@ class Importer {
             return;
         }
         for (const char* name : kLightInputs) {
+            // Hydra gives every input of the light's type, authored
+            // or its fallback (a dome's texture:format, say): only
+            // those Ernie's light declares.
+            const std::string input = std::string("inputs:") + name;
             const VtValue value = ValueOf(light->Get(TfToken(name)));
-            if (!value.IsEmpty()) {
-                Call(path, [&] {
-                    SetValue(path, std::string("inputs:") + name,
-                             value);
-                });
+            if (!value.IsEmpty() &&
+                sink_.Declares(path.c_str(), input.c_str())) {
+                Call(path, [&] { SetValue(path, input, value); });
             }
         }
         for (const char* name : kLightAttributes) {
@@ -1618,7 +1912,8 @@ class Importer {
     /// An instancer (a PointInstancer's, or native instances'
     /// gathered by UsdImaging): instances of its prototypes,
     /// translated too.
-    void TranslateInstancer(const HdContainerDataSourceHandle& ds,
+    void TranslateInstancer(const SdfPath& source,
+                            const HdContainerDataSourceHandle& ds,
                             const std::string& path) {
         const HdInstancerTopologySchema topology =
             HdInstancerTopologySchema::GetFromParent(ds);
@@ -1749,6 +2044,7 @@ class Importer {
             sink_.SetTargets(p, "prototypes", texts.data(),
                              texts.size(), true);
         });
+        InstancePartitions(source, topology, value, count, path);
         if (const VtBoolArray mask =
                 topology.GetMask()
                     ? topology.GetMask()->GetTypedValue(0.0f)
@@ -2968,6 +3264,9 @@ class Importer {
     std::vector<std::pair<SdfPath, std::string>> lights_;
     /// Files unpacked from packages by their package-relative paths.
     std::unordered_map<std::string, std::string> unpacked_;
+    /// Each scene partition's world, and the partitions by world.
+    std::map<std::string, int> partitions_;
+    std::vector<std::string> partitionNames_;
     std::unordered_set<std::string> warned_;
 };
 

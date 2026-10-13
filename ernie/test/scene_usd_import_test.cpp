@@ -2,6 +2,7 @@
 #include "ernie/scene/usd_import.h"
 
 #include "ernie/scene/geometry_schemas.h"
+#include "ernie/scene/light_schemas.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/tokens.h"
@@ -9,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -813,6 +815,230 @@ def Xform "Asset"
     const std::string bytes((std::istreambuf_iterator<char>(in)),
                             std::istreambuf_iterator<char>());
     EXPECT_EQ(bytes, texture);
+}
+
+TEST_F(UsdImportTest, ScenePartitionsBecomeWorlds) {
+    // RTX's scene partitions on environment roots, a camera, a light,
+    // as a primvar, per point instance, and through native instances.
+    const std::filesystem::path file = dir_ / "partitioned.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Set"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+class "Wheel"
+{
+    def Cube "Tyre" {}
+}
+def Xform "Set"
+{
+    def Cube "Ground" {}
+    def Xform "Env0"
+    {
+        token omni:scenePartition = "env_0"
+        def Cube "Box" {}
+        def Xform "Wheel" (
+            instanceable = true
+            prepend references = </Wheel>
+        )
+        {
+        }
+        def DistantLight "Sun"
+        {
+            token omni:scenePartition = "env_0"
+        }
+    }
+    def Xform "Env1"
+    {
+        token omni:scenePartition = "env_1"
+        def Cube "Box" {}
+        def Xform "Wheel" (
+            instanceable = true
+            prepend references = </Wheel>
+        )
+        {
+        }
+    }
+    def Xform "Env2"
+    {
+        string primvars:omni:scenePartition = "env_2"
+        def Cube "Box" {}
+    }
+    def Camera "Eye"
+    {
+        token omni:scenePartition = "env_1"
+    }
+    def PointInstancer "Rocks"
+    {
+        point3f[] positions = [(0, 0, 0), (1, 0, 0), (2, 0, 0)]
+        int[] protoIndices = [0, 0, 0]
+        rel prototypes = </Set/Rocks/Rock>
+        token[] primvars:omni:scenePartition = ["env_1", "env_0", "env_9"] (
+            interpolation = "vertex"
+        )
+        def Cube "Rock" {}
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Set"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+
+    // Worlds are the partitions' indices, named on the root.
+    const auto names = scene_.Get<std::vector<std::string>>(
+        Path("/World/Set"), "ernie:usd:scenePartitions", {});
+    const auto world = [&](const std::string& name) {
+        const auto it = std::find(names.begin(), names.end(), name);
+        return it == names.end()
+                   ? -2
+                   : static_cast<int>(it - names.begin());
+    };
+    for (const char* name : {"env_0", "env_1", "env_2", "env_9"}) {
+        EXPECT_GE(world(name), 0) << name;
+    }
+    const auto worldOf = [&](const char* path) {
+        return scene_.Get<int>(Path(path), tokens::kWorld, -1);
+    };
+    EXPECT_EQ(worldOf("/World/Set/Env0"), world("env_0"));
+    EXPECT_EQ(worldOf("/World/Set/Env1"), world("env_1"));
+    EXPECT_EQ(worldOf("/World/Set/Env2"), world("env_2"))
+        << "the primvar spelling";
+    EXPECT_EQ(worldOf("/World/Set/Env0/Sun"), world("env_0"))
+        << "a light's own";
+    EXPECT_EQ(worldOf("/World/Set/Eye"), world("env_1"))
+        << "the camera sees its partition";
+    EXPECT_EQ(worldOf("/World/Set/Ground"), -1)
+        << "unpartitioned: every world's";
+    EXPECT_EQ(
+        Ints(scene_.Read(Path("/World/Set/Rocks"), tokens::kWorlds)),
+        (std::vector<std::int32_t>{world("env_1"), world("env_0"),
+                                   world("env_9")}));
+
+    // The wheels' native instancer: each instance in the partition of
+    // the prim it stands for.
+    std::vector<std::int32_t> wheels;
+    for (const Path& prim : scene_.Prims()) {
+        if (prim.String() != "/World/Set/Rocks" &&
+            scene_.Read(prim, tokens::kWorlds) != nullptr) {
+            wheels = Ints(scene_.Read(prim, tokens::kWorlds));
+        }
+    }
+    std::vector<std::int32_t> envs = {world("env_0"), world("env_1")};
+    std::sort(wheels.begin(), wheels.end());
+    std::sort(envs.begin(), envs.end());
+    EXPECT_EQ(wheels, envs);
+}
+
+TEST_F(UsdImportTest, PhotometricLightsKeepTheirUnits) {
+    // Omniverse's photometric and illuminant APIs, which this OpenUSD
+    // has no definitions of, applied with and without their values.
+    const std::filesystem::path file = dir_ / "photometric.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Set"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Set"
+{
+    def SphereLight "Bulb" (
+        prepend apiSchemas = ["PhotometricAreaLightAPI"]
+    )
+    {
+    }
+    def RectLight "Panel" (
+        prepend apiSchemas = ["PhotometricAreaLightAPI"]
+    )
+    {
+        float photometric:power = 800
+        float photometric:illuminance = 300
+        float photometric:illuminance:distance = 2
+        token physical:illuminant = "blackbody"
+    }
+    def DistantLight "Sun" (
+        prepend apiSchemas = ["PhotometricDistantLightAPI"]
+    )
+    {
+        float photometric:illuminance = 50000
+    }
+    def DomeLight "Sky" (
+        prepend apiSchemas = ["PhotometricDomeLightAPI", "OmniFiniteDomeLightAPI"]
+    )
+    {
+        bool visibleInPrimaryRay = 0
+        token omni:rtx:domeLight:mode = "sphere"
+    }
+    def SphereLight "Lamp" (
+        prepend apiSchemas = ["PhysicalLightIlluminantAPI"]
+    )
+    {
+        token physical:illuminant = "custom"
+        float2[] physical:customIlluminant = [(450, 1), (550, 2), (650, 1)]
+    }
+    def DiskLight "Stray"
+    {
+        float photometric:power = 900
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Set"), file);
+    const auto number = [&](const char* path, std::string_view name) {
+        return scene_.Get<double>(Path(path), name, -1.0);
+    };
+    EXPECT_DOUBLE_EQ(
+        number("/World/Set/Bulb", tokens::kPhotometricPower), 1600.0)
+        << "the API's default, authored so the light is photometric";
+    EXPECT_EQ(Token("/World/Set/Bulb", tokens::kPhysicalIlluminant),
+              "white");
+    EXPECT_DOUBLE_EQ(
+        number("/World/Set/Panel", tokens::kPhotometricPower), 800.0);
+    EXPECT_DOUBLE_EQ(
+        number("/World/Set/Panel", tokens::kPhotometricIlluminance),
+        300.0);
+    EXPECT_DOUBLE_EQ(number("/World/Set/Panel",
+                            tokens::kPhotometricIlluminanceDistance),
+                     2.0);
+    EXPECT_EQ(Token("/World/Set/Panel", tokens::kPhysicalIlluminant),
+              "blackbody");
+    EXPECT_DOUBLE_EQ(
+        number("/World/Set/Sun", tokens::kPhotometricIlluminance),
+        50000.0);
+    EXPECT_DOUBLE_EQ(
+        number("/World/Set/Sky", tokens::kPhotometricIlluminance),
+        10000.0)
+        << "the dome API's default";
+    EXPECT_FALSE(scene_.Get<bool>(
+        Path("/World/Set/Sky"), tokens::kVisibleInPrimaryRay, true));
+    EXPECT_EQ(Token("/World/Set/Lamp", tokens::kPhysicalIlluminant),
+              "custom");
+    EXPECT_EQ(ernie::Light(scene_, Path("/World/Set/Lamp"))
+                  .GetPhysicalCustomIlluminant(),
+              (std::vector<float>{450, 1, 550, 2, 650, 1}));
+    EXPECT_TRUE(ernie::Light(scene_, Path("/World/Set/Bulb"))
+                    .IsPhotometric());
+    EXPECT_FALSE(ernie::Light(scene_, Path("/World/Set/Lamp"))
+                     .IsPhotometric());
+    EXPECT_EQ(scene_.Get(Path("/World/Set/Stray"),
+                         tokens::kPhotometricPower),
+              nullptr)
+        << "without its API, as RTX ignores it";
+
+    EXPECT_EQ(result.warnings.size(), 2u)
+        << "none for inputs Ernie's lights lack, such as a dome's "
+           "texture:format";
+    std::vector<std::string> expected = {"finite dome",
+                                         "without a Photometric"};
+    for (const std::string& part : expected) {
+        EXPECT_TRUE(std::any_of(
+            result.warnings.begin(), result.warnings.end(),
+            [&](const std::string& warning) {
+                return warning.find(part) != std::string::npos;
+            }))
+            << "a warning about " << part;
+    }
 }
 
 TEST_F(UsdImportTest, MissingFilesThrow) {

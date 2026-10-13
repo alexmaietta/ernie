@@ -243,6 +243,19 @@ class SceneSink final : public usd_plugin::Sink {
     void WriteFloats(const char* path, const char* attribute,
                      const float* values, std::size_t rows,
                      std::size_t columns) override {
+        // An attribute declared a list of numbers (a light's custom
+        // illuminant) takes them as one value, not an array.
+        if (const PrimTypeDef* type =
+                PrimTypeOf(scene_, Path(path))) {
+            if (const AttributeDef* def = type->Find(attribute);
+                def != nullptr &&
+                def->kind == AttributeKind::FloatArray) {
+                Set(path, attribute,
+                    Value(std::vector<float>(
+                        values, values + rows * columns)));
+                return;
+            }
+        }
         std::vector<std::int64_t> shape{
             static_cast<std::int64_t>(rows)};
         if (columns != 1) {
