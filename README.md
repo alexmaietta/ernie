@@ -24,23 +24,54 @@ Its key features are aimed at planetary robotics and sensing:
 | **Sensors** | Quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth<br>Sensor filter chains (noise models, lens flare, vignetting), with your own filters written in Slang |
 | **Planets** | Terrain as a built-in prim, with continuous level of detail, updated in place where its heights change<br>Whole planets and moons drawn from orbit down to the ground<br>Earth and Mars atmospheres from physical models, from the ground or from orbit, with aerial perspective<br>Star fields from your own catalogs, with brightness from magnitudes and color from B-V indices |
 | **Light** | Spectral rendering: light carried in bands (16 across 380-780 nm by default) from the sources, through the materials, to the sensor<br>Distant lights with an angular size, for soft penumbrae from the sun's width in the sky<br>Illuminants (blackbody, CIE daylight, the measured solar spectrum) and custom spectral curves, such as Earthshine on the Moon |
-| **Materials** | Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert BRDFs built in, and your own for the surfaces you study |
+| **Materials** | Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert BRDFs built in, and your own for the surfaces you study<br>OpenPBR Surface materials, spectral throughout: coat, fuzz, thin film, anisotropy, transmission and subsurface scattering ([below](#physically-based-materials)) |
+| **Volumes** | Smoke, dust, exhaust plumes and clouds from VDB files, GPU arrays or procedural cloud layers, lit by the sun, sky and ground and casting shadows ([below](#volumes)) |
 | **Simulation and learning** | Batch rendering: many worlds, each with its own camera, rendered in one step for RL and Monte Carlo workloads<br>Meshes, instances and points written from CUDA or Warp arrays without copies<br>A floating origin, so large scenes keep their precision |
 | **Tools** | A viewer with customizable panels, to drive your own simulations and workflows<br>Debug drawing for labels, trajectories and overlays in the scene |
 | **Integrations** | TerrainGen builds on Ernie's viewer, adding its own panels to render synthetic terrain<br>Newton Viewer and IsaacLab renderer backends, and a viewer and renderer for Project Chrono's Chrono Sensor |
+
+### Volumes
+
+Volumes are UsdVol-style prims: a `Volume` names its fields and a material gives them density, albedo, emission and a phase function. They are ray marched per pixel, spectrally, and composited with the surfaces, the sky and the atmosphere.
+
+| Effect | What it does | Demo |
+| --- | --- | --- |
+| **Grids** | NanoVDB and OpenVDB files, NanoVDB arrays, and dense fields that CUDA or Warp kernels write on the GPU each frame, read without a copy to the host | `volumes_plume`, `volumes_dust_devil`, `volumes_lunar_dust` |
+| **Procedural cloud layers** | Up to four layers of cumulus and cirrus carved at each sample from a weather map and Perlin-Worley noise, drifting with the wind | `volumes_cloud_layers` |
+| **Phase functions** | Henyey-Greenstein, double and dual Henyey-Greenstein, Rayleigh, isotropic, and cloud droplets by Mie theory per band: silver linings, fogbows and glories | `volumes_cloud_droplets` |
+| **Multiple scattering** | Wrenninge's octaves, or Bouthors' collectors for the light clouds scatter many times, with a powder effect at their edges | `volumes_clouds`, `volumes_cloud_droplets` |
+| **Emission** | Black-body glow from temperature fields, emission fields and colours, and the Temperature var for thermal sensors | `volumes_plume`, `volumes_rcs` |
+| **Lighting** | Sun, sky and ground light through a lighting cache; shadows from surfaces onto volumes and from volumes onto surfaces and each other | `volumes_lunar_dust`, `volumes_clouds` |
+| **Clouds and the atmosphere** | Cloud layers lit through their own shadow maps from the sun, light shafts from the sun through the air past clouds and terrain, and aerial perspective in front of the clouds | `volumes_cloud_layers` |
+| **Performance** | Empty space skipped by bricks, temporal amortisation and half-resolution marching, and volumes outside every view left unmarched | |
+
+### Physically based materials
+
+OpenPBR Surface (`open_pbr`) is built in alongside UsdPreviewSurface. Its colours are uplifted to spectra on the GPU, so the thin film's interference and the subsurface radius vary by wavelength. Layers that no material in the scene uses are compiled out of the shaders, and the G-buffer's tangents, the transparent pass and the subsurface pass run only while a material needs them.
+
+| Feature | OpenPBR inputs | Demo |
+| --- | --- | --- |
+| **Rough diffuse** | `base_diffuse_roughness`: energy-preserving Oren-Nayar (EON), flat like the full Moon when rough | `pbr_diffuse_roughness` |
+| **Metals** | `base_metalness`, `specular_color` as the F82 edge tint | `pbr_metals` |
+| **Clear coat** | `coat_weight`, `coat_roughness`, `coat_ior`, `coat_color`, `coat_darkening` | `pbr_coat` |
+| **Fuzz** | `fuzz_weight`, `fuzz_color`, `fuzz_roughness`: Zeltner's sheen, for velvet and dust | `pbr_fuzz` |
+| **Thin film** | `thin_film_weight`, `thin_film_thickness`, `thin_film_ior`: iridescence computed per band | `pbr_thin_film` |
+| **Anisotropy** | `specular_roughness_anisotropy`, along the texture's u, with smooth mesh tangents, in direct and sky light | `pbr_anisotropy` |
+| **Transmission** | `transmission_weight`, `transmission_color`, `geometry_thin_walled`: glass with screen-space refraction, and alpha blending for partly opaque materials | `pbr_transmission` |
+| **Subsurface scattering** | `subsurface_weight`, `subsurface_color`, `subsurface_radius` and its scale per channel, spread across the image by Burley's profile per band | `pbr_subsurface` |
+
+Run a demo with `python -m ernie --demo demo_<name>` (`--list` names them all), or open it from the viewer's Demos panel.
 
 For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
 Future work:
 
 - A fully USD- and glTF-compliant renderer, loading OpenUSD, glTF, OBJ, STL and 3D Tiles, with the glTF material system, UsdPreviewSurface shaders and MDL and MaterialX support
-- Volumetric rendering
 - Differentiable rendering
 - Reflections and global illumination
 - OpenXR integrations
 - WebGPU backend
 - Gaussian splat and particle fields
-- LWIR thermal emissions
 - Lidar and radar sensors
 - A real-time ray-tracing renderer alongside the rasterizer
 - Integrations into Newton Viewer, Chrono Sensor, and IsaacLab
