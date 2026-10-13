@@ -507,6 +507,7 @@ struct DemoRunner::State {
     std::string viewVar;
     Viewer::Gizmo gizmo = Viewer::Gizmo::None;
     bool gizmoLocal = false;
+    Theme theme;  ///< The UI's, which a demo may restyle.
 
     // The Demos panel, the demo it shows, and what it asked for
     // during the last frame.
@@ -526,6 +527,7 @@ struct DemoRunner::State {
         viewer->SetViewVar(viewVar);
         viewer->SetGizmo(gizmo);
         viewer->SetGizmoLocal(gizmoLocal);
+        viewer->SetTheme(theme);
     }
 
     void Announce(Demo& demo) {
@@ -709,6 +711,7 @@ DemoRunner::DemoRunner(DemoOptions options, const std::string& title)
     s.viewVar = s.viewer->ViewVar();
     s.gizmo = s.viewer->GetGizmo();
     s.gizmoLocal = s.viewer->GizmoLocal();
+    s.theme = s.viewer->GetTheme();
     s.scope = s.viewer->NewScope();
     s.viewer->SetScope(s.scope);
 }
