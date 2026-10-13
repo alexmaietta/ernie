@@ -12,6 +12,7 @@ extern const char kBrdfLommelSeeligerSlang[];
 extern const char kBrdfLunarLambertSlang[];
 extern const char kBrdfOrenNayarSlang[];
 extern const char kBrdfHapkeSlang[];
+extern const char kBrdfOpenPbrSlang[];
 extern const char kBrdfPreviewSurfaceSlang[];
 
 /// Per-frame resources and helpers every raster pass shares.
@@ -104,6 +105,9 @@ extern const char kCullSlang[];
 extern const char kMeshSlang[];
 /// Vertex normals of meshes whose points move on the GPU.
 extern const char kMeshNormalsSlang[];
+/// Skinned meshes posed on the GPU, and subdivision surfaces refined
+/// from their posed control points.
+extern const char kSkinningSlang[];
 /// Instance poses composed on the GPU from transform ops and parents.
 extern const char kInstanceComposeSlang[];
 /// Bounds of instancers' positions written from the compute device.

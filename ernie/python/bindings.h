@@ -95,6 +95,8 @@ void BindSceneJson(nb::module_& m);
 /// `ernie.schema` builds classes from.
 void BindSchema(nb::module_& m);
 void BindRender(nb::module_& m);
+/// `Scene.import_usd` (ernie/scene/usd_import.h).
+void BindUsd(nb::module_& m);
 
 /// The `app` submodule; built only with Ernie's app
 /// (`ERNIE_HAS_APP`).

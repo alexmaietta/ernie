@@ -1596,12 +1596,19 @@ void BindScene(nb::module_& m) {
         .def(
             "set",
             [](Prim& prim, std::string_view attribute,
-               nb::handle value) -> Prim& {
-                return prim.Set(attribute, ValueFromPython(value));
+               nb::handle value,
+               std::optional<double> time) -> Prim& {
+                return time ? prim.SetAt(attribute, *time,
+                                         ValueFromPython(value))
+                            : prim.Set(attribute,
+                                       ValueFromPython(value));
             },
             nb::arg("attribute"), nb::arg("value").none(),
+            nb::arg("time") = nb::none(),
             nb::rv_policy::reference_internal,
-            "Sets `attribute`; returns the prim for chaining.")
+            "Sets `attribute`, or with `time` its time sample there "
+            "(as "
+            "Scene.set); returns the prim for chaining.")
         .def(
             "set_xform",
             [](Prim& prim, nb::handle translate, nb::handle rotate,
@@ -1634,13 +1641,19 @@ void BindScene(nb::module_& m) {
         .def(
             "write",
             [](Prim& prim, std::string_view attribute,
-               const AnyArray& array) -> Prim& {
-                return prim.Write(attribute, TensorFromArray(array));
+               const AnyArray& array,
+               std::optional<double> time) -> Prim& {
+                return time ? prim.WriteAt(attribute, *time,
+                                           TensorFromArray(array))
+                            : prim.Write(attribute,
+                                         TensorFromArray(array));
             },
             nb::arg("attribute"), nb::arg("array"),
+            nb::arg("time") = nb::none(),
             nb::rv_policy::reference_internal,
-            "Writes any DLPack array as `attribute` without copying; "
-            "returns the prim.")
+            "Writes any DLPack array as `attribute` without copying, "
+            "or "
+            "with `time` as its time sample there; returns the prim.")
         .def(
             "read",
             [](const Prim& prim,
@@ -1751,11 +1764,62 @@ void BindScene(nb::module_& m) {
         .def(
             "set",
             [](Scene& scene, const Path& path,
-               std::string_view attribute, nb::handle value) {
-                scene.Set(path, attribute, ValueFromPython(value));
+               std::string_view attribute, nb::handle value,
+               std::optional<double> time) {
+                if (time) {
+                    scene.SetAt(path, attribute, *time,
+                                ValueFromPython(value));
+                } else {
+                    scene.Set(path, attribute,
+                              ValueFromPython(value));
+                }
             },
             nb::arg("path"), nb::arg("attribute"),
-            nb::arg("value").none())
+            nb::arg("value").none(), nb::arg("time") = nb::none(),
+            "Sets `attribute`, clearing its time samples; with "
+            "`time`, sets "
+            "its time sample at that time code instead. A sampled "
+            "attribute holds its value at the stage's time code "
+            "(Stage.time_code), interpolated between samples "
+            "(linearly; "
+            "quaternions spherically; tokens, ints and paths held) "
+            "and "
+            "held beyond them.")
+        .def(
+            "sample_times",
+            [](const Scene& scene, const Path& path,
+               std::string_view attribute) {
+                std::vector<double> times;
+                for (const TimeSample& sample :
+                     scene.SamplesOf(path, attribute)) {
+                    times.push_back(sample.time);
+                }
+                return times;
+            },
+            nb::arg("path"), nb::arg("attribute"),
+            "The time codes of `attribute`'s samples; empty when it "
+            "has none.")
+        .def(
+            "get_at",
+            [](const Scene& scene, const Path& path,
+               std::string_view attribute, double time,
+               nb::object fallback) {
+                const Value value =
+                    scene.GetAt(path, attribute, time);
+                return value.Empty() ? fallback
+                                     : ValueToPython(value);
+            },
+            nb::arg("path"), nb::arg("attribute"), nb::arg("time"),
+            nb::arg("default") = nb::none(),
+            "`attribute`'s value at `time`, interpolated from its "
+            "samples, "
+            "without moving the stage's time code.")
+        .def("clear_samples", &Scene::ClearSamples, nb::arg("path"),
+             nb::arg("attribute"),
+             "Removes `attribute`'s time samples, keeping its value "
+             "now.")
+        .def("animated_prims", &Scene::AnimatedPrims,
+             "The prims with time-sampled attributes.")
         .def(
             "get",
             [](const Scene& scene, const Path& path,
@@ -1770,18 +1834,30 @@ void BindScene(nb::module_& m) {
             "write",
             [](Scene& scene, const Path& path,
                std::string_view attribute, const AnyArray& array,
-               nb::handle stream) {
-                scene.Write(path, attribute, TensorFromArray(array),
-                            StreamOf(stream));
+               nb::handle stream, std::optional<double> time) {
+                if (time) {
+                    scene.WriteAt(path, attribute, *time,
+                                  TensorFromArray(array),
+                                  StreamOf(stream));
+                } else {
+                    scene.Write(path, attribute,
+                                TensorFromArray(array),
+                                StreamOf(stream));
+                }
             },
             nb::arg("path"), nb::arg("attribute"), nb::arg("array"),
             nb::arg("stream").none() = nb::none(),
+            nb::arg("time") = nb::none(),
             "Writes any DLPack array (NumPy, PyTorch, JAX, Warp) as "
             "`attribute` without "
             "copying. For a CUDA array, `stream` (an int, a "
             "torch.cuda.Stream, or None for the "
             "legacy default stream) is the one its contents are "
-            "written on.")
+            "written on. With `time`, the array is the attribute's "
+            "time "
+            "sample at that time code (as Scene.set): CPU float "
+            "arrays "
+            "blend between samples, others hold.")
         .def(
             "map",
             [](nb::handle self, const Path& path,
@@ -2832,6 +2908,16 @@ void BindScene(nb::module_& m) {
         {"POINT_INSTANCER", tokens::kPointInstancer},
         {"GEOM_POINTS", tokens::kGeomPoints},
         {"VOLUME", tokens::kVolume},
+        {"SKEL_ROOT", tokens::kSkelRoot},
+        {"SKELETON", tokens::kSkeleton},
+        {"SKEL_ANIMATION", tokens::kSkelAnimation},
+        {"BLEND_SHAPE", tokens::kBlendShape},
+        {"SKEL_SKELETON", tokens::kSkelSkeleton},
+        {"SKEL_JOINT_INDICES", tokens::kSkelJointIndices},
+        {"SKEL_JOINT_WEIGHTS", tokens::kSkelJointWeights},
+        {"SKEL_SKINNING_METHOD", tokens::kSkelSkinningMethod},
+        {"CLASSIC_LINEAR", tokens::kClassicLinear},
+        {"DUAL_QUATERNION", tokens::kDualQuaternion},
         {"OPENVDB_ASSET", tokens::kOpenVDBAsset},
         {"NANOVDB_FIELD", tokens::kNanoVDBField},
         {"NANOVDB_BUFFER", tokens::kNanoVdbBuffer},

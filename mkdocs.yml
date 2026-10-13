@@ -64,6 +64,7 @@ nav:
           - Custom render delegates: extending/custom-render-delegates.md
   - Guides:
       - Describing scenes: guides/scenes.md
+      - Importing USD: guides/usd-import.md
       - Batched rendering for RL: guides/batched-rendering.md
       - GPU interop: guides/gpu-interop.md
   - API reference:

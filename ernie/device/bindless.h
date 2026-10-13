@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 namespace ernie {
@@ -79,15 +80,25 @@ class BindlessHeap {
     BindlessHeap& operator=(const BindlessHeap&) = delete;
 
     /// A slot holding `view` (of `Texture2D` or `Texture2DArray`
-    /// kind), sampled in `layout`.
+    /// kind), sampled in `layout`. Every slot of the same view and
+    /// layout is the same one, freed with the last: textures shared
+    /// by many materials take one.
     /// @throws std::runtime_error when the kind's array is full of
     /// slots in use.
     Slot AddImage(Kind kind, VkImageView view,
                   VkImageLayout layout =
                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    /// A slot holding `sampler`, a comparison sampler or not.
+    /// A slot holding `sampler`, a comparison sampler or not, shared
+    /// as `AddImage`'s are: samplers are few (`Sampler`s of the same
+    /// state share one), the materials using them many.
     Slot AddSampler(VkSampler sampler, bool comparison = false);
+
+    /// Stops sharing the slots of `object` (an image view or
+    /// sampler), which is being destroyed, so that a new object given
+    /// its handle gets a slot of its own; slots still held stay until
+    /// released.
+    void Forget(std::uint64_t object);
 
     /// Lets slots freed `kRetireFrames` frames ago be reused; the
     /// renderer calls it once a frame.
@@ -125,6 +136,32 @@ class BindlessHeap {
     VkDescriptorSet set_ = VK_NULL_HANDLE;
     mutable std::mutex mutex_;
     Array arrays_[kKinds];
+    /// What a slot holds: an image view and its layout, or a sampler.
+    struct Held {
+        std::uint64_t object = 0;
+        std::uint32_t layout = 0;
+        bool operator==(const Held&) const = default;
+    };
+    struct HeldHash {
+        std::size_t operator()(const Held& held) const {
+            return std::hash<std::uint64_t>()(held.object) ^
+                   (std::hash<std::uint32_t>()(held.layout) << 1);
+        }
+    };
+    struct SharedSlot {
+        Held held;
+        std::uint32_t holders = 0;
+    };
+    /// Each kind's slots in use by what they hold, to share; and how
+    /// many `Slot`s hold each, by slot. `Forget` drops only the
+    /// first.
+    std::unordered_map<Held, std::uint32_t, HeldHash> shared_[kKinds];
+    std::unordered_map<std::uint32_t, SharedSlot> sharedAt_[kKinds];
+
+    /// The slot of `kind` holding `held`, shared, written from
+    /// `info`.
+    Slot Share(Kind kind, const Held& held,
+               const VkDescriptorImageInfo& info);
     std::uint64_t frame_ = 0;
 };
 

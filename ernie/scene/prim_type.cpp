@@ -7,6 +7,7 @@
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/skel_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/volume_schemas.h"
 
@@ -244,6 +245,32 @@ AttributeTraits<std::vector<Path>>::Store(const Value& value) {
     }
     if (std::optional<std::vector<Path>> list = From(value)) {
         return Value(std::move(*list));
+    }
+    return std::nullopt;
+}
+
+std::vector<std::string>
+AttributeTraits<std::vector<std::string>>::Read(
+    const Scene& scene, const Path& path, std::string_view name,
+    const std::vector<std::string>& fallback) {
+    const Value* value = scene.Get(path, name);
+    if (value == nullptr) {
+        return fallback;
+    }
+    return From(*value).value_or(fallback);
+}
+
+std::optional<std::vector<std::string>>
+AttributeTraits<std::vector<std::string>>::From(const Value& value) {
+    if (const auto* list = value.Get<std::vector<std::string>>()) {
+        return *list;
+    }
+    if (const auto* single = value.Get<std::string>()) {
+        return std::vector<std::string>{*single};
+    }
+    if (const auto* floats = value.Get<std::vector<float>>();
+        floats != nullptr && floats->empty()) {
+        return std::vector<std::string>{};
     }
     return std::nullopt;
 }
@@ -703,7 +730,8 @@ std::span<const PrimTypeDef* const> PrimTypes() {
              {BaseSchemaTypes(), LightSchemaTypes(),
               GeometrySchemaTypes(), CameraSchemaTypes(),
               MaterialSchemaTypes(), RenderSchemaTypes(),
-              TerrainSchemaTypes(), VolumeSchemaTypes()}) {
+              TerrainSchemaTypes(), VolumeSchemaTypes(),
+              SkelSchemaTypes()}) {
             all.insert(all.end(), family.begin(), family.end());
         }
         return all;

@@ -1159,7 +1159,21 @@ struct Viewer::State {
     /// coordinates, in double precision (prims far from the origin),
     /// and writes the active camera.
     void FrameBox(const glm::dvec3& low, const glm::dvec3& high) {
-        controller.Frame(low, high);
+        // The box's corners fit the active camera's view, whatever
+        // its lens and the viewport's shape.
+        if (scene.Has(activeCamera) && orthographicView < 0) {
+            const CameraParams camera =
+                CameraParamsOf(scene, activeCamera, ViewportWidth(),
+                               ViewportHeight());
+            if (!camera.orthographic) {
+                controller.verticalFov =
+                    static_cast<float>(camera.VerticalFov());
+            }
+        }
+        controller.FrameView(
+            low, high,
+            static_cast<double>(std::max(ViewportWidth(), 1u)) /
+                static_cast<double>(std::max(ViewportHeight(), 1u)));
         WriteActiveCamera();
     }
 

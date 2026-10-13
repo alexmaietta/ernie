@@ -89,6 +89,7 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
     case AttributeKind::Relationships:  // Not edited in panels yet,
                                         // but a render's camera.
     case AttributeKind::FloatArray:
+    case AttributeKind::TokenArray:
     case AttributeKind::Tensor:
         break;
     }
@@ -105,12 +106,14 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
 }
 
 /// A registered type's sections, one per `AttributeMeta::group` in
-/// `kGroups`' order (others after, as they come, then "Prim", what
-/// every prim has); within one, the type's own attributes before its
-/// bases'.
+/// `kGroups`' order (others after, as they come, then `kLateGroups`,
+/// then "Prim", what every prim has); within one, the type's own
+/// attributes before its bases'.
 std::vector<PropertySection> SectionsOf(const PrimTypeDef& type) {
     static constexpr std::array<std::string_view, 4> kGroups{
         "Light", "Shape", "Spectrum", "Photometric"};
+    static constexpr std::array<std::string_view, 1> kLateGroups{
+        "Skinning"};
     std::vector<PropertySection> sections;
     for (const PrimTypeDef* level = &type; level != nullptr;
          level = level->base) {
@@ -131,7 +134,14 @@ std::vector<PropertySection> SectionsOf(const PrimTypeDef& type) {
     }
     const auto rank = [](const PropertySection& section) {
         if (section.title == "Prim") {
-            return kGroups.size() + 1;
+            return kGroups.size() + kLateGroups.size() + 1;
+        }
+        if (const auto late =
+                std::ranges::find(kLateGroups, section.title);
+            late != kLateGroups.end()) {
+            return kGroups.size() + 1 +
+                   static_cast<std::size_t>(late -
+                                            kLateGroups.begin());
         }
         return static_cast<std::size_t>(
             std::ranges::find(kGroups, section.title) -

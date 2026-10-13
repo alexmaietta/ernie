@@ -17,6 +17,12 @@
       (::ernie::AttributeMeta{.label = "Metres per unit",                                          \
                               .doc = "Metres in one scene unit. Ernie draws in metres.",           \
                               .group = "Units", .min = 1e-9, .max = 1e9}))                         \
+    X(int, SubdivisionRefineLevel, ::ernie::tokens::kSubdivisionRefineLevel, 1,                    \
+      (::ernie::AttributeMeta{.label = "Subdivision level",                                        \
+                              .doc = "Refinement of subdivision surfaces without their own "       \
+                                     "ernie:refineLevel: 2^level segments along each control "     \
+                                     "edge (usdview's complexity low to very high is 0 to 3).",    \
+                              .group = "Subdivision", .min = 0.0, .max = 8.0}))                    \
     X(double, KilogramsPerUnit, ::ernie::tokens::kKilogramsPerUnit, 1.0,                           \
       (::ernie::AttributeMeta{.label = "Kilograms per unit",                                       \
                               .doc = "Kilograms in one unit of mass.",                             \

@@ -120,9 +120,9 @@ TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
         (std::vector<std::string>{"Shader", "Texture", "Prim"}));
     EXPECT_EQ(
         Titles(SchemaOf(scene, "/Looks/Rock/Node", brdfs, filters)),
-        (std::vector<std::string>{"Shader", "Preview surface",
-                                  "Texture", "Transform 2D",
-                                  "Primvar reader", "Thermal", "Prim"}));
+        (std::vector<std::string>{
+            "Shader", "Preview surface", "Texture", "Transform 2D",
+            "Primvar reader", "Thermal", "Prim"}));
 }
 
 TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
@@ -138,8 +138,8 @@ TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
     const std::vector<PropertySection> capsule =
         SchemaOf(scene, "/Capsule", brdfs, filters);
     EXPECT_EQ(Titles(capsule),
-              (std::vector<std::string>{"Shape", "Geometry", "Thermal",
-                                        "Prim"}));
+              (std::vector<std::string>{"Shape", "Geometry",
+                                        "Thermal", "Prim"}));
     ASSERT_EQ(capsule[0].fields.size(), 3u);
     EXPECT_EQ(capsule[0].fields[0].fallback, Value(0.5));
     EXPECT_EQ(capsule[0].fields[1].label, "Height");
@@ -149,14 +149,18 @@ TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
     EXPECT_EQ(FieldOf(capsule, tokens::kDisplayColor)->kind,
               PropertyField::Kind::Color);
 
-    // A mesh's arrays are not edited.
-    EXPECT_EQ(Titles(SchemaOf(scene, "/Mesh", brdfs, filters)),
-              (std::vector<std::string>{"Geometry", "Thermal", "Prim"}));
+    // A mesh's arrays are not edited; its subdivision tokens and
+    // level, and its skeleton and skinning method (near the end),
+    // are.
+    EXPECT_EQ(
+        Titles(SchemaOf(scene, "/Mesh", brdfs, filters)),
+        (std::vector<std::string>{"Subdivision", "Geometry",
+                                  "Thermal", "Skinning", "Prim"}));
 
     const std::vector<PropertySection> ground =
         SchemaOf(scene, "/Ground", brdfs, filters);
-    EXPECT_EQ(Titles(ground),
-              (std::vector<std::string>{"Ground", "Thermal", "Prim"}));
+    EXPECT_EQ(Titles(ground), (std::vector<std::string>{
+                                  "Ground", "Thermal", "Prim"}));
     EXPECT_EQ(FieldOf(ground, tokens::kChecker)->label,
               "Checkerboard");
     EXPECT_EQ(FieldOf(ground, tokens::kCheckerSize)->min, 0.001);

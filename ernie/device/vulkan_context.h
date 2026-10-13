@@ -280,6 +280,12 @@ class VulkanContext {
         return *bindless_;
     }
 
+    /// The bindless heap, or null while the context is made or torn
+    /// down.
+    BindlessHeap* FindBindless() const {
+        return bindless_.get();
+    }
+
     /// Validation and error messages reported since the last call,
     /// oldest first.
     std::vector<std::string> TakeValidationMessages();

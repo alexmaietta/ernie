@@ -137,6 +137,36 @@ TEST(OrbitController, FrameFitsTheBoxInView) {
     }
 }
 
+// A flat, wide box seen from above at a slant in a wide view: its
+// corners fit the view, nearer than its bounding sphere would put the
+// eye, and one of them reaches the margin.
+TEST(OrbitController, FrameViewFitsTheCornersOfAFlatBox) {
+    const glm::vec3 boundsMin(-1.0f, -1.2f, 0.0f);
+    const glm::vec3 boundsMax(1.0f, 1.2f, 0.3f);
+    OrbitController sphere;
+    sphere.yaw = 0.3f;
+    sphere.Frame(boundsMin, boundsMax);
+    OrbitController camera;
+    camera.yaw = 0.3f;
+    camera.FrameView(boundsMin, boundsMax, 16.0 / 10.0);
+    EXPECT_LT(camera.distance, 0.8 * sphere.distance);
+
+    const glm::mat4 viewProjection =
+        camera.MakeCamera(1600, 1000).RasterView().ViewProjection();
+    float widest = 0.0f;
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 corner((i & 1) ? boundsMax.x : boundsMin.x,
+                               (i & 2) ? boundsMax.y : boundsMin.y,
+                               (i & 4) ? boundsMax.z : boundsMin.z);
+        const glm::vec3 ndc = Project(viewProjection, corner);
+        EXPECT_LE(std::fabs(ndc.x), 1.0f) << i;
+        EXPECT_LE(std::fabs(ndc.y), 1.0f) << i;
+        widest =
+            std::max({widest, std::fabs(ndc.x), std::fabs(ndc.y)});
+    }
+    EXPECT_NEAR(widest, 1.0f / 1.1f, 0.01f);
+}
+
 TEST(OrbitController, AppliesItsPoseFieldOfViewAndClippingToACamera) {
     OrbitController orbit;
     orbit.target = {1.0f, 2.0f, 3.0f};

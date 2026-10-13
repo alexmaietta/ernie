@@ -4,16 +4,19 @@
 #include "ernie/geometry/ellipsoid.h"
 #include "ernie/geometry/primitives.h"
 #include "ernie/geometry/sphere_tessellation.h"
+#include "ernie/geometry/subdivision.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
+#include "ernie/scene/stage_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/scene/xform.h"
+#include "ernie/session/skinning.h"
 #include "ernie/session/volumes.h"
 #include "ernie/util/astronomy.h"
 #include "ernie/util/atmosphere.h"
@@ -3032,6 +3035,34 @@ std::string ShaderIdOf(const Scene& scene, const Path& path) {
     return Shader(scene, path).GetInfoId();
 }
 
+/// The connection of `input` on the UsdPreviewSurface `surface` when
+/// it reads a texture: one reading a primvar (UsdPrimvarReader_*) is
+/// not shaded with, the input keeping its own value.
+std::optional<Connection> TextureConnection(const Scene& scene,
+                                            const Path& surface,
+                                            std::string_view input) {
+    std::optional<Connection> connection =
+        GetConnection(scene, surface, input);
+    if (connection && ShaderIdOf(scene, connection->prim)
+                          .starts_with("UsdPrimvarReader_")) {
+        return std::nullopt;
+    }
+    return connection;
+}
+
+/// Whether `input` on `surface` reads the prim's displayColor through
+/// a primvar reader.
+bool ReadsDisplayColor(const Scene& scene, const Path& surface,
+                       std::string_view input) {
+    const std::optional<Connection> connection =
+        GetConnection(scene, surface, input);
+    return connection &&
+           ShaderIdOf(scene, connection->prim)
+               .starts_with("UsdPrimvarReader_") &&
+           GetToken(scene, connection->prim, tokens::kVarname, "") ==
+               "displayColor";
+}
+
 TextureWrap WrapOf(const std::string& wrap, const Path& texture,
                    std::string_view attribute) {
     if (wrap == "repeat" || wrap == "useMetadata") {
@@ -3218,7 +3249,7 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
               tokens::kRoughness, tokens::kMetallic,
               tokens::kOpacity}) {
             if (const std::optional<Connection> texture =
-                    GetConnection(scene, surface, input)) {
+                    TextureConnection(scene, surface, input)) {
                 const bool scalar = input != tokens::kDiffuseColor &&
                                     input != tokens::kNormalInput;
                 return TextureReaderOf(scene, *texture, input,
@@ -3233,18 +3264,19 @@ std::string UvSetOf(const Scene& scene, const Path& material) {
 }
 
 /// Texture coordinates `primvars:<name>` of the Mesh at `mesh` per
-/// corner of `data`'s triangles (`MeshData::uvs`), or empty without
-/// them.
+/// face corner (per entry of `faceIndices`), whatever their
+/// interpolation, or empty without them.
 std::vector<float>
 TexCoordsOf(const Scene& scene, const Path& mesh,
-            const std::string& name, const MeshData& data,
+            const std::string& name, std::size_t points,
             std::span<const std::int64_t> faceCounts,
-            std::size_t faceVertexCount) {
+            std::span<const std::int64_t> faceIndices) {
     using namespace tokens;
     const std::string attribute = std::string(kPrimvarsPrefix) + name;
     const std::optional<std::vector<float>> values =
         FloatAttribute(scene, mesh, attribute, 2);
-    if (!values || data.indices.empty()) {
+    const std::size_t faceVertexCount = faceIndices.size();
+    if (!values || faceVertexCount == 0) {
         return {};
     }
     const std::size_t valueCount = values->size() / 2;
@@ -3264,7 +3296,6 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
     }
     const std::size_t elements =
         indices != nullptr ? lookup.size() : valueCount;
-    const std::size_t points = data.points.size() / 3;
     std::string interpolation =
         GetToken(scene, mesh,
                  attribute + std::string(kInterpolationSuffix), "");
@@ -3290,14 +3321,21 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
             (interpolation.empty() ? ""
                                    : " (" + interpolation + ")"));
     }
-    const TriangleCorners corners = TriangulatedCorners(faceCounts);
-    std::vector<float> uvs(2 * data.indices.size());
-    for (std::size_t c = 0; c < data.indices.size(); ++c) {
+    std::vector<float> uvs(2 * faceVertexCount);
+    std::size_t face = 0;
+    std::size_t faceEnd =
+        faceCounts.empty() ? 0
+                           : static_cast<std::size_t>(faceCounts[0]);
+    for (std::size_t c = 0; c < faceVertexCount; ++c) {
+        while (c >= faceEnd && face + 1 < faceCounts.size()) {
+            faceEnd += static_cast<std::size_t>(faceCounts[++face]);
+        }
         const std::size_t element =
-            interpolation == "faceVarying" ? corners.faceVertices[c]
-            : interpolation == "vertex"    ? data.indices[c]
-            : interpolation == "uniform"   ? corners.faces[c]
-                                           : 0;
+            interpolation == "faceVarying" ? c
+            : interpolation == "vertex"
+                ? static_cast<std::size_t>(faceIndices[c])
+            : interpolation == "uniform" ? face
+                                         : 0;
         const auto value = static_cast<std::size_t>(
             indices != nullptr ? lookup[element]
                                : static_cast<std::int64_t>(element));
@@ -3305,6 +3343,77 @@ TexCoordsOf(const Scene& scene, const Path& mesh,
         uvs[2 * c + 1] = (*values)[2 * value + 1];
     }
     return uvs;
+}
+
+/// `data`'s control mesh (its points and colours, of `faceCounts` and
+/// `faceIndices`, with `cornerUvs` per face corner) as the
+/// subdivision surface the Mesh `view` tags, refined at `level`.
+MeshData SubdividedMeshData(const Mesh& view, const MeshData& data,
+                            std::span<const std::int64_t> faceCounts,
+                            std::span<const std::int64_t> faceIndices,
+                            std::span<const float> cornerUvs,
+                            int level, RefinementStencils* stencils) {
+    using namespace tokens;
+    SubdivisionSurface surface;
+    const std::string scheme = view.GetSubdivisionScheme();
+    surface.scheme = scheme == kLoop ? SubdivisionScheme::Loop
+                     : scheme == kBilinear
+                         ? SubdivisionScheme::Bilinear
+                         : SubdivisionScheme::CatmullClark;
+    const std::string boundary = view.GetInterpolateBoundary();
+    surface.boundary = boundary == kNone ? BoundaryInterpolation::None
+                       : boundary == kEdgeOnly
+                           ? BoundaryInterpolation::EdgeOnly
+                           : BoundaryInterpolation::EdgeAndCorner;
+    const std::string linear =
+        view.GetFaceVaryingLinearInterpolation();
+    surface.faceVarying =
+        linear == kNone ? FaceVaryingInterpolation::None
+        : linear == kCornersOnly
+            ? FaceVaryingInterpolation::CornersOnly
+        : linear == kCornersPlus2
+            ? FaceVaryingInterpolation::CornersPlus2
+        : linear == kBoundaries ? FaceVaryingInterpolation::Boundaries
+        : linear == kAll        ? FaceVaryingInterpolation::All
+                         : FaceVaryingInterpolation::CornersPlus1;
+    surface.triangles = view.GetTriangleSubdivisionRule() == kSmooth
+                            ? TriangleSubdivision::Smooth
+                            : TriangleSubdivision::CatmullClark;
+    const auto ints = [](const Tensor* tensor,
+                         std::string_view name) {
+        return tensor != nullptr ? IntsOf(*tensor, name)
+                                 : std::vector<std::int64_t>();
+    };
+    const auto floats = [](const Tensor* tensor,
+                           std::string_view name) {
+        return tensor != nullptr ? FloatsOf(*tensor, 1, name)
+                                 : std::vector<float>();
+    };
+    const std::vector<std::int64_t> creases =
+        ints(view.GetCreaseIndices(), kCreaseIndices);
+    const std::vector<std::int64_t> lengths =
+        ints(view.GetCreaseLengths(), kCreaseLengths);
+    const std::vector<float> sharpnesses =
+        floats(view.GetCreaseSharpnesses(), kCreaseSharpnesses);
+    const std::vector<std::int64_t> corners =
+        ints(view.GetCornerIndices(), kCornerIndices);
+    const std::vector<float> cornerSharpnesses =
+        floats(view.GetCornerSharpnesses(), kCornerSharpnesses);
+    const std::vector<std::int64_t> holes =
+        ints(view.GetHoleIndices(), kHoleIndices);
+    surface.points = data.points;
+    surface.faceVertexCounts = faceCounts;
+    surface.faceVertexIndices = faceIndices;
+    surface.creaseIndices = creases;
+    surface.creaseLengths = lengths;
+    surface.creaseSharpnesses = sharpnesses;
+    surface.cornerIndices = corners;
+    surface.cornerSharpnesses = cornerSharpnesses;
+    surface.holeIndices = holes;
+    surface.cornerUvs = cornerUvs;
+    surface.colors = data.colors;
+    return stencils != nullptr ? Subdivide(surface, level, *stencils)
+                               : Subdivide(surface, level);
 }
 
 }  // namespace
@@ -3363,14 +3472,14 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
                 static_cast<float>(specular[c]);
         }
         if (const std::optional<Connection> roughness =
-                GetConnection(scene, surface, kRoughness)) {
+                TextureConnection(scene, surface, kRoughness)) {
             settings.roughnessTexture = TextureReaderOf(
                 scene, *roughness, kRoughness, surface, true);
             settings.brdfParams[static_cast<std::size_t>(
                 index("roughness"))] = 0.0f;
         }
         if (const std::optional<Connection> metallic =
-                GetConnection(scene, surface, kMetallic)) {
+                TextureConnection(scene, surface, kMetallic)) {
             settings.metallicTexture = TextureReaderOf(
                 scene, *metallic, kMetallic, surface, true);
             settings.metallicParam = index("metallic");
@@ -3398,20 +3507,23 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
     if (!surface.IsEmpty()) {
         const Shader shader(scene, surface);
         if (const std::optional<Connection> diffuse =
-                GetConnection(scene, surface, kDiffuseColor)) {
+                TextureConnection(scene, surface, kDiffuseColor)) {
             settings.albedoTexture = TextureReaderOf(
                 scene, *diffuse, kDiffuseColor, surface);
             settings.albedo = glm::vec3(1.0f);
+        } else if (ReadsDisplayColor(scene, surface, kDiffuseColor)) {
+            settings.albedo =
+                glm::vec3(1.0f);  // The display colour's.
         } else {
             settings.albedo = glm::vec3(shader.GetDiffuseColor());
         }
         if (const std::optional<Connection> normal =
-                GetConnection(scene, surface, kNormalInput)) {
+                TextureConnection(scene, surface, kNormalInput)) {
             settings.normalTexture = TextureReaderOf(
                 scene, *normal, kNormalInput, surface);
         }
         if (const std::optional<Connection> opacity =
-                GetConnection(scene, surface, kOpacity)) {
+                TextureConnection(scene, surface, kOpacity)) {
             settings.opacityTexture = TextureReaderOf(
                 scene, *opacity, kOpacity, surface, true);
         }
@@ -3623,8 +3735,10 @@ MeshData PrimitiveMeshOf(const Scene& scene, const Path& path) {
                                 "' is not a UsdGeom primitive");
 }
 
-MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
+MeshData MeshDataOf(const Scene& scene, const Path& mesh,
+                    const MeshDataOptions& options) {
     using namespace tokens;
+    const bool posed = options.posed;
     if (scene.TypeOf(mesh) != kMesh &&
         IsMeshType(scene.TypeOf(mesh))) {
         return PrimitiveMeshOf(scene, mesh);
@@ -3642,12 +3756,26 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
     } else {
         data.points = FloatAttribute(scene, mesh, kPoints, 3)
                           .value_or(std::vector<float>());
+        // A skinned mesh posed at the stage's time code, before
+        // subdivision refines it.
+        if (posed) {
+            if (const std::optional<SkinBinding> binding =
+                    SkinBindingOf(scene, mesh)) {
+                const SkeletonPose skeleton = SkeletonPoseOf(
+                    scene, binding->skeleton,
+                    Stage(scene, Path::Root()).GetTimeCode());
+                data.points = SkinnedPoints(
+                    *binding,
+                    SkinPoseOf(scene, mesh, *binding, skeleton),
+                    data.points);
+            }
+        }
     }
     const std::size_t count = data.points.size() / 3;
     const Tensor* counts = view.GetFaceVertexCounts();
     const Tensor* indices = view.GetFaceVertexIndices();
     std::vector<std::int64_t> faceCounts;
-    std::size_t faceVertexCount = 0;
+    std::vector<std::int64_t> faceIndices;
     const bool gpuIndices =
         indices != nullptr && IsGpu(indices->Location().kind);
     if (gpuIndices) {
@@ -3677,11 +3805,9 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
             "needs both faceVertexCounts and faceVertexIndices");
     } else if (counts != nullptr) {
         faceCounts = IntsOf(*counts, kFaceVertexCounts);
-        const std::vector<std::int64_t> faceIndices =
-            IntsOf(*indices, kFaceVertexIndices);
+        faceIndices = IntsOf(*indices, kFaceVertexIndices);
         data.indices =
             TriangulateFaces(faceCounts, faceIndices, count);
-        faceVertexCount = faceIndices.size();
     }
     // Normals and colours written on the GPU are zeros here, holding
     // their place until the renderer copies them in (as points).
@@ -3709,12 +3835,55 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh) {
         }
     }
     // Without the triangles on the host, no texture coordinates.
+    std::vector<float> cornerUvs;
     if (!gpuIndices) {
-        data.uvs = TexCoordsOf(
+        cornerUvs = TexCoordsOf(
             scene, mesh, UvSetOf(scene, view.GetMaterialBinding()),
-            data, faceCounts, faceVertexCount);
+            count, faceCounts, faceIndices);
+    }
+    if (const std::optional<int> level =
+            SubdivisionLevelOf(scene, mesh);
+        level && !data.indices.empty()) {
+        return SubdividedMeshData(view, data, faceCounts, faceIndices,
+                                  cornerUvs, *level,
+                                  options.stencils);
+    }
+    if (!cornerUvs.empty()) {
+        const std::vector<std::uint32_t> faceVertices =
+            TriangulatedCorners(faceCounts).faceVertices;
+        data.uvs.resize(2 * faceVertices.size());
+        for (std::size_t c = 0; c < faceVertices.size(); ++c) {
+            data.uvs[2 * c] = cornerUvs[2 * faceVertices[c]];
+            data.uvs[2 * c + 1] = cornerUvs[2 * faceVertices[c] + 1];
+        }
     }
     return data;
+}
+
+std::optional<int> SubdivisionLevelOf(const Scene& scene,
+                                      const Path& mesh) {
+    using namespace tokens;
+    if (scene.TypeOf(mesh) != kMesh) {
+        return std::nullopt;
+    }
+    const Mesh view(scene, mesh);
+    if (view.GetSubdivisionScheme() == kNone ||
+        scene.Read(mesh, kActiveCounts) != nullptr) {
+        return std::nullopt;
+    }
+    for (const std::string_view attribute :
+         {kPoints, kFaceVertexCounts, kFaceVertexIndices}) {
+        const Tensor* tensor = scene.Read(mesh, attribute);
+        if (tensor == nullptr || IsGpu(tensor->Location().kind)) {
+            return std::nullopt;
+        }
+    }
+    const int level = view.GetRefineLevel();
+    return std::clamp(
+        level >= 0 ? level
+                   : scene.Get<int>(Path::Root(),
+                                    kSubdivisionRefineLevel, 1),
+        0, 8);
 }
 
 InstanceData InstanceDataOf(const Scene& scene,

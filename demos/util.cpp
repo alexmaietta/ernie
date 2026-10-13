@@ -8,8 +8,10 @@
 #ifdef ERNIE_DEMO_DOWNLOADS
 #include <curl/curl.h>
 #endif
+#include <stb_image.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -539,6 +541,165 @@ std::vector<std::string> FetchRanges(
     static_cast<void>(ranges);
 #endif
     return parts;
+}
+
+namespace {
+
+std::uint32_t Crc32(std::span<const unsigned char> bytes) {
+    static const std::array<std::uint32_t, 256> kTable = [] {
+        std::array<std::uint32_t, 256> table{};
+        for (std::uint32_t n = 0; n < 256; ++n) {
+            std::uint32_t c = n;
+            for (int k = 0; k < 8; ++k) {
+                c = (c & 1u) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            }
+            table[n] = c;
+        }
+        return table;
+    }();
+    std::uint32_t crc = 0xFFFFFFFFu;
+    for (const unsigned char byte : bytes) {
+        crc = kTable[(crc ^ byte) & 0xFFu] ^ (crc >> 8);
+    }
+    return crc ^ 0xFFFFFFFFu;
+}
+
+std::uint32_t U16(const unsigned char* p) {
+    return static_cast<std::uint32_t>(p[0]) |
+           (static_cast<std::uint32_t>(p[1]) << 8);
+}
+
+std::uint32_t U32(const unsigned char* p) {
+    return U16(p) | (U16(p + 2) << 16);
+}
+
+}  // namespace
+
+void ExtractZip(const std::filesystem::path& zip,
+                const std::filesystem::path& directory) {
+    // References: PKWARE's APPNOTE.TXT (the archive's records),
+    // https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+    std::ifstream file(zip, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Cannot open " + zip.string());
+    }
+    const auto read = [&](std::uint64_t offset, std::size_t size) {
+        std::vector<unsigned char> bytes(size);
+        file.seekg(static_cast<std::streamoff>(offset));
+        if (!file.read(reinterpret_cast<char*>(bytes.data()),
+                       static_cast<std::streamsize>(size))) {
+            throw std::runtime_error(zip.string() + " is truncated");
+        }
+        return bytes;
+    };
+    file.seekg(0, std::ios::end);
+    const auto size = static_cast<std::uint64_t>(file.tellg());
+    // The end of central directory record, within the last 64 KiB
+    // (its comment) and 22 bytes.
+    const std::uint64_t tail = std::min<std::uint64_t>(size, 65557);
+    const std::vector<unsigned char> end = read(size - tail, tail);
+    std::size_t record = std::string::npos;
+    for (std::size_t i = end.size() >= 22 ? end.size() - 21 : 0;
+         i-- > 0;) {
+        if (U32(&end[i]) == 0x06054B50u) {
+            record = i;
+            break;
+        }
+    }
+    if (record == std::string::npos) {
+        throw std::runtime_error(zip.string() +
+                                 " is not a zip archive");
+    }
+    const std::uint32_t entries = U16(&end[record + 10]);
+    const std::uint32_t directorySize = U32(&end[record + 12]);
+    const std::uint32_t directoryOffset = U32(&end[record + 16]);
+    if (entries == 0xFFFFu || directoryOffset == 0xFFFFFFFFu) {
+        throw std::runtime_error(zip.string() +
+                                 " is a zip64 archive, not read");
+    }
+    const std::vector<unsigned char> central =
+        read(directoryOffset, directorySize);
+    std::size_t at = 0;
+    for (std::uint32_t entry = 0; entry < entries; ++entry) {
+        if (at + 46 > central.size() ||
+            U32(&central[at]) != 0x02014B50u) {
+            throw std::runtime_error(
+                zip.string() + "'s central directory is damaged");
+        }
+        const unsigned char* header = &central[at];
+        const std::uint32_t method = U16(header + 10);
+        const std::uint32_t crc = U32(header + 16);
+        const std::uint32_t packed = U32(header + 20);
+        const std::uint32_t unpacked = U32(header + 24);
+        const std::uint32_t nameSize = U16(header + 28);
+        const std::uint32_t extraSize = U16(header + 30);
+        const std::uint32_t commentSize = U16(header + 32);
+        const std::uint32_t local = U32(header + 42);
+        const std::string name(
+            reinterpret_cast<const char*>(header + 46), nameSize);
+        at += 46 + nameSize + extraSize + commentSize;
+
+        const std::filesystem::path relative =
+            std::filesystem::path(name).lexically_normal();
+        if (name.empty() || relative.is_absolute() ||
+            relative.has_root_name() ||
+            (!relative.empty() && *relative.begin() == "..")) {
+            throw std::runtime_error(zip.string() +
+                                     " holds the path " + name +
+                                     ", outside its directory");
+        }
+        const std::filesystem::path target = directory / relative;
+        if (name.back() == '/') {
+            std::filesystem::create_directories(target);
+            continue;
+        }
+        if (packed == 0xFFFFFFFFu || unpacked == 0xFFFFFFFFu) {
+            throw std::runtime_error(zip.string() +
+                                     " is a zip64 archive, not read");
+        }
+        const std::vector<unsigned char> localHeader =
+            read(local, 30);
+        if (U32(localHeader.data()) != 0x04034B50u) {
+            throw std::runtime_error(zip.string() + "'s entry " +
+                                     name + " is damaged");
+        }
+        const std::uint64_t data = local + 30 +
+                                   U16(&localHeader[26]) +
+                                   U16(&localHeader[28]);
+        const std::vector<unsigned char> stored = read(data, packed);
+        std::vector<unsigned char> bytes;
+        if (method == 0) {
+            bytes = stored;
+        } else if (method == 8) {
+            bytes.resize(unpacked);
+            const int written = stbi_zlib_decode_noheader_buffer(
+                reinterpret_cast<char*>(bytes.data()),
+                static_cast<int>(unpacked),
+                reinterpret_cast<const char*>(stored.data()),
+                static_cast<int>(packed));
+            if (written != static_cast<int>(unpacked)) {
+                throw std::runtime_error(zip.string() + "'s entry " +
+                                         name + " does not inflate");
+            }
+        } else {
+            throw std::runtime_error(
+                zip.string() + "'s entry " + name +
+                " has compression method " + std::to_string(method) +
+                ", not stored or deflated");
+        }
+        if (Crc32(bytes) != crc) {
+            throw std::runtime_error(zip.string() + "'s entry " +
+                                     name +
+                                     " fails its CRC-32 check");
+        }
+        std::filesystem::create_directories(target.parent_path());
+        std::ofstream out(target, std::ios::binary | std::ios::trunc);
+        if (!out.write(reinterpret_cast<const char*>(bytes.data()),
+                       static_cast<std::streamsize>(bytes.size()))) {
+            throw std::runtime_error("Cannot write " +
+                                     target.string());
+        }
+    }
 }
 
 std::filesystem::path DataFile(std::string_view name) {

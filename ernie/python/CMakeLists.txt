@@ -10,7 +10,8 @@ nanobind_add_module(
     scene.cpp
     scene_json.cpp
     schema.cpp
-    tensor.cpp)
+    tensor.cpp
+    usd.cpp)
 target_link_libraries(_ernie PRIVATE ernie ernie_build_options)
 if(TARGET ernie_app)
     target_sources(_ernie PRIVATE app.cpp demo.cpp held.cpp)

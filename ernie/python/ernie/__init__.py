@@ -108,6 +108,7 @@ from ._ernie import (
     RenderProductOutput,
     RenderVarOutput,
     Scene,
+    UsdImport,
     Wireframe,
     author_singlet_chromatic,
     camera_image_corners,
@@ -135,6 +136,7 @@ from ._ernie import (
     star_illuminance,
     synthetic_stars,
     tokens,
+    usd_import_available,
 )
 
 # The typed prim classes, such as SphereLight.
@@ -194,5 +196,7 @@ __all__ = [
     "star_illuminance",
     "synthetic_stars",
     "tokens",
+    "UsdImport",
+    "usd_import_available",
     *schema.__all__,
 ]

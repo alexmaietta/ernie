@@ -28,6 +28,7 @@
 #include <filesystem>
 #include <functional>
 #include <future>
+#include <map>
 #include <optional>
 #include <random>
 #include <set>
@@ -423,6 +424,26 @@ std::optional<Bounds3> XformExtentOf(const Scene& scene,
     }
     return Bounds3({box[0], box[1], box[2]},
                    {box[3], box[4], box[5]});
+}
+
+/// Whether the Mesh at `path` is a point cache the GPU blends: two or
+/// more samples of `points`, float32 CPU arrays of one size.
+bool IsPointCache(const Scene& scene, const Path& path) {
+    if (scene.TypeOf(path) != tokens::kMesh) {
+        return false;
+    }
+    const std::span<const TimeSample> samples =
+        scene.SamplesOf(path, tokens::kPoints);
+    if (samples.size() < 2 || !samples.front().isTensor) {
+        return false;
+    }
+    return std::ranges::all_of(
+        samples, [&](const TimeSample& sample) {
+            return sample.tensor.Type() == DType::Float32 &&
+                   sample.tensor.Location().kind == DeviceKind::Cpu &&
+                   sample.tensor.Elements() ==
+                       samples.front().tensor.Elements();
+        });
 }
 
 std::string Describe(const Path& path, std::string_view what,
@@ -1840,6 +1861,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
     std::set<Path> seen;
     std::vector<std::string> errors;
     std::vector<Path> paths;
+    bool skinned = false;
     for (const std::string_view type :
          {kMesh, kCube, kSphere, kCylinder, kCone, kCapsule,
           kPlane}) {
@@ -1884,6 +1906,43 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             }
             key.second[11] = hash;
         }
+        // A skinned mesh is added again as its binding or its
+        // skeleton's joints change (slot 11 too); it is posed on the
+        // GPU every sync (`PoseSkins`).
+        if (scene.TypeOf(path) == kMesh) {
+            const Path skeleton = Mesh(scene, path).GetSkeleton();
+            if (!skeleton.IsEmpty()) {
+                skinned = true;
+                std::uint64_t hash =
+                    scene.AttributeVersion(skeleton, kJoints);
+                for (const std::string_view attribute :
+                     {kSkelSkeleton, kSkelJoints, kSkelJointIndices,
+                      kSkelJointWeights, kSkelGeomBindTransform,
+                      kSkelSkinningMethod, kSkelBlendShapes,
+                      kSkelBlendShapeTargets}) {
+                    hash = hash * 0x100000001b3ull ^
+                           scene.AttributeVersion(path, attribute);
+                }
+                key.second[11] =
+                    key.second[11] * 0x100000001b3ull ^ (hash + 1);
+            }
+        }
+        // A point cache (sampled points) is blended on the GPU every
+        // sync, and added again as its samples change (slot 11 too).
+        const bool pointCache = IsPointCache(scene, path);
+        if (pointCache) {
+            skinned = true;
+            std::uint64_t hash = 0;
+            for (const TimeSample& sample :
+                 scene.SamplesOf(path, kPoints)) {
+                hash = hash * 0x100000001b3ull ^
+                       reinterpret_cast<std::uintptr_t>(
+                           sample.tensor.Data()) ^
+                       std::bit_cast<std::uint64_t>(sample.time);
+            }
+            key.second[11] =
+                key.second[11] * 0x100000001b3ull ^ (hash + 1);
+        }
         // Triangles written on the GPU too, while their number holds
         // (key slot 2).
         const bool gpuIndices = onGpu(kFaceVertexIndices);
@@ -1895,7 +1954,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         // and the temperatures, written each solver step (slot 5);
         // a thermal network's nodes (6) and their temperatures (7).
         const std::array<std::uint64_t, 8> versions{
-            scene.AttributeVersion(path, kPoints),
+            pointCache ? 0 : scene.AttributeVersion(path, kPoints),
             gpuNormals ? scene.AttributeVersion(path, kNormals) : 0,
             gpuColors ? scene.AttributeVersion(path, kDisplayColor)
                       : 0,
@@ -1952,10 +2011,26 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             meshes_.RemoveMesh(it->second.handle);
         }
         try {
-            MeshData data = MeshDataOf(scene, path);
+            // A skinned mesh or point cache at rest, which the GPU
+            // poses.
+            std::optional<SkinBinding> binding =
+                scene.TypeOf(path) == kMesh
+                    ? SkinBindingOf(scene, path)
+                    : std::nullopt;
+            const bool deformed = binding.has_value() || pointCache;
+            RefinementStencils stencils;
+            MeshData data = deformed
+                                ? MeshDataOf(scene, path,
+                                             {.posed = false,
+                                              .stencils = &stencils})
+                                : MeshDataOf(scene, path);
             synced.hasColors = !data.colors.empty();
             synced.tint = ConstantDisplayColor(Gprim(scene, path));
             synced.handle = meshes_.AddMesh(std::move(data));
+            if (deformed) {
+                AddSkin(scene, path, std::move(binding),
+                        std::move(stencils), synced);
+            }
             // Before the points, which recompute normals from host
             // triangles otherwise.
             if (gpuIndices) {
@@ -2002,9 +2077,265 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         }
         it = syncedMeshes_.erase(it);
     }
+    skinned_ = skinned;
+    posedTimeCode_ = scene.AttributeVersion(Path::Root(), kTimeCode);
+    if (skinned) {
+        PoseSkins(scene, errors);
+    }
     if (!errors.empty()) {
         throw std::invalid_argument("Cannot upload " +
                                     errors.front());
+    }
+}
+
+void RasterDelegate::AddSkin(const Scene& scene, const Path& path,
+                             std::optional<SkinBinding> given,
+                             RefinementStencils stencils,
+                             SyncedMesh& synced) {
+    // A point cache alone binds no joints.
+    SkinBinding binding = given ? std::move(*given) : SkinBinding{};
+    MeshDrawable::Skin skin;
+    // Its control points, as the scene holds them: each sample of a
+    // point cache, one after another.
+    const auto append = [&](const Tensor& points) {
+        const Tensor packed = points.Contiguous();
+        if (packed.Type() != DType::Float32 ||
+            packed.Location().kind != DeviceKind::Cpu) {
+            throw std::invalid_argument(
+                "a posed mesh's points must be float32 on the CPU");
+        }
+        const float* first = packed.As<float>();
+        skin.restPoints.insert(skin.restPoints.end(), first,
+                               first + packed.Elements());
+        Bounds3 box{glm::vec3(std::numeric_limits<float>::max()),
+                    glm::vec3(std::numeric_limits<float>::lowest())};
+        for (std::int64_t i = 0; i + 2 < packed.Elements(); i += 3) {
+            const glm::vec3 p(first[i], first[i + 1], first[i + 2]);
+            box.first = glm::min(box.first, p);
+            box.second = glm::max(box.second, p);
+        }
+        synced.sampleBounds.push_back(box);
+    };
+    synced.sampleBounds.clear();
+    const std::span<const TimeSample> samples =
+        scene.SamplesOf(path, tokens::kPoints);
+    if (IsPointCache(scene, path)) {
+        for (const TimeSample& sample : samples) {
+            append(sample.tensor);
+        }
+        skin.restSamples = samples.size();
+    } else if (const Tensor* points =
+                   scene.Read(path, tokens::kPoints)) {
+        append(*points);
+    }
+    synced.deformed = true;
+    const std::size_t controls =
+        skin.restPoints.size() / 3 / skin.restSamples;
+    const std::size_t perPoint = binding.perPoint;
+    if (perPoint == 0 || binding.constant) {
+        skin.constantInfluences = true;
+        skin.influenceStarts = {0,
+                                static_cast<std::uint32_t>(perPoint)};
+    } else {
+        if (binding.jointIndices.size() != controls * perPoint) {
+            throw std::invalid_argument("a skinned mesh needs joint "
+                                        "influences for each point");
+        }
+        for (std::size_t p = 0; p <= controls; ++p) {
+            skin.influenceStarts.push_back(
+                static_cast<std::uint32_t>(p * perPoint));
+        }
+    }
+    const std::size_t influences =
+        skin.constantInfluences ? perPoint : controls * perPoint;
+    std::set<std::uint32_t> joints;
+    for (std::size_t k = 0; k < influences; ++k) {
+        skin.influenceJoints.push_back(
+            static_cast<std::uint32_t>(binding.jointIndices[k]));
+        skin.influenceWeights.push_back(binding.jointWeights[k]);
+        if (binding.jointWeights[k] != 0.0f) {
+            joints.insert(skin.influenceJoints.back());
+        }
+    }
+    skin.joints = binding.joints.size();
+    skin.dualQuaternion =
+        binding.method == SkinningMethod::DualQuaternion;
+    // Blend shape offsets by point, each with its sub-shape.
+    struct Entry {
+        std::uint32_t point;
+        std::uint32_t shape;
+        glm::vec3 offset;
+    };
+    std::vector<Entry> entries;
+    synced.shapeReach = 0.0f;
+    for (std::size_t s = 0; s < binding.subShapes.size(); ++s) {
+        const SkinBinding::SubShape& shape = binding.subShapes[s];
+        float reach = 0.0f;
+        for (std::size_t k = 0; 3 * k + 2 < shape.offsets.size();
+             ++k) {
+            const std::int64_t point =
+                shape.pointIndices.empty()
+                    ? static_cast<std::int64_t>(k)
+                : k < shape.pointIndices.size()
+                    ? shape.pointIndices[k]
+                    : -1;
+            if (point < 0 ||
+                static_cast<std::size_t>(point) >= controls) {
+                continue;
+            }
+            const glm::vec3 offset(shape.offsets[3 * k],
+                                   shape.offsets[3 * k + 1],
+                                   shape.offsets[3 * k + 2]);
+            entries.push_back({static_cast<std::uint32_t>(point),
+                               static_cast<std::uint32_t>(s),
+                               offset});
+            reach = std::max(reach, glm::length(offset));
+        }
+        synced.shapeReach += reach;
+    }
+    if (!entries.empty()) {
+        std::stable_sort(entries.begin(), entries.end(),
+                         [](const Entry& a, const Entry& b) {
+                             return a.point < b.point;
+                         });
+        skin.shapeStarts.assign(controls + 1, 0u);
+        for (const Entry& entry : entries) {
+            ++skin.shapeStarts[entry.point + 1];
+            skin.shapeOffsets.insert(
+                skin.shapeOffsets.end(),
+                {entry.offset.x, entry.offset.y, entry.offset.z});
+            skin.shapeIndices.push_back(entry.shape);
+        }
+        for (std::size_t p = 0; p < controls; ++p) {
+            skin.shapeStarts[p + 1] += skin.shapeStarts[p];
+        }
+    }
+    skin.subShapes = binding.subShapes.size();
+    skin.stencils = std::move(stencils);
+    synced.skinJoints.assign(joints.begin(), joints.end());
+    synced.restBounds = Bounds3{};
+    if (controls != 0) {
+        synced.restBounds = synced.sampleBounds.front();
+        for (const Bounds3& box : synced.sampleBounds) {
+            synced.restBounds.first =
+                glm::min(synced.restBounds.first, box.first);
+            synced.restBounds.second =
+                glm::max(synced.restBounds.second, box.second);
+        }
+    }
+    meshes_.SetSkin(synced.handle, std::move(skin));
+    synced.skin =
+        std::make_shared<const SkinBinding>(std::move(binding));
+}
+
+void RasterDelegate::PoseSkins(const Scene& scene,
+                               std::vector<std::string>& errors) {
+    ERNIE_ZONE("Pose skins");
+    const double time = Stage(scene, Path::Root()).GetTimeCode();
+    std::map<Path, SkeletonPose> skeletons;
+    // A 3x4 transform's rows, as skinning.slang reads them.
+    const auto rows = [](const glm::mat4& m,
+                         std::vector<float>& out) {
+        for (int r = 0; r < 3; ++r) {
+            out.insert(out.end(),
+                       {m[0][r], m[1][r], m[2][r], m[3][r]});
+        }
+    };
+    const auto box = [](const glm::mat4& m, const Bounds3& b,
+                        Bounds3& into) {
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p(
+                m * glm::vec4((corner & 1) ? b.second.x : b.first.x,
+                              (corner & 2) ? b.second.y : b.first.y,
+                              (corner & 4) ? b.second.z : b.first.z,
+                              1.0f));
+            into.first = glm::min(into.first, p);
+            into.second = glm::max(into.second, p);
+        }
+    };
+    for (auto& [path, synced] : syncedMeshes_) {
+        if (!synced.deformed || synced.handle == 0) {
+            continue;
+        }
+        try {
+            const SkinBinding& binding = *synced.skin;
+            SkinPose pose;
+            if (!binding.skeleton.IsEmpty()) {
+                auto skeleton = skeletons.find(binding.skeleton);
+                if (skeleton == skeletons.end()) {
+                    skeleton =
+                        skeletons
+                            .emplace(binding.skeleton,
+                                     SkeletonPoseOf(scene,
+                                                    binding.skeleton,
+                                                    time))
+                            .first;
+                }
+                pose = SkinPoseOf(scene, path, binding,
+                                  skeleton->second);
+            }
+            const glm::mat4 bind = binding.geomBindTransform;
+            const glm::mat4 toMesh(pose.skelToMesh);
+            MeshDrawable::SkinPose out;
+            rows(bind, out.rows);
+            rows(toMesh, out.rows);
+            for (const glm::mat4& joint : pose.skinning) {
+                if (binding.method == SkinningMethod::Linear) {
+                    rows(toMesh * joint * bind, out.rows);
+                } else {
+                    const JointDualQuaternion dq = FactorJoint(joint);
+                    out.rows.insert(out.rows.end(),
+                                    {dq.real.x, dq.real.y, dq.real.z,
+                                     dq.real.w, dq.dual.x, dq.dual.y,
+                                     dq.dual.z, dq.dual.w});
+                    for (int r = 0; r < 3; ++r) {
+                        out.rows.insert(out.rows.end(),
+                                        {dq.scale[0][r],
+                                         dq.scale[1][r],
+                                         dq.scale[2][r], 0.0f});
+                    }
+                }
+            }
+            out.subShapeWeights = pose.subShapeWeights;
+            // A point cache's two samples either side of the time
+            // code.
+            Bounds3 restBounds = synced.restBounds;
+            if (synced.sampleBounds.size() > 1) {
+                if (const std::optional<SampleBracket> bracket =
+                        scene.BracketAt(path, tokens::kPoints)) {
+                    out.lower =
+                        static_cast<std::uint32_t>(bracket->lower);
+                    out.upper =
+                        static_cast<std::uint32_t>(bracket->upper);
+                    out.alpha = static_cast<float>(bracket->alpha);
+                    const Bounds3& a =
+                        synced.sampleBounds[bracket->lower];
+                    const Bounds3& b =
+                        synced.sampleBounds[bracket->upper];
+                    restBounds = {glm::min(a.first, b.first),
+                                  glm::max(a.second, b.second)};
+                }
+            }
+            // Its rest box (widened by its blend shapes) carried by
+            // each joint it follows: a box around it in any blend of
+            // them.
+            const glm::vec3 reach(synced.shapeReach);
+            const Bounds3 rest{restBounds.first - reach,
+                               restBounds.second + reach};
+            out.bounds = {
+                glm::vec3(std::numeric_limits<float>::max()),
+                glm::vec3(std::numeric_limits<float>::lowest())};
+            if (synced.skinJoints.empty()) {
+                box(toMesh, rest, out.bounds);
+            }
+            for (const std::uint32_t j : synced.skinJoints) {
+                box(toMesh * pose.skinning[j] * bind, rest,
+                    out.bounds);
+            }
+            meshes_.SetSkinPose(synced.handle, std::move(out));
+        } catch (const std::invalid_argument& error) {
+            errors.push_back(Describe(path, "skinned mesh", error));
+        }
     }
 }
 
@@ -3070,16 +3401,21 @@ void RasterDelegate::Sync(const Scene& scene) {
         // Changes only to cameras and render prims, such as a batch's
         // poses and worlds every step, leave the synced materials,
         // terrain, meshes and draws as they are (lights and settings
-        // resolve every frame).
-        if (std::all_of(changes.begin(), changes.end(),
-                        [&scene](const Change& change) {
-                            return IsViewChange(scene, change);
-                        })) {
+        // resolve every frame); a new time code poses skinned meshes.
+        const bool posing =
+            skinned_ &&
+            scene.AttributeVersion(Path::Root(), tokens::kTimeCode) !=
+                posedTimeCode_;
+        if (!posing && std::all_of(changes.begin(), changes.end(),
+                                   [&scene](const Change& change) {
+                                       return IsViewChange(scene,
+                                                           change);
+                                   })) {
             return;
         }
         // So does a simulation step that only rewrites the arrays of
         // prims posed on the GPU: the drawable takes the new arrays.
-        if (RefreshGpuXforms(scene, changes)) {
+        if (!posing && RefreshGpuXforms(scene, changes)) {
             renderer_.MarkCastersChanged();
             return;
         }
@@ -3144,11 +3480,24 @@ RasterDelegate::Items(const Scene& scene) const {
             prototypes.insert(prototype);
         }
     }
-    const auto isPrototype = [&prototypes](const Path& path) {
-        return std::any_of(prototypes.begin(), prototypes.end(),
-                           [&path](const Path& prototype) {
-                               return path.HasPrefix(prototype);
-                           });
+    // The meshes of each prototype, which may be a mesh or a subtree
+    // of them (as USD's are), by their nearest prototype ancestor.
+    std::map<Path, std::vector<Path>> prototypeMeshes;
+    std::set<Path> inPrototypes;
+    for (const auto& [path, synced] : syncedMeshes_) {
+        for (Path at = path; !at.IsEmpty(); at = at.Parent()) {
+            if (prototypes.contains(at)) {
+                prototypeMeshes[at].push_back(path);
+                inPrototypes.insert(path);
+                break;
+            }
+            if (at == Path::Root()) {
+                break;
+            }
+        }
+    }
+    const auto isPrototype = [&inPrototypes](const Path& path) {
+        return inPrototypes.contains(path);
     };
     const auto shade = [this, &scene](const Path& mesh,
                                       const SyncedMesh& synced,
@@ -3212,38 +3561,50 @@ RasterDelegate::Items(const Scene& scene) const {
                 ? GpuAnchorOf(scene, path).value_or(GpuAnchor{}).frame
                 : scene.WorldTransform(path);
         for (std::size_t k = 0; k < targets.size(); ++k) {
-            const auto mesh = syncedMeshes_.find(targets[k]);
-            if (mesh == syncedMeshes_.end() ||
-                mesh->second.handle == 0 || lists[k].empty()) {
+            const auto meshes = prototypeMeshes.find(targets[k]);
+            if (meshes == prototypeMeshes.end() || lists[k].empty()) {
                 continue;
             }
-            MeshItem item;
-            item.mesh = mesh->second.handle;
-            item.transform = world;
-            item.prototype =
-                glm::mat4(scene.LocalTransform(targets[k]));
-            item.instancer = synced.handle;
-            item.primId = PrimIdOf(path);
-            item.linkGroup = links_.GroupOf(path);
-            // Instances sorted by world, so each view draws its
-            // world's as one range.
-            std::vector<std::uint32_t>& instances = lists[k];
-            std::stable_sort(
-                instances.begin(), instances.end(),
-                [&worlds](std::uint32_t a, std::uint32_t b) {
-                    return worlds[a] < worlds[b];
-                });
-            const bool oneWorld =
-                worlds[instances.front()] == worlds[instances.back()];
-            item.world = worlds[instances.front()];
-            if (!oneWorld) {
-                for (const std::uint32_t instance : instances) {
-                    item.instanceWorlds.push_back(worlds[instance]);
+            // From the prototype's parent's frame, which instances
+            // place, down to each of its meshes.
+            const glm::dmat4 above = glm::inverse(
+                scene.WorldTransform(targets[k].Parent()));
+            for (const Path& meshPath : meshes->second) {
+                const auto mesh = syncedMeshes_.find(meshPath);
+                if (mesh == syncedMeshes_.end() ||
+                    mesh->second.handle == 0 ||
+                    !scene.IsVisible(meshPath)) {
+                    continue;
                 }
+                MeshItem item;
+                item.mesh = mesh->second.handle;
+                item.transform = world;
+                item.prototype =
+                    glm::mat4(above * scene.WorldTransform(meshPath));
+                item.instancer = synced.handle;
+                item.primId = PrimIdOf(path);
+                item.linkGroup = links_.GroupOf(path);
+                // Instances sorted by world, so each view draws its
+                // world's as one range.
+                std::vector<std::uint32_t>& instances = lists[k];
+                std::stable_sort(
+                    instances.begin(), instances.end(),
+                    [&worlds](std::uint32_t a, std::uint32_t b) {
+                        return worlds[a] < worlds[b];
+                    });
+                const bool oneWorld = worlds[instances.front()] ==
+                                      worlds[instances.back()];
+                item.world = worlds[instances.front()];
+                if (!oneWorld) {
+                    for (const std::uint32_t instance : instances) {
+                        item.instanceWorlds.push_back(
+                            worlds[instance]);
+                    }
+                }
+                item.instances = instances;
+                shade(meshPath, mesh->second, item);
+                items.push_back(std::move(item));
             }
-            item.instances = std::move(instances);
-            shade(targets[k], mesh->second, item);
-            items.push_back(std::move(item));
         }
     }
     return items;

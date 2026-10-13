@@ -102,6 +102,106 @@
                                      "as simulators count them (more entries are ignored); read "  \
                                      "on the GPU, the rest neither drawn nor bounded.",            \
                               .group = "Geometry", .integer = true}))                              \
+    X(std::string, SubdivisionScheme, ::ernie::tokens::kSubdivisionScheme, ::ernie::tokens::kNone, \
+      (::ernie::AttributeMeta{.label = "Subdivision",                                              \
+                              .doc = "The surface the faces are the control mesh of, refined by "  \
+                                     "OpenSubdiv; none draws the faces themselves (USD's "         \
+                                     "fallback is catmullClark, which import keeps). Normals are " \
+                                     "the surface's, not the authored ones. Points written on "    \
+                                     "the GPU draw the control mesh.",                             \
+                              .group = "Subdivision",                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kCatmullClark,  \
+                                          ::ernie::tokens::kLoop, ::ernie::tokens::kBilinear},     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(int, RefineLevel, ::ernie::tokens::kRefineLevel, -1,                                         \
+      (::ernie::AttributeMeta{.label = "Refine level",                                             \
+                              .doc = "2^level segments along each control edge; -1 for the "       \
+                                     "stage's ernie:subdivision:refineLevel.",                     \
+                              .group = "Subdivision", .min = -1.0, .max = 8.0,                     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, InterpolateBoundary, ::ernie::tokens::kInterpolateBoundary,                     \
+      ::ernie::tokens::kEdgeAndCorner,                                                             \
+      (::ernie::AttributeMeta{.doc = "How boundary edges and corners are interpolated.",           \
+                              .group = "Subdivision",                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kEdgeOnly,      \
+                                          ::ernie::tokens::kEdgeAndCorner},                        \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, FaceVaryingLinearInterpolation,                                                 \
+      ::ernie::tokens::kFaceVaryingLinearInterpolation, ::ernie::tokens::kCornersPlus1,            \
+      (::ernie::AttributeMeta{.doc = "Where texture coordinates stay linear, not smoothed: none "  \
+                                     "smooths them everywhere, all keeps them linear.",            \
+                              .group = "Subdivision",                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kCornersOnly,   \
+                                          ::ernie::tokens::kCornersPlus1,                          \
+                                          ::ernie::tokens::kCornersPlus2,                          \
+                                          ::ernie::tokens::kBoundaries, ::ernie::tokens::kAll},    \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, TriangleSubdivisionRule, ::ernie::tokens::kTriangleSubdivisionRule,             \
+      ::ernie::tokens::kCatmullClark,                                                              \
+      (::ernie::AttributeMeta{.doc = "Catmull-Clark's weights for triangles, or smoother ones.",   \
+                              .group = "Subdivision",                                              \
+                              .options = {::ernie::tokens::kCatmullClark,                          \
+                                          ::ernie::tokens::kSmooth},                               \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseIndices, ::ernie::tokens::kCreaseIndices, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = "Integer point indices of crease chains, one after another.", \
+                              .group = "Subdivision", .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseLengths, ::ernie::tokens::kCreaseLengths, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = "Integer number of points of each crease chain.",             \
+                              .group = "Subdivision", .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseSharpnesses, ::ernie::tokens::kCreaseSharpnesses, nullptr,            \
+      (::ernie::AttributeMeta{.doc = "Sharpness of each crease, or of each crease edge; 10 or "    \
+                                     "more is infinitely sharp.",                                  \
+                              .group = "Subdivision", .dirty = ::ernie::Dirty::Topology}))         \
+    X(::ernie::Tensor, CornerIndices, ::ernie::tokens::kCornerIndices, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = "Integer indices of sharp corner points.",                    \
+                              .group = "Subdivision", .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CornerSharpnesses, ::ernie::tokens::kCornerSharpnesses, nullptr,            \
+      (::ernie::AttributeMeta{.doc = "Sharpness of each corner.", .group = "Subdivision",          \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, HoleIndices, ::ernie::tokens::kHoleIndices, nullptr,                        \
+      (::ernie::AttributeMeta{.doc = "Integer indices of faces left out of the surface.",          \
+                              .group = "Subdivision", .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Path, Skeleton, ::ernie::tokens::kSkelSkeleton, ::ernie::Path(),                    \
+      (::ernie::AttributeMeta{.doc = "The Skeleton skinning it; unset, it is not skinned.",        \
+                              .group = "Skinning", .options = {::ernie::tokens::kSkeleton},        \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::vector<std::string>, SkelJoints, ::ernie::tokens::kSkelJoints,                          \
+      std::vector<std::string>{},                                                                  \
+      (::ernie::AttributeMeta{.doc = "The Skeleton's joints its joint indices count, in their "    \
+                                     "order; unset, all of them in the Skeleton's order.",         \
+                              .group = "Skinning", .dirty = ::ernie::Dirty::Topology}))            \
+    X(::ernie::Tensor, JointIndices, ::ernie::tokens::kSkelJointIndices, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = "Integer (points, k) joints influencing each point, or "      \
+                                     "(1, k) for all points (rigid).",                             \
+                              .group = "Skinning", .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, JointWeights, ::ernie::tokens::kSkelJointWeights, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = "(points, k) or (1, k) weights of the joint indices.",        \
+                              .group = "Skinning", .dirty = ::ernie::Dirty::Topology}))            \
+    X(glm::dmat4, GeomBindTransform, ::ernie::tokens::kSkelGeomBindTransform, glm::dmat4(1.0),     \
+      (::ernie::AttributeMeta{.doc = "Places its points in the Skeleton's space when bound.",      \
+                              .group = "Skinning", .dirty = ::ernie::Dirty::Topology}))            \
+    X(std::string, SkinningMethod, ::ernie::tokens::kSkelSkinningMethod,                           \
+      ::ernie::tokens::kClassicLinear,                                                             \
+      (::ernie::AttributeMeta{.doc = "How joint transforms blend: linearly, or as dual "           \
+                                     "quaternions, which keep volume at twisting joints.",         \
+                              .group = "Skinning",                                                 \
+                              .options = {::ernie::tokens::kClassicLinear,                         \
+                                          ::ernie::tokens::kDualQuaternion},                       \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::vector<std::string>, SkelBlendShapes, ::ernie::tokens::kSkelBlendShapes,                \
+      std::vector<std::string>{},                                                                  \
+      (::ernie::AttributeMeta{.doc = "Its names for its blend shapes, as animations weight them.", \
+                              .group = "Skinning", .dirty = ::ernie::Dirty::Topology}))            \
+    X(std::vector<::ernie::Path>, BlendShapeTargets, ::ernie::tokens::kSkelBlendShapeTargets,      \
+      std::vector<::ernie::Path>{},                                                                \
+      (::ernie::AttributeMeta{.doc = "The BlendShape prim of each name.", .group = "Skinning",     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
     X(::ernie::Tensor, ThermalTemperatures, ::ernie::tokens::kThermalTemperatures, nullptr,        \
       (::ernie::AttributeMeta{.label = "Temperatures",                                             \
                               .doc = "float32 (n,) kelvin, one per point, on the CPU or a CUDA "   \

@@ -7,6 +7,7 @@ ernie_add_library(
     light_links.cpp
     outputs.cpp
     resolve.cpp
+    skinning.cpp
     volumes.cpp
     PUBLIC
     ernie_device

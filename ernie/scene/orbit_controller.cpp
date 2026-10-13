@@ -80,4 +80,39 @@ void OrbitController::Frame(const glm::dvec3& boundsMin,
                    kMinDistance, kMaxDistance);
 }
 
+void OrbitController::FrameView(const glm::dvec3& boundsMin,
+                                const glm::dvec3& boundsMax,
+                                double aspect) {
+    target = 0.5 * (boundsMin + boundsMax);
+    // The view's axes from the current yaw and pitch.
+    const double horizontal = std::cos(double(pitch));
+    const glm::dvec3 back(std::sin(double(yaw)) * horizontal,
+                          -std::cos(double(yaw)) * horizontal,
+                          std::sin(double(pitch)));
+    const glm::dvec3 forward = -back;
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 up = glm::cross(right, forward);
+    // A margin of 5% of the view on each side.
+    const double tanV = std::tan(0.5 * double(verticalFov)) / 1.1;
+    const double tanH = tanV * std::max(aspect, 1e-3);
+    // The eye at target - forward * d sees a corner at depth d + z;
+    // each corner needs d at least |x| / tanH - z and |y| / tanV - z,
+    // and in front of the near plane (1% of d).
+    double need = kMinDistance;
+    for (int corner = 0; corner < 8; ++corner) {
+        const glm::dvec3 c =
+            glm::dvec3((corner & 1) ? boundsMax.x : boundsMin.x,
+                       (corner & 2) ? boundsMax.y : boundsMin.y,
+                       (corner & 4) ? boundsMax.z : boundsMin.z) -
+            target;
+        const double x = glm::dot(c, right);
+        const double y = glm::dot(c, up);
+        const double z = glm::dot(c, forward);
+        need = std::max({need, std::abs(x) / tanH - z,
+                         std::abs(y) / tanV - z, -z / 0.98});
+    }
+    distance = std::clamp(need, kMinDistance, kMaxDistance);
+}
+
 }  // namespace ernie

@@ -16,6 +16,7 @@
 #include "ernie/session/light_links.h"
 #include "ernie/session/outputs.h"
 #include "ernie/session/resolve.h"
+#include "ernie/session/skinning.h"
 #include "ernie/util/image.h"
 #include "ernie/util/tensor.h"
 #include "ernie/util/texture_cache.h"
@@ -349,6 +350,17 @@ class RasterDelegate : public RenderDelegate {
         std::array<std::uint64_t, 8> versions{};
         bool hasColors = false;
         glm::vec3 tint{0.5f};
+        /// A skinned mesh's binding, posed on the GPU each sync: the
+        /// joints its influences use, and the box of its rest control
+        /// points, widened by its blend shapes' largest offsets.
+        std::shared_ptr<const SkinBinding> skin;
+        std::vector<std::uint32_t> skinJoints;
+        Bounds3 restBounds{};
+        float shapeReach = 0.0f;
+        /// Posed on the GPU (skinned, or a point cache), and a point
+        /// cache's samples' boxes.
+        bool deformed = false;
+        std::vector<Bounds3> sampleBounds;
     };
 
     /// A mesh's writer and bounds (`SetMeshWriter`).
@@ -547,6 +559,15 @@ class RasterDelegate : public RenderDelegate {
     NeedsMetering(const Scene& scene, const RenderPrims& base,
                   std::span<const RenderProductSpec> specs) const;
     void SyncMeshes(const Scene& scene);
+    /// Gives the mesh `synced` (added at rest) its skin, from its
+    /// binding and, for a subdivision surface, its stencils.
+    void AddSkin(const Scene& scene, const Path& path,
+                 std::optional<SkinBinding> binding,
+                 RefinementStencils stencils, SyncedMesh& synced);
+    /// Poses every skinned mesh at the stage's time code, each
+    /// skeleton posed once; failures go to `errors`.
+    void PoseSkins(const Scene& scene,
+                   std::vector<std::string>& errors);
     void SyncInstancers(const Scene& scene);
     /// Hands the meshes' drawable the arrays of prims posed on the
     /// GPU that changed, one instancer per group of prims sharing
@@ -734,6 +755,11 @@ class RasterDelegate : public RenderDelegate {
     static constexpr double kRebaseDistance = 1024.0;
     ChangeCursor cursor_;
     std::uint64_t sceneId_ = 0;
+    /// Whether any mesh is skinned, and the version of the stage's
+    /// time code they were last posed at: a new time code poses them
+    /// again.
+    bool skinned_ = false;
+    std::uint64_t posedTimeCode_ = 0;
     RenderPrims prims_;
     std::optional<Key> heightfield_;
     std::optional<Key>

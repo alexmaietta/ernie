@@ -13,6 +13,8 @@ ernie_add_test_suite(
     geometry_mesh_data_test.cpp
     geometry_primitives_test.cpp
     geometry_sphere_tessellation_test.cpp
+    geometry_skinning_test.cpp
+    geometry_subdivision_test.cpp
     raster_delegate_test.cpp
     raster_poisson_disk_test.cpp
     raster_sensor_plan_test.cpp
@@ -37,8 +39,10 @@ ernie_add_test_suite(
     scene_schema_test.cpp
     scene_sensor_filters_test.cpp
     scene_stage_test.cpp
+    scene_time_samples_test.cpp
     scene_temperature_model_test.cpp
     scene_terrain_schemas_test.cpp
+    scene_usd_import_test.cpp
     scene_volume_schemas_test.cpp
     scene_wide_view_test.cpp
     scene_xform_test.cpp
@@ -90,6 +94,7 @@ ernie_add_test_suite(
     raster_cascade_shadow_gpu_test.cpp
     raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp
+    raster_skinning_gpu_test.cpp
     raster_gpu_block_encoder_gpu_test.cpp
     raster_gpu_meshes_gpu_test.cpp
     raster_gpu_terrain_gpu_test.cpp

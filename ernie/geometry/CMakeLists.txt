@@ -9,6 +9,10 @@ ernie_add_library(
     mesh_data.cpp
     planet_heights.cpp
     primitives.cpp
+    skinning.cpp
     sphere_tessellation.cpp
+    subdivision.cpp
     PUBLIC
-    ernie_util)
+    ernie_util
+    PRIVATE
+    ernie_opensubdiv)

@@ -83,6 +83,14 @@ class OrbitController {
     void Frame(const glm::dvec3& boundsMin,
                const glm::dvec3& boundsMax);
 
+    /// Aims at the centre of the box [`boundsMin`, `boundsMax`] from
+    /// the current direction, at the distance where all its corners
+    /// fit a view `aspect` (width over height) wide with a small
+    /// margin: a flat or long box fills the view rather than its
+    /// bounding sphere.
+    void FrameView(const glm::dvec3& boundsMin,
+                   const glm::dvec3& boundsMax, double aspect);
+
     /// The orbit distance's range: a millimetre to about 100,000
     /// light-years.
     static constexpr double kMinDistance = 1e-3;

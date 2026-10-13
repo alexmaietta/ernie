@@ -146,6 +146,15 @@ std::vector<std::string> FetchRanges(
     const std::string& url,
     std::span<const std::pair<std::uint64_t, std::uint64_t>> ranges);
 
+/// Extracts the zip archive at `zip` (stored or deflated entries, as
+/// release archives are) into `directory`, made as needed, checking
+/// each file's CRC-32.
+/// @throws std::runtime_error if it cannot be read, is zip64, holds
+/// another compression or a path outside `directory`, or a file's
+/// CRC-32 does not match.
+void ExtractZip(const std::filesystem::path& zip,
+                const std::filesystem::path& directory);
+
 /// Data file `name` the demos ship (such as LRO's ISDs): in
 /// $ERNIE_DEMO_DATA, else the source tree's ISD fixtures, which the
 /// Python package ships as ernie/demos/data.

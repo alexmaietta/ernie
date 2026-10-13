@@ -72,8 +72,68 @@ jobs:
   # (ERNIE_TEST_REQUIRE_VALIDATION). Windows (MSVC) runs the unit tests and the GPU tests on
   # Mesa's lavapipe, without the validation layers; macOS (Apple Clang, MoltenVK), with no Vulkan
   # driver on its runners, the unit tests. Both build through sccache.
+  # OpenUSD for the USD importer plugin (cmake/third_party/openusd.cmake), built from source once
+  # per compiler and pin and cached, so the test jobs only restore it: its install directory
+  # (.deps/openusd-<version>-<options>) is named for the version, build options and compiler.
+  openusd:
+    name: openusd (${{ matrix.key }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: linux-gcc
+            os: ubuntu-24.04
+            cc: gcc
+            cxx: g++
+          - key: linux-clang
+            os: ubuntu-24.04
+            cc: clang
+            cxx: clang++
+          - key: macos
+            os: macos-15
+            cc: clang
+            cxx: clang++
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        id: openusd
+        with:
+          path: .deps/openusd-*/
+          key: openusd-${{ matrix.key }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
+      - name: Install Ninja
+        if: steps.openusd.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then brew install ninja; else sudo apt-get update && sudo apt-get install -y ninja-build; fi
+      - uses: actions/setup-python@v7
+        if: steps.openusd.outputs.cache-hit != 'true'
+        with:
+          python-version: "3.12"
+      # The fetched dependencies' sources, as the test jobs cache them.
+      - uses: actions/cache@v6
+        if: steps.openusd.outputs.cache-hit != 'true'
+        with:
+          path: |
+            .deps/*-src
+            .deps/*-subbuild
+          key: deps-${{ runner.os != 'Linux' && format('{0}-', runner.os) || '' }}${{ hashFiles('cmake/third_party/**') }}
+      - name: Build OpenUSD
+        if: steps.openusd.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release "-DFETCHCONTENT_BASE_DIR=$PWD/.deps" \
+            -DERNIE_USD=ON -DERNIE_USD_BUILD_JOBS=4 -DERNIE_BUILD_PYTHON=OFF -DERNIE_BUILD_APP=OFF
+          cmake --build build --target ernie_openusd_build
+          rm -rf .deps/openusd-work .deps/openusd-download
+
   test:
     name: test (${{ matrix.name }})
+    needs: openusd
     runs-on: ${{ matrix.os || 'ubuntu-24.04' }}
     timeout-minutes: ${{ matrix.os == 'windows-2025' && 75 || 60 }}
     strategy:
@@ -179,6 +239,13 @@ jobs:
             .deps/*-src
             .deps/*-subbuild
           key: deps-${{ runner.os != 'Linux' && format('{0}-', runner.os) || '' }}${{ hashFiles('cmake/third_party/**') }}
+      # OpenUSD as the openusd job built it, for the USD importer (not on Windows yet).
+      - uses: actions/cache/restore@v6
+        if: runner.os != 'Windows'
+        with:
+          path: .deps/openusd-*/
+          key: openusd-${{ runner.os == 'macOS' && 'macos' || format('linux-{0}', matrix.cc) }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
+          fail-on-cache-miss: true
       - name: Configure
         if: runner.os == 'Linux'
         run: >
@@ -186,7 +253,7 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_INSTALL=ON
-          -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+          -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON -DERNIE_USD=ON
           "-DPython_EXECUTABLE=$PWD/.venv/bin/python"
       # Windows with debug information for the debugger below, in the
       # objects (/Z7), which sccache caches as it cannot /Zi's PDBs.
@@ -199,6 +266,7 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+          ${{ runner.os == 'macOS' && '-DERNIE_USD=ON' || '' }}
       - name: Build
         shell: bash
         run: cmake --build build --parallel 4

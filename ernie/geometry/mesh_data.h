@@ -20,6 +20,23 @@ struct MeshData {
     /// entry of `indices`), so face-varying coordinates need no split
     /// vertices.
     std::vector<float> uvs;
+
+    /// A coarser level of detail: `count` entries of `lodIndices`
+    /// from `first`, at most `error` (in mesh units) from the full
+    /// mesh.
+    struct Level {
+        std::uint32_t first = 0;
+        std::uint32_t count = 0;
+        float error = 0.0f;
+    };
+    /// Empty, or coarser levels of detail the mesh comes with, finest
+    /// first, as a subdivision surface's coarser tessellations; a
+    /// renderer simplifies a mesh without them itself.
+    std::vector<Level> levels;
+    /// The levels' triangles, three indices of `points` each.
+    std::vector<std::uint32_t> lodIndices;
+    /// Empty, or s, t per entry of `lodIndices` (with `uvs`).
+    std::vector<float> lodUvs;
 };
 
 /// Where each corner of `TriangulateFaces`' triangles comes from: its

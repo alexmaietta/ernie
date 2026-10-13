@@ -443,6 +443,68 @@ void SetKey(Scene& scene, const Path& path, const PrimTypeDef* type,
         std::string(message));
 }
 
+/// The key of a prim's time samples: {attribute: [[time, value],
+/// ...]}.
+constexpr std::string_view kTimeSamplesKey = "$timeSamples";
+
+/// Sets the time samples `json` describes on the prim at `path`, each
+/// value read as `SetKey` reads its attribute's.
+void LoadSamples(Scene& scene, const Path& path,
+                 const PrimTypeDef* type, const Json& json,
+                 std::span<const Tensor> arrays) {
+    if (!json.is_object()) {
+        Fail(path, kTimeSamplesKey,
+             "time samples are an object of attributes");
+    }
+    for (const auto& [key, samples] : json.items()) {
+        const AttributeDef* def = nullptr;
+        if (type != nullptr) {
+            def = type->FindByPyName(key);
+            def = def != nullptr ? def : type->Find(key);
+        }
+        const std::string name =
+            def != nullptr ? std::string(def->name) : key;
+        if (!samples.is_array()) {
+            Fail(path, key,
+                 "time samples are a list of [time, value] pairs");
+        }
+        for (const Json& sample : samples) {
+            if (!sample.is_array() || sample.size() != 2 ||
+                !sample[0].is_number()) {
+                Fail(path, key, "a time sample is [time, value]");
+            }
+            const double time = sample[0].get<double>();
+            const Json& value = sample[1];
+            try {
+                if (IsArrayRef(value)) {
+                    const Json& index = value["$array"];
+                    if (!index.is_number_unsigned() ||
+                        index.get<std::size_t>() >= arrays.size()) {
+                        Fail(path, key, "\"$array\" is out of range");
+                    }
+                    scene.WriteAt(path, name, time,
+                                  arrays[index.get<std::size_t>()]);
+                } else if (def != nullptr
+                               ? def->kind == AttributeKind::Tensor
+                               : IsTensorArray(value)) {
+                    scene.WriteAt(
+                        path, name, time,
+                        TensorOf(value, def != nullptr &&
+                                            def->meta.integer));
+                } else if (def != nullptr) {
+                    scene.SetAt(
+                        path, name, time,
+                        def->Coerce(DeclaredValueOf(*def, value)));
+                } else {
+                    scene.SetAt(path, name, time, ValueOf(value));
+                }
+            } catch (const std::exception& error) {
+                Fail(path, key, error.what());
+            }
+        }
+    }
+}
+
 /// Defines (or finds) the prim at `path` as `body` describes it, then
 /// its children; `arrays` are what `{"$array": i}` values refer to.
 void LoadPrim(Scene& scene, const Path& path, const Json& body,
@@ -501,7 +563,14 @@ void LoadPrim(Scene& scene, const Path& path, const Json& body,
             fail("translate/rotate/orient/scale", error.what());
         }
     }
+    if (const auto samples = body.find(kTimeSamplesKey);
+        samples != body.end()) {
+        LoadSamples(scene, path, type, *samples, arrays);
+    }
     for (const auto& [key, value] : body.items()) {
+        if (key == kTimeSamplesKey) {
+            continue;
+        }
         if (value.is_object() && !IsArrayRef(value)) {
             Path child;
             try {
@@ -794,6 +863,31 @@ Json PrimJson(const Scene& scene, const Path& path) {
         } catch (const std::invalid_argument& error) {
             SaveFail(path, name, error.what());
         }
+    }
+    // Sampled attributes' samples, after their values at the time
+    // code.
+    Json samples = Json::object();
+    for (const std::string& name : scene.Attributes(path)) {
+        const std::span<const TimeSample> each =
+            scene.SamplesOf(path, name);
+        if (each.empty()) {
+            continue;
+        }
+        Json list = Json::array();
+        try {
+            for (const TimeSample& sample : each) {
+                list.push_back(Json::array(
+                    {sample.time, sample.isTensor
+                                      ? TensorJson(sample.tensor)
+                                      : ValueJson(sample.value)}));
+            }
+        } catch (const std::invalid_argument& error) {
+            SaveFail(path, name, error.what());
+        }
+        samples[name] = std::move(list);
+    }
+    if (!samples.empty()) {
+        body[std::string(kTimeSamplesKey)] = std::move(samples);
     }
     // The root's children are the top level's.
     if (path.IsRoot()) {

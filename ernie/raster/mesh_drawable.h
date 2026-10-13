@@ -5,6 +5,7 @@
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/pipeline.h"
 #include "ernie/geometry/mesh_data.h"
+#include "ernie/geometry/subdivision.h"
 #include "ernie/raster/drawable.h"
 #include "ernie/raster/renderer.h"
 #include "ernie/session/delegate.h"
@@ -273,7 +274,8 @@ class MeshDrawable : public RasterDrawable {
     /// range); empty removes them.
     /// @throws std::invalid_argument for an unknown mesh, or not one
     /// per point.
-    void SetTemperatures(std::uint32_t mesh, std::span<const float> kelvin);
+    void SetTemperatures(std::uint32_t mesh,
+                         std::span<const float> kelvin);
 
     /// The same from a contiguous float32 tensor on the compute
     /// device, copied as `SetNormals`.
@@ -289,7 +291,8 @@ class MeshDrawable : public RasterDrawable {
     /// again (rarely: a network's layout, not its temperatures).
     /// @throws std::invalid_argument for an unknown mesh, or not one
     /// per point.
-    void SetNodeIds(std::uint32_t mesh, std::span<const std::uint32_t> ids);
+    void SetNodeIds(std::uint32_t mesh,
+                    std::span<const std::uint32_t> ids);
 
     /// Sets the temperatures of a mesh's nodes, kelvin, at least one
     /// per node of its ids, as a thermal solver writes them each
@@ -353,6 +356,63 @@ class MeshDrawable : public RasterDrawable {
     /// @throws std::invalid_argument for an unknown mesh.
     void SetWriter(std::uint32_t mesh, MeshWriter writer,
                    std::optional<Bounds3> bounds = {});
+
+    /// A skinned mesh's data, fixed while its binding holds: its rest
+    /// control points (its points, or a subdivision surface's control
+    /// points), their joint influences and blend shape offsets, and a
+    /// subdivision surface's refinement stencils.
+    struct Skin {
+        /// x, y, z each, `restSamples` times over: a point cache's
+        /// samples, which each pose blends two of.
+        std::vector<float> restPoints;
+        std::size_t restSamples = 1;
+        /// Each point's influences from starts[point] to
+        /// starts[point + 1]; with `constantInfluences`, one range
+        /// (two starts) for every point.
+        std::vector<std::uint32_t> influenceStarts;
+        std::vector<std::uint32_t> influenceJoints;
+        std::vector<float> influenceWeights;
+        bool constantInfluences = false;
+        /// Empty, or each point's offsets from starts[point] to
+        /// starts[point + 1], x, y, z each, and each offset's
+        /// sub-shape.
+        std::vector<std::uint32_t> shapeStarts;
+        std::vector<float> shapeOffsets;
+        std::vector<std::uint32_t> shapeIndices;
+        std::size_t subShapes = 0;
+        bool dualQuaternion = false;
+        std::size_t joints = 0;
+        /// Empty, or the mesh's points as sums of the control points.
+        RefinementStencils stencils;
+    };
+
+    /// A skinned mesh's pose for a frame.
+    struct SkinPose {
+        /// Linear: each joint's 3 rows of skelToMesh * skinning *
+        /// geomBindTransform. Dual quaternions: the 3 rows of
+        /// geomBindTransform and of skelToMesh, then each joint's
+        /// real and dual quaternions (x, y, z, w) and the 3 rows
+        /// (with a 0) of its scale.
+        std::vector<float> rows;
+        std::vector<float> subShapeWeights;
+        Bounds3 bounds;  ///< Of the mesh's points in this pose.
+        /// The rest samples blended: `alpha` of the way from `lower`
+        /// to `upper`.
+        std::uint32_t lower = 0;
+        std::uint32_t upper = 0;
+        float alpha = 0.0f;
+    };
+
+    /// Poses mesh `mesh` on the GPU from `skin` (`SetSkinPose`), its
+    /// normals following from its triangles.
+    /// @throws std::invalid_argument for an unknown mesh or arrays
+    /// that disagree with it.
+    void SetSkin(std::uint32_t mesh, Skin skin);
+
+    /// The pose mesh `mesh`'s skin takes next frame.
+    /// @throws std::invalid_argument for an unknown or unskinned
+    /// mesh, or a pose of the wrong size.
+    void SetSkinPose(std::uint32_t mesh, SkinPose pose);
 
     /// Maps a mesh's points for writing in place on the compute
     /// device: a float32 (points, 3) tensor over the drawable's own
@@ -590,7 +650,8 @@ class MeshDrawable : public RasterDrawable {
     /// The number of levels of detail of mesh `mesh`, the full mesh
     /// included: meshes of at least `kMinLodTriangles` triangles are
     /// simplified (meshoptimizer) into up to `kMaxLevels` levels of
-    /// about half the triangles of the one before.
+    /// about half the triangles of the one before, or take the levels
+    /// they come with (`MeshData::levels`).
     /// @throws std::invalid_argument for an unknown mesh.
     std::size_t LevelCount(std::uint32_t mesh) const;
 
@@ -710,6 +771,19 @@ class MeshDrawable : public RasterDrawable {
             false;  ///< Device points set with bounds.
         /// Writes it on the GPU each frame (`SetWriter`).
         MeshWriter writer;
+        /// Posed on the GPU (`SetSkin`): its skin's data in one
+        /// buffer, where each of its arrays starts there (bytes), its
+        /// pose, staged for the next frame, and a subdivision
+        /// surface's posed control points.
+        std::unique_ptr<Skin> skin;
+        std::unique_ptr<GpuBuffer> skinData;
+        std::array<VkDeviceSize, 10> skinOffsets{};
+        std::unique_ptr<GpuBuffer> skinPose;
+        std::unique_ptr<GpuBuffer> skinControl;
+        std::vector<float> skinPoseData;  ///< Rows, then weights.
+        std::array<std::uint32_t, 3>
+            skinSamples{};  ///< Lower, upper, alpha's bits.
+        bool skinPosed = false;
         /// Whether its normals follow its device points, recomputed
         /// on the GPU when they move: a mesh with normals whose
         /// points, but not normals, come from the device.
@@ -1115,6 +1189,15 @@ class MeshDrawable : public RasterDrawable {
     /// The meshes whose normals the next frame recomputes, as their
     /// handles.
     std::vector<std::uint32_t> pendingNormals_;
+    /// skinning.slang: skinned meshes posed, and subdivision surfaces
+    /// refined from their control points; the meshes the next frame
+    /// poses.
+    PipelineLayout skinLayout_;
+    std::unique_ptr<ComputePipeline> skinPipeline_;
+    std::unique_ptr<ComputePipeline> refinePipeline_;
+    std::vector<std::uint32_t> pendingSkins_;
+    /// Records the pending skins' dispatches (`RecordCull`).
+    void RecordSkins(VkCommandBuffer commands) const;
     std::shared_ptr<GpuBuffer> positions_;
     std::shared_ptr<GpuBuffer> orientations_;
     std::shared_ptr<GpuBuffer> scales_;

@@ -148,7 +148,21 @@ std::uint32_t BindlessHeap::Take(Kind kind) {
 
 void BindlessHeap::Release(Kind kind, std::uint32_t index) {
     const std::lock_guard lock(mutex_);
-    Array& array = arrays_[static_cast<std::uint32_t>(kind)];
+    // Shared: freed with its last holder.
+    const auto k = static_cast<std::uint32_t>(kind);
+    if (const auto at = sharedAt_[k].find(index);
+        at != sharedAt_[k].end()) {
+        if (--at->second.holders > 0) {
+            return;
+        }
+        // Unless forgotten (and its handle maybe shared anew).
+        if (const auto it = shared_[k].find(at->second.held);
+            it != shared_[k].end() && it->second == index) {
+            shared_[k].erase(it);
+        }
+        sharedAt_[k].erase(at);
+    }
+    Array& array = arrays_[k];
     array.retiring.emplace_back(index, frame_ + kRetireFrames);
     --array.inUse;
 }
@@ -172,23 +186,48 @@ BindlessHeap::Slot BindlessHeap::AddImage(Kind kind, VkImageView view,
         throw std::invalid_argument(
             "BindlessHeap::AddImage takes a texture kind");
     }
-    const std::lock_guard lock(mutex_);
-    const std::uint32_t index = Take(kind);
-    Write(kind, index,
-          VkDescriptorImageInfo{VK_NULL_HANDLE, view, layout});
-    return Slot(this, kind, index);
+    return Share(kind,
+                 Held{reinterpret_cast<std::uint64_t>(view),
+                      static_cast<std::uint32_t>(layout)},
+                 VkDescriptorImageInfo{VK_NULL_HANDLE, view, layout});
 }
 
 BindlessHeap::Slot BindlessHeap::AddSampler(VkSampler sampler,
                                             bool comparison) {
-    const Kind kind =
-        comparison ? Kind::ComparisonSampler : Kind::Sampler;
+    return Share(comparison ? Kind::ComparisonSampler : Kind::Sampler,
+                 Held{reinterpret_cast<std::uint64_t>(sampler), 0},
+                 VkDescriptorImageInfo{sampler, VK_NULL_HANDLE,
+                                       VK_IMAGE_LAYOUT_UNDEFINED});
+}
+
+BindlessHeap::Slot
+BindlessHeap::Share(Kind kind, const Held& held,
+                    const VkDescriptorImageInfo& info) {
     const std::lock_guard lock(mutex_);
+    const auto k = static_cast<std::uint32_t>(kind);
+    // Not written again: frames in flight may read the slot, and an
+    // update to a descriptor in use invalidates their commands. A
+    // destroyed object's slots are forgotten (`Forget`), so a handle
+    // reused after it never finds them.
+    if (const auto it = shared_[k].find(held);
+        it != shared_[k].end()) {
+        ++sharedAt_[k].at(it->second).holders;
+        return Slot(this, kind, it->second);
+    }
     const std::uint32_t index = Take(kind);
-    Write(kind, index,
-          VkDescriptorImageInfo{sampler, VK_NULL_HANDLE,
-                                VK_IMAGE_LAYOUT_UNDEFINED});
+    shared_[k].emplace(held, index);
+    sharedAt_[k].emplace(index, SharedSlot{held, 1});
+    Write(kind, index, info);
     return Slot(this, kind, index);
+}
+
+void BindlessHeap::Forget(std::uint64_t object) {
+    const std::lock_guard lock(mutex_);
+    for (auto& shared : shared_) {
+        std::erase_if(shared, [object](const auto& entry) {
+            return entry.first.object == object;
+        });
+    }
 }
 
 void BindlessHeap::AdvanceFrame() {

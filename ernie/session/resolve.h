@@ -3,6 +3,7 @@
 
 #include "ernie/device/vulkan_context.h"
 #include "ernie/geometry/mesh_data.h"
+#include "ernie/geometry/subdivision.h"
 #include "ernie/scene/brdf.h"
 #include "ernie/scene/camera.h"
 #include "ernie/scene/material.h"
@@ -561,8 +562,29 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
 /// @throws std::invalid_argument naming the attribute for arrays of
 /// the wrong type, size or device, or invalid topology. For a UsdGeom
 /// primitive (Cube, Sphere, Cylinder, Cone, Capsule, Plane) the
-/// generated mesh, `PrimitiveMeshOf`.
-MeshData MeshDataOf(const Scene& scene, const Path& mesh);
+/// generated mesh, `PrimitiveMeshOf`. A Mesh with a
+/// `subdivisionScheme` is its limit surface instead, refined by
+/// OpenSubdiv at `SubdivisionLevelOf` (`Subdivide`), its normals the
+/// surface's. A skinned Mesh (`skel:skeleton`) is posed at the
+/// stage's time code, before it is refined, unless `options` say
+/// otherwise.
+struct MeshDataOptions {
+    /// Pose a skinned mesh (on the CPU); false keeps its rest points,
+    /// for the GPU to pose.
+    bool posed = true;
+    /// Where a subdivision surface's refinement stencils go, if
+    /// anywhere (`Subdivide`); left empty for other meshes.
+    RefinementStencils* stencils = nullptr;
+};
+MeshData MeshDataOf(const Scene& scene, const Path& mesh,
+                    const MeshDataOptions& options = {});
+
+/// The refine level the Mesh at `mesh` draws its subdivision surface
+/// at (its `ernie:refineLevel`, else the stage's), or none when it
+/// draws its faces: no scheme, or its points or faces written on the
+/// GPU, or active counts.
+std::optional<int> SubdivisionLevelOf(const Scene& scene,
+                                      const Path& mesh);
 
 /// Whether prims of `type` draw as meshes: Mesh and the UsdGeom
 /// primitives.

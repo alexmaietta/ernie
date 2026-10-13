@@ -136,6 +136,34 @@ constexpr DescriptorBinding kActiveDrawsBindings[] = {
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
+/// skinning.slang's push constants, which reach every buffer by
+/// address.
+struct SkinConstants {
+    std::uint32_t info[4];
+    std::uint32_t samples[4];
+    VkDeviceAddress rest = 0;
+    VkDeviceAddress influenceStarts = 0;
+    VkDeviceAddress influenceJoints = 0;
+    VkDeviceAddress influenceWeights = 0;
+    VkDeviceAddress shapeStarts = 0;
+    VkDeviceAddress shapeOffsets = 0;
+    VkDeviceAddress shapeIndices = 0;
+    VkDeviceAddress shapeWeights = 0;
+    VkDeviceAddress pose = 0;
+    VkDeviceAddress output = 0;
+};
+static_assert(sizeof(SkinConstants) == 112,
+              "SkinConstants must match skinning.slang");
+
+struct RefineConstants {
+    std::uint32_t info[4];
+    VkDeviceAddress control = 0;
+    VkDeviceAddress starts = 0;
+    VkDeviceAddress indices = 0;
+    VkDeviceAddress weights = 0;
+    VkDeviceAddress output = 0;
+};
+
 /// mesh_normals.slang's bindings: points, indices, adjacency and the
 /// normals it writes.
 constexpr DescriptorBinding kNormalsBindings[] = {
@@ -320,7 +348,8 @@ struct MeshResources {
     VkDeviceAddress uvs;
     VkDeviceAddress instanceColors;
     VkDeviceAddress activeCounts;
-    /// Meshes' temperatures per point (`MeshDrawable::temperatures_`).
+    /// Meshes' temperatures per point
+    /// (`MeshDrawable::temperatures_`).
     VkDeviceAddress temperatures;
     /// Their thermal networks' nodes per point and the nodes'
     /// temperatures (`MeshDrawable::nodeIds_`, `nodeTemperatures_`).
@@ -332,14 +361,13 @@ static_assert(sizeof(MeshResources) == 128,
 
 /// The mesh passes, which write the renderer's G-buffer.
 std::vector<ShaderModuleSource> MeshModules(bool pushbroom = false) {
-    return {
-        {"brdf", std::string(BrdfSlang())},
-        ProjectionModule(pushbroom),
-        {"bindless", shaders::kBindlessSlang},
-        {"frame", shaders::kFrameSlang},
-        {"gbuffer", shaders::kGBufferSlang},
-        {"surface", shaders::kSurfaceSlang},
-        {"mesh", shaders::kMeshSlang}};
+    return {{"brdf", std::string(BrdfSlang())},
+            ProjectionModule(pushbroom),
+            {"bindless", shaders::kBindlessSlang},
+            {"frame", shaders::kFrameSlang},
+            {"gbuffer", shaders::kGBufferSlang},
+            {"surface", shaders::kSurfaceSlang},
+            {"mesh", shaders::kMeshSlang}};
 }
 
 /// A host-visible storage buffer holding `bytes`, at least 16 bytes
@@ -549,8 +577,17 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
                          16),
       anchorLayout_(renderer.Context(), kAnchorBindings, 16),
       lightCullLayout_(renderer.Context(), kLightCullBindings, 64),
+      skinLayout_(renderer.Context(), {}, sizeof(SkinConstants)),
       cullLayout_(renderer.Context(), kCullBindings,
                   sizeof(CullConstants)) {
+    const std::vector<ShaderModuleSource> skinning{
+        {"skinning", shaders::kSkinningSlang}};
+    skinPipeline_ = std::make_unique<ComputePipeline>(
+        context_, skinLayout_,
+        renderer_.Compiler().CompileSpirv(skinning, "skinMain"));
+    refinePipeline_ = std::make_unique<ComputePipeline>(
+        context_, skinLayout_,
+        renderer_.Compiler().CompileSpirv(skinning, "refineMain"));
     const std::vector<ShaderModuleSource> normals{
         {"mesh_normals", shaders::kMeshNormalsSlang}};
     normalsPipeline_ = std::make_unique<ComputePipeline>(
@@ -685,7 +722,6 @@ void MeshDrawable::CreateCutoutPipelines(bool pushbroom) {
     }
 }
 
-
 void MeshDrawable::CreateMinimalPipelines() {
     if (minimalPipelines_[0] != nullptr) {
         return;
@@ -748,6 +784,26 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
         throw std::invalid_argument(
             "Mesh texture coordinates must come one pair per corner");
     }
+    for (const std::uint32_t index : data.lodIndices) {
+        if (index >= count) {
+            throw std::invalid_argument(
+                "Mesh level index out of range");
+        }
+    }
+    for (const MeshData::Level& level : data.levels) {
+        if (level.count % 3 != 0 ||
+            std::size_t{level.first} + level.count >
+                data.lodIndices.size()) {
+            throw std::invalid_argument(
+                "Mesh levels must be triangles of lodIndices");
+        }
+    }
+    if (!data.levels.empty() && !data.uvs.empty() &&
+        data.lodUvs.size() != 2 * data.lodIndices.size()) {
+        throw std::invalid_argument(
+            "Mesh level texture coordinates must come one pair per "
+            "corner");
+    }
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
     mesh.data = std::move(data);
@@ -779,6 +835,37 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
         {0, static_cast<std::uint32_t>(data.indices.size()), 0.0f});
     mesh.lodIndices.clear();
     mesh.lodUvs.clear();
+    // Levels the mesh comes with (a subdivision surface's coarser
+    // tessellations), taken as they are.
+    if (!data.levels.empty()) {
+        std::size_t end = 0;
+        for (const MeshData::Level& level : data.levels) {
+            if (data.indices.size() / 3 < kMinLodTriangles ||
+                mesh.levels.size() >= kMaxLevels ||
+                level.count < 3 * 8) {
+                break;
+            }
+            mesh.levels.push_back(
+                {static_cast<std::uint32_t>(data.indices.size()) +
+                     level.first,
+                 level.count, level.error});
+            end =
+                std::max<std::size_t>(end, level.first + level.count);
+        }
+        mesh.lodIndices.assign(data.lodIndices.begin(),
+                               data.lodIndices.begin() +
+                                   static_cast<std::ptrdiff_t>(end));
+        if (!data.uvs.empty()) {
+            mesh.lodUvs.assign(
+                data.lodUvs.begin(),
+                data.lodUvs.begin() +
+                    static_cast<std::ptrdiff_t>(2 * end));
+        }
+        mesh.data.levels = {};
+        mesh.data.lodIndices = {};
+        mesh.data.lodUvs = {};
+        return;
+    }
     std::vector<std::vector<glm::vec2>> pointUvs;
     std::vector<unsigned char> locked;
     if (!data.uvs.empty()) {
@@ -957,7 +1044,8 @@ void MeshDrawable::SetTemperatures(std::uint32_t mesh,
                                     std::to_string(mesh));
     }
     Mesh& target = it->second;
-    if (!kelvin.empty() && kelvin.size() != target.data.points.size() / 3) {
+    if (!kelvin.empty() &&
+        kelvin.size() != target.data.points.size() / 3) {
         throw std::invalid_argument(
             "Mesh temperatures need one per point");
     }
@@ -970,7 +1058,8 @@ void MeshDrawable::SetTemperatures(std::uint32_t mesh,
     activeMeshes_.insert(mesh);
 }
 
-void MeshDrawable::SetTemperatures(std::uint32_t mesh, const Tensor& kelvin,
+void MeshDrawable::SetTemperatures(std::uint32_t mesh,
+                                   const Tensor& kelvin,
                                    std::uintptr_t stream) {
     const auto it = meshes_.find(mesh);
     if (it == meshes_.end()) {
@@ -1002,18 +1091,20 @@ void MeshDrawable::SetNodeIds(std::uint32_t mesh,
     }
     Mesh& target = it->second;
     if (!ids.empty() && ids.size() != target.data.points.size() / 3) {
-        throw std::invalid_argument("Mesh node ids need one per point");
+        throw std::invalid_argument(
+            "Mesh node ids need one per point");
     }
     target.nodeIds.assign(ids.begin(), ids.end());
     target.nodeCount =
-        ids.empty() ? 0u : *std::max_element(ids.begin(), ids.end()) + 1;
+        ids.empty() ? 0u
+                    : *std::max_element(ids.begin(), ids.end()) + 1;
     // The pools take the ids and make room for the nodes.
     geometryDirty_ = true;
     drawsDirty_ = true;
 }
 
-void MeshDrawable::SetNodeTemperatures(std::uint32_t mesh,
-                                       std::span<const float> kelvin) {
+void MeshDrawable::SetNodeTemperatures(
+    std::uint32_t mesh, std::span<const float> kelvin) {
     const auto it = meshes_.find(mesh);
     if (it == meshes_.end()) {
         throw std::invalid_argument("Unknown mesh " +
@@ -1028,8 +1119,9 @@ void MeshDrawable::SetNodeTemperatures(std::uint32_t mesh,
     const bool has = !kelvin.empty();
     drawsDirty_ = drawsDirty_ || has != target.hasNodeTemperatures;
     target.hasNodeTemperatures = has;
-    target.nodeTemperatures.assign(
-        kelvin.begin(), kelvin.begin() + (has ? target.nodeCount : 0));
+    target.nodeTemperatures.assign(kelvin.begin(),
+                                   kelvin.begin() +
+                                       (has ? target.nodeCount : 0));
     target.deviceNodeTemperatures = Tensor();
     target.nodeTemperaturesDirty = has;
     activeMeshes_.insert(mesh);
@@ -1045,7 +1137,8 @@ void MeshDrawable::SetNodeTemperatures(std::uint32_t mesh,
     }
     CheckDeviceTensor(kelvin, 1, "Mesh node temperatures");
     Mesh& target = it->second;
-    if (static_cast<std::size_t>(kelvin.Elements()) < target.nodeCount) {
+    if (static_cast<std::size_t>(kelvin.Elements()) <
+        target.nodeCount) {
         throw std::invalid_argument(
             "Mesh node temperatures need one per node, " +
             std::to_string(target.nodeCount));
@@ -1225,6 +1318,142 @@ void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
     } else {
         writers_.erase(mesh);
     }
+    ForgetBounds();
+}
+
+void MeshDrawable::SetSkin(std::uint32_t mesh, Skin skin) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end()) {
+        throw std::invalid_argument("Unknown mesh " +
+                                    std::to_string(mesh));
+    }
+    Mesh& target = it->second;
+    const std::size_t points = target.data.points.size() / 3;
+    if (skin.restSamples == 0 ||
+        skin.restPoints.size() % (3 * skin.restSamples) != 0) {
+        throw std::invalid_argument("A skin's rest samples disagree");
+    }
+    const std::size_t controls =
+        skin.restPoints.size() / 3 / skin.restSamples;
+    const bool refined = !skin.stencils.starts.empty();
+    if (refined ? skin.stencils.starts.size() != points + 1
+                : controls != points) {
+        throw std::invalid_argument(
+            "A skin needs a rest point per mesh point, or a stencil "
+            "per mesh "
+            "point");
+    }
+    const std::size_t ranges =
+        skin.constantInfluences ? 2 : controls + 1;
+    if (skin.influenceStarts.size() != ranges ||
+        skin.influenceJoints.size() != skin.influenceWeights.size() ||
+        skin.influenceStarts.back() > skin.influenceJoints.size() ||
+        (!skin.shapeStarts.empty() &&
+         (skin.shapeStarts.size() != controls + 1 ||
+          skin.shapeOffsets.size() != 3 * skin.shapeIndices.size() ||
+          skin.shapeStarts.back() > skin.shapeIndices.size()))) {
+        throw std::invalid_argument("A skin's arrays disagree");
+    }
+    for (const std::uint32_t joint : skin.influenceJoints) {
+        if (joint >= skin.joints) {
+            throw std::invalid_argument(
+                "A skin's joint is out of range");
+        }
+    }
+    for (const std::uint32_t shape : skin.shapeIndices) {
+        if (shape >= skin.subShapes) {
+            throw std::invalid_argument(
+                "A skin's sub-shape is out of range");
+        }
+    }
+    for (const std::uint32_t index : skin.stencils.indices) {
+        if (index >= controls) {
+            throw std::invalid_argument(
+                "A skin's stencil is out of range");
+        }
+    }
+    // Every array in one buffer, each 16-byte aligned.
+    std::vector<std::byte> bytes;
+    const auto append = [&](std::size_t slot, auto span) {
+        bytes.resize((bytes.size() + 15) / 16 * 16);
+        target.skinOffsets[slot] = bytes.size();
+        const auto raw = std::as_bytes(span);
+        bytes.insert(bytes.end(), raw.begin(), raw.end());
+    };
+    append(0, std::span<const float>(skin.restPoints));
+    append(1, std::span<const std::uint32_t>(skin.influenceStarts));
+    append(2, std::span<const std::uint32_t>(skin.influenceJoints));
+    append(3, std::span<const float>(skin.influenceWeights));
+    append(4, std::span<const std::uint32_t>(skin.shapeStarts));
+    append(5, std::span<const float>(skin.shapeOffsets));
+    append(6, std::span<const std::uint32_t>(skin.shapeIndices));
+    append(7, std::span<const std::uint32_t>(skin.stencils.starts));
+    append(8, std::span<const std::uint32_t>(skin.stencils.indices));
+    append(9, std::span<const float>(skin.stencils.weights));
+    target.skinData = std::make_unique<GpuBuffer>(
+        context_, std::max<VkDeviceSize>(bytes.size(), 16),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    target.skinData->Write(bytes);
+    const std::size_t rows =
+        24 + (skin.dualQuaternion ? 20 : 12) * skin.joints;
+    target.skinPose = std::make_unique<GpuBuffer>(
+        context_, (rows + skin.subShapes + 4) * sizeof(float),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        BufferMemory::Device);
+    target.skinControl =
+        refined ? std::make_unique<GpuBuffer>(
+                      context_,
+                      std::max<std::size_t>(3 * controls, 4) *
+                          sizeof(float),
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                      BufferMemory::Device)
+                : nullptr;
+    target.skinPoseData.clear();
+    target.skinPosed = false;
+    target.skin = std::make_unique<Skin>(std::move(skin));
+    // Its normals follow its triangles as it moves.
+    if (target.data.normals.empty()) {
+        target.data.normals.assign(target.data.points.size(), 0.0f);
+    }
+    if (!target.recomputeNormals && !target.data.indices.empty()) {
+        target.recomputeNormals = true;
+        target.adjacency =
+            TrianglesAround(target.data.indices, points);
+    }
+    geometryDirty_ = true;
+}
+
+void MeshDrawable::SetSkinPose(std::uint32_t mesh, SkinPose pose) {
+    const auto it = meshes_.find(mesh);
+    if (it == meshes_.end() || !it->second.skin) {
+        throw std::invalid_argument("Mesh " + std::to_string(mesh) +
+                                    " is not skinned");
+    }
+    Mesh& target = it->second;
+    const Skin& skin = *target.skin;
+    const std::size_t rows =
+        24 + (skin.dualQuaternion ? 20 : 12) * skin.joints;
+    if (pose.rows.size() != rows ||
+        pose.subShapeWeights.size() != skin.subShapes ||
+        pose.lower >= skin.restSamples ||
+        pose.upper >= skin.restSamples) {
+        throw std::invalid_argument(
+            "A skin pose needs rows for every joint, a "
+            "weight for every sub-shape and two of its "
+            "rest samples");
+    }
+    target.skinSamples = {pose.lower, pose.upper,
+                          std::bit_cast<std::uint32_t>(pose.alpha)};
+    target.skinPoseData = std::move(pose.rows);
+    target.skinPoseData.insert(target.skinPoseData.end(),
+                               pose.subShapeWeights.begin(),
+                               pose.subShapeWeights.end());
+    target.skinPosed = true;
+    std::tie(target.low, target.high) = pose.bounds;
+    target.pointsBounded = true;
+    target.pointsDirty = true;
+    activeMeshes_.insert(mesh);
     ForgetBounds();
 }
 
@@ -1513,20 +1742,19 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
     if (!mesh.deviceTemperatures.Empty() &&
         (all || mesh.temperaturesDirty)) {
         ERNIE_ZONE("Mesh thermal device copy");
-        compute_->CopyToBuffer(mesh.deviceTemperatures, *temperatures_,
-                               VkDeviceSize{mesh.firstVertex} *
-                                   sizeof(float),
-                               mesh.temperaturesStream);
+        compute_->CopyToBuffer(
+            mesh.deviceTemperatures, *temperatures_,
+            VkDeviceSize{mesh.firstVertex} * sizeof(float),
+            mesh.temperaturesStream);
         mesh.temperaturesDirty = false;
     }
     if (!mesh.deviceNodeTemperatures.Empty() &&
         (all || mesh.nodeTemperaturesDirty)) {
         ERNIE_ZONE("Mesh thermal node device copy");
-        compute_->CopyToBuffer(mesh.deviceNodeTemperatures,
-                               *nodeTemperatures_,
-                               VkDeviceSize{mesh.firstNode} *
-                                   sizeof(float),
-                               mesh.nodeTemperaturesStream);
+        compute_->CopyToBuffer(
+            mesh.deviceNodeTemperatures, *nodeTemperatures_,
+            VkDeviceSize{mesh.firstNode} * sizeof(float),
+            mesh.nodeTemperaturesStream);
         mesh.nodeTemperaturesDirty = false;
     }
     // The full mesh's triangles, first of its indices; written in
@@ -1559,6 +1787,7 @@ void MeshDrawable::CopyDeviceAttributes(Mesh& mesh, bool all) {
 
 std::shared_ptr<GpuBuffer>
 MeshDrawable::Pool(std::span<const std::byte> bytes) const {
+    ERNIE_ZONE("Mesh pool upload");
     if (compute_ == nullptr) {
         return StorageBuffer(context_, bytes);
     }
@@ -1954,7 +2183,8 @@ void MeshDrawable::SettleMotion() {
         mesh.pointsWritten = false;
         mesh.mappedPoints = {};
         const bool pending = mesh.pointsDirty || mesh.normalsDirty ||
-                             mesh.colorsDirty || mesh.temperaturesDirty ||
+                             mesh.colorsDirty ||
+                             mesh.temperaturesDirty ||
                              mesh.nodeTemperaturesDirty;
         it = pending ? std::next(it) : activeMeshes_.erase(it);
     }
@@ -2010,6 +2240,31 @@ void MeshDrawable::RebuildGeometry() {
     // Points and triangles in use, by slot; device ones start as
     // every one, until copied in.
     std::vector<std::int32_t> counts;
+    {
+        ERNIE_ZONE("Mesh reserve geometry");
+        std::size_t pointFloats = 0;
+        std::size_t indexCount = 0;
+        std::size_t uvFloats = 0;
+        std::size_t nodes = 0;
+        for (const auto& [handle, mesh] : meshes_) {
+            pointFloats += mesh.data.points.size();
+            indexCount +=
+                mesh.data.indices.size() + mesh.lodIndices.size();
+            uvFloats += mesh.data.uvs.size() + mesh.lodUvs.size();
+            nodes += mesh.nodeTemperatures.empty()
+                         ? mesh.nodeCount
+                         : mesh.nodeTemperatures.size();
+        }
+        // The points twice: both halves of the pool.
+        points.reserve(2 * pointFloats);
+        normals.reserve(pointFloats);
+        colors.reserve(pointFloats);
+        temperatures.reserve(pointFloats / 3);
+        nodeIds.reserve(pointFloats / 3);
+        nodeTemperatures.reserve(nodes);
+        indices.reserve(indexCount);
+        uvs.reserve(uvFloats);
+    }
     for (auto& [handle, mesh] : meshes_) {
         mesh.countSlot = 0;
         if (mesh.writer) {
@@ -2056,25 +2311,27 @@ void MeshDrawable::RebuildGeometry() {
         }
         // Device temperatures are copied in after.
         if (mesh.temperatures.empty()) {
-            temperatures.resize(temperatures.size() + count / 3, 0.0f);
+            temperatures.resize(temperatures.size() + count / 3,
+                                0.0f);
         } else {
             temperatures.insert(temperatures.end(),
                                 mesh.temperatures.begin(),
                                 mesh.temperatures.end());
             mesh.temperaturesDirty = false;
         }
-        // Its nodes per point, and room for their temperatures (device
-        // ones copied in after).
+        // Its nodes per point, and room for their temperatures
+        // (device ones copied in after).
         if (mesh.nodeIds.empty()) {
             nodeIds.resize(nodeIds.size() + count / 3, 0u);
         } else {
             nodeIds.insert(nodeIds.end(), mesh.nodeIds.begin(),
                            mesh.nodeIds.end());
         }
-        mesh.firstNode = static_cast<std::uint32_t>(nodeTemperatures.size());
+        mesh.firstNode =
+            static_cast<std::uint32_t>(nodeTemperatures.size());
         if (mesh.nodeTemperatures.empty()) {
-            nodeTemperatures.resize(nodeTemperatures.size() + mesh.nodeCount,
-                                    0.0f);
+            nodeTemperatures.resize(
+                nodeTemperatures.size() + mesh.nodeCount, 0.0f);
         } else {
             nodeTemperatures.insert(nodeTemperatures.end(),
                                     mesh.nodeTemperatures.begin(),
@@ -2134,18 +2391,28 @@ void MeshDrawable::RebuildGeometry() {
     colors_ = Pool(std::as_bytes(std::span(colors)));
     temperatures_ = Pool(std::as_bytes(std::span(temperatures)));
     nodeIds_ = Pool(std::as_bytes(std::span(nodeIds)));
-    nodeTemperatures_ = Pool(std::as_bytes(std::span(nodeTemperatures)));
+    nodeTemperatures_ =
+        Pool(std::as_bytes(std::span(nodeTemperatures)));
     // Shared, as triangles may be copied in from the compute device.
     indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
     adjacency_ = StorageBuffer(context_, adjacency);
     pendingNormals_.clear();
+    pendingSkins_.clear();
     for (auto& [handle, mesh] : meshes_) {
         if (compute_ != nullptr) {
             if (!mesh.devicePoints.Empty()) {
                 CopyDevicePoints(mesh);
             }
             CopyDeviceAttributes(mesh, true);
+        }
+        // Skinned meshes posed again over their rest points.
+        if (mesh.skin && !mesh.skinPoseData.empty()) {
+            renderer_.Uploads().Write(
+                *mesh.skinPose,
+                std::as_bytes(std::span(mesh.skinPoseData)));
+            pendingSkins_.push_back(handle);
+            mesh.pointsDirty = false;
         }
         if (mesh.recomputeNormals) {
             pendingNormals_.push_back(handle);
@@ -2614,13 +2881,15 @@ void MeshDrawable::Prepare(const FrameParams& params,
     } else {
         // Only meshes whose points move recompute their normals.
         pendingNormals_.clear();
+        pendingSkins_.clear();
         for (const std::uint32_t handle : activeMeshes_) {
             Mesh& mesh = meshes_.at(handle);
             if (compute_ != nullptr) {
                 CopyDeviceAttributes(mesh, false);
             }
             // Host temperatures, only this mesh's range.
-            if (mesh.temperaturesDirty && !mesh.temperatures.empty()) {
+            if (mesh.temperaturesDirty &&
+                !mesh.temperatures.empty()) {
                 ERNIE_ZONE("Mesh thermal upload");
                 renderer_.Uploads().Write(
                     *temperatures_,
@@ -2645,7 +2914,13 @@ void MeshDrawable::Prepare(const FrameParams& params,
             // Into the other half, keeping the last frame's points
             // for motion blur.
             FlipPoints(mesh);
-            if (mesh.pointsInPlace) {
+            if (mesh.skin) {
+                // Posed on the GPU from this frame's pose.
+                renderer_.Uploads().Write(
+                    *mesh.skinPose,
+                    std::as_bytes(std::span(mesh.skinPoseData)));
+                pendingSkins_.push_back(handle);
+            } else if (mesh.pointsInPlace) {
                 // Written there through `MapPoints`: the frame waits
                 // for their stream.
                 compute_->SignalVulkan(mesh.deviceStream);
@@ -4007,9 +4282,107 @@ void MeshDrawable::RecordAnchors(VkCommandBuffer commands,
     vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
 }
 
+void MeshDrawable::RecordSkins(VkCommandBuffer commands) const {
+    if (pendingSkins_.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(context_, commands, "Mesh skinning");
+    const auto barrier = [commands] {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        memory.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        memory.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT |
+                               VK_ACCESS_2_MEMORY_WRITE_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    // After the poses' uploads and the last frame's reads of the
+    // points; the control points, then the refined ones.
+    barrier();
+    vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      skinPipeline_->Handle());
+    bool refining = false;
+    for (const std::uint32_t handle : pendingSkins_) {
+        const Mesh& mesh = meshes_.at(handle);
+        const Skin& skin = *mesh.skin;
+        const auto controls = static_cast<std::uint32_t>(
+            skin.restPoints.size() / 3 / skin.restSamples);
+        const VkDeviceAddress data = mesh.skinData->Address();
+        SkinConstants constants;
+        constants.info[0] = controls;
+        constants.info[1] = skin.dualQuaternion ? 1u : 0u;
+        constants.info[2] = skin.constantInfluences ? 1u : 0u;
+        constants.info[3] = skin.shapeStarts.empty() ? 0u : 1u;
+        constants.samples[0] = mesh.skinSamples[0];
+        constants.samples[1] = mesh.skinSamples[1];
+        constants.samples[2] = mesh.skinSamples[2];
+        constants.samples[3] = 0;
+        constants.rest = data + mesh.skinOffsets[0];
+        constants.influenceStarts = data + mesh.skinOffsets[1];
+        constants.influenceJoints = data + mesh.skinOffsets[2];
+        constants.influenceWeights = data + mesh.skinOffsets[3];
+        constants.shapeStarts = data + mesh.skinOffsets[4];
+        constants.shapeOffsets = data + mesh.skinOffsets[5];
+        constants.shapeIndices = data + mesh.skinOffsets[6];
+        constants.pose = mesh.skinPose->Address();
+        constants.shapeWeights =
+            constants.pose +
+            (mesh.skinPoseData.size() - skin.subShapes) *
+                sizeof(float);
+        constants.output = mesh.skinControl
+                               ? mesh.skinControl->Address()
+                               : points_->Address() +
+                                     VkDeviceSize{PointBase(mesh) +
+                                                  mesh.firstVertex} *
+                                         3 * sizeof(float);
+        refining = refining || mesh.skinControl != nullptr;
+        skinLayout_.PushConstants(commands, &constants,
+                                  sizeof(constants));
+        vkCmdDispatch(commands, (controls + 63) / 64, 1, 1);
+    }
+    barrier();
+    if (refining) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          refinePipeline_->Handle());
+        for (const std::uint32_t handle : pendingSkins_) {
+            const Mesh& mesh = meshes_.at(handle);
+            if (!mesh.skinControl) {
+                continue;
+            }
+            const auto count = static_cast<std::uint32_t>(
+                mesh.data.points.size() / 3);
+            const VkDeviceAddress data = mesh.skinData->Address();
+            SkinConstants push{};
+            RefineConstants constants;
+            constants.info[0] = count;
+            constants.info[1] = constants.info[2] =
+                constants.info[3] = 0;
+            constants.control = mesh.skinControl->Address();
+            constants.starts = data + mesh.skinOffsets[7];
+            constants.indices = data + mesh.skinOffsets[8];
+            constants.weights = data + mesh.skinOffsets[9];
+            constants.output =
+                points_->Address() +
+                VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 *
+                    sizeof(float);
+            static_assert(sizeof(RefineConstants) <=
+                          sizeof(SkinConstants));
+            std::memcpy(&push, &constants, sizeof(constants));
+            skinLayout_.PushConstants(commands, &push, sizeof(push));
+            vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
+        }
+        barrier();
+    }
+}
+
 void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
-    // Normals that follow moving points first, before any pass draws
-    // them.
+    // Skinned meshes posed, then normals that follow moving points,
+    // before any pass draws them.
+    RecordSkins(commands);
     if (!pendingNormals_.empty()) {
         ERNIE_GPU_ZONE(context_, commands, "Mesh normals");
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,

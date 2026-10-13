@@ -331,6 +331,58 @@ TEST(MeshDataOf,
                  std::invalid_argument);
 }
 
+TEST(MeshDataOf, RefinesSubdivisionSurfaces) {
+    // A cube cage, its faces counterclockwise from outside.
+    Scene scene;
+    const std::array<float, 24> points{-1, -1, -1, 1,  -1, -1, 1, 1,
+                                       -1, -1, 1,  -1, -1, -1, 1, 1,
+                                       -1, 1,  1,  1,  1,  -1, 1, 1};
+    const std::array<std::int32_t, 6> counts{4, 4, 4, 4, 4, 4};
+    const std::array<std::int32_t, 24> indices{
+        0, 3, 2, 1, 4, 5, 6, 7, 0, 1, 5, 4,
+        2, 3, 7, 6, 1, 2, 6, 5, 0, 4, 7, 3};
+    const std::array<float, 24> up{0, 0, 1, 0, 0, 1, 0, 0,
+                                   1, 0, 0, 1, 0, 0, 1, 0,
+                                   0, 1, 0, 0, 1, 0, 0, 1};
+    ernie::Mesh cube =
+        ernie::Mesh::Define(scene, "/Cube")
+            .SetPoints(Tensor::Copy<float>(points, {8, 3}))
+            .SetFaceVertexCounts(
+                Tensor::Copy<std::int32_t>(counts, {6}))
+            .SetFaceVertexIndices(
+                Tensor::Copy<std::int32_t>(indices, {24}))
+            .SetNormals(Tensor::Copy<float>(up, {8, 3}));
+    EXPECT_FALSE(ernie::SubdivisionLevelOf(scene, "/Cube"));
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Cube").indices.size(),
+              12u * 3);
+
+    // The stage's level (1 by default): the limit surface's normals,
+    // not the authored ones.
+    cube.SetSubdivisionScheme(std::string(tokens::kCatmullClark));
+    EXPECT_EQ(ernie::SubdivisionLevelOf(scene, "/Cube"), 1);
+    const ernie::MeshData level1 = ernie::MeshDataOf(scene, "/Cube");
+    EXPECT_EQ(level1.indices.size(), 48u * 3);
+    EXPECT_EQ(level1.points.size(), 26u * 3);
+    EXPECT_LT(level1.normals[2], 0.0f)
+        << "the first point is a bottom corner";
+
+    // The mesh's own level, else the stage's.
+    cube.SetRefineLevel(2);
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Cube").indices.size(),
+              192u * 3);
+    cube.SetRefineLevel(-1);
+    scene.Set(ernie::Path::Root(), tokens::kSubdivisionRefineLevel,
+              0);
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Cube").indices.size(),
+              12u * 3);
+
+    // Active counts draw the faces themselves.
+    const std::array<std::int32_t, 2> active{8, 36};
+    scene.Write("/Cube", tokens::kActiveCounts,
+                Tensor::Copy<std::int32_t>(active, {2}));
+    EXPECT_FALSE(ernie::SubdivisionLevelOf(scene, "/Cube"));
+}
+
 TEST(MaterialSettingsOf, ReadsTheThermalTemperatureAndEmissivity) {
     Scene scene;
     const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();

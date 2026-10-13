@@ -19,6 +19,7 @@ NB_MODULE(_ernie, m) {
     ernie::python::BindSceneJson(m);
     ernie::python::BindSchema(m);
     ernie::python::BindRender(m);
+    ernie::python::BindUsd(m);
 #ifdef ERNIE_HAS_APP
     ernie::python::BindApp(m);
 #endif

@@ -59,6 +59,59 @@ inline constexpr std::string_view kPointInstancer = "PointInstancer";
 inline constexpr std::string_view kGeomPoints = "Points";
 inline constexpr std::string_view kVolume = "Volume";
 
+// Skeletal animation (UsdSkel). A Skeleton's joints, each a path
+// whose parent is the joint path before its last element, carry bind
+// and rest transforms; its animation source, a SkelAnimation, samples
+// the joints' local translations, rotations and scales and blend
+// shape weights at time codes. A Mesh bound to a Skeleton
+// (`skel:skeleton`) has joint indices and weights per point (or one
+// set for all) and may name BlendShapes, offsets added to its points
+// before skinning.
+inline constexpr std::string_view kSkelRoot = "SkelRoot";
+inline constexpr std::string_view kSkeleton = "Skeleton";
+inline constexpr std::string_view kSkelAnimation = "SkelAnimation";
+inline constexpr std::string_view kBlendShape = "BlendShape";
+inline constexpr std::string_view kJoints = "joints";
+inline constexpr std::string_view kBindTransforms = "bindTransforms";
+inline constexpr std::string_view kRestTransforms = "restTransforms";
+inline constexpr std::string_view kSkelAnimationSource =
+    "skel:animationSource";
+inline constexpr std::string_view kTranslations = "translations";
+inline constexpr std::string_view kRotations = "rotations";
+inline constexpr std::string_view kBlendShapes = "blendShapes";
+inline constexpr std::string_view kBlendShapeWeights =
+    "blendShapeWeights";
+/// Ernie: the time codes of a SkelAnimation's samples (USD keeps them
+/// as an attribute's time samples).
+inline constexpr std::string_view kAnimationTimes = "ernie:times";
+inline constexpr std::string_view kOffsets = "offsets";
+inline constexpr std::string_view kNormalOffsets = "normalOffsets";
+inline constexpr std::string_view kPointIndices = "pointIndices";
+/// Ernie: a BlendShape's inbetween shapes (USD's `inbetweens:*`
+/// attributes), by weight.
+inline constexpr std::string_view kInbetweenWeights =
+    "ernie:inbetweenWeights";
+inline constexpr std::string_view kInbetweenOffsets =
+    "ernie:inbetweenOffsets";
+inline constexpr std::string_view kInbetweenNormalOffsets =
+    "ernie:inbetweenNormalOffsets";
+inline constexpr std::string_view kSkelSkeleton = "skel:skeleton";
+inline constexpr std::string_view kSkelJoints = "skel:joints";
+inline constexpr std::string_view kSkelJointIndices =
+    "primvars:skel:jointIndices";
+inline constexpr std::string_view kSkelJointWeights =
+    "primvars:skel:jointWeights";
+inline constexpr std::string_view kSkelGeomBindTransform =
+    "primvars:skel:geomBindTransform";
+inline constexpr std::string_view kSkelBlendShapes =
+    "skel:blendShapes";
+inline constexpr std::string_view kSkelBlendShapeTargets =
+    "skel:blendShapeTargets";
+inline constexpr std::string_view kSkelSkinningMethod =
+    "skel:skinningMethod";
+inline constexpr std::string_view kClassicLinear = "classicLinear";
+inline constexpr std::string_view kDualQuaternion = "dualQuaternion";
+
 // Volumes (UsdVol). A Volume names its fields with relationships
 // `field:<name>` (`field:density`, `field:temperature`), each to a
 // field prim: an OpenVDBAsset, a grid of a NanoVDB file (.nvdb; .vdb
@@ -301,6 +354,42 @@ inline constexpr std::string_view kFaceVertexIndices =
 /// capacity.
 inline constexpr std::string_view kActiveCounts =
     "ernie:activeCounts";
+// Subdivision surfaces, as UsdGeomMesh tags them (OpenSubdiv's
+// terms).
+inline constexpr std::string_view kSubdivisionScheme =
+    "subdivisionScheme";
+inline constexpr std::string_view kCatmullClark = "catmullClark";
+inline constexpr std::string_view kLoop = "loop";
+inline constexpr std::string_view kBilinear = "bilinear";
+inline constexpr std::string_view kInterpolateBoundary =
+    "interpolateBoundary";
+inline constexpr std::string_view kEdgeOnly = "edgeOnly";
+inline constexpr std::string_view kEdgeAndCorner = "edgeAndCorner";
+inline constexpr std::string_view kFaceVaryingLinearInterpolation =
+    "faceVaryingLinearInterpolation";
+inline constexpr std::string_view kCornersOnly = "cornersOnly";
+inline constexpr std::string_view kCornersPlus1 = "cornersPlus1";
+inline constexpr std::string_view kCornersPlus2 = "cornersPlus2";
+inline constexpr std::string_view kBoundaries = "boundaries";
+inline constexpr std::string_view kAll = "all";
+inline constexpr std::string_view kTriangleSubdivisionRule =
+    "triangleSubdivisionRule";
+inline constexpr std::string_view kSmooth = "smooth";
+inline constexpr std::string_view kCreaseIndices = "creaseIndices";
+inline constexpr std::string_view kCreaseLengths = "creaseLengths";
+inline constexpr std::string_view kCreaseSharpnesses =
+    "creaseSharpnesses";
+inline constexpr std::string_view kCornerIndices = "cornerIndices";
+inline constexpr std::string_view kCornerSharpnesses =
+    "cornerSharpnesses";
+inline constexpr std::string_view kHoleIndices = "holeIndices";
+/// Ernie: a subdivision surface's refinement, 2^level segments along
+/// each control edge; -1 for the stage's.
+inline constexpr std::string_view kRefineLevel = "ernie:refineLevel";
+/// Ernie: on the stage, the refinement of subdivision surfaces
+/// without their own.
+inline constexpr std::string_view kSubdivisionRefineLevel =
+    "ernie:subdivision:refineLevel";
 inline constexpr std::string_view kDisplayColor =
     "primvars:displayColor";
 inline constexpr std::string_view kPositions = "positions";

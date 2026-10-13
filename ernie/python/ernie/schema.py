@@ -331,11 +331,41 @@ class Schema:
         for name, rows in arrays.items():
             scene.write(prims, names[name], rows, stream=stream)
 
-    def set(self, *attribute: Any, **attributes: Any) -> Any:
+    def set(
+        self,
+        *attribute: Any,
+        time: float | None = None,
+        **attributes: Any,
+    ) -> Any:
         """Sets attributes by Python name, and the transform from
         ``translate``, ``rotate``, ``rotation_order``, ``orient`` and
-        ``scale``; ``set(token, value)`` sets one by USD name. Returns
-        this prim."""
+        ``scale``; ``set(token, value)`` sets one by USD name. With
+        ``time``, sets their time samples at that time code instead
+        (Scene.set), arrays as Scene.write's. Returns this prim."""
+        if time is not None:
+            if any(key in attributes for key in _XFORM_KEYS):
+                raise TypeError(
+                    "time samples take the transform as one matrix: "
+                    "set(tokens.TRANSFORM, matrix, time=t)"
+                )
+            if attribute:
+                self.prim.set(*attribute, time=time)
+            for name, value in attributes.items():
+                definition = self._attributes.get(name)
+                if definition is None:
+                    raise TypeError(
+                        f"{type(self).__name__} has no attribute {name!r}"
+                        + _closest(name, [*self._attributes])
+                    )
+                if hasattr(value, "__dlpack__") or isinstance(
+                    value, np.ndarray
+                ):
+                    self.prim.write(definition.name, value, time=time)
+                else:
+                    self.prim.set(
+                        definition.name, _target(value), time=time
+                    )
+            return self
         if attribute:
             self.prim.set(*attribute)
         xform = {

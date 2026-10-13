@@ -20,17 +20,18 @@ target_compile_definitions(
     PRIVATE
         ERNIE_DEMO_DATA_DIR="${PROJECT_SOURCE_DIR}/ernie/test/fixtures/isd"
 )
-target_link_libraries(ernie_demos PRIVATE ernie_app
+target_link_libraries(ernie_demos PRIVATE ernie_app ernie_stb
                                           ernie_build_options)
 set_target_properties(ernie_demos PROPERTIES POSITION_INDEPENDENT_CODE
                                              ON)
 
-# libcurl, for the demos to fetch their data (curl.cmake); every target
-# their objects go into links it.
+# libcurl, for the demos to fetch their data (curl.cmake), and stb's
+# inflate for unpacking it (util.cpp's ExtractZip; libernie's copy is
+# hidden): every target their objects go into links them.
 include("${PROJECT_SOURCE_DIR}/cmake/third_party/curl.cmake")
-set(ernie_demo_links)
+set(ernie_demo_links ernie_stb)
 if(TARGET ernie_curl)
-    set(ernie_demo_links ernie_curl)
+    list(APPEND ernie_demo_links ernie_curl)
     target_link_libraries(ernie_demos PRIVATE ernie_curl)
 endif()
 

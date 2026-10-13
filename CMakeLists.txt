@@ -33,6 +33,10 @@ option(
     ERNIE_TRACY
     "Instrument Ernie for the Tracy profiler (CPU and Vulkan GPU zones, on demand)"
     OFF)
+option(
+    ERNIE_USD
+    "Build libernie_usd, the USD importer plugin (builds OpenUSD from source on first use unless ERNIE_USD_ROOT is set)"
+    OFF)
 option(ERNIE_CCACHE "Compile through ccache when it is installed" ON)
 # libernie and the install rules need CMake 3.24's whole-archive linking; Windows needs export
 # annotations first.
@@ -106,6 +110,7 @@ include(cmake/third_party/openexr.cmake)
 include(cmake/third_party/basisu.cmake)
 include(cmake/third_party/bc7enc.cmake)
 include(cmake/third_party/meshoptimizer.cmake)
+include(cmake/third_party/opensubdiv.cmake)
 include(cmake/third_party/tracy.cmake)
 include(cmake/third_party/json.cmake)
 

@@ -485,6 +485,8 @@ ernie::Value SampleOf(const ernie::AttributeDef& def) {
     case AttributeKind::Matrix:
         return glm::translate(glm::dmat4(1.0),
                               glm::dvec3(1.0, 2.0, 3.0));
+    case AttributeKind::TokenArray:
+        return std::vector<std::string>{"Hips", "Hips/Spine"};
     case AttributeKind::Tensor:
         break;
     }

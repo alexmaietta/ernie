@@ -38,7 +38,8 @@ void BindSchema(nb::module_& m) {
         .value("FLOAT_ARRAY", AttributeKind::FloatArray)
         .value("TENSOR", AttributeKind::Tensor)
         .value("QUAT", AttributeKind::Quat)
-        .value("MATRIX", AttributeKind::Matrix);
+        .value("MATRIX", AttributeKind::Matrix)
+        .value("TOKEN_ARRAY", AttributeKind::TokenArray);
 
     nb::class_<AttributeDef>(m, "AttributeDef",
                              "An attribute a registered prim type "

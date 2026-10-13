@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/device/image.h"
 
+#include "ernie/device/bindless.h"
 #include "ernie/device/buffer.h"
 #include "ernie/device/gpu_profile.h"
 #include "ernie/device/memory_stats.h"
 #include "ernie/device/pipeline.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
+#include <cstdint>
+#include <map>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -292,6 +297,17 @@ void GpuImage::Release() {
         return;
     }
     memory::Untrack(std::bit_cast<std::uint64_t>(image_));
+    // Before their handles can be reused, out of the bindless heap's
+    // shared slots.
+    if (BindlessHeap* heap = context_->FindBindless()) {
+        heap->Forget(std::bit_cast<std::uint64_t>(view_));
+        for (const auto* views :
+             {&layerViews_, &groupViews_, &mipViews_}) {
+            for (VkImageView view : *views) {
+                heap->Forget(std::bit_cast<std::uint64_t>(view));
+            }
+        }
+    }
     for (VkImageView view : layerViews_) {
         vkDestroyImageView(context_->Device(), view, nullptr);
     }
@@ -408,6 +424,40 @@ void GpuImage::Upload(
     });
 }
 
+namespace {
+
+/// The samplers of each device by their state, shared by every
+/// `Sampler` of that state: drivers allow few (4000 on NVIDIA's), and
+/// a scene of hundreds of materials would make thousands of the same.
+struct SamplerCache {
+    struct Entry {
+        VkSampler sampler = VK_NULL_HANDLE;
+        std::uint32_t users = 0;
+    };
+    std::mutex mutex;
+    std::map<std::array<std::uint64_t, 9>, Entry> entries;
+};
+
+SamplerCache& Samplers() {
+    static SamplerCache cache;
+    return cache;
+}
+
+std::array<std::uint64_t, 9> KeyOf(VkDevice device,
+                                   const VkSamplerCreateInfo& info) {
+    return {reinterpret_cast<std::uint64_t>(device),
+            static_cast<std::uint64_t>(info.magFilter),
+            static_cast<std::uint64_t>(info.mipmapMode),
+            static_cast<std::uint64_t>(info.addressModeU),
+            static_cast<std::uint64_t>(info.addressModeV),
+            static_cast<std::uint64_t>(info.borderColor),
+            info.anisotropyEnable,
+            std::bit_cast<std::uint32_t>(info.maxAnisotropy),
+            info.compareEnable};
+}
+
+}  // namespace
+
 Sampler::Sampler(const VulkanContext& context,
                  const SamplerDesc& desc)
     : context_(context) {
@@ -430,13 +480,42 @@ Sampler::Sampler(const VulkanContext& context,
         info.compareEnable = VK_TRUE;
         info.compareOp = VK_COMPARE_OP_LESS;
     }
-    CheckVk(
-        vkCreateSampler(context.Device(), &info, nullptr, &sampler_),
-        "vkCreateSampler");
+    SamplerCache& cache = Samplers();
+    const std::lock_guard lock(cache.mutex);
+    SamplerCache::Entry& entry =
+        cache.entries[KeyOf(context.Device(), info)];
+    if (entry.sampler == VK_NULL_HANDLE) {
+        const VkResult result = vkCreateSampler(
+            context.Device(), &info, nullptr, &entry.sampler);
+        if (result != VK_SUCCESS) {
+            cache.entries.erase(KeyOf(context.Device(), info));
+            CheckVk(result, "vkCreateSampler");
+        }
+    }
+    ++entry.users;
+    sampler_ = entry.sampler;
 }
 
 Sampler::~Sampler() {
-    vkDestroySampler(context_.Device(), sampler_, nullptr);
+    SamplerCache& cache = Samplers();
+    const std::lock_guard lock(cache.mutex);
+    for (auto it = cache.entries.begin(); it != cache.entries.end();
+         ++it) {
+        if (it->second.sampler == sampler_ &&
+            it->first[0] ==
+                reinterpret_cast<std::uint64_t>(context_.Device())) {
+            if (--it->second.users == 0) {
+                if (BindlessHeap* heap = context_.FindBindless()) {
+                    heap->Forget(
+                        std::bit_cast<std::uint64_t>(sampler_));
+                }
+                vkDestroySampler(context_.Device(), sampler_,
+                                 nullptr);
+                cache.entries.erase(it);
+            }
+            return;
+        }
+    }
 }
 
 }  // namespace ernie

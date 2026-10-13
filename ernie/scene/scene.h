@@ -3,6 +3,7 @@
 
 #include "ernie/scene/overlay.h"
 #include "ernie/scene/path.h"
+#include "ernie/scene/time_samples.h"
 #include "ernie/scene/value.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/tensor.h"
@@ -120,6 +121,12 @@ class Prim {
 
     /// As `Scene::Write`; returns this handle for chaining.
     Prim& Write(std::string_view attribute, Tensor tensor);
+
+    /// As `Scene::SetAt` and `Scene::WriteAt`: a time sample; return
+    /// this handle for chaining.
+    Prim& SetAt(std::string_view attribute, double time, Value value);
+    Prim& WriteAt(std::string_view attribute, double time,
+                  Tensor tensor);
 
     /// As `SetXform` (ernie/scene/xform.h); returns this handle for
     /// chaining.
@@ -374,6 +381,58 @@ class Scene {
     /// (`LocalTransformEdits`).
     void SetLocalTransform(const Path& path, const glm::dmat4& local);
 
+    /// Sets `attribute`'s value at time code `time`, a time sample,
+    /// as USD's `UsdAttribute::Set(value, time)` does. An attribute
+    /// with samples holds, as its value (`Get`, `Read`), the one at
+    /// the stage's time code (the root's `ernie:timeCode`),
+    /// interpolated between the samples either side (`Interpolate`,
+    /// time_samples.h) and held beyond the first and last; setting
+    /// the time code evaluates every sampled attribute again,
+    /// recording a change only where its value changed. `Set` or
+    /// `Write` without a time clears the attribute's samples. Samples
+    /// of an attribute are all values or all tensors: a sample of the
+    /// other kind replaces them.
+    /// @throws std::invalid_argument if the prim does not exist or
+    /// the value does not fit the attribute.
+    void SetAt(const Path& path, std::string_view attribute,
+               double time, Value value);
+    /// `SetAt` for a tensor, kept and shared as `Write` keeps it.
+    /// Device tensors between samples hold the lower sample, for
+    /// consumers on the device to blend (`SamplesOf`).
+    void WriteAt(const Path& path, std::string_view attribute,
+                 double time, Tensor tensor,
+                 std::uintptr_t stream = 1);
+
+    /// The attribute's time samples, in time order; empty when it has
+    /// none.
+    std::span<const TimeSample>
+    SamplesOf(const Path& path, std::string_view attribute) const;
+
+    /// The attribute's value at `time` (without moving the stage's
+    /// time code): its samples interpolated, else its value; empty
+    /// when it is unset or a tensor.
+    Value GetAt(const Path& path, std::string_view attribute,
+                double time) const;
+
+    /// Removes the attribute's samples, keeping the value it holds
+    /// now; false if it had none.
+    bool ClearSamples(const Path& path, std::string_view attribute);
+
+    /// The prims with sampled attributes, in path order.
+    std::vector<Path> AnimatedPrims() const;
+
+    /// The stage's time code (the root's `ernie:timeCode`), at which
+    /// sampled attributes are evaluated.
+    double TimeCode() const;
+
+    /// Where the stage's time code falls among the attribute's
+    /// samples
+    /// (`BracketOf`), for consumers that blend its tensor samples
+    /// themselves, as a renderer does on the GPU, rather than `Read`
+    /// them blended on the CPU; none when it has no samples.
+    std::optional<SampleBracket>
+    BracketAt(const Path& path, std::string_view attribute) const;
+
     /// Whether neither the prim nor any ancestor has `visibility` set
     /// to `invisible`.
     bool IsVisible(const Path& path) const;
@@ -436,7 +495,13 @@ class Scene {
         /// checked against, if any.
         const PrimTypeDef* schema = nullptr;
         std::map<std::string, Value, std::less<>> values;
-        std::map<std::string, Tensor, std::less<>> tensors;
+        /// Mutable: a sampled tensor between two samples is blended
+        /// when first read (`pending`).
+        mutable std::map<std::string, Tensor, std::less<>> tensors;
+        /// Sampled tensors between samples not yet blended: the
+        /// samples either side and how far between.
+        mutable std::map<std::string, SampleBracket, std::less<>>
+            pending;
         std::map<std::string, std::uintptr_t, std::less<>>
             streams;  ///< CUDA tensors' streams.
         /// Tensors written as rows of one tensor (`Write` of many
@@ -445,6 +510,9 @@ class Scene {
                  std::less<>>
             rows;
         std::map<std::string, std::uint64_t, std::less<>> versions;
+        /// Sampled attributes' samples, in time order (`SetAt`).
+        std::map<std::string, std::vector<TimeSample>, std::less<>>
+            samples;
         std::array<std::uint64_t, kStampCount> stamps{};
         std::uint64_t ownTransform = 0;  ///< `OwnTransformVersion`.
         std::uint64_t latest =
@@ -469,7 +537,21 @@ class Scene {
                          row = std::nullopt,
                      bool checked = false);
 
+    /// Adds `sample` to the attribute's samples (replacing one at its
+    /// time) and evaluates the attribute at the time code.
+    void AddSample(const Path& path, PrimData& prim,
+                   std::string_view attribute, TimeSample sample);
+    /// Drops the attribute's samples, if any, without evaluating.
+    void DropSamples(const Path& path, PrimData& prim,
+                     std::string_view attribute);
+    /// Evaluates a sampled attribute at `time` into its value or
+    /// tensor, stamping it when that changed.
+    void Evaluate(const Path& path, PrimData& prim,
+                  std::string_view attribute, double time);
     std::map<Path, PrimData> prims_;
+    /// The prims with sampled attributes, which a new time code
+    /// evaluates.
+    std::set<Path> animated_;
     std::uint64_t removals_ = 0;  ///< Counts `Remove`s, which
                                   ///< invalidate resolved `PrimSet`s.
     std::map<Path, std::uint64_t> removed_;

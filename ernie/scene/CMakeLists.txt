@@ -24,9 +24,12 @@ ernie_add_library(
     scene_json.cpp
     schema.cpp
     sensor_filters.cpp
+    skel_schemas.cpp
     stage_schemas.cpp
     temperature_model.cpp
     terrain_schemas.cpp
+    time_samples.cpp
+    usd_import.cpp
     volume_schemas.cpp
     wide_view.cpp
     xform.cpp
@@ -36,4 +39,5 @@ ernie_add_library(
     ernie_kernel
     ernie_json
     ernie_stb
-    ernie_font_inter)
+    ernie_font_inter
+    ${CMAKE_DL_LIBS})

@@ -9,6 +9,7 @@ set(ernie_shaders
     closure/lommel_seeliger.slang=kBrdfLommelSeeligerSlang
     closure/lunar_lambert.slang=kBrdfLunarLambertSlang
     closure/oren_nayar.slang=kBrdfOrenNayarSlang
+    closure/open_pbr.slang=kBrdfOpenPbrSlang
     closure/preview_surface.slang=kBrdfPreviewSurfaceSlang
     film/cube_faces.slang=kCubeFacesSlang
     film/filter_agx.slang=kFilterAgxSlang
@@ -62,6 +63,7 @@ set(ernie_shaders
     raster/ground.slang=kGroundSlang
     raster/mesh.slang=kMeshSlang
     raster/mesh_normals.slang=kMeshNormalsSlang
+    raster/skinning.slang=kSkinningSlang
     raster/meter.slang=kMeterSlang
     raster/motion.slang=kMotionSlang
     raster/motion_vectors.slang=kMotionVectorsSlang

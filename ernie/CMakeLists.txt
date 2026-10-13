@@ -44,6 +44,15 @@ add_library(ernie INTERFACE)
 target_link_libraries(ernie INTERFACE ernie_backends)
 add_library(Ernie::ernie ALIAS ernie)
 
+# The USD importer plugin, which ernie_scene loads when a USD file is first imported.
+if(ERNIE_USD)
+    add_subdirectory(usd)
+    target_compile_definitions(
+        ernie_scene
+        PRIVATE ERNIE_USD_PLUGIN_BUILD_PATH="$<TARGET_FILE:ernie_usd>"
+    )
+endif()
+
 # The interactive viewer, on top of everything; optional so that headless and Python-only builds
 # need no windowing or UI libraries.
 if(ERNIE_BUILD_APP)
