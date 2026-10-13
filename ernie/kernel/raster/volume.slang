@@ -1934,6 +1934,15 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         var collected = false;
         // Where its light map holds no surface about the ray, the octaves after all.
         var declined = false;
+        // The collectors' light, held until the march leaves the span, then as much of it as the
+        // cloud behind its surface along the ray holds back (a grazing ray through a thin edge,
+        // little): through the transmittance up to the surface, `collectedAt`, already.
+        float collectedScale = 0.0;
+        float collectedAt = 1.0;
+        float4 collectedTints[kMaxGroups];
+        for (uint g = 0; g < groups; ++g) {
+            collectedTints[g] = float4(0.0);
+        }
         // A black body's glow, its parts at each band's wavelength found once for the span: what
         // the material absorbs times 2 h c^2 / lambda^5, and h c / (lambda k) (`planckOf`).
         float4 glowScales[kMaxGroups];
@@ -2076,6 +2085,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                                        geometryShadow(shading.lights[slot],
                                                                       litSurface, viewLights.y,
                                                                       mapTexels);
+                            collectedScale = scattered;
+                            collectedAt = transmittance;
                         }
                         // Past the cloud's surface, its collectors' alone.
                         for (uint n = 1; n < sunOctaves && !(surfaced && !declined); ++n) {
@@ -2097,8 +2108,10 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                                                              sunTowards, sunSine, g, air[0].w,
                                                              air[1].x);
                                 }
-                                emitted[g] +=
-                                    (lit * (first * sunFirst[g] + others) + scattered) * tint;
+                                emitted[g] += lit * (first * sunFirst[g] + others) * tint;
+                                if (scattered > 0.0) {
+                                    collectedTints[g] = tint;
+                                }
                             }
                         }
                         continue;
@@ -2162,6 +2175,12 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
             }
             frontSum += transmittance * opacity * t;
             transmittance *= 1.0 - opacity;
+        }
+        if (collectedScale > 0.0) {
+            let held = saturate(1.0 - transmittance / max(collectedAt, 1e-9));
+            for (uint g = 0; g < groups; ++g) {
+                emitted[g] += collectedTints[g] * (collectedScale * held);
+            }
         }
     }
 
@@ -3088,16 +3107,25 @@ float collectorScattering(VolumeGpu volume, LightMapFrame frame, float3 p, float
     let straight = lightMapAt(frame, 0.0, at);
     lit = frame.centre + at.x * frame.e1 + at.y * frame.e2 +
           (frame.radius - straight.x) * frame.towards;
-    // The first collector, the whole lit surface's, alike for every set.
-    Slab whole;
-    if (!slabAt(frame, p, toEye, p, frame.radius, whole)) {
+    // The first collector, the whole cloud's about `p` (alike for every set): as large as the
+    // coarsest level the cloud still mostly covers there, as one volume may hold many clouds.
+    uint footprint = 0;
+    for (uint level = 1; level < lightMapLevels(frame.size); ++level) {
+        if (lightMapTexel(frame, level, at).w < 0.5) {
+            break;
+        }
+        footprint = level;
+    }
+    let whole = texel * exp2(float(footprint));
+    Slab first;
+    if (!slabAt(frame, p, toEye, p, whole, first)) {
         return -1.0;
     }
     float total = 0.0;
     for (uint set = 0; set < kOrderSets; ++set) {
         float3 c = p;
-        float size = frame.radius;
-        Slab slab = whole;
+        float size = whole;
+        Slab slab = first;
         float radiance = 0.0;
         for (uint n = 0; n < kCollectorIterations; ++n) {
             if (n > 0 && !slabAt(frame, p, toEye, c, size, slab)) {
