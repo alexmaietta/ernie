@@ -857,6 +857,8 @@ GenerateMaterialXShader(const MaterialXSource& source) {
     units->setUnitConverterRegistry(converters);
     generator->setUnitSystem(units);
 
+    // The document's own struct types (MaterialX 1.39's typedefs).
+    generator->registerTypeDefs(document);
     mx::GenContext context(generator);
     const std::filesystem::path folder = MaterialXLibraries();
     context.registerSourceCodeSearchPath(
