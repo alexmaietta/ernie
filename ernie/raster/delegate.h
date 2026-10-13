@@ -323,6 +323,9 @@ class RasterDelegate : public RenderDelegate {
         std::optional<Key> temperatureTexture;
         /// Whether it names a temperature model.
         bool temperatureModel = false;
+        /// The primvar its diffuse colour reads (`ColorPrimvarOf`),
+        /// if any: its meshes' colours.
+        std::optional<ColorPrimvar> colors;
         /// Its thermal terminal's temperature texture (`TextureKey`),
         /// empty for none.
         std::string temperatureReader;
@@ -721,6 +724,10 @@ class RasterDelegate : public RenderDelegate {
     /// What a mesh's draw takes from its material and the mesh.
     void ShadeItem(const Scene& scene, const Path& mesh,
                    const SyncedMesh& synced, MeshItem& item) const;
+    /// Makes the material a mesh without one draws with for its
+    /// `primvars:displayOpacity` below 1
+    /// (`displayOpacityMaterials_`), before `ShadeItem` looks it up.
+    void EnsureDisplayOpacity(const Scene& scene, const Path& mesh);
     /// The meshes whose draws a sync's `changes` may change, or null
     /// when they may change draws beyond their own prims' meshes (a
     /// material, a light linking, an ancestor's world...), so that
@@ -928,6 +935,9 @@ class RasterDelegate : public RenderDelegate {
         sensorAgcs_;            ///< By product, pass.
     std::optional<Key> stars_;  ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
+    /// The fallback material at each display opacity below 1 that
+    /// meshes without a material draw with, by the opacity in 1/1024.
+    std::map<int, std::uint32_t> displayOpacityMaterials_;
     /// A prim bound to each material id, the first `MaterialOf` saw,
     /// for its temperature model's axis (`SyncTemperatureAxes`).
     mutable std::map<std::uint32_t, Path> materialPrims_;

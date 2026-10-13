@@ -25,6 +25,8 @@ def test_material_and_shader_are_registered():
         "UsdPrimvarReader_float2",
         "UsdTransform2d",
         "ErnieThermal",
+        "UsdPrimvarReader_float",
+        "UsdPrimvarReader_float3",
     ]
     assert shader.find("source_color_space").options == [
         "auto",

@@ -309,6 +309,85 @@ TEST(MeshDataOf, ReadsNormalsPerCornerWithAnyInterpolation) {
     EXPECT_TRUE(data.cornerNormals.empty());
 }
 
+// A material whose diffuse colour reads a primvar takes the mesh's
+// colours from it: three values a point through a float3 reader, one
+// a face through a float reader (grey), over a white albedo.
+TEST(MeshDataOf, ReadsTheColoursItsMaterialsPrimvarReaderReads) {
+    Scene scene;
+    const std::array<float, 18> points{0, 0, 0, 1, 0, 0, 1, 1, 0,
+                                       0, 1, 0, 2, 0, 0, 2, 1, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    ernie::Mesh::Define(scene, "/Mesh")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetMaterialBinding("/Looks/M");
+    ernie::Material::Define(scene, "/Looks/M");
+    ernie::Shader::Define(scene, "/Looks/M/Surface")
+        .SetInfoId(std::string(tokens::kUsdPreviewSurface))
+        .SetDiffuseColor(glm::dvec3(0.3));
+    ernie::Connect(scene, "/Looks/M", tokens::kSurfaceOutput,
+                   "/Looks/M/Surface", tokens::kSurfaceOutput);
+    ernie::Shader::Define(scene, "/Looks/M/Read")
+        .SetInfoId(std::string(tokens::kUsdPrimvarReaderFloat3))
+        .SetVarname("tint");
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Read", "outputs:result");
+    std::vector<float> tint(18);
+    for (std::size_t i = 0; i < 18; ++i) {
+        tint[i] = static_cast<float>(i) / 18.0f;
+    }
+    scene.Write("/Mesh", "primvars:tint",
+                Tensor::Copy<float>(tint, {6, 3}));
+    const std::optional<ernie::ColorPrimvar> read =
+        ernie::ColorPrimvarOf(scene, "/Looks/M");
+    ASSERT_TRUE(read);
+    EXPECT_EQ(read->name, "tint");
+    EXPECT_EQ(read->width, 3u);
+    EXPECT_EQ(ernie::MeshDataOf(scene, "/Mesh").colors, tint);
+    const ernie::MaterialSettings settings =
+        ernie::MaterialSettingsOf(
+            scene, "/Looks/M", ernie::BrdfRegistry::WithBuiltins());
+    EXPECT_EQ(settings.albedo, glm::vec3(1.0f));
+
+    ernie::Shader(scene, "/Looks/M/Read")
+        .SetInfoId(std::string(tokens::kUsdPrimvarReaderFloat));
+    const std::array<float, 2> wet{0.25f, 0.75f};
+    scene.Write("/Mesh", "primvars:tint",
+                Tensor::Copy<float>(wet, {2}));
+    const ernie::MeshData data = ernie::MeshDataOf(scene, "/Mesh");
+    ASSERT_EQ(data.cornerColors.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerColors[2], 0.25f) << "face 0's, grey";
+    EXPECT_EQ(data.cornerColors[3 * 6], 0.75f) << "face 1's";
+}
+
+// Holes are left out without a subdivision scheme too, the corners'
+// values with their triangles: the second quad's two triangles go.
+TEST(MeshDataOf, LeavesOutHoleFaces) {
+    Scene scene;
+    const std::array<float, 18> points{0, 0, 0, 1, 0, 0, 1, 1, 0,
+                                       0, 1, 0, 2, 0, 0, 2, 1, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const std::array<float, 6> faces{1, 0, 0, 0, 1, 0};
+    const std::array<std::int32_t, 1> hole{1};
+    ernie::Mesh::Define(scene, "/Mesh")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetHoleIndices(Tensor::Copy<std::int32_t>(hole, {1}));
+    scene.Write("/Mesh", tokens::kDisplayColor,
+                Tensor::Copy<float>(faces, {2, 3}));
+    const ernie::MeshData data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_EQ(data.indices,
+              (std::vector<std::uint32_t>{0, 1, 2, 0, 2, 3}));
+    ASSERT_EQ(data.cornerColors.size(), 3u * 6u);
+    EXPECT_EQ(data.cornerColors[3 * 5], 1.0f) << "face 0's red only";
+}
+
 // The two quads coloured per face (uniform): each face's colour at
 // every corner of its triangles; indexed, the same; one per point
 // stays per point; one value is the constant colour, no array.

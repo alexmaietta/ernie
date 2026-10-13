@@ -879,6 +879,63 @@ TEST_F(RasterDelegateTest, UniformColoursColourEachFace) {
     }
 }
 
+// A material whose diffuse colour reads a float3 primvar colours each
+// face as the primvar does; without the material, the mesh at display
+// opacity 0.25 lets most of what lies behind it through.
+TEST_F(RasterDelegateTest,
+       PrimvarReadersAndDisplayOpacityShadeMeshes) {
+    Scene scene = MeshScene();
+    const std::array<float, 18> points{-4, -4, 0, 0, -4, 0, 0, 4, 0,
+                                       -4, 4,  0, 4, -4, 0, 4, 4, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const std::array<float, 6> tint{1, 0, 0, 0, 1, 0};
+    ernie::Mesh::Define(scene, "/World/Faces")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetMaterialBinding("/Looks/Read");
+    scene.Write("/World/Faces", "primvars:tint",
+                Tensor::Copy<float>(tint, {2, 3}));
+    ernie::Material::Define(scene, "/Looks/Read");
+    ernie::Shader::Define(scene, "/Looks/Read/Surface")
+        .SetInfoId(std::string(tokens::kUsdPreviewSurface));
+    ernie::Connect(scene, "/Looks/Read", tokens::kSurfaceOutput,
+                   "/Looks/Read/Surface", tokens::kSurfaceOutput);
+    ernie::Shader::Define(scene, "/Looks/Read/Tint")
+        .SetInfoId(std::string(tokens::kUsdPrimvarReaderFloat3))
+        .SetVarname("tint");
+    ernie::Connect(scene, "/Looks/Read/Surface",
+                   tokens::kDiffuseColor, "/Looks/Read/Tint",
+                   "outputs:result");
+    RasterDelegate delegate(*context_);
+    const Tensor read = delegate.Render(scene);
+    const std::uint8_t* left = TexelAt(scene, read, {-2.0f, 0, 0});
+    const std::uint8_t* right = TexelAt(scene, read, {2.0f, 0, 0});
+    EXPECT_GT(left[0], left[1] + 100) << "red";
+    EXPECT_GT(right[1], right[0] + 100) << "green";
+
+    scene.Clear("/World/Faces", tokens::kMaterialBinding);
+    scene.Set("/World/Faces", tokens::kDisplayColor, glm::dvec3(1.0));
+    const Tensor opaque = delegate.Render(scene);
+    // Over a red floor: white at a quarter opacity lets the red
+    // through.
+    DefineQuad(scene, "/World/Floor", 10.0f);
+    scene.Set("/World/Floor", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), glm::dvec3(0, 0, -2)));
+    ernie::Mesh(scene, "/World/Floor")
+        .SetMaterialBinding("/Looks/Red");
+    scene.Set("/World/Faces", tokens::kDisplayOpacity, 0.25);
+    const Tensor ghost = delegate.Render(scene);
+    const int lit = TexelAt(scene, opaque, {-2.0f, 0, 0})[1];
+    const std::uint8_t* t = TexelAt(scene, ghost, {-2.0f, 0, 0});
+    EXPECT_GT(lit, 150);
+    EXPECT_LT(t[1], lit - 60) << "the red floor shows through";
+    EXPECT_GT(t[1], 10) << "but the white still tints it";
+    EXPECT_GT(t[0], t[1] + 60);
+}
+
 // The ridge's six points and four triangles, written on the GPU.
 constexpr const char* kRidgeWriterSlang = R"(
 struct Push {

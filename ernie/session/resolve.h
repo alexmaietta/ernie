@@ -250,6 +250,21 @@ Path BoundMaterial(const Scene& scene, const Path& prim);
 std::string TextureCoordinateSetOf(const Scene& scene,
                                    const Path& material);
 
+/// The colours a material's diffuse colour reads through a
+/// UsdPrimvarReader_float or _float3: the mesh primvar
+/// (`primvars:<name>`), one value or three each (`width`), and the
+/// reader's fallback where a mesh has none.
+struct ColorPrimvar {
+    std::string name;
+    std::size_t width = 3;
+    glm::vec3 fallback{0.0f};
+};
+
+/// That of the Material `material`'s UsdPreviewSurface, if it reads
+/// one.
+std::optional<ColorPrimvar> ColorPrimvarOf(const Scene& scene,
+                                           const Path& material);
+
 /// The sun's spectral irradiance at normal incidence per band of
 /// `bands`, in W m^-2 nm^-1, from the DistantLight at `light`:
 /// - physical, when it has `ernie:irradiance` or `ernie:spectrum`:

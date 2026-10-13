@@ -3047,17 +3047,37 @@ std::optional<Connection> TextureConnection(const Scene& scene,
     return connection;
 }
 
-/// Whether `input` on `surface` reads the prim's displayColor through
-/// a primvar reader.
-bool ReadsDisplayColor(const Scene& scene, const Path& surface,
-                       std::string_view input) {
+/// The primvar `input` on `surface` reads through a float or float3
+/// primvar reader, if it does.
+std::optional<ColorPrimvar> PrimvarReadOf(const Scene& scene,
+                                          const Path& surface,
+                                          std::string_view input) {
     const std::optional<Connection> connection =
         GetConnection(scene, surface, input);
-    return connection &&
-           ShaderIdOf(scene, connection->prim)
-               .starts_with("UsdPrimvarReader_") &&
-           GetToken(scene, connection->prim, tokens::kVarname, "") ==
-               "displayColor";
+    if (!connection) {
+        return std::nullopt;
+    }
+    const std::string id = ShaderIdOf(scene, connection->prim);
+    if (id != tokens::kUsdPrimvarReaderFloat &&
+        id != tokens::kUsdPrimvarReaderFloat3) {
+        return std::nullopt;
+    }
+    ColorPrimvar read;
+    read.name =
+        GetToken(scene, connection->prim, tokens::kVarname, "");
+    read.width = id == tokens::kUsdPrimvarReaderFloat ? 1 : 3;
+    if (const Value* fallback =
+            scene.Get(connection->prim, tokens::kFallbackInput)) {
+        if (const auto* v = fallback->Get<glm::dvec3>()) {
+            read.fallback = glm::vec3(*v);
+        } else if (const auto* f = fallback->Get<double>()) {
+            read.fallback = glm::vec3(static_cast<float>(*f));
+        }
+    }
+    if (read.name.empty()) {
+        return std::nullopt;
+    }
+    return read;
 }
 
 TextureWrap WrapOf(const std::string& wrap, const Path& texture,
@@ -3441,6 +3461,23 @@ std::string TextureCoordinateSetOf(const Scene& scene,
     return UvSetOf(scene, material);
 }
 
+std::optional<ColorPrimvar> ColorPrimvarOf(const Scene& scene,
+                                           const Path& material) {
+    if (material.IsEmpty()) {
+        return std::nullopt;
+    }
+    try {
+        const Path surface = PreviewSurfaceOf(scene, material);
+        return surface.IsEmpty()
+                   ? std::nullopt
+                   : PrimvarReadOf(scene, surface,
+                                   tokens::kDiffuseColor);
+    } catch (const std::invalid_argument&) {
+        // The material's own sync reports what is wrong with it.
+        return std::nullopt;
+    }
+}
+
 MaterialSettings MaterialSettingsOf(const Scene& scene,
                                     const Path& material,
                                     const BrdfRegistry& brdfs) {
@@ -3553,9 +3590,9 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
             settings.albedoTexture = TextureReaderOf(
                 scene, *diffuse, kDiffuseColor, surface);
             settings.albedo = glm::vec3(1.0f);
-        } else if (ReadsDisplayColor(scene, surface, kDiffuseColor)) {
-            settings.albedo =
-                glm::vec3(1.0f);  // The display colour's.
+        } else if (PrimvarReadOf(scene, surface, kDiffuseColor)) {
+            settings.albedo = glm::vec3(
+                1.0f);  // The mesh's colours' (`ColorPrimvarOf`).
         } else {
             settings.albedo = glm::vec3(shader.GetDiffuseColor());
         }
@@ -3957,12 +3994,30 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
             }
         }
     }
-    // Colours one per point; or per face corner (faceVarying or
-    // uniform, perhaps indexed), which the triangles' corners carry;
-    // a constant one tints the mesh instead.
+    // Colours, its displayColor or the primvar its material's diffuse
+    // colour reads (`ColorPrimvarOf`), one value or three each: one
+    // per point; or per face corner (faceVarying or uniform, perhaps
+    // indexed), which the triangles' corners carry; a constant one
+    // tints the mesh instead.
+    const std::optional<ColorPrimvar> colorRead =
+        ColorPrimvarOf(scene, view.GetMaterialBinding());
+    const std::string attribute =
+        colorRead ? std::string(kPrimvarsPrefix) + colorRead->name
+                  : std::string(kDisplayColor);
+    const std::size_t width = colorRead ? colorRead->width : 3;
+    const auto rgb = [width](std::vector<float> values) {
+        if (width == 3) {
+            return values;
+        }
+        std::vector<float> grey;
+        grey.reserve(3 * values.size());
+        for (const float v : values) {
+            grey.insert(grey.end(), {v, v, v});
+        }
+        return grey;
+    };
     std::vector<float> faceCornerColors;
-    if (const Tensor* colors = view.ReadDisplayColor()) {
-        const std::string attribute(kDisplayColor);
+    if (const Tensor* colors = scene.Read(mesh, attribute)) {
         const std::string interpolation = GetToken(
             scene, mesh,
             attribute + std::string(kInterpolationSuffix), "");
@@ -3971,23 +4026,23 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
                        attribute + std::string(kIndicesSuffix)) !=
             nullptr;
         const bool gpu = IsGpu(colors->Location().kind);
+        const auto elements =
+            static_cast<std::size_t>(colors->Elements());
         if (!indexed &&
             (interpolation.empty() || interpolation == "vertex") &&
-            static_cast<std::size_t>(colors->Elements()) ==
-                data.points.size() &&
-            count > 1) {
+            elements == width * count && count > 1 &&
+            (!gpu || width == 3)) {
             data.colors =
                 gpu ? std::vector<float>(data.points.size(), 0.0f)
-                    : FloatsOf(*colors, 3, kDisplayColor);
+                    : rgb(FloatsOf(*colors, width, attribute));
         } else if (!gpu && !gpuIndices && !faceIndices.empty() &&
-                   colors->Elements() > 3 &&
-                   interpolation != "constant") {
+                   elements > width && interpolation != "constant") {
             try {
-                auto [values, kind] =
-                    CornerValuesOf(scene, mesh, attribute, 3, count,
-                                   faceCounts, faceIndices, true);
+                auto [values, kind] = CornerValuesOf(
+                    scene, mesh, attribute, width, count, faceCounts,
+                    faceIndices, true);
                 if (kind != "constant") {
-                    faceCornerColors = std::move(values);
+                    faceCornerColors = rgb(std::move(values));
                 }
             } catch (const std::invalid_argument&) {
                 // Of no count it could be: the constant colour.
@@ -4041,6 +4096,47 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
                             data.cornerColors.begin() +
                                 static_cast<std::ptrdiff_t>(3 * c));
             }
+        }
+    }
+    // Faces in `holeIndices` are not drawn whatever the scheme, as in
+    // USD: their triangles go, with their corners' values.
+    if (const Tensor* holeIndices = view.GetHoleIndices();
+        holeIndices != nullptr && !faceCounts.empty()) {
+        std::vector<bool> hole(faceCounts.size(), false);
+        bool any = false;
+        for (const std::int64_t face :
+             IntsOf(*holeIndices, kHoleIndices)) {
+            if (face >= 0 &&
+                static_cast<std::size_t>(face) < hole.size()) {
+                hole[static_cast<std::size_t>(face)] = true;
+                any = true;
+            }
+        }
+        if (any) {
+            const std::vector<std::uint32_t> faces =
+                TriangulatedCorners(faceCounts).faces;
+            const auto keep = [&](auto& values, std::size_t width) {
+                if (values.size() != width * faces.size()) {
+                    return;
+                }
+                std::size_t kept = 0;
+                for (std::size_t c = 0; c < faces.size(); ++c) {
+                    if (!hole[faces[c]]) {
+                        std::copy_n(values.begin() +
+                                        static_cast<std::ptrdiff_t>(
+                                            width * c),
+                                    width,
+                                    values.begin() +
+                                        static_cast<std::ptrdiff_t>(
+                                            width * kept++));
+                    }
+                }
+                values.resize(width * kept);
+            };
+            keep(data.indices, 1);
+            keep(data.uvs, 2);
+            keep(data.cornerNormals, 3);
+            keep(data.cornerColors, 3);
         }
     }
     return data;

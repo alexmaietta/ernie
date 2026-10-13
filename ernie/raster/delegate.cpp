@@ -325,6 +325,55 @@ glm::vec3 ConstantDisplayColor(const Gprim& gprim) {
     return glm::vec3(gprim.GetDisplayColor());
 }
 
+/// The one value of the colour primvar `read` on `mesh` (a value or a
+/// one-value array), else the reader's fallback; displayColor's own
+/// fallback when it reads that.
+glm::vec3 ConstantPrimvarColor(const Scene& scene, const Path& mesh,
+                               const ColorPrimvar& read) {
+    const std::string attribute =
+        std::string(tokens::kPrimvarsPrefix) + read.name;
+    if (attribute == tokens::kDisplayColor) {
+        return ConstantDisplayColor(Gprim(scene, mesh));
+    }
+    if (const Tensor* tensor = scene.Read(mesh, attribute);
+        tensor != nullptr &&
+        static_cast<std::size_t>(tensor->Elements()) == read.width &&
+        tensor->Location().kind == DeviceKind::Cpu) {
+        const std::vector<float> v =
+            FloatsOf(*tensor, read.width, attribute);
+        return read.width == 1 ? glm::vec3(v[0])
+                               : glm::vec3(v[0], v[1], v[2]);
+    }
+    if (const Value* value = scene.Get(mesh, attribute)) {
+        if (const auto* rgb = value->Get<glm::dvec3>()) {
+            return glm::vec3(*rgb);
+        }
+        if (const auto* grey = value->Get<double>()) {
+            return glm::vec3(static_cast<float>(*grey));
+        }
+    }
+    return read.fallback;
+}
+
+/// A Gprim's `primvars:displayOpacity` (a value or a one-value array)
+/// in 1/1024, 1024 for opaque or none.
+int DisplayOpacityKey(const Scene& scene, const Path& gprim) {
+    double opacity = 1.0;
+    if (const Tensor* tensor =
+            scene.Read(gprim, tokens::kDisplayOpacity);
+        tensor != nullptr && tensor->Elements() == 1 &&
+        tensor->Location().kind == DeviceKind::Cpu) {
+        opacity = FloatsOf(*tensor, 1, tokens::kDisplayOpacity)[0];
+    } else if (const Value* value =
+                   scene.Get(gprim, tokens::kDisplayOpacity)) {
+        if (const auto* v = value->Get<double>()) {
+            opacity = *v;
+        }
+    }
+    return static_cast<int>(
+        std::lround(std::clamp(opacity, 0.0, 1.0) * 1024.0));
+}
+
 /// The instance op of transform op `op` (`xformOp:translate`...),
 /// composed on the GPU.
 InstanceOpKind InstanceOpKindOf(std::string_view op) {
@@ -823,6 +872,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
         MaterialSettingsOf(scene, path, renderer_.Brdfs());
     renderer_.SetMaterial(material.id, settings);
     material.temperatureModel = !settings.temperatureModel.empty();
+    material.colors = ColorPrimvarOf(scene, path);
     RasterMaterial& gpu = renderer_.Material(material.id);
     // The textures of a UsdPreviewSurface: albedo, normal map,
     // roughness and metallic.
@@ -2171,6 +2221,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         scene.AttributeVersion(Path::Root(), kSubdivisionRefineLevel);
     // Each material's texture coordinate primvar, found once.
     std::map<Path, std::string> uvSets;
+    // And the colours it reads, if any.
+    std::map<Path, std::optional<ColorPrimvar>> colorReads;
     for (const Path& path : paths) {
         seen.insert(path);
         Key key =
@@ -2223,6 +2275,29 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         if (constantColour) {
             key.second[4] = 0;
         }
+        // The colours its material's diffuse colour reads, which and
+        // their versions (slot 4 too).
+        if (scene.TypeOf(path) == kMesh) {
+            const Path material = BoundMaterial(scene, path);
+            auto [read, added] = colorReads.try_emplace(material);
+            if (added) {
+                read->second = ColorPrimvarOf(scene, material);
+            }
+            if (read->second) {
+                const std::string attribute =
+                    std::string(kPrimvarsPrefix) + read->second->name;
+                key.second[4] = key.second[4] * 0x100000001b3ull ^
+                                std::hash<std::string>()(attribute);
+                for (const std::string_view suffix :
+                     {std::string_view(), kIndicesSuffix,
+                      kInterpolationSuffix}) {
+                    key.second[4] =
+                        key.second[4] * 0x100000001b3ull ^
+                        scene.AttributeVersion(
+                            path, attribute + std::string(suffix));
+                }
+            }
+        }
         // A subdivision surface's level (its own or the stage's) and
         // tags (key slot 11). Its points refine again when they
         // change.
@@ -2241,6 +2316,10 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
                        scene.AttributeVersion(path, attribute);
             }
             key.second[11] = hash;
+        } else {
+            // Holes in faces drawn as they are (slot 11 too).
+            key.second[11] =
+                scene.AttributeVersion(path, kHoleIndices);
         }
         // A skinned mesh is added again as its binding or its
         // skeleton's joints change (slot 11 too); it is posed on the
@@ -4364,8 +4443,40 @@ void RasterDelegate::ShadeItem(const Scene& scene, const Path& mesh,
     const bool bound = item.material != RasterRenderer::kDefaultMaterial;
     item.tint = bound ? glm::vec3(1.0f) : synced.tint;
     item.vertexColors = !bound;
+    if (bound) {
+        // A material whose diffuse colour reads a primvar takes the
+        // mesh's colours: per point or corner, else the primvar's one
+        // value, else the reader's fallback.
+        const auto material =
+            materials_.find(BoundMaterial(scene, mesh));
+        if (material != materials_.end() && material->second.colors) {
+            const ColorPrimvar& read = *material->second.colors;
+            item.vertexColors = true;
+            item.tint = ConstantPrimvarColor(scene, mesh, read);
+        }
+    } else if (const auto opacity = displayOpacityMaterials_.find(
+                   DisplayOpacityKey(scene, mesh));
+               opacity != displayOpacityMaterials_.end()) {
+        item.material = opacity->second;
+    }
     item.temperature = CheckedTemperature(
         mesh, Gprim(scene, mesh).GetThermalTemperature());
+}
+
+void RasterDelegate::EnsureDisplayOpacity(const Scene& scene,
+                                          const Path& mesh) {
+    const int key = DisplayOpacityKey(scene, mesh);
+    if (key >= 1024 || !BoundMaterial(scene, mesh).IsEmpty() ||
+        displayOpacityMaterials_.contains(key)) {
+        return;
+    }
+    // The default material's, see-through.
+    MaterialSettings settings =
+        renderer_.Material(RasterRenderer::kDefaultMaterial)
+            .Settings();
+    settings.opacity = static_cast<float>(key) / 1024.0f;
+    displayOpacityMaterials_.emplace(key,
+                                     renderer_.AddMaterial(settings));
 }
 
 void RasterDelegate::SyncItems(const Scene& scene,
@@ -4427,6 +4538,21 @@ void RasterDelegate::SyncItems(const Scene& scene,
                                                    meshes.end(),
                                                    path),
                                   path);
+                }
+            }
+        }
+    }
+    // The display opacities' materials, before the draws look them
+    // up.
+    if (touched == nullptr) {
+        for (const auto& [path, synced] : syncedMeshes_) {
+            EnsureDisplayOpacity(scene, path);
+        }
+    } else {
+        for (const std::set<Path>* paths : rebuilt) {
+            for (const Path& path : *paths) {
+                if (syncedMeshes_.contains(path)) {
+                    EnsureDisplayOpacity(scene, path);
                 }
             }
         }

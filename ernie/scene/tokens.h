@@ -390,6 +390,11 @@ inline constexpr std::string_view kSubdivisionRefineLevel =
     "ernie:subdivision:refineLevel";
 inline constexpr std::string_view kDisplayColor =
     "primvars:displayColor";
+/// A Gprim's opacity, 0 to 1 (a value or a one-value array): a prim
+/// without a material draws that transparent, as Hydra's fallback
+/// material does.
+inline constexpr std::string_view kDisplayOpacity =
+    "primvars:displayOpacity";
 inline constexpr std::string_view kPositions = "positions";
 inline constexpr std::string_view kOrientations = "orientations";
 inline constexpr std::string_view kScales = "scales";
@@ -1136,6 +1141,14 @@ inline constexpr std::string_view kUsdPreviewSurface =
 inline constexpr std::string_view kUsdUVTexture = "UsdUVTexture";
 inline constexpr std::string_view kUsdPrimvarReaderFloat2 =
     "UsdPrimvarReader_float2";
+/// Primvar readers a UsdPreviewSurface's diffuseColor may read: the
+/// mesh's colours come from their primvar (`inputs:varname`), one
+/// value or three, else their `inputs:fallback`.
+inline constexpr std::string_view kUsdPrimvarReaderFloat =
+    "UsdPrimvarReader_float";
+inline constexpr std::string_view kUsdPrimvarReaderFloat3 =
+    "UsdPrimvarReader_float3";
+inline constexpr std::string_view kFallbackInput = "inputs:fallback";
 inline constexpr std::string_view kUsdTransform2d = "UsdTransform2d";
 inline constexpr std::string_view kConnectSuffix = ".connect";
 inline constexpr std::string_view kSurfaceOutput = "outputs:surface";

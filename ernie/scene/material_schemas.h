@@ -314,13 +314,15 @@
 #define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
     X(std::string, InfoId, ::ernie::tokens::kInfoId, "",                                           \
       (::ernie::AttributeMeta{.label = "Shader",                                                   \
-                              .doc = "The shader's type; Ernie reads the five below.",             \
+                              .doc = "The shader's type; Ernie reads the seven below.",            \
                               .group = "Shader",                                                   \
                               .options = {::ernie::tokens::kUsdPreviewSurface,                     \
                                           ::ernie::tokens::kUsdUVTexture,                          \
                                           ::ernie::tokens::kUsdPrimvarReaderFloat2,                \
                                           ::ernie::tokens::kUsdTransform2d,                        \
-                                          ::ernie::tokens::kErnieThermal}}))                       \
+                                          ::ernie::tokens::kErnieThermal,                          \
+                                          ::ernie::tokens::kUsdPrimvarReaderFloat,                 \
+                                          ::ernie::tokens::kUsdPrimvarReaderFloat3}}))             \
     X(glm::dvec3, DiffuseColor, ::ernie::tokens::kDiffuseColor, glm::dvec3(0.18),                  \
       (::ernie::AttributeMeta{.label = "Diffuse colour", .doc = "Linear RGB albedo.",              \
                               .group = "Preview surface", .color = true}))                         \
@@ -389,7 +391,8 @@
       (::ernie::AttributeMeta{.doc = "Added after the rotation.", .group = "Transform 2D"}))       \
     X(std::string, Varname, ::ernie::tokens::kVarname, "st",                                       \
       (::ernie::AttributeMeta{.label = "Primvar",                                                  \
-                              .doc = "The mesh primvar of the texture coordinates.",               \
+                              .doc = "The mesh primvar it reads: texture coordinates, or the "     \
+                                     "colours a diffuse colour takes (float, float3 readers).",    \
                               .group = "Primvar reader"}))                                         \
     X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperatureInput, 0.0,                  \
       (::ernie::AttributeMeta{.label = "Temperature",                                              \
