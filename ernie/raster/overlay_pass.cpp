@@ -146,6 +146,8 @@ std::uint32_t SegmentsPerItem(OverlayBatchKind kind) {
         return 1;
     case OverlayBatchKind::Markers:
     case OverlayBatchKind::Numbers:
+    case OverlayBatchKind::Texts:
+    case OverlayBatchKind::Image:
         return 0;
     case OverlayBatchKind::Boxes:
         return 12;

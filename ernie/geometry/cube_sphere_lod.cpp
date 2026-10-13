@@ -175,13 +175,17 @@ CubeSphereLod::CubeSphereLod(
                 if (col + 1 < side) {
                     step = std::max(
                         step,
-                        std::abs(heights[row * side + col + 1] - h));
+                        std::abs(static_cast<double>(
+                                     heights[row * side + col + 1]) -
+                                 h));
                 }
                 if (row + 1 < side) {
                     step = std::max(
                         step,
-                        std::abs(heights[(row + 1) * side + col] -
-                                 h));
+                        std::abs(
+                            static_cast<double>(
+                                heights[(row + 1) * side + col]) -
+                            h));
                 }
             }
         }
@@ -367,12 +371,11 @@ CubeSphereRegion CubeSphereLod::NodeRegion(std::uint32_t face,
     const double baseLow = std::max(
         std::min({radii_.x, radii_.y, radii_.z}), base - spread);
     const double baseHigh = std::min(radius_, base + spread);
-    const double h0 =
-        std::min(static_cast<double>(h.x) * exaggeration,
-                 static_cast<double>(h.y) * exaggeration);
-    const double h1 =
-        std::max(static_cast<double>(h.x) * exaggeration,
-                 static_cast<double>(h.y) * exaggeration);
+    const double scale = static_cast<double>(exaggeration);
+    const double h0 = std::min(static_cast<double>(h.x) * scale,
+                               static_cast<double>(h.y) * scale);
+    const double h1 = std::max(static_cast<double>(h.x) * scale,
+                               static_cast<double>(h.y) * scale);
     const double low = baseLow + (h0 < 0.0 ? h0 : h0 * normalCos_);
     const double high = baseHigh + (h1 > 0.0 ? h1 : h1 * normalCos_);
     if (normalSin_ > 0.0 && low > 0.0) {
@@ -456,7 +459,8 @@ double CubeSphereLod::MinFirstRange(float exaggeration,
                     const glm::vec2 h =
                         trees_[face].NodeHeights(0, x, y);
                     const double highest =
-                        std::max(std::abs(h.x), std::abs(h.y)) *
+                        static_cast<double>(
+                            std::max(std::abs(h.x), std::abs(h.y))) *
                         scale;
                     const double low =
                         std::min({radii_.x, radii_.y, radii_.z}) -
@@ -525,7 +529,8 @@ std::vector<LodRange> CubeSphereLod::Ranges(double firstRange,
             firstRange * std::ldexp(1.0, static_cast<int>(level));
         ranges[level] = {
             static_cast<float>(previous +
-                               morphStart * (end - previous)),
+                               static_cast<double>(morphStart) *
+                                   (end - previous)),
             static_cast<float>(end)};
         previous = end;
     }
@@ -623,13 +628,15 @@ bool CubeSphereLod::SelectNode(std::uint32_t face,
         return true;
     }
     const double distance = region.Distance(eye);
-    if (level + 1 < Levels() && distance > ranges[level].morphEnd) {
+    if (level + 1 < Levels() &&
+        distance > static_cast<double>(ranges[level].morphEnd)) {
         return false;
     }
     if (Hidden(region, eye, frustum, occluder)) {
         return true;
     }
-    if (level == 0 || distance > ranges[level - 1].morphEnd) {
+    if (level == 0 ||
+        distance > static_cast<double>(ranges[level - 1].morphEnd)) {
         EmitQuarters(face, level, x, y, eye, frustum, exaggeration,
                      occluder, out);
         return true;

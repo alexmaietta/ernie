@@ -440,12 +440,14 @@ BuildDense(std::span<const float> values, const glm::ivec3& shape,
     };
     using Constants = pnanovdb_grid_type_constants_t;
     const auto at = [&](int i, int j, int k) {
+        const auto index = [](int n) {
+            return static_cast<std::size_t>(n);
+        };
         return values.empty()
                    ? 0.0f
-                   : values[(static_cast<std::size_t>(i) * shape.y +
-                             j) *
-                                shape.z +
-                            k];
+                   : values[(index(i) * index(shape.y) + index(j)) *
+                                index(shape.z) +
+                            index(k)];
     };
     // The leaves (8^3) holding active values, then the lower (128^3)
     // and upper (4096^3) nodes above them, each keyed by its origin.
@@ -740,9 +742,10 @@ BuildDense(std::span<const float> values, const glm::ivec3& shape,
             pnanovdb_map_set_invmatd(buf, map, 3 * row + column,
                                      inverse);
         }
+        const double offset = origin[static_cast<glm::length_t>(row)];
         pnanovdb_map_set_vecf(buf, map, row,
-                              static_cast<float>(origin[row]));
-        pnanovdb_map_set_vecd(buf, map, row, origin[row]);
+                              static_cast<float>(offset));
+        pnanovdb_map_set_vecd(buf, map, row, offset);
     }
     pnanovdb_map_set_taperf(buf, map, 0, 1.0f);
     pnanovdb_map_set_taperd(buf, map, 0, 1.0);

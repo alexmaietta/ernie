@@ -481,7 +481,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
             : 0u;
 
     std::string imports;
-    std::string params;
+    std::string paramFields;
     std::string source =
         "lens.band(band, pixel)";  // the spectrum's source in this
                                    // segment
@@ -507,21 +507,21 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         // field; built-ins take none.
         if (stage.custom) {
             imports += "import " + ModuleOf(stage.custom->id) + ";\n";
-            params += "    " + type + ".Params " + var + ";\n";
+            paramFields += "    " + type + ".Params " + var + ";\n";
             std::uint32_t offset = stage.firstParam;
             for (const SensorFilterParam& param :
                  stage.custom->params) {
                 if (param.size == 1 || param.table) {
-                    params += "    " + var + "." + param.name +
-                              " = filterParam(" +
-                              std::to_string(offset) + ");\n";
+                    paramFields += "    " + var + "." + param.name +
+                                   " = filterParam(" +
+                                   std::to_string(offset) + ");\n";
                 } else {
-                    params += "    for (uint i = 0; i < " +
-                              std::to_string(param.size) +
-                              "; ++i) {\n        " + var + "." +
-                              param.name + "[i] = filterParam(" +
-                              std::to_string(offset) +
-                              " + i);\n    }\n";
+                    paramFields += "    for (uint i = 0; i < " +
+                                   std::to_string(param.size) +
+                                   "; ++i) {\n        " + var + "." +
+                                   param.name + "[i] = filterParam(" +
+                                   std::to_string(offset) +
+                                   " + i);\n    }\n";
                 }
                 offset += param.table ? 1 + param.size : param.size;
             }
@@ -545,14 +545,14 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
                 break;  // the lens heads the first segment
             }
             if (stage.custom->domain == FilterDomain::Spectrum) {
-                params += "    SpatialImage input" +
-                          std::to_string(s) + " = {0};\n";
+                paramFields += "    SpatialImage input" +
+                               std::to_string(s) + " = {0};\n";
                 source = type + ".band(band, pixel, input" +
                          std::to_string(s) + args + ")";
                 sourceBase = base;
                 usesBands = true;
             } else {
-                params +=
+                paramFields +=
                     "    SpatialImage input" + std::to_string(s) +
                     " = {" +
                     std::string(ChannelOf(stage.custom->domain)) +
@@ -622,7 +622,7 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
            "    if (!beginPixel(id, pixel)) {\n"
            "        return;\n"
            "    }\n" +
-           params +
+           paramFields +
            "    let lens = Lens.at(pixel);\n"
            "    SensorPixel value = {};\n"
            "    lens.finish(value, pixel, " +

@@ -142,8 +142,9 @@ void WriteExr(const std::filesystem::path& path,
     }
     const Tensor contiguous =
         image.IsContiguous() ? image : image.Contiguous();
-    const std::size_t count =
-        static_cast<std::size_t>(rows) * cols * channels;
+    const std::size_t count = static_cast<std::size_t>(rows) *
+                              static_cast<std::size_t>(cols) *
+                              static_cast<std::size_t>(channels);
     // Floats and uint32 as they are; narrower integers as floats.
     const bool uints = type == DType::UInt32;
     std::vector<float> floats;
@@ -173,12 +174,17 @@ void WriteExr(const std::filesystem::path& path,
         header.compression() = Imf::ZIP_COMPRESSION;
         const Imf::PixelType pixel = uints ? Imf::UINT : Imf::FLOAT;
         Imf::FrameBuffer frame;
-        const std::size_t texel = channels * sizeof(float);
+        const std::size_t texel =
+            static_cast<std::size_t>(channels) * sizeof(float);
         for (int c = 0; c < channels; ++c) {
             header.channels().insert(name(c), Imf::Channel(pixel));
-            frame.insert(name(c),
-                         Imf::Slice(pixel, base + c * sizeof(float),
-                                    texel, texel * cols));
+            frame.insert(
+                name(c),
+                Imf::Slice(pixel,
+                           base + static_cast<std::size_t>(c) *
+                                      sizeof(float),
+                           texel,
+                           texel * static_cast<std::size_t>(cols)));
         }
         Imf::OutputFile file(path.string().c_str(), header);
         file.setFrameBuffer(frame);

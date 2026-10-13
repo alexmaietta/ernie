@@ -93,7 +93,10 @@ Overlay::Overlay() {
 
 OverlayItem Overlay::ItemOf(const OverlayStyle& style,
                             const glm::vec4& color) {
-    OverlayItem item{color, style.depth, style.world};
+    OverlayItem item;
+    item.color = color;
+    item.depth = style.depth;
+    item.world = style.world;
     item.id = style.id;
     item.hover = style.hover;
     item.metric = style.metric;
@@ -422,8 +425,8 @@ Overlay& Overlay::SetVisible(bool visible) {
 void Overlay::AddSegment(const glm::dvec3& a, const glm::dvec3& b,
                          const OverlayStyle& style,
                          const glm::vec4& color) {
-    segments_.push_back(
-        {a, b, style.width, ItemOf(style, color), style.dash});
+    segments_.push_back({a, b, style.width, ItemOf(style, color),
+                         style.dash, std::nullopt});
 }
 
 Overlay& Overlay::Line(const glm::dvec3& a, const glm::dvec3& b,
@@ -522,15 +525,15 @@ Overlay& Overlay::Box(const glm::dvec3& low, const glm::dvec3& high,
                       const OverlayStyle& style,
                       const glm::dmat4& transform) {
     std::array<glm::dvec3, 8> corners;
-    for (int i = 0; i < 8; ++i) {
+    for (std::size_t i = 0; i < 8; ++i) {
         corners[i] =
             Apply(transform, {(i & 1) != 0 ? high.x : low.x,
                               (i & 2) != 0 ? high.y : low.y,
                               (i & 4) != 0 ? high.z : low.z});
     }
     // Corners differing in one bit share an edge.
-    for (int i = 0; i < 8; ++i) {
-        for (const int bit : {1, 2, 4}) {
+    for (std::size_t i = 0; i < 8; ++i) {
+        for (const std::size_t bit : {1u, 2u, 4u}) {
             if ((i & bit) == 0) {
                 AddSegment(corners[i], corners[i | bit], style,
                            style.color);
@@ -657,7 +660,7 @@ Overlay& Overlay::WireMesh(std::span<const glm::dvec3> points,
     CheckIndices(points, indices);
     std::set<std::pair<std::uint32_t, std::uint32_t>> edges;
     for (std::size_t t = 0; t < indices.size(); t += 3) {
-        for (int k = 0; k < 3; ++k) {
+        for (std::size_t k = 0; k < 3; ++k) {
             const std::uint32_t a = indices[t + k];
             const std::uint32_t b = indices[t + (k + 1) % 3];
             edges.emplace(std::min(a, b), std::max(a, b));

@@ -148,8 +148,8 @@ VirtualTexture::TileData(const SparseTile& tile) const {
         std::max(1u, source_->width >> tile.mip);
     const std::uint32_t mipHeight =
         std::max(1u, source_->height >> tile.mip);
-    const auto blocks = [&](std::uint32_t texels) {
-        return (texels + info.blockSize - 1) / info.blockSize;
+    const auto blocks = [&](std::uint32_t length) {
+        return (length + info.blockSize - 1) / info.blockSize;
     };
     const std::uint32_t blocksAcrossMip = blocks(mipWidth);
     const std::uint32_t blocksDownMip = blocks(mipHeight);

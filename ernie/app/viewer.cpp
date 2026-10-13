@@ -1790,10 +1790,10 @@ struct Viewer::State {
                  {glm::dvec2(0.0), glm::dvec2(1.0, 0.0),
                   glm::dvec2(-1.0, 0.0), glm::dvec2(0.0, 1.0),
                   glm::dvec2(0.0, -1.0)}) {
-                const glm::dvec3 start =
+                const glm::dvec3 tail =
                     centre +
                     0.25 * reach * (offset.x * x + offset.y * y);
-                overlay.Arrow(start, start + down * reach, style,
+                overlay.Arrow(tail, tail + down * reach, style,
                               0.18 * reach);
             }
             return true;
@@ -2885,7 +2885,9 @@ struct Viewer::State {
         draw->AddRectFilled(
             corner,
             ImVec2(corner.x + width + 2.0f * pad,
-                   corner.y + lineHeight * hudLines.size() +
+                   corner.y +
+                       lineHeight *
+                           static_cast<float>(hudLines.size()) +
                        2.0f * pad),
             ImGui::GetColorU32(box), 4.0f * contentScale);
         // Right-aligned, as Kit's: the label muted, its value bright.
@@ -3037,8 +3039,8 @@ struct Viewer::State {
         // The settings menu: a pill drawn with Kit's three bars.
         {
             const ImVec2 corner = ImGui::GetCursorScreenPos();
-            const bool open = pill("##settings", "   ");
-            if (open) {
+            const bool menuOpen = pill("##settings", "   ");
+            if (menuOpen) {
                 DrawSettingsMenu();
                 ImGui::EndCombo();
             }
@@ -3768,8 +3770,9 @@ struct Viewer::State {
             return;
         }
         std::error_code error;
-        for (const std::filesystem::path& frame : encodingFrames) {
-            std::filesystem::remove(frame, error);
+        for (const std::filesystem::path& framePath :
+             encodingFrames) {
+            std::filesystem::remove(framePath, error);
         }
         if (!encodingFrames.empty()) {
             std::filesystem::remove(

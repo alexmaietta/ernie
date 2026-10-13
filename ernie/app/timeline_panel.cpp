@@ -112,12 +112,15 @@ class TimelinePanel final : public Panel {
         const ImVec2 low = ImGui::GetCursorScreenPos();
         const ImVec2 high(low.x + width, low.y + height);
         ImGui::InvisibleButton("##ruler", ImVec2(width, height));
-        const double perCode = width / (end - start);
+        const double perCode =
+            static_cast<double>(width) / (end - start);
         const double frame = Timeline::FrameTimeCodes(scene);
         if (ImGui::IsItemActive()) {
             timeline.Pause();
             const double at =
-                start + (ImGui::GetIO().MousePos.x - low.x) / perCode;
+                start + static_cast<double>(
+                            ImGui::GetIO().MousePos.x - low.x) /
+                            perCode;
             const double snapped =
                 start + std::round((at - start) / frame) * frame;
             timeline.Seek(scene, std::clamp(snapped, start, end));

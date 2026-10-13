@@ -31,32 +31,35 @@ GradientNoise::GradientNoise(std::uint32_t seed) {
     // A Fisher-Yates shuffle driven by a 32-bit LCG (Numerical
     // Recipes' constants), the same on every platform.
     std::uint32_t state = seed * 2654435761u + 1013904223u;
-    for (int i = 255; i > 0; --i) {
+    for (std::size_t i = 255; i > 0; --i) {
         state = state * 1664525u + 1013904223u;
-        const auto j = static_cast<int>((state >> 8) % (i + 1));
+        const std::size_t j = (state >> 8) % (i + 1);
         std::swap(order[i], order[j]);
     }
-    for (int i = 0; i < 512; ++i) {
+    for (std::size_t i = 0; i < 512; ++i) {
         permutation_[i] = order[i & 255];
     }
 }
 
 double GradientNoise::operator()(const glm::dvec3& p) const {
     const glm::dvec3 floor = glm::floor(p);
-    const int x = static_cast<int>(floor.x) & 255;
-    const int y = static_cast<int>(floor.y) & 255;
-    const int z = static_cast<int>(floor.z) & 255;
+    const auto x =
+        static_cast<std::size_t>(static_cast<int>(floor.x) & 255);
+    const auto y =
+        static_cast<std::size_t>(static_cast<int>(floor.y) & 255);
+    const auto z =
+        static_cast<std::size_t>(static_cast<int>(floor.z) & 255);
     const glm::dvec3 f = p - floor;
     const double u = Fade(f.x);
     const double v = Fade(f.y);
     const double w = Fade(f.z);
     const auto& P = permutation_;
-    const int a = P[x] + y;
-    const int aa = P[a] + z;
-    const int ab = P[a + 1] + z;
-    const int b = P[x + 1] + y;
-    const int ba = P[b] + z;
-    const int bb = P[b + 1] + z;
+    const std::size_t a = P[x] + y;
+    const std::size_t aa = P[a] + z;
+    const std::size_t ab = P[a + 1] + z;
+    const std::size_t b = P[x + 1] + y;
+    const std::size_t ba = P[b] + z;
+    const std::size_t bb = P[b + 1] + z;
     const auto lerp = [](double t, double a0, double a1) {
         return a0 + t * (a1 - a0);
     };

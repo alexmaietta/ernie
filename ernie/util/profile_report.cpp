@@ -32,7 +32,7 @@ void Gather(std::vector<ReportNode>& roots,
                                      return n.name == zone->name;
                                  });
         if (node == siblings.end()) {
-            siblings.push_back({zone->name});
+            siblings.emplace_back().name = zone->name;
             node = siblings.end() - 1;
         }
         node->ms += static_cast<double>(zone->end - zone->start);
@@ -141,7 +141,8 @@ Report Summarize(std::span<const Frame> frames,
         report.cpuMs = report.cpuMs * 1e-6 / count;
         for (auto& [thread, roots] : threads) {
             Average(roots, count, report.cpuMs);
-            ReportNode node{ThreadName(threadNames, thread)};
+            ReportNode node;
+            node.name = ThreadName(threadNames, thread);
             for (const ReportNode& root : roots) {
                 node.ms += root.ms;
             }

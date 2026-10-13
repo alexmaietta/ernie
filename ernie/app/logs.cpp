@@ -344,10 +344,10 @@ class ImagePanel final : public Panel {
         const int columns = std::max(
             1, static_cast<int>(std::ceil(std::sqrt(views))));
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-        const float width =
-            std::max(16.0f, (ImGui::GetContentRegionAvail().x -
-                             spacing * (columns - 1)) /
-                                static_cast<float>(columns));
+        const float width = std::max(
+            16.0f, (ImGui::GetContentRegionAvail().x -
+                    spacing * static_cast<float>(columns - 1)) /
+                       static_cast<float>(columns));
         const ImVec2 size(width, width *
                                      static_cast<float>(shape_.rows) /
                                      static_cast<float>(shape_.cols));
@@ -657,10 +657,12 @@ void ViewerLogs::DrawPlots() {
         }
         const auto [low, high] = std::minmax_element(
             array.values.begin(), array.values.end());
-        const double lowest = array.values.empty() ? 0.0 : *low;
-        const double highest = array.values.empty()
-                                   ? 1.0
-                                   : std::max(*high, *low + 1e-12f);
+        const double lowest =
+            array.values.empty() ? 0.0 : static_cast<double>(*low);
+        const double highest =
+            array.values.empty()
+                ? 1.0
+                : static_cast<double>(std::max(*high, *low + 1e-12f));
         const float height = std::clamp(
             ImGui::GetContentRegionAvail().x *
                 static_cast<float>(array.rows) /

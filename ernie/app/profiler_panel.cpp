@@ -177,10 +177,11 @@ class ProfilerPanel final : public Panel {
         if (ImGui::Button("Capture (F5)") ||
             (key && !capture_.has_value())) {
             const std::uint64_t now = profiler::Now();
-            capture_ = Capturing{now,
-                                 now + static_cast<std::uint64_t>(
-                                           captureSeconds_ * 1e9),
-                                 {}};
+            capture_ = Capturing{
+                now,
+                now + static_cast<std::uint64_t>(
+                          static_cast<double>(captureSeconds_) * 1e9),
+                {}};
         }
         ImGui::EndDisabled();
         ImGui::SetItemTooltip("Record CPU and GPU zones for the "
@@ -334,8 +335,8 @@ class ProfilerPanel final : public Panel {
         if (frames_.empty()) {
             return frames;
         }
-        const std::uint64_t window =
-            static_cast<std::uint64_t>(averageSeconds_ * 1e9);
+        const std::uint64_t window = static_cast<std::uint64_t>(
+            static_cast<double>(averageSeconds_) * 1e9);
         const std::uint64_t last = frames_.back().end;
         for (const Frame& frame : frames_) {
             if (frame.end + window >= last) {
@@ -676,8 +677,9 @@ class ProfilerPanel final : public Panel {
             const double span = view_->second - view_->first;
             const double at =
                 view_->first +
-                std::clamp((io.MousePos.x - left) / (right - left),
-                           0.0f, 1.0f) *
+                static_cast<double>(std::clamp(
+                    (io.MousePos.x - left) / (right - left), 0.0f,
+                    1.0f)) *
                     span;
             if (io.MouseWheel != 0.0f) {
                 const double scale = std::pow(
@@ -687,7 +689,9 @@ class ProfilerPanel final : public Panel {
             }
             if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
                 const double shift =
-                    -io.MouseDelta.x / (right - left) * span;
+                    static_cast<double>(-io.MouseDelta.x /
+                                        (right - left)) *
+                    span;
                 view_ = std::pair(view_->first + shift,
                                   view_->second + shift);
             }

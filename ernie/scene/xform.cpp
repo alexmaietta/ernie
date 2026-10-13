@@ -252,10 +252,11 @@ glm::dmat4 OpMatrix(const Scene& scene, const Path& path,
         }
         // Arrays are x, y, z, w, or w first by the prim's
         // `ernie:quaternionOrder`.
-        const Value* order =
+        const Value* quaternionOrder =
             scene.Get(path, tokens::kQuaternionOrder);
-        const auto* token =
-            order != nullptr ? order->Get<std::string>() : nullptr;
+        const auto* token = quaternionOrder != nullptr
+                                ? quaternionOrder->Get<std::string>()
+                                : nullptr;
         const bool wFirst =
             scene.Get(path, op.attribute) == nullptr &&
             token != nullptr && *token == tokens::kWxyz;

@@ -196,9 +196,11 @@ class CapturePanel final : public Panel {
             std::snprintf(label, sizeof(label), "%lld / %lld",
                           static_cast<long long>(done),
                           static_cast<long long>(total));
-            ImGui::ProgressBar(
-                total > 0 ? static_cast<float>(done) / total : 0.0f,
-                ImVec2(-1.0f, 0.0f), label);
+            ImGui::ProgressBar(total > 0
+                                   ? static_cast<float>(done) /
+                                         static_cast<float>(total)
+                                   : 0.0f,
+                               ImVec2(-1.0f, 0.0f), label);
             return;
         }
         ImGui::BeginDisabled(viewer.Encoding());
