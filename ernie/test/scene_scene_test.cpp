@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
@@ -412,6 +413,53 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
     scene.Write(bodies, tokens::kTranslate, rows(50));
     EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kTranslate)->As<float>()[0],
                     51.0f);
+}
+
+TEST(Scene, SelectionsFindPrimsOfATypeAndMapTheirColumns) {
+    Scene scene;
+    for (const char* path : {"/A", "/B", "/C"}) {
+        ernie::Cube::Define(scene, path).SetXform({.translate = {1, 2, 3}});
+    }
+    ernie::Cube(scene, "/A").SetDisplayColor({1.0, 0.0, 0.0});
+    ernie::Cube(scene, "/C").SetDisplayColor({0.0, 0.0, 1.0});
+    ernie::Sphere::Define(scene, "/S").SetXform({.translate = {0, 0, 0}});
+
+    ernie::Selection cubes = scene.Select(tokens::kCube);
+    EXPECT_EQ(cubes.Prims().Paths(),
+              (std::vector<Path>{"/A", "/B", "/C"}));
+    ernie::Selection coloured =
+        scene.Select(tokens::kCube, {std::string(tokens::kDisplayColor)});
+    EXPECT_EQ(coloured.Prims().Paths(), (std::vector<Path>{"/A", "/C"}));
+
+    // Every attribute stepped as columns, mapped at once; the same
+    // prims keep their set, so their columns stay.
+    ChangeCursor cursor;
+    scene.Changes(cursor);
+    const std::vector<std::string> stepped{
+        std::string(tokens::kTranslate),
+        std::string(tokens::kDisplayColor)};
+    std::vector<Tensor> rows = coloured.Map(ernie::Device{}, stepped);
+    ASSERT_EQ(rows.size(), 2u);
+    rows[0].As<float>()[3] = 7.0f;  // /C's x
+    coloured.Unmap();
+    std::vector<ernie::ColumnChange> columns;
+    scene.Changes(cursor, columns);
+    EXPECT_EQ(scene.Read("/C", tokens::kTranslate)->As<float>()[0], 7.0f);
+    rows = coloured.Map(ernie::Device{}, stepped);
+    coloured.Unmap();
+    columns.clear();
+    EXPECT_TRUE(scene.Changes(cursor, columns).empty());
+    EXPECT_EQ(columns.size(), 2u) << "one change per column";
+
+    // Found again as prims come, go, or gain or lose an attribute.
+    ernie::Cube::Define(scene, "/D").SetDisplayColor({0.0, 1.0, 0.0});
+    EXPECT_EQ(coloured.Prims().Size(), 3u);
+    scene.Clear("/A", tokens::kDisplayColor);
+    EXPECT_EQ(coloured.Prims().Paths(), (std::vector<Path>{"/C", "/D"}));
+    ernie::Cube(scene, "/A").SetDisplayColor({1.0, 0.0, 0.0});
+    EXPECT_EQ(coloured.Prims().Size(), 3u);
+    scene.Remove("/C");
+    EXPECT_EQ(cubes.Prims().Paths(), (std::vector<Path>{"/A", "/B", "/D"}));
 }
 
 TEST(Scene, ColumnsOfArraysGiveEachPrimItsOwnLength) {

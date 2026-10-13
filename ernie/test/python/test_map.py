@@ -133,3 +133,18 @@ def test_columns_read_without_a_change_and_hold_arrays_of_any_length():
     np.testing.assert_array_equal(
         np.asarray(scene.read("/N", tokens.POINTS)), values[2:]
     )
+
+
+def test_selections_map_every_attribute_of_a_kind_at_once():
+    scene = ernie.Scene()
+    for i, path in enumerate(("/A", "/B", "/C")):
+        scene.define(path, ernie.Cube, translate=(i, 0.0, 0.0))
+    scene.define("/S", ernie.Sphere, translate=(0.0, 0.0, 0.0))
+    cubes = scene.select(ernie.Cube, [tokens.TRANSLATE])
+    assert len(cubes) == 3
+    with cubes.map([tokens.TRANSLATE], "cpu") as (poses,):
+        poses[:, 2] = 5.0
+    (poses,) = cubes.read([tokens.TRANSLATE])
+    np.testing.assert_array_equal(poses[:, 2], [5.0, 5.0, 5.0])
+    scene.define("/D", ernie.Cube, translate=(3.0, 0.0, 0.0))
+    assert [str(p) for p in cubes.prims.paths] == ["/A", "/B", "/C", "/D"]

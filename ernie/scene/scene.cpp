@@ -262,6 +262,14 @@ void Scene::Stamp(const Path& path, PrimData& prim,
         it->second = version_;
     } else {
         prim.versions.emplace(std::string(attribute), version_);
+        TouchType(prim.type);  // held now, which selections ask
+    }
+    if (!prim.cleared.empty()) {
+        if (const auto cleared = prim.cleared.find(attribute);
+            cleared != prim.cleared.end()) {
+            prim.cleared.erase(cleared);
+            TouchType(prim.type);  // held again
+        }
     }
     if (IsXformAttribute(attribute)) {
         prim.ownTransform = version_;
@@ -387,6 +395,7 @@ Prim Scene::Define(const Path& path, std::string_view type) {
             prim.tensors.clear();
             prim.versions.clear();
             prim.samples.clear();
+            prim.cleared.clear();
             animated_.erase(path);
             removed_[path] = version_;
             staleDependents_.insert(path);
@@ -402,6 +411,8 @@ Prim Scene::Define(const Path& path, std::string_view type) {
         if (!type.empty()) {
             byType_[std::string(type)].insert(path);
         }
+        TouchType(prim.type);
+        TouchType(type);
         prim.type = type;
         prim.schema = FindPrimType(type);
     }
@@ -516,6 +527,7 @@ bool Scene::Remove(const Path& path) {
             typed != byType_.end()) {
             typed->second.erase(last->first);
         }
+        TouchType(last->second.type);
         ++last;
     }
     prims_.erase(first, last);
@@ -689,14 +701,38 @@ void Scene::Unmap(const Path& path, std::string_view attribute,
 
 const Scene::ColumnData*
 Scene::ColumnOf(const PrimSet& prims, std::string_view attribute) const {
-    if (prims.id_ == 0 || prims.sceneId_ != Id() ||
-        prims.removals_ != removals_ ||
-        prims.prims_.size() != prims.Size()) {
+    if (prims.id_ == 0) {
         return nullptr;
     }
     const auto of =
         columnOf_.find(std::pair(prims.id_, std::string(attribute)));
-    return of != columnOf_.end() ? &columns_.at(of->second) : nullptr;
+    if (of == columnOf_.end()) {
+        return nullptr;
+    }
+    // Looked up again after removals, or in another copy of the set
+    // (a selection's, a column's): still the column while every prim
+    // is there and its row.
+    if (prims.sceneId_ != Id() || prims.removals_ != removals_ ||
+        prims.prims_.size() != prims.Size()) {
+        std::vector<void*> found;
+        found.reserve(prims.Size());
+        for (const Path& path : prims.Paths()) {
+            const auto it = prims_.find(path);
+            if (it == prims_.end()) {
+                return nullptr;
+            }
+            const auto bound = it->second.bound.find(attribute);
+            if (bound == it->second.bound.end() ||
+                bound->second.column != of->second) {
+                return nullptr;
+            }
+            found.push_back(const_cast<PrimData*>(&it->second));
+        }
+        prims.prims_ = std::move(found);
+        prims.sceneId_ = Id();
+        prims.removals_ = removals_;
+    }
+    return &columns_.at(of->second);
 }
 
 Scene::ColumnData* Scene::ColumnOf(const PrimSet& prims,
@@ -1044,6 +1080,87 @@ Tensor Column::Read(Device device) const {
         " are not on that device: map or write them there first");
 }
 
+std::uint64_t Scene::TypeVersion(std::string_view type) const {
+    const auto it = typeVersions_.find(type);
+    return it != typeVersions_.end() ? it->second : 0;
+}
+
+void Scene::TouchType(std::string_view type) {
+    if (const auto it = typeVersions_.find(type);
+        it != typeVersions_.end()) {
+        ++it->second;
+    } else {
+        typeVersions_.emplace(std::string(type), 1);
+    }
+}
+
+Selection Scene::Select(std::string_view type,
+                        std::vector<std::string> attributes) {
+    return Selection(*this, std::string(type), std::move(attributes));
+}
+
+const PrimSet& Selection::Prims() {
+    const std::uint64_t now = scene_->TypeVersion(type_);
+    if (found_ == now) {
+        return prims_;
+    }
+    std::vector<Path> paths;
+    if (const auto typed = scene_->byType_.find(type_);
+        typed != scene_->byType_.end()) {
+        for (const Path& path : typed->second) {
+            const Scene::PrimData& prim = scene_->prims_.at(path);
+            const bool holds = std::ranges::all_of(
+                attributes_, [&prim](const std::string& attribute) {
+                    return prim.values.contains(attribute) ||
+                           prim.tensors.contains(attribute) ||
+                           prim.samples.contains(attribute);
+                });
+            if (holds) {
+                paths.push_back(path);
+            }
+        }
+    }
+    // The same prims keep their set, and their columns: identified
+    // here, so the copies its columns hold are one set.
+    if (paths != prims_.Paths()) {
+        prims_ = PrimSet(std::move(paths));
+    }
+    Scene::IdentifyPrimSet(prims_);
+    found_ = now;
+    return prims_;
+}
+
+Column Selection::GetColumn(std::string_view attribute) {
+    return scene_->GetColumn(Prims(), attribute);
+}
+
+std::vector<Tensor>
+Selection::Map(Device device, const std::vector<std::string>& attributes,
+               std::uintptr_t stream) {
+    std::vector<Tensor> rows;
+    for (const std::string& attribute : attributes) {
+        rows.push_back(GetColumn(attribute).Map(device, stream));
+        mapped_.push_back(attribute);
+    }
+    return rows;
+}
+
+void Selection::Unmap(std::uintptr_t stream) {
+    for (const std::string& attribute : mapped_) {
+        GetColumn(attribute).Unmap(stream);
+    }
+    mapped_.clear();
+}
+
+std::vector<Tensor>
+Selection::Read(Device device, const std::vector<std::string>& attributes) {
+    std::vector<Tensor> rows;
+    for (const std::string& attribute : attributes) {
+        rows.push_back(GetColumn(attribute).Read(device));
+    }
+    return rows;
+}
+
 const std::pair<Tensor, std::int64_t>*
 Scene::RowOf(const Path& path, std::string_view attribute) const {
     const auto prim = prims_.find(path);
@@ -1132,6 +1249,9 @@ bool Scene::Clear(const Path& path, std::string_view attribute) {
         prim.rows.erase(row);
     }
     Stamp(path, prim, attribute);
+    // No longer held, which selections ask.
+    prim.cleared.emplace(attribute);
+    TouchType(prim.type);
     return true;
 }
 

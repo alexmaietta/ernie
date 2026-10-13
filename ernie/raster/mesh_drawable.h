@@ -1164,7 +1164,10 @@ class MeshDrawable : public RasterDrawable {
         bool pushedCulled = false;
     };
     /// With `state`, starts from what it says is bound and leaves it
-    /// as bound after.
+    /// as bound after. With `keptList`, `ranges` is one of the lists kept
+    /// from frame to frame (`viewDraws_`, `shadowDraws_`,
+    /// `shadowWorldDraws_`): what it records is planned once while
+    /// they and the draws stay (`plans_`).
     std::size_t
     Record(VkCommandBuffer commands, const RasterFrame& frame,
            std::span<const VisibleRange> ranges,
@@ -1172,7 +1175,40 @@ class MeshDrawable : public RasterDrawable {
            bool shadow, bool direct, int culledSet,
            const DescriptorResource* motion = nullptr,
            RecordState* state = nullptr,
-           std::optional<bool> transparent = std::nullopt) const;
+           std::optional<bool> transparent = std::nullopt,
+           bool keptList = false) const;
+    /// What `Record` draws, in order: a multi-draw of `count` indirect
+    /// draws from `first` binding draw `item`'s resources, or with
+    /// `range` at 0 or more the direct draw of `ranges[range]`.
+    struct RecordStep {
+        std::uint32_t item = 0;
+        std::uint32_t first = 0;
+        std::uint32_t count = 0;
+        std::int64_t range = -1;
+    };
+    /// A kept list's plan, by the list and what `Record` draws of it,
+    /// for the lists and draws as they were (`PlanVersion`).
+    struct PlanKey {
+        const VisibleRange* ranges = nullptr;
+        std::size_t size = 0;
+        std::int32_t world = 0;
+        std::int8_t casters = 0;  ///< None, or with or without shared.
+        std::int8_t transparent = 0;  ///< Any, opaque or transparent.
+        bool shadow = false;
+        bool direct = false;
+        int culledSet = 0;
+        auto operator<=>(const PlanKey&) const = default;
+    };
+    using PlanVersion =
+        std::tuple<std::uint64_t, std::uint64_t, std::uint64_t,
+                   std::uint64_t, bool>;
+    PlanVersion CurrentPlanVersion() const;
+    mutable std::map<PlanKey, std::vector<RecordStep>> plans_;
+    mutable PlanVersion plansVersion_{};
+    /// Cull lists made anew (`Cull` when not steady), and draws written
+    /// (`WriteDraws`), which plans follow.
+    std::uint64_t cullLists_ = 0;
+    std::uint64_t drawsWritten_ = 0;
     /// `RecordColor`, from and into `state`.
     void RecordColorState(VkCommandBuffer commands,
                           const RasterFrame& frame, std::size_t view,

@@ -276,6 +276,53 @@ class Column {
     std::string attribute_;
 };
 
+/// The prims of a type that hold some attributes (`Scene::Select`),
+/// as a Fabric query finds the buckets of a type and attributes: found
+/// again only once prims of the type come, go, or author or clear an
+/// attribute, and kept in one `PrimSet` meanwhile, so the columns of
+/// its attributes stay theirs from step to step.
+class Selection {
+  public:
+    Selection() = default;
+
+    /// The prims, in path order, found again if they may have changed.
+    const PrimSet& Prims();
+
+    /// One attribute of the prims as a column (`Scene::GetColumn`).
+    Column GetColumn(std::string_view attribute);
+
+    /// Each of `attributes`' rows on `device` to write in place, in
+    /// that order (`Column::Map`): a kernel's view of every array it
+    /// steps. `Unmap` ends them all.
+    /// @throws std::invalid_argument as `Column::Map`; those mapped
+    /// before stay mapped until `Unmap`.
+    std::vector<Tensor> Map(Device device,
+                            const std::vector<std::string>& attributes,
+                            std::uintptr_t stream = 1);
+    /// Ends `Map`: every mapped column changed, after `stream`'s work.
+    void Unmap(std::uintptr_t stream = 1);
+
+    /// Each of `attributes`' rows on `device` to read, recording no
+    /// change (`Column::Read`).
+    /// @throws std::invalid_argument as `Column::Read`.
+    std::vector<Tensor> Read(Device device,
+                             const std::vector<std::string>& attributes);
+
+  private:
+    friend class Scene;
+    Selection(Scene& scene, std::string type,
+              std::vector<std::string> attributes)
+        : scene_(&scene), type_(std::move(type)),
+          attributes_(std::move(attributes)) {}
+
+    Scene* scene_ = nullptr;
+    std::string type_;
+    std::vector<std::string> attributes_;
+    std::uint64_t found_ = ~0ull;  ///< The type's version when found.
+    PrimSet prims_;
+    std::vector<std::string> mapped_;
+};
+
 /// A lightweight, USD-shaped scene for Ernie: a tree of typed prims
 /// named by `Path`, each holding attributes by USD name, plus change
 /// tracking for render delegates.
@@ -410,6 +457,13 @@ class Scene {
     /// `attribute` of `prims` as one column (`Column`), to write whole
     /// or map on a device. Checked when first written or mapped.
     Column GetColumn(const PrimSet& prims, std::string_view attribute);
+
+    /// The prims of `type` holding every one of `attributes` (set,
+    /// written or rows of a column), as a `Selection` that finds them
+    /// again only when they may have changed: the way to step every
+    /// body of a kind without listing them.
+    Selection Select(std::string_view type,
+                     std::vector<std::string> attributes = {});
 
     /// Attaches `storage` (held weakly) as where columns mapped on its
     /// devices live (`Column::Map`); null detaches it. A renderer
@@ -656,6 +710,8 @@ class Scene {
             samples;
         std::array<std::uint64_t, kStampCount> stamps{};
         std::uint64_t ownTransform = 0;  ///< `OwnTransformVersion`.
+        /// Attributes `Clear`ed since last authored, for `Selection`.
+        std::set<std::string, std::less<>> cleared;
         std::uint64_t latest =
             0;  ///< Its latest stamp, its key in `stamped_`.
         /// Its world transform and visibility as last found
@@ -701,6 +757,12 @@ class Scene {
                      const Tensor& rows, std::vector<std::int64_t> offsets,
                      std::uintptr_t stream);
     friend class Column;
+    friend class Selection;
+    /// Counts the changes to which prims of `type` there are and which
+    /// attributes they hold (`Selection`).
+    std::uint64_t TypeVersion(std::string_view type) const;
+    void TouchType(std::string_view type);
+    std::map<std::string, std::uint64_t, std::less<>> typeVersions_;
     /// Gives `prims` its id (`PrimSet::id_`) if it has none.
     static void IdentifyPrimSet(const PrimSet& prims);
     /// `prims`' `attribute` now, one float32 row each, on the CPU.

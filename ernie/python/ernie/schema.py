@@ -687,3 +687,21 @@ _define.__doc__ = (
 )
 Scene.define = _define
 Prim.define = _define
+
+_scene_select = Scene.select
+
+
+def _select(
+    self: Scene, type: Any, attributes: list[str] | None = None
+) -> Any:
+    if isinstance(type, builtins.type) and issubclass(type, Schema):
+        type = type.prim_type.name
+    return _scene_select(self, type, list(attributes or []))
+
+
+_select.__doc__ = (
+    "The prims of `type`, a type name or a typed prim class "
+    "(ernie.Cube), holding every one of `attributes`, as a Selection "
+    "found again only when they may have changed."
+)
+Scene.select = _select

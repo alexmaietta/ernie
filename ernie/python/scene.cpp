@@ -86,6 +86,26 @@ struct ColumnMapping {
     }
 };
 
+/// A selection's columns mapped (`Selection.map`): a context manager
+/// returning the arrays and unmapping them all on exit.
+struct SelectionMapping {
+    nb::object selection;
+    nb::object stream;
+    nb::object arrays;
+    bool unmapped = false;
+
+    void Unmap(nb::handle override) {
+        if (unmapped) {
+            return;
+        }
+        unmapped = true;
+        nb::cast<Selection&>(selection).Unmap(
+            StreamOf(override.is_valid() && !override.is_none()
+                         ? override
+                         : nb::handle(stream)));
+    }
+};
+
 /// A device by name: "cpu", "cuda" or "cuda:N".
 Device DeviceFromName(std::string_view name) {
     if (name == "cpu") {
@@ -1853,6 +1873,83 @@ void BindScene(nb::module_& m) {
             "change: nothing to unmap, and writes into the array go "
             "unseen.");
 
+    nb::class_<SelectionMapping>(
+        m, "SelectionMapping",
+        "A selection's columns mapped for writing in place "
+        "(Selection.map); a context manager returning the arrays, in "
+        "the order asked, and unmapping them all on exit.")
+        .def_ro("arrays", &SelectionMapping::arrays)
+        .def("__enter__",
+             [](SelectionMapping& mapping) { return mapping.arrays; })
+        .def(
+            "__exit__",
+            [](SelectionMapping& mapping, nb::handle, nb::handle,
+               nb::handle) { mapping.Unmap({}); },
+            nb::arg("type").none(), nb::arg("value").none(),
+            nb::arg("traceback").none())
+        .def(
+            "unmap",
+            [](SelectionMapping& mapping, nb::handle stream) {
+                mapping.Unmap(stream);
+            },
+            nb::arg("stream").none() = nb::none());
+
+    nb::class_<Selection>(
+        m, "Selection",
+        "The prims of a type holding some attributes (Scene.select), "
+        "found again only when they may have changed and kept as one "
+        "PrimSet, so their columns stay theirs: the way to step every "
+        "body of a kind without listing them.")
+        .def_prop_ro("prims",
+                     [](Selection& selection) {
+                         return selection.Prims();
+                     })
+        .def("__len__",
+             [](Selection& selection) {
+                 return selection.Prims().Size();
+             })
+        .def("column", &Selection::GetColumn, nb::arg("attribute"),
+             nb::keep_alive<0, 1>(),
+             "One attribute of the prims as a column.")
+        .def(
+            "map",
+            [](nb::handle self, const std::vector<std::string>& attributes,
+               std::string_view device, nb::handle stream) {
+                Selection& selection = nb::cast<Selection&>(self);
+                nb::list arrays;
+                for (const Tensor& rows : selection.Map(
+                         DeviceFromName(device), attributes,
+                         StreamOf(stream))) {
+                    arrays.append(ArrayFromTensor(rows, true));
+                }
+                SelectionMapping mapping;
+                mapping.selection = nb::borrow(self);
+                mapping.stream = nb::borrow(stream);
+                mapping.arrays = nb::tuple(arrays);
+                return mapping;
+            },
+            nb::arg("attributes"), nb::arg("device") = "cuda",
+            nb::arg("stream").none() = nb::none(),
+            "Each of `attributes`' rows on `device` to write in place, "
+            "in that order: `with selection.map([TRANSLATE, "
+            "DISPLAY_COLOR], \"cuda\") as (poses, colours):`, all "
+            "unmapped on exit.")
+        .def(
+            "read",
+            [](Selection& selection,
+               const std::vector<std::string>& attributes,
+               std::string_view device) {
+                nb::list arrays;
+                for (const Tensor& rows : selection.Read(
+                         DeviceFromName(device), attributes)) {
+                    arrays.append(ArrayFromTensor(rows));
+                }
+                return nb::tuple(arrays);
+            },
+            nb::arg("attributes"), nb::arg("device") = "cpu",
+            "Each of `attributes`' rows on `device` to read, recording "
+            "no change.");
+
     nb::class_<Scene>(
         m, "Scene",
         "A USD-shaped scene: typed prims named by Path holding "
@@ -2043,6 +2140,12 @@ void BindScene(nb::module_& m) {
             "Commits writes into a mapped array: renderers read it "
             "again, on the GPU after the "
             "work queued on `stream`.")
+        .def("select", &Scene::Select, nb::arg("type"),
+             nb::arg("attributes") = std::vector<std::string>(),
+             nb::keep_alive<0, 1>(),
+             "The prims of `type` (a name, such as \"Cube\") holding "
+             "every one of `attributes`, as a Selection found again "
+             "only when they may have changed.")
         .def("column", &Scene::GetColumn, nb::arg("prims"),
              nb::arg("attribute"), nb::keep_alive<0, 1>(),
              "`attribute` of `prims` (a PrimSet) as one Column, to write "
@@ -3472,6 +3575,11 @@ void BindScene(nb::module_& m) {
         {"USD_UV_TEXTURE", tokens::kUsdUVTexture},
         {"USD_PRIMVAR_READER_FLOAT2",
          tokens::kUsdPrimvarReaderFloat2},
+        {"USD_PRIMVAR_READER_FLOAT", tokens::kUsdPrimvarReaderFloat},
+        {"USD_PRIMVAR_READER_FLOAT3",
+         tokens::kUsdPrimvarReaderFloat3},
+        {"FALLBACK_INPUT", tokens::kFallbackInput},
+        {"DISPLAY_OPACITY", tokens::kDisplayOpacity},
         {"USD_TRANSFORM2D", tokens::kUsdTransform2d},
         {"SURFACE_OUTPUT", tokens::kSurfaceOutput},
         {"DIFFUSE_COLOR", tokens::kDiffuseColor},

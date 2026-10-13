@@ -3815,6 +3815,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
 void MeshDrawable::WriteDraws() {
     ERNIE_ZONE("Mesh write draws");
     cullItemsDirty_ = true;
+    ++drawsWritten_;
     itemIdOffsets_.clear();
     itemIndices_.clear();
     itemCountSlots_.clear();
@@ -4638,6 +4639,9 @@ void MeshDrawable::Cull(const FrameParams& params,
     // Both kept: the jobs, records and lists are last frame's, as are
     // the GPU's copies of them, so only the cull blocks go out.
     const bool steady = reuseShadows;
+    if (!steady) {
+        ++cullLists_;  // the lists made anew: their plans too
+    }
     if (reuse) {
         if (!steady) {
             jobs = viewLayout_.jobs;
@@ -5622,12 +5626,20 @@ std::size_t MeshDrawable::DrawCount(std::size_t view) const {
     return view < viewDraws_.size() ? viewDraws_[view].size() : 0;
 }
 
+MeshDrawable::PlanVersion MeshDrawable::CurrentPlanVersion() const {
+    return {cullLists_, drawsWritten_, layoutVersion_,
+            renderer_.MaterialsVersion(),
+            shadowCutoutPipeline_ != nullptr &&
+                cutoutPipelines_[pushbroom_ ? 1 : 0] != nullptr};
+}
+
 std::size_t MeshDrawable::Record(
     VkCommandBuffer commands, const RasterFrame& frame,
     std::span<const VisibleRange> ranges, const glm::mat4& light,
     const ShadowCasters* casters, bool shadow, bool direct,
     int culledSet, const DescriptorResource* motion,
-    RecordState* state, std::optional<bool> transparent) const {
+    RecordState* state, std::optional<bool> transparent,
+    bool keptList) const {
     std::size_t calls = 0;
     RecordState own;
     RecordState& kept = state != nullptr ? *state : own;
@@ -5744,53 +5756,110 @@ std::size_t MeshDrawable::Record(
         batch.reset();
     };
 
-    for (const VisibleRange& visible : ranges) {
-        const WorldRange& range =
-            itemRanges_[visible.item][visible.range];
-        if (casters != nullptr && !casters->Draws(range.world)) {
-            continue;
-        }
-        const std::uint32_t vertices = itemIndices_[visible.item];
-        if (vertices == 0 || !drawn(visible.item)) {
-            continue;
-        }
-        if (visible.job >= 0) {
-            // Occluders draw with the direct draws, their only set;
-            // other jobs in their culled set's phase.
-            if (visible.occluder ? !direct : culledSet < 0) {
+    // What to draw, in order: planned from the ranges, or as planned
+    // for a kept list while it and the draws stay.
+    const auto plan = [&] {
+        std::vector<RecordStep> steps;
+        std::optional<RecordStep> open;
+        for (std::size_t r = 0; r < ranges.size(); ++r) {
+            const VisibleRange& visible = ranges[r];
+            const WorldRange& range =
+                itemRanges_[visible.item][visible.range];
+            if (casters != nullptr && !casters->Draws(range.world)) {
                 continue;
             }
-            const int set = visible.occluder ? 0 : culledSet;
-            const GpuCullJob& job =
-                cullJobs_[static_cast<std::size_t>(visible.job)];
-            const std::uint32_t levels =
-                cullDrawCounts_[static_cast<std::size_t>(
-                    visible.job)];
-            const std::uint32_t firstDraw =
-                set == 0 ? job.output[1] : job.output[3];
-            // Shadow batches span materials, except cutout ones,
-            // which bind their own to test their opacity.
-            const bool sameMaterial =
-                materialOf(batch ? batch->item : visible.item) ==
-                    materialOf(visible.item) &&
-                itemPipelines_[batch ? batch->item : visible.item] ==
-                    itemPipelines_[visible.item];
-            const bool joins =
-                batch && batch->first + batch->count == firstDraw &&
-                ((shadow && !cutout(batch->item) &&
-                  !cutout(visible.item)) ||
-                 sameMaterial);
-            if (!joins) {
-                flush();
-                batch = Batch{visible.item, firstDraw, 0};
+            const std::uint32_t vertices = itemIndices_[visible.item];
+            if (vertices == 0 || !drawn(visible.item)) {
+                continue;
             }
-            batch->count += levels;
+            if (visible.job >= 0) {
+                // Occluders draw with the direct draws, their only set;
+                // other jobs in their culled set's phase.
+                if (visible.occluder ? !direct : culledSet < 0) {
+                    continue;
+                }
+                const int set = visible.occluder ? 0 : culledSet;
+                const GpuCullJob& job =
+                    cullJobs_[static_cast<std::size_t>(visible.job)];
+                const std::uint32_t levels =
+                    cullDrawCounts_[static_cast<std::size_t>(
+                        visible.job)];
+                const std::uint32_t firstDraw =
+                    set == 0 ? job.output[1] : job.output[3];
+                // Shadow batches span materials, except cutout ones,
+                // which bind their own to test their opacity.
+                const std::uint32_t at = open ? open->item : visible.item;
+                const bool sameMaterial =
+                    materialOf(at) == materialOf(visible.item) &&
+                    itemPipelines_[at] == itemPipelines_[visible.item];
+                const bool joins =
+                    open && open->first + open->count == firstDraw &&
+                    ((shadow && !cutout(open->item) &&
+                      !cutout(visible.item)) ||
+                     sameMaterial);
+                if (!joins) {
+                    if (open) {
+                        steps.push_back(*open);
+                    }
+                    open = RecordStep{visible.item, firstDraw, 0};
+                }
+                open->count += levels;
+                continue;
+            }
+            if (!direct) {
+                continue;
+            }
+            if (open) {
+                steps.push_back(*open);
+                open.reset();
+            }
+            steps.push_back(
+                {visible.item, 0, 0, static_cast<std::int64_t>(r)});
+        }
+        if (open) {
+            steps.push_back(*open);
+        }
+        return steps;
+    };
+    std::vector<RecordStep> planned;
+    const std::vector<RecordStep>* steps = &planned;
+    if (keptList && motion == nullptr) {
+        const PlanVersion version = CurrentPlanVersion();
+        if (version != plansVersion_) {
+            plans_.clear();
+            plansVersion_ = version;
+        }
+        const PlanKey key{
+            ranges.data(),
+            ranges.size(),
+            casters != nullptr ? casters->world : 0,
+            static_cast<std::int8_t>(
+                casters == nullptr ? 0 : casters->shared ? 1 : 2),
+            static_cast<std::int8_t>(!transparent ? 0
+                                     : *transparent ? 2
+                                                    : 1),
+            shadow,
+            direct,
+            culledSet};
+        auto it = plans_.find(key);
+        if (it == plans_.end()) {
+            it = plans_.emplace(key, plan()).first;
+        }
+        steps = &it->second;
+    } else {
+        planned = plan();
+    }
+    for (const RecordStep& step : *steps) {
+        if (step.range < 0) {
+            batch = Batch{step.item, step.first, step.count};
+            flush();
             continue;
         }
-        if (!direct) {
-            continue;
-        }
-        flush();
+        const VisibleRange& visible =
+            ranges[static_cast<std::size_t>(step.range)];
+        const WorldRange& range =
+            itemRanges_[visible.item][visible.range];
+        const std::uint32_t vertices = itemIndices_[visible.item];
         bind(visible.item, false);
         constants.first = visible.item;
         constants.instanceOffset = range.first;
@@ -5884,7 +5953,7 @@ void MeshDrawable::RecordShadow(VkCommandBuffer commands,
     if (casters.world == ShadowCasters::kAllWorlds) {
         Record(commands, frame, shadowDraws_[cascade],
                lightViewProjection, &casters, true, true, 0, nullptr,
-               nullptr, opaque);
+               nullptr, opaque, true);
         return;
     }
     const auto& byWorld = shadowWorldDraws_[cascade];
@@ -5894,7 +5963,7 @@ void MeshDrawable::RecordShadow(VkCommandBuffer commands,
         if (draws != byWorld.end() && casters.Draws(world)) {
             Record(commands, frame, draws->second,
                    lightViewProjection, &casters, true, true, 0,
-                   nullptr, nullptr, opaque);
+                   nullptr, nullptr, opaque, true);
         }
         if (casters.world < 0) {
             break;  // the shared casters only
@@ -5954,11 +6023,11 @@ void MeshDrawable::RecordColorState(VkCommandBuffer commands,
         Record(commands, frame, viewDraws_[view], glm::mat4(1.0f),
                nullptr, false, true,
                occlusion_ == Occlusion::Off || twoPass ? 0 : -1,
-               nullptr, state, transparent);
+               nullptr, state, transparent, true);
         if (occlusion_ != Occlusion::Off) {
             Record(commands, frame, viewDraws_[view], glm::mat4(1.0f),
                    nullptr, false, false, twoPass ? 1 : 0, nullptr,
-                   state, transparent);
+                   state, transparent, true);
         }
         return;
     }
