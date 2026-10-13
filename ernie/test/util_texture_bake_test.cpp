@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -233,6 +235,110 @@ TEST_F(TextureBake, MosaicsBakeAsTheirJoinedImage) {
                  std::invalid_argument);
 }
 
+TEST_F(TextureBake, RasterBakesMatchWholeBakesBandByBand) {
+    // 600 x 2100: bands of 1024, 1024 and 52 rows, their mips 0 to 8
+    // made band by band (the last band's ending at mip 5), the rest
+    // joined; a bake a few rows of blocks a step is the same.
+    const auto input = Png("tall.png", 600, 2100, [](int x, int y) {
+        return glm::u8vec4(x * 7, y * 3, (x * y) & 0xff, 255 - y % 7);
+    });
+    for (const TextureFormat format :
+         {TextureFormat::Rgba8, TextureFormat::Bc7}) {
+        BakeOptions options;
+        options.format = format;
+        BakeTexture(input, dir_ / "whole.dds", options);
+        const TextureData whole = LoadTextureFile(dir_ / "whole.dds");
+        for (const std::uint64_t texels :
+             {~std::uint64_t{0}, std::uint64_t{20000}}) {
+            ernie::RasterBake bake(ernie::OpenRaster(input),
+                                   dir_ / "banded.dds", options);
+            int steps = 1;
+            while (!bake.Step(texels, true)) {
+                ++steps;
+            }
+            EXPECT_EQ(bake.Encoded(), bake.Total());
+            // 1.68 million texels in all.
+            if (texels < bake.Total()) {
+                EXPECT_GE(steps, 80);
+            }
+            const TextureData banded =
+                LoadTextureFile(dir_ / "banded.dds");
+            ASSERT_EQ(banded.mips, whole.mips);
+            ASSERT_EQ(banded.Data().size(), whole.Data().size());
+            for (std::uint32_t mip = 0; mip < whole.mips; ++mip) {
+                const auto a = whole.Mip(0, mip);
+                const auto b = banded.Mip(0, mip);
+                EXPECT_TRUE(std::equal(a.begin(), a.end(), b.begin()))
+                    << "format " << static_cast<int>(format)
+                    << ", mip " << mip << ", " << texels
+                    << " texels a step";
+            }
+        }
+    }
+}
+
+TEST_F(TextureBake, AnUnfinishedRasterBakeRemovesItsFile) {
+    const auto input = Png("big.png", 512, 3000, [](int x, int y) {
+        return glm::u8vec4(x, y, 0, 255);
+    });
+    const auto output = dir_ / "unfinished.dds";
+    {
+        ernie::RasterBake bake(ernie::OpenRaster(input), output);
+        EXPECT_FALSE(bake.Step(4096, true));
+        EXPECT_TRUE(std::filesystem::exists(output));
+        EXPECT_LT(bake.Encoded(), bake.Total());
+    }
+    EXPECT_FALSE(std::filesystem::exists(output));
+
+    BakeOptions normal;
+    normal.role = TextureRole::Normal;
+    EXPECT_THROW(ernie::RasterBake(ernie::OpenRaster(input),
+                                   dir_ / "normal.dds", normal),
+                 std::invalid_argument);
+}
+
+TEST_F(TextureBake, MosaicFilesNameTheirTilesRowByRow) {
+    std::vector<std::filesystem::path> tiles;
+    for (int row = 0; row < 2; ++row) {
+        for (int column = 0; column < 3; ++column) {
+            tiles.push_back(Png("tile" + std::to_string(row) +
+                                    std::to_string(column) + ".png",
+                                8, 4, [&](int x, int y) {
+                                    return glm::u8vec4(column * 8 + x,
+                                                       row * 4 + y, 0,
+                                                       255);
+                                }));
+        }
+    }
+    {
+        std::ofstream file(dir_ / "world.mosaic");
+        file << "# Two rows of three\n"
+             << "tile00.png tile01.png  tile02.png\n\n"
+             << "tile10.png tile11.png tile12.png  # bottom\n";
+    }
+    const std::unique_ptr<ernie::RasterSource> mosaic =
+        ernie::OpenRaster(dir_ / "world.mosaic");
+    ASSERT_EQ(mosaic->Width(), 24u);
+    ASSERT_EQ(mosaic->Height(), 8u);
+    EXPECT_EQ(mosaic->Parts().size(), 6u);
+    // A rectangle across all six tiles reads as the joined image.
+    std::vector<std::byte> pixels(20 * 6 * 4);
+    mosaic->Read(2, 1, 20, 6, pixels);
+    for (std::uint32_t y = 0; y < 6; ++y) {
+        for (std::uint32_t x = 0; x < 20; ++x) {
+            const std::size_t at = (y * 20 + x) * 4;
+            ASSERT_EQ(static_cast<int>(pixels[at]), 2 + x);
+            ASSERT_EQ(static_cast<int>(pixels[at + 1]), 1 + y);
+        }
+    }
+    {
+        std::ofstream file(dir_ / "ragged.mosaic");
+        file << "tile00.png tile01.png\ntile10.png\n";
+    }
+    EXPECT_THROW(ernie::OpenRaster(dir_ / "ragged.mosaic"),
+                 std::invalid_argument);
+}
+
 TEST_F(TextureBake, DecodedBlocksMatchTheirSources) {
     // An 8 x 8 diagonal gradient's mips (its colours on one line, as
     // BC1 and BC7's one subset fit) baked to BC1, BC4, BC5 and BC7
@@ -311,10 +417,33 @@ TEST_F(TextureBake, TheTextureCacheKeepsTheRecentlyUsed) {
     ASSERT_TRUE(c);
     EXPECT_EQ(c->Mip(0, 0)[0], std::byte{1});
 
+    // A bake written in parts beside the cache, published: kept,
+    // though larger than the cache, the others going.
+    const std::optional<std::filesystem::path> partial =
+        cache.PartialPath("big");
+    ASSERT_TRUE(partial);
+    {
+        const auto png = Png("big.png", 64, 64, [](int x, int y) {
+            return glm::u8vec4(x, y, 0, 255);
+        });
+        ernie::RasterBake bake(ernie::OpenRaster(png), *partial);
+        while (!bake.Step(~std::uint64_t{0}, true)) {
+        }
+    }
+    EXPECT_FALSE(cache.Read("big"));
+    EXPECT_TRUE(cache.Publish(*partial, "big"));
+    EXPECT_FALSE(std::filesystem::exists(*partial));
+    const std::optional<TextureData> big = cache.Read("big");
+    ASSERT_TRUE(big);
+    EXPECT_EQ(big->width, 64u);
+    EXPECT_FALSE(cache.Read("a"));
+    EXPECT_FALSE(cache.Read("c"));
+
     const ernie::TextureCache none(std::nullopt);
     EXPECT_FALSE(none.Enabled());
     none.Write("a", texture);
     EXPECT_FALSE(none.Read("a"));
+    EXPECT_FALSE(none.PartialPath("a"));
 }
 
 TEST_F(TextureBake, Rgba8MipsHalveAnImageIn8Bits) {

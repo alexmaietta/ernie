@@ -15,8 +15,9 @@ namespace ernie {
 /// GPU), so that a texture decodes, mips and encodes once until its
 /// file, or how it is read, changes. Entries are keyed by a hash of
 /// everything they depend on; past `capacity` bytes the least
-/// recently used go. Any thread may read; failures to read or write
-/// are a miss, never an error.
+/// recently used go (16 GB by default: a global mosaic of Blue
+/// Marble's eight tiles is 5 GB of BC7). Any thread may read;
+/// failures to read or write are a miss, never an error.
 class TextureCache {
   public:
     /// The default folder: `ERNIE_TEXTURE_CACHE` (empty or "0" for
@@ -27,7 +28,7 @@ class TextureCache {
     /// A cache in `directory`, none without one.
     explicit TextureCache(std::optional<std::filesystem::path>
                               directory = DefaultDirectory(),
-                          std::uintmax_t capacity = std::uintmax_t{4}
+                          std::uintmax_t capacity = std::uintmax_t{16}
                                                     << 30);
 
     bool Enabled() const {
@@ -43,12 +44,27 @@ class TextureCache {
     void Write(std::string_view key,
                const TextureData& texture) const;
 
+    /// A new file beside the cache's for a DDS file to be written to
+    /// in parts (a `RasterBake`), then cached by `Publish`; none
+    /// without a cache.
+    std::optional<std::filesystem::path>
+    PartialPath(std::string_view key) const;
+
+    /// Caches the DDS file written whole at `partial` under `key`,
+    /// moving it, then removes the least recently used past the
+    /// capacity, never it. False if it could not be moved (it is
+    /// removed).
+    bool Publish(const std::filesystem::path& partial,
+                 std::string_view key) const;
+
     /// Forgets the texture cached under `key`, if any.
     void Remove(std::string_view key) const;
 
   private:
     std::filesystem::path PathOf(std::string_view key) const;
-    void Prune() const;
+    /// Removes the least recently used past the capacity, but not
+    /// `kept`.
+    void Prune(const std::filesystem::path& kept) const;
 
     std::optional<std::filesystem::path> directory_;
     std::uintmax_t capacity_;

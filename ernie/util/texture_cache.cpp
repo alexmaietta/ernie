@@ -6,6 +6,7 @@
 #include "ernie/util/texture_bake.h"
 
 #include <algorithm>
+#include <chrono>
 #include <random>
 #include <string>
 #include <utility>
@@ -61,28 +62,50 @@ TextureCache::Read(std::string_view key) const {
 
 void TextureCache::Write(std::string_view key,
                          const TextureData& texture) const {
-    if (!directory_) {
+    const std::optional<fs::path> partial = PartialPath(key);
+    if (!partial) {
         return;
     }
     ERNIE_ZONE("Texture cache write");
-    const fs::path path = PathOf(key);
-    // Written beside it, then renamed over it, so that no reader (in
-    // this process or another) sees a part of it.
-    fs::path partial = path;
-    partial += ".part" + std::to_string(std::random_device{}());
-    std::error_code error;
-    fs::create_directories(*directory_, error);
     try {
-        WriteDdsFile(partial, texture);
-        fs::rename(partial, path, error);
+        WriteDdsFile(*partial, texture);
     } catch (const std::exception&) {
-        error = std::make_error_code(std::errc::io_error);
-    }
-    if (error) {
-        fs::remove(partial, error);
+        std::error_code error;
+        fs::remove(*partial, error);
         return;
     }
-    Prune();
+    Publish(*partial, key);
+}
+
+std::optional<fs::path>
+TextureCache::PartialPath(std::string_view key) const {
+    if (!directory_) {
+        return std::nullopt;
+    }
+    std::error_code error;
+    fs::create_directories(*directory_, error);
+    // Written beside its entry, then renamed over it, so that no
+    // reader (in this process or another) sees a part of it.
+    fs::path partial = PathOf(key);
+    partial += ".part" + std::to_string(std::random_device{}());
+    return partial;
+}
+
+bool TextureCache::Publish(const fs::path& partial,
+                           std::string_view key) const {
+    std::error_code error;
+    if (!directory_) {
+        fs::remove(partial, error);
+        return false;
+    }
+    const fs::path path = PathOf(key);
+    fs::rename(partial, path, error);
+    if (error) {
+        fs::remove(partial, error);
+        return false;
+    }
+    Prune(path);
+    return true;
 }
 
 void TextureCache::Remove(std::string_view key) const {
@@ -92,7 +115,7 @@ void TextureCache::Remove(std::string_view key) const {
     }
 }
 
-void TextureCache::Prune() const {
+void TextureCache::Prune(const fs::path& kept) const {
     ERNIE_ZONE("Texture cache prune");
     struct Entry {
         fs::path path;
@@ -102,13 +125,24 @@ void TextureCache::Prune() const {
     std::vector<Entry> entries;
     std::uintmax_t total = 0;
     std::error_code error;
+    const fs::file_time_type now = fs::file_time_type::clock::now();
     for (const fs::directory_entry& file :
          fs::directory_iterator(*directory_, error)) {
+        const fs::file_time_type used = file.last_write_time(error);
+        if (error) {
+            continue;
+        }
+        // Parts a day old are of writes that never finished.
+        if (file.path().extension().string().starts_with(".part")) {
+            if (now - used > std::chrono::hours(24)) {
+                fs::remove(file.path(), error);
+            }
+            continue;
+        }
         if (file.path().extension() != ".dds") {
             continue;
         }
-        Entry entry{file.path(), file.last_write_time(error),
-                    file.file_size(error)};
+        Entry entry{file.path(), used, file.file_size(error)};
         if (error) {
             continue;
         }
@@ -125,6 +159,9 @@ void TextureCache::Prune() const {
     for (const Entry& entry : entries) {
         if (total <= capacity_) {
             break;
+        }
+        if (entry.path == kept) {
+            continue;
         }
         if (fs::remove(entry.path, error)) {
             total -= entry.bytes;

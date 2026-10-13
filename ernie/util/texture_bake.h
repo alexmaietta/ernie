@@ -2,9 +2,12 @@
 #pragma once
 
 #include "ernie/util/image.h"
+#include "ernie/util/raster_source.h"
 #include "ernie/util/texture_file.h"
 
+#include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 
@@ -107,6 +110,60 @@ LoadRgba8Mips(const std::filesystem::path& file, bool srgb);
 TextureData BakeTexture(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         const BakeOptions& options = {});
+
+/// A colour or data raster baked into a DDS file a band of rows at a
+/// time, as `BakeTexture` would bake it whole: for images larger than
+/// memory, than JPEG's 65535 limit or than one file (a
+/// `MosaicRaster`), and to spread a bake over a viewer's frames.
+///
+/// A thread of the bake's own reads the raster a part
+/// (`RasterSource::Parts`) and a band of 1024 rows at a time, as
+/// RGBA8, and makes the band's mips while they split into whole
+/// blocks at its edges, each the 2 x 2 average of the last (in linear
+/// light for sRGB colour), exactly the whole image's mips there. The
+/// smaller mips come from the bands' last ones joined. `Step`, on the
+/// caller's thread, encodes what is ready (on the GPU with the
+/// options' encoder) and writes it in place in the file. At most some
+/// 256 MB of band mips wait to be encoded.
+///
+/// Samples are 8- or 16-bit (the high byte kept); one channel is
+/// grey, two grey and alpha, three RGB.
+///
+/// References:
+/// - R. Geldreich, "bc7enc_rdo" (bc7enc and rgbcx).
+///   https://github.com/richgel999/bc7enc_rdo
+class RasterBake {
+  public:
+    /// Begins baking `source` into `output` (its header written).
+    /// @throws std::invalid_argument for normal maps or samples that
+    /// are not 8- or 16-bit; std::runtime_error if `output` cannot be
+    /// written.
+    RasterBake(std::unique_ptr<RasterSource> source,
+               const std::filesystem::path& output,
+               const BakeOptions& options = {});
+    /// Stops the bake; an unfinished one removes its file.
+    ~RasterBake();
+    RasterBake(const RasterBake&) = delete;
+    RasterBake& operator=(const RasterBake&) = delete;
+
+    /// The stored texture's layout, its texels in the file only.
+    const TextureData& Layout() const;
+
+    /// Encodes and writes what the reading thread has ready, about
+    /// `texels` texels of it (a band's rows of blocks at least); with
+    /// `wait`, waiting for it to be read. Returns true once the file
+    /// is whole.
+    /// @throws what reading the raster or writing the file threw.
+    bool Step(std::uint64_t texels, bool wait = false);
+
+    /// Texels of every mip encoded, and in all.
+    std::uint64_t Encoded() const;
+    std::uint64_t Total() const;
+
+  private:
+    struct State;
+    std::unique_ptr<State> state_;
+};
 
 /// As `BakeTexture`, for an image too large to hold whole: a mosaic
 /// of `tiles`, 8-bit PNG or JPEG images of one size, `columns` to a

@@ -12,11 +12,16 @@
 #include <atomic>
 #include <cctype>
 #include <cmath>
+#include <condition_variable>
 #include <cstring>
+#include <deque>
+#include <exception>
 #include <fstream>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <numeric>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -532,189 +537,441 @@ TextureData BakeTexture(const std::filesystem::path& input,
     return texture;
 }
 
-TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
-                       std::uint32_t columns,
-                       const std::filesystem::path& output,
-                       const BakeOptions& options) {
-    ERNIE_ZONE("Bake mosaic");
-    if (columns == 0 || tiles.empty() ||
-        tiles.size() % columns != 0) {
-        throw std::invalid_argument("A mosaic needs whole rows of " +
-                                    std::to_string(columns) +
-                                    " tiles");
+namespace {
+
+/// Rows of a band read at once.
+constexpr std::uint32_t kBandRows = 1024;
+/// Band mips waiting to be encoded, past which reading waits.
+constexpr std::size_t kQueuedBytes = std::size_t{256} << 20;
+
+/// The texels of mip `mip` from a span [`start`, `start` + `count`)
+/// of a side of `side` texels: the span's start there and how many.
+/// Spans start at multiples of 2^mip, so a mip's spans tile it.
+std::pair<std::uint32_t, std::uint32_t> MipSpan(std::uint32_t side,
+                                                std::uint32_t start,
+                                                std::uint32_t count,
+                                                std::uint32_t mip) {
+    const std::uint32_t first = start >> mip;
+    const std::uint32_t end = start + count == side
+                                  ? std::max(1u, side >> mip)
+                                  : (start + count) >> mip;
+    return {first, end > first ? end - first : 0};
+}
+
+/// `pixels` samples of `source`'s at `samples` as RGBA8 at `out`.
+void ToRgba8(const RasterSource& source, const std::byte* samples,
+             std::size_t pixels, std::uint8_t* out) {
+    const std::uint32_t channels = source.Channels();
+    const bool wide = source.Type() == RasterSampleType::UInt16;
+    for (std::size_t i = 0; i < pixels; ++i) {
+        std::array<std::uint8_t, 4> c{0, 0, 0, 255};
+        for (std::uint32_t k = 0; k < std::min(channels, 4u); ++k) {
+            if (wide) {
+                std::uint16_t value = 0;
+                std::memcpy(&value, samples + (i * channels + k) * 2,
+                            2);
+                c[k] = static_cast<std::uint8_t>(value >> 8);
+            } else {
+                c[k] = static_cast<std::uint8_t>(
+                    samples[i * channels + k]);
+            }
+        }
+        if (channels <= 2) {
+            // Grey, and alpha.
+            c = {c[0], c[0], c[0], channels == 2 ? c[1] : c[3]};
+        }
+        std::memcpy(out + i * 4, c.data(), 4);
     }
+}
+
+/// The rows and columns of `rgba` (`width` wide) up to `w` x `h`.
+std::vector<std::uint8_t> Cropped(std::vector<std::uint8_t> rgba,
+                                  std::uint32_t width,
+                                  std::uint32_t w, std::uint32_t h) {
+    if (w == width) {
+        rgba.resize(std::size_t{w} * h * 4);
+        return rgba;
+    }
+    std::vector<std::uint8_t> cropped(std::size_t{w} * h * 4);
+    for (std::uint32_t y = 0; y < h; ++y) {
+        std::memcpy(cropped.data() + std::size_t{y} * w * 4,
+                    rgba.data() + std::size_t{y} * width * 4,
+                    std::size_t{w} * 4);
+    }
+    return cropped;
+}
+
+}  // namespace
+
+struct RasterBake::State {
+    /// A rectangle of a mip to encode: `w` x `h` texels at (`x`, `y`)
+    /// of mip `mip`, RGBA8.
+    struct Piece {
+        std::uint32_t mip = 0;
+        std::uint32_t x = 0;
+        std::uint32_t y = 0;
+        std::uint32_t w = 0;
+        std::uint32_t h = 0;
+        std::vector<std::uint8_t> rgba;
+    };
+
+    std::unique_ptr<RasterSource> source;
+    std::filesystem::path output;
+    BakeOptions options;
+    bool srgb = true;
+    TextureData layout;
+    TextureFormatInfo info;
+    bc7enc_compress_block_params bc7{};
+    /// Mips made band by band; the rest are joined.
+    std::uint32_t banded = 0;
+    std::fstream file;
+    std::uint64_t total = 0;
+    std::atomic<std::uint64_t> encoded = 0;
+
+    std::mutex mutex;
+    std::condition_variable changed;
+    std::deque<Piece> pieces;
+    std::size_t queued = 0;  ///< Bytes of `pieces`.
+    bool read = false;       ///< Every piece queued.
+    bool stop = false;
+    std::exception_ptr failure;
+
+    /// The piece being encoded, and its rows done.
+    std::optional<Piece> current;
+    std::uint32_t row = 0;
+    bool done = false;
+    std::jthread reader;
+
+    /// Queues `piece`, once there is room.
+    void Queue(Piece piece) {
+        std::unique_lock lock(mutex);
+        changed.wait(lock, [&] {
+            return stop || pieces.empty() || queued < kQueuedBytes;
+        });
+        if (stop) {
+            return;
+        }
+        queued += piece.rgba.size();
+        pieces.push_back(std::move(piece));
+        changed.notify_all();
+    }
+
+    bool Stopping() {
+        const std::scoped_lock lock(mutex);
+        return stop;
+    }
+
+    /// The reading thread: bands' mips, then the joined ones.
+    void Read() {
+        try {
+            ReadBands();
+        } catch (...) {
+            const std::scoped_lock lock(mutex);
+            failure = std::current_exception();
+        }
+        const std::scoped_lock lock(mutex);
+        read = true;
+        changed.notify_all();
+    }
+
+    void ReadBands() {
+        ERNIE_ZONE("Read raster bands");
+        const std::uint32_t width = layout.width;
+        const std::uint32_t height = layout.height;
+        const std::size_t pixel =
+            std::size_t{source->Channels()} * source->SampleBytes();
+        const std::uint32_t joinedWidth =
+            MipSpan(width, 0, width, banded).second;
+        const std::uint32_t joinedHeight =
+            MipSpan(height, 0, height, banded).second;
+        std::vector<std::uint8_t> joined;
+        if (banded < layout.mips) {
+            joined.resize(std::size_t{joinedWidth} * joinedHeight *
+                          4);
+        }
+        std::vector<std::byte> samples;
+        for (const RasterRect& part : source->Parts()) {
+            for (std::uint32_t y = part.y; y < part.y + part.height;
+                 y += kBandRows) {
+                if (Stopping()) {
+                    return;
+                }
+                const std::uint32_t rows =
+                    std::min(kBandRows, part.y + part.height - y);
+                std::uint32_t w = part.width;
+                std::uint32_t h = rows;
+                samples.resize(std::size_t{w} * h * pixel);
+                std::vector<std::uint8_t> rgba(std::size_t{w} * h *
+                                               4);
+                {
+                    ERNIE_ZONE("Read band");
+                    source->Read(part.x, y, w, h, samples);
+                    ToRgba8(*source, samples.data(),
+                            std::size_t{w} * h, rgba.data());
+                }
+                for (std::uint32_t mip = 0;; ++mip) {
+                    const auto [x0, across] =
+                        MipSpan(width, part.x, part.width, mip);
+                    const auto [y0, down] =
+                        MipSpan(height, y, rows, mip);
+                    if (across == 0 || down == 0) {
+                        break;
+                    }
+                    // Halving keeps a texel of a side of one, which
+                    // the whole image's mip may not have here.
+                    if (across < w || down < h) {
+                        rgba =
+                            Cropped(std::move(rgba), w, across, down);
+                        w = across;
+                        h = down;
+                    }
+                    if (mip == banded) {
+                        for (std::uint32_t r = 0; r < h; ++r) {
+                            std::memcpy(
+                                joined.data() + (std::size_t{y0 + r} *
+                                                     joinedWidth +
+                                                 x0) *
+                                                    4,
+                                rgba.data() + std::size_t{r} * w * 4,
+                                std::size_t{w} * 4);
+                        }
+                        break;
+                    }
+                    const bool last = mip + 1 == layout.mips;
+                    std::vector<std::uint8_t> half =
+                        last ? std::vector<std::uint8_t>{}
+                             : HalveRgba8(rgba, w, h, srgb);
+                    Queue(Piece{mip, x0, y0, w, h, std::move(rgba)});
+                    if (last || Stopping()) {
+                        break;
+                    }
+                    rgba = std::move(half);
+                    w = std::max(1u, w / 2);
+                    h = std::max(1u, h / 2);
+                }
+            }
+        }
+        source->Release();
+        std::uint32_t w = joinedWidth;
+        std::uint32_t h = joinedHeight;
+        for (std::uint32_t mip = banded; mip < layout.mips; ++mip) {
+            if (Stopping()) {
+                return;
+            }
+            std::vector<std::uint8_t> half =
+                mip + 1 < layout.mips ? HalveRgba8(joined, w, h, srgb)
+                                      : std::vector<std::uint8_t>{};
+            Queue(Piece{mip, 0, 0, w, h, std::move(joined)});
+            joined = std::move(half);
+            w = std::max(1u, w / 2);
+            h = std::max(1u, h / 2);
+        }
+    }
+};
+
+RasterBake::RasterBake(std::unique_ptr<RasterSource> source,
+                       const std::filesystem::path& output,
+                       const BakeOptions& options)
+    : state_(std::make_unique<State>()) {
+    State& s = *state_;
     if (options.role == TextureRole::Normal) {
         throw std::invalid_argument(
-            "Normal maps are not baked as mosaics");
+            "Normal maps are not baked by bands");
     }
-    const auto rows =
-        static_cast<std::uint32_t>(tiles.size() / columns);
-    // Every tile an 8-bit PNG or JPEG of one size.
-    std::uint32_t tileWidth = 0;
-    std::uint32_t tileHeight = 0;
-    for (const std::filesystem::path& tile : tiles) {
-        const std::string name = tile.string();
-        int width = 0;
-        int height = 0;
-        int channels = 0;
-        if (stbi_info(name.c_str(), &width, &height, &channels) ==
-                0 ||
-            stbi_is_16_bit(name.c_str()) != 0) {
-            throw std::runtime_error("Cannot read " + name +
-                                     " as an 8-bit PNG or JPEG");
-        }
-        if (tileWidth == 0) {
-            tileWidth = static_cast<std::uint32_t>(width);
-            tileHeight = static_cast<std::uint32_t>(height);
-        } else if (static_cast<std::uint32_t>(width) != tileWidth ||
-                   static_cast<std::uint32_t>(height) != tileHeight) {
-            throw std::invalid_argument(
-                "A mosaic's tiles are all one size: " + name +
-                " is not " + std::to_string(tileWidth) + " x " +
-                std::to_string(tileHeight));
-        }
+    if (source->Type() != RasterSampleType::UInt8 &&
+        source->Type() != RasterSampleType::UInt16) {
+        throw std::invalid_argument(
+            "Textures bake from 8- or 16-bit samples");
     }
-    const bool srgb =
-        options.role == TextureRole::Colour && options.srgb;
+    s.source = std::move(source);
+    s.output = output;
+    s.options = options;
+    s.srgb = options.role == TextureRole::Colour && options.srgb;
     const TextureFormat format =
-        WithSrgb(options.format.value_or(TextureFormat::Bc7), srgb);
-    const std::uint32_t width = columns * tileWidth;
-    const std::uint32_t height = rows * tileHeight;
+        WithSrgb(options.format.value_or(TextureFormat::Bc7), s.srgb);
+    const std::uint32_t width = s.source->Width();
+    const std::uint32_t height = s.source->Height();
     std::uint32_t mips = 1;
     for (std::uint32_t side = std::max(width, height); side > 1;
          side >>= 1) {
         ++mips;
     }
-    const TextureData layout =
-        Allocate(format, width, height, mips, false);
-    const TextureFormatInfo info = InfoOf(format);
-    // Mips stay per tile while they halve exactly and split into
-    // whole blocks at the tiles' edges (21600 texels: mips 0 to 3);
-    // the rest are made from those tiles' last mips joined.
-    std::uint32_t perTile = 0;
-    while (perTile + 1 < mips && tileWidth % (4u << perTile) == 0 &&
-           tileHeight % (4u << perTile) == 0) {
-        ++perTile;
+    s.layout = Allocate(format, width, height, mips, false);
+    s.info = InfoOf(format);
+    s.bc7 = Bc7Params(format, options.quality);
+    for (std::uint32_t mip = 0; mip < mips; ++mip) {
+        s.total += std::uint64_t{std::max(1u, width >> mip)} *
+                   std::max(1u, height >> mip);
     }
-    std::ofstream file(output, std::ios::binary | std::ios::trunc);
-    if (!file) {
+    // Bands start at multiples of `alignment` texels: their mips are
+    // made band by band while their starts there are of whole blocks
+    // and halve exactly into the next.
+    const std::vector<RasterRect> parts = s.source->Parts();
+    std::uint32_t alignment = kBandRows;
+    for (const RasterRect& part : parts) {
+        alignment = std::gcd(alignment, std::gcd(part.x, part.y));
+        if (part.x + part.width != width) {
+            alignment = std::gcd(alignment, part.width);
+        }
+        if (part.y + part.height != height) {
+            alignment = std::gcd(alignment, part.height);
+        }
+    }
+    const bool whole = parts.size() == 1 && height <= kBandRows;
+    s.banded = whole ? mips : 0;
+    while (!whole && s.banded < mips &&
+           alignment % (std::max(s.info.blockSize, 2u) << s.banded) ==
+               0) {
+        ++s.banded;
+    }
+    s.file.open(output,
+                std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!s.file) {
         throw std::runtime_error("Cannot write " + output.string());
     }
-    WriteDdsHeader(file, layout);
-    // Writes `blocks` (`across` x `down` blocks of mip `mip`) at
-    // block
-    // (`column`, `row`) of the mip.
-    const auto write = [&](std::uint32_t mip, std::uint32_t column,
-                           std::uint32_t row, std::uint32_t across,
-                           std::uint32_t down,
-                           const std::vector<std::byte>& blocks) {
-        const std::uint32_t mipWidth = std::max(1u, width >> mip);
-        const std::size_t mipAcross =
-            (mipWidth + info.blockSize - 1) / info.blockSize;
-        for (std::uint32_t y = 0; y < down; ++y) {
-            file.seekp(static_cast<std::streamoff>(
-                kDdsHeaderBytes + layout.offsets[mip] +
-                ((row + y) * mipAcross + column) * info.blockBytes));
-            file.write(reinterpret_cast<const char*>(
-                           blocks.data() +
-                           std::size_t{y} * across * info.blockBytes),
-                       static_cast<std::streamsize>(across *
-                                                    info.blockBytes));
-        }
-    };
-    const bc7enc_compress_block_params bc7 =
-        Bc7Params(format, options.quality);
-    const auto encode = [&](std::span<const std::uint8_t> rgba,
-                            std::uint32_t w, std::uint32_t h) {
-        std::vector<std::byte> blocks(ImageBytes(format, w, h));
-        if (info.compressed()) {
-            if (options.encoder != nullptr &&
-                options.encoder->Encodes(format)) {
-                options.encoder->Encode(rgba, w, h, format,
-                                        blocks.data());
-            } else {
-                EncodeBlocks(format, rgba, w, h, blocks.data(), bc7);
-            }
-        } else {
-            std::memcpy(blocks.data(), rgba.data(), rgba.size());
-        }
-        return blocks;
-    };
+    WriteDdsHeader(s.file, s.layout);
+    s.reader = std::jthread([&s] { s.Read(); });
+}
 
-    // The tiles' last per-tile mips, joined.
-    const std::uint32_t joinedWidth = width >> perTile;
-    const std::uint32_t joinedHeight = height >> perTile;
-    std::vector<std::uint8_t> joined(std::size_t{joinedWidth} *
-                                     joinedHeight * 4);
-    // The next tile decodes on its own thread while this one encodes.
-    using Decoded =
-        std::unique_ptr<stbi_uc, decltype(&stbi_image_free)>;
-    const auto decode = [&](std::size_t index) {
-        const std::string name = tiles[index].string();
-        int w = 0;
-        int h = 0;
-        int channels = 0;
-        stbi_uc* data = stbi_load(name.c_str(), &w, &h, &channels, 4);
-        if (data == nullptr) {
-            throw std::runtime_error("Cannot read " + name + ": " +
-                                     stbi_failure_reason());
+RasterBake::~RasterBake() {
+    State& s = *state_;
+    {
+        const std::scoped_lock lock(s.mutex);
+        s.stop = true;
+        s.changed.notify_all();
+    }
+    if (s.reader.joinable()) {
+        s.reader.join();
+    }
+    if (!s.done) {
+        s.file.close();
+        std::error_code error;
+        std::filesystem::remove(s.output, error);
+    }
+}
+
+const TextureData& RasterBake::Layout() const {
+    return state_->layout;
+}
+
+std::uint64_t RasterBake::Encoded() const {
+    return state_->encoded;
+}
+
+std::uint64_t RasterBake::Total() const {
+    return state_->total;
+}
+
+bool RasterBake::Step(std::uint64_t texels, bool wait) {
+    ERNIE_ZONE("Raster bake step");
+    State& s = *state_;
+    std::uint64_t spent = 0;
+    const std::uint32_t side = s.info.blockSize;
+    std::vector<std::byte> blocks;
+    while (!s.done) {
+        if (!s.current) {
+            std::unique_lock lock(s.mutex);
+            if (wait) {
+                s.changed.wait(lock, [&] {
+                    return !s.pieces.empty() || s.read;
+                });
+            }
+            if (s.failure) {
+                std::rethrow_exception(s.failure);
+            }
+            if (s.pieces.empty()) {
+                if (!s.read) {
+                    return false;
+                }
+                lock.unlock();
+                s.file.close();
+                if (!s.file) {
+                    throw std::runtime_error("Cannot write " +
+                                             s.output.string());
+                }
+                s.done = true;
+                break;
+            }
+            s.current = std::move(s.pieces.front());
+            s.pieces.pop_front();
+            s.queued -= s.current->rgba.size();
+            s.row = 0;
+            s.changed.notify_all();
         }
-        return Decoded(data, &stbi_image_free);
-    };
-    std::future<Decoded> next =
-        std::async(std::launch::async, decode, 0);
-    for (std::size_t index = 0; index < tiles.size(); ++index) {
-        Decoded decoded = next.get();
-        if (index + 1 < tiles.size()) {
-            next = std::async(std::launch::async, decode, index + 1);
+        if (spent >= texels) {
+            return false;
         }
-        const auto column =
-            static_cast<std::uint32_t>(index % columns);
-        const auto row = static_cast<std::uint32_t>(index / columns);
-        std::uint32_t w = tileWidth;
-        std::uint32_t h = tileHeight;
-        std::vector<std::uint8_t> halved;
-        std::span<const std::uint8_t> rgba(decoded.get(),
-                                           std::size_t{w} * h * 4);
-        for (std::uint32_t mip = 0; mip < perTile; ++mip) {
-            const std::uint32_t across =
-                (w + info.blockSize - 1) / info.blockSize;
-            const std::uint32_t down =
-                (h + info.blockSize - 1) / info.blockSize;
-            write(mip, column * across, row * down, across, down,
-                  encode(rgba, w, h));
-            halved = HalveRgba8(rgba, w, h, srgb);
-            rgba = halved;
-            decoded.reset();
-            w /= 2;
-            h /= 2;
+        // Whole rows of blocks, about the texels left.
+        const State::Piece& piece = *s.current;
+        const std::uint64_t left = texels - spent;
+        const auto fit =
+            static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                piece.h, left / piece.w / side * side));
+        const std::uint32_t rows =
+            std::min(piece.h - s.row, std::max(fit, side));
+        const std::span<const std::uint8_t> rgba(
+            piece.rgba.data() + std::size_t{s.row} * piece.w * 4,
+            std::size_t{rows} * piece.w * 4);
+        const TextureFormat format = s.layout.format;
+        blocks.resize(ImageBytes(format, piece.w, rows));
+        {
+            ERNIE_ZONE("Encode band");
+            if (!s.info.compressed()) {
+                std::memcpy(blocks.data(), rgba.data(), rgba.size());
+            } else if (s.options.encoder != nullptr &&
+                       s.options.encoder->Encodes(format)) {
+                s.options.encoder->Encode(rgba, piece.w, rows, format,
+                                          blocks.data());
+            } else {
+                EncodeBlocks(format, rgba, piece.w, rows,
+                             blocks.data(), s.bc7);
+            }
         }
-        for (std::uint32_t y = 0; y < h; ++y) {
-            std::memcpy(joined.data() + ((std::size_t{row} * h + y) *
-                                             joinedWidth +
-                                         std::size_t{column} * w) *
-                                            4,
-                        rgba.data() + std::size_t{y} * w * 4,
-                        std::size_t{w} * 4);
+        // Each row of blocks in its place in the mip.
+        const std::size_t mipAcross =
+            (std::max(1u, s.layout.width >> piece.mip) + side - 1) /
+            side;
+        const std::size_t across = (piece.w + side - 1) / side;
+        const std::size_t rowBytes = across * s.info.blockBytes;
+        for (std::uint32_t y = 0; y < (rows + side - 1) / side; ++y) {
+            const std::size_t at =
+                kDdsHeaderBytes + s.layout.offsets[piece.mip] +
+                ((std::size_t{piece.y + s.row} / side + y) *
+                     mipAcross +
+                 piece.x / side) *
+                    s.info.blockBytes;
+            s.file.seekp(static_cast<std::streamoff>(at));
+            s.file.write(reinterpret_cast<const char*>(blocks.data() +
+                                                       y * rowBytes),
+                         static_cast<std::streamsize>(rowBytes));
+        }
+        if (!s.file) {
+            throw std::runtime_error("Cannot write " +
+                                     s.output.string());
+        }
+        spent += std::uint64_t{piece.w} * rows;
+        s.encoded += std::uint64_t{piece.w} * rows;
+        s.row += rows;
+        if (s.row >= piece.h) {
+            s.current.reset();
         }
     }
-    // The joined mips, down to 1 x 1.
-    std::uint32_t w = joinedWidth;
-    std::uint32_t h = joinedHeight;
-    for (std::uint32_t mip = perTile; mip < mips; ++mip) {
-        write(mip, 0, 0, (w + info.blockSize - 1) / info.blockSize,
-              (h + info.blockSize - 1) / info.blockSize,
-              encode(joined, w, h));
-        if (mip + 1 < mips) {
-            joined = HalveRgba8(joined, w, h, srgb);
-            w = std::max(1u, w / 2);
-            h = std::max(1u, h / 2);
-        }
+    return true;
+}
+
+TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
+                       std::uint32_t columns,
+                       const std::filesystem::path& output,
+                       const BakeOptions& options) {
+    ERNIE_ZONE("Bake mosaic");
+    RasterBake bake(std::make_unique<MosaicRaster>(
+                        std::vector<std::filesystem::path>(
+                            tiles.begin(), tiles.end()),
+                        columns),
+                    output, options);
+    while (!bake.Step(~std::uint64_t{0}, true)) {
     }
-    if (!file) {
-        throw std::runtime_error("Cannot write " + output.string());
-    }
-    return layout;
+    return bake.Layout();
 }
 
 }  // namespace ernie
