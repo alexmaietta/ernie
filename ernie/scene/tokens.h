@@ -1032,6 +1032,30 @@ inline constexpr std::string_view kThermalModelParams =
     "ernie:thermal:model:params";
 inline constexpr std::string_view kThermalModelData =
     "ernie:thermal:model:data";
+/// A Material's thermal terminal (Ernie), as `outputs:surface` is its
+/// surface's: connected to an ErnieThermal Shader, whose inputs give
+/// the material's thermal properties in place of its own
+/// `ernie:thermal:*`, its temperature connectable to a texture (one
+/// channel of a UsdUVTexture, kelvin after its scale and bias, read
+/// at the mesh's texture coordinates as the Material's temperature
+/// texture is, without a UsdTransform2d). The node formats' importers
+/// map their thermal properties onto.
+inline constexpr std::string_view kThermalOutput =
+    "outputs:ernie:thermal";
+inline constexpr std::string_view kErnieThermal = "ErnieThermal";
+/// ErnieThermal's inputs: temperature (K, 0 for none), emissivity (0
+/// to 1 at every wavelength; below 0, 1 minus the reflectance),
+/// temperature model, its parameters and data.
+inline constexpr std::string_view kThermalTemperatureInput =
+    "inputs:temperature";
+inline constexpr std::string_view kThermalEmissivityInput =
+    "inputs:emissivity";
+inline constexpr std::string_view kThermalModelInput =
+    "inputs:temperatureModel";
+inline constexpr std::string_view kThermalModelParamsInput =
+    "inputs:temperatureModelParams";
+inline constexpr std::string_view kThermalModelDataInput =
+    "inputs:temperatureModelData";
 /// A mesh's temperatures (Ernie): float32 (n,) kelvin per point, a
 /// thermal solver's write-back, from the CPU or a CUDA device.
 inline constexpr std::string_view kThermalTemperatures =

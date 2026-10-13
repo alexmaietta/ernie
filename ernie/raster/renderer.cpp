@@ -4253,20 +4253,22 @@ void RasterRenderer::WriteMaterialTable() {
             // and the sunlight it absorbs and how well it radiates.
             if (!settings.temperatureModel.empty()) {
                 ERNIE_ZONE("Temperature model table");
-                const int index = temperatureModels_.IndexOf(
+                const int modelIndex = temperatureModels_.IndexOf(
                     settings.temperatureModel);
-                if (index < 0) {
+                if (modelIndex < 0) {
                     throw std::invalid_argument(
                         "A material names temperature model '" +
                         settings.temperatureModel +
                         "', which the renderer has not registered");
                 }
-                const TemperatureModel& model =
+                const TemperatureModel& thermalModel =
                     temperatureModels_
-                        .Models()[static_cast<std::size_t>(index)];
+                        .Models()[static_cast<std::size_t>(
+                            modelIndex)];
                 TemperatureMaterialGpu& record = temperatureTable[id];
-                record.model = static_cast<std::uint32_t>(index) + 1;
-                std::vector<float> values = model.Defaults();
+                record.model =
+                    static_cast<std::uint32_t>(modelIndex) + 1;
+                std::vector<float> values = thermalModel.Defaults();
                 const std::vector<float>& given =
                     settings.temperatureModelParams;
                 for (std::size_t i = 0;
@@ -4280,12 +4282,13 @@ void RasterRenderer::WriteMaterialTable() {
                             record.params);
                 const std::vector<float>* data =
                     &settings.temperatureModelData;
-                if (data->empty() && model.defaultData) {
+                if (data->empty() && thermalModel.defaultData) {
                     auto [found, added] =
-                        temperatureDefaults_.try_emplace(model.id);
+                        temperatureDefaults_.try_emplace(
+                            thermalModel.id);
                     if (added) {
                         ERNIE_ZONE("Temperature model default data");
-                        found->second = model.defaultData();
+                        found->second = thermalModel.defaultData();
                     }
                     data = &found->second;
                 }

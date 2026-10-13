@@ -117,12 +117,19 @@ class LunarThermalDemo : public app::Demo {
         Sphere::Define(scene, "/World/Moon")
             .SetRadius(kRadius)
             .SetMaterialBinding("/World/Looks/Regolith");
-        // The body black and warmed by its electronics, the panels open
-        // behind, each with its finish's absorptivity and emissivity.
+        // The body black and warmed by its electronics, through the
+        // material's thermal terminal; the panels open behind, each
+        // with its finish's absorptivity and emissivity.
         Material::Define(scene, "/World/Looks/Body")
-            .SetReflectanceLibrary("black_paint")
+            .SetReflectanceLibrary("black_paint");
+        Shader::Define(scene, "/World/Looks/Body/Thermal")
+            .SetInfoId(std::string(tokens::kErnieThermal))
+            .SetThermalEmissivity(0.85)
             .SetThermalModel("balance")
-            .SetThermalModelParams({-1.0f, -1.0f, kSpace, kInternal, 1.0f});
+            .SetThermalModelParams(
+                {-1.0f, -1.0f, kSpace, kInternal, 1.0f});
+        Connect(scene, "/World/Looks/Body", tokens::kThermalOutput,
+                "/World/Looks/Body/Thermal", "outputs:out");
         Cube::Define(scene, "/World/Body")
             .SetSize(1.0)
             .SetMaterialBinding("/World/Looks/Body");
@@ -256,7 +263,8 @@ class LunarThermalDemo : public app::Demo {
               "yet it should look the colder at 8 to 14 um");
         const double body = kelvinAt(Project(kCraft));
         std::printf("body %.1f K\n", body);
-        Check(body > 250.0 && body < 400.0, "the body should sit between");
+        Check(body > reads[0].first && body < reads[1].first,
+              "the body should sit between the panels");
     }
 
   private:

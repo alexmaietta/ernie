@@ -96,15 +96,21 @@ class Demo(ernie.demo.Demo):
         world.define(
             "Moon", ernie.Sphere, radius=RADIUS, material_binding=regolith.path
         )
-        # The body black and warmed by its electronics, the panels open
-        # behind, each with its finish's absorptivity and emissivity.
+        # The body black and warmed by its electronics, through the
+        # material's thermal terminal; the panels open behind, each with
+        # its finish's absorptivity and emissivity.
         body = looks.define(
-            "Body",
-            ernie.Material,
-            reflectance_library="black_paint",
+            "Body", ernie.Material, reflectance_library="black_paint"
+        )
+        thermal = body.define(
+            "Thermal",
+            ernie.Shader,
+            info_id=tokens.ERNIE_THERMAL,
+            thermal_emissivity=0.85,
             thermal_model="balance",
             thermal_model_params=[-1.0, -1.0, SPACE, INTERNAL, 1.0],
         )
+        scene.connect(body.path, tokens.THERMAL_OUTPUT, thermal.path, "outputs:out")
         world.define(
             "Body",
             ernie.Cube,
@@ -317,7 +323,9 @@ class Demo(ernie.demo.Demo):
         col, row = project(CRAFT)
         body = float(kelvin[row, col])
         print(f"body {body:.1f} K")
-        assert 250.0 < body < 400.0, "the body should sit between"
+        assert reads["White"][0] < body < reads["Aluminium"][0], (
+            "the body should sit between the panels"
+        )
 
 
 if __name__ == "__main__":

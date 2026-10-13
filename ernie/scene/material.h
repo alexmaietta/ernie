@@ -130,6 +130,10 @@ struct MaterialSettings {
     std::string temperatureModel;
     std::vector<float> temperatureModelParams;
     std::vector<float> temperatureModelData;
+    /// Its thermal terminal's temperature texture (`tokens::
+    /// kThermalOutput`): one channel, kelvin after the reader's scale
+    /// and bias, in place of the Material's temperature texture.
+    std::optional<TextureReader> temperatureTexture;
     /// How much of incident polarization its diffuse reflection
     /// keeps (`tokens::kPolarizationRetention`), 0 to 1.
     float polarizationRetention = 0.0f;

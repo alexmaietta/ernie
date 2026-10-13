@@ -269,12 +269,13 @@
 #define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
     X(std::string, InfoId, ::ernie::tokens::kInfoId, "",                                           \
       (::ernie::AttributeMeta{.label = "Shader",                                                   \
-                              .doc = "The shader's type; Ernie reads the four below.",             \
+                              .doc = "The shader's type; Ernie reads the five below.",             \
                               .group = "Shader",                                                   \
                               .options = {::ernie::tokens::kUsdPreviewSurface,                     \
                                           ::ernie::tokens::kUsdUVTexture,                          \
                                           ::ernie::tokens::kUsdPrimvarReaderFloat2,                \
-                                          ::ernie::tokens::kUsdTransform2d}}))                     \
+                                          ::ernie::tokens::kUsdTransform2d,                        \
+                                          ::ernie::tokens::kErnieThermal}}))                       \
     X(glm::dvec3, DiffuseColor, ::ernie::tokens::kDiffuseColor, glm::dvec3(0.18),                  \
       (::ernie::AttributeMeta{.label = "Diffuse colour", .doc = "Linear RGB albedo.",              \
                               .group = "Preview surface", .color = true}))                         \
@@ -344,7 +345,27 @@
     X(std::string, Varname, ::ernie::tokens::kVarname, "st",                                       \
       (::ernie::AttributeMeta{.label = "Primvar",                                                  \
                               .doc = "The mesh primvar of the texture coordinates.",               \
-                              .group = "Primvar reader"}))
+                              .group = "Primvar reader"}))                                         \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperatureInput, 0.0,                  \
+      (::ernie::AttributeMeta{.label = "Temperature",                                              \
+                              .doc = "Kelvin, 0 for none; connectable to one channel of a "        \
+                                     "UsdUVTexture, kelvin after its scale and bias.",             \
+                              .group = "Thermal", .max = 5000.0}))                                 \
+    X(double, ThermalEmissivity, ::ernie::tokens::kThermalEmissivityInput, -1.0,                   \
+      (::ernie::AttributeMeta{.label = "Emissivity",                                               \
+                              .doc = "0 to 1 at every wavelength; below 0, 1 minus the "           \
+                                     "reflectance (Kirchhoff).",                                   \
+                              .group = "Thermal", .min = -1.0, .max = 1.0}))                       \
+    X(std::string, ThermalModel, ::ernie::tokens::kThermalModelInput, "",                          \
+      (::ernie::AttributeMeta{.label = "Temperature model",                                        \
+                              .doc = "As the Material's ernie:thermal:model.",                     \
+                              .group = "Thermal"}))                                                \
+    X(std::vector<float>, ThermalModelParams, ::ernie::tokens::kThermalModelParamsInput,           \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Model parameters", .group = "Thermal"}))                   \
+    X(std::vector<float>, ThermalModelData, ::ernie::tokens::kThermalModelDataInput,               \
+      std::vector<float>{},                                                                        \
+      (::ernie::AttributeMeta{.label = "Model data", .group = "Thermal"}))
 
 #define ERNIE_MATERIAL_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_MATERIAL_ATTRIBUTES(X)
 #define ERNIE_SHADER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SHADER_ATTRIBUTES(X)

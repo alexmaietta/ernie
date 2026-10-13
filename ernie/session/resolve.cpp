@@ -3465,6 +3465,46 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
     settings.temperatureModel = view.GetThermalModel();
     settings.temperatureModelParams = view.GetThermalModelParams();
     settings.temperatureModelData = view.GetThermalModelData();
+    // Its thermal terminal's ErnieThermal node, whose inputs replace
+    // those: its temperature a constant or a texture's channel, its
+    // emissivity the same at every wavelength, its model.
+    if (const std::optional<Connection> thermal =
+            GetConnection(scene, material, kThermalOutput)) {
+        const Path& node = thermal->prim;
+        if (ShaderIdOf(scene, node) != kErnieThermal) {
+            throw std::invalid_argument(
+                "Material '" + material.String() + "' " +
+                std::string(kThermalOutput) + " connects to '" +
+                node.String() + "', which is not an ErnieThermal");
+        }
+        const Shader shader(scene, node);
+        if (const std::optional<Connection> texture = GetConnection(
+                scene, node, kThermalTemperatureInput)) {
+            settings.temperatureTexture =
+                TextureReaderOf(scene, *texture,
+                                kThermalTemperatureInput, node, true);
+        } else {
+            const double kelvin = shader.GetThermalTemperature();
+            if (!(kelvin >= 0.0)) {
+                throw std::invalid_argument(
+                    "'" + node.String() + "' has " +
+                    std::string(kThermalTemperatureInput) +
+                    " below 0 K: " + std::to_string(kelvin));
+            }
+            settings.temperature = static_cast<float>(kelvin);
+        }
+        if (const double emissivity = shader.GetThermalEmissivity();
+            emissivity >= 0.0) {
+            const auto e =
+                static_cast<float>(std::min(emissivity, 1.0));
+            settings.emissivity = Spectrum::FromPairs(
+                std::vector<float>{100.0f, e, 1e6f, e});
+        }
+        settings.temperatureModel = shader.GetThermalModel();
+        settings.temperatureModelParams =
+            shader.GetThermalModelParams();
+        settings.temperatureModelData = shader.GetThermalModelData();
+    }
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));
     settings.speckleRoughness =
