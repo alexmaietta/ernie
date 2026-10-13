@@ -10,6 +10,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/volume_schemas.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/nanovdb.h"
 #include "ernie/util/profile.h"
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -19,6 +20,8 @@
 #include <algorithm>
 #include <limits>
 #include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -346,6 +349,42 @@ std::optional<Bounds3> FieldBoundsOf(const Scene& scene,
                        voxel * glm::vec3(float(shape[0]),
                                          float(shape[1]),
                                          float(shape[2]))};
+    }
+    // NanoVDB grids in host memory, from their headers alone, walked
+    // grid to grid; grids on a device would need a read back.
+    if (type != nullptr && type->IsA(NanoVDBField::Definition())) {
+        const NanoVDBField grids(scene, field);
+        const Tensor* buffer = grids.GetBuffer();
+        if (buffer == nullptr ||
+            buffer->Location().kind != DeviceKind::Cpu ||
+            !buffer->IsContiguous() || buffer->Elements() == 0) {
+            return std::nullopt;
+        }
+        const std::span bytes(
+            static_cast<const std::uint8_t*>(buffer->Data()),
+            static_cast<std::size_t>(buffer->Elements()) *
+                SizeOf(buffer->Type()));
+        const std::string name = grids.GetFieldName();
+        int seen = 0;
+        for (std::size_t offset = 0; offset < bytes.size();) {
+            const NanoVdbGrid head = NanoVdbGridHead(bytes.subspan(
+                offset,
+                std::min(kNanoVdbHeadBytes, bytes.size() - offset)));
+            if ((name.empty() || head.name == name) &&
+                seen++ == grids.GetFieldIndex()) {
+                if (head.Empty()) {
+                    return std::nullopt;
+                }
+                glm::dvec3 low;
+                glm::dvec3 high;
+                head.GridBounds(low, high);
+                return Bounds3{glm::vec3(low), glm::vec3(high)};
+            }
+            if (head.size == 0) {
+                break;
+            }
+            offset += static_cast<std::size_t>(head.size);
+        }
     }
     return std::nullopt;
 }

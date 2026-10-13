@@ -5,11 +5,13 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/session/volumes.h"
+#include "ernie/util/nanovdb.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -160,4 +162,19 @@ TEST(VolumeSchemas, VolumesBoundTheirFieldsFromTheirAttributes) {
     ASSERT_TRUE(smoke.has_value());
     EXPECT_EQ(smoke->second, glm::vec3(2.0f, 3.0f, 4.0f));
     EXPECT_FALSE(ernie::VolumeBoundsOf(scene, Path("/Nothing")));
+
+    // A NanoVDB array's from its grid's header: its active voxels at
+    // x 10 to 11.5, grown by a voxel for trilinear sampling.
+    const std::vector<std::uint8_t> grid = ernie::DenseNanoVdbGrid(
+        std::vector<float>(4 * 4 * 4, 1.0f), glm::ivec3(4), 0.5,
+        glm::dvec3(10.0, 0.0, 0.0), "density");
+    ernie::NanoVDBField::Define(scene, "/Plume")
+        .SetBuffer(ernie::Tensor::Copy<std::uint8_t>(
+            grid, {static_cast<std::int64_t>(grid.size())}));
+    const auto plume = ernie::VolumeBoundsOf(scene, Path("/Plume"));
+    ASSERT_TRUE(plume.has_value());
+    EXPECT_LE(plume->first.x, 10.0f);
+    EXPECT_GT(plume->first.x, 9.0f);
+    EXPECT_GE(plume->second.x, 11.5f);
+    EXPECT_LT(plume->second.x, 12.5f);
 }

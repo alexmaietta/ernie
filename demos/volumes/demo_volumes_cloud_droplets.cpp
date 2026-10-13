@@ -189,6 +189,9 @@ class CloudDropletsDemo : public app::Demo {
                          });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
+            // The same view, orbiting and zooming about the cloud.
+            viewer->LookAt({0.0, -6500.0, 1300.0},
+                           {0.0, 0.0, 1700.0});
         }
     }
 

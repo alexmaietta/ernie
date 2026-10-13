@@ -183,6 +183,8 @@ class Demo(ernie.demo.Demo):
         )
         if viewer is not None:
             viewer.active_camera = camera.path
+            # The same view, orbiting and zooming about the cloud.
+            viewer.look_at((0.0, -6500.0, 1300.0), (0.0, 0.0, 1700.0))
 
     def place_sun(self):
         a = math.radians(self.azimuth)
