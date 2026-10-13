@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "bindings.h"
 
+#include "ernie/geometry/planet_heights.h"
 #include "ernie/scene/cahvore.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/dem.h"
@@ -12,6 +13,7 @@
 #include "ernie/util/image.h"
 #include "ernie/util/nanovdb.h"
 #include "ernie/util/noise.h"
+#include "ernie/util/raster_source.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/tensor.h"
 
@@ -2218,6 +2220,30 @@ void BindScene(nb::module_& m) {
           nb::arg("label_path"),
           "Reads the DEM a PDS3 label describes on a polar "
           "stereographic grid (LOLA's polar LDEM products).");
+    m.def(
+        "planet_heights_of",
+        [](const std::filesystem::path& path, std::uint32_t faceCells,
+           double unit, double reference) {
+            std::vector<float> heights;
+            {
+                nb::gil_scoped_release release;
+                heights =
+                    PlanetHeightsOf(*OpenRaster(path), faceCells,
+                                    {unit, reference, {}});
+            }
+            const auto side =
+                static_cast<std::int64_t>(faceCells) + 1;
+            return ArrayFromTensor(
+                Tensor::Copy<float>(heights, {6, side, side}));
+        },
+        nb::arg("path"), nb::arg("face_cells"), nb::arg("unit") = 1.0,
+        nb::arg("reference") = 0.0,
+        "A Terrain's planet heights, (6, face_cells + 1, "
+        "face_cells + 1) float32, resampled from the "
+        "latitude-longitude raster at path (TIFF, PDS3, PNG or JPEG; "
+        "the whole body from 180 W unless its file says otherwise): "
+        "its values times unit, less reference (the radius, for "
+        "rasters of radii).");
     const auto localTerrain = [](const LocalTerrain& terrain) {
         nb::dict result;
         result["heights"] = ArrayFromTensor(terrain.heights);

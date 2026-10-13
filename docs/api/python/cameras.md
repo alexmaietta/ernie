@@ -22,4 +22,6 @@ Camera models read from mission files, planetary elevation models, and lens help
 
 ::: ernie.local_terrain_of
 
+::: ernie.planet_heights_of
+
 ::: ernie.author_singlet_chromatic

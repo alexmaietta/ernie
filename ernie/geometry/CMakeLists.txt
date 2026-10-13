@@ -7,6 +7,7 @@ ernie_add_library(
     frustum.cpp
     lod_quadtree.cpp
     mesh_data.cpp
+    planet_heights.cpp
     primitives.cpp
     sphere_tessellation.cpp
     PUBLIC
