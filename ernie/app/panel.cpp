@@ -62,6 +62,12 @@ struct PlotWidget {
     std::function<std::vector<float>()> source;
 };
 
+struct ProgressWidget {
+    std::string label;
+    double fraction = 0.0;
+    std::string overlay;
+};
+
 int ResizeString(ImGuiInputTextCallbackData* data) {
     if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
         auto* text = static_cast<std::string*>(data->UserData);
@@ -92,7 +98,8 @@ struct WidgetPanel::Widget {
     Id id = 0;
     std::variant<TextWidget, SeparatorWidget, ButtonWidget,
                  CheckboxWidget, SliderWidget, ComboWidget,
-                 InputTextWidget, ColorWidget, PlotWidget>
+                 InputTextWidget, ColorWidget, PlotWidget,
+                 ProgressWidget>
         data;
 };
 
@@ -211,11 +218,27 @@ WidgetPanel::Plot(std::string label,
     return next_++;
 }
 
+WidgetPanel::Id WidgetPanel::Progress(std::string label) {
+    widgets_.push_back(std::make_unique<Widget>(
+        Widget{next_, ProgressWidget{std::move(label), 0.0, {}}}));
+    return next_++;
+}
+
 void WidgetPanel::Set(Id widget, bool value) {
     Find<CheckboxWidget>(widgets_, widget).value = value;
 }
 
 void WidgetPanel::Set(Id widget, double value) {
+    for (auto& w : widgets_) {
+        if (w->id != widget) {
+            continue;
+        }
+        if (auto* bar = std::get_if<ProgressWidget>(&w->data)) {
+            bar->fraction = std::clamp(value, 0.0, 1.0);
+            return;
+        }
+        break;
+    }
     SliderWidget& slider = Find<SliderWidget>(widgets_, widget);
     slider.value = std::clamp(value, slider.min, slider.max);
 }
@@ -237,6 +260,10 @@ void WidgetPanel::Set(Id widget, std::string value) {
         }
         if (auto* field = std::get_if<InputTextWidget>(&w->data)) {
             field->value = std::move(value);
+            return;
+        }
+        if (auto* bar = std::get_if<ProgressWidget>(&w->data)) {
+            bar->overlay = std::move(value);
             return;
         }
         break;
@@ -341,6 +368,16 @@ void WidgetPanel::Draw(Viewer& /*viewer*/) {
                             static_cast<int>(values.size()));
                         ImPlot::EndPlot();
                     }
+                } else if constexpr (std::is_same_v<T,
+                                                    ProgressWidget>) {
+                    ImGui::ProgressBar(
+                        static_cast<float>(w.fraction),
+                        ImVec2(ImGui::CalcItemWidth(), 0.0f),
+                        w.overlay.empty() ? nullptr
+                                          : w.overlay.c_str());
+                    ImGui::SameLine(
+                        0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                    ImGui::TextUnformatted(w.label.c_str());
                 }
             },
             widget.data);

@@ -10,6 +10,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -62,18 +63,33 @@ std::filesystem::path CacheDir();
 /// (ERNIE_DEMO_DOWNLOADS) and $ERNIE_OFFLINE unset.
 bool CanDownload();
 
-/// Downloads `url` to `path`, its directory made as needed, through
-/// `path` + ".part", renamed when complete; failed attempts that are
-/// tried again go to `report`, else are printed.
-/// @throws std::runtime_error if it cannot (`CanDownload`), or on a
-/// failed request.
+/// How far a download has come, shared with the thread fetching it.
+struct DownloadProgress {
+    /// Bytes in hand, a resumed part's included.
+    std::atomic<std::uint64_t> bytes = 0;
+    /// Bytes in all; 0 until the server says.
+    std::atomic<std::uint64_t> total = 0;
+    /// Set to stop the download, keeping its part to resume.
+    std::atomic<bool> cancel = false;
+};
+
+/// Downloads `url` to `path`, its directory made as needed: streamed
+/// into `path` + ".part", renamed when complete. A part left by a
+/// download stopped or failed before is resumed (an HTTP range
+/// request; from the start if the server ignores it), and failed
+/// attempts resume up to five times, going to `report` (else
+/// printed). `progress`, when given, follows it and can cancel it.
+/// @throws std::runtime_error if it cannot (`CanDownload`), on a
+/// failed request, or when cancelled.
 void Download(
     const std::string& url, const std::filesystem::path& path,
-    const std::function<void(const std::string&)>& report = {});
+    const std::function<void(const std::string&)>& report = {},
+    DownloadProgress* progress = nullptr);
 
 /// `Download` on a thread of its own, so a demo runs while its data
 /// comes: its progress and outcome are messages for the demo to show
-/// as it steps (`TakeMessages`, such as into the viewer's log).
+/// as it steps (`TakeMessages`, such as into the viewer's log), and
+/// its bytes so far for a progress bar (`Fraction`, `Status`).
 class AsyncDownload {
   public:
     /// A message, and whether it is an error.
@@ -84,7 +100,8 @@ class AsyncDownload {
 
     /// Starts fetching `url` to `path`.
     AsyncDownload(std::string url, std::filesystem::path path);
-    /// Waits for the download to end.
+    /// Cancels the download (its part kept, to resume next time) and
+    /// waits for it to stop.
     ~AsyncDownload();
     AsyncDownload(const AsyncDownload&) = delete;
     AsyncDownload& operator=(const AsyncDownload&) = delete;
@@ -95,11 +112,28 @@ class AsyncDownload {
     bool Done() const;
     bool Succeeded() const;
 
+    /// Bytes in hand, and in all (0 until the server says).
+    std::uint64_t Bytes() const {
+        return progress_.bytes;
+    }
+    std::uint64_t Total() const {
+        return progress_.total;
+    }
+    /// The fraction in hand, 0 to 1 (0 until the total is known).
+    double Fraction() const;
+    /// Megabytes in hand and in all, as "120 of 2,100 MB".
+    std::string Status() const;
+    /// Stops the download, keeping its part to resume.
+    void Cancel() {
+        progress_.cancel = true;
+    }
+
   private:
     mutable std::mutex mutex_;
     std::vector<Message> messages_;
     bool done_ = false;
     bool succeeded_ = false;
+    DownloadProgress progress_;
     std::thread thread_;
 };
 

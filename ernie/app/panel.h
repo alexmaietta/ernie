@@ -114,8 +114,13 @@ class WidgetPanel final : public Panel {
     Id Plot(std::string label,
             std::function<std::vector<float>()> source);
 
-    /// Sets the value of a checkbox (`bool`), slider (`double`),
-    /// combo (index) or colour, or the text of a text or text field.
+    /// A progress bar, empty until `Set` gives its fraction done (0
+    /// to 1) and the text over it (such as a download's megabytes).
+    Id Progress(std::string label);
+
+    /// Sets the value of a checkbox (`bool`), slider or progress bar
+    /// (`double`), combo (index) or colour, or the text of a text,
+    /// text field or progress bar.
     void Set(Id widget, bool value);
     void Set(Id widget, double value);
     void Set(Id widget, std::size_t value);

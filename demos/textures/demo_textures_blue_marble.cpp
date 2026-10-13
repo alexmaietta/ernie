@@ -150,6 +150,7 @@ class BlueMarbleDemo : public app::Demo {
         } else if (demos::CanDownload()) {
             download_ =
                 std::make_unique<demos::AsyncDownload>(kUrl, image_);
+            progress_ = Widgets().Progress("Download");
         } else {
             Report("Blue Marble is not cached and cannot be fetched",
                    true);
@@ -207,11 +208,14 @@ class BlueMarbleDemo : public app::Demo {
             for (const auto& message : download_->TakeMessages()) {
                 Report(message.text, message.error);
             }
+            Widgets().Set(progress_, download_->Fraction());
+            Widgets().Set(progress_, download_->Status());
             if (download_->Done()) {
                 if (download_->Succeeded()) {
                     UseImage(image_);
                 }
                 download_.reset();
+                Widgets().Remove(progress_);
             }
         }
     }
@@ -295,6 +299,7 @@ class BlueMarbleDemo : public app::Demo {
 
     std::filesystem::path image_;
     std::unique_ptr<demos::AsyncDownload> download_;
+    app::WidgetPanel::Id progress_ = 0;
     double altitude_ = 12000.0;  ///< km
     double latitude_ = 20.0;
     double longitude_ = 10.0;

@@ -8,6 +8,7 @@ import re
 import struct
 import sys
 import threading
+import urllib.error
 import urllib.request
 import zlib
 
@@ -465,32 +466,90 @@ def _require_downloads():
         )
 
 
-def download(url, path, report=print):
-    """Downloads `url` to `path`, its directory made as needed,
-    through `path` + ".part", renamed when complete; failed attempts
-    that are tried again go to `report`."""
+class DownloadCancelled(RuntimeError):
+    """A download stopped by its `cancel`: its part is kept, to
+    resume."""
+
+
+def download(url, path, report=print, progress=None):
+    """Downloads `url` to `path`, its directory made as needed:
+    streamed into `path` + ".part", renamed when complete. A part left
+    by a download stopped or failed before is resumed (an HTTP range
+    request; from the start if the server ignores it), and failed
+    attempts resume up to five times, going to `report`. `progress`,
+    when given, is kept up to date: its `bytes` in hand, its `total`
+    (0 until the server says), and its `cancelled`, which stops the
+    download (`DownloadCancelled`)."""
     _require_downloads()
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    request = urllib.request.Request(
-        url, headers={"User-Agent": "ernie-demos"}
-    )
-    _, _, body = _open(request, report)
-    with open(path + ".part", "wb") as f:
-        f.write(body)
-    os.replace(path + ".part", path)
+    part = path + ".part"
+    attempts = 5
+    failure: OSError
+    for attempt in range(1, attempts + 1):
+        have = os.path.getsize(part) if os.path.exists(part) else 0
+        headers = {"User-Agent": "ernie-demos"}
+        if have:
+            headers["Range"] = f"bytes={have}-"
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(
+                request, timeout=120
+            ) as response:
+                # A server that ignores the range sends the whole file.
+                if have and response.status != 206:
+                    have = 0
+                length = response.headers.get("Content-Length")
+                if progress is not None:
+                    progress.total = (
+                        have + int(length) if length else 0
+                    )
+                    progress.bytes = have
+                with open(part, "ab" if have else "wb") as f:
+                    while chunk := response.read(1 << 20):
+                        if (
+                            progress is not None
+                            and progress.cancelled
+                        ):
+                            raise DownloadCancelled(
+                                f"Stopped fetching {url} at "
+                                f"{os.path.getsize(part) // 1000000} MB; "
+                                "it resumes next time"
+                            )
+                        f.write(chunk)
+                        if progress is not None:
+                            progress.bytes += len(chunk)
+            os.replace(part, path)
+            return
+        except urllib.error.HTTPError as error:
+            # A part already whole: the range starts past the file's end.
+            if error.code == 416 and have:
+                os.replace(part, path)
+                return
+            failure = error
+        except DownloadCancelled:
+            raise
+        except OSError as error:
+            failure = error
+        if attempt == attempts:
+            raise failure
+        report(f"Fetching {url} failed: {failure}; resuming")
 
 
 class AsyncDownload:
     """`download` on a thread of its own, so a demo runs while its
     data comes: its progress and outcome are messages for the demo to
-    show as it steps (`take_messages`, such as into the viewer's
-    log)."""
+    show as it steps (`take_messages`, such as into the viewer's log),
+    and its bytes so far for a progress bar (`fraction`, `status`).
+    `cancel` stops it, keeping its part to resume next time."""
 
     def __init__(self, url, path):
         self._messages = queue.Queue()
         self._messages.put((f"Fetching {url}", False))
         self.done = False
         self.succeeded = False
+        self.bytes = 0
+        self.total = 0
+        self.cancelled = False
 
         def run():
             try:
@@ -498,6 +557,7 @@ class AsyncDownload:
                     url,
                     path,
                     lambda text: self._messages.put((text, False)),
+                    self,
                 )
                 self._messages.put(
                     (f"Fetched {os.path.basename(path)}", False)
@@ -509,6 +569,25 @@ class AsyncDownload:
 
         self._thread = threading.Thread(target=run, daemon=True)
         self._thread.start()
+
+    def cancel(self):
+        """Stops the download, keeping its part to resume."""
+        self.cancelled = True
+
+    @property
+    def fraction(self):
+        """The fraction in hand, 0 to 1 (0 until the total is known)."""
+        return (
+            min(1.0, self.bytes / self.total) if self.total else 0.0
+        )
+
+    @property
+    def status(self):
+        """Megabytes in hand and in all, as "120 of 2,100 MB"."""
+        text = f"{self.bytes // 1000000:,}"
+        if self.total:
+            text += f" of {self.total // 1000000:,}"
+        return text + " MB"
 
     def take_messages(self):
         """The (text, is_error) messages since the last call."""
@@ -687,9 +766,11 @@ def _module_file(cls):
 
 
 __all__ = [
+    "AsyncDownload",
     "COMMON_ARGS",
     "Demo",
     "DemoEntry",
+    "DownloadCancelled",
     "cache_dir",
     "can_download",
     "catalog",

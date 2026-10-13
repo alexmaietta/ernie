@@ -370,6 +370,11 @@ void BindApp(nb::module_& parent) {
             "A line plot of the floats `source()` returns, read "
             "each frame.")
         .def(
+            "progress", &WidgetPanel::Progress, nb::arg("label"),
+            "Adds a progress bar, empty until `set` gives it a float "
+            "fraction done (0 to 1) and a str to show over it; "
+            "returns its id.")
+        .def(
             "set",
             [](WidgetPanel& panel, WidgetPanel::Id widget,
                nb::handle value) {

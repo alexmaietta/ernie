@@ -160,6 +160,7 @@ class Demo(ernie.demo.Demo):
             self.use_image(self.image)
         elif can_download():
             self.download = AsyncDownload(URL, self.image)
+            self.progress = self.widgets.progress("Download")
         else:
             self.report(
                 "Blue Marble is not cached and cannot be fetched",
@@ -223,10 +224,13 @@ class Demo(ernie.demo.Demo):
         if self.download is not None:
             for text, error in self.download.take_messages():
                 self.report(text, error)
+            self.widgets.set(self.progress, self.download.fraction)
+            self.widgets.set(self.progress, self.download.status)
             if self.download.done:
                 if self.download.succeeded:
                     self.use_image(self.image)
                 self.download = None
+                self.widgets.remove(self.progress)
 
     def test_final(self):
         # Over the blue and the green quarters of the stand-in, from
