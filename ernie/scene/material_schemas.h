@@ -122,7 +122,18 @@
       std::vector<float>{},                                                                        \
       (::ernie::AttributeMeta{.label = "Model data",                                               \
                               .doc = "Floats the temperature model reads, such as a diurnal "      \
-                                     "table: latitudes, local times, then kelvin row by row.",     \
+                                     "table (DiurnalTable::ModelData).",                           \
+                              .group = "Thermal"}))                                                \
+    X(double, ThermalInertia, ::ernie::tokens::kThermalInertia, 0.0,                               \
+      (::ernie::AttributeMeta{.label = "Thermal inertia",                                          \
+                              .doc = "J m^-2 K^-1 s^-1/2, which the temperature model reads (the " \
+                                     "diurnal table's inertia axis); 0 for none.",                 \
+                              .group = "Thermal", .min = 0.0, .max = 10000.0}))                    \
+    X(::ernie::Tensor, ThermalInertiaTexture, ::ernie::tokens::kThermalInertiaTexture, nullptr,    \
+      (::ernie::AttributeMeta{.label = "Thermal inertia texture",                                  \
+                              .doc = "float32 (rows, cols) or (rows, cols, 1) thermal inertia "    \
+                                     "through mesh texture coordinates, row 0 at the top, in "     \
+                                     "place of the thermal inertia where above 0.",                \
                               .group = "Thermal"}))                                                \
     X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
       (::ernie::AttributeMeta{.doc = "float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo " \
@@ -380,6 +391,11 @@
                               .doc = "0 to 1 at every wavelength; below 0, 1 minus the "           \
                                      "reflectance (Kirchhoff).",                                   \
                               .group = "Thermal", .min = -1.0, .max = 1.0}))                       \
+    X(double, ThermalInertia, ::ernie::tokens::kThermalInertiaInput, 0.0,                          \
+      (::ernie::AttributeMeta{.label = "Thermal inertia",                                          \
+                              .doc = "J m^-2 K^-1 s^-1/2 for the temperature model, 0 for none; "  \
+                                     "connectable to one channel of a UsdUVTexture.",              \
+                              .group = "Thermal", .min = 0.0, .max = 10000.0}))                    \
     X(std::string, ThermalModel, ::ernie::tokens::kThermalModelInput, "",                          \
       (::ernie::AttributeMeta{.label = "Temperature model",                                        \
                               .doc = "As the Material's ernie:thermal:model.",                     \

@@ -3692,6 +3692,17 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
     settings.temperatureModel = view.GetThermalModel();
     settings.temperatureModelParams = view.GetThermalModelParams();
     settings.temperatureModelData = view.GetThermalModelData();
+    const auto inertia = [](const Path& prim, double value) {
+        if (!(value >= 0.0)) {
+            throw std::invalid_argument(
+                "'" + prim.String() +
+                "' has a thermal inertia below 0: " +
+                std::to_string(value));
+        }
+        return static_cast<float>(value);
+    };
+    settings.thermalInertia =
+        inertia(material, view.GetThermalInertia());
     // Its thermal terminal's ErnieThermal node, whose inputs replace
     // those: its temperature a constant or a texture's channel, its
     // emissivity the same at every wavelength, its model.
@@ -3731,6 +3742,8 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
         settings.temperatureModelParams =
             shader.GetThermalModelParams();
         settings.temperatureModelData = shader.GetThermalModelData();
+        settings.thermalInertia =
+            inertia(node, shader.GetThermalInertia());
     }
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));

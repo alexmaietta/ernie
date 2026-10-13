@@ -109,11 +109,10 @@ class LunarThermalDemo : public app::Demo {
         Scene& scene = GetScene();
         Xform::Define(scene, "/World");
         Xform::Define(scene, "/World/Looks");
-        // The Moon's diurnal table about its pole, +z.
+        // The Moon's diurnal table about its pole, the sphere's +z.
         Material::Define(scene, "/World/Looks/Regolith")
             .SetAlbedo(glm::dvec3(0.12))
-            .SetThermalModel("diurnal")
-            .SetThermalModelParams({0.0f, 0.0f, 1.0f});
+            .SetThermalModel("diurnal");
         Sphere::Define(scene, "/World/Moon")
             .SetRadius(kRadius)
             .SetMaterialBinding("/World/Looks/Regolith");

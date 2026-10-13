@@ -33,7 +33,8 @@ constexpr const char* kTemperatureModelSlang = R"(
 // irradiance over all wavelengths facing it (W/m^2) and the share of it reaching the point past
 // shadows; the sunlight on the surface from every distant light (W/m^2, shadowed); the material's
 // solar absorptivity and hemispherical thermal emissivity; its own temperature (K, 0 for none);
-// and the frame's time (s).
+// the frame's time (s); the world +z axis of a prim bound to the material (0 for none); and its
+// thermal inertia (J m^-2 K^-1 s^-1/2, 0 for none).
 public struct TemperatureInput {
     public float3 position;
     public float3 normal;
@@ -45,6 +46,8 @@ public struct TemperatureInput {
     public float emissivity;
     public float kelvin;
     public float time;
+    public float3 axis;
+    public float inertia;
 }
 
 // A material's parameters for its model, and its data.
@@ -93,16 +96,51 @@ public struct BalanceTemperature : ITemperatureModel {
 constexpr const char* kDiurnalSlang = R"(
 import temperature_model;
 
-// A table of latitude (rows, 0 to 90 degrees) and local solar time (columns from midnight), after
-// its two sizes, read at the surface normal's latitude and hour angle about the body's pole.
+// Where `value` lies along an ascending axis of `count` values from data `first`, clamped to its
+// ends: the index of the value below and the weight of the one above, by its logarithm when
+// `logarithmic` (thermal inertia spans decades).
+float2 axisWeight(TemperatureParams p, uint first, uint count, float value, bool logarithmic) {
+    if (count < 2) {
+        return float2(0.0);
+    }
+    uint i = 0;
+    while (i + 2 < count && p.data(first + i + 1) < value) {
+        ++i;
+    }
+    var low = p.data(first + i);
+    var high = p.data(first + i + 1);
+    var x = value;
+    if (logarithmic) {
+        low = log(max(low, 1e-6));
+        high = log(max(high, 1e-6));
+        x = log(max(x, 1e-6));
+    }
+    return float2(float(i), saturate((x - low) / max(high - low, 1e-12)));
+}
+
+// A table of latitude (0 to 90 degrees), local solar time (from midnight), thermal inertia and
+// albedo (DiurnalTable::ModelData), read at the surface normal's latitude and hour angle about the
+// body's pole, the pixel's thermal inertia (the table's first without one) and its albedo (1 minus
+// its solar absorptivity).
 public struct DiurnalTemperature : ITemperatureModel {
     public float kelvin(TemperatureInput input, TemperatureParams p) {
-        let rows = uint(p.data(0));
-        let columns = uint(p.data(1));
-        if (rows < 2 || columns < 2 || p.dataCount() < 2 + rows * columns) {
+        if (p.dataCount() < 5 || p.data(0) != -2.0) {
             return input.kelvin;
         }
+        let rows = uint(p.data(1));
+        let columns = uint(p.data(2));
+        let inertias = uint(p.data(3));
+        let albedos = uint(p.data(4));
+        let first = 5 + inertias + albedos;
+        if (rows < 2 || columns < 2 || inertias < 1 || albedos < 1 ||
+            p.dataCount() < first + rows * columns * inertias * albedos) {
+            return input.kelvin;
+        }
+        // The pole given, else the bound prim's +z, else world +z.
         var pole = float3(p.get(0), p.get(1), p.get(2));
+        if (dot(pole, pole) == 0.0) {
+            pole = input.axis;
+        }
         pole = dot(pole, pole) > 0.0 ? normalize(pole) : float3(0.0, 0.0, 1.0);
         let n = input.normal;
         let latitude = asin(saturate(abs(dot(n, pole))));
@@ -117,14 +155,29 @@ public struct DiurnalTemperature : ITemperatureModel {
         let column = phase * float(columns);
         let r0 = min(uint(row), rows - 2);
         let c0 = uint(column) % columns;
-        let c1 = (c0 + 1) % columns;
         let fr = saturate(row - float(r0));
         let fc = frac(column);
-        let first = 2 + r0 * columns;
-        let next = first + columns;
-        let low = lerp(p.data(first + c0), p.data(first + c1), fc);
-        let high = lerp(p.data(next + c0), p.data(next + c1), fc);
-        return lerp(low, high, fr);
+        let inertia = axisWeight(p, 5, inertias,
+                                 input.inertia > 0.0 ? input.inertia : p.data(5), true);
+        let albedo = axisWeight(p, 5 + inertias, albedos, 1.0 - input.absorptivity, false);
+        var sum = 0.0;
+        for (uint corner = 0; corner < 16; ++corner) {
+            let r = corner & 1u;
+            let c = (corner >> 1) & 1u;
+            let i = (corner >> 2) & 1u;
+            let a = (corner >> 3) & 1u;
+            let weight = (r != 0 ? fr : 1.0 - fr) * (c != 0 ? fc : 1.0 - fc) *
+                         (i != 0 ? inertia.y : 1.0 - inertia.y) *
+                         (a != 0 ? albedo.y : 1.0 - albedo.y);
+            if (weight == 0.0) {
+                continue;
+            }
+            let ii = min(uint(inertia.x) + i, inertias - 1);
+            let aa = min(uint(albedo.x) + a, albedos - 1);
+            let index = (((r0 + r) * columns + (c0 + c) % columns) * inertias + ii) * albedos + aa;
+            sum += weight * p.data(first + index);
+        }
+        return sum;
     }
 }
 )";
@@ -177,25 +230,28 @@ TemperatureModelRegistry TemperatureModelRegistry::WithBuiltins() {
     diurnal.id = "diurnal";
     diurnal.name = "Diurnal table";
     diurnal.description =
-        "The temperature of a table of latitude and local solar time, "
-        "baked offline by a regolith model whose thermal inertia keeps "
-        "the night warm and lags the afternoon: the Moon's by default.";
+        "The temperature of a table of latitude, local solar time, "
+        "thermal inertia and albedo, baked offline by a regolith "
+        "model "
+        "whose thermal inertia keeps the night warm and lags the "
+        "afternoon: the Moon's by default. Each pixel reads it at "
+        "its "
+        "own thermal inertia and albedo.";
     diurnal.references = {
         "P. O. Hayne et al., \"Global regolith thermophysical "
         "properties of the Moon from the Diviner Lunar Radiometer "
         "Experiment\", JGR Planets 122(12), 2017. "
         "https://doi.org/10.1002/2017JE005387"};
-    diurnal.params = {{"poleX", 0.0f, "The body's pole, world x."},
-                      {"poleY", 0.0f, "The body's pole, world y."},
-                      {"poleZ", 1.0f, "The body's pole, world z."}};
+    const std::string pole =
+        "; all 0, the +z axis of the prim the material is bound to.";
+    diurnal.params = {
+        {"poleX", 0.0f, "The body's pole, world x" + pole},
+        {"poleY", 0.0f, "The body's pole, world y" + pole},
+        {"poleZ", 0.0f, "The body's pole, world z" + pole}};
     diurnal.typeName = "DiurnalTemperature";
     diurnal.slang = kDiurnalSlang;
     diurnal.defaultData = [] {
-        const DiurnalTable& table = LunarDiurnalTable();
-        std::vector<float> data{static_cast<float>(table.latitudes),
-                                static_cast<float>(table.times)};
-        data.insert(data.end(), table.kelvin.begin(), table.kelvin.end());
-        return data;
+        return LunarDiurnalTable().ModelData();
     };
     registry.models_.push_back(std::move(diurnal));
     return registry;

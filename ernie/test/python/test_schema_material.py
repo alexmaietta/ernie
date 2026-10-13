@@ -24,6 +24,7 @@ def test_material_and_shader_are_registered():
         "UsdUVTexture",
         "UsdPrimvarReader_float2",
         "UsdTransform2d",
+        "ErnieThermal",
     ]
     assert shader.find("source_color_space").options == [
         "auto",
@@ -115,3 +116,43 @@ def test_texture_bias_is_a_four_vector():
     )
     with pytest.raises(ValueError, match="4-vector"):
         texture.bias = (1.0, 2.0, 3.0)
+
+
+def test_diurnal_tables_bake_and_pack_for_materials():
+    # Rocks keep the night warm; darker ground is hotter at noon.
+    regolith = ernie.RegolithProperties()
+    assert regolith.thermal_inertia == pytest.approx(64.0, abs=4.0)
+    assert ernie.RegolithProperties(
+        thermal_inertia=500.0
+    ).thermal_inertia == pytest.approx(500.0)
+    table = ernie.DiurnalTable.bake(
+        regolith,
+        latitudes=2,
+        times=24,
+        inertias=[50.0, 1500.0],
+        albedos=[0.07, 0.2],
+    )
+    kelvin = table.kelvin
+    assert kelvin.shape == (2, 24, 2, 2)
+    assert kelvin[0, 23, 1, 0] > kelvin[0, 23, 0, 0] + 60.0
+    assert kelvin[0, 12, 0, 0] > kelvin[0, 12, 0, 1]
+    data = table.model_data()
+    assert data[0] == -2.0 and len(data) == 5 + 4 + kelvin.size
+    back = ernie.DiurnalTable.from_model_data(data)
+    assert np.array_equal(back.kelvin, kelvin)
+    with pytest.raises(ValueError, match="layout tag"):
+        ernie.DiurnalTable.from_model_data([2.0, 24.0])
+    with pytest.raises(ValueError, match="ascending"):
+        ernie.DiurnalTable.bake(inertias=[100.0, 50.0])
+    # A material reads it, its inertia a constant or a texture.
+    scene = ernie.Scene()
+    material = ernie.Material.define(
+        scene,
+        "/Looks/Regolith",
+        thermal_model="diurnal",
+        thermal_model_data=data,
+        thermal_inertia=400.0,
+    )
+    assert material.thermal_inertia == 400.0
+    assert len(material.thermal_model_data) == len(data)
+    assert ernie.DiurnalTable.lunar().kelvin.shape == (19, 96, 1, 1)

@@ -246,13 +246,18 @@ struct ShadingConstants {
 
 // A material's temperature model (the renderer's `TemperatureMaterialGpu`): its index in the
 // registry plus 1 (0 for none), its data's count and address, its solar absorptivity and thermal
-// emissivity, and its parameters.
+// emissivity, the world +z axis of a prim bound to it (0 for none), its thermal inertia, and its
+// parameters.
 struct TemperatureMaterial {
     uint model;
     uint dataCount;
     float absorptivity;
     float emissivity;
     float* data;
+    float axisX;
+    float axisY;
+    float axisZ;
+    float inertia;
     uint2 padding;
     float params[16];
 }
@@ -2700,6 +2705,8 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
     input.emissivity = record.emissivity;
     input.kelvin = materials[ids.x].surface.y;
     input.time = asfloat(pass.model.w);
+    input.axis = float3(record.axisX, record.axisY, record.axisZ);
+    input.inertia = record.inertia;
     let lightCount = min(sh.size.w, kShadeLights);
     for (uint k = 0; k < lightCount; ++k) {
         let light = lights[shv.view.z + k];

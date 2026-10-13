@@ -11,11 +11,17 @@ TEST(TemperatureModel, BuiltinsRegisterAndDispatch) {
     ASSERT_EQ(registry.IndexOf("diurnal"), 1);
     EXPECT_EQ(registry.Find("balance")->Defaults(),
               (std::vector<float>{-1.0f, -1.0f, 3.0f, 0.0f, 1.0f}));
-    // The diurnal model's lunar table: its sizes, then 19 x 96 kelvin.
-    const std::vector<float> data = registry.Find("diurnal")->defaultData();
-    ASSERT_EQ(data.size(), 2u + 19u * 96u);
-    EXPECT_EQ(data[0], 19.0f);
-    EXPECT_EQ(data[1], 96.0f);
+    // The diurnal model's lunar table: its tag and sizes, its one
+    // inertia and albedo, then 19 x 96 kelvin; its pole the prim's.
+    const std::vector<float> data =
+        registry.Find("diurnal")->defaultData();
+    ASSERT_EQ(data.size(), 5u + 2u + 19u * 96u);
+    EXPECT_EQ(data[0], -2.0f);
+    EXPECT_EQ(data[1], 19.0f);
+    EXPECT_EQ(data[2], 96.0f);
+    EXPECT_EQ(data[6], 0.12f);
+    EXPECT_EQ(registry.Find("diurnal")->Defaults(),
+              (std::vector<float>{0.0f, 0.0f, 0.0f}));
     const auto modules = ernie::TemperatureModelModules(registry);
     ASSERT_EQ(modules.size(), 4u);
     EXPECT_EQ(modules.back().name, "temperature_models");

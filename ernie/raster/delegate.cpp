@@ -685,8 +685,35 @@ RasterDelegate::MaterialId(const Path& path) const {
 
 std::uint32_t RasterDelegate::MaterialOf(const Scene& scene,
                                          const Path& prim) const {
-    return MaterialId(BoundMaterial(scene, prim))
-        .value_or(RasterRenderer::kDefaultMaterial);
+    const std::uint32_t id =
+        MaterialId(BoundMaterial(scene, prim))
+            .value_or(RasterRenderer::kDefaultMaterial);
+    materialPrims_.try_emplace(id, prim);
+    return id;
+}
+
+void RasterDelegate::SyncTemperatureAxes(const Scene& scene) {
+    for (const auto& [path, material] : materials_) {
+        if (!material.temperatureModel) {
+            continue;
+        }
+        const auto prim = materialPrims_.find(material.id);
+        if (prim == materialPrims_.end()) {
+            continue;
+        }
+        // A prim gone or bound elsewhere since: the next one seen.
+        if (!scene.Has(prim->second) ||
+            BoundMaterial(scene, prim->second) != path) {
+            materialPrims_.erase(prim);
+            continue;
+        }
+        const glm::dvec3 axis(scene.WorldTransform(prim->second)[2]);
+        const double length = glm::length(axis);
+        if (length > 0.0) {
+            renderer_.SetTemperatureAxis(material.id,
+                                         glm::vec3(axis / length));
+        }
+    }
 }
 
 void RasterDelegate::SyncMaterials(const Scene& scene) {
@@ -730,6 +757,7 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
     const MaterialSettings settings =
         MaterialSettingsOf(scene, path, renderer_.Brdfs());
     renderer_.SetMaterial(material.id, settings);
+    material.temperatureModel = !settings.temperatureModel.empty();
     RasterMaterial& gpu = renderer_.Material(material.id);
     // The textures of a UsdPreviewSurface: albedo, normal map,
     // roughness and metallic.
@@ -4626,6 +4654,8 @@ void RasterDelegate::UpdatePrims(
             return OverlayAnchorOf(scene, path);
         },
         &meshes_);
+    // Once every drawable has named its prims' materials.
+    SyncTemperatureAxes(scene);
     renderer_.Update(frame, drawables, drawn);
     renderer_.Overlays().SetAnchorResolver({}, &meshes_);
     PrepareSensorState(stateKey, extent, views, frame.time);

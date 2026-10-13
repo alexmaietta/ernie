@@ -4,9 +4,13 @@
 #include "ernie/util/profile.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <stdexcept>
+#include <string>
+#include <thread>
 
 namespace ernie {
 
@@ -174,22 +178,181 @@ DiurnalSurfaceTemperatures(const RegolithProperties& regolith,
     return surface;
 }
 
-DiurnalTable DiurnalTemperatureTable(const RegolithProperties& regolith,
-                                     int latitudes, int times) {
-    if (latitudes < 2 || times < 2) {
+double ThermalInertia(const RegolithProperties& regolith) {
+    return std::sqrt(regolith.deepConductivity *
+                     regolith.deepDensity *
+                     HeatCapacity(regolith, 250.0));
+}
+
+RegolithProperties WithThermalInertia(RegolithProperties regolith,
+                                      double inertia) {
+    if (!(inertia > 0.0)) {
         throw std::invalid_argument(
-            "A diurnal table needs at least 2 latitudes and times");
+            "A thermal inertia must be above 0, not " +
+            std::to_string(inertia));
     }
-    ERNIE_ZONE("Diurnal temperature table");
-    DiurnalTable table{latitudes, times, {}};
-    table.kelvin.reserve(static_cast<std::size_t>(latitudes) *
-                         static_cast<std::size_t>(times));
-    for (int row = 0; row < latitudes; ++row) {
-        const double latitude = 0.5 * M_PI * row / (latitudes - 1);
-        for (const double kelvin :
-             DiurnalSurfaceTemperatures(regolith, latitude, times)) {
-            table.kelvin.push_back(static_cast<float>(kelvin));
+    const double ratio = inertia / ThermalInertia(regolith);
+    regolith.surfaceConductivity *= ratio * ratio;
+    regolith.deepConductivity *= ratio * ratio;
+    return regolith;
+}
+
+std::size_t DiurnalTable::At(int latitude, int time, int inertia,
+                             int albedo) const {
+    const auto index = [](int value) {
+        return static_cast<std::size_t>(value);
+    };
+    return ((index(latitude) * index(times) + index(time)) *
+                inertias.size() +
+            index(inertia)) *
+               albedos.size() +
+           index(albedo);
+}
+
+namespace {
+
+/// Whether `values` is not empty and strictly ascending.
+bool Ascending(const std::vector<float>& values) {
+    return !values.empty() &&
+           std::adjacent_find(values.begin(), values.end(),
+                              std::greater_equal<>()) == values.end();
+}
+
+}  // namespace
+
+void DiurnalTable::Check() const {
+    const auto bad = [](const std::string& why) {
+        return std::invalid_argument("Diurnal table: " + why);
+    };
+    if (latitudes < 2 || times < 2) {
+        throw bad("needs at least 2 latitudes and times");
+    }
+    if (!Ascending(inertias) || !Ascending(albedos)) {
+        throw bad("inertias and albedos must be given ascending");
+    }
+    if (!(inertias.front() > 0.0f)) {
+        throw bad("inertias must be above 0");
+    }
+    if (kelvin.size() != At(latitudes, 0)) {
+        throw bad("has " + std::to_string(kelvin.size()) +
+                  " temperatures for " +
+                  std::to_string(At(latitudes, 0)) + " entries");
+    }
+}
+
+std::vector<float> DiurnalTable::ModelData() const {
+    Check();
+    std::vector<float> data{kModelDataTag,
+                            static_cast<float>(latitudes),
+                            static_cast<float>(times),
+                            static_cast<float>(inertias.size()),
+                            static_cast<float>(albedos.size())};
+    data.insert(data.end(), inertias.begin(), inertias.end());
+    data.insert(data.end(), albedos.begin(), albedos.end());
+    data.insert(data.end(), kelvin.begin(), kelvin.end());
+    return data;
+}
+
+DiurnalTable
+DiurnalTable::FromModelData(const std::vector<float>& data) {
+    constexpr std::size_t kHeader = 5;
+    if (data.size() < kHeader || data[0] != kModelDataTag) {
+        throw std::invalid_argument(
+            "Diurnal table data must start with its layout tag (-2), "
+            "as DiurnalTable::ModelData writes it");
+    }
+    const auto count = [&](std::size_t i) {
+        const float value = data[i];
+        if (!(value >= 0.0f && value < 1e7f) ||
+            value != std::floor(value)) {
+            throw std::invalid_argument(
+                "Diurnal table data has a bad count: " +
+                std::to_string(value));
         }
+        return static_cast<std::size_t>(value);
+    };
+    DiurnalTable table;
+    table.latitudes = static_cast<int>(count(1));
+    table.times = static_cast<int>(count(2));
+    const std::size_t inertias = count(3);
+    const std::size_t albedos = count(4);
+    if (data.size() < kHeader + inertias + albedos) {
+        throw std::invalid_argument(
+            "Diurnal table data is cut short");
+    }
+    const auto first = data.begin() + kHeader;
+    table.inertias.assign(first, first + static_cast<long>(inertias));
+    table.albedos.assign(first + static_cast<long>(inertias),
+                         first +
+                             static_cast<long>(inertias + albedos));
+    table.kelvin.assign(first + static_cast<long>(inertias + albedos),
+                        data.end());
+    table.Check();
+    return table;
+}
+
+DiurnalTable DiurnalTemperatureTable(
+    const RegolithProperties& regolith, int latitudes, int times,
+    std::vector<float> inertias, std::vector<float> albedos) {
+    ERNIE_ZONE("Diurnal temperature table");
+    DiurnalTable table;
+    table.latitudes = latitudes;
+    table.times = times;
+    table.inertias = inertias.empty()
+                         ? std::vector<float>{static_cast<float>(
+                               ThermalInertia(regolith))}
+                         : std::move(inertias);
+    table.albedos =
+        albedos.empty()
+            ? std::vector<float>{static_cast<float>(regolith.albedo)}
+            : std::move(albedos);
+    if (!(table.albedos.front() >= 0.0f &&
+          table.albedos.back() < 1.0f)) {
+        throw std::invalid_argument(
+            "Diurnal table: albedos must lie in [0, 1)");
+    }
+    table.kelvin.assign(
+        latitudes >= 2 && times >= 2 ? table.At(latitudes, 0) : 0,
+        0.0f);
+    table.Check();
+    // A row a latitude, inertia and albedo, run across threads.
+    const std::size_t inertiaCount = table.inertias.size();
+    const std::size_t albedoCount = table.albedos.size();
+    const std::size_t rows = static_cast<std::size_t>(latitudes) *
+                             inertiaCount * albedoCount;
+    std::atomic<std::size_t> next{0};
+    const auto work = [&] {
+        for (std::size_t r; (r = next.fetch_add(1)) < rows;) {
+            const auto albedo = static_cast<int>(r % albedoCount);
+            const auto inertia =
+                static_cast<int>(r / albedoCount % inertiaCount);
+            const auto row =
+                static_cast<int>(r / (albedoCount * inertiaCount));
+            RegolithProperties properties = WithThermalInertia(
+                regolith,
+                table.inertias[static_cast<std::size_t>(inertia)]);
+            properties.albedo =
+                table.albedos[static_cast<std::size_t>(albedo)];
+            const std::vector<double> kelvin =
+                DiurnalSurfaceTemperatures(
+                    properties, 0.5 * M_PI * row / (latitudes - 1),
+                    times);
+            for (int time = 0; time < times; ++time) {
+                table.kelvin[table.At(row, time, inertia, albedo)] =
+                    static_cast<float>(
+                        kelvin[static_cast<std::size_t>(time)]);
+            }
+        }
+    };
+    const std::size_t threads = std::clamp<std::size_t>(
+        std::thread::hardware_concurrency() / 2, 1, rows);
+    std::vector<std::thread> pool;
+    for (std::size_t t = 1; t < threads; ++t) {
+        pool.emplace_back(work);
+    }
+    work();
+    for (std::thread& thread : pool) {
+        thread.join();
     }
     return table;
 }

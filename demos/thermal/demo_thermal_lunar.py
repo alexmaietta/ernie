@@ -85,13 +85,12 @@ class Demo(ernie.demo.Demo):
         scene = self.scene
         world = scene.define("/World", ernie.Xform)
         looks = world.define("Looks", ernie.Xform)
-        # The Moon's diurnal table about its pole, +z.
+        # The Moon's diurnal table about its pole, the sphere's +z.
         regolith = looks.define(
             "Regolith",
             ernie.Material,
             albedo=(0.12, 0.12, 0.12),
             thermal_model="diurnal",
-            thermal_model_params=[0.0, 0.0, 1.0],
         )
         world.define(
             "Moon", ernie.Sphere, radius=RADIUS, material_binding=regolith.path

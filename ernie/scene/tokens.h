@@ -1182,6 +1182,15 @@ inline constexpr std::string_view kThermalModelParams =
     "ernie:thermal:model:params";
 inline constexpr std::string_view kThermalModelData =
     "ernie:thermal:model:data";
+/// A material's thermal inertia (Ernie), J m^-2 K^-1 s^-1/2, which
+/// its temperature model reads (the diurnal table's inertia axis); 0
+/// for none. Its texture: float32 (rows, cols) or (rows, cols, 1)
+/// through mesh texture coordinates, row 0 at the top, in place of
+/// it where above 0.
+inline constexpr std::string_view kThermalInertia =
+    "ernie:thermal:inertia";
+inline constexpr std::string_view kThermalInertiaTexture =
+    "ernie:thermal:inertiaTexture";
 /// A Material's thermal terminal (Ernie), as `outputs:surface` is its
 /// surface's: connected to an ErnieThermal Shader, whose inputs give
 /// the material's thermal properties in place of its own
@@ -1195,11 +1204,14 @@ inline constexpr std::string_view kThermalOutput =
 inline constexpr std::string_view kErnieThermal = "ErnieThermal";
 /// ErnieThermal's inputs: temperature (K, 0 for none), emissivity (0
 /// to 1 at every wavelength; below 0, 1 minus the reflectance),
+/// thermal inertia (0 for none; connectable as the temperature is),
 /// temperature model, its parameters and data.
 inline constexpr std::string_view kThermalTemperatureInput =
     "inputs:temperature";
 inline constexpr std::string_view kThermalEmissivityInput =
     "inputs:emissivity";
+inline constexpr std::string_view kThermalInertiaInput =
+    "inputs:thermalInertia";
 inline constexpr std::string_view kThermalModelInput =
     "inputs:temperatureModel";
 inline constexpr std::string_view kThermalModelParamsInput =

@@ -238,6 +238,11 @@ class RasterRenderer {
         return temperatureModels_;
     }
 
+    /// Gives material `id`'s temperature model the world +z axis of a
+    /// prim bound to it (`TemperatureInput::axis`: the diurnal
+    /// model's pole when it names none), from the next frame.
+    void SetTemperatureAxis(std::uint32_t id, const glm::vec3& axis);
+
     const SensorFilterRegistry& SensorFilters() const {
         return sensorFilters_;
     }
@@ -1366,6 +1371,8 @@ class RasterRenderer {
     bool temperatureModelsInUse_ = false;
     /// Models' default data by id, made when first needed.
     std::map<std::string, std::vector<float>> temperatureDefaults_;
+    /// Materials' prim axes by id (`SetTemperatureAxis`).
+    std::map<std::uint32_t, glm::vec3> temperatureAxes_;
     /// The frame's time on the sensor clock, s, for temperature
     /// models.
     double frameTime_ = 0.0;

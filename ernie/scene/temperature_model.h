@@ -41,8 +41,10 @@ struct TemperatureModelParam {
 /// wavelengths facing it (W/m^2) and how much of it reaches the point
 /// past shadows; the sunlight on the surface from every distant light
 /// (W/m^2, shadowed); the material's solar absorptivity and thermal
-/// emissivity; its own temperature (0 for none); and the frame's time
-/// (s). Parameter `i` is `p.get(i)`, the material's
+/// emissivity; its own temperature (0 for none); the frame's time
+/// (s); the world +z axis of a prim bound to the material (0 for
+/// none); and its thermal inertia (0 for none). Parameter `i` is
+/// `p.get(i)`, the material's
 /// `ernie:thermal:model:data` `p.data(i)` (`p.dataCount()` of them).
 ///
 ///     import temperature_model;
@@ -78,7 +80,8 @@ class TemperatureModelRegistry {
     TemperatureModelRegistry() = default;
 
     /// A registry with the built-in models:
-    /// - "balance": zero-capacitance energy balance, each point at the
+    /// - "balance": zero-capacitance energy balance, each point at
+    /// the
     ///   temperature where what it absorbs of the sunlight on it, and
     ///   its internal heat, equals what it radiates to its
     ///   surroundings, at once (a spacecraft's thin panels; PANGU's
@@ -86,15 +89,18 @@ class TemperatureModelRegistry {
     ///   (below 0, the material's), the surroundings' temperature
     ///   (K), internal heat (W/m^2), and the faces radiating (1, or 2
     ///   for a panel open behind).
-    /// - "diurnal": the temperature a table of latitude and local time
-    ///   gives (PANGU's planetary LUTs), whose thermal inertia, from a
-    ///   regolith model run offline, keeps the night warm and lags the
-    ///   afternoon; latitude and local solar time from the surface
-    ///   normal, the body's pole and the brightest distant light, so
-    ///   slopes take the temperatures of the latitude and hour that
-    ///   face the sun as they do. Parameters: the pole's x, y and z
-    ///   (world). Data: latitudes, local times, then the kelvin row
-    ///   by row (`DiurnalTable`); without, the Moon's
+    /// - "diurnal": the temperature a table of latitude, local time,
+    ///   thermal inertia and albedo gives (PANGU's planetary LUTs),
+    ///   baked by a regolith model run offline whose thermal inertia
+    ///   keeps the night warm and lags the afternoon; latitude and
+    ///   local solar time from the surface normal, the body's pole
+    ///   and the brightest distant light, so slopes take the
+    ///   temperatures of the latitude and hour that face the sun as
+    ///   they do; each pixel's thermal inertia (the table's first
+    ///   without one) and albedo (1 minus its absorptivity).
+    ///   Parameters: the pole's x, y and z (world; all 0, the +z axis
+    ///   of the prim the material is bound to). Data:
+    ///   `DiurnalTable::ModelData`; without, the Moon's
     ///   (`LunarDiurnalTable`).
     static TemperatureModelRegistry WithBuiltins();
 

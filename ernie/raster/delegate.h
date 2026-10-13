@@ -314,6 +314,8 @@ class RasterDelegate : public RenderDelegate {
         std::optional<Key> detailAlbedo;
         std::optional<Key> detailNormal;
         std::optional<Key> temperatureTexture;
+        /// Whether it names a temperature model.
+        bool temperatureModel = false;
         /// Its thermal terminal's temperature texture (`TextureKey`),
         /// empty for none.
         std::string temperatureReader;
@@ -477,6 +479,10 @@ class RasterDelegate : public RenderDelegate {
     void SyncMaterials(const Scene& scene);
     void SyncMaterial(const Scene& scene, const Path& path,
                       SyncedMaterial& material);
+    /// Gives each material with a temperature model the +z axis of
+    /// the first prim seen bound to it (`MaterialOf`,
+    /// `RasterRenderer::SetTemperatureAxis`), as it turns.
+    void SyncTemperatureAxes(const Scene& scene);
     /// The upload of what `reader` reads into `slot`, shared with
     /// every material reading it the same way: from `sharedTextures_`
     /// while a material holds it, else loaded and uploaded. Image
@@ -649,6 +655,8 @@ class RasterDelegate : public RenderDelegate {
     /// Light linking's groups of the synced geometry (`links_`).
     void SyncLinks(const Scene& scene);
     std::vector<PointsItem> PointsItems(const Scene& scene) const;
+    /// The material id of `prim`'s bound material, noting the prim
+    /// as the material's in `materialPrims_` when it has none yet.
     std::uint32_t MaterialOf(const Scene& scene,
                              const Path& prim) const;
     /// The draws of the synced meshes and instancers. With `touched`,
@@ -865,6 +873,9 @@ class RasterDelegate : public RenderDelegate {
         sensorAgcs_;            ///< By product, pass.
     std::optional<Key> stars_;  ///< The StarField last uploaded.
     std::map<Path, SyncedMaterial> materials_;
+    /// A prim bound to each material id, the first `MaterialOf` saw,
+    /// for its temperature model's axis (`SyncTemperatureAxes`).
+    mutable std::map<std::uint32_t, Path> materialPrims_;
     /// Material textures by what they were uploaded from and how
     /// (`SharedTexture`), held by the materials reading them: one
     /// upload however many read it, freed with the last.

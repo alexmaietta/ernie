@@ -16,6 +16,7 @@
 #include "support/vulkan_fixture.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 #include <stb_image_write.h>
 
@@ -1496,6 +1497,20 @@ TEST_F(RasterDelegateTest, TemperatureModelsFollowTheSunlight) {
     EXPECT_NEAR(centre(), moon.kelvin[48], 1.0f);
     sun({-1.0, 0.0, 1.0});
     EXPECT_NEAR(centre(), moon.kelvin[60], 1.0f);
+    // Without a pole, the bound prim's +z: the same quad as a prim
+    // turned 90 degrees about x, its points in its xz plane, so its
+    // +z is along -y and that sun is in the morning.
+    const float half = 8.0f;
+    const std::array<float, 12> turned{-half, 0.0f,  half, half,
+                                       0.0f,  half,  half, 0.0f,
+                                       -half, -half, 0.0f, -half};
+    ernie::Mesh(scene, "/World/Quad")
+        .SetPoints(Tensor::Copy<float>(turned, {4, 3}));
+    scene.Set("/World/Quad", tokens::kTransform,
+              glm::rotate(glm::dmat4(1.0), 0.5 * M_PI,
+                          glm::dvec3(1.0, 0.0, 0.0)));
+    material.SetThermalModelParams({});
+    EXPECT_NEAR(centre(), moon.kelvin[36], 1.0f) << "9 am";
     material.SetThermalModel("none");
     EXPECT_THROW(Render(delegate, scene, "Temperature"),
                  std::invalid_argument);

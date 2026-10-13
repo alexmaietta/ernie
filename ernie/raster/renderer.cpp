@@ -20,11 +20,22 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace ernie {
 
 namespace {
+
+/// FNV-1a over `values`' bits.
+std::size_t HashFloats(const std::vector<float>& values) {
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const float value : values) {
+        hash = (hash ^ std::bit_cast<std::uint32_t>(value)) *
+               1099511628211ull;
+    }
+    return static_cast<std::size_t>(hash);
+}
 
 struct Uniforms {
     float viewProjection[16];
@@ -652,18 +663,21 @@ constexpr DescriptorBinding kTemperatureBindings[] = {
 
 /// shading.slang's TemperatureMaterial: a material's temperature
 /// model (its index plus 1, 0 for none), its data's count and
-/// address, its solar absorptivity and thermal emissivity, and its
-/// parameters.
+/// address, its solar absorptivity and thermal emissivity, the +z
+/// axis of a prim bound to it (`SetTemperatureAxis`), its thermal
+/// inertia, and its parameters.
 struct TemperatureMaterialGpu {
     std::uint32_t model;
     std::uint32_t dataCount;
     float absorptivity;
     float emissivity;
     VkDeviceAddress data;
+    float axis[3];
+    float inertia;
     std::uint32_t padding[2];
     float params[TemperatureModelRegistry::kMaxParams];
 };
-static_assert(sizeof(TemperatureMaterialGpu) == 96,
+static_assert(sizeof(TemperatureMaterialGpu) == 112,
               "TemperatureMaterialGpu must match shading.slang");
 
 /// frame.slang's FrameResources, every drawable's binding 0: the
@@ -2326,6 +2340,11 @@ RasterRenderer::Material(std::uint32_t id) const {
     return *it->second;
 }
 
+void RasterRenderer::SetTemperatureAxis(std::uint32_t id,
+                                        const glm::vec3& axis) {
+    temperatureAxes_[id] = axis;
+}
+
 void RasterRenderer::RemoveMaterial(std::uint32_t id) {
     if (id == kDefaultMaterial) {
         throw std::invalid_argument(
@@ -2339,6 +2358,7 @@ void RasterRenderer::RemoveMaterial(std::uint32_t id) {
     ++materialSetVersion_;
     vkDeviceWaitIdle(context_.Device());
     materials_.erase(it);
+    temperatureAxes_.erase(id);
 }
 
 const RasterMaterial&
@@ -4328,6 +4348,8 @@ void RasterRenderer::WriteMaterialTable() {
     std::vector<TemperatureMaterialGpu> temperatureTable(
         count, TemperatureMaterialGpu{});
     std::vector<float> temperatureData;
+    // Where each distinct data went in it, by `HashFloats`.
+    std::unordered_map<std::size_t, std::size_t> sharedData;
     std::set<std::size_t> models;
     const std::span<const BrdfModel> registered = brdfs_.Models();
     // Models' parameters past the core ones, each material's after
@@ -4503,12 +4525,34 @@ void RasterRenderer::WriteMaterialTable() {
                     }
                     data = &found->second;
                 }
-                // Its address once the buffer is made.
-                record.data = temperatureData.size();
+                // Its address once the buffer is made; materials with
+                // the same data share one copy.
+                const std::size_t hash = HashFloats(*data);
+                auto [shared, fresh] = sharedData.try_emplace(
+                    hash, temperatureData.size());
+                if (!fresh &&
+                    !(temperatureData.size() - shared->second >=
+                          data->size() &&
+                      std::equal(data->begin(), data->end(),
+                                 temperatureData.begin() +
+                                     static_cast<std::ptrdiff_t>(
+                                         shared->second)))) {
+                    shared->second = temperatureData.size();
+                    fresh = true;
+                }
+                record.data = shared->second;
                 record.dataCount =
                     static_cast<std::uint32_t>(data->size());
-                temperatureData.insert(temperatureData.end(),
-                                       data->begin(), data->end());
+                if (fresh) {
+                    temperatureData.insert(temperatureData.end(),
+                                           data->begin(),
+                                           data->end());
+                }
+                if (const auto axis = temperatureAxes_.find(id);
+                    axis != temperatureAxes_.end()) {
+                    std::copy_n(&axis->second.x, 3, record.axis);
+                }
+                record.inertia = settings.thermalInertia;
                 record.absorptivity = static_cast<float>(
                     SolarAbsorptivity(reflectance));
                 record.emissivity = static_cast<float>(

@@ -15,6 +15,7 @@
 #include "ernie/util/noise.h"
 #include "ernie/util/raster_source.h"
 #include "ernie/util/reflectance_library.h"
+#include "ernie/util/regolith.h"
 #include "ernie/util/tensor.h"
 
 #include <nanobind/operators.h>
@@ -2872,6 +2873,132 @@ void BindScene(nb::module_& m) {
         "name, source (the ECOSTRESS file), and wavelengths (nm) "
         "and values (fractions) from 0.35 um to 2.5 um and for most "
         "into the thermal infrared.");
+    nb::class_<RegolithProperties>(
+        m, "RegolithProperties",
+        "A regolith's thermophysical properties and its body's "
+        "sunlight, the Moon's by default (Hayne et al. 2017): what "
+        "DiurnalTable.bake runs its 1-D heat conduction model on.")
+        .def(
+            "__init__",
+            [](RegolithProperties* self, double solarIrradiance,
+               double dayLength, double albedo, double emissivity,
+               std::optional<double> inertia) {
+                RegolithProperties regolith;
+                regolith.solarIrradiance = solarIrradiance;
+                regolith.dayLength = dayLength;
+                regolith.albedo = albedo;
+                regolith.emissivity = emissivity;
+                new (self) RegolithProperties(
+                    inertia ? WithThermalInertia(regolith, *inertia)
+                            : regolith);
+            },
+            nb::arg("solar_irradiance") =
+                RegolithProperties{}.solarIrradiance,
+            nb::arg("day_length") = RegolithProperties{}.dayLength,
+            nb::arg("albedo") = RegolithProperties{}.albedo,
+            nb::arg("emissivity") = RegolithProperties{}.emissivity,
+            nb::arg("thermal_inertia").none() = nb::none(),
+            "The Moon's regolith with these: sunlight at the body "
+            "(W/m^2), its solar day (s), Bond albedo at normal "
+            "incidence, infrared emissivity and, if given, thermal "
+            "inertia (J m^-2 K^-1 s^-1/2, its conductivities scaled "
+            "to it).")
+        .def_rw("solar_irradiance",
+                &RegolithProperties::solarIrradiance)
+        .def_rw("day_length", &RegolithProperties::dayLength)
+        .def_rw("albedo", &RegolithProperties::albedo)
+        .def_rw("albedo_a", &RegolithProperties::albedoA)
+        .def_rw("albedo_b", &RegolithProperties::albedoB)
+        .def_rw("emissivity", &RegolithProperties::emissivity)
+        .def_rw("surface_density",
+                &RegolithProperties::surfaceDensity)
+        .def_rw("deep_density", &RegolithProperties::deepDensity)
+        .def_rw("density_scale", &RegolithProperties::densityScale)
+        .def_rw("surface_conductivity",
+                &RegolithProperties::surfaceConductivity)
+        .def_rw("deep_conductivity",
+                &RegolithProperties::deepConductivity)
+        .def_rw("radiative_chi", &RegolithProperties::radiativeChi)
+        .def_rw("geothermal_flux",
+                &RegolithProperties::geothermalFlux)
+        .def_rw("heat_capacity", &RegolithProperties::heatCapacity)
+        .def_prop_ro(
+            "thermal_inertia",
+            [](const RegolithProperties& r) {
+                return ThermalInertia(r);
+            },
+            "sqrt(k rho c) of the deep regolith at 250 K, J m^-2 "
+            "K^-1 "
+            "s^-1/2 (about 64 for the Moon's).")
+        .def("with_thermal_inertia", &WithThermalInertia,
+             nb::arg("inertia"),
+             "A copy with this thermal inertia: its contact "
+             "conductivities scaled by the square of the ratio.");
+    nb::class_<DiurnalTable>(
+        m, "DiurnalTable",
+        "Surface temperatures over latitude (0 to 90 degrees), local "
+        "solar time (from midnight), thermal inertia and albedo, for "
+        "the diurnal temperature model: a Material's "
+        "thermal_model_data = table.model_data().")
+        .def_static(
+            "bake",
+            [](const RegolithProperties& regolith, int latitudes,
+               int times, std::vector<float> inertias,
+               std::vector<float> albedos) {
+                nb::gil_scoped_release release;
+                return DiurnalTemperatureTable(
+                    regolith, latitudes, times, std::move(inertias),
+                    std::move(albedos));
+            },
+            nb::arg("regolith") = RegolithProperties{},
+            nb::arg("latitudes") = 19, nb::arg("times") = 96,
+            nb::arg("inertias") = std::vector<float>{},
+            nb::arg("albedos") = std::vector<float>{},
+            "Bakes a table with the regolith model, at `latitudes` "
+            "latitudes and `times` local times, for each of "
+            "`inertias` (ascending; none, the regolith's own) and "
+            "`albedos` (ascending; none, its own), rows in parallel: "
+            "about 6 ms a row.")
+        .def_static(
+            "lunar", [] { return LunarDiurnalTable(); },
+            "The Moon's table, which the diurnal model reads without "
+            "data: every 5 degrees and quarter hour, one inertia and "
+            "albedo.")
+        .def_static("from_model_data", &DiurnalTable::FromModelData,
+                    nb::arg("data"), "The table model_data() gave.")
+        .def_ro("latitudes", &DiurnalTable::latitudes)
+        .def_ro("times", &DiurnalTable::times)
+        .def_ro("inertias", &DiurnalTable::inertias)
+        .def_ro("albedos", &DiurnalTable::albedos)
+        .def_prop_ro(
+            "kelvin",
+            [](const DiurnalTable& table) {
+                auto* values = new std::vector<float>(table.kelvin);
+                nb::capsule owner(values, [](void* p) noexcept {
+                    delete static_cast<std::vector<float>*>(p);
+                });
+                const std::size_t shape[4] = {
+                    static_cast<std::size_t>(table.latitudes),
+                    static_cast<std::size_t>(table.times),
+                    table.inertias.size(), table.albedos.size()};
+                return nb::cast(nb::ndarray<nb::numpy, float>(
+                                    values->data(), 4, shape, owner),
+                                nb::rv_policy::reference);
+            },
+            "float32 (latitudes, times, inertias, albedos) kelvin, a "
+            "copy.")
+        .def(
+            "model_data", &DiurnalTable::ModelData,
+            "The table as the diurnal model's data, for a Material's "
+            "thermal_model_data.")
+        .def("__repr__", [](const DiurnalTable& table) {
+            return "DiurnalTable(" + std::to_string(table.latitudes) +
+                   " latitudes, " + std::to_string(table.times) +
+                   " times, " +
+                   std::to_string(table.inertias.size()) +
+                   " inertias, " +
+                   std::to_string(table.albedos.size()) + " albedos)";
+        });
     m.def(
         "synthetic_stars",
         [](std::size_t count, std::uint64_t seed, double faintest) {
@@ -3009,11 +3136,14 @@ void BindScene(nb::module_& m) {
         {"THERMAL_MODEL", tokens::kThermalModel},
         {"THERMAL_MODEL_PARAMS", tokens::kThermalModelParams},
         {"THERMAL_MODEL_DATA", tokens::kThermalModelData},
+        {"THERMAL_INERTIA", tokens::kThermalInertia},
+        {"THERMAL_INERTIA_TEXTURE", tokens::kThermalInertiaTexture},
         {"THERMAL_OUTPUT", tokens::kThermalOutput},
         {"ERNIE_THERMAL", tokens::kErnieThermal},
         {"THERMAL_TEMPERATURE_INPUT",
          tokens::kThermalTemperatureInput},
         {"THERMAL_EMISSIVITY_INPUT", tokens::kThermalEmissivityInput},
+        {"THERMAL_INERTIA_INPUT", tokens::kThermalInertiaInput},
         {"THERMAL_MODEL_INPUT", tokens::kThermalModelInput},
         {"THERMAL_MODEL_PARAMS_INPUT",
          tokens::kThermalModelParamsInput},
