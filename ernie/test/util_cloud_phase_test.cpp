@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstddef>
 #include <numbers>
 
 namespace {
@@ -14,23 +15,24 @@ using ernie::SpectralBands;
 
 constexpr double kPi = std::numbers::pi;
 
-double ThetaOf(const DropletPhaseTable& table, int i) {
-    const double u = static_cast<double>(i) / (table.angles - 1);
+double ThetaOf(const DropletPhaseTable& table, std::size_t i) {
+    const double u = static_cast<double>(i) /
+                     static_cast<double>(table.angles - 1);
     return 0.5 * kPi * (1.0 - std::cos(kPi * u));
 }
 
 // Row `row`'s value nearest scattering angle `degrees`.
-double At(const DropletPhaseTable& table, int row, double degrees) {
+double At(const DropletPhaseTable& table, std::size_t row,
+          double degrees) {
     const double theta = degrees * kPi / 180.0;
-    int best = 0;
-    for (int i = 0; i < table.angles; ++i) {
+    std::size_t best = 0;
+    for (std::size_t i = 0; i < table.angles; ++i) {
         if (std::abs(ThetaOf(table, i) - theta) <
             std::abs(ThetaOf(table, best) - theta)) {
             best = i;
         }
     }
-    return table
-        .values[static_cast<std::size_t>(row) * table.angles + best];
+    return double(table.values[row * table.angles + best]);
 }
 
 }  // namespace
@@ -45,21 +47,21 @@ TEST(CloudPhase, DropletsScatterAsBouthorsEtAlFindOverTheSphere) {
     // About half the light in the narrow forward peak (theirs 51%).
     EXPECT_GT(table.forwardFraction, 0.4);
     EXPECT_LT(table.forwardFraction, 0.6);
-    for (int row = 0; row <= bands.count; ++row) {
-        const bool mean = row == bands.count;
+    const auto rows = static_cast<std::size_t>(bands.count);
+    for (std::size_t row = 0; row <= rows; ++row) {
+        const bool mean = row == rows;
         // The bands' mean, its peak folded away, integrates to 1 over
         // the sphere; each band's, its peak kept, to 1 over the
         // extinction's share left (its own peak's about the mean's).
         double total = 0.0;
-        for (int i = 0; i + 1 < table.angles; ++i) {
+        for (std::size_t i = 0; i + 1 < table.angles; ++i) {
             const double a = ThetaOf(table, i);
             const double b = ThetaOf(table, i + 1);
             const float* values =
-                table.values.data() +
-                static_cast<std::size_t>(row) * table.angles;
+                table.values.data() + row * table.angles;
             total += 0.5 *
-                     (values[i] * std::sin(a) +
-                      values[i + 1] * std::sin(b)) *
+                     (double(values[i]) * std::sin(a) +
+                      double(values[i + 1]) * std::sin(b)) *
                      (b - a) * 2.0 * kPi;
         }
         const double expected =

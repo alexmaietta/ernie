@@ -156,7 +156,8 @@ TEST_F(RasterDelegateTest, CloudLightMapsHoldTheSurfaceTheSunSees) {
     delegate.Step(scene);
     const std::vector<glm::vec4> maps =
         delegate.Renderer().Volumes().LightMaps();
-    constexpr std::size_t kSize = 128;
+    // Its texels about two voxels (radius / voxel, 15), at least 32.
+    constexpr std::size_t kSize = 32;
     ASSERT_GT(maps.size(), 3 + kSize * kSize);
     // Its header: across the map, its radius (the bounds' sphere
     // about the centre), and towards the sun, straight up. The grid's
@@ -176,13 +177,13 @@ TEST_F(RasterDelegateTest, CloudLightMapsHoldTheSurfaceTheSunSees) {
     EXPECT_NEAR(centre.z, depth, 0.03 * depth);
     // The cube's square of the map's, its surface about 1.7 m of 2
     // radii across; its coarsest level the mean, its coverage that
-    // share.
+    // share, whole texels.
     std::size_t covered = 0;
     for (std::size_t i = 0; i < kSize * kSize; ++i) {
         covered += maps[3 + i].w > 0.5f;
     }
     const double side = 1.7 / (2.0 * radius) * kSize;
-    EXPECT_NEAR(double(covered), side * side, 0.05 * side * side);
+    EXPECT_NEAR(double(covered), side * side, 0.1 * side * side);
     const glm::vec4 coarsest = maps.back();
     EXPECT_NEAR(coarsest.w, double(covered) / (kSize * kSize), 0.01);
     // Its edges' columns shallower.
@@ -227,8 +228,9 @@ TEST_F(RasterDelegateTest,
                     for (std::size_t x = kCentre - kHalf;
                          x <= kCentre + kHalf; ++x) {
                         mean[b] +=
-                            values[(b * kVarSize + y) * kVarSize +
-                                   x] /
+                            double(values[(b * kVarSize + y) *
+                                              kVarSize +
+                                          x]) /
                             (kFrames * (2 * kHalf + 1) *
                              (2 * kHalf + 1));
                     }
@@ -263,19 +265,20 @@ TEST_F(RasterDelegateTest,
             .forwardFraction;
     const double thickness = (1.0 - forward) * 10.0 * kDepth;
     const double at = std::log2(thickness / 0.25);
-    const int low = static_cast<int>(at);
+    const auto low = static_cast<std::size_t>(at);
     double expected = 0.0;
-    for (int set = 0; set < ernie::kCloudOrderSets; ++set) {
-        for (int a = 0; a < shape.azimuths; ++a) {
-            const double thin = table.At(
+    for (std::size_t set = 0; set < ernie::kCloudOrderSets; ++set) {
+        for (std::size_t a = 0; a < shape.azimuths; ++a) {
+            const double thin = double(table.At(
                 set, shape.Cell(shape.lightCosines - 1, low, 0, 0, a),
-                0);
-            const double thick = table.At(
+                0));
+            const double thick = double(table.At(
                 set,
                 shape.Cell(shape.lightCosines - 1, low + 1, 0, 0, a),
-                0);
-            expected +=
-                (thin + (thick - thin) * (at - low)) / shape.azimuths;
+                0));
+            expected += (thin + (thick - thin) *
+                                    (at - static_cast<double>(low))) /
+                        static_cast<double>(shape.azimuths);
         }
     }
     for (std::size_t b = 0; b < once.size(); ++b) {

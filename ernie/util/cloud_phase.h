@@ -3,6 +3,7 @@
 
 #include "ernie/util/spectrum.h"
 
+#include <cstddef>
 #include <vector>
 
 namespace ernie {
@@ -36,7 +37,7 @@ struct DropletPhaseTable {
     /// Samples of each row, at scattering angles theta(u) = pi / 2
     /// (1 - cos pi u), u = i / (angles - 1): dense about the forward
     /// and backward directions, where the peaks are.
-    int angles = 0;
+    std::size_t angles = 0;
     /// Rows of `angles` values (sr^-1): each band's, its peak kept,
     /// over 1 - its share (integrating to 1 / (1 - it)); then the
     /// bands' mean, its peak folded away (integrating to 1), for
@@ -57,6 +58,6 @@ inline constexpr double kDropletForwardDegrees = 5.0;
 DropletPhaseTable DropletPhase(double effectiveRadiusUm,
                                double spread,
                                const SpectralBands& bands,
-                               int angles = 1024);
+                               std::size_t angles = 1024);
 
 }  // namespace ernie

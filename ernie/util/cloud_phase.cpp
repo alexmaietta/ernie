@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <cstddef>
 #include <future>
 #include <numbers>
 #include <span>
@@ -23,14 +24,18 @@ constexpr std::complex<double> kWater(1.333, 0.0);
 DropletPhaseTable DropletPhase(double effectiveRadiusUm,
                                double spread,
                                const SpectralBands& bands,
-                               int angles) {
+                               std::size_t angles) {
     constexpr double kPi = std::numbers::pi;
     DropletPhaseTable table;
-    table.angles = std::max(angles, 2);
-    std::vector<double> thetas(table.angles);
-    std::vector<double> cosines(table.angles);
-    for (int i = 0; i < table.angles; ++i) {
-        const double u = static_cast<double>(i) / (table.angles - 1);
+    table.angles = std::max<std::size_t>(angles, 2);
+    const std::size_t n = table.angles;
+    const auto count =
+        static_cast<std::size_t>(std::max(bands.count, 0));
+    std::vector<double> thetas(n);
+    std::vector<double> cosines(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        const double u =
+            static_cast<double>(i) / static_cast<double>(n - 1);
         thetas[i] = 0.5 * kPi * (1.0 - std::cos(kPi * u));
         cosines[i] = std::cos(thetas[i]);
     }
@@ -50,7 +55,7 @@ DropletPhaseTable DropletPhase(double effectiveRadiusUm,
             // The peak's share, by the trapezoid rule over the
             // sphere.
             double peak = 0.0;
-            for (int i = 0; i + 1 < table.angles && thetas[i] < cut;
+            for (std::size_t i = 0; i + 1 < n && thetas[i] < cut;
                  ++i) {
                 const double to = std::min(thetas[i + 1], cut);
                 const double along =
@@ -72,40 +77,39 @@ DropletPhaseTable DropletPhase(double effectiveRadiusUm,
             return std::make_pair(std::move(phase), peak);
         }));
     }
-    table.values.assign(static_cast<std::size_t>(bands.count + 1) *
-                            table.angles,
-                        0.0f);
-    float* mean =
-        table.values.data() +
-        static_cast<std::size_t>(bands.count) * table.angles;
-    for (int b = 0; b < bands.count; ++b) {
+    // The bands' mean, summed in doubles.
+    table.values.assign((count + 1) * n, 0.0f);
+    std::vector<double> mean(n, 0.0);
+    for (std::size_t b = 0; b < count; ++b) {
         const auto [phase, peak] = jobs[b].get();
-        table.forwardFraction += peak / bands.count;
-        for (int i = 0; i < table.angles; ++i) {
-            table.values[static_cast<std::size_t>(b) * table.angles +
-                         i] = static_cast<float>(phase[i]);
+        table.forwardFraction += peak / static_cast<double>(count);
+        for (std::size_t i = 0; i < n; ++i) {
+            table.values[b * n + i] = static_cast<float>(phase[i]);
             if (thetas[i] >= cut) {
-                mean[i] += static_cast<float>(phase[i] / bands.count);
+                mean[i] += phase[i] / static_cast<double>(count);
             }
         }
     }
     // Within the peak, the mean held at its edge's value, for light
     // scattered many times shows no hole about the sun; integrating
     // to 1 again.
-    int edge = 0;
-    while (edge + 1 < table.angles && thetas[edge] < cut) {
+    std::size_t edge = 0;
+    while (edge + 1 < n && thetas[edge] < cut) {
         ++edge;
     }
-    std::fill(mean, mean + edge, mean[edge]);
+    std::fill(mean.begin(),
+              mean.begin() + static_cast<std::ptrdiff_t>(edge),
+              mean[edge]);
     double total = 0.0;
-    for (int i = 0; i + 1 < table.angles; ++i) {
+    for (std::size_t i = 0; i + 1 < n; ++i) {
         total += 0.5 *
                  (mean[i] * std::sin(thetas[i]) +
                   mean[i + 1] * std::sin(thetas[i + 1])) *
                  (thetas[i + 1] - thetas[i]) * 2.0 * kPi;
     }
-    for (int i = 0; i < table.angles; ++i) {
-        mean[i] = static_cast<float>(mean[i] / total);
+    for (std::size_t i = 0; i < n; ++i) {
+        table.values[count * n + i] =
+            static_cast<float>(mean[i] / total);
     }
     return table;
 }

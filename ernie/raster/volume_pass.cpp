@@ -186,17 +186,21 @@ constexpr std::uint32_t kAnimated = 256;
 constexpr std::uint32_t kHalfResolution = 1024;
 // Angles of each row of the cloud droplets' phase tables
 // (`DropletPhaseTable`).
-constexpr int kDropletAngles = 1024;
-// Texels across a light map at its finest (`lightMapMain`), and a
-// map's float4s: its header's three, then its levels down to one.
-constexpr std::uint32_t kLightMapSize = 128;
-constexpr std::uint64_t kLightMapTexels = [] {
+constexpr std::uint32_t kDropletAngles = 1024;
+// Texels across a light map at its finest (`lightMapMain`), a power
+// of two about two voxels of its density each, within these.
+constexpr std::uint32_t kMinLightMapSize = 32;
+constexpr std::uint32_t kMaxLightMapSize = 512;
+// A light map's float4s: its header's three, then its levels down to
+// one texel.
+std::uint64_t LightMapTexels(std::uint32_t size) {
     std::uint64_t texels = 3;
-    for (std::uint64_t size = kLightMapSize; size > 0; size /= 2) {
-        texels += size * size;
+    for (std::uint64_t texelsAcross = size; texelsAcross > 0;
+         texelsAcross /= 2) {
+        texels += texelsAcross * texelsAcross;
     }
     return texels;
-}();
+}
 // volume.slang's flag for writing the volumes' temperature
 // (`RenderTargets::MediaTemperature`).
 constexpr std::uint32_t kMediaTemperature = 512;
@@ -877,7 +881,8 @@ void VolumePass::PlanDistanceGrids() {
         loaded.bricks = bricks;
         words += kHeader + kWordsPerBrick *
                                static_cast<std::uint64_t>(bricks.x) *
-                               bricks.y * bricks.z;
+                               static_cast<std::uint64_t>(bricks.y) *
+                               static_cast<std::uint64_t>(bricks.z);
     }
     if (words == 0) {
         distanceBuilds_.clear();
@@ -906,7 +911,8 @@ void VolumePass::PlanDistanceGrids() {
              loaded.distances, loaded.firstBrick, loaded.bricks});
         scratch = std::max<std::uint64_t>(
             scratch, static_cast<std::uint64_t>(loaded.bricks.x) *
-                         loaded.bricks.y * loaded.bricks.z);
+                         static_cast<std::uint64_t>(loaded.bricks.y) *
+                         static_cast<std::uint64_t>(loaded.bricks.z));
         loaded.distanceStale = false;
     }
     // Two passes' words, each read by the next.
@@ -945,8 +951,9 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     bandCount_ = static_cast<std::uint32_t>(bands.count);
     originShift_ = glm::vec3(origin - origin_);
     origin_ = origin;
-    bandGroups_ = static_cast<std::uint32_t>(
-        std::clamp<std::size_t>((bands.count + 3) / 4, 1, 16));
+    bandGroups_ = static_cast<std::uint32_t>(std::clamp<std::size_t>(
+        static_cast<std::size_t>(std::max(bands.count, 0) + 3) / 4, 1,
+        16));
     if (!(settings == settings_)) {
         hostChanged_ |= 3 | kHostDiscrete;
     }
@@ -1007,6 +1014,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     PrepareDropletTables(volumes, bands, uploads);
     PrepareTransport(volumes, uploads);
     std::uint64_t lightMapTexels = 0;
+    std::uint32_t lightMapLargest = 0;
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -1127,14 +1135,36 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     std::max(voxel, 1e-9) / settings_.stepsPerVoxel);
                 placed.info[1] = static_cast<std::uint32_t>(world);
                 placed.info[2] = volume.linkGroup;
-                // Cloud droplets' light map, for their collectors.
+                // Cloud droplets' light map, for their collectors:
+                // across its bounds' sphere, a texel about two voxels
+                // (its size after its bounds, `lightMapSizeOf`).
                 placed.info[3] = kNoCache;
                 if (settings_.collectors &&
                     volume.material.phase == tokens::kCloudDroplets &&
                     held.density != nullptr) {
+                    const glm::dvec3 half = 0.5 * (hi - lo);
+                    double radius = 0.0;
+                    for (int c = 0; c < 4; ++c) {
+                        const glm::dvec3 corner =
+                            half * glm::dvec3((c & 1) ? -1.0 : 1.0,
+                                              (c & 2) ? -1.0 : 1.0,
+                                              1.0);
+                        radius = std::max(
+                            radius,
+                            glm::length(glm::dmat3(transform) *
+                                        corner));
+                    }
+                    const auto size = std::clamp(
+                        std::bit_ceil(static_cast<std::uint32_t>(
+                            std::min(std::ceil(radius /
+                                               std::max(voxel, 1e-9)),
+                                     double(kMaxLightMapSize)))),
+                        kMinLightMapSize, kMaxLightMapSize);
+                    placed.boundsMax[3] = static_cast<float>(size);
                     placed.info[3] =
                         static_cast<std::uint32_t>(lightMapTexels);
-                    lightMapTexels += kLightMapTexels;
+                    lightMapTexels += LightMapTexels(size);
+                    lightMapLargest = std::max(lightMapLargest, size);
                 }
                 Rows(glm::translate(glm::dmat4(1.0), -origin) *
                          transform,
@@ -1252,6 +1282,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     cacheCells_ = cacheCells;
     cacheLargest_ = cacheLargest;
     lightMapTexels_ = lightMapTexels;
+    lightMapLargest_ = lightMapLargest;
 }
 
 std::vector<glm::vec4> VolumePass::LightMaps() const {
@@ -1494,7 +1525,7 @@ void VolumePass::Prepare(
             hostChanged_ |= 1;
         }
         resources.lightMaps = lightMaps_->Address();
-        resources.lightMapSize = kLightMapSize;
+        resources.lightMapSize = lightMapLargest_;
         if (transport_ != nullptr) {
             resources.transport = transport_->Address();
             resources.collectors = 1;
@@ -1754,8 +1785,8 @@ void VolumePass::Prepare(
         cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           buffers);
         vkCmdDispatch(commands,
-                      (kLightMapSize * kLightMapSize + 63) / 64, 1,
-                      volumeCount_);
+                      (lightMapLargest_ * lightMapLargest_ + 63) / 64,
+                      1, volumeCount_);
         vkCmdPipelineBarrier2(commands, &dependency);
         vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           lightMapMipsPipeline_->Handle());

@@ -331,6 +331,7 @@ class VolumePass {
     std::future<std::vector<float>> transportJob_;
     std::unique_ptr<GpuBuffer> transport_;
     std::uint64_t lightMapTexels_ = 0;
+    std::uint32_t lightMapLargest_ = 0;
     mutable std::unique_ptr<GpuBuffer> lightMaps_;
     mutable std::unique_ptr<ComputePipeline> lightMapPipeline_;
     mutable std::unique_ptr<ComputePipeline> lightMapMipsPipeline_;

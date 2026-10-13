@@ -269,8 +269,8 @@ struct VolumeResources {
     uint dropletBands;
     // Cloud droplets' multiple scattering by collectors (`collectorScattering`): the canonical
     // transport table (`transportAt`) and the volumes' light maps (`lightMapMain`, a volume's from
-    // its `info.w`), each `lightMapSize` texels across at its finest; and 1 once the table is
-    // ready, else 0 (their octaves meanwhile).
+    // its `info.w`, `lightMapSizeOf` texels across at its finest), the largest `lightMapSize`
+    // across; and 1 once the table is ready, else 0 (their octaves meanwhile).
     float4* transport;
     float4* lightMaps;
     uint lightMapSize;
@@ -1932,6 +1932,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                          uint(material.phase.x) == kCloudDroplets &&
                          lightMapFrameOf(volume).slot == viewLights.z + sun;
         var collected = false;
+        // Where its light map holds no surface about the ray, the octaves after all.
+        var declined = false;
         // A black body's glow, its parts at each band's wavelength found once for the span: what
         // the material absorbs times 2 h c^2 / lambda^5, and h c / (lambda k) (`planckOf`).
         float4 glowScales[kMaxGroups];
@@ -2058,9 +2060,25 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                         float others = 0.0;
                         float a = material.scattering.y;
                         float b = material.scattering.z;
+                        // The surface reached: what its collectors bring, through the
+                        // transmittance up to it, where the light reaches its lit surface.
+                        let surfaced =
+                            collecting && !declined && (collected || rho >= material.phase.z);
+                        float scattered = 0.0;
+                        if (surfaced && !collected) {
+                            collected = true;
+                            float3 litSurface;
+                            scattered = collectorScattering(volume, lightMapFrameOf(volume), world,
+                                                            -direction, litSurface);
+                            declined = scattered < 0.0;
+                            scattered = declined ? 0.0
+                                                 : scattered * transmittance *
+                                                       geometryShadow(shading.lights[slot],
+                                                                      litSurface, viewLights.y,
+                                                                      mapTexels);
+                        }
                         // Past the cloud's surface, its collectors' alone.
-                        let surfaced = collecting && (collected || rho >= material.phase.z);
-                        for (uint n = 1; n < sunOctaves && !surfaced; ++n) {
+                        for (uint n = 1; n < sunOctaves && !(surfaced && !declined); ++n) {
                             others += a * exp(-b * depth) * sunPhases[n];
                             a *= material.scattering.y;
                             b *= material.scattering.z;
@@ -2068,18 +2086,6 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                         let lit = weight * sigma *
                                   geometryShadow(shading.lights[slot], world, viewLights.y,
                                                  mapTexels);
-                        // The surface reached: what its collectors bring, through the
-                        // transmittance up to it, where the light reaches its lit surface.
-                        float scattered = 0.0;
-                        if (surfaced && !collected) {
-                            collected = true;
-                            float3 litSurface;
-                            scattered = collectorScattering(volume, lightMapFrameOf(volume), world,
-                                                            -direction, litSurface);
-                            scattered *= transmittance *
-                                         geometryShadow(shading.lights[slot], litSurface,
-                                                        viewLights.y, mapTexels);
-                        }
                         if (lit > 0.0 || scattered > 0.0) {
                             let throughAir = air[1].y != 0.0;
                             for (uint g = 0; g < groups; ++g) {
@@ -2747,15 +2753,18 @@ int transportDim(int k) {
     default: return 8;
     }
 }
-// A light map's levels past its first, its header's float4s and the iterations finding each
-// collector.
+// A light map's header's float4s, and the iterations finding each collector.
 static const uint kLightMapHeader = 3;
 static const uint kCollectorIterations = 6;
 
-// The light map's texels before level `level`.
-uint lightMapLevelOffset(uint level) {
+// Texels across instance `volume`'s light map at its finest (`VolumePass`'s, after its bounds).
+uint lightMapSizeOf(VolumeGpu volume) {
+    return uint(volume.boundsMax.w);
+}
+
+// A light map `size` texels across: its texels before level `level`, and its levels.
+uint lightMapLevelOffset(uint size, uint level) {
     uint offset = kLightMapHeader;
-    uint size = pass.lightMapSize;
     for (uint l = 0; l < level; ++l) {
         offset += size * size;
         size = max(size >> 1, 1u);
@@ -2763,8 +2772,8 @@ uint lightMapLevelOffset(uint level) {
     return offset;
 }
 
-uint lightMapLevels() {
-    return firstbithigh(max(pass.lightMapSize, 1u)) + 1;
+uint lightMapLevels(uint size) {
+    return firstbithigh(max(size, 1u)) + 1;
 }
 
 // The first distant light lighting instance `volume` (`volumeMain`'s sun), its slot, or `kNoSun`.
@@ -2781,7 +2790,8 @@ uint sunOf(VolumeGpu volume) {
 }
 
 // A light map's frame: across it `e1` and `e2`, along it `towards` (to the light), about the
-// volume's centre (relative to the frame's origin), `radius` either way.
+// volume's centre (relative to the frame's origin), `radius` either way, in `size` texels at its
+// finest from float4 `base` on.
 struct LightMapFrame {
     float3 e1;
     float3 e2;
@@ -2789,6 +2799,8 @@ struct LightMapFrame {
     float3 centre;
     float radius;
     uint slot;
+    uint size;
+    uint base;
 }
 
 float3 worldOf(VolumeGpu volume, float3 local) {
@@ -2805,15 +2817,16 @@ float3 localOf(VolumeGpu volume, float3 world) {
 
 LightMapFrame lightMapFrameOf(VolumeGpu volume) {
     LightMapFrame frame;
-    let base = volume.info.w;
-    let a = pass.lightMaps[base];
-    let b = pass.lightMaps[base + 1];
+    frame.base = volume.info.w;
+    let a = pass.lightMaps[frame.base];
+    let b = pass.lightMaps[frame.base + 1];
     frame.e1 = a.xyz;
     frame.radius = a.w;
     frame.e2 = b.xyz;
     frame.slot = asuint(b.w);
-    frame.towards = pass.lightMaps[base + 2].xyz;
+    frame.towards = pass.lightMaps[frame.base + 2].xyz;
     frame.centre = worldOf(volume, 0.5 * (volume.boundsMin.xyz + volume.boundsMax.xyz));
+    frame.size = lightMapSizeOf(volume);
     return frame;
 }
 
@@ -2829,7 +2842,7 @@ void lightMapMain(uint3 id: SV_DispatchThreadID) {
         return;
     }
     let volume = volumes[id.z];
-    let size = pass.lightMapSize;
+    let size = lightMapSizeOf(volume);
     if (volume.info.w == kNoCache || id.x >= size * size) {
         return;
     }
@@ -2873,7 +2886,7 @@ void lightMapMain(uint3 id: SV_DispatchThreadID) {
         let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
                                dot(volume.density.toIndex[1].xyz, d),
                                dot(volume.density.toIndex[2].xyz, d));
-        let steps = clamp(uint(ceil((exit - near) * length(indexStep))), 1u, 2 * kMaxCacheSteps);
+        let steps = clamp(uint(ceil((exit - near) * length(indexStep))), 1u, 4 * kMaxCacheSteps);
         let dt = (exit - near) / float(steps);
         float sum = 0.0;
         float first = -1.0;
@@ -2902,7 +2915,7 @@ void lightMapMain(uint3 id: SV_DispatchThreadID) {
             texel = float4(first, last, sum * volume.params.x * dt, 1.0);
         }
     }
-    pass.lightMaps[lightMapLevelOffset(0) + base + id.x] = texel;
+    pass.lightMaps[base + lightMapLevelOffset(size, 0) + id.x] = texel;
 }
 
 // Each light map's coarser levels, a group per volume: each texel the mean of the four below it.
@@ -2917,12 +2930,13 @@ void lightMapMipsMain(uint3 id: SV_DispatchThreadID) {
         return;
     }
     let base = volume.info.w;
-    var below = pass.lightMapSize;
-    for (uint level = 1; level < lightMapLevels(); ++level) {
+    let finest = lightMapSizeOf(volume);
+    var below = finest;
+    for (uint level = 1; level < lightMapLevels(finest); ++level) {
         AllMemoryBarrierWithGroupSync();
         let size = max(below >> 1, 1u);
-        let from = base + lightMapLevelOffset(level - 1);
-        let to = base + lightMapLevelOffset(level);
+        let from = base + lightMapLevelOffset(finest, level - 1);
+        let to = base + lightMapLevelOffset(finest, level);
         for (uint i = id.x; i < size * size; i += 256) {
             let x = 2 * (i % size);
             let y = 2 * (i / size);
@@ -2937,21 +2951,30 @@ void lightMapMipsMain(uint3 id: SV_DispatchThreadID) {
     }
 }
 
-// A light map's filtered surface at level `level`, at `uv` across it (world units from its
-// centre), bilinear: where it first and last reaches the surface and its optical depth through,
-// over its coverage (w).
-float4 lightMapAt(LightMapFrame frame, uint base, uint level, float2 uv) {
-    let size = max(pass.lightMapSize >> level, 1u);
+// A light map at level `level`, at `uv` across it (world units from its centre), bilinear, as
+// stored: times its coverage.
+float4 lightMapTexel(LightMapFrame frame, uint level, float2 uv) {
+    let size = max(frame.size >> level, 1u);
     let at = (uv / (2.0 * frame.radius) + 0.5) * float(size) - 0.5;
     let i0 = clamp(int2(floor(at)), int2(0), int2(size) - 1);
     let i1 = min(i0 + 1, int2(size) - 1);
     let f = saturate(at - float2(i0));
-    let first = base + lightMapLevelOffset(level);
+    let first = frame.base + lightMapLevelOffset(frame.size, level);
     let a = pass.lightMaps[first + i0.y * size + i0.x];
     let b = pass.lightMaps[first + i0.y * size + i1.x];
     let c = pass.lightMaps[first + i1.y * size + i0.x];
     let e = pass.lightMaps[first + i1.y * size + i1.x];
-    let value = lerp(lerp(a, b, f.x), lerp(c, e, f.x), f.y);
+    return lerp(lerp(a, b, f.x), lerp(c, e, f.x), f.y);
+}
+
+// A light map's surface filtered at level `level` (fractional, its two levels blended), at `uv`
+// across it: where it first and last reaches the surface and its optical depth through, over its
+// coverage (w).
+float4 lightMapAt(LightMapFrame frame, float level, float2 uv) {
+    let low = uint(level);
+    let high = min(low + 1, lightMapLevels(frame.size) - 1);
+    let value = lerp(lightMapTexel(frame, low, uv), lightMapTexel(frame, high, uv),
+                     level - float(low));
     return float4(value.xyz / max(value.w, 1e-6), value.w);
 }
 
@@ -2971,8 +2994,8 @@ float4 transportAt(uint set, float muL, float thickness, float depth, float muV,
         low[k] = min(int(c), transportDim(k) - 2);
         w[k] = c - float(low[k]);
     }
-    let cells = uint(transportDim(0) * transportDim(1) * transportDim(2) *
-                     transportDim(3) * transportDim(4));
+    let cells = uint(transportDim(0) * transportDim(1) * transportDim(2) * transportDim(3) *
+                     transportDim(4));
     float4 sum = float4(0.0);
     for (int corner = 0; corner < 32; ++corner) {
         float weight = 1.0;
@@ -2989,78 +3012,109 @@ float4 transportAt(uint set, float muL, float thickness, float depth, float muV,
     return sum;
 }
 
+// The slab tangent to a light map's surface filtered at a collector's size about it, as the
+// canonical transport reads it from view point `p` looking along `toEye`'s opposite.
+struct Slab {
+    float muL;
+    float thickness;
+    float depth;
+    float muV;
+    float psi;
+    // The light's way along it and across it towards the view's side, its extinction (per world
+    // unit) and the view point's foot on it.
+    float3 along;
+    float3 across;
+    float kappa;
+    float3 foot;
+}
+
+// The slab about collector `c` of size `size` (world units), false where the light map has no
+// surface there.
+bool slabAt(LightMapFrame frame, float3 p, float3 toEye, float3 c, float size, out Slab slab) {
+    slab = (Slab)0;
+    let texel = 2.0 * frame.radius / float(frame.size);
+    let level = clamp(log2(max(size / texel, 1.0)), 0.0, float(lightMapLevels(frame.size) - 1));
+    let step = texel * exp2(level);
+    let r = c - frame.centre;
+    let uv = float2(dot(r, frame.e1), dot(r, frame.e2));
+    let surface = lightMapAt(frame, level, uv);
+    if (surface.w < 0.05) {
+        return false;
+    }
+    // The filtered surface's slope across the map, for its normal.
+    let du = lightMapAt(frame, level, uv + float2(step, 0.0)).x -
+             lightMapAt(frame, level, uv - float2(step, 0.0)).x;
+    let dv = lightMapAt(frame, level, uv + float2(0.0, step)).x -
+             lightMapAt(frame, level, uv - float2(0.0, step)).x;
+    let outward = normalize(0.5 * (du * frame.e1 + dv * frame.e2) / step + frame.towards);
+    let inward = -outward;
+    let onSurface = frame.centre + uv.x * frame.e1 + uv.y * frame.e2 +
+                    (frame.radius - surface.x) * frame.towards;
+    let along = max(surface.y - surface.x, 0.5 * texel);
+    slab.kappa = surface.z / along;
+    if (slab.kappa <= 0.0) {
+        return false;
+    }
+    slab.muL = max(dot(frame.towards, outward), 0.05);
+    slab.thickness = surface.z * slab.muL;
+    let depthGeometric = dot(p - onSurface, inward);
+    slab.depth = clamp(depthGeometric * slab.kappa, 0.0, slab.thickness) /
+                 max(slab.thickness, 1e-6);
+    slab.foot = p - inward * depthGeometric;
+    slab.muV = dot(toEye, inward);
+    var alongLight = -frame.towards - slab.muL * inward;
+    let alongLength = length(alongLight);
+    slab.along = alongLength > 1e-4 ? alongLight / alongLength
+                                    : normalize(frame.e1 - dot(frame.e1, inward) * inward);
+    let across = cross(inward, slab.along);
+    let viewAcross = toEye - slab.muV * inward;
+    let side = dot(viewAcross, across);
+    slab.across = side < 0.0 ? -across : across;
+    slab.psi = atan2(abs(side), dot(viewAcross, slab.along));
+    return true;
+}
+
 // The light scattered twice or more towards unit `toEye` from where the view ray enters the
 // cloud of instance `volume` at `p` (relative to the frame's origin), per unit irradiance from
 // its light map's light: per order set, the collector found by fixed-point iteration from the
 // whole lit surface down, the cloud about it as a slab tangent to its lit surface filtered at the
-// collector's size. `lit` the lit surface straight towards the light from `p`, for what shadows
-// it.
+// collector's size. -1 where the light map holds no surface about `p`, for the octaves instead.
+// `lit` the lit surface straight towards the light from `p`, for what shadows it.
 float collectorScattering(VolumeGpu volume, LightMapFrame frame, float3 p, float3 toEye,
                           out float3 lit) {
-    let base = volume.info.w;
-    let levels = lightMapLevels();
-    let texel = 2.0 * frame.radius / float(pass.lightMapSize);
+    let texel = 2.0 * frame.radius / float(frame.size);
     let rel = p - frame.centre;
     let at = float2(dot(rel, frame.e1), dot(rel, frame.e2));
-    let straight = lightMapAt(frame, base, 0, at);
+    let straight = lightMapAt(frame, 0.0, at);
     lit = frame.centre + at.x * frame.e1 + at.y * frame.e2 +
           (frame.radius - straight.x) * frame.towards;
+    // The first collector, the whole lit surface's, alike for every set.
+    Slab whole;
+    if (!slabAt(frame, p, toEye, p, frame.radius, whole)) {
+        return -1.0;
+    }
     float total = 0.0;
     for (uint set = 0; set < kOrderSets; ++set) {
         float3 c = p;
         float size = frame.radius;
+        Slab slab = whole;
         float radiance = 0.0;
         for (uint n = 0; n < kCollectorIterations; ++n) {
-            let level = uint(clamp(round(log2(size / texel)), 0.0, float(levels - 1)));
-            let step = texel * float(1u << level);
-            let r = c - frame.centre;
-            let uv = float2(dot(r, frame.e1), dot(r, frame.e2));
-            let surface = lightMapAt(frame, base, level, uv);
-            if (surface.w < 0.05) {
+            if (n > 0 && !slabAt(frame, p, toEye, c, size, slab)) {
                 break;
             }
-            // The filtered surface's slope across the map, for its normal.
-            let du = lightMapAt(frame, base, level, uv + float2(step, 0.0)).x -
-                     lightMapAt(frame, base, level, uv - float2(step, 0.0)).x;
-            let dv = lightMapAt(frame, base, level, uv + float2(0.0, step)).x -
-                     lightMapAt(frame, base, level, uv - float2(0.0, step)).x;
-            let outward = normalize(0.5 * (du * frame.e1 + dv * frame.e2) / step + frame.towards);
-            let inward = -outward;
-            let onSurface = frame.centre + uv.x * frame.e1 + uv.y * frame.e2 +
-                            (frame.radius - surface.x) * frame.towards;
-            let muL = max(dot(frame.towards, outward), 0.05);
-            let along = max(surface.y - surface.x, 0.5 * texel);
-            let kappa = surface.z / along;
-            if (kappa <= 0.0) {
-                break;
-            }
-            let thickness = surface.z * muL;
-            let depthGeometric = dot(p - onSurface, inward);
-            let depth = clamp(depthGeometric * kappa, 0.0, thickness);
-            let muV = dot(toEye, inward);
-            // The light's way along the slab, and across it towards the view's side.
-            var alongLight = -frame.towards - muL * inward;
-            let alongLength = length(alongLight);
-            alongLight = alongLength > 1e-4 ? alongLight / alongLength
-                                            : normalize(frame.e1 - dot(frame.e1, inward) * inward);
-            let across = cross(inward, alongLight);
-            let viewAcross = toEye - muV * inward;
-            let side = dot(viewAcross, across);
-            let psi = atan2(abs(side), dot(viewAcross, alongLight));
-            let q = transportAt(set, muL, thickness, depth / max(thickness, 1e-6), muV, psi);
+            let q = transportAt(set, slab.muL, slab.thickness, slab.depth, slab.muV, slab.psi);
             // Thinner slabs than the lattice's scatter twice and more as their thickness squared.
-            let thin = saturate(thickness / 0.25);
+            let thin = saturate(slab.thickness / 0.25);
             radiance = q.x * thin * thin;
-            let foot = p - inward * depthGeometric;
-            let target =
-                foot + (q.y * alongLight + q.z * (side < 0.0 ? -across : across)) / kappa;
+            let target = slab.foot + (q.y * slab.along + q.z * slab.across) / slab.kappa;
             var move = target - c;
             let moved = length(move);
             if (moved > size) {
                 move *= size / moved;
             }
             c += move;
-            size = max(q.w / kappa, texel);
+            size = max(q.w / slab.kappa, texel);
         }
         total += radiance;
     }
