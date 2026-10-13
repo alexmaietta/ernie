@@ -31,7 +31,7 @@ using demos::Check;
 
 constexpr double kCoverage = 0.4;
 constexpr double kSunElevation = 20.0;
-constexpr double kSunAzimuth = 120.0;
+constexpr double kSunAzimuth = 30.0;
 constexpr double kWind = 15.0;
 
 struct View {

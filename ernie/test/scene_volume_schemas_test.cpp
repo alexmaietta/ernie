@@ -4,6 +4,9 @@
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/session/volumes.h"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <gtest/gtest.h>
 
@@ -124,4 +127,37 @@ TEST(VolumeSchemas, TypesAreRegistered) {
     EXPECT_EQ(types[4], &dense);
     EXPECT_EQ(types[5], &clouds);
     EXPECT_EQ(types[6], &volume);
+}
+
+TEST(VolumeSchemas, VolumesBoundTheirFieldsFromTheirAttributes) {
+    // Without reading a grid: cloud layers across their extent from
+    // their lowest bottom to their highest top, a dense field over
+    // its array's shape, and a volume over its fields, placed in its
+    // frame.
+    Scene scene;
+    ernie::Volume::Define(scene, "/Clouds")
+        .SetField("density", "/Clouds/Layers");
+    ernie::CloudLayersField::Define(scene, "/Clouds/Layers")
+        .SetExtent(5000.0);
+    const auto layers =
+        ernie::VolumeBoundsOf(scene, Path("/Clouds/Layers"));
+    ASSERT_TRUE(layers.has_value());
+    EXPECT_EQ(layers->first, glm::vec3(-5000.0f, -5000.0f, 750.0f));
+    EXPECT_EQ(layers->second, glm::vec3(5000.0f, 5000.0f, 8000.0f));
+    scene.Set(
+        "/Clouds/Layers", ernie::tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 100.0)));
+    const auto clouds = ernie::VolumeBoundsOf(scene, Path("/Clouds"));
+    ASSERT_TRUE(clouds.has_value());
+    EXPECT_EQ(clouds->first.z, 850.0f);
+    EXPECT_EQ(clouds->second.z, 8100.0f);
+
+    ernie::DenseField::Define(scene, "/Smoke")
+        .SetVoxelSize(0.5)
+        .SetValues(ernie::Tensor::Copy<float>(
+            std::vector<float>(4 * 6 * 8, 0.0f), {4, 6, 8}));
+    const auto smoke = ernie::VolumeBoundsOf(scene, Path("/Smoke"));
+    ASSERT_TRUE(smoke.has_value());
+    EXPECT_EQ(smoke->second, glm::vec3(2.0f, 3.0f, 4.0f));
+    EXPECT_FALSE(ernie::VolumeBoundsOf(scene, Path("/Nothing")));
 }

@@ -158,6 +158,13 @@
       (std::vector<float>{0.0f, 1.0f, 2.0f}),                                                      \
       (::ernie::AttributeMeta{.doc = "Each layer's weather map channel: 0 low cumulus cells, 1 "    \
                                      "mid, 2 high streaks, 3 everywhere.",                         \
+                              .group = "Clouds"}))                                                 \
+    X(std::vector<float>, LayerShadows, ::ernie::tokens::kCloudLayerShadows,                       \
+      (std::vector<float>{1.0f, 1.0f, 0.0f}),                                                      \
+      (::ernie::AttributeMeta{.doc = "Whether each layer goes in the shadow map from the sun (1) " \
+                                     "or not (0): thin high layers left out, whose faint optical " \
+                                     "depth over kilometres would put the map's front far above "  \
+                                     "the clouds below (as three-geospatial's cirrus).",           \
                               .group = "Clouds"}))
 
 #define ERNIE_FIELD_BASE_ATTRIBUTES(X)

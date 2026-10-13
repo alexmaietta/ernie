@@ -3788,6 +3788,10 @@ std::optional<Bounds3> LocalBoundsOf(const Scene& scene,
     if (std::optional<Bounds3> extent = ExtentOf(scene, prim)) {
         return extent;
     }
+    // Volumes' and their fields' from their attributes (`volumes.h`).
+    if (std::optional<Bounds3> volume = VolumeBoundsOf(scene, prim)) {
+        return volume;
+    }
     if (const std::optional<PlanetSphere> planet =
             PlanetOf(scene, prim)) {
         // The planet lies in world space, whatever the prim's

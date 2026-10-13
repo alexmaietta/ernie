@@ -283,6 +283,9 @@ struct VolumeResources {
     // another) and each field's block of `kCloudLayerBlock` float4s, a field's from its `grid.x`.
     float* cloudNoise;
     float4* cloudLayers;
+    // Cloud layers' shadow maps from their sun (`cloudShadowMain`), a volume's from its
+    // `cloudShadowBase`.
+    float4* cloudShadows;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> shading;
@@ -2084,7 +2087,11 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                     if (k == sun) {
                         // The span's sun: its phases and tints found for the span.
                         let slot = viewLights.z + k;
+                        // Cloud layers from their shadow map and a short march (as three-geospatial's
+                        // clouds), else the lighting cache, else marched.
                         let depth = sunLinks.z == 0 ? 0.0
+                                    : hasCloudShadow(volume, slot)
+                                        ? cloudSunDepth(volume, local, world, sunTowards, jitter)
                                     : hasCache(volume, slot)
                                         ? cachedDepth(volume, slot, local)
                                         : volumesDepth(shadowRun, world, sunTowards, 1e30,
@@ -3283,7 +3290,8 @@ float collectorsOfPiece(VolumeGpu volume, LightMapFrame frame, float3 p, float3 
 // turbulence displacement, weather tile, shape tile), (detail tile, turbulence tile, weather
 // offset x, y), then per layer: bottoms, tops, density scales, shape amounts, detail amounts,
 // weather exponents, shape biases, coverage filter widths, the density profile's a, b, c, d (a
-// e^(b h) + c h + d over its height fraction h) and the weather channels (asuint, 4 none).
+// e^(b h) + c h + d over its height fraction h), the weather channels (asuint, 4 none) and
+// whether it goes in the shadow map (`cloudShadowMain`, 1 or 0).
 static const uint kCloudLayersGrid = 0xC10D5u;
 static const uint kCloudLayerBlock = 16;
 // The noise textures' sizes and where each starts in `pass.cloudNoise` (`CloudNoise`'s order).
@@ -3379,6 +3387,11 @@ float4 cloudCoverage(float4* block, float3 p, out float4 heightFraction) {
 
 // A cloud layers field's density at its volume's local point `local`, summed over its layers.
 float cloudLayersDensity(FieldGpu field, float3 local) {
+    return cloudLayersDensityOf(field, local, float4(1.0));
+}
+
+// `cloudLayersDensity` of the layers `mask` holds (1 each, else 0).
+float cloudLayersDensityOf(FieldGpu field, float3 local, float4 mask) {
     let p = float3(dot(field.toIndex[0], float4(local, 1.0)),
                    dot(field.toIndex[1], float4(local, 1.0)),
                    dot(field.toIndex[2], float4(local, 1.0)));
@@ -3386,7 +3399,7 @@ float cloudLayersDensity(FieldGpu field, float3 local) {
     let general = block[0];
     let tiles = block[1];
     float4 heightFraction;
-    var density = cloudCoverage(block, p, heightFraction);
+    var density = cloudCoverage(block, p, heightFraction) * mask;
     if (all(density <= 0.0)) {
         return 0.0;
     }
@@ -3454,4 +3467,168 @@ uint stepAfterClearSky(FieldGpu field, float3 index, float3 origin, float3 step,
         next = t + ahead;
     }
     return uint(clamp(ceil((next - start) / dt - jitter), 0.0, 1e9));
+}
+
+// Cloud layers' shadow maps: per volume of cloud layers, across its sun through it, each column's
+// front (the distance from the map's plane into its clouds, weighted by the light still reaching
+// there), its mean extinction where it holds any and its optical depth through as far as the light
+// reaches (to a transmittance of 1e-4, a tail past it),
+// for the optical depth towards the sun from any point in it without marching there. A header as
+// a light map's (`lightMapMain`), its size in its third's w.
+//
+// Reference: takram, three-geospatial's clouds (shadow.frag and clouds.frag's sampleShadowOpticalDepth),
+//   2024, MIT, Copyright (c) 2024 Shota Matsuda: their beer shadow maps' front depth, mean extinction
+//   and largest optical depth; after Activision's "Beer shadow maps" (Call of Duty: Black Ops 3).
+
+// Instance `volume`'s shadow map's first float4 (`kNoCache` none), in its bounds' w.
+uint cloudShadowBase(VolumeGpu volume) {
+    return asuint(volume.boundsMin.w);
+}
+
+// Whether instance `volume` has a shadow map, built for light slot `slot`.
+bool hasCloudShadow(VolumeGpu volume, uint slot) {
+    let base = cloudShadowBase(volume);
+    return base != kNoCache && asuint(pass.cloudShadows[base + 1].w) == slot;
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void cloudShadowMain(uint3 id: SV_DispatchThreadID) {
+    if (pass.rebuild[8] == 0 || id.z >= pass.volumeCount) {
+        return;
+    }
+    let volume = volumes[id.z];
+    let base = cloudShadowBase(volume);
+    if (base == kNoCache) {
+        return;
+    }
+    let size = lightMapSizeOf(volume);
+    if (id.x >= size * size) {
+        return;
+    }
+    let slot = sunOf(volume);
+    let towards = slot != kNoSun ? pass.shadowLights[slot].position.xyz : float3(0.0, 0.0, 1.0);
+    let e1 = normalize(cross(towards, abs(towards.z) < 0.9 ? float3(0.0, 0.0, 1.0)
+                                                           : float3(1.0, 0.0, 0.0)));
+    let e2 = cross(towards, e1);
+    let half = 0.5 * (volume.boundsMax.xyz - volume.boundsMin.xyz);
+    let toWorld = float3x3(volume.toWorld[0].xyz, volume.toWorld[1].xyz, volume.toWorld[2].xyz);
+    float radius = 0.0;
+    for (int c = 0; c < 4; ++c) {
+        let corner = half * float3((c & 1) != 0 ? -1.0 : 1.0, (c & 2) != 0 ? -1.0 : 1.0, 1.0);
+        radius = max(radius, length(mul(toWorld, corner)));
+    }
+    if (id.x == 0) {
+        pass.cloudShadows[base] = float4(e1, radius);
+        pass.cloudShadows[base + 1] = float4(e2, asfloat(slot));
+        pass.cloudShadows[base + 2] = float4(towards, float(size));
+    }
+    let centre = worldOf(volume, volume.boundsMin.xyz + half);
+    let uv = ((float2(id.x % size, id.x / size) + 0.5) / float(size) * 2.0 - 1.0) * radius;
+    let start = centre + uv.x * e1 + uv.y * e2 + radius * towards;
+    let o = localOf(volume, start);
+    let d = float3(dot(volume.toLocal[0].xyz, -towards), dot(volume.toLocal[1].xyz, -towards),
+                   dot(volume.toLocal[2].xyz, -towards));
+    let inverse = 1.0 / d;
+    let t0 = (volume.boundsMin.xyz - o) * inverse;
+    let t1 = (volume.boundsMax.xyz - o) * inverse;
+    let near = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), max(min(t0.z, t1.z), 0.0));
+    let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), min(max(t0.z, t1.z), 2.0 * radius));
+    float4 texel = float4(0.0);
+    if (slot != kNoSun && near < exit) {
+        var accessor = accessorOf(volume.density);
+        let indexOrigin = float3(dot(volume.density.toIndex[0], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[1], float4(o, 1.0)),
+                                 dot(volume.density.toIndex[2], float4(o, 1.0)));
+        let indexStep = float3(dot(volume.density.toIndex[0].xyz, d),
+                               dot(volume.density.toIndex[1].xyz, d),
+                               dot(volume.density.toIndex[2].xyz, d));
+        // Two of the march's steps a step, at most 512 along the column.
+        let dt = max(2.0 * volume.params.w, (exit - near) / 512.0);
+        let steps = uint(ceil((exit - near) / dt));
+        float depth = 0.0;
+        float tail = 0.0;
+        float transmittance = 1.0;
+        float weighted = 0.0;
+        float weights = 0.0;
+        float extinctionSum = 0.0;
+        float held = 0.0;
+        for (uint i = 0; i < steps; ++i) {
+            let t = near + (float(i) + 0.5) * dt;
+            let index = indexOrigin + indexStep * t;
+            let next = stepAfterEmptyTile(volume.density, index, indexOrigin, indexStep, near, dt,
+                                          0.5, accessor);
+            if (next > i) {
+                i = next - 1;
+                continue;
+            }
+            // The layers that go in it (`layerShadows`).
+            let mask = pass.cloudLayers[volume.density.grid.x * kCloudLayerBlock + 15];
+            let sigma =
+                max(cloudLayersDensityOf(volume.density, o + d * t, mask), 0.0) * volume.params.x;
+            if (sigma <= 0.0) {
+                continue;
+            }
+            // The front: the distances where the light still reaches, weighted by how much.
+            depth += sigma * dt;
+            transmittance *= exp(-sigma * dt);
+            weighted += t * transmittance;
+            weights += transmittance;
+            extinctionSum += sigma;
+            held += 1.0;
+            if (transmittance <= 1e-4) {
+                // The light gone: what lies past it, about, as it falls off with the steps
+                // taken (theirs).
+                tail = min(2.0 * dt * exp(1.0 - held), 0.5 * dt);
+                break;
+            }
+        }
+        if (held > 0.0 && weights > 0.0) {
+            texel = float4(weighted / weights, extinctionSum / held, depth + tail, 1.0);
+        }
+    }
+    pass.cloudShadows[base + 3 + id.x] = texel;
+}
+
+// The optical depth from world point `world` (local `local`) towards the sun `towards` through
+// cloud layers instance `volume`: a short march out to about 350 m (steps of 50, 100 and 200 m,
+// jittered by `jitter`) for its fine shapes, then its shadow map's, from there, its mean
+// extinction past the column's front, at most its depth as far as the light reaches.
+float cloudSunDepth(VolumeGpu volume, float3 local, float3 world, float3 towards, float jitter) {
+    let localTowards = float3(dot(volume.toLocal[0].xyz, towards),
+                              dot(volume.toLocal[1].xyz, towards),
+                              dot(volume.toLocal[2].xyz, towards));
+    var accessor = accessorOf(volume.density);
+    float depth = 0.0;
+    float reached = 0.0;
+    float step = 50.0;
+    for (uint i = 0; i < 3; ++i) {
+        let at = reached + step * (0.5 + 0.5 * (jitter - 0.5));
+        depth += max(sampleField(volume.density, local + localTowards * at, accessor), 0.0) *
+                 volume.params.x * step;
+        reached += step;
+        step *= 2.0;
+    }
+    let base = cloudShadowBase(volume);
+    let a = pass.cloudShadows[base];
+    let b = pass.cloudShadows[base + 1];
+    let c = pass.cloudShadows[base + 2];
+    let radius = a.w;
+    let size = uint(c.w);
+    let centre = worldOf(volume, 0.5 * (volume.boundsMin.xyz + volume.boundsMax.xyz));
+    let q = world + towards * reached - centre;
+    let at = (float2(dot(q, a.xyz), dot(q, b.xyz)) / (2.0 * radius) + 0.5) * float(size) - 0.5;
+    let i0 = clamp(int2(floor(at)), int2(0), int2(size) - 1);
+    let i1 = min(i0 + 1, int2(size) - 1);
+    let f = saturate(at - float2(i0));
+    let first = base + 3;
+    let texel =
+        lerp(lerp(pass.cloudShadows[first + i0.y * size + i0.x],
+                  pass.cloudShadows[first + i0.y * size + i1.x], f.x),
+             lerp(pass.cloudShadows[first + i1.y * size + i0.x],
+                  pass.cloudShadows[first + i1.y * size + i1.x], f.x), f.y);
+    // Where the column holds clouds (its coverage, w), its depth past their front.
+    let along = radius - dot(q, c.xyz);
+    let past = texel.w > 0.0 ? texel.xyz / texel.w : float3(0.0);
+    return depth + texel.w * min(past.z, past.y * max(along - past.x, 0.0));
 }

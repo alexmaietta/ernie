@@ -600,6 +600,7 @@ struct CloudLayersParams {
     /// Four per layer: a, b, c, d.
     std::vector<float> profiles;
     std::vector<float> channels;
+    std::vector<float> shadows;
 
     bool operator==(const CloudLayersParams&) const = default;
 };

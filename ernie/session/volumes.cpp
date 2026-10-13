@@ -17,6 +17,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -63,6 +64,7 @@ std::optional<VolumeFieldParams> FieldOf(const Scene& scene,
         layers.filterWidths = clouds.GetLayerCoverageFilterWidths();
         layers.profiles = clouds.GetLayerDensityProfiles();
         layers.channels = clouds.GetLayerChannels();
+        layers.shadows = clouds.GetLayerShadows();
         return field;
     }
     if (type != nullptr && type->IsA(DenseField::Definition())) {
@@ -304,6 +306,93 @@ std::vector<VolumeParams> VolumesOf(const Scene& scene) {
         }
     }
     return volumes;
+}
+
+namespace {
+
+std::optional<Bounds3> FieldBoundsOf(const Scene& scene,
+                                     const Path& field) {
+    const PrimTypeDef* type = PrimTypeOf(scene, field);
+    if (type != nullptr &&
+        type->IsA(CloudLayersField::Definition())) {
+        const CloudLayersField clouds(scene, field);
+        const std::vector<float> bottoms = clouds.GetLayerAltitudes();
+        const std::vector<float> heights = clouds.GetLayerHeights();
+        float bottom = std::numeric_limits<float>::max();
+        float top = std::numeric_limits<float>::lowest();
+        for (std::size_t l = 0;
+             l < bottoms.size() && l < heights.size(); ++l) {
+            if (heights[l] > 0.0f) {
+                bottom = std::min(bottom, bottoms[l]);
+                top = std::max(top, bottoms[l] + heights[l]);
+            }
+        }
+        if (!(bottom < top)) {
+            return std::nullopt;
+        }
+        const auto reach = static_cast<float>(clouds.GetExtent());
+        return Bounds3{glm::vec3(-reach, -reach, bottom),
+                       glm::vec3(reach, reach, top)};
+    }
+    if (type != nullptr && type->IsA(DenseField::Definition())) {
+        const DenseField dense(scene, field);
+        const Tensor* values = dense.GetValues();
+        if (values == nullptr || values->Rank() != 3) {
+            return std::nullopt;
+        }
+        const auto voxel = static_cast<float>(dense.GetVoxelSize());
+        const std::vector<std::int64_t>& shape = values->Shape();
+        return Bounds3{glm::vec3(0.0f),
+                       voxel * glm::vec3(float(shape[0]),
+                                         float(shape[1]),
+                                         float(shape[2]))};
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
+std::optional<Bounds3> VolumeBoundsOf(const Scene& scene,
+                                      const Path& prim) {
+    if (!scene.Has(prim)) {
+        return std::nullopt;
+    }
+    if (std::optional<Bounds3> own = FieldBoundsOf(scene, prim)) {
+        return own;
+    }
+    const PrimTypeDef* type = PrimTypeOf(scene, prim);
+    if (type == nullptr || !type->IsA(Volume::Definition())) {
+        return std::nullopt;
+    }
+    // Its fields' boxes, each placed in the volume's frame.
+    const Volume volume(scene, prim);
+    const glm::dmat4 toLocal =
+        glm::inverse(scene.WorldTransform(prim));
+    std::optional<Bounds3> bounds;
+    for (const std::string& name : volume.FieldNames()) {
+        const Path field = volume.GetField(name);
+        if (field.IsEmpty() || !scene.Has(field)) {
+            continue;
+        }
+        const std::optional<Bounds3> box =
+            FieldBoundsOf(scene, field);
+        if (!box) {
+            continue;
+        }
+        const glm::dmat4 toVolume =
+            toLocal * scene.WorldTransform(field);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::dvec3 local(
+                (corner & 1) ? box->second.x : box->first.x,
+                (corner & 2) ? box->second.y : box->first.y,
+                (corner & 4) ? box->second.z : box->first.z);
+            const glm::vec3 point(toVolume * glm::dvec4(local, 1.0));
+            bounds = bounds ? Bounds3{glm::min(bounds->first, point),
+                                      glm::max(bounds->second, point)}
+                            : Bounds3{point, point};
+        }
+    }
+    return bounds;
 }
 
 }  // namespace ernie

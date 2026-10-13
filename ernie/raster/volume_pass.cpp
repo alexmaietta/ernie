@@ -109,8 +109,7 @@ struct VolumeResources {
     std::uint32_t collectors;
     VkDeviceAddress cloudNoise;
     VkDeviceAddress cloudLayers;
-    // To the block's 16-byte multiple.
-    std::uint32_t padding[2];
+    VkDeviceAddress cloudShadows;
 };
 static_assert(sizeof(VolumeResources) == 224,
               "VolumeResources must match volume.slang");
@@ -122,6 +121,10 @@ constexpr std::uint32_t kNoGrid = 0xFFFFFFFFu;
 constexpr std::uint32_t kNoCache = 0xFFFFFFFFu;
 constexpr double kCacheVoxels = 2.0;
 constexpr std::uint32_t kMaxCacheCells = 128;
+// Cloud layers' cache's most cells along one axis: their sun from
+// their shadow map, the cache only for the sky's and the other
+// lights.
+constexpr std::uint32_t kMaxCloudCacheCells = 48;
 // NanoVDB grids start 32-byte aligned.
 constexpr std::uint64_t kGridAlignment = 32;
 
@@ -241,6 +244,8 @@ CloudBlockOf(const CloudLayersParams& layers) {
         block[56 + l] =
             std::bit_cast<float>(static_cast<std::uint32_t>(
                 channel >= 0.0f && channel < 4.0f ? channel : 4.0f));
+        block[60 + l] =
+            at(layers.shadows, l, 1.0f) > 0.5f ? 1.0f : 0.0f;
     }
     return block;
 }
@@ -249,6 +254,29 @@ CloudBlockOf(const CloudLayersParams& layers) {
 // of two about two voxels of its density each, within these.
 constexpr std::uint32_t kMinLightMapSize = 32;
 constexpr std::uint32_t kMaxLightMapSize = 512;
+// A light map's texels across for a volume of local bounds `lo` to
+// `hi` placed by `transform` (across its bounds' sphere) whose voxels
+// are `voxel` world units: about two voxels a texel.
+std::uint32_t LightMapSizeOf(const glm::dvec3& lo,
+                             const glm::dvec3& hi,
+                             const glm::dmat4& transform,
+                             double voxel) {
+    const glm::dvec3 half = 0.5 * (hi - lo);
+    double radius = 0.0;
+    for (int c = 0; c < 4; ++c) {
+        const glm::dvec3 corner =
+            half * glm::dvec3((c & 1) ? -1.0 : 1.0,
+                              (c & 2) ? -1.0 : 1.0, 1.0);
+        radius = std::max(
+            radius, glm::length(glm::dmat3(transform) * corner));
+    }
+    return std::clamp(
+        std::bit_ceil(static_cast<std::uint32_t>(
+            std::min(std::ceil(radius / std::max(voxel, 1e-9)),
+                     double(kMaxLightMapSize)))),
+        kMinLightMapSize, kMaxLightMapSize);
+}
+
 // A light map's float4s: its header's three, then its levels down to
 // one texel.
 std::uint64_t LightMapTexels(std::uint32_t size) {
@@ -1091,6 +1119,10 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     PrepareTransport(volumes, uploads);
     std::uint64_t lightMapTexels = 0;
     std::uint32_t lightMapLargest = 0;
+    // Cloud layers' shadow maps' float4s in all and the largest's
+    // texels across.
+    std::uint64_t cloudShadowTexels = 0;
+    std::uint32_t cloudShadowLargest = 0;
 
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
@@ -1267,24 +1299,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                     volume.material.phase == tokens::kCloudDroplets &&
                     (held.density != nullptr ||
                      held.layers != nullptr)) {
-                    const glm::dvec3 half = 0.5 * (hi - lo);
-                    double radius = 0.0;
-                    for (int c = 0; c < 4; ++c) {
-                        const glm::dvec3 corner =
-                            half * glm::dvec3((c & 1) ? -1.0 : 1.0,
-                                              (c & 2) ? -1.0 : 1.0,
-                                              1.0);
-                        radius = std::max(
-                            radius,
-                            glm::length(glm::dmat3(transform) *
-                                        corner));
-                    }
-                    const auto size = std::clamp(
-                        std::bit_ceil(static_cast<std::uint32_t>(
-                            std::min(std::ceil(radius /
-                                               std::max(voxel, 1e-9)),
-                                     double(kMaxLightMapSize)))),
-                        kMinLightMapSize, kMaxLightMapSize);
+                    const std::uint32_t size =
+                        LightMapSizeOf(lo, hi, transform, voxel);
                     placed.boundsMax[3] = static_cast<float>(size);
                     placed.info[3] =
                         static_cast<std::uint32_t>(lightMapTexels);
@@ -1304,11 +1320,18 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                         const double extent = hi[a] - lo[a];
                         const double size =
                             glm::length(glm::dvec3(voxelToLocal[a]));
+                        // Cloud layers' sun from their shadow map,
+                        // the cache for the sky's light and the other
+                        // lights, coarser.
+                        const double most =
+                            held.layers != nullptr
+                                ? double(kMaxCloudCacheCells)
+                                : double(kMaxCacheCells);
                         const auto n =
                             static_cast<std::uint32_t>(std::clamp(
                                 std::ceil(extent /
                                           (size * kCacheVoxels)),
-                                2.0, double(kMaxCacheCells)));
+                                2.0, most));
                         placed.cache[a] = n;
                         cells *= n;
                     }
@@ -1316,6 +1339,23 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                         static_cast<std::uint32_t>(cacheCells);
                     cacheCells += cells;
                     cacheLargest = std::max(cacheLargest, cells);
+                }
+                // Cloud layers' shadow map from their sun, sized as a
+                // light map (`cloudShadowMain`).
+                placed.boundsMin[3] = std::bit_cast<float>(kNoCache);
+                if (held.layers != nullptr) {
+                    // Its texels across, as its light map's, after
+                    // its bounds.
+                    const std::uint32_t size =
+                        LightMapSizeOf(lo, hi, transform, voxel);
+                    placed.boundsMax[3] = static_cast<float>(size);
+                    placed.boundsMin[3] = std::bit_cast<float>(
+                        static_cast<std::uint32_t>(
+                            cloudShadowTexels));
+                    cloudShadowTexels +=
+                        3 + std::uint64_t{size} * size;
+                    cloudShadowLargest =
+                        std::max(cloudShadowLargest, size);
                 }
                 instances.push_back(placed);
                 worlds.push_back(world);
@@ -1408,6 +1448,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     cacheLargest_ = cacheLargest;
     lightMapTexels_ = lightMapTexels;
     lightMapLargest_ = lightMapLargest;
+    cloudShadowTexels_ = cloudShadowTexels;
+    cloudShadowLargest_ = cloudShadowLargest;
     // Cloud layers: their noise textures, made or read once, and
     // their blocks.
     if (!cloudBlocks.empty()) {
@@ -1678,6 +1720,20 @@ void VolumePass::Prepare(
         cloudNoise_ != nullptr ? cloudNoise_->Address() : 0;
     resources.cloudLayers =
         cloudLayers_ != nullptr ? cloudLayers_->Address() : 0;
+    if (cloudShadowTexels_ > 0) {
+        const VkDeviceSize bytes = 16 * cloudShadowTexels_;
+        if (cloudShadows_ == nullptr ||
+            cloudShadows_->Size() < bytes) {
+            if (cloudShadows_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            cloudShadows_ = std::make_unique<GpuBuffer>(
+                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            hostChanged_ |= 1;
+        }
+        resources.cloudShadows = cloudShadows_->Address();
+    }
     // Cloud droplets' collectors: their light maps, built again with
     // the caches, and the transport table once ready.
     if (lightMapTexels_ > 0) {
@@ -1960,6 +2016,44 @@ void VolumePass::Prepare(
         cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                           buffers);
         vkCmdDispatch(commands, 1, 1, volumeCount_);
+        vkCmdPipelineBarrier2(commands, &dependency);
+    }
+
+    if (cloudShadowTexels_ > 0) {
+        // Cloud layers' shadow maps across their sun, where the
+        // caches are built again (each thread checks).
+        ERNIE_ZONE("Record cloud shadow maps");
+        ERNIE_GPU_ZONE(context_, commands, "Cloud shadow maps");
+        if (cloudShadowPipeline_ == nullptr ||
+            cloudShadowPipelinePatterns_ !=
+                patterns.Models().size()) {
+            ERNIE_ZONE("Cloud shadow map pipeline");
+            if (cloudShadowPipeline_ != nullptr) {
+                vkDeviceWaitIdle(context_.Device());
+            }
+            cloudShadowPipeline_ = std::make_unique<ComputePipeline>(
+                context_, cacheLayout_,
+                compiler_.CompileSpirv(VolumeModules(patterns, false),
+                                       "cloudShadowMain"));
+            cloudShadowPipelinePatterns_ = patterns.Models().size();
+        }
+        const DescriptorResource buffers[] = {
+            DescriptorResource::Of(*pool_),
+            DescriptorResource::Of(*resources_)};
+        VkMemoryBarrier2 built{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        built.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        built.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        built.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+        dependency.pMemoryBarriers = &built;
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          cloudShadowPipeline_->Handle());
+        cacheLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          buffers);
+        vkCmdDispatch(
+            commands,
+            (cloudShadowLargest_ * cloudShadowLargest_ + 63) / 64, 1,
+            volumeCount_);
         vkCmdPipelineBarrier2(commands, &dependency);
     }
 

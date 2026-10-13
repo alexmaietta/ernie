@@ -341,6 +341,14 @@ class VolumePass {
     std::unique_ptr<GpuBuffer> cloudNoise_;
     std::unique_ptr<GpuBuffer> cloudLayers_;
     std::vector<std::array<float, 64>> cloudBlocks_;
+    /// Cloud layers' shadow maps from their sun (volume.slang's
+    /// `cloudShadowMain`): their float4s in all and the largest's
+    /// texels across.
+    std::uint64_t cloudShadowTexels_ = 0;
+    std::uint32_t cloudShadowLargest_ = 0;
+    mutable std::unique_ptr<GpuBuffer> cloudShadows_;
+    mutable std::unique_ptr<ComputePipeline> cloudShadowPipeline_;
+    mutable std::size_t cloudShadowPipelinePatterns_ = 0;
     std::unique_ptr<GpuBuffer> distances_;
     std::uint64_t distanceWords_ = 0;
     mutable std::vector<DistanceBuild> distanceBuilds_;

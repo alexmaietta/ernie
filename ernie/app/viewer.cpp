@@ -633,7 +633,10 @@ struct Viewer::State {
                   scene.AttributeVersion(path, attribute);
         }
         auto& [cachedKey, bounds] = boundsCache[path];
-        if (cachedKey != key || key == 0) {
+        // A Volume's from its fields' prims, whose edits its own
+        // attributes do not show: found again each time, cheaply.
+        if (cachedKey != key || key == 0 ||
+            scene.TypeOf(path) == tokens::kVolume) {
             cachedKey = key;
             bounds = LocalBoundsOf(scene, path);
         }

@@ -21,7 +21,7 @@ from ernie.demo import (
 
 COVERAGE = 0.4
 SUN_ELEVATION = 20.0
-SUN_AZIMUTH = 120.0
+SUN_AZIMUTH = 30.0
 WIND = 15.0
 # Each view: eye (m) and pitch (degrees), looking along -x.
 VIEWS = {

@@ -128,6 +128,7 @@ inline constexpr std::string_view kCloudLayerDensityProfiles =
     "layerDensityProfiles";
 inline constexpr std::string_view kCloudLayerChannels =
     "layerChannels";
+inline constexpr std::string_view kCloudLayerShadows = "layerShadows";
 inline constexpr std::string_view kDenseValues =
     "ernie:values";  ///< array: (x, y, z) float32.
 inline constexpr std::string_view kVoxelSize =
