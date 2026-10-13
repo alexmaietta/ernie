@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""NASA's Blue Marble, a 21600 x 10800 image of the Earth, on a globe:
-fetched once into the cache, loaded off the main thread (a grey checker
-meanwhile), compressed to BC7 on the GPU and streamed as a virtual texture,
+"""NASA's Blue Marble on a globe: one 21600 x 10800 image of the Earth, or
+its eight 21600 x 21600 tiles joined (86400 x 43200, past a GPU image's
+side). Fetched once into the cache, baked a band at a time to BC7 on the GPU
+off the frame (a grey checker meanwhile) and streamed as a virtual texture,
 its tiles sharpening as the camera comes down."""
 
 import math
@@ -23,11 +24,19 @@ from ernie.demo import (
 EARTH_RADIUS = 6371.0088e3
 
 # Blue Marble Next Generation, August 2004, with topography and bathymetry
-# (NASA Earth Observatory, public domain).
-URL = (
+# (NASA Earth Observatory, public domain): one image, or eight tiles of 90
+# degrees square, A to D west to east from 180 W, 1 the northern row.
+RECORD = (
     "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73776/"
-    "world.topo.bathy.200408.3x21600x10800.jpg"
 )
+IMAGE = "world.topo.bathy.200408.3x21600x10800.jpg"
+TILES = ["A1", "B1", "C1", "D1", "A2", "B2", "C2", "D2"]
+
+
+def tile_file(name):
+    """Tile `name`'s file."""
+    return f"world.topo.bathy.200408.3x21600x21600.{name}.jpg"
+
 
 LOADING = ["auto", "async", "complete"]
 
@@ -48,11 +57,12 @@ def at(latitude, longitude, radius):
 
 
 def stand_in_earth():
-    """A stand-in Earth for the checks, which run offline: a lat-long
-    image wider than a virtual texture's side (so it streams as the real
-    one does), each quarter of longitude its own colour, west to east red,
-    green, blue and yellow, darker towards the poles."""
+    """A stand-in Earth for the checks, which run offline: eight tiles
+    joined as the real ones are (a `.mosaic`), wider than a virtual
+    texture's side, each quarter of longitude its own colour, west to east
+    red, green, blue and yellow, darker towards the poles."""
     cols, rows = 8400, 4200
+    side = cols // 4
     quarters = np.array(
         [[200, 40, 40], [40, 200, 40], [40, 40, 200], [200, 200, 40]],
         dtype=np.float64,
@@ -63,11 +73,72 @@ def stand_in_earth():
     image = np.concatenate(
         [rgb, np.full((rows, cols, 1), 255, dtype=np.uint8)], axis=2
     )
-    path = os.path.join(
-        tempfile.gettempdir(), "ernie_demo_blue_marble_stand_in.png"
+    folder = os.path.join(
+        tempfile.gettempdir(), "ernie_demo_blue_marble"
     )
-    write_png(path, image)
+    os.makedirs(folder, exist_ok=True)
+    rows_of_names = []
+    for row in range(2):
+        names = []
+        for column in range(4):
+            name = f"tile{row}{column}.png"
+            write_png(
+                os.path.join(folder, name),
+                image[
+                    row * side : (row + 1) * side,
+                    column * side : (column + 1) * side,
+                ],
+            )
+            names.append(name)
+        rows_of_names.append(" ".join(names))
+    path = os.path.join(folder, "stand_in.mosaic")
+    with open(path, "w") as f:
+        f.write("\n".join(rows_of_names) + "\n")
     return path
+
+
+class Fetch:
+    """A dataset's files fetched one after another, with a progress bar
+    while they come; `on_done` once all are there."""
+
+    def __init__(self, widgets, files, on_done, report):
+        self.widgets = widgets
+        self.files = [
+            (u, p) for u, p in files if not os.path.exists(p)
+        ]
+        self.next = 0
+        self.download = None
+        self.on_done = on_done
+        self.report = report
+        self.progress = widgets.progress("Download")
+
+    def close(self):
+        """Stops the fetch, keeping its part to resume."""
+        if self.download is not None:
+            self.download.cancel()
+        self.widgets.remove(self.progress)
+
+    def step(self):
+        """Moves the fetch on; True once it has ended."""
+        if self.download is None and self.next < len(self.files):
+            self.download = AsyncDownload(*self.files[self.next])
+        if self.download is None:
+            self.on_done()
+            return True
+        for text, error in self.download.take_messages():
+            self.report(text, error)
+        self.widgets.set(self.progress, self.download.fraction)
+        self.widgets.set(
+            self.progress,
+            f"{self.next + 1} of {len(self.files)}: "
+            f"{self.download.status}",
+        )
+        if not self.download.done:
+            return False
+        succeeded = self.download.succeeded
+        self.download = None
+        self.next += 1
+        return not succeeded
 
 
 class Demo(ernie.demo.Demo):
@@ -148,26 +219,22 @@ class Demo(ernie.demo.Demo):
         self.altitude = 12000.0  # km
         self.latitude = 20.0
         self.longitude = 10.0
-        self.image = os.path.join(
-            cache_dir(),
-            "blue_marble",
-            "world.topo.bathy.200408.3x21600x10800.jpg",
-        )
-        self.download = None
+        self.fetch = None
         if args.test:
             self.use_image(stand_in_earth())
-        elif os.path.exists(self.image):
-            self.use_image(self.image)
-        elif can_download():
-            self.download = AsyncDownload(URL, self.image)
-            self.progress = self.widgets.progress("Download")
         else:
-            self.report(
-                "Blue Marble is not cached and cannot be fetched",
-                True,
-            )
+            self.select_image(0)
 
         widgets = self.widgets
+        widgets.combo(
+            "Image",
+            [
+                "21600 x 10800 (27 MB)",
+                "8 tiles, 86400 x 43200 (420 MB)",
+            ],
+            0,
+            on_change=self.select_image,
+        )
         widgets.slider(
             "Altitude (km)",
             200.0,
@@ -221,16 +288,51 @@ class Demo(ernie.demo.Demo):
 
     def step(self):
         # The download's news in the log, and the image once fetched.
-        if self.download is not None:
-            for text, error in self.download.take_messages():
-                self.report(text, error)
-            self.widgets.set(self.progress, self.download.fraction)
-            self.widgets.set(self.progress, self.download.status)
-            if self.download.done:
-                if self.download.succeeded:
-                    self.use_image(self.image)
-                self.download = None
-                self.widgets.remove(self.progress)
+        if self.fetch is not None and self.fetch.step():
+            self.fetch.close()
+            self.fetch = None
+
+    def select_image(self, index):
+        """Textures the globe with image `index` (0 the single image, 1
+        the eight tiles), fetching it first if need be."""
+        folder = os.path.join(cache_dir(), "blue_marble")
+        if index == 0:
+            files = [(RECORD + IMAGE, os.path.join(folder, IMAGE))]
+            image = os.path.join(folder, IMAGE)
+        else:
+            files = [
+                (
+                    RECORD + tile_file(t),
+                    os.path.join(folder, tile_file(t)),
+                )
+                for t in TILES
+            ]
+            image = os.path.join(
+                folder, "world.topo.bathy.200408.3x21600x21600.mosaic"
+            )
+        if self.fetch is not None:
+            self.fetch.close()
+            self.fetch = None
+        if not can_download() and not all(
+            os.path.exists(p) for _, p in files
+        ):
+            self.report(
+                "Blue Marble is not cached and cannot be fetched",
+                True,
+            )
+            return
+
+        def done():
+            # The tiles joined, two rows of four.
+            if index == 1:
+                with open(image, "w") as f:
+                    for row in range(2):
+                        names = TILES[4 * row : 4 * row + 4]
+                        f.write(" ".join(tile_file(t) for t in names))
+                        f.write("\n")
+            self.use_image(image)
+
+        self.fetch = Fetch(self.widgets, files, done, self.report)
 
     def test_final(self):
         # Over the blue and the green quarters of the stand-in, from

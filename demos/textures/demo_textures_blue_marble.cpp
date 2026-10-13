@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// NASA's Blue Marble, a 21600 x 10800 image of the Earth, on a globe:
-// fetched once into the cache, loaded off the main thread (a grey
-// checker meanwhile), compressed to BC7 on the GPU and streamed as a
-// virtual texture, its tiles sharpening as the camera comes down.
+// NASA's Blue Marble on a globe: one 21600 x 10800 image of the
+// Earth, or its eight 21600 x 21600 tiles joined (86400 x 43200, past
+// a GPU image's side). Fetched once into the cache, baked a band at a
+// time to BC7 on the GPU off the frame (a grey checker meanwhile) and
+// streamed as a virtual texture, its tiles sharpening as the camera
+// comes down.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
@@ -17,15 +19,19 @@
 #include "ernie/scene/xform.h"
 #include "util.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -37,10 +43,20 @@ constexpr double kPi = std::numbers::pi;
 constexpr double kEarthRadius = 6371.0088e3;
 
 // Blue Marble Next Generation, August 2004, with topography and
-// bathymetry (NASA Earth Observatory, public domain).
-constexpr const char* kUrl =
-    "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73776/"
+// bathymetry (NASA Earth Observatory, public domain): one image, or
+// eight tiles of 90 degrees square, A to D west to east from 180 W,
+// 1 the northern row.
+constexpr const char* kRecord =
+    "https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73776/";
+constexpr const char* kImage =
     "world.topo.bathy.200408.3x21600x10800.jpg";
+const std::array<std::string, 8> kTiles = {"A1", "B1", "C1", "D1",
+                                           "A2", "B2", "C2", "D2"};
+
+/// Tile `name`'s file.
+std::string TileFile(const std::string& name) {
+    return "world.topo.bathy.200408.3x21600x21600." + name + ".jpg";
+}
 
 const std::array<std::string, 3> kLoading = {"auto", "async",
                                              "complete"};
@@ -55,13 +71,14 @@ glm::dvec3 At(double latitude, double longitude, double radius) {
                                std::sin(phi));
 }
 
-/// A stand-in Earth for the checks, which run offline: a lat-long
-/// image wider than a virtual texture's side (so it streams as the
-/// real one does), each quarter of longitude its own colour, west to
+/// A stand-in Earth for the checks, which run offline: eight tiles
+/// joined as the real ones are (a `.mosaic`), wider than a virtual
+/// texture's side, each quarter of longitude its own colour, west to
 /// east red, green, blue and yellow, darker towards the poles.
 std::filesystem::path StandInEarth() {
     constexpr std::int64_t kCols = 8400;
     constexpr std::int64_t kRows = 4200;
+    constexpr std::int64_t kSide = kCols / 4;
     constexpr std::array<std::array<std::uint8_t, 3>, 4> kQuarters = {
         {{200, 40, 40},
          {40, 200, 40},
@@ -84,13 +101,90 @@ std::filesystem::path StandInEarth() {
             texel[3] = 255;
         }
     }
-    const std::filesystem::path path =
+    const std::filesystem::path dir =
         std::filesystem::temp_directory_path() /
-        "ernie_demo_blue_marble_stand_in.png";
-    app::WritePng(
-        path, Tensor::Copy<std::uint8_t>(texels, {kRows, kCols, 4}));
-    return path;
+        "ernie_demo_blue_marble";
+    std::filesystem::create_directories(dir);
+    std::ofstream mosaic(dir / "stand_in.mosaic");
+    for (std::int64_t row = 0; row < 2; ++row) {
+        for (std::int64_t column = 0; column < 4; ++column) {
+            std::vector<std::uint8_t> tile(kSide * kSide * 4);
+            for (std::int64_t y = 0; y < kSide; ++y) {
+                std::copy_n(
+                    texels.begin() +
+                        ((row * kSide + y) * kCols + column * kSide) *
+                            4,
+                    kSide * 4, tile.begin() + y * kSide * 4);
+            }
+            const std::string name = "tile" + std::to_string(row) +
+                                     std::to_string(column) + ".png";
+            app::WritePng(dir / name, Tensor::Copy<std::uint8_t>(
+                                          tile, {kSide, kSide, 4}));
+            mosaic << name << (column < 3 ? " " : "\n");
+        }
+    }
+    return dir / "stand_in.mosaic";
 }
+
+/// A dataset's files fetched one after another, with a progress bar
+/// while they come; `onDone` once all are there.
+class Fetch {
+  public:
+    Fetch(app::WidgetPanel& widgets,
+          std::vector<std::pair<std::string, std::filesystem::path>>
+              files,
+          std::function<void()> onDone,
+          std::function<void(const std::string&, bool)> report)
+        : widgets_(widgets), onDone_(std::move(onDone)),
+          report_(std::move(report)) {
+        for (auto& [url, path] : files) {
+            if (!std::filesystem::exists(path)) {
+                files_.emplace_back(std::move(url), std::move(path));
+            }
+        }
+        progress_ = widgets_.Progress("Download");
+    }
+    ~Fetch() {
+        widgets_.Remove(progress_);
+    }
+    Fetch(const Fetch&) = delete;
+    Fetch& operator=(const Fetch&) = delete;
+
+    /// Moves the fetch on; true once it has ended.
+    bool Step() {
+        if (download_ == nullptr && next_ < files_.size()) {
+            download_ = std::make_unique<demos::AsyncDownload>(
+                files_[next_].first, files_[next_].second);
+        }
+        if (download_ == nullptr) {
+            onDone_();
+            return true;
+        }
+        for (const auto& message : download_->TakeMessages()) {
+            report_(message.text, message.error);
+        }
+        widgets_.Set(progress_, download_->Fraction());
+        widgets_.Set(progress_, std::to_string(next_ + 1) + " of " +
+                                    std::to_string(files_.size()) +
+                                    ": " + download_->Status());
+        if (!download_->Done()) {
+            return false;
+        }
+        const bool succeeded = download_->Succeeded();
+        download_.reset();
+        ++next_;
+        return !succeeded;
+    }
+
+  private:
+    app::WidgetPanel& widgets_;
+    std::vector<std::pair<std::string, std::filesystem::path>> files_;
+    std::size_t next_ = 0;
+    std::unique_ptr<demos::AsyncDownload> download_;
+    app::WidgetPanel::Id progress_ = 0;
+    std::function<void()> onDone_;
+    std::function<void(const std::string&, bool)> report_;
+};
 
 class BlueMarbleDemo : public app::Demo {
   public:
@@ -141,20 +235,16 @@ class BlueMarbleDemo : public app::Demo {
 
         // The image: the stand-in for the checks; else the cached
         // Blue Marble, fetched in the background the first time.
-        image_ = demos::CacheDir() / "blue_marble" /
-                 "world.topo.bathy.200408.3x21600x10800.jpg";
         if (options.test) {
             UseImage(StandInEarth());
-        } else if (std::filesystem::exists(image_)) {
-            UseImage(image_);
-        } else if (demos::CanDownload()) {
-            download_ =
-                std::make_unique<demos::AsyncDownload>(kUrl, image_);
-            progress_ = Widgets().Progress("Download");
         } else {
-            Report("Blue Marble is not cached and cannot be fetched",
-                   true);
+            SelectImage(0);
         }
+        Widgets().Combo(
+            "Image",
+            {"21600 x 10800 (27 MB)",
+             "8 tiles, 86400 x 43200 (420 MB)"},
+            0, [this](std::size_t index) { SelectImage(index); });
 
         Widgets().Slider("Altitude (km)", 200.0, 40000.0, altitude_,
                          [this](double km) {
@@ -204,19 +294,8 @@ class BlueMarbleDemo : public app::Demo {
 
     void Step() override {
         // The download's news in the log, and the image once fetched.
-        if (download_ != nullptr) {
-            for (const auto& message : download_->TakeMessages()) {
-                Report(message.text, message.error);
-            }
-            Widgets().Set(progress_, download_->Fraction());
-            Widgets().Set(progress_, download_->Status());
-            if (download_->Done()) {
-                if (download_->Succeeded()) {
-                    UseImage(image_);
-                }
-                download_.reset();
-                Widgets().Remove(progress_);
-            }
+        if (fetch_ != nullptr && fetch_->Step()) {
+            fetch_.reset();
         }
     }
 
@@ -249,6 +328,53 @@ class BlueMarbleDemo : public app::Demo {
     }
 
   private:
+    /// Textures the globe with image `index` (0 the single image, 1
+    /// the eight tiles), fetching it first if need be.
+    void SelectImage(std::size_t index) {
+        const std::filesystem::path dir =
+            demos::CacheDir() / "blue_marble";
+        std::vector<std::pair<std::string, std::filesystem::path>>
+            files;
+        std::filesystem::path image = dir / kImage;
+        if (index == 0) {
+            files.emplace_back(std::string(kRecord) + kImage, image);
+        } else {
+            for (const std::string& tile : kTiles) {
+                files.emplace_back(std::string(kRecord) +
+                                       TileFile(tile),
+                                   dir / TileFile(tile));
+            }
+            image =
+                dir / "world.topo.bathy.200408.3x21600x21600.mosaic";
+        }
+        fetch_.reset();
+        if (!demos::CanDownload() &&
+            !std::all_of(files.begin(), files.end(),
+                         [](const auto& f) {
+                             return std::filesystem::exists(f.second);
+                         })) {
+            Report("Blue Marble is not cached and cannot be fetched",
+                   true);
+            return;
+        }
+        fetch_ = std::make_unique<Fetch>(
+            Widgets(), files,
+            [this, index, dir, image] {
+                // The tiles joined, two rows of four.
+                if (index == 1) {
+                    std::ofstream mosaic(image);
+                    for (std::size_t i = 0; i < kTiles.size(); ++i) {
+                        mosaic << TileFile(kTiles[i])
+                               << (i % 4 < 3 ? " " : "\n");
+                    }
+                }
+                UseImage(image);
+            },
+            [this](const std::string& text, bool error) {
+                Report(text, error);
+            });
+    }
+
     /// Textures the globe with `path`, read as sRGB colour.
     void UseImage(const std::filesystem::path& path) {
         Scene& scene = GetScene();
@@ -297,9 +423,7 @@ class BlueMarbleDemo : public app::Demo {
         }
     }
 
-    std::filesystem::path image_;
-    std::unique_ptr<demos::AsyncDownload> download_;
-    app::WidgetPanel::Id progress_ = 0;
+    std::unique_ptr<Fetch> fetch_;
     double altitude_ = 12000.0;  ///< km
     double latitude_ = 20.0;
     double longitude_ = 10.0;
