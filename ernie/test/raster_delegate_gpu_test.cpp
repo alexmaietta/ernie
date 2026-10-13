@@ -583,7 +583,7 @@ TEST_F(RasterDelegateTest, CudaTrianglesDrawAndChangeInPlace) {
 TEST_F(RasterDelegateTest, ActiveCountsDrawTheTrianglesInUse) {
     // Drawn directly (CPU culling) and by the GPU's culling jobs:
     // either way only the triangles in use reach the vertex shader.
-    for (const std::string culling :
+    for (const std::string& culling :
          {std::string(tokens::kCpu), std::string(tokens::kGpu)}) {
         SCOPED_TRACE(culling);
         RasterDelegate delegate(*context_);
@@ -839,8 +839,10 @@ TEST_F(RasterDelegateTest,
         std::vector<std::int32_t> indices;
         for (int y = 0; y <= kCells; ++y) {
             for (int x = 0; x <= kCells; ++x) {
-                const float u = -1.5f + 3.0f * x / kCells;
-                const float v = -1.5f + 3.0f * y / kCells;
+                const float u =
+                    -1.5f + 3.0f * static_cast<float>(x) / kCells;
+                const float v =
+                    -1.5f + 3.0f * static_cast<float>(y) / kCells;
                 points.insert(
                     points.end(),
                     {u, v,
@@ -1065,7 +1067,8 @@ TEST_F(RasterDelegateTest,
         double sum = 0.0;
         for (std::size_t row = 0; row < kVarSize; ++row) {
             for (std::size_t col = 0; col < kVarSize; ++col) {
-                sum += At<float>(vars.at("HdrColor"), row, col, 1);
+                sum += static_cast<double>(
+                    At<float>(vars.at("HdrColor"), row, col, 1));
             }
         }
         return sum / static_cast<double>(kVarSize * kVarSize);

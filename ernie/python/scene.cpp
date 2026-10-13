@@ -2654,7 +2654,7 @@ void BindScene(nb::module_& m) {
     m.def(
         "noise_permutation",
         [](std::uint32_t seed) {
-            const auto& table = GradientNoise(seed).Permutation();
+            const auto table = GradientNoise(seed).Permutation();
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 std::span(table.data(), table.size()),
                 {static_cast<std::int64_t>(table.size())}));

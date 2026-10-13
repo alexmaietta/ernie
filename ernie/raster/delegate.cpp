@@ -363,9 +363,9 @@ void SetBetween(InstanceParent& parent, const glm::dmat4& between) {
     if (glm::determinant(glm::dmat3(between)) < 0.0) {
         scale.x = -scale.x;
     }
-    const glm::dmat3 rotation(glm::dvec3(between[0]) / scale.x,
+    const glm::dmat3 rotation{glm::dvec3(between[0]) / scale.x,
                               glm::dvec3(between[1]) / scale.y,
-                              glm::dvec3(between[2]) / scale.z);
+                              glm::dvec3(between[2]) / scale.z};
     const glm::dquat q = glm::normalize(glm::quat_cast(rotation));
     const glm::dmat4 rebuilt =
         glm::translate(glm::dmat4(1.0), glm::dvec3(between[3])) *
@@ -1250,7 +1250,9 @@ void RasterDelegate::ApplyDomeDirections(FrameParams& frame) const {
         for (std::size_t b = 0;
              b < light.spectrum.size() && b < shape.size(); ++b) {
             light.spectrum[b] = static_cast<float>(
-                frame.dome->radiance[b] * shape[b] * peak);
+                static_cast<double>(frame.dome->radiance[b] *
+                                    shape[b]) *
+                peak);
         }
         light.shadows = true;
         light.domeDiffuse = true;
@@ -1281,8 +1283,9 @@ void RasterDelegate::ApplyDomeSun(FrameParams& frame) const {
     std::vector<float> spectrum(frame.dome->radiance.size(), 0.0f);
     for (std::size_t b = 0; b < spectrum.size() && b < shape.size();
          ++b) {
-        spectrum[b] = static_cast<float>(frame.dome->radiance[b] *
-                                         shape[b] * peak);
+        spectrum[b] = static_cast<float>(
+            static_cast<double>(frame.dome->radiance[b] * shape[b]) *
+            peak);
     }
     const glm::vec3 towards(
         glm::normalize(rotation * domeSun_->direction));
@@ -1774,7 +1777,8 @@ void RasterDelegate::SyncInstancers(const Scene& scene) {
                     } else if (const std::optional<std::vector<float>>
                                    values = FloatAttribute(
                                        scene, path, attribute,
-                                       width)) {
+                                       static_cast<std::size_t>(
+                                           width))) {
                         const auto rows = static_cast<std::int64_t>(
                                               values->size()) /
                                           width;
@@ -3865,18 +3869,18 @@ RasterDelegate::StepAsync(const Scene& scene,
                 }
                 held = *known;
             } else if (name.starts_with(kAovPrefix)) {
-                const std::vector<std::string>& outputs =
+                const std::vector<std::string>& chainAov =
                     chainAovs[c];
-                if (std::find(outputs.begin(), outputs.end(),
+                if (std::find(chainAov.begin(), chainAov.end(),
                               name.substr(kAovPrefix.size())) ==
-                    outputs.end()) {
+                    chainAov.end()) {
                     throw missing();
                 }
-                const auto slot =
+                const auto aovSlot =
                     std::find(aovs.begin(), aovs.end(),
                               name.substr(kAovPrefix.size()));
                 held = kAovSlotNames[static_cast<std::size_t>(
-                    slot - aovs.begin())];
+                    aovSlot - aovs.begin())];
             } else {
                 continue;
             }
@@ -3958,15 +3962,15 @@ RasterDelegate::StepAsync(const Scene& scene,
             // for it (`SubmitWaits`).
             const std::uintptr_t stream =
                 scene.WriteStream(cameras.front(), tokens::kPoses);
-            ComputeInterop& compute = RequireCompute();
+            ComputeInterop& interop = RequireCompute();
             if (gpuPoses->Data() ==
-                compute
+                interop
                     .View(renderer_.EnsurePoseBuffer(1),
                           DType::Float32, {1})
                     .Data()) {
                 // Written in place into the pose buffer (`MapArray`):
                 // only the writes to wait for.
-                compute.SignalVulkan(stream);
+                interop.SignalVulkan(stream);
             } else if (gpuPosesQuaternions_ &&
                        QuaternionsWFirst(scene, cameras.front())) {
                 // Position, w, x, y, z into position, x, y, z, w.

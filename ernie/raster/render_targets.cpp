@@ -231,7 +231,9 @@ GpuImage& RenderTargets::Raster(bool full) {
                 full ? RasterLayers() : 1, 1,
                 VK_FORMAT_R32G32B32A32_SFLOAT,
                 kStorage |
-                    (full ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0u),
+                    (full ? static_cast<VkImageUsageFlags>(
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+                          : 0u),
                 false, true});
     }
     return *image;

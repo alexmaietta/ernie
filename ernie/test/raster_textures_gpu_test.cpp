@@ -754,9 +754,9 @@ void ExpectVirtualAlbedoLoadsTheTilesInView(
     double difference = 0.0;
     double total = 0.0;
     for (std::int64_t i = 0; i < close.Elements(); ++i) {
-        difference +=
-            std::abs(close.As<float>()[i] - full.As<float>()[i]);
-        total += std::abs(full.As<float>()[i]);
+        difference += static_cast<double>(
+            std::abs(close.As<float>()[i] - full.As<float>()[i]));
+        total += static_cast<double>(std::abs(full.As<float>()[i]));
     }
     EXPECT_LT(difference, 0.02 * total);
 }

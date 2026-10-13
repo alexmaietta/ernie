@@ -843,15 +843,15 @@ void PointsDrawable::Prepare(
     std::vector<VkDrawIndirectCommand> commands(jobs_.size(),
                                                 {6, 0, 0, 0});
     const auto reserve = [&](std::unique_ptr<GpuBuffer>& buffer,
-                             VkDeviceSize bytes,
+                             VkDeviceSize wanted,
                              VkBufferUsageFlags usage) {
-        bytes = std::max<VkDeviceSize>(bytes, 16);
-        if (buffer == nullptr || buffer->Size() < bytes) {
+        wanted = std::max<VkDeviceSize>(wanted, 16);
+        if (buffer == nullptr || buffer->Size() < wanted) {
             if (buffer != nullptr) {
                 vkDeviceWaitIdle(context_.Device());
             }
             buffer = std::make_unique<GpuBuffer>(
-                context_, bytes, usage, BufferMemory::Device);
+                context_, wanted, usage, BufferMemory::Device);
         }
     };
     reserve(cullJobs_, jobs_.size() * sizeof(glm::uvec4),

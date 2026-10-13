@@ -317,11 +317,11 @@ double ProfileRing(const std::vector<float>& profile, double c) {
     const double t = at - row;
     double sum = 0.0;
     for (int j = 0; j < columns; ++j) {
-        sum +=
-            (1.0 - t) *
-                profile[static_cast<std::size_t>(row * columns + j)] +
-            t * profile[static_cast<std::size_t>((row + 1) * columns +
-                                                 j)];
+        const double below = static_cast<double>(profile[
+            static_cast<std::size_t>(row * columns + j)]);
+        const double above = static_cast<double>(profile[
+            static_cast<std::size_t>((row + 1) * columns + j)]);
+        sum += (1.0 - t) * below + t * above;
     }
     return sum / columns;
 }
@@ -410,9 +410,10 @@ std::vector<float> ProfileOf(const BoundableLight& light,
 double ProfileAxis(const std::vector<float>& profile) {
     const double axis = ProfileRing(profile, 1.0);
     return axis > 0.0 ? axis
-                      : std::max(*std::max_element(profile.begin(),
-                                                   profile.end()),
-                                 1e-9f);
+                      : static_cast<double>(std::max(
+                            *std::max_element(profile.begin(),
+                                              profile.end()),
+                            1e-9f));
 }
 
 /// A light's IES profile grid `theta` radians off its axis and `phi`
@@ -1896,7 +1897,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
                                   ? plain
                                   : side * CylinderEmittedSolidAngle(
                                                shape, light.profile);
-        const double axis =
+        const double onAxis =
             light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
         const std::optional<std::vector<float>> pairs =
             SpectrumPairs(emitter);
@@ -1904,7 +1905,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
             const auto perLux = [&](double distance) {
                 return RectLuminancePerLux(length, 2.0 * radius,
                                            distance) /
-                       axis;
+                       onAxis;
             };
             light.spectrum = RelativeSpectrum(
                 emitter, bands,
@@ -1958,7 +1959,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
                 ? plain
                 : area *
                       EmittedSolidAngle(shape, true, light.profile);
-        const double axis =
+        const double onAxis =
             light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
         const std::optional<std::vector<float>> pairs =
             SpectrumPairs(emitter);
@@ -1970,7 +1971,7 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
                             ? RectLuminancePerLux(size.x, size.y,
                                                   distance)
                             : DiskLuminancePerLux(radius, distance)) /
-                       axis;
+                       onAxis;
             };
             light.spectrum = RelativeSpectrum(
                 emitter, bands,
@@ -2017,10 +2018,10 @@ LightParams LightParamsOf(const Scene& scene, const Path& path,
             ? plain
             : EmittedSolidAngle(shape, false, light.profile);
     if (sphere.IsPhotometric()) {
-        const double axis =
+        const double onAxis =
             light.profile.empty() ? 1.0 : ProfileAxis(light.profile);
         const auto perLux = [&](double distance) {
-            return distance * distance / axis;
+            return distance * distance / onAxis;
         };
         light.spectrum = RelativeSpectrum(
             sphere, bands,
@@ -2161,7 +2162,9 @@ std::optional<DomeSunExtraction> ExtractDomeSun(const Image& map) {
     const auto luminance = [&](std::int64_t r, std::int64_t c) {
         const glm::vec4& t = map.At(static_cast<std::uint32_t>(c),
                                     static_cast<std::uint32_t>(r));
-        return 0.2126 * t.r + 0.7152 * t.g + 0.0722 * t.b;
+        return 0.2126 * static_cast<double>(t.r) +
+               0.7152 * static_cast<double>(t.g) +
+               0.0722 * static_cast<double>(t.b);
     };
     const auto solidAngle = [&](std::int64_t r) {
         return (std::cos(static_cast<double>(r) * dTheta) -

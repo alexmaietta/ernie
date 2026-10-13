@@ -3445,28 +3445,28 @@ void MeshDrawable::Cull(const FrameParams& params,
             // Plain meshes too: a job of their one instance, so every
             // view's draws go out indirectly.
             if (job) {
-                GpuCullJob job{};
-                job.range[0] = entry.item;
-                job.range[1] = itemIdOffsets_[i] + range.first;
-                job.range[2] = range.count;
-                job.range[3] = slot;
+                GpuCullJob cullJob{};
+                cullJob.range[0] = entry.item;
+                cullJob.range[1] = itemIdOffsets_[i] + range.first;
+                cullJob.range[2] = range.count;
+                cullJob.range[3] = slot;
                 // A run of the range's count of ids and an indirect
                 // draw per level.
                 const std::uint32_t levels = CullLevels(i);
-                job.output[0] = visible;
-                job.output[1] = draws;
+                cullJob.output[0] = visible;
+                cullJob.output[1] = draws;
                 // A view's occluder, numbered once the views' own
                 // jobs are all listed (-2 - its index meanwhile).
                 if (pyramid && isOccluder(i)) {
                     entry.occluder = true;
                     entry.job = -2 - static_cast<std::int32_t>(
                                          occluderJobs.size());
-                    occluderJobs.push_back(job);
+                    occluderJobs.push_back(cullJob);
                     occluderDrawCounts.push_back(levels);
                 } else {
                     entry.job =
                         static_cast<std::int32_t>(jobs.size());
-                    jobs.push_back(job);
+                    jobs.push_back(cullJob);
                     cullDrawCounts_.push_back(levels);
                 }
                 addRecords(entry.item, visible, range.count);
@@ -3557,7 +3557,9 @@ void MeshDrawable::Cull(const FrameParams& params,
                 const glm::mat4 packed = strip.Packed();
                 const glm::vec4 intrinsics = strip.Intrinsics();
                 for (int column = 0; column < 4; ++column) {
-                    views[slot + 6 + column] = packed[column];
+                    views[slot + 6 +
+                          static_cast<std::size_t>(column)] =
+                        packed[column];
                 }
                 views[slot + 10].z = intrinsics.x;
                 views[slot + 10].w = intrinsics.y;
@@ -3653,10 +3655,10 @@ void MeshDrawable::Cull(const FrameParams& params,
     // ones, not every world's.
     shadowWorldDraws_.assign(shadowDraws_.size(), {});
     for (std::size_t c = 0; c < shadowDraws_.size(); ++c) {
-        for (const VisibleRange& visible : shadowDraws_[c]) {
+        for (const VisibleRange& caster : shadowDraws_[c]) {
             shadowWorldDraws_
-                [c][itemRanges_[visible.item][visible.range].world]
-                    .push_back(visible);
+                [c][itemRanges_[caster.item][caster.range].world]
+                    .push_back(caster);
         }
     }
     WriteCullJobs(jobs, views, visible, draws);
@@ -4188,9 +4190,9 @@ std::size_t MeshDrawable::Record(
                                      : shadowPipeline_.get())
             : minimal_ != MinimalMode::Off
                 ? minimalPipelines_[(minimal_ == MinimalMode::None
-                                         ? 2
-                                         : 0) +
-                                    (cut ? 1 : 0)]
+                                         ? 2u
+                                         : 0u) +
+                                    (cut ? 1u : 0u)]
                       .get()
             : cut ? cutoutPipelines_[pushbroom_ ? 1 : 0].get()
                   : itemPipelines_[item];

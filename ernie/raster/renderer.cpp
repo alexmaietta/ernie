@@ -1375,7 +1375,8 @@ double WhiteLuminance(const LightParams& light,
     for (int b = 0; b < bands.count &&
                     b < static_cast<int>(light.spectrum.size());
          ++b) {
-        white += light.spectrum[static_cast<std::size_t>(b)] *
+        white += static_cast<double>(
+                     light.spectrum[static_cast<std::size_t>(b)]) *
                  CieXyz(bands.Centre(b)).y * bands.Width();
     }
     return white * kLuminousEfficacy / M_PI;
@@ -1422,9 +1423,11 @@ glm::vec3 MinimalAmbient(const FrameParams& params,
     const double white = brightest != nullptr
                              ? WhiteLuminance(*brightest, bands)
                              : 0.0;
-    return colour * (white > 0.0
-                         ? static_cast<float>(params.ambient / white)
-                         : 1.0f);
+    return colour *
+           (white > 0.0
+                ? static_cast<float>(
+                      static_cast<double>(params.ambient) / white)
+                : 1.0f);
 }
 
 /// The dome's luminance as minimal shading's background shows it, in
@@ -1442,7 +1445,8 @@ float MinimalSky(const FrameParams& params,
          b < static_cast<int>(params.dome->radiance.size());
          ++b) {
         luminance +=
-            params.dome->radiance[static_cast<std::size_t>(b)] *
+            static_cast<double>(
+                params.dome->radiance[static_cast<std::size_t>(b)]) *
             CieXyz(bands.Centre(b)).y * bands.Width();
     }
     luminance *= kLuminousEfficacy;
@@ -3722,11 +3726,12 @@ void RasterRenderer::Update(
                         glm::value_ptr(map.lightViewProjection), 64);
             shadowUniforms.texelWorld[c] = map.texelWorldSize;
         }
-        const ShadowCascade& first = lightViews_[minimalKey_->first];
+        const ShadowCascade& firstMap =
+            lightViews_[minimalKey_->first];
         shadowUniforms.minimal[0] =
             static_cast<float>(minimalKey_->first);
         shadowUniforms.minimal[1] =
-            static_cast<float>(first.resolution) /
+            static_cast<float>(firstMap.resolution) /
             static_cast<float>(lightResolution_);
         shadowUniforms.minimal[2] = static_cast<float>(maps);
         shadowUniforms.minimal[3] = 1.0f;
@@ -3914,8 +3919,8 @@ void RasterRenderer::Update(
                             static_cast<double>(params.exposure) *
                             kLuminousEfficacy * LuminanceIntegral();
         if (gain > 0.0 && std::isfinite(gain)) {
-            radianceScale_ = std::exp2(std::clamp(
-                std::round(std::log2(gain)), -100.0, 100.0));
+            radianceScale_ = static_cast<float>(std::exp2(std::clamp(
+                std::round(std::log2(gain)), -100.0, 100.0)));
         }
     }
     // The sky's kernel shades everything it may show, in the frame's
@@ -4381,11 +4386,12 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
     // luminance shapes.
     const glm::vec3 ambientColour =
         UnitLuminanceColor(params.ambientColor);
-    shading.sun[3] = glm::length(ambientColour) > 0.0f
-                         ? static_cast<float>(params.ambient /
-                                              (kLuminousEfficacy *
-                                               LuminanceIntegral()))
-                         : 0.0f;
+    shading.sun[3] =
+        glm::length(ambientColour) > 0.0f
+            ? static_cast<float>(
+                  static_cast<double>(params.ambient) /
+                  (kLuminousEfficacy * LuminanceIntegral()))
+            : 0.0f;
     shading.ambient[0] = ambientColour.r;
     shading.ambient[1] = ambientColour.g;
     shading.ambient[2] = ambientColour.b;
@@ -4715,8 +4721,10 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
     const auto own = [&](std::size_t c, int i) {
         return peak > 0.0f
                    ? kLuminousEfficacy *
-                         responses[c][static_cast<std::size_t>(i)] /
-                         peak * bands_.Width()
+                         static_cast<double>(
+                             responses[c]
+                                      [static_cast<std::size_t>(i)]) /
+                         static_cast<double>(peak) * bands_.Width()
                    : 0.0;
     };
     if (model.channels.size() == 1) {
@@ -5799,7 +5807,8 @@ void RasterRenderer::ReadMeter(std::uint32_t slot) {
         const double to = std::min(seen + count, high);
         if (to > from) {
             const double centre =
-                kMeterLow + (bin + 0.5) / kMeterBinsPerStop;
+                static_cast<double>(kMeterLow) +
+                (bin + 0.5) / static_cast<double>(kMeterBinsPerStop);
             weighted += centre * (to - from);
             counted += to - from;
         }
@@ -6633,11 +6642,11 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                                     shading);
             };
             bind(*pipelines[1]);
-            bool general = false;
+            bool generalBound = false;
             const auto part = [&](std::uint32_t index) {
-                if (index != 0 && !general) {
+                if (index != 0 && !generalBound) {
                     bind(*pipelines[0]);
-                    general = true;
+                    generalBound = true;
                 }
                 ShadingConstants constants = constantsFor(0);
                 constants.model[3] = index;
@@ -6876,8 +6885,10 @@ void RasterRenderer::Filter(VkCommandBuffer commands,
             std::vector<DescriptorResource> resources = bound;
             resources.push_back(general(image(true, segment)));
             resources.push_back(general(image(false, segment)));
-            for (std::size_t slot = 0; slot < kMaxAovs; ++slot) {
-                resources.push_back(general(targets.BoundAov(slot)));
+            for (std::size_t aovSlot = 0; aovSlot < kMaxAovs;
+                 ++aovSlot) {
+                resources.push_back(
+                    general(targets.BoundAov(aovSlot)));
             }
             resources.push_back(general(previous));
             resources.push_back(general(next));

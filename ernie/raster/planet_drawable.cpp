@@ -123,10 +123,12 @@ PackedFaceGradients(const CubeSphereLod& lod, std::uint32_t face,
         for (std::size_t col = 0; col < side; ++col) {
             const std::size_t west = col > 0 ? col - 1 : col;
             const std::size_t east = col + 1 < side ? col + 1 : col;
-            const double du = (at(east, row) - at(west, row)) /
-                              arc(west, row, east, row);
-            const double dv = (at(col, south) - at(col, north)) /
-                              arc(col, north, col, south);
+            const double du =
+                static_cast<double>(at(east, row) - at(west, row)) /
+                arc(west, row, east, row);
+            const double dv =
+                static_cast<double>(at(col, south) - at(col, north)) /
+                arc(col, north, col, south);
             level[row * side + col] = glm::vec2(
                 static_cast<float>(du), static_cast<float>(dv));
         }
