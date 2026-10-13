@@ -219,6 +219,64 @@ void Extra(std::uint32_t (&extra)[4], const OverlayItem& item,
     extra[3] = 0;
 }
 
+/// Segment `a` to `b` as pieces `emit(a, b, t0, t1)` (`t` the
+/// fraction along it), split where it passes `origin` (the frame's,
+/// near the eye) so that each piece's ends lie within `kReach` times
+/// its nearest point's distance from it (at least a metre). Float32,
+/// which the GPU draws in, keeps a point to a part in ten million of
+/// that distance, so a line as long as an orbit passing the eye
+/// would otherwise be drawn kilometres from where it is.
+template <typename Emit>
+void SplitNearOrigin(const glm::dvec3& a, const glm::dvec3& b,
+                     const glm::dvec3& origin, Emit&& emit) {
+    constexpr double kReach = 100.0;
+    const glm::dvec3 along = b - a;
+    const double length2 = glm::dot(along, along);
+    const auto point = [&](double t) { return a + t * along; };
+    const auto distance = [&](double t) {
+        return glm::length(point(t) - origin);
+    };
+    // Pieces [t0, t1] still to emit, in order.
+    std::vector<std::pair<double, double>> pending{{0.0, 1.0}};
+    std::vector<std::pair<double, double>> done;
+    while (!pending.empty()) {
+        const auto [t0, t1] = pending.back();
+        pending.pop_back();
+        // The piece's point nearest the origin.
+        const double nearest =
+            length2 > 0.0
+                ? std::clamp(glm::dot(origin - a, along) / length2,
+                             t0, t1)
+                : t0;
+        const double closest = std::max(distance(nearest), 1.0);
+        const double farthest = std::max(distance(t0), distance(t1));
+        const double span = (t1 - t0) * std::sqrt(length2);
+        if (farthest <= kReach * closest || span <= 1e-3 * closest) {
+            done.emplace_back(t0, t1);
+            continue;
+        }
+        if (nearest > t0 && nearest < t1) {
+            pending.emplace_back(nearest, t1);
+            pending.emplace_back(t0, nearest);
+            continue;
+        }
+        // Nearest at an end: a piece from it as long as half the
+        // reach, the rest split again.
+        const double step =
+            std::min(0.5 * kReach * closest / span, 0.5) * (t1 - t0);
+        if (nearest == t0) {
+            pending.emplace_back(t0 + step, t1);
+            pending.emplace_back(t0, t0 + step);
+        } else {
+            pending.emplace_back(t1 - step, t1);
+            pending.emplace_back(t0, t1 - step);
+        }
+    }
+    for (const auto& [t0, t1] : done) {
+        emit(point(t0), point(t1), t0, t1);
+    }
+}
+
 void Relative(float (&out)[4], const glm::dvec3& p,
               const glm::dvec3& origin, float w = 0.0f) {
     const glm::vec3 relative(p - origin);
@@ -519,15 +577,30 @@ void OverlayPass::BuildLayer(HostLayer& layer,
         return drawn;
     };
     for (const OverlaySegment& segment : overlay.Segments()) {
-        GpuSegment gpu;
         const glm::dvec3 from = originOf(segment.item);
-        Relative(gpu.a, segment.a, from, segment.width);
-        Relative(gpu.b, segment.b, from, segment.dash);
-        Info(gpu.info, shown(segment.item), MarkerShape::Square,
-             segment.item.anchor);
-        Extra(gpu.extra, segment.item, segment.endColor);
-        segments.emplace_back(GroupKey{false, segment.item.world},
-                              gpu);
+        const OverlayItem item = shown(segment.item);
+        SplitNearOrigin(
+            segment.a, segment.b, from,
+            [&](const glm::dvec3& a, const glm::dvec3& b, double t0,
+                double t1) {
+                GpuSegment gpu;
+                Relative(gpu.a, a, from, segment.width);
+                Relative(gpu.b, b, from, segment.dash);
+                OverlayItem piece = item;
+                std::optional<glm::vec4> end;
+                if (segment.endColor) {
+                    piece.color =
+                        glm::mix(item.color, *segment.endColor,
+                                 static_cast<float>(t0));
+                    end = glm::mix(item.color, *segment.endColor,
+                                   static_cast<float>(t1));
+                }
+                Info(gpu.info, piece, MarkerShape::Square,
+                     segment.item.anchor);
+                Extra(gpu.extra, segment.item, end);
+                segments.emplace_back(
+                    GroupKey{false, segment.item.world}, gpu);
+            });
     }
     for (const OverlayTriangle& triangle : overlay.Fills()) {
         GpuTriangle gpu;

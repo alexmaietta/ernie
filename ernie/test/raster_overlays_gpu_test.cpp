@@ -6,6 +6,7 @@
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/overlay.h"
 #include "ernie/scene/render_schemas.h"
+#include "ernie/scene/schema.h"
 #include "ernie/scene/sensor_filters.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
@@ -17,7 +18,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 using ernie::MarkerShape;
@@ -636,4 +639,50 @@ TEST_F(RasterDelegateTest, OverlaysDrawMarkersLabelsAndShapes) {
         << "the shaft";
     EXPECT_EQ(Rgb(scene, image, {0.0f, -7.0f, 0.0f}), glm::ivec3(255))
         << "the head";
+}
+
+// Lines as long as orbits, 1e11 m and more, pass close by an eye as
+// far from the world's origin: the white line 300 million km long
+// runs 50 m below the eye, 150 million km out, through the middle of
+// the image, as it would at the origin.
+TEST_F(RasterDelegateTest,
+       LinesAsLongAsOrbitsPassTheEyeWhereTheyAre) {
+    // At the origin a line 300 m long, then the orbit's.
+    for (const auto& [earth, length] :
+         {std::pair{glm::dvec3(0.0), 100.0},
+          std::pair{glm::dvec3(1.5e11, 0.0, 0.0), 1e11}}) {
+        RasterDelegate delegate(*context_);
+        Scene scene;
+        ernie::Camera::Define(scene, "/World/Camera")
+            .SetFocalLength(18.0)
+            .SetClippingRange(glm::dvec2(
+                0.1, std::numeric_limits<double>::infinity()))
+            .SetSensorNoise(false)
+            .SetTransform(
+                ernie::LookAtTransform(earth + glm::dvec3(0, 0, 50),
+                                       earth, {0.0, 1.0, 0.0}));
+        ernie::RenderSettings::Define(scene, "/Render/Settings")
+            .SetCamera(ernie::Path("/World/Camera"))
+            .SetResolution(glm::dvec2(kSize, kSize))
+            .SetClearColor(glm::dvec3(0.0))
+            .SetOverlays("*");
+        OverlayStyle style;
+        style.width = 3.0f;
+        style.depth = OverlayDepth::Always;
+        scene.GetOverlay("orbits").Line(
+            earth - glm::dvec3(length, 0, 0),
+            earth + glm::dvec3(2.0 * length, 0, 0), style);
+        const Tensor image = delegate.Render(scene);
+        const auto* pixels = image.As<std::uint8_t>();
+        const auto at = [&](std::uint32_t row, std::uint32_t col) {
+            return pixels[(row * kSize + col) * 4];
+        };
+        for (const std::uint32_t col : {4u, kSize / 2, kSize - 5}) {
+            EXPECT_GT(at(kSize / 2, col), 200u)
+                << "the line " << length << " m long at column "
+                << col;
+            EXPECT_LT(at(kSize / 4, col), 30u)
+                << "clear above it, column " << col;
+        }
+    }
 }
