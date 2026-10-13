@@ -932,7 +932,9 @@ class Importer {
             "velocities", "accelerations",    "xformOpOrder"};
         for (const auto& [source, path] : mapped_) {
             const UsdPrim prim = stage_->GetPrimAtPath(source);
-            if (!prim) {
+            // A SkelAnimation's samples come in as its arrays over
+            // `ernie:times` (UsdSkelAnimQuery).
+            if (!prim || prim.IsA<UsdSkelAnimation>()) {
                 continue;
             }
             for (const UsdAttribute& attribute :
