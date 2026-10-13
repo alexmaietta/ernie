@@ -293,6 +293,10 @@ Prim Scene::Define(const Path& path, std::string_view type) {
             removed_[path] = version_;
             dependentsStale_ = true;
             Stamp(path, prim, Dirty::Added);
+            // Its transform and visibility are gone from under its
+            // descendants too.
+            Stamp(path, prim, Dirty::Transform);
+            Stamp(path, prim, Dirty::Visibility);
         }
         if (!prim.type.empty()) {
             byType_[prim.type].erase(path);
@@ -747,17 +751,20 @@ glm::dmat4 Scene::LocalTransform(const Path& path) const {
 }
 
 glm::dmat4 Scene::WorldTransform(const Path& path) const {
-    glm::dmat4 world = LocalTransform(path);
-    if (ResetsXformStack(*this, path)) {
-        return world;
+    // Kept from the last call while nothing moved it: any transform
+    // above it stamps it too (`Stamp`).
+    const PrimData& prim = Find(path);
+    if (prim.worldAt != 0 &&
+        prim.worldAt >= prim.stamps[StampIndex(Dirty::Transform)]) {
+        return prim.world;
     }
-    for (Path parent = path.Parent(); !parent.IsEmpty();
-         parent = parent.Parent()) {
-        world = LocalTransform(parent) * world;
-        if (ResetsXformStack(*this, parent)) {
-            break;
-        }
+    glm::dmat4 world = ComposeXformOps(*this, path);
+    if (const Path parent = path.Parent();
+        !parent.IsEmpty() && !ResetsXformStack(*this, path)) {
+        world = WorldTransform(parent) * world;
     }
+    prim.world = world;
+    prim.worldAt = version_;
     return world;
 }
 
@@ -982,17 +989,20 @@ std::vector<Path> Scene::AnimatedPrims() const {
 }
 
 bool Scene::IsVisible(const Path& path) const {
-    Find(path);
-    for (Path p = path; !p.IsEmpty(); p = p.Parent()) {
-        const Value* visibility = Get(p, tokens::kVisibility);
-        const std::string* token =
-            visibility != nullptr ? visibility->Get<std::string>()
-                                  : nullptr;
-        if (token != nullptr && *token == tokens::kInvisible) {
-            return false;
-        }
+    // Kept as `WorldTransform` keeps its matrix.
+    const PrimData& prim = Find(path);
+    if (prim.visibleAt != 0 &&
+        prim.visibleAt >= prim.stamps[StampIndex(Dirty::Visibility)]) {
+        return prim.visible;
     }
-    return true;
+    const Value* visibility = Get(path, tokens::kVisibility);
+    const std::string* token =
+        visibility != nullptr ? visibility->Get<std::string>() : nullptr;
+    const Path parent = path.Parent();
+    prim.visible = !(token != nullptr && *token == tokens::kInvisible) &&
+                   (parent.IsEmpty() || IsVisible(parent));
+    prim.visibleAt = version_;
+    return prim.visible;
 }
 
 const std::map<Path, std::vector<std::pair<Path, Dirty>>>&

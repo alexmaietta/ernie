@@ -517,6 +517,14 @@ class Scene {
         std::uint64_t ownTransform = 0;  ///< `OwnTransformVersion`.
         std::uint64_t latest =
             0;  ///< Its latest stamp, its key in `stamped_`.
+        /// Its world transform and visibility as last found
+        /// (`WorldTransform`, `IsVisible`), and the version then: kept
+        /// while no transform or visibility of it or its ancestors
+        /// has been stamped since (a retype stamps both).
+        mutable glm::dmat4 world{1.0};
+        mutable std::uint64_t worldAt = 0;
+        mutable bool visible = true;
+        mutable std::uint64_t visibleAt = 0;
     };
 
     PrimData& Find(const Path& path);

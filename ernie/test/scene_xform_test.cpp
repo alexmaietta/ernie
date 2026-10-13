@@ -1130,3 +1130,31 @@ TEST(Xform, OpsTakePlainNumbers) {
     EXPECT_THROW(ops.scale = std::vector<double>({1.0, 2.0}),
                  std::invalid_argument);
 }
+
+TEST(Xform, WorldTransformsAndVisibilityFollowEveryChange) {
+    Scene scene;
+    scene.Define("/World/Arm/Hand", "Xform");
+    SetXform(scene, "/World/Arm/Hand", {.translate = {1, 0, 0}});
+    const auto x = [&] { return scene.WorldTransform("/World/Arm/Hand")[3][0]; };
+    EXPECT_DOUBLE_EQ(x(), 1.0);
+    EXPECT_DOUBLE_EQ(x(), 1.0) << "kept";
+    // An ancestor moved, then retyped (its ops gone), then sampled.
+    SetXform(scene, "/World", {.translate = {10, 0, 0}});
+    EXPECT_DOUBLE_EQ(x(), 11.0);
+    scene.Define("/World", "Scope");
+    EXPECT_DOUBLE_EQ(x(), 1.0);
+    scene.SetAt("/World/Arm", tokens::kTranslate, 0.0, glm::dvec3(0.0));
+    scene.SetAt("/World/Arm", tokens::kTranslate, 10.0,
+                glm::dvec3(20.0, 0.0, 0.0));
+    scene.Set("/World/Arm", tokens::kXformOpOrder,
+              std::vector<std::string>{std::string(tokens::kTranslate)});
+    EXPECT_DOUBLE_EQ(x(), 1.0);
+    scene.Set(Path::Root(), tokens::kTimeCode, 5.0);
+    EXPECT_DOUBLE_EQ(x(), 11.0);
+
+    EXPECT_TRUE(scene.IsVisible("/World/Arm/Hand"));
+    scene.Set("/World", tokens::kVisibility, tokens::kInvisible);
+    EXPECT_FALSE(scene.IsVisible("/World/Arm/Hand"));
+    scene.Set("/World", tokens::kVisibility, tokens::kInherited);
+    EXPECT_TRUE(scene.IsVisible("/World/Arm/Hand"));
+}
