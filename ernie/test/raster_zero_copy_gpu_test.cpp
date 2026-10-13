@@ -164,6 +164,42 @@ TEST_F(RasterDelegateTest,
         std::invalid_argument);
 }
 
+TEST_F(RasterDelegateTest, AMeshsPointsColumnMapsTheRenderersOwnArray) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene scene = MeshScene();
+    const std::vector<float> extent{-14.0f, -4.0f, -1.0f,
+                                    -10.0f, 4.0f,  1.0f};
+    scene.Set("/World/Quad", tokens::kExtent, extent);
+    delegate.Render(scene);
+
+    // The column's one row is the array the renderer draws from.
+    ernie::Column points = scene.GetColumn(
+        ernie::PrimSet({"/World/Quad"}), tokens::kPoints);
+    const Tensor rows = points.Map(cuda->Location());
+    EXPECT_EQ(rows.Shape(), (std::vector<std::int64_t>{1, 4, 3}));
+    EXPECT_EQ(scene.Read("/World/Quad", tokens::kPoints)->Data(),
+              rows.Data());
+    const std::vector<float> wideQuad{-3, -3, 0, 3,  -3, 0,
+                                      3,  3,  0, -3, 3,  0};
+    WriteInto(*cuda, rows, wideQuad);
+    points.Unmap();
+    // Read where it is, nothing to unmap.
+    EXPECT_EQ(points.Read(cuda->Location()).Data(), rows.Data());
+    const Tensor image = delegate.Render(scene);
+
+    Scene host = MeshScene();
+    host.Set("/World/Quad", tokens::kExtent, extent);
+    ernie::Mesh(host, "/World/Quad")
+        .SetPoints(Tensor::Copy<float>(wideQuad, {4, 3}));
+    RasterDelegate reference(*context_);
+    EXPECT_EQ(Differing(image, reference.Render(host)), 0u);
+}
+
 TEST_F(RasterDelegateTest, MappedHeightsDrawWhereDirtyWithoutCopies) {
     RasterDelegate delegate(*context_);
     std::string why;

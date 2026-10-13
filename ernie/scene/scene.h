@@ -235,6 +235,12 @@ class Column {
     /// @throws std::invalid_argument as `Scene::Write` of a `PrimSet`.
     void Write(const Tensor& rows, std::uintptr_t stream = 1);
 
+    /// Takes `values` as the prims' arrays of different lengths, one
+    /// after another (`Scene::Write` with counts), sharing its memory.
+    void WriteArrays(const Tensor& values,
+                     std::span<const std::int64_t> counts,
+                     std::uintptr_t stream = 1);
+
     /// The rows on `device` to write in place until `Unmap`: storage a
     /// consumer offers there (`ColumnStorage`), else the rows written
     /// last if they are there, else on the CPU the prims' values
@@ -249,6 +255,15 @@ class Column {
     /// The rows as they are, sharing the column's memory once written
     /// or mapped; before that, the prims' values gathered on the CPU.
     Tensor Read() const;
+
+    /// The rows on `device` to read, as `Map` would give them but
+    /// recording no change (nothing to `Unmap`): a simulation's state
+    /// read where it lives, a renderer's own storage included, without
+    /// the scene or its consumers seeing an edit. Writing into them is
+    /// not seen either.
+    /// @throws std::invalid_argument when the rows are not on `device`
+    /// (on the CPU, the prims' values are gathered).
+    Tensor Read(Device device) const;
 
   private:
     friend class Scene;
@@ -426,6 +441,19 @@ class Scene {
     /// @throws std::invalid_argument as the `Write` of many paths.
     void Write(const PrimSet& prims, std::string_view attribute,
                const Tensor& rows, std::uintptr_t stream = 1);
+
+    /// As the `Write` of a PrimSet, for arrays of different lengths
+    /// (meshes' points, of as many points as each has): `values` holds
+    /// them one after another, prim i's the `counts[i]` entries along
+    /// its first dimension after the prims' before it, each prim's
+    /// array a view of them. Written again with the same counts, one
+    /// change as rows are; other counts lay it out anew.
+    /// @throws std::invalid_argument if a prim does not exist, the
+    /// counts are not one per prim, or they do not add up to the
+    /// entries of `values`; nothing is written then.
+    void Write(const PrimSet& prims, std::string_view attribute,
+               const Tensor& values, std::span<const std::int64_t> counts,
+               std::uintptr_t stream = 1);
 
     /// The tensor `attribute` of the prim at `path` was written from
     /// as one row by the `Write` of many paths, and that row; null if
@@ -664,7 +692,14 @@ class Scene {
         std::pair<std::uint64_t, std::string> key;  ///< `columnOf_`'s.
         /// Its rows are storage a `ColumnStorage` offered.
         bool provided = false;
+        /// Of arrays of different lengths, prim i's entries of `rows`
+        /// from `offsets[i]` to `offsets[i + 1]`; empty for rows.
+        std::vector<std::int64_t> offsets;
     };
+    /// The `Write`s of a PrimSet: rows, or with `offsets` arrays.
+    void WriteColumn(const PrimSet& prims, std::string_view attribute,
+                     const Tensor& rows, std::vector<std::int64_t> offsets,
+                     std::uintptr_t stream);
     friend class Column;
     /// Gives `prims` its id (`PrimSet::id_`) if it has none.
     static void IdentifyPrimSet(const PrimSet& prims);

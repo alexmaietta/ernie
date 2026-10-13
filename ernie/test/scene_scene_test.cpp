@@ -414,6 +414,47 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
                     51.0f);
 }
 
+TEST(Scene, ColumnsOfArraysGiveEachPrimItsOwnLength) {
+    Scene scene;
+    scene.Define("/A", tokens::kMesh);
+    scene.Define("/B", tokens::kMesh);
+    ernie::Column points =
+        scene.GetColumn(ernie::PrimSet({"/A", "/B"}), tokens::kPoints);
+    // Three points for A, four for B, one after another.
+    std::vector<float> values(7 * 3);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        values[i] = static_cast<float>(i);
+    }
+    const std::vector<std::int64_t> counts{3, 4};
+    points.WriteArrays(Tensor::Copy<float>(values, {7, 3}), counts);
+    const Tensor* b = scene.Read("/B", tokens::kPoints);
+    ASSERT_NE(b, nullptr);
+    EXPECT_EQ(b->Shape(), (std::vector<std::int64_t>{4, 3}));
+    EXPECT_FLOAT_EQ(b->As<float>()[0], 9.0f);
+    EXPECT_EQ(scene.Read("/A", tokens::kPoints)->Shape()[0], 3);
+
+    // Written again alike: one column change, read through the views.
+    ChangeCursor cursor;
+    scene.Changes(cursor);
+    values[9] = 90.0f;
+    points.WriteArrays(Tensor::Copy<float>(values, {7, 3}), counts);
+    std::vector<ernie::ColumnChange> columns;
+    EXPECT_TRUE(scene.Changes(cursor, columns).empty());
+    EXPECT_EQ(columns.size(), 1u);
+    EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kPoints)->As<float>()[0],
+                    90.0f);
+
+    // Other lengths lay the column out anew.
+    const std::vector<std::int64_t> other{5, 2};
+    points.WriteArrays(Tensor::Copy<float>(values, {7, 3}), other);
+    EXPECT_EQ(scene.Read("/A", tokens::kPoints)->Shape()[0], 5);
+    EXPECT_EQ(scene.Read("/B", tokens::kPoints)->Shape()[0], 2);
+    const std::vector<std::int64_t> wrong{5, 5};
+    EXPECT_THROW(
+        points.WriteArrays(Tensor::Copy<float>(values, {7, 3}), wrong),
+        std::invalid_argument);
+}
+
 TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
     Scene scene;
     for (const char* path : {"/A", "/B"}) {
@@ -441,8 +482,17 @@ TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
     EXPECT_FLOAT_EQ(scene.Read("/A", tokens::kTranslate)->As<float>()[0],
                     10.0f);
     EXPECT_EQ(poses.Map(cpu).Data(), rows.Data()) << "mapped again";
+    poses.Unmap();
+    scene.Changes(cursor);
+    // Read where they are, the same rows, and no change.
+    EXPECT_EQ(poses.Read(cpu).Data(), rows.Data());
+    columns.clear();
+    EXPECT_TRUE(scene.Changes(cursor, columns).empty());
+    EXPECT_TRUE(columns.empty()) << "reading is no edit";
     // Nothing holds them on a GPU.
     EXPECT_THROW(poses.Map({ernie::DeviceKind::Cuda, 0}),
+                 std::invalid_argument);
+    EXPECT_THROW(poses.Read({ernie::DeviceKind::Cuda, 0}),
                  std::invalid_argument);
 
     // A consumer's storage, used once offered and asked for no more.

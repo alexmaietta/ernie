@@ -304,9 +304,17 @@ void Scene::Refresh(const PrimData& prim,
             map.emplace(std::string(attribute), std::move(value));
         }
     };
-    assign(prim.tensors, column.rows.Row(row));
     assign(prim.streams, column.stream);
-    assign(prim.rows, std::pair(column.rows, row));
+    if (column.offsets.empty()) {
+        assign(prim.tensors, column.rows.Row(row));
+        assign(prim.rows, std::pair(column.rows, row));
+    } else {
+        const auto first = static_cast<std::size_t>(row);
+        assign(prim.tensors,
+               column.rows.Slice(column.offsets[first],
+                                 column.offsets[first + 1] -
+                                     column.offsets[first]));
+    }
     bound->second.seen = column.version;
 }
 
@@ -746,6 +754,44 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
         throw std::invalid_argument(
             "Scene::Write needs one tensor row per path");
     }
+    WriteColumn(prims, attribute, rows, {}, stream);
+}
+
+void Scene::Write(const PrimSet& prims, std::string_view attribute,
+                  const Tensor& values,
+                  std::span<const std::int64_t> counts,
+                  std::uintptr_t stream) {
+    ERNIE_ZONE("Scene write arrays");
+    if (counts.size() != prims.Size()) {
+        throw std::invalid_argument(
+            "Scene::Write of arrays needs one count per path");
+    }
+    std::vector<std::int64_t> offsets{0};
+    for (const std::int64_t count : counts) {
+        if (count < 0) {
+            throw std::invalid_argument(
+                "Scene::Write of arrays needs counts of 0 or more");
+        }
+        offsets.push_back(offsets.back() + count);
+    }
+    if (values.Rank() == 0 || values.Shape()[0] != offsets.back()) {
+        throw std::invalid_argument(
+            "Scene::Write of arrays needs the counts to add up to the "
+            "values' entries");
+    }
+    WriteColumn(prims, attribute, values, std::move(offsets), stream);
+}
+
+void Scene::WriteColumn(const PrimSet& prims, std::string_view attribute,
+                        const Tensor& rows,
+                        std::vector<std::int64_t> offsets,
+                        std::uintptr_t stream) {
+    // Laid out anew: arrays of other lengths than the column's, or
+    // rows in place of arrays.
+    if (const ColumnData* column = ColumnOf(prims, attribute);
+        column != nullptr && column->offsets != offsets) {
+        BreakColumn(columnOf_.at(column->key));
+    }
     // The same prims' column again: replaced whole, its prims' rows
     // taken when read (`Refresh`), the change one `ColumnChange`.
     if (ColumnData* column = ColumnOf(prims, attribute)) {
@@ -784,10 +830,20 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
     }
     for (std::size_t i = 0; i < prims.Size(); ++i) {
         const auto row = static_cast<std::int64_t>(i);
-        WriteTensor(prims.Paths()[i],
-                    *static_cast<PrimData*>(prims.prims_[i]),
-                    attribute, rows.Row(row), stream,
-                    std::pair(rows, row), true);
+        // An array is a prim's own entries, not a row a consumer may
+        // take with the others (`RowOf`).
+        if (offsets.empty()) {
+            WriteTensor(prims.Paths()[i],
+                        *static_cast<PrimData*>(prims.prims_[i]),
+                        attribute, rows.Row(row), stream,
+                        std::pair(rows, row), true);
+        } else {
+            WriteTensor(prims.Paths()[i],
+                        *static_cast<PrimData*>(prims.prims_[i]),
+                        attribute,
+                        rows.Slice(offsets[i], offsets[i + 1] - offsets[i]),
+                        stream, std::nullopt, true);
+        }
     }
     // From now one column, which the next write of the same prims
     // replaces whole (and `Unmap` of them marks changed whole).
@@ -803,6 +859,7 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
     column.version = version_;
     column.boundAt = version_;
     column.key = {prims.id_, std::string(attribute)};
+    column.offsets = std::move(offsets);
     for (std::size_t i = 0; i < prims.Size(); ++i) {
         static_cast<PrimData*>(prims.prims_[i])
             ->bound.insert_or_assign(
@@ -909,6 +966,12 @@ void Column::Write(const Tensor& rows, std::uintptr_t stream) {
     scene_->Write(prims_, attribute_, rows, stream);
 }
 
+void Column::WriteArrays(const Tensor& values,
+                         std::span<const std::int64_t> counts,
+                         std::uintptr_t stream) {
+    scene_->Write(prims_, attribute_, values, counts, stream);
+}
+
 Tensor Column::Map(Device device, std::uintptr_t stream) {
     Scene& scene = *scene_;
     const auto held = [&]() -> const Tensor* {
@@ -962,6 +1025,23 @@ Tensor Column::Read() const {
         return data->rows;
     }
     return scene_->GatherRows(prims_, attribute_);
+}
+
+Tensor Column::Read(Device device) const {
+    if (const Scene::ColumnData* data =
+            std::as_const(*scene_).ColumnOf(prims_, attribute_);
+        data != nullptr && data->rows.Location() == device) {
+        return data->rows;
+    }
+    if (device.kind == DeviceKind::Cpu) {
+        const Tensor rows = Read();
+        if (rows.Location() == device) {
+            return rows;
+        }
+    }
+    throw std::invalid_argument(
+        "The rows of " + attribute_ +
+        " are not on that device: map or write them there first");
 }
 
 const std::pair<Tensor, std::int64_t>*

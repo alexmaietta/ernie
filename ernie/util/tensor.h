@@ -130,6 +130,12 @@ class Tensor {
     /// the entries are out of range.
     Tensor Slice(std::int64_t first, std::int64_t count) const;
 
+    /// This contiguous tensor's memory viewed with `shape`, of as many
+    /// elements, on any device, sharing its owner.
+    /// @throws std::invalid_argument if it is not contiguous or the
+    /// element counts differ.
+    Tensor Reshaped(std::vector<std::int64_t> shape) const;
+
     bool IsContiguous() const;
 
     /// A contiguous, owning CPU copy, or this tensor itself when it

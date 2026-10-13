@@ -632,6 +632,20 @@ class DelegateColumns final : public ColumnStorage {
                         true};
         } catch (const std::invalid_argument&) {
         }
+        // One prim's array (a mesh's points, an instancer's positions,
+        // a terrain's heights) as the column's one row: the arrays it
+        // draws from, which alternate between frames, so asked for
+        // each time.
+        if (prims.Size() == 1) {
+            try {
+                const Tensor array = delegate_.MapArray(
+                    scene, prims.Paths().front(), attribute, stream);
+                std::vector<std::int64_t> shape = array.Shape();
+                shape.insert(shape.begin(), 1);
+                return Rows{array.Reshaped(std::move(shape)), false};
+            } catch (const std::invalid_argument&) {
+            }
+        }
         try {
             const Tensor host = scene.GetColumn(prims, attribute).Read();
             if (host.Location().kind != DeviceKind::Cpu) {

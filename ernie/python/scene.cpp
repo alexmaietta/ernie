@@ -1797,6 +1797,20 @@ void BindScene(nb::module_& m) {
             "attribute without copying; for a CUDA array, `stream` is "
             "the one its contents are written on.")
         .def(
+            "write_arrays",
+            [](Column& column, const AnyArray& values,
+               const std::vector<std::int64_t>& counts,
+               nb::handle stream) {
+                column.WriteArrays(TensorFromArray(values), counts,
+                                   StreamOf(stream));
+            },
+            nb::arg("values"), nb::arg("counts"),
+            nb::arg("stream").none() = nb::none(),
+            "Takes `values` as the prims' arrays of different lengths "
+            "(meshes' points, say), one after another: prim i's the "
+            "`counts[i]` entries after the prims' before it, each a "
+            "view of them, without copying.")
+        .def(
             "map",
             [](nb::handle self, std::string_view device,
                nb::handle stream) {
@@ -1826,11 +1840,18 @@ void BindScene(nb::module_& m) {
             "queued on `stream`.")
         .def(
             "read",
-            [](const Column& column) {
-                return ArrayFromTensor(column.Read());
+            [](const Column& column,
+               std::optional<std::string_view> device) {
+                return ArrayFromTensor(
+                    device ? column.Read(DeviceFromName(*device))
+                           : column.Read());
             },
+            nb::arg("device").none() = nb::none(),
             "The rows as they are, without copying once written or "
-            "mapped.");
+            "mapped; on `device` (\"cpu\", \"cuda\"), where they live "
+            "there, the renderer's own storage included. Reading is no "
+            "change: nothing to unmap, and writes into the array go "
+            "unseen.");
 
     nb::class_<Scene>(
         m, "Scene",

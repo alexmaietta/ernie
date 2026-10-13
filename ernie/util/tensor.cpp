@@ -258,6 +258,19 @@ Tensor Tensor::Slice(std::int64_t first, std::int64_t count) const {
                   owner_);
 }
 
+Tensor Tensor::Reshaped(std::vector<std::int64_t> shape) const {
+    std::int64_t elements = 1;
+    for (const std::int64_t extent : shape) {
+        elements *= extent;
+    }
+    if (!IsContiguous() || elements != Elements()) {
+        throw std::invalid_argument(
+            "Tensor::Reshaped needs a contiguous tensor of as many "
+            "elements");
+    }
+    return Tensor(data_, type_, std::move(shape), {}, device_, owner_);
+}
+
 bool Tensor::IsContiguous() const {
     return strides_ == RowMajor(shape_) || Elements() <= 1;
 }

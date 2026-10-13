@@ -110,3 +110,26 @@ def test_column_writes_come_as_one_column_change():
     expanded = scene.expand_columns(changes, columns)
     assert [str(p) for p, _ in expanded] == ["/A", "/B"]
     assert all(bits & ernie.Dirty.TRANSFORM for _, bits in expanded)
+
+
+def test_columns_read_without_a_change_and_hold_arrays_of_any_length():
+    scene = ernie.Scene()
+    for path in ("/A", "/B"):
+        scene.define(path, "Xform").set_xform(translate=(0.0, 0.0, 0.0))
+    poses = scene.column(ernie.PrimSet(["/A", "/B"]), tokens.TRANSLATE)
+    poses.write(np.ones((2, 3), np.float32))
+    cursor = ernie.ChangeCursor()
+    scene.changes(cursor)
+    np.testing.assert_array_equal(poses.read("cpu"), np.ones((2, 3)))
+    assert scene.column_changes(cursor) == ([], [])
+    with pytest.raises(ValueError):
+        poses.read("cuda")
+
+    for path in ("/M", "/N"):
+        scene.define(path, ernie.Mesh)
+    points = scene.column(ernie.PrimSet(["/M", "/N"]), tokens.POINTS)
+    values = np.arange(15, dtype=np.float32).reshape(5, 3)
+    points.write_arrays(values, [2, 3])
+    np.testing.assert_array_equal(
+        np.asarray(scene.read("/N", tokens.POINTS)), values[2:]
+    )
