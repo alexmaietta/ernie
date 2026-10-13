@@ -3265,21 +3265,27 @@ void MeshDrawable::Prepare(const FrameParams& params,
     }
     // Cutout materials draw with their own pipelines, compiled the
     // first time one appears.
-    bool cutout = false;
-    for (std::size_t i = 0; i < items_.size() && !cutout; ++i) {
-        cutout = Cutout(i);
+    // What the items' materials ask (cutout, transparent, tangents),
+    // found again only when the items or the materials change.
+    const std::uint64_t materials = renderer_.MaterialsVersion();
+    const bool scan = scannedLayout_ != layoutVersion_ ||
+                      scannedMaterials_ != materials;
+    if (scan) {
+        ERNIE_ZONE("Mesh scan materials");
+        scannedLayout_ = layoutVersion_;
+        scannedMaterials_ = materials;
+        anyCutout_ = false;
+        anyTransparent_ = false;
+        for (std::size_t i = 0; i < items_.size(); ++i) {
+            anyCutout_ = anyCutout_ || Cutout(i);
+            anyTransparent_ = anyTransparent_ || Transparent(i);
+        }
     }
-    if (cutout) {
+    if (anyCutout_) {
         CreateCutoutPipelines(pushbroom);
     }
     // Transparent materials draw in their own phase, when shaded.
-    drawsTransparent_ = false;
-    for (std::size_t i = 0;
-         i < items_.size() && minimal_ == MinimalMode::Off &&
-         !drawsTransparent_;
-         ++i) {
-        drawsTransparent_ = Transparent(i);
-    }
+    drawsTransparent_ = anyTransparent_ && minimal_ == MinimalMode::Off;
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
@@ -3290,7 +3296,7 @@ void MeshDrawable::Prepare(const FrameParams& params,
     }
     // Meshes an anisotropic material shades take smooth tangents,
     // made with the geometry when that changes.
-    {
+    if (scan) {
         std::set<std::uint32_t> wanted;
         for (const MeshItem& item : items_) {
             if (renderer_.MaterialReadsTangents(item.material)) {

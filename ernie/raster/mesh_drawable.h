@@ -1379,6 +1379,12 @@ class MeshDrawable : public RasterDrawable {
     /// `GpuCullItem`s), for `PatchInstanceBases`.
     std::vector<std::byte> drawBytes_;
     std::vector<std::byte> cullItemBytes_;
+    /// What the items' materials ask, as `Prepare` last found it, and
+    /// the layout and materials it found it for.
+    std::uint64_t scannedLayout_ = ~0ull;
+    std::uint64_t scannedMaterials_ = ~0ull;
+    bool anyCutout_ = false;
+    bool anyTransparent_ = false;
     /// Items moved, retinted or reheated with the layout kept
     /// (`SetItems`), or settled (`SettleMotion`): patched at the next
     /// `Prepare`.

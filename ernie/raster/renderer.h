@@ -279,6 +279,13 @@ class RasterRenderer {
         return materialSetVersion_;
     }
 
+    /// Counts every change of materials, their settings included
+    /// (`SetMaterial`), so drawables that read them (cutout,
+    /// transparent, tangents) know when to again.
+    std::uint64_t MaterialsVersion() const {
+        return materialsVersion_;
+    }
+
     /// The material drawables should use for `id`: that material, or
     /// the default one if it is gone.
     const RasterMaterial& MaterialOrDefault(std::uint32_t id) const;
@@ -1006,6 +1013,7 @@ class RasterRenderer {
         materials_;
     std::uint32_t nextMaterial_ = 1;
     std::uint64_t materialSetVersion_ = 0;
+    std::uint64_t materialsVersion_ = 0;  ///< `MaterialsVersion`.
     std::uint64_t frames_ = 0;         ///< `BeginFrame`s so far.
     glm::dvec3 materialsOrigin_{0.0};  ///< The origin the materials'
                                        ///< uniforms are relative to.

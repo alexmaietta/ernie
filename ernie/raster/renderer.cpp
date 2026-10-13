@@ -2311,12 +2311,14 @@ RasterRenderer::AddMaterial(const MaterialSettings& settings) {
         id, std::make_unique<RasterMaterial>(context_, uploads_));
     materials_.at(id)->SetOrigin(materialsOrigin_);
     ++materialSetVersion_;
+    ++materialsVersion_;
     SetMaterial(id, settings);
     return id;
 }
 
 void RasterRenderer::SetMaterial(std::uint32_t id,
                                  const MaterialSettings& settings) {
+    ++materialsVersion_;
     const BrdfModel* model = brdfs_.Find(settings.brdf);
     if (model == nullptr) {
         throw std::invalid_argument("Unknown BRDF: " + settings.brdf);
@@ -2382,6 +2384,7 @@ void RasterRenderer::RemoveMaterial(std::uint32_t id) {
                                     std::to_string(id));
     }
     ++materialSetVersion_;
+    ++materialsVersion_;
     vkDeviceWaitIdle(context_.Device());
     materials_.erase(it);
     temperatureAxes_.erase(id);
@@ -4485,6 +4488,9 @@ void RasterRenderer::WriteMaterialTable() {
     // none) until the buffer is made.
     std::vector<float> extended;
     modelFeatures_.assign(registered.size(), 0u);
+    // Flags drawables read: changed, their `MaterialsVersion` moves.
+    const auto wasTransparent = std::move(transparentMaterials_);
+    const auto wasTangents = std::move(tangentMaterials_);
     transparentMaterials_.assign(count, false);
     tangentMaterials_.assign(count, false);
     for (const auto& [id, material] : materials_) {
@@ -4771,6 +4777,10 @@ void RasterRenderer::WriteMaterialTable() {
                                  (entry.extended - 1) * sizeof(float);
             }
         }
+    }
+    if (transparentMaterials_ != wasTransparent ||
+        tangentMaterials_ != wasTangents) {
+        ++materialsVersion_;
     }
     const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
     if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
