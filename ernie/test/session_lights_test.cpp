@@ -214,7 +214,7 @@ glm::vec3 Evaluate(const std::array<glm::vec3, 9>& sh,
                             1.092548f * n.x * n.z,
                             0.546274f * (n.x * n.x - n.y * n.y)};
     glm::vec3 sum(0.0f);
-    for (int k = 0; k < 9; ++k) {
+    for (std::size_t k = 0; k < 9; ++k) {
         sum += sh[k] * basis[k];
     }
     return sum;
@@ -880,7 +880,8 @@ TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {
     // All its power in the 530-555 nm band, as W/nm.
     double total = 0.0;
     for (int i = 0; i < bands.count; ++i) {
-        total += params.spectrum[static_cast<std::size_t>(i)] *
+        total += static_cast<double>(
+                     params.spectrum[static_cast<std::size_t>(i)]) *
                  bands.Width();
     }
     EXPECT_NEAR(total, 0.005, 1e-8);
@@ -901,8 +902,8 @@ TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {
     laser.SetWavelength(530.0).SetLinewidth(2.0);
     const std::vector<float> split =
         ernie::LightParamsOf(scene, "/Laser", bands).spectrum;
-    EXPECT_NEAR(split[5] * 25.0, 0.0025, 1e-7);
-    EXPECT_NEAR(split[6] * 25.0, 0.0025, 1e-7);
+    EXPECT_NEAR(static_cast<double>(split[5]) * 25.0, 0.0025, 1e-7);
+    EXPECT_NEAR(static_cast<double>(split[6]) * 25.0, 0.0025, 1e-7);
 
     // An aperture as wide as the beam there (1/e^2 radii 1 and 2 mm
     // at the waist, which here is the aperture) passes
@@ -911,7 +912,7 @@ TEST(LightParamsOf, LasersCarryTheirBeamAndLine) {
         std::sqrt(0.001 * 0.002));
     const std::vector<float> clipped =
         ernie::LightParamsOf(scene, "/Laser", bands).spectrum;
-    EXPECT_NEAR((clipped[5] + clipped[6]) * 25.0,
+    EXPECT_NEAR(static_cast<double>(clipped[5] + clipped[6]) * 25.0,
                 0.005 * (1.0 - std::exp(-2.0)), 1e-7);
     EXPECT_EQ(ernie::ResolveRenderPrims(scene, {}).lights,
               std::vector<Path>{Path("/Laser")});
@@ -1028,10 +1029,11 @@ TEST(LightParamsOf, IlluminantsShapeTheSpectrum) {
     EXPECT_NEAR(white.x, 1.0 / 3.0, 0.005)
         << "flat: the equal-energy point";
     sun.SetColorTemperature(6504.0);
-    const glm::dvec2 daylight =
+    // Not "daylight", which <time.h> declares.
+    const glm::dvec2 d65 =
         Chromaticity(shape(tokens::kIlluminantD), bands);
-    EXPECT_NEAR(daylight.x, 0.3127, 0.005);
-    EXPECT_NEAR(daylight.y, 0.3290, 0.005);
+    EXPECT_NEAR(d65.x, 0.3127, 0.005);
+    EXPECT_NEAR(d65.y, 0.3290, 0.005);
     sun.SetColorTemperature(3000.0);
     const glm::dvec2 warm =
         Chromaticity(shape(tokens::kBlackbody), bands);

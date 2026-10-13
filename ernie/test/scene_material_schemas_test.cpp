@@ -35,20 +35,27 @@ TEST(MaterialSchemas, MaterialFallbacksMatchMaterialSettings) {
     EXPECT_EQ(material.GetAlbedoMapCellSize(), 1.0);
     EXPECT_EQ(material.GetDetailAlbedo(), nullptr);
     EXPECT_EQ(material.GetDetailNormal(), nullptr);
-    EXPECT_FLOAT_EQ(material.GetDetailTileSize(), detail.tileSize);
-    EXPECT_FLOAT_EQ(material.GetDetailAlbedoStrength(),
-                    detail.albedoStrength);
-    EXPECT_FLOAT_EQ(material.GetDetailNormalStrength(),
-                    detail.normalStrength);
+    // The schema's doubles as the settings' floats.
+    EXPECT_FLOAT_EQ(static_cast<float>(material.GetDetailTileSize()),
+                    detail.tileSize);
+    EXPECT_FLOAT_EQ(
+        static_cast<float>(material.GetDetailAlbedoStrength()),
+        detail.albedoStrength);
+    EXPECT_FLOAT_EQ(
+        static_cast<float>(material.GetDetailNormalStrength()),
+        detail.normalStrength);
     EXPECT_EQ(material.GetDetailDirectxNormals(),
               detail.directXNormals);
     EXPECT_EQ(material.GetDetailHexTiling(), detail.hexTiling);
-    EXPECT_FLOAT_EQ(material.GetDetailHexRotation(),
-                    detail.hexRotation);
-    EXPECT_FLOAT_EQ(material.GetDetailHexContrast(),
-                    detail.hexContrast);
-    EXPECT_FLOAT_EQ(material.GetDetailHexSharpness(),
-                    detail.hexSharpness);
+    EXPECT_FLOAT_EQ(
+        static_cast<float>(material.GetDetailHexRotation()),
+        detail.hexRotation);
+    EXPECT_FLOAT_EQ(
+        static_cast<float>(material.GetDetailHexContrast()),
+        detail.hexContrast);
+    EXPECT_FLOAT_EQ(
+        static_cast<float>(material.GetDetailHexSharpness()),
+        detail.hexSharpness);
     EXPECT_FALSE(material.HasBrdf());
 }
 
@@ -88,9 +95,10 @@ TEST(MaterialSchemas,
         }
     }
     const glm::dvec3 specular = shader.GetSpecularColor();
-    for (int c = 0; c < 3; ++c) {
-        EXPECT_FLOAT_EQ(static_cast<float>(specular[c]),
-                        model->params[4 + c].defaultValue);
+    for (std::size_t c = 0; c < 3; ++c) {
+        EXPECT_FLOAT_EQ(
+            static_cast<float>(specular[static_cast<int>(c)]),
+            model->params[4 + c].defaultValue);
     }
     // A texture's.
     const ernie::TextureReader reader;

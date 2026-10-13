@@ -201,7 +201,8 @@ TEST(IsdLineScanner, StripsFitDecentringOnAndOffTheLine) {
         glm::transpose(glm::dmat3(strip.from));
     double off = 0.0;
     for (int i = 0; i <= 16; ++i) {
-        const double sample = scanner.Isd().samples * i / 16.0;
+        const double sample =
+            static_cast<double>(scanner.Isd().samples) * i / 16.0;
         // The ISD's ray at the strip's first pose, in the camera's
         // frame, facing the scene.
         glm::dvec3 ray = toCamera * scanner.Look(1000.0, sample);

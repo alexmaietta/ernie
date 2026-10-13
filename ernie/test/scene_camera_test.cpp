@@ -196,7 +196,7 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
     EXPECT_FALSE(CameraParams().RasterView().IsOrthographic());
     // The axis lands on the principal point at every depth, and a
     // pixel is 0.04 units.
-    for (const double depth : {2.0, 9.0}) {
+    for (const float depth : {2.0f, 9.0f}) {
         const glm::vec4 clip =
             view.ViewProjection() *
             glm::vec4(1.0f, 2.0f, 10.0f - depth, 1.0f);
@@ -205,7 +205,7 @@ TEST(Camera, OrthographicSpansItsAperturesInTheScene) {
         EXPECT_NEAR((1.0f - clip.y) * 50.0f, 40.0f, 1e-4f);
         // Reverse-Z: 1 at the near plane, 0 at the far.
         EXPECT_NEAR(clip.z,
-                    (camera.farPlane - depth) /
+                    (camera.farPlane - static_cast<double>(depth)) /
                         (camera.farPlane - camera.nearPlane),
                     1e-6);
     }
@@ -384,8 +384,8 @@ TEST(Camera, PoseGivesTheEyeForwardAndRasterView) {
     EXPECT_NEAR(ahead.y / ahead.w, 0.0f, 1e-5f);
 
     const ernie::CameraView wide = camera.RasterView(1.5);
-    EXPECT_NEAR(std::tan(wide.verticalFov / 2.0),
-                1.5 * std::tan(plain.verticalFov / 2.0), 1e-5);
+    EXPECT_NEAR(std::tan(wide.verticalFov / 2.0f),
+                1.5f * std::tan(plain.verticalFov / 2.0f), 1e-5f);
     camera.horizontalApertureOffsetMm = 2.0;
     const ernie::CameraView shifted = camera.RasterView();
     EXPECT_NEAR(shifted.projection[2][0],

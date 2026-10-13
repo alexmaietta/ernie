@@ -67,18 +67,20 @@ enum class AttributeKind {
 };
 
 /// How an attribute is described and edited. Declared with designated
-/// initializers in this order.
+/// initializers in this order; every member has a default
+/// initializer, so those naming only some draw no
+/// -Wmissing-field-initializers.
 struct AttributeMeta {
-    std::string_view label;  ///< For panels; derived from the name
-                             ///< ("Color temperature") if empty.
-    std::string_view doc;
+    std::string_view label{};  ///< For panels; derived from the name
+                               ///< ("Color temperature") if empty.
+    std::string_view doc{};
     std::string_view
-        group;  ///< The panel section, such as "Light" or "Shape".
+        group{};  ///< The panel section, such as "Light" or "Shape".
     double min = 0.0;  ///< Edit limits; none when equal.
     double max = 0.0;
     std::vector<std::string_view>
-        options;  ///< A token's choices, or a relationship's target
-                  ///< type.
+        options{};  ///< A token's choices, or a relationship's target
+                    ///< type.
     bool color =
         false;  ///< A `Vec3` (`Vec4`) that is linear RGB (RGBA).
     bool asset = false;  ///< A `Token` that is a file path.
@@ -91,11 +93,11 @@ struct AttributeMeta {
     bool lenient = false;
     /// What changing it stamps (`DirtyOf`): `Dirty::Points` for bulk
     /// positions, say. Unset, any other edit (`Dirty::Params`).
-    std::optional<Dirty> dirty;
+    std::optional<Dirty> dirty{};
     /// For a list of targets usually holding one (a product's camera,
     /// or a batch's cameras): the plural name Python reads the list
     /// by, its own name then reading the first target alone.
-    std::string_view plural;
+    std::string_view plural{};
     /// It also takes an array written in place of its value
     /// (`Scene::Write`): colours per vertex for one `displayColor`, a
     /// width per point, a pose per prim for a transform op. Scene
