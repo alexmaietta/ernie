@@ -64,11 +64,15 @@ static_assert(offsetof(Uniforms, forward) == 64 &&
                   offsetof(Uniforms, flags) == 96,
               "minimal_resolve.slang reads these offsets");
 
+/// Room for every cascade (`RasterRenderer::kMaxCascades`) in
+/// `ShadowUniforms`, in whole float4s.
+constexpr std::size_t kShadowSlots = 12;
+
 struct ShadowUniforms {
-    float lightViewProjection[4][16];
-    float splits[4];
-    float texelWorld[4];
-    float depthWorld[4];
+    float lightViewProjection[kShadowSlots][16];
+    float splits[kShadowSlots];
+    float texelWorld[kShadowSlots];
+    float depthWorld[kShadowSlots];
     float params[4];
     /// Minimal shading's main light's maps: the first's layer, the
     /// share of a layer they take, how many, and 1 with maps.
@@ -79,8 +83,10 @@ struct ShadowUniforms {
     /// unit of slope, the largest slope, 1 with one.
     float casterBias[4];
 };
-static_assert(sizeof(ShadowUniforms) == 496,
+static_assert(sizeof(ShadowUniforms) == 1104,
               "ShadowUniforms must match frame.slang");
+static_assert(RasterRenderer::kMaxCascades <= kShadowSlots,
+              "ShadowUniforms holds every cascade");
 
 struct ShadingUniforms {
     float invViewProj[16];
@@ -2720,11 +2726,17 @@ void RasterRenderer::WriteLights(
                 entry.shadow[0] = views.front().texelWorldSize;
                 // Cascades: where each starts and ends along the
                 // view, which shading picks and fades between them by
-                // (shading.slang's `cascadeAt`).
+                // (shading.slang's `cascadeAt`), their ends in
+                // `patternParams`, a distant light having no pattern.
                 if (cascaded) {
-                    for (std::size_t c = 0; c < views.size() && c < 4;
+                    static_assert(
+                        kMaxCascades <=
+                        std::size(LightGpu{}.patternParams));
+                    for (std::size_t c = 0;
+                         c < views.size() &&
+                         c < static_cast<std::size_t>(kMaxCascades);
                          ++c) {
-                        entry.beam[c] = views[c].splitFar;
+                        entry.patternParams[c] = views[c].splitFar;
                     }
                     entry.beamExtra[0] = views.front().splitNear;
                 }
@@ -2809,8 +2821,7 @@ void RasterRenderer::WriteLights(
                         atmospherePlanet_ =
                             params.atmosphere->planetCentre;
                     }
-                    const Bounds3 receivers =
-                        LongRangeReceivers(params);
+                    const Bounds3& receivers = cascadeFit_->receivers;
                     if (std::optional<ShadowCascade> far =
                             FitLongRangeView(
                                 receivers.first, receivers.second,
@@ -3629,6 +3640,8 @@ void RasterRenderer::Update(
         // This slot's last frame has finished: its depths seen count.
         ReadDepthRange(uploads_.Slot());
         cascadeFit_->distance = FitCascadeDistance(params);
+        cascadeFit_->start = FitCascadeStart(params);
+        cascadeFit_->receivers = LongRangeReceivers(params);
     }
     // A batch's per-world maps of its distant lights, at the
     // resolution of its worlds' maps: the worlds of its views, and
@@ -6292,9 +6305,35 @@ RasterRenderer::FitViewCascades(const glm::vec3& towards,
     const CascadeFit& fit = *cascadeFit_;
     const auto [low, high] =
         WithShadows(fit.casterLow, fit.casterHigh, towards);
-    return FitCascades(fit.view, fit.distance, towards, low, high,
-                       fit.count, fit.exponent, resolution,
-                       fit.around, context_.SupportsDepthClamp());
+    // Their casters on to where the long-range view's begin.
+    return FitCascades(
+        fit.view, fit.distance, towards, low, high, fit.count,
+        fit.exponent, resolution, fit.around,
+        context_.SupportsDepthClamp(), fit.start,
+        LongRangeCastersEnd(fit.receivers.first, fit.receivers.second,
+                            towards));
+}
+
+float RasterRenderer::FitCascadeStart(
+    const FrameParams& params) const {
+    const CascadeFit& fit = *cascadeFit_;
+    // As the distance's (`FitCascadeDistance`): a recent frame of
+    // this stream from about this pose, a tenth short of its nearest.
+    if (!seen_ || seen_->pose.stream != params.stream ||
+        glm::dot(fit.view.forward, seen_->pose.forward) <
+            kVisibleFitTurn ||
+        glm::length(glm::dvec3(params.camera.transform[3]) -
+                    seen_->pose.eye) >
+            kVisibleFitEyeShift *
+                static_cast<double>(seen_->nearest)) {
+        return 0.0f;
+    }
+    // Volumes write no depth: theirs may lie nearer.
+    if (volumes_->Bounds()) {
+        return 0.0f;
+    }
+    const float nearest = 0.9f * seen_->nearest;
+    return nearest > kNearCascadesReach ? nearest : 0.0f;
 }
 
 float RasterRenderer::FitCascadeDistance(
@@ -6349,15 +6388,12 @@ float RasterRenderer::FitCascadeDistance(
         }
         farthest = std::min(farthest, 1.1f * seenFar);
     }
-    // No farther than a set distance, as Unreal's
-    // DynamicShadowDistance, beyond which nothing is shadowed; nor
-    // than the casters the cascades hold reach, a moon in view
-    // aside, which the long-range view shadows by
-    // (`kLongRangeStart`).
+    // No farther than a set distance, beyond which nothing is
+    // shadowed; however far otherwise, far cascades going on past the
+    // near ones (`FullRangeSplits`).
     if (params.shadows.distance > 0.0f) {
         farthest = std::min(farthest, params.shadows.distance);
     }
-    farthest = std::min(farthest, kLongRangeStart);
     // A margin keeps surfaces at exactly the farthest depth, such as
     // flat ground under a nadir camera, inside the last cascade.
     return std::clamp(1.01f * farthest, view.nearPlane * 1.01f,

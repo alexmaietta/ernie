@@ -753,7 +753,7 @@ void PlanetDrawable::Prepare(
         // every patch: its matrix here is only an estimate, or one of
         // its sub-frames'.
         const Frustum light = Rotated(
-            Shifted(Frustum::FromMatrix(cascade.lightViewProjection),
+            Shifted(Frustum::FromMatrix(cascade.CullViewProjection()),
                     -eye),
             toBody);
         const bool culls = !cascade.moving && !cascade.gpuFitted;

@@ -70,6 +70,42 @@ std::vector<float> CascadeSplits(float nearPlane, float farPlane,
     return splits;
 }
 
+std::vector<float> FullRangeSplits(float start, float end, int count,
+                                   float exponent, int maxCount) {
+    maxCount = std::max(maxCount, 1);
+    count = std::clamp(count, 1, maxCount);
+    const float nearEnd = std::min(end, kNearCascadesReach);
+    std::vector<float> splits;
+    float from = start;
+    if (start * kFarCascadeRatio < nearEnd) {
+        splits = CascadeSplits(start, nearEnd, count, exponent);
+        from = nearEnd;
+    } else {
+        splits = {start};
+    }
+    if (!(end > from)) {
+        return splits;
+    }
+    const int near = static_cast<int>(splits.size()) - 1;
+    if (near >= maxCount) {
+        // No room for far cascades: the last near one reaches the
+        // end.
+        splits.back() = end;
+        return splits;
+    }
+    const auto needed = static_cast<int>(std::ceil(
+        std::log(end / from) / std::log(kFarCascadeRatio) - 1e-4f));
+    const int far = std::clamp(needed, 1, maxCount - near);
+    const float ratio =
+        std::pow(end / from, 1.0f / static_cast<float>(far));
+    for (int i = 1; i < far; ++i) {
+        splits.push_back(from *
+                         std::pow(ratio, static_cast<float>(i)));
+    }
+    splits.push_back(end);
+    return splits;
+}
+
 std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
                                             const glm::vec3& high,
                                             const glm::vec3& toSun,
@@ -97,8 +133,8 @@ std::vector<ShadowCascade>
 FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& toSun, const glm::vec3& sceneMin,
             const glm::vec3& sceneMax, int count, float exponent,
-            std::uint32_t resolution, float around,
-            bool clampCasters) {
+            std::uint32_t resolution, float around, bool clampCasters,
+            float start, std::optional<float> castersFrom) {
     const glm::vec3 up = std::fabs(toSun.z) > 0.99f
                              ? glm::vec3(0.0f, 1.0f, 0.0f)
                              : glm::vec3(0.0f, 0.0f, 1.0f);
@@ -127,17 +163,24 @@ FitCascades(const CameraView& camera, float shadowDistance,
     // crosses a step.
     const float stops =
         4.0f * std::log2(std::max(shadowDistance, 1e-6f));
-    const float start = camera.nearPlane;
-    const std::vector<float> splits = CascadeSplits(
-        start,
-        std::max(std::exp2(std::ceil(stops) / 4.0f), start * 1.001f),
-        count, exponent);
+    const float first = std::max(
+        camera.nearPlane,
+        std::exp2(
+            std::floor(4.0f * std::log2(std::max(start, 1e-6f))) /
+            4.0f));
+    const float last =
+        std::max(std::exp2(std::ceil(stops) / 4.0f), first * 1.001f);
+    const std::vector<float> splits =
+        camera.IsOrthographic()
+            ? CascadeSplits(first, last, count, exponent)
+            : FullRangeSplits(first, last, count, exponent);
+    const int cascadeCount = static_cast<int>(splits.size()) - 1;
     const float tanY = std::tan(0.5f * camera.verticalFov);
     const float tanX = tanY * camera.aspect;
     const glm::vec3 forward =
         -glm::vec3(glm::inverse(camera.view)[2]);
     std::vector<ShadowCascade> cascades;
-    for (int c = 0; c < count; ++c) {
+    for (int c = 0; c < cascadeCount; ++c) {
         ShadowCascade cascade;
         cascade.splitNear = splits[static_cast<std::size_t>(c)];
         cascade.splitFar = splits[static_cast<std::size_t>(c) + 1];
@@ -191,12 +234,11 @@ FitCascades(const CameraView& camera, float shadowDistance,
         const float x = std::floor(centerInLight.x / snap) * snap;
         const float y = std::floor(centerInLight.y / snap) * snap;
         // The sphere's depth, at least kCascadeMinDepthHalf either
-        // way, and towards the light as far as kLongRangeStart, where
-        // the long-range map takes the casters over: those culled
-        // wholly nearer the light, those partly nearer clamped onto
-        // the near plane, or without clamping held while the scene
-        // reaches no farther (Unreal's caster frustum, which reaches
-        // the light).
+        // way, and towards the light as far as kLongRangeStart: those
+        // culled wholly nearer the light, those partly nearer clamped
+        // onto the near plane, or without clamping held while the
+        // scene reaches no farther (Unreal's caster frustum, which
+        // reaches the light).
         const float depthHalf =
             std::max(radius, kCascadeMinDepthHalf);
         float zNear =
@@ -211,9 +253,37 @@ FitCascades(const CameraView& camera, float shadowDistance,
             x - half, x + half, y - half, y + half, zNear, zFar);
         cascade.lightViewProjection = projection * lightView;
         cascade.texelWorldSize = texel;
+        // Casters on to where the long-range view's begin, culled by
+        // a frustum reaching that far and clamped onto the near plane
+        // past it, its depth kept fine for the receivers.
+        if (clampCasters && castersFrom && *castersFrom < zNear) {
+            cascade.casterCull =
+                glm::orthoRH_ZO(x - half, x + half, y - half,
+                                y + half, *castersFrom, zFar) *
+                lightView;
+        }
         cascades.push_back(cascade);
     }
     return cascades;
+}
+
+float LongRangeCastersEnd(const glm::vec3& receiverLow,
+                          const glm::vec3& receiverHigh,
+                          const glm::vec3& toSun) {
+    const glm::vec3 up = std::fabs(toSun.z) > 0.99f
+                             ? glm::vec3(0.0f, 1.0f, 0.0f)
+                             : glm::vec3(0.0f, 0.0f, 1.0f);
+    const glm::mat4 lightView =
+        glm::lookAtRH(toSun, glm::vec3(0.0f), up);
+    float receiverNear = std::numeric_limits<float>::max();
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 p((i & 1) ? receiverHigh.x : receiverLow.x,
+                          (i & 2) ? receiverHigh.y : receiverLow.y,
+                          (i & 4) ? receiverHigh.z : receiverLow.z);
+        receiverNear = std::min(receiverNear,
+                                -(lightView * glm::vec4(p, 1.0f)).z);
+    }
+    return receiverNear - kLongRangeStart;
 }
 
 std::optional<ShadowCascade>
@@ -255,7 +325,7 @@ FitLongRangeView(const glm::vec3& receiverLow,
                        glm::vec4(corner(sceneMin, sceneMax, i), 1.0f))
                           .z);
     }
-    // Where the cascades' casters end.
+    // Where the cascades' casters begin (`LongRangeCastersEnd`).
     const float castersEnd = receiverNear - kLongRangeStart;
     if (!(sceneNear < castersEnd)) {
         return std::nullopt;

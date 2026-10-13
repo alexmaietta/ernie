@@ -68,6 +68,8 @@ struct Reference {
     /// The cascades' reach (`tokens::kShadowDistance`), 0 for as far
     /// as the view sees.
     double shadowDistance = 0.0;
+    /// The camera's far clipping plane, metres.
+    double farClip = 1e5;
 };
 
 /// How a scene's floor pixels shadow against the exact shadows of its
@@ -130,7 +132,7 @@ ShadowCheck CheckShadows(const ernie::VulkanContext& context,
         .SetFocalLength(reference.focal)
         .SetHorizontalAperture(36.0)
         .SetVerticalAperture(36.0 * aspect)
-        .SetClippingRange(glm::dvec2(0.1, 1e5));
+        .SetClippingRange(glm::dvec2(0.1, reference.farClip));
     scene.Set("/World/Camera", tokens::kTransform,
               LookAtTransform(reference.eye, reference.target,
                               {0.0, 0.0, 1.0}));
@@ -391,6 +393,41 @@ TEST_F(CascadeShadowTest, ReferenceABallFarTowardsTheSun) {
     reference.toSun = toSun;
     reference.eye = {-6.0, -14.0, 9.0};
     reference.target = {0.0, 0.0, 0.0};
+    ExpectExact(*context_, reference);
+}
+
+// Balls 20 to 32 km off through a long lens, past where cascades
+// used to end (10 km): far cascades carry on to what the view sees.
+TEST_F(CascadeShadowTest, ReferenceBallsKilometresAway) {
+    Reference reference;
+    reference.balls = {{{20e3, 800.0, 250.0}, 250.0},
+                       {{25e3, -1200.0, 300.0}, 300.0},
+                       {{32e3, 1500.0, 400.0}, 400.0}};
+    // Their shadows cast aside, in sight from 10 km up.
+    reference.toSun = {0.2, -0.7, 0.68};
+    reference.eye = {0.0, 0.0, 10e3};
+    reference.target = {25e3, 0.0, 0.0};
+    reference.focal = 100.0;
+    reference.farClip = 1e6;
+    ExpectExact(*context_, reference);
+}
+
+// From orbit, 400 km up: the cascades start short of the nearest
+// depth seen rather than at the eye, and shadow the ground below.
+TEST_F(CascadeShadowTest, ReferenceTheGroundFromOrbit) {
+    Reference reference;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            reference.balls.push_back(
+                {{-40e3 + 40e3 * i, -25e3 + 25e3 * j, 6e3 + 2e3 * j},
+                 3e3});
+        }
+    }
+    reference.toSun = {0.4, -0.3, 0.85};
+    reference.eye = {0.0, -1e3, 400e3};
+    reference.target = {0.0, 0.0, 0.0};
+    reference.focal = 120.0;
+    reference.farClip = 1e7;
     ExpectExact(*context_, reference);
 }
 

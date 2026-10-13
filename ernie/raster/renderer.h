@@ -120,13 +120,15 @@ std::vector<ShadowCascade> FitLightShadowViews(
 ///   38(2):147-155, 2019 (RGB modulation to spectra).
 class RasterRenderer {
   public:
-    static constexpr int kMaxCascades = 4;
+    /// Cascades of a distant light over a single view, near and far
+    /// (`FullRangeSplits`).
+    static constexpr int kMaxCascades = kMaxViewCascades;
 
     /// Lights per frame, and shadow map views among them besides a
     /// batch's per-world maps; lights past the views draw without
     /// shadows.
     static constexpr std::size_t kMaxLights = 16;
-    static constexpr std::size_t kMaxLightShadowViews = 24;
+    static constexpr std::size_t kMaxLightShadowViews = 32;
     /// Sub-frames whose lights move (`LightParams::previous`); more
     /// light them all from the frame's poses.
     static constexpr std::size_t kMaxLightSubframes = 64;
@@ -1039,18 +1041,33 @@ class RasterRenderer {
         int count = 1;
         float exponent = 3.0f;
         float distance = 0.0f;
+        /// Where the cascades start along the view: short of the
+        /// nearest depth a recent frame saw, 0 for the near plane.
+        float start = 0.0f;
+        /// `LongRangeReceivers`, whose nearest point to each light
+        /// splits its casters between its cascades and its long-range
+        /// view (`LongRangeCastersEnd`).
+        Bounds3 receivers;
     };
     /// The depth a single view's cascades reach: as far as the
     /// casters and their shadows on the floor reach along it, towards
     /// each shadowed distant light of `params`; within the depths a
     /// recent frame of the same stream saw from about the same pose
-    /// (`seen_`), and the volumes' bounds, which write no depth.
+    /// (`seen_`), and the volumes' bounds, which write no depth. No
+    /// farther than `ShadowSettings::distance` when set, and however
+    /// far otherwise: far cascades cover what the view sees
+    /// (`FullRangeSplits`).
     float FitCascadeDistance(const FrameParams& params) const;
+    /// Where a single view's cascades start: short of the nearest
+    /// depth a recent frame saw (`seen_`) when that lies past the
+    /// near cascades' reach (`kNearCascadesReach`), as from orbit; 0,
+    /// the near plane, otherwise.
+    float FitCascadeStart(const FrameParams& params) const;
     /// The box of what `cascadeFit_`'s view may see shadowed by the
     /// long-range views (`FitLongRangeView`): with an atmosphere, the
     /// view's frustum through its shell, whose sky and aerial
     /// perspective march the air; without, out to the cascades'
-    /// casters' reach (`kLongRangeStart`).
+    /// reach, at least `kLongRangeStart`.
     Bounds3 LongRangeReceivers(const FrameParams& params) const;
     /// The world centre of the planet whose atmosphere shadows its
     /// own light (`ShadowCasters::skipPlanet`), out of the long-range

@@ -107,13 +107,14 @@ public struct DrawConstants {
 // (its cascades over a single view, or a batch's shared map, which each view's world's places
 // with `Uniforms::minimalShadow`).
 public struct Shadows {
-    public float4x4 lightViewProj[4];
+    // Up to 12 cascades (renderer's `kShadowSlots`), their scalars four to a float4.
+    public float4x4 lightViewProj[12];
     // Far view depth of each cascade.
-    public float4 splits;
+    public float4 splits[3];
     // World size of one shadow map texel in each cascade.
-    public float4 texelWorld;
+    public float4 texelWorld[3];
     // World depth spanned by each cascade's [0, 1] depth.
-    public float4 depthWorld;
+    public float4 depthWorld[3];
     // Filter radius (texels), normal offset (texels), cascade count, enabled.
     public float4 params;
     // Minimal shading's main light's maps in `shadowMap`: x the first one's layer, y the share of a
@@ -207,7 +208,7 @@ public float3 towardsViewer(float3 world) {
 public uint cascadeIndex(float depth) {
     let count = uint(s.params.z);
     for (uint c = 0; c < count; ++c) {
-        if (depth < s.splits[c]) {
+        if (depth < s.splits[c / 4][c % 4]) {
             return c;
         }
     }
@@ -217,9 +218,11 @@ public uint cascadeIndex(float depth) {
 // `color` tinted by shadow cascade when cascade debugging is on.
 public float3 cascadeTint(float3 color, float3 world) {
     if (s.debug.x == 1 && s.params.w > 0.0) {
-        let tints = float3[5](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
-                              float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5), float3(1.0, 1.0, 1.0));
-        return color * tints[cascadeIndex(viewDepth(world))];
+        // Four tints in turn, white past the last cascade.
+        let tints = float3[4](float3(1.0, 0.55, 0.55), float3(0.55, 1.0, 0.55),
+                              float3(0.55, 0.65, 1.0), float3(1.0, 1.0, 0.5));
+        let cascade = cascadeIndex(viewDepth(world));
+        return cascade < uint(s.params.z) ? color * tints[cascade % 4] : color;
     }
     return color;
 }
@@ -237,7 +240,8 @@ public float minimalShadow(float3 world, float3 normal) {
     let count = uint(s.minimal.z);
     let cascade = count > 1 ? min(cascadeIndex(viewDepth(world)), count - 1) : 0;
     let nDotL = saturate(dot(normal, u.minimalLights[0].xyz));
-    let offset = normal * s.params.y * s.texelWorld[cascade] * max(1.0 - nDotL, 0.25);
+    let offset =
+        normal * s.params.y * s.texelWorld[cascade / 4][cascade % 4] * max(1.0 - nDotL, 0.25);
     let clip = mul(s.lightViewProj[cascade], float4(world + offset, 1.0));
     // A batch view's world's map: the shared one's clip space, scaled and offset.
     let place = u.minimalShadow[0];

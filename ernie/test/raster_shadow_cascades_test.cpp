@@ -75,6 +75,58 @@ TEST(CascadeSplits, GrowEachCascadeByTheExponent) {
     EXPECT_FLOAT_EQ(uniform[2], 501.0f);
 }
 
+// From the ground to the horizon 300 km off: Unreal's cascades to
+// 200 m, then far ones no more than kFarCascadeRatio deeper each, to
+// the end.
+TEST(FullRangeSplits, CarryOnPastTheNearCascadesToTheEnd) {
+    const auto splits = ernie::FullRangeSplits(0.1f, 300e3f, 4, 3.0f);
+    // 1500 times past 200 m: four far cascades of 8 times at most.
+    ASSERT_EQ(splits.size(), 9u);
+    const auto near = CascadeSplits(0.1f, 200.0f, 4, 3.0f);
+    for (std::size_t i = 0; i < near.size(); ++i) {
+        EXPECT_FLOAT_EQ(splits[i], near[i]) << "split " << i;
+    }
+    for (std::size_t i = 5; i < splits.size(); ++i) {
+        EXPECT_LE(splits[i] / splits[i - 1],
+                  ernie::kFarCascadeRatio * 1.0001f)
+            << "split " << i;
+    }
+    EXPECT_FLOAT_EQ(splits.back(), 300e3f);
+    // Within the near reach, Unreal's alone.
+    EXPECT_EQ(ernie::FullRangeSplits(0.1f, 150.0f, 3, 3.0f),
+              CascadeSplits(0.1f, 150.0f, 3, 3.0f));
+}
+
+// From orbit the nearest depth is far: no near cascades over the
+// empty space before it, and a single one when the view spans less
+// than a ratio.
+TEST(FullRangeSplits, StartFarAwayWithoutNearCascades) {
+    const auto orbit =
+        ernie::FullRangeSplits(351e3f, 420e3f, 4, 3.0f);
+    ASSERT_EQ(orbit.size(), 2u);
+    EXPECT_FLOAT_EQ(orbit.front(), 351e3f);
+    EXPECT_FLOAT_EQ(orbit.back(), 420e3f);
+    // A start within a ratio of 200 m leaves the near ones out too.
+    const auto close =
+        ernie::FullRangeSplits(50.0f, 3200.0f, 4, 3.0f);
+    ASSERT_EQ(close.size(), 3u);
+    EXPECT_FLOAT_EQ(close[1], 400.0f);
+}
+
+// More far cascades than room for stretch their ratio instead: still
+// the end, with at most the count given.
+TEST(FullRangeSplits, StretchTheRatioPastTheirLimit) {
+    const auto splits =
+        ernie::FullRangeSplits(0.1f, 1e10f, 4, 3.0f, 10);
+    ASSERT_EQ(splits.size(), 11u);
+    EXPECT_FLOAT_EQ(splits.back(), 1e10f);
+    EXPECT_GT(splits[10] / splits[9], ernie::kFarCascadeRatio);
+    const auto fewest =
+        ernie::FullRangeSplits(0.1f, 1e6f, 4, 3.0f, 4);
+    ASSERT_EQ(fewest.size(), 5u);
+    EXPECT_FLOAT_EQ(fewest.back(), 1e6f);
+}
+
 TEST(FitCascades,
      CoversEveryFrustumSliceAndTheCastersTowardsTheLight) {
     const CameraView camera = TestCamera();
@@ -83,7 +135,10 @@ TEST(FitCascades,
     const auto cascades =
         FitCascades(camera, 1200.0f, toSun, kSceneMin, kSceneMax, 4,
                     3.0f, kResolution);
-    ASSERT_EQ(cascades.size(), 4u);
+    // Four near ones to 200 m, and one far one on to 1200 m, less
+    // than its ratio deeper.
+    ASSERT_EQ(cascades.size(), 5u);
+    EXPECT_FLOAT_EQ(cascades[3].splitFar, ernie::kNearCascadesReach);
     EXPECT_FLOAT_EQ(cascades.front().splitNear, camera.nearPlane);
     // The distance up to the next quarter stop.
     EXPECT_GE(cascades.back().splitFar, 1200.0f);
@@ -148,7 +203,7 @@ TEST(FitCascades, HandlesAnOverheadSun) {
     const auto cascades =
         FitCascades(TestCamera(), 800.0f, glm::vec3(0.0f, 0.0f, 1.0f),
                     kSceneMin, kSceneMax, 2, 3.0f, kResolution);
-    ASSERT_EQ(cascades.size(), 2u);
+    ASSERT_EQ(cascades.size(), 3u);
     const glm::vec3 ndc = Project(cascades[0].lightViewProjection,
                                   glm::vec3(0.0f, 0.0f, 40.0f));
     EXPECT_TRUE(std::isfinite(ndc.x));
@@ -309,7 +364,7 @@ TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
     const auto cascades =
         FitCascades(camera, 1200.0f, toSun, planetMin, planetMax, 4,
                     3.0f, kResolution, 0.0f, true);
-    ASSERT_EQ(cascades.size(), 4u);
+    ASSERT_EQ(cascades.size(), 5u);
     for (std::size_t c = 0; c < cascades.size(); ++c) {
         const ShadowCascade& cascade = cascades[c];
         // The depth one unit of the map's range covers, in metres.
@@ -352,6 +407,55 @@ TEST(FitCascades, DriftingDistancesKeepTheCascades) {
         EXPECT_EQ(a[c].lightViewProjection, b[c].lightViewProjection)
             << "cascade " << c;
     }
+}
+
+// Under a low sun the cascades' casters reach on to where the
+// long-range view's begin, however far: culled by a frustum that far
+// and clamped onto the map's near plane past its depth range, which
+// stays as fine. Every caster towards the light is the cascades' or
+// the long-range view's, never both or neither.
+TEST(FitCascades, CastersReachOnToTheLongRangeView) {
+    const CameraView camera = TestCamera();
+    const glm::vec3 toSun =
+        glm::normalize(glm::vec3(0.9f, -0.2f, 0.1f));
+    // Receivers 300 km across, as far as a view to the horizon sees.
+    const glm::vec3 receiverLow(-150e3f, -150e3f, -2e3f);
+    const glm::vec3 receiverHigh(150e3f, 150e3f, 2e3f);
+    const float castersFrom =
+        ernie::LongRangeCastersEnd(receiverLow, receiverHigh, toSun);
+    const glm::vec3 sceneLow = receiverLow - glm::vec3(1e6f);
+    const glm::vec3 sceneHigh = receiverHigh + glm::vec3(1e6f);
+    const auto cascades =
+        FitCascades(camera, 1200.0f, toSun, sceneLow, sceneHigh, 4,
+                    3.0f, kResolution, 0.0f, true, 0.0f, castersFrom);
+    const auto far = ernie::FitLongRangeView(
+        receiverLow, receiverHigh, toSun, sceneLow, sceneHigh, 0.005f,
+        kResolution);
+    ASSERT_TRUE(far);
+    // A receiver in the first cascade and casters along the light
+    // from it, out past where the long-range view takes over.
+    const ShadowCascade& first = cascades.front();
+    ASSERT_TRUE(first.casterCull);
+    const glm::vec3 receiver =
+        camera.eye +
+        camera.forward * 0.5f * (first.splitNear + first.splitFar);
+    for (const float along :
+         {1.0f, 5e3f, 20e3f, 80e3f, 160e3f, 250e3f, 400e3f}) {
+        const glm::vec3 caster = receiver + toSun * along;
+        const float cull = Project(*first.casterCull, caster).z;
+        const float longRange =
+            Project(far->lightViewProjection, caster).z;
+        const bool cascaded = cull >= 0.0f && cull <= 1.0f;
+        const bool distant = longRange >= 0.0f && longRange < 1.0f;
+        EXPECT_NE(cascaded, distant) << along << " m towards the sun";
+    }
+    // Its depth range as fine as without: its sphere's and
+    // kLongRangeStart, not the casters' reach.
+    const glm::vec3 a = Project(first.lightViewProjection, receiver);
+    const glm::vec3 b =
+        Project(first.lightViewProjection, receiver + toSun);
+    EXPECT_LT(1.0f / std::fabs(b.z - a.z),
+              2.0f * ernie::kLongRangeStart);
 }
 
 // Without a caster more than kLongRangeStart towards the light, a

@@ -1030,7 +1030,7 @@ void TerrainDrawable::Prepare(
         // its sub-frames'.
         const ShadowCascade& cascade = cascades[c];
         const Frustum light = Shifted(
-            Frustum::FromMatrix(cascade.lightViewProjection), local);
+            Frustum::FromMatrix(cascade.CullViewProjection()), local);
         const bool culls = !cascade.moving && !cascade.gpuFitted;
         tree_.Select(lodEyes_.front(), ranges,
                      culls ? &light : nullptr, params_.exaggeration,

@@ -4606,9 +4606,10 @@ void MeshDrawable::Cull(const FrameParams& params,
             Frustum frustum;
             frustum.planes.fill(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
             if (!cascade.moving) {
-                frustum = Frustum::FromMatrix(cascade.lightViewProjection);
+                frustum =
+                    Frustum::FromMatrix(cascade.CullViewProjection());
             }
-            pushView(frustum, cascade.lightViewProjection,
+            pushView(frustum, cascade.CullViewProjection(),
                      1.0f / std::max(cascade.texelWorldSize, 1e-30f),
                      false);
             continue;
@@ -4630,7 +4631,7 @@ void MeshDrawable::Cull(const FrameParams& params,
             seen = ShadowCasters{true, *cascade.world};
         }
         shadowDraws_.push_back(
-            list(cascade.lightViewProjection,
+            list(cascade.CullViewProjection(),
                  1.0f / std::max(cascade.texelWorldSize, 1e-30f),
                  false, seen ? &*seen : nullptr, !cascade.gpuFitted,
                  cascade.shadowMask, !cascade.moving));

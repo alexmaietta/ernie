@@ -571,7 +571,7 @@ float interleavedGradientNoise(float2 pixel) {
 static const float kCascadeTransition = 0.1;
 
 // Whether a light's shadow views are cascades over the view (`RasterRenderer::FitViewCascades`):
-// a distant light's, with its splits along the view (`LightGpu::beam`, from `beamExtra.x`).
+// a distant light's, with its splits along the view (`cascadeSplit`, from `beamExtra.x`).
 bool hasCascades(LightGpu light) {
     return light.position.w == 0.0 && light.map.y == 0.0 && light.beamExtra.x > 0.0;
 }
@@ -590,6 +590,12 @@ struct CascadeAt {
     float out;
 }
 
+// Where cascade `c` of a distant light's ends along the view (`patternParams`, a distant light
+// having no pattern).
+float cascadeSplit(LightGpu light, uint c) {
+    return light.patternParams[c / 4][c % 4];
+}
+
 CascadeAt cascadeAt(LightGpu light, float3 world) {
     let count = uint(light.cone.w);
     let depth = dot(world, shv.forward.xyz) - shv.forward.w;
@@ -598,15 +604,15 @@ CascadeAt cascadeAt(LightGpu light, float3 world) {
     at.out = 0.0;
     at.cascade = count;
     for (uint c = 0; c < count; ++c) {
-        if (depth < light.beam[c]) {
+        if (depth < cascadeSplit(light, c)) {
             at.cascade = c;
             break;
         }
     }
     // Within the one before's reach past its split: still that one, fading into this or out.
     if (at.cascade > 0) {
-        let split = light.beam[at.cascade - 1];
-        let start = at.cascade > 1 ? light.beam[at.cascade - 2] : light.beamExtra.x;
+        let split = cascadeSplit(light, at.cascade - 1);
+        let start = at.cascade > 1 ? cascadeSplit(light, at.cascade - 2) : light.beamExtra.x;
         let reach = kCascadeTransition * (split - start);
         if (depth < split + reach) {
             let fade = saturate((depth - split) / max(reach, 1e-12));

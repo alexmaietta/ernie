@@ -184,7 +184,10 @@
     X(bool, LodShowLevels, ::ernie::tokens::kLodShowLevels, false,                                 \
       (::ernie::AttributeMeta{.label = "Show LOD levels", .group = "Culling and LOD"}))            \
     X(int, ShadowCascades, ::ernie::tokens::kShadowCascades, 3,                                    \
-      (::ernie::AttributeMeta{.label = "Cascades", .group = "Shadows", .min = 1.0, .max = 4.0}))   \
+      (::ernie::AttributeMeta{.label = "Cascades",                                                 \
+                              .doc = "Near cascades, over the first 200 m; far ones, each 8 "      \
+                                     "times deeper, go on to the farthest depth seen.",            \
+                              .group = "Shadows", .min = 1.0, .max = 4.0}))                        \
     X(int, ShadowResolution, ::ernie::tokens::kShadowResolution, 2048,                             \
       (::ernie::AttributeMeta{.label = "Resolution", .doc = "Texels along each cascade's side.",   \
                               .group = "Shadows", .min = 256.0, .max = 8192.0}))                   \
