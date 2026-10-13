@@ -120,9 +120,9 @@ TEST(NanoVdb, BuildsAGridFromDenseValues) {
     // [2, 17] x [1, 8] x [3, 130], 0 elsewhere.
     const glm::ivec3 shape(20, 10, 140);
     std::vector<float> values(20 * 10 * 140, 0.0f);
-    for (int i = 2; i <= 17; ++i) {
-        for (int j = 1; j <= 8; ++j) {
-            for (int k = 3; k <= 130; ++k) {
+    for (std::size_t i = 2; i <= 17; ++i) {
+        for (std::size_t j = 1; j <= 8; ++j) {
+            for (std::size_t k = 3; k <= 130; ++k) {
                 values[(i * 10 + j) * 140 + k] =
                     0.5f + 0.01f * static_cast<float>(k);
             }
@@ -139,8 +139,8 @@ TEST(NanoVdb, BuildsAGridFromDenseValues) {
     EXPECT_EQ(grid.indexMin, glm::ivec3(2, 1, 3));
     EXPECT_EQ(grid.indexMax, glm::ivec3(17, 8, 130));
     EXPECT_TRUE(grid.hasStatistics);
-    EXPECT_FLOAT_EQ(grid.minValue, 0.53f);
-    EXPECT_FLOAT_EQ(grid.maxValue, 1.8f);
+    EXPECT_FLOAT_EQ(static_cast<float>(grid.minValue), 0.53f);
+    EXPECT_FLOAT_EQ(static_cast<float>(grid.maxValue), 1.8f);
     EXPECT_EQ(grid.voxelSize, glm::dvec3(0.25));
     EXPECT_EQ(grid.indexToGrid * glm::dvec4(4.0, 0.0, 0.0, 1.0),
               glm::dvec4(2.0, 2.0, 3.0, 1.0));

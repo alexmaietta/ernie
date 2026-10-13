@@ -595,7 +595,8 @@ TEST_F(RasterDelegateTest, LaserLinesAndGridsSpreadTheirPower) {
                             std::size_t col) {
         double power = 0.0;
         for (std::size_t row = 0; row < kVarSize; ++row) {
-            power += band[row * kVarSize + col] * pixel * pixel;
+            power += static_cast<double>(band[row * kVarSize + col]) *
+                     pixel * pixel;
         }
         return power / unit;
     };
@@ -628,7 +629,8 @@ TEST_F(RasterDelegateTest, LaserLinesAndGridsSpreadTheirPower) {
         double power = 0.0;
         for (std::size_t r = row - 1; r <= row + 1; ++r) {
             for (std::size_t c = col - 1; c <= col + 1; ++c) {
-                power += band[r * kVarSize + c] * pixel * pixel;
+                power += static_cast<double>(band[r * kVarSize + c]) *
+                         pixel * pixel;
             }
         }
         return power / unit;
@@ -678,7 +680,7 @@ public struct Square : ILightPattern {
     const std::vector<float> band = Band8(delegate, scene);
     double total = 0.0;
     for (const float value : band) {
-        total += value * pixel * pixel;
+        total += static_cast<double>(value) * pixel * pixel;
     }
     EXPECT_NEAR(total / unit, 0.8, 0.04) << "all of its power";
     // 0.8 W over 16 m^2, inside; nothing outside.
@@ -687,7 +689,9 @@ public struct Square : ILightPattern {
         const auto [row, col] =
             PixelOf(scene, static_cast<float>(at.x),
                     static_cast<float>(at.y));
-        EXPECT_NEAR(band[row * kVarSize + col] / unit, 0.05, 0.0015)
+        EXPECT_NEAR(static_cast<double>(band[row * kVarSize + col]) /
+                        unit,
+                    0.05, 0.0015)
             << "at " << at.x << ", " << at.y;
     }
     const auto [row, col] = PixelOf(scene, 3.0f, 0.0f);
@@ -712,7 +716,8 @@ TEST_F(RasterDelegateTest, LaserPatternsReadTheirDataAndImage) {
         double power = 0.0;
         for (std::size_t r = row - 1; r <= row + 1; ++r) {
             for (std::size_t c = col - 1; c <= col + 1; ++c) {
-                power += band[r * kVarSize + c] * pixel * pixel;
+                power += static_cast<double>(band[r * kVarSize + c]) *
+                         pixel * pixel;
             }
         }
         return power / unit;
@@ -771,14 +776,15 @@ public struct ListedDots : ILightPattern {
     band = Band8(delegate, scene);
     double total = 0.0;
     for (const float value : band) {
-        total += value * pixel * pixel;
+        total += static_cast<double>(value) * pixel * pixel;
     }
     EXPECT_NEAR(total / unit, 0.8, 0.04) << "all of its power";
     for (const auto& [x, want] :
          {std::pair{-1.0f, 0.05}, std::pair{1.0f, 0.15}}) {
         const auto [row, col] = PixelOf(scene, x, 0.0f);
-        EXPECT_NEAR(band[row * kVarSize + col] / unit, want,
-                    0.03 * want)
+        EXPECT_NEAR(static_cast<double>(band[row * kVarSize + col]) /
+                        unit,
+                    want, 0.03 * want)
             << "at x = " << x;
     }
     const auto [row, col] = PixelOf(scene, 0.0f, 2.0f);
@@ -799,7 +805,7 @@ TEST_F(RasterDelegateTest,
     const double unit = 0.5 / M_PI / bandWidth;
     const auto at = [&](const std::vector<float>& band, float x) {
         const auto [row, col] = PixelOf(scene, x, 0.0f);
-        return band[row * kVarSize + col] / unit;
+        return static_cast<double>(band[row * kVarSize + col]) / unit;
     };
     // An image 4 m x 2 m across the floor 10 m down, written as an
     // array: a quarter of its power in its left half, the rest in its
@@ -823,7 +829,7 @@ TEST_F(RasterDelegateTest,
     EXPECT_NEAR(at(host, 1.0f), 0.15, 0.0045);
     double total = 0.0;
     for (const float value : host) {
-        total += value * pixel * pixel;
+        total += static_cast<double>(value) * pixel * pixel;
     }
     EXPECT_NEAR(total / unit, 0.8, 0.04);
 
@@ -837,7 +843,8 @@ TEST_F(RasterDelegateTest,
                 cuda->Upload(halves(0.2f, 0.6f)));
     const std::vector<float> copied = Band8(delegate, scene);
     for (std::size_t i = 0; i < host.size(); ++i) {
-        ASSERT_NEAR(copied[i], host[i], 1e-3f * unit)
+        ASSERT_NEAR(copied[i], host[i],
+                    static_cast<double>(1e-3f) * unit)
             << "texel " << i;
     }
     // Mapped: the renderer's own memory, written in place with the
@@ -947,7 +954,7 @@ TEST_F(RasterDelegateTest, LaserDotsAreSeededAndKeepTheirPower) {
     const auto total = [&](const std::vector<float>& band) {
         double power = 0.0;
         for (const float value : band) {
-            power += value * pixel * pixel;
+            power += static_cast<double>(value) * pixel * pixel;
         }
         return power / unit;
     };
@@ -980,7 +987,7 @@ TEST_F(RasterDelegateTest, LaserPulsesAndSequencesFollowTheClock) {
     const auto total = [&](const std::vector<float>& band) {
         double power = 0.0;
         for (const float value : band) {
-            power += value * pixel * pixel;
+            power += static_cast<double>(value) * pixel * pixel;
         }
         return power / unit;
     };
@@ -1022,7 +1029,7 @@ TEST_F(RasterDelegateTest, LaserPulsesAndSequencesFollowTheClock) {
         .SetSequencePeriod(0.1);
     const auto at = [&](const std::vector<float>& band, float x) {
         const auto [row, col] = PixelOf(scene, x, 0.0f);
-        return band[row * kVarSize + col] / unit;
+        return static_cast<double>(band[row * kVarSize + col]) / unit;
     };
     // All 1 W in a lit half of 4 m^2.
     delegate.ResetTime(0.05);
@@ -1053,7 +1060,7 @@ TEST_F(RasterDelegateTest, LightsMovingAcrossTheShutterSmear) {
     const auto total = [](const std::vector<float>& band) {
         double sum = 0.0;
         for (const float value : band) {
-            sum += value;
+            sum += static_cast<double>(value);
         }
         return sum;
     };
@@ -1143,7 +1150,8 @@ TEST_F(RasterDelegateTest, PolarizersPassPolarizedLightByItsAngle) {
     // Each pixel's share of what it sees without one.
     const auto cell = [&](std::size_t dr, std::size_t dc) {
         const std::size_t i = (r + dr) * kVarSize + c + dc;
-        return static_cast<double>(mosaic[i]) / unpolarized[i];
+        return static_cast<double>(mosaic[i]) /
+               static_cast<double>(unpolarized[i]);
     };
     EXPECT_NEAR(cell(0, 0), 0.08, 0.01) << "90 degrees";
     EXPECT_NEAR(cell(1, 1), 0.8, 0.01) << "0 degrees";
@@ -1334,8 +1342,8 @@ TEST_F(RasterDelegateTest,
         double ma = 0.0;
         double mb = 0.0;
         for (std::size_t i = 0; i < a.size(); ++i) {
-            ma += a[i] / a.size();
-            mb += b[i] / b.size();
+            ma += a[i] / static_cast<double>(a.size());
+            mb += b[i] / static_cast<double>(b.size());
         }
         double ab = 0.0;
         double aa = 0.0;
@@ -1358,8 +1366,8 @@ TEST_F(RasterDelegateTest,
             double mean = 0.0;
             double squares = 0.0;
             for (const double v : a) {
-                mean += v / a.size();
-                squares += v * v / a.size();
+                mean += v / static_cast<double>(a.size());
+                squares += v * v / static_cast<double>(a.size());
             }
             meanContrast +=
                 std::sqrt(squares - mean * mean) / mean / 4.0;
@@ -1530,7 +1538,7 @@ TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
     const std::vector<float> band = Band8(delegate, narrow);
     double total = 0.0;
     for (const float value : band) {
-        total += value * pixel * pixel;
+        total += static_cast<double>(value) * pixel * pixel;
     }
     EXPECT_NEAR(total, 0.5 / M_PI / bandWidth,
                 0.03 * 0.5 / M_PI / bandWidth)
@@ -1552,7 +1560,9 @@ TEST_F(RasterDelegateTest, LasersLightAGaussianSpot) {
         double power = 0.0;
         for (std::size_t row = top; row <= bottom; ++row) {
             for (std::size_t col = first; col <= last; ++col) {
-                power += values[row * kVarSize + col] * pixel * pixel;
+                power += static_cast<double>(
+                             values[row * kVarSize + col]) *
+                         pixel * pixel;
             }
         }
         return power;
@@ -1809,7 +1819,10 @@ TEST_F(RasterDelegateTest, DomesLightEverySurfaceDiffusely) {
     EXPECT_FALSE(delegate.Renderer().Bands().count == 0);
 
     std::vector<float> map(8 * 16 * 3, 0.0f);
-    std::fill(map.begin(), map.begin() + map.size() / 2, 1.0f);
+    std::fill(map.begin(),
+              map.begin() +
+                  static_cast<std::ptrdiff_t>(map.size() / 2),
+              1.0f);
     sky.SetTexture(Tensor::Copy<float>(map, {8, 16, 3}));
     ernie::RenderProductSetOutputs upper = delegate.Step(scene);
     EXPECT_NEAR(At<float>(MapVars(upper).at("HdrColor"), c, c, 1),
@@ -1876,7 +1889,10 @@ TEST_F(RasterDelegateTest,
     ernie::RenderSettings::Define(scene, "/Render/Settings")
         .SetAmbient(0.0);
     std::vector<float> map(8 * 16 * 3, 0.0f);
-    std::fill(map.begin(), map.begin() + map.size() / 2, 1.0f);
+    std::fill(map.begin(),
+              map.begin() +
+                  static_cast<std::ptrdiff_t>(map.size() / 2),
+              1.0f);
     ernie::DomeLight::Define(scene, "/World/Sky")
         .SetIntensity(1.0)
         .SetTexture(Tensor::Copy<float>(map, {8, 16, 3}));
@@ -2356,10 +2372,10 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
                 .ElectronsPerRadiance(0);
         double expected = 0.0;
         for (std::size_t b = 0; b < 6; ++b) {
-            expected +=
+            expected += static_cast<double>(
                 perRadiance[b] *
                 spectral
-                    .As<float>()[(b * kVarSize + c) * kVarSize + c];
+                    .As<float>()[(b * kVarSize + c) * kVarSize + c]);
         }
         ASSERT_GT(expected, 100.0);
         ASSERT_LT(expected, 1e11) << "below the full well";
@@ -2479,7 +2495,8 @@ TEST_F(RasterDelegateTest,
         At<float>(MapVars(outputs).at("HdrColor"), c, c, 2));
     const float luminance =
         glm::dot(hdr, glm::vec3(0.2126f, 0.7152f, 0.0722f));
-    EXPECT_NEAR(M_PI * luminance / 0.5, 990.0, 25.0);
+    EXPECT_NEAR(M_PI * static_cast<double>(luminance) / 0.5, 990.0,
+                25.0);
 }
 
 TEST_F(RasterDelegateTest, ARenderersFirstFrameHasItsLightsShadows) {
@@ -2676,7 +2693,8 @@ TEST_F(RasterDelegateTest, DomesShowBehindTheScene) {
     const std::vector<float> dome =
         ernie::DomeParamsOf(scene, "/World/Sky", bands).radiance;
     const std::size_t c = kVarSize / 2;
-    for (int band = 0; band < bands.count; ++band) {
+    for (std::size_t band = 0;
+         band < static_cast<std::size_t>(bands.count); ++band) {
         EXPECT_NEAR(SpectralAt(vars.at("SpectralRadiance"), band, c,
                                c, kVarSize),
                     dome[band], 0.02f * dome[band])
@@ -2745,19 +2763,22 @@ TEST_F(RasterDelegateTest,
                                     .vars.at("SpectralRadiance")
                                     .Map(ernie::MapDevice::Cpu)
                                     .tensor;
-        const ernie::CameraParams camera =
-            ernie::CameraParamsOf(scene, "/World/Camera", size, size);
+        const ernie::CameraParams camera = ernie::CameraParamsOf(
+            scene, "/World/Camera", static_cast<std::uint32_t>(size),
+            static_cast<std::uint32_t>(size));
         const double f = camera.FocalLengthPixels();
+        const double half = 0.5 * static_cast<double>(size);
         double sum = 0.0;
         for (std::size_t row = 0; row < size; ++row) {
             for (std::size_t col = 0; col < size; ++col) {
                 const double x =
-                    (static_cast<double>(col) + 0.5 - 0.5 * size) / f;
+                    (static_cast<double>(col) + 0.5 - half) / f;
                 const double y =
-                    (static_cast<double>(row) + 0.5 - 0.5 * size) / f;
+                    (static_cast<double>(row) + 0.5 - half) / f;
                 const double cosine =
                     1.0 / std::sqrt(1.0 + x * x + y * y);
-                sum += SpectralAt(spectral, band, row, col, size) *
+                sum += static_cast<double>(SpectralAt(
+                           spectral, band, row, col, size)) *
                        cosine * cosine * cosine / (f * f);
             }
         }
@@ -2837,9 +2858,9 @@ TEST_F(RasterDelegateTest, PushbroomRowsSeeStarsFromTheirOwnPoses) {
                                   camera.PrincipalPoint().x) /
                                  f;
                 const double cosine = 1.0 / std::sqrt(1.0 + x * x);
-                sums[row] +=
-                    SpectralAt(spectral, kBand, row, col, kSize) *
-                    cosine * cosine * cosine / (f * f);
+                sums[row] += static_cast<double>(SpectralAt(
+                                 spectral, kBand, row, col, kSize)) *
+                             cosine * cosine * cosine / (f * f);
             }
         }
         return sums;

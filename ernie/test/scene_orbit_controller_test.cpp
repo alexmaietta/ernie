@@ -80,11 +80,11 @@ TEST(OrbitController, ZoomMovesCloserAndClamps) {
     OrbitController camera;
     camera.distance = 100.0f;
     camera.Zoom(1.0f);
-    EXPECT_FLOAT_EQ(camera.distance, 90.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(camera.distance), 90.0f);
     camera.Zoom(-1.0f);
     EXPECT_NEAR(camera.distance, 100.0f, 1e-3f);
     camera.Zoom(1000.0f);
-    EXPECT_FLOAT_EQ(camera.distance, 1e-3f);
+    EXPECT_FLOAT_EQ(static_cast<float>(camera.distance), 1e-3f);
 }
 
 TEST(OrbitController, PanFollowsTheCursorAtTargetDepth) {
@@ -100,7 +100,7 @@ TEST(OrbitController, PanFollowsTheCursorAtTargetDepth) {
     EXPECT_NEAR(glm::length(glm::vec3(camera.target) - before),
                 expected, 1e-3f);
     EXPECT_LT(camera.target.x, before.x);
-    EXPECT_FLOAT_EQ(camera.target.z, before.z);
+    EXPECT_FLOAT_EQ(static_cast<float>(camera.target.z), before.z);
 }
 
 TEST(OrbitController, VerticalPanMovesAlongZ) {
@@ -111,8 +111,8 @@ TEST(OrbitController, VerticalPanMovesAlongZ) {
     camera.PanVertical(0.0f, 20.0f, 500.0f);
     EXPECT_NEAR(camera.target.z, 20.0f * perPixel, 1e-4f)
         << "dragging down raises the view";
-    EXPECT_FLOAT_EQ(camera.target.x, 0.0f);
-    EXPECT_FLOAT_EQ(camera.target.y, 0.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(camera.target.x), 0.0f);
+    EXPECT_FLOAT_EQ(static_cast<float>(camera.target.y), 0.0f);
 }
 
 TEST(OrbitController, FrameFitsTheBoxInView) {

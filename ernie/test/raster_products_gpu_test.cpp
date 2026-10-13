@@ -405,7 +405,7 @@ TEST_F(RasterDelegateTest, RenderVarsMeasureTheScene) {
     const double perDn = camera.sensor.ElectronsPerDn(camera.iso);
     EXPECT_EQ(vars.at("RawDN").Type(), DType::UInt16);
     EXPECT_NEAR(At<std::uint16_t>(vars.at("RawDN"), c, c, 1),
-                electrons / perDn, 0.5 + 1e-3);
+                static_cast<double>(electrons) / perDn, 0.5 + 1e-3);
 }
 
 TEST_F(RasterDelegateTest,
@@ -448,9 +448,9 @@ TEST_F(RasterDelegateTest,
     int differing = 0;
     for (std::size_t row = 0; row < kVarSize; ++row) {
         for (std::size_t col = 0; col < kVarSize; ++col) {
-            mean += At<float>(a, row, col, 1);
-            clean +=
-                At<float>(cleanVars.at("Electrons"), row, col, 1);
+            mean += static_cast<double>(At<float>(a, row, col, 1));
+            clean += static_cast<double>(
+                At<float>(cleanVars.at("Electrons"), row, col, 1));
             differing +=
                 At<float>(a, row, col, 1) != At<float>(b, row, col, 1)
                     ? 1
@@ -599,8 +599,11 @@ TEST_F(RasterDelegateTest,
         {16, 2}, {12, 29}, {20, 5}, {14, 16}};
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
-        const glm::dvec2 pinhole = camera.lens.Undistort(
-            {(column + 0.5 - camera.PrincipalPoint().x) / f, line});
+        const glm::dvec2 pinhole =
+            camera.lens.Undistort({(static_cast<double>(column) +
+                                    0.5 - camera.PrincipalPoint().x) /
+                                       f,
+                                   line});
         if (column != 16) {
             ASSERT_GT(std::abs(pinhole.y - line) * 50.0, 1.5)
                 << "rows off the line's";
@@ -609,7 +612,8 @@ TEST_F(RasterDelegateTest,
         // 16; the camera's x and y are the world's.
         const double z = 0.05;
         const glm::dvec2 ground =
-            glm::dvec2(0.0, row + 0.5 - 16.0) + (50.0 - z) * pinhole;
+            glm::dvec2(0.0, static_cast<double>(row) + 0.5 - 16.0) +
+            (50.0 - z) * pinhole;
         const Path square("/World/Square" + std::to_string(i));
         DefineQuad(scene, square, 0.9f);
         scene.Set(
@@ -669,7 +673,8 @@ TEST_F(RasterDelegateTest,
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
         const glm::dvec3 ground =
-            scanner.ImageToGround(row + 0.5, column + 0.5);
+            scanner.ImageToGround(static_cast<double>(row) + 0.5,
+                                  static_cast<double>(column) + 0.5);
         const Path ball("/World/Ball" + std::to_string(i));
         ernie::Sphere::Define(scene, ball).SetRadius(60.0);
         scene.Set(ball, tokens::kTransform,
@@ -728,7 +733,8 @@ TEST_F(RasterDelegateTest,
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
         const glm::dvec3 ground =
-            nac.ImageToGround(kFirst + row + 0.5, column + 0.5);
+            nac.ImageToGround(static_cast<double>(kFirst + row) + 0.5,
+                              static_cast<double>(column) + 0.5);
         const Path ball("/World/Ball" + std::to_string(i));
         ernie::Sphere::Define(scene, ball).SetRadius(0.6);
         scene.Set(ball, tokens::kTransform,
@@ -806,11 +812,14 @@ TEST_F(RasterDelegateTest,
         {2, 10}, {7, 512}, {11, 1013}};
     for (std::size_t i = 0; i < std::size(pixels); ++i) {
         const auto [row, column] = pixels[i];
-        const double line = framelet.firstLine + row + 0.5;
-        const glm::dvec3 ground =
-            wac.ImageToGround(line, column + 0.5);
-        const double across = glm::length(
-            wac.ImageToGround(line, column + 1.5) - ground);
+        const double line =
+            static_cast<double>(framelet.firstLine + row) + 0.5;
+        const glm::dvec3 ground = wac.ImageToGround(
+            line, static_cast<double>(column) + 0.5);
+        const double across =
+            glm::length(wac.ImageToGround(
+                            line, static_cast<double>(column) + 1.5) -
+                        ground);
         const Path ball("/World/Ball" + std::to_string(i));
         ernie::Sphere::Define(scene, ball).SetRadius(0.4 * across);
         scene.Set(ball, tokens::kTransform,
@@ -902,15 +911,16 @@ TEST_F(RasterDelegateTest,
     int ground = 0;
     for (std::size_t row = 0; row < kVarSize; ++row) {
         for (std::size_t col = 0; col < kVarSize; ++col) {
-            const glm::dvec2 distorted((col + 0.5 - centre.x) / f,
-                                       (centre.y - (row + 0.5)) / f);
+            const glm::dvec2 distorted(
+                (static_cast<double>(col) + 0.5 - centre.x) / f,
+                (centre.y - (static_cast<double>(row) + 0.5)) / f);
             const glm::dvec3 ray =
                 ernie::LensRay(camera.lens, distorted);
             const double offAxis = std::acos(-ray.z);
             const Path prim = delegate.PrimPath(
                 At<std::uint32_t>(vars.at("PrimId"), row, col));
             if (prim == Path("/World/Cube")) {
-                cubeSum += glm::dvec2(col + 0.5, row + 0.5);
+                cubeSum += glm::dvec2(col, row) + 0.5;
                 ++cubeHits;
                 continue;
             }
@@ -986,7 +996,7 @@ TEST_F(RasterDelegateTest, AFisheyeSeesBehindItselfOnTheBackFace) {
             const Path prim = delegate.PrimPath(
                 At<std::uint32_t>(vars.at("PrimId"), row, col));
             if (prim == Path("/World/Cube")) {
-                cubeSum += glm::dvec2(col + 0.5, row + 0.5);
+                cubeSum += glm::dvec2(col, row) + 0.5;
                 ++cubeHits;
             }
         }
@@ -1160,7 +1170,7 @@ TEST_F(RasterDelegateTest,
                     const double value =
                         spectral
                             .As<float>()[(b * 96 + row) * 96 + col];
-                    sum += value * glm::dvec2(col + 0.5, row + 0.5);
+                    sum += value * (glm::dvec2(col, row) + 0.5);
                     total += value;
                 }
             }
@@ -1266,7 +1276,7 @@ TEST_F(RasterDelegateTest,
                     const double value =
                         std::abs(static_cast<double>(image[i]) -
                                  static_cast<double>(ground[i]));
-                    sum += value * glm::dvec2(col + 0.5, row + 0.5);
+                    sum += value * (glm::dvec2(col, row) + 0.5);
                     total += value;
                 }
             }
@@ -1347,9 +1357,9 @@ TEST_F(RasterDelegateTest,
         for (std::size_t row = 0; row < kVarSize; ++row) {
             for (std::size_t col = 1; col < kVarSize; ++col) {
                 for (std::size_t c = 0; c < 3; ++c) {
-                    variation[c] +=
+                    variation[c] += static_cast<double>(
                         std::abs(At<float>(hdr, row, col, c) -
-                                 At<float>(hdr, row, col - 1, c));
+                                 At<float>(hdr, row, col - 1, c)));
                 }
             }
         }
@@ -1383,7 +1393,8 @@ TEST_F(RasterDelegateTest,
     const std::size_t c = kVarSize / 2;
     for (const std::size_t col :
          {std::size_t{0}, std::size_t{4}, c}) {
-        const double x = (col + 0.5 - camera.PrincipalPoint().x) /
+        const double x = (static_cast<double>(col) + 0.5 -
+                          camera.PrincipalPoint().x) /
                          camera.FocalLengthPixels();
         const double y = (camera.PrincipalPoint().y - (c + 0.5)) /
                          camera.FocalLengthPixels();

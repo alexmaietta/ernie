@@ -377,7 +377,8 @@ TEST_F(
     // The kernel's square holds the light of the pattern within about
     // its own area's radius, and keeps all of it, so the pattern's
     // shares within it grow by one over that.
-    const double kernel = (2.0 * kRadius + 1.0) / std::sqrt(M_PI);
+    const double kernel =
+        (2.0 * static_cast<double>(kRadius) + 1.0) / std::sqrt(M_PI);
     for (const std::size_t band : {std::size_t{2}, std::size_t{12}}) {
         const double expected = ernie::BlackbodySpectralIrradiance(
             camera.bands.Lower(static_cast<int>(band)) +
@@ -910,15 +911,16 @@ TEST_F(
             for (std::size_t x = kSize / 2; x < kSize; ++x) {
                 const double gained =
                     at(flared, x, y) -
-                    (1.0 - strength) * at(base, x, y);
+                    (1.0 - static_cast<double>(strength)) *
+                        at(base, x, y);
                 ghost += gained;
                 where += gained * (glm::dvec2(x, y) + 0.5);
             }
         }
         ASSERT_GT(ghost, 0.0) << scale;
         where /= ghost;
-        EXPECT_NEAR(ghost, strength * source,
-                    0.03 * strength * source)
+        EXPECT_NEAR(ghost, static_cast<double>(strength) * source,
+                    0.03 * static_cast<double>(strength) * source)
             << scale;
         const glm::dvec2 expected =
             centre + static_cast<double>(scale) * (quad - centre);
@@ -954,7 +956,9 @@ TEST_F(RasterDelegateTest, StrayLightComesFromEveryDistantLight) {
     const auto luminance = [](const std::vector<float>& image) {
         const float* rgb =
             &image[(kSize / 2 * kSize + kSize / 2) * 4];
-        return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        return 0.2126 * static_cast<double>(rgb[0]) +
+               0.7152 * static_cast<double>(rgb[1]) +
+               0.0722 * static_cast<double>(rgb[2]);
     };
     const double expected = perPst * 1e-3 * std::pow(6.0, -2.0);
     EXPECT_NEAR(luminance(veiled) - luminance(lit), expected,
@@ -985,7 +989,9 @@ TEST_F(
     const auto luminance = [](const std::vector<float>& image,
                               std::size_t x, std::size_t y) {
         const float* rgb = &image[(y * kSize + x) * 4];
-        return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        return 0.2126 * static_cast<double>(rgb[0]) +
+               0.7152 * static_cast<double>(rgb[1]) +
+               0.0722 * static_cast<double>(rgb[2]);
     };
     const std::size_t middle =
         kSize / 2;  // the background between the quad and the rocks
@@ -1348,7 +1354,8 @@ TEST_F(RasterDelegateTest,
             const double solved = 0.5 * (lo + hi);
             const double expected = std::clamp(
                 std::floor((solved < 600.0 ? solved : lin) -
-                           offset[x] + dark[x] + 0.5),
+                           static_cast<double>(offset[x]) +
+                           static_cast<double>(dark[x]) + 0.5),
                 0.0, 4095.0);
             EXPECT_NEAR(read[i], expected, 1.0) << x << ", " << y;
             low += solved < 600.0 ? 1 : 0;
@@ -1455,7 +1462,8 @@ TEST_F(RasterDelegateTest,
             double below = 0.0;
             for (std::size_t i = 0; i < kSize; ++i) {
                 (i < y ? above : below) +=
-                    i == y ? 0.0 : base[at(x, i)];
+                    i == y ? 0.0
+                           : static_cast<double>(base[at(x, i)]);
             }
             const double own = base[at(x, y)];
             const auto expect = [&](const std::vector<float>& image,
@@ -1637,7 +1645,8 @@ TEST_F(RasterDelegateTest, GaussianPsfBlursByItsTermsAndKeepsLight) {
                         clampAt(static_cast<std::ptrdiff_t>(x) + i);
                     const std::size_t sy =
                         clampAt(static_cast<std::ptrdiff_t>(y) + j);
-                    sum += g * base[(sy * kSize + sx) * 4 + 1];
+                    sum += g * static_cast<double>(
+                                   base[(sy * kSize + sx) * 4 + 1]);
                     weights += g;
                 }
             }
@@ -1703,7 +1712,9 @@ TEST_F(RasterDelegateTest, JpegKeepsQualityAndLosesDetailAsItFalls) {
                 largest = std::max(largest, e);
             }
         }
-        return std::pair(total / (plain.size() * 3 / 4), largest);
+        return std::pair(
+            total / static_cast<double>(plain.size() * 3 / 4),
+            largest);
     };
     const auto [best, bestLargest] = errorAt(100.0f);
     const auto [good, goodLargest] = errorAt(75.0f);
@@ -1836,8 +1847,9 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
             VarsThrough(delegate, scene, vars, chain({{"netd", 1.0f}}, {}));
         for (const float k : values["BrightnessTemperature"]) {
             if (k > 300.0f && k < 340.0f) {
-                sum += k;
-                squares += static_cast<double>(k) * k;
+                sum += static_cast<double>(k);
+                squares +=
+                    static_cast<double>(k) * static_cast<double>(k);
                 ++count;
             }
         }

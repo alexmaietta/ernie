@@ -48,11 +48,13 @@ void ExpectClosedSphere(const MeshData& mesh, float radius) {
     ASSERT_EQ(mesh.uvs.size(), 2 * mesh.indices.size());
     for (std::uint32_t i = 0; i < vertices; ++i) {
         const glm::dvec3 p = Point(mesh, i);
-        EXPECT_NEAR(glm::length(p), radius, 1e-5 * radius);
+        EXPECT_NEAR(glm::length(p), radius,
+                    1e-5 * static_cast<double>(radius));
         const glm::dvec3 n(mesh.normals[3 * i],
                            mesh.normals[3 * i + 1],
                            mesh.normals[3 * i + 2]);
-        EXPECT_GT(glm::dot(n, p), 0.999 * radius);
+        EXPECT_GT(glm::dot(n, p),
+                  0.999 * static_cast<double>(radius));
     }
     std::map<std::pair<std::uint32_t, std::uint32_t>, int> edges;
     double solidAngle = 0.0;

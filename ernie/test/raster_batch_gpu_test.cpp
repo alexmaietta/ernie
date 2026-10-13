@@ -1159,7 +1159,7 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
     Scene pipelined = PosedRowSceneOfFour();
     const auto images =
         Steps(delegate, pipelined, change, kSteps, true);
-    for (int step = 0; step < kSteps; ++step) {
+    for (std::size_t step = 0; step < kSteps; ++step) {
         EXPECT_EQ(images[step], expected[step]) << "step " << step;
     }
 
@@ -1212,7 +1212,7 @@ TEST_F(RasterDelegateTest, StepsInFlightRenderAsStepsOneAtATime) {
     };
     const auto gpuImages =
         Steps(delegate, gpuPipelined, stalled, kSteps, true);
-    for (int step = 0; step < kSteps; ++step) {
+    for (std::size_t step = 0; step < kSteps; ++step) {
         EXPECT_EQ(gpuImages[step], gpuExpected[step])
             << "GPU poses, step " << step;
     }

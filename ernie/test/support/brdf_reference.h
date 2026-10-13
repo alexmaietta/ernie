@@ -169,7 +169,8 @@ inline double PreviewSurfaceReference(const Geometry& g,
     // Turquin's multiple-scattering compensation, 1 + f0 (1 / E - 1)
     // with E from Lazarov's fit at the lobe's (widened) roughness, as
     // the geometric mean over cos(i) and cos(e).
-    const double alpha = static_cast<double>(p[0]) * p[0];
+    const double alpha =
+        static_cast<double>(p[0]) * static_cast<double>(p[0]);
     const double lobeRoughness = std::pow(
         std::clamp(alpha * alpha + 2.0 * variance, 1e-6, 1.0), 0.25);
     const auto albedoE = [&](double mu) {
@@ -186,22 +187,25 @@ inline double PreviewSurfaceReference(const Geometry& g,
                          (1.0 + f0 * (1.0 / albedoE(g.mu) - 1.0)));
     };
     double f = 0.0;
-    if (p[3] > 0.5) {
-        const double f0 = (p[4] + p[5] + p[6]) / 3.0;
+    if (p[3] > 0.5f) {
+        const double f0 =
+            static_cast<double>(p[4] + p[5] + p[6]) / 3.0;
         const double fresnel = schlick(f0);
         f = (1.0 - fresnel) * albedo / kPi +
             fresnel * specular * compensation(f0);
     } else {
-        const double r0 = std::pow((p[2] - 1.0) / (p[2] + 1.0), 2.0);
+        const double ior = p[2];
+        const double r0 = std::pow((ior - 1.0) / (ior + 1.0), 2.0);
         const double dielectric =
             (1.0 - schlick(r0)) * albedo / kPi +
             schlick(r0) * specular * compensation(r0);
         const double metal =
             schlick(albedo) * specular * compensation(albedo);
-        f = (1.0 - p[1]) * dielectric + p[1] * metal;
+        const double metallic = p[1];
+        f = (1.0 - metallic) * dielectric + metallic * metal;
     }
-    if (p[7] > 0.0) {
-        const double coat = schlick(0.04) * p[7];
+    if (p[7] > 0.0f) {
+        const double coat = schlick(0.04) * static_cast<double>(p[7]);
         f = f * (1.0 - coat) + coat * lobe(p[8]);
     }
     return kPi * g.mu0 * f;

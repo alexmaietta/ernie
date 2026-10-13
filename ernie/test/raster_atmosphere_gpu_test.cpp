@@ -1017,8 +1017,10 @@ TEST_F(RasterDelegateTest, AFullMoonShowsItsNormalAlbedo) {
             SpectrumAt(outputs, row, kVarSize / 2);
         for (const std::size_t band :
              {std::size_t{2}, std::size_t{12}}) {
-            EXPECT_NEAR(disc[band] / (0.12 * sun[band] / kPi), 1.0,
-                        0.02)
+            EXPECT_NEAR(
+                disc[band] /
+                    (0.12 * static_cast<double>(sun[band]) / kPi),
+                1.0, 0.02)
                 << "row " << row << " band " << band;
         }
     }

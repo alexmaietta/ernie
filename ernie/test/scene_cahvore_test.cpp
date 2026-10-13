@@ -53,7 +53,7 @@ TEST(Cahvore, ReadsTheMars2020CameraModels) {
     const auto models = ernie::ReadCahvoreModelsFile(
         Fixture("m2020_camera_models.json"));
     ASSERT_EQ(models.size(), 6u);
-    const ernie::CahvoreModel& hazcam = Named(models, "HAZFLA");
+    const ernie::CahvoreModel hazcam = Named(models, "HAZFLA");
     EXPECT_EQ(hazcam.kind, ernie::CahvoreModel::Kind::Cahvore);
     EXPECT_EQ(hazcam.pupilType, 3);
     EXPECT_DOUBLE_EQ(hazcam.linearity, 0.37);
@@ -169,7 +169,7 @@ TEST(Cahvore, ConvertsToErnieCameras) {
     // pupil millimetres. Its distortion's axis O lies 0.08 degrees
     // off the image plane's normal, a tilt Ernie's lens cannot take:
     // a few pixels at the image's edges, of 5120.
-    const ernie::CahvoreModel& navl = Named(models, "NAVL");
+    const ernie::CahvoreModel navl = Named(models, "NAVL");
     const ernie::CahvoreModel::ErnieCamera navcam =
         navl.ToCamera(6.4);
     EXPECT_EQ(navcam.camera.lens.projection,

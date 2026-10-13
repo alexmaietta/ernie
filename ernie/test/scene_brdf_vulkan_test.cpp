@@ -241,7 +241,8 @@ TEST_F(BrdfVulkanTest, UnresolvedSlopesWidenTheModelsRoughness) {
         BrdfRegistry::WithBuiltins().Find("hapke")->Defaults();
     const std::vector<glm::dvec3> rough =
         Evaluate("hapke", hapke, cases, variance);
-    const double tanT = std::tan(hapke[4] * kPi / 180.0);
+    const double tanT =
+        std::tan(static_cast<double>(hapke[4]) * kPi / 180.0);
     hapke[4] = static_cast<float>(
         std::atan(std::sqrt(tanT * tanT + 2.0 * variance / kPi)) *
         180.0 / kPi);

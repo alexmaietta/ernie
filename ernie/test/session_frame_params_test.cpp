@@ -318,8 +318,9 @@ TEST(LaserTiming, FlashesDecayJitterAndFireOnTheExposure) {
     for (int n = 0; n < 20; ++n) {
         // 0.1 ms into pulse n as it would start without jitter: lit
         // when it starts no later, three times in five.
-        lit += strobe.LitBetween(0.01 * n + 1e-4, 0.01 * n + 1e-4)[0]
-                   .weight;
+        lit += static_cast<double>(
+            strobe.LitBetween(0.01 * n + 1e-4, 0.01 * n + 1e-4)[0]
+                .weight);
     }
     EXPECT_GT(lit, 6.0) << "some pulses started in time";
     EXPECT_LT(lit, 18.0) << "some started late";
