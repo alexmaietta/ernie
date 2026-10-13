@@ -2603,6 +2603,7 @@ bool MeshDrawable::UpdateItems(
 }
 
 void MeshDrawable::SetItems(std::vector<MeshItem> items) {
+    ERNIE_ZONE("Mesh set items");
     for (const MeshItem& item : items) {
         if (!meshes_.contains(item.mesh)) {
             throw std::invalid_argument("Unknown mesh " +

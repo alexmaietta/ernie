@@ -1588,6 +1588,59 @@ TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
     expectFresh("its group's world");
 }
 
+TEST_F(RasterDelegateTest, LikeShapesShareOneMeshThatEditsKeepApart) {
+    Scene scene = MeshScene();
+    for (int i = 0; i < 3; ++i) {
+        const Path cube("/World/Cube" + std::to_string(i));
+        ernie::Cube::Define(scene, cube).SetSize(4.0);
+        ernie::SetXform(scene, cube,
+                        {.translate = {-8.0 + 8.0 * i, 6.0, 0.0}});
+    }
+    RasterDelegate delegate(*context_);
+    const auto meshes = [&delegate] {
+        for (const auto& [name, value] : delegate.Stats().counters) {
+            if (name == ernie::raster_stats::kMeshes) {
+                return value;
+            }
+        }
+        return std::uint64_t{0};
+    };
+    const auto expectFresh = [&](const char* edit) {
+        const Tensor kept = delegate.Render(scene);
+        RasterDelegate fresh(*context_);
+        const Tensor whole = fresh.Render(scene);
+        ASSERT_EQ(kept.Elements(), whole.Elements());
+        EXPECT_EQ(std::memcmp(kept.Data(), whole.Data(),
+                              static_cast<std::size_t>(kept.Elements())),
+                  0)
+            << edit;
+    };
+    delegate.Render(scene);
+    const std::uint64_t alone = meshes();
+    // A fourth like cube adds a draw, not a mesh.
+    ernie::Cube::Define(scene, "/World/Cube3").SetSize(4.0);
+    ernie::SetXform(scene, "/World/Cube3", {.translate = {0.0, -6.0, 0.0}});
+    expectFresh("a like cube added");
+    EXPECT_EQ(meshes(), alone);
+    // One resized takes a mesh of its own; the others keep theirs.
+    ernie::Cube(scene, "/World/Cube1").SetSize(2.0);
+    expectFresh("a cube resized");
+    EXPECT_EQ(meshes(), alone + 1);
+    // Back to the others' size, it shares theirs again.
+    ernie::Cube(scene, "/World/Cube1").SetSize(4.0);
+    expectFresh("a cube resized back");
+    EXPECT_EQ(meshes(), alone);
+    // The mesh stays while a cube draws it, and goes with the last.
+    for (const char* gone : {"/World/Cube0", "/World/Cube1", "/World/Cube2"}) {
+        scene.Remove(gone);
+        expectFresh("a cube removed");
+        EXPECT_EQ(meshes(), alone);
+    }
+    scene.Remove("/World/Cube3");
+    expectFresh("the last cube removed");
+    EXPECT_EQ(meshes(), alone - 1);
+}
+
 TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
     const auto scene = [](bool column, float lift) {
         Scene built = MeshScene();

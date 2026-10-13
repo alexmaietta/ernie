@@ -267,7 +267,7 @@ void Scene::Stamp(const Path& path, PrimData& prim,
         prim.ownTransform = version_;
     }
     if (TargetDirties().contains(attribute)) {
-        dependentsStale_ = true;
+        staleDependents_.insert(path);
     }
     // Written alone, a column's row is the prim's own again.
     if (!prim.bound.empty()) {
@@ -381,7 +381,7 @@ Prim Scene::Define(const Path& path, std::string_view type) {
             prim.samples.clear();
             animated_.erase(path);
             removed_[path] = version_;
-            dependentsStale_ = true;
+            staleDependents_.insert(path);
             Stamp(path, prim, Dirty::Added);
             // Its transform and visibility are gone from under its
             // descendants too.
@@ -499,6 +499,9 @@ bool Scene::Remove(const Path& path) {
     auto last = first;
     while (last != prims_.end() && last->first.HasPrefix(path)) {
         removed_[last->first] = version_;
+        if (dependencyTargets_.contains(last->first)) {
+            staleDependents_.insert(last->first);
+        }
         stamped_.erase({last->second.latest, last->first});
         animated_.erase(last->first);
         if (const auto typed = byType_.find(last->second.type);
@@ -509,7 +512,6 @@ bool Scene::Remove(const Path& path) {
     }
     prims_.erase(first, last);
     ++removals_;
-    dependentsStale_ = true;
     return true;
 }
 
@@ -1346,31 +1348,57 @@ bool Scene::IsVisible(const Path& path) const {
 
 const std::map<Path, std::vector<std::pair<Path, Dirty>>>&
 Scene::Dependents() const {
-    if (!dependentsStale_) {
+    if (staleDependents_.empty()) {
         return dependents_;
     }
     ERNIE_ZONE("Scene dependents");
-    dependents_.clear();
-    for (const auto& [path, prim] : prims_) {
+    for (const Path& path : staleDependents_) {
+        // Its entries as they were out...
+        if (const auto old = dependencyTargets_.find(path);
+            old != dependencyTargets_.end()) {
+            for (const Path& target : old->second) {
+                const auto it = dependents_.find(target);
+                if (it == dependents_.end()) {
+                    continue;
+                }
+                std::erase_if(it->second, [&path](const auto& entry) {
+                    return entry.first == path;
+                });
+                if (it->second.empty()) {
+                    dependents_.erase(it);
+                }
+            }
+            dependencyTargets_.erase(old);
+        }
+        // ...and its relationships as they are in.
+        const auto prim = prims_.find(path);
+        if (prim == prims_.end()) {
+            continue;
+        }
+        std::vector<Path> targets;
         for (const auto& [attribute, bit] : TargetDirties()) {
-            const auto value = prim.values.find(attribute);
-            if (value == prim.values.end()) {
+            const auto value = prim->second.values.find(attribute);
+            if (value == prim->second.values.end()) {
                 continue;
             }
             const auto depend = [&](const Path& target) {
                 if (!target.IsEmpty()) {
                     dependents_[target].emplace_back(path, bit);
+                    targets.push_back(target);
                 }
             };
             if (const auto* target = value->second.Get<Path>()) {
                 depend(*target);
-            } else if (const auto* targets =
+            } else if (const auto* list =
                            value->second.Get<std::vector<Path>>()) {
-                std::ranges::for_each(*targets, depend);
+                std::ranges::for_each(*list, depend);
             }
         }
+        if (!targets.empty()) {
+            dependencyTargets_.emplace(path, std::move(targets));
+        }
     }
-    dependentsStale_ = false;
+    staleDependents_.clear();
     return dependents_;
 }
 

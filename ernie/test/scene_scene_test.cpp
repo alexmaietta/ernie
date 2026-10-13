@@ -334,6 +334,20 @@ TEST(Scene, DeclaredInheritanceAndRelationshipsReachDependents) {
     scene.Remove("/Looks/Grey");
     EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rover/Wheel"),
               Dirty::Material);
+
+    // A bound prim removed and defined again unbound, or retyped,
+    // depends on nothing.
+    scene.Define("/Looks/Grey", tokens::kMaterial);
+    scene.Define("/Looks/Red", tokens::kMaterial);
+    scene.Remove("/World/Rover/Wheel");
+    scene.Define("/World/Rover/Wheel", tokens::kMesh);
+    scene.Define("/World/Rock", tokens::kCube);
+    scene.Changes(cursor);
+    scene.Set("/Looks/Grey", "user:note", 2.0);
+    scene.Set("/Looks/Red", "user:note", 2.0);
+    const std::vector<Change> unbound = scene.Changes(cursor);
+    EXPECT_EQ(BitsOf(unbound, "/World/Rover/Wheel"), Dirty::None);
+    EXPECT_EQ(BitsOf(unbound, "/World/Rock"), Dirty::None);
 }
 
 TEST(Scene, ColumnsWriteManyPrimsWhole) {

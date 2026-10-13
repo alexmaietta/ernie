@@ -707,6 +707,8 @@ RenderStats RasterDelegate::Stats() const {
                                 meshes_.DrawCount(0));
     stats.counters.emplace_back(raster_stats::kMeshDrawCalls,
                                 meshes_.DrawCalls(0));
+    stats.counters.emplace_back(raster_stats::kMeshes,
+                                meshes_.MeshCount());
     stats.counters.emplace_back(raster_stats::kTexturesLoading,
                                 loadingTextures_.size() +
                                     compressingTextures_.size());
@@ -2052,6 +2054,73 @@ RasterDelegate::ChangedMeshes(const Scene& scene,
     return meshes;
 }
 
+namespace {
+
+/// FNV-1a over the geometry's arrays, which `SameGeometry` confirms.
+std::uint64_t GeometryHash(const MeshData& data) {
+    std::uint64_t hash = 0xcbf29ce484222325ull;
+    const auto add = [&hash](const auto& values) {
+        const auto bytes = std::as_bytes(std::span(values));
+        hash = (hash ^ bytes.size()) * 0x100000001b3ull;
+        for (const std::byte b : bytes) {
+            hash = (hash ^ static_cast<std::uint64_t>(b)) *
+                   0x100000001b3ull;
+        }
+    };
+    add(data.points);
+    add(data.indices);
+    add(data.normals);
+    add(data.cornerNormals);
+    add(data.colors);
+    add(data.uvs);
+    return hash;
+}
+
+bool SameGeometry(const MeshData& a, const MeshData& b) {
+    return a.points == b.points && a.indices == b.indices &&
+           a.normals == b.normals && a.cornerNormals == b.cornerNormals &&
+           a.colors == b.colors && a.uvs == b.uvs &&
+           a.lodIndices == b.lodIndices && a.lodUvs == b.lodUvs &&
+           a.lodCornerNormals == b.lodCornerNormals &&
+           a.levels.size() == b.levels.size();
+}
+
+}  // namespace
+
+std::uint32_t RasterDelegate::ShareMesh(MeshData data) {
+    const std::uint64_t hash = GeometryHash(data);
+    for (auto [it, end] = sharedMeshes_.equal_range(hash); it != end;
+         ++it) {
+        if (SameGeometry(it->second.data, data)) {
+            ++it->second.prims;
+            return it->second.handle;
+        }
+    }
+    const std::uint32_t handle = meshes_.AddMesh(data);
+    sharedMeshes_.emplace(hash, SharedMesh{handle, 1, std::move(data)});
+    sharedHashes_[handle] = hash;
+    return handle;
+}
+
+bool RasterDelegate::ReleaseShared(std::uint32_t handle) {
+    const auto hash = sharedHashes_.find(handle);
+    if (hash == sharedHashes_.end()) {
+        return true;
+    }
+    for (auto [it, end] = sharedMeshes_.equal_range(hash->second);
+         it != end; ++it) {
+        if (it->second.handle == handle) {
+            if (--it->second.prims > 0) {
+                return false;
+            }
+            sharedMeshes_.erase(it);
+            break;
+        }
+    }
+    sharedHashes_.erase(hash);
+    return true;
+}
+
 void RasterDelegate::SyncMeshes(const Scene& scene,
                                 const std::vector<Path>* only) {
     ERNIE_ZONE("Sync meshes");
@@ -2062,6 +2131,13 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
     // Meshes replaced or gone, removed at once at the end: one at a
     // time, a new scene's sync took quadratic time in its meshes.
     std::vector<std::uint32_t> dropped;
+    // A shared mesh goes with the last prim drawing it.
+    const auto release = [&](const SyncedMesh& synced) {
+        if (synced.handle != 0 &&
+            (!synced.shared || ReleaseShared(synced.handle))) {
+            dropped.push_back(synced.handle);
+        }
+    };
     bool skinned = false;
     if (only != nullptr) {
         for (const Path& path : *only) {
@@ -2225,7 +2301,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
             if (synced.versions == versions) {
                 continue;
             }
-            if (synced.handle != 0 &&
+            // A shared mesh is never written for one prim: added again.
+            if (synced.handle != 0 && !synced.shared &&
                 !(subdivision && synced.versions[0] != versions[0])) {
                 try {
                     if (synced.versions[3] != versions[3]) {
@@ -2261,8 +2338,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         SyncedMesh synced;
         synced.key = key;
         synced.versions = versions;
-        if (it != syncedMeshes_.end() && it->second.handle != 0) {
-            dropped.push_back(it->second.handle);
+        if (it != syncedMeshes_.end()) {
+            release(it->second);
         }
         try {
             // A skinned mesh or point cache at rest, which the GPU
@@ -2280,7 +2357,18 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
                                 : MeshDataOf(scene, path);
             synced.hasColors = !data.colors.empty();
             synced.tint = ConstantDisplayColor(Gprim(scene, path));
-            synced.handle = meshes_.AddMesh(std::move(data));
+            // An implicit shape nothing writes for it alone shares the
+            // mesh of its geometry: a field of like cubes adds one.
+            synced.shared =
+                scene.TypeOf(path) != kMesh && !deformed && !gpuIndices &&
+                !gpuNormals && !gpuColors && !onGpu(kPoints) &&
+                !meshWriters_.contains(path) &&
+                scene.Read(path, kActiveCounts) == nullptr &&
+                scene.Read(path, kThermalTemperatures) == nullptr &&
+                scene.Read(path, kThermalNodeIds) == nullptr;
+            synced.handle = synced.shared
+                                ? ShareMesh(std::move(data))
+                                : meshes_.AddMesh(std::move(data));
             if (deformed) {
                 AddSkin(scene, path, std::move(binding),
                         std::move(stencils), synced);
@@ -2314,7 +2402,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
             }
         } catch (const std::invalid_argument& error) {
             if (synced.handle != 0) {
-                meshes_.RemoveMesh(synced.handle);
+                if (!synced.shared || ReleaseShared(synced.handle)) {
+                    meshes_.RemoveMesh(synced.handle);
+                }
                 synced.handle = 0;
             }
             errors.push_back(Describe(path, "mesh", error));
@@ -2324,9 +2414,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
     }
     // Those gone: of all, or of those named.
     const auto drop = [&](std::map<Path, SyncedMesh>::iterator it) {
-        if (it->second.handle != 0) {
-            dropped.push_back(it->second.handle);
-        }
+        release(it->second);
         remeshed_.insert(it->first);
         return syncedMeshes_.erase(it);
     };
@@ -3614,6 +3702,15 @@ void RasterDelegate::SetMeshWriter(const Path& path,
     } else {
         meshWriters_.erase(path);
     }
+    // A shared mesh draws other prims too: this prim's is added again
+    // as its own, with the writer, at the next sync.
+    if (handle != 0 && synced->second.shared) {
+        if (writer) {
+            synced->second.key.second[0] = ~0ull;
+            unshared_.insert(path);
+        }
+        return;
+    }
     if (handle != 0) {
         meshes_.SetWriter(handle, std::move(writer), bounds);
     }
@@ -4054,7 +4151,9 @@ void RasterDelegate::Sync(const Scene& scene) {
         const auto view = [&scene](const Change& change) {
             return IsViewChange(scene, change);
         };
-        if (!posing && std::ranges::all_of(changes, view) &&
+        // Meshes to be made a prim's own sync whatever changed.
+        const bool held = posing || !unshared_.empty();
+        if (!held && std::ranges::all_of(changes, view) &&
             std::ranges::all_of(
                 columns, [&](const ColumnChange& column) {
                     return std::ranges::all_of(
@@ -4066,7 +4165,7 @@ void RasterDelegate::Sync(const Scene& scene) {
         }
         // So does a simulation step that only rewrites the arrays of
         // prims posed on the GPU: the drawable takes the new arrays.
-        if (!posing && RefreshGpuXforms(scene, changes, columns)) {
+        if (!held && RefreshGpuXforms(scene, changes, columns)) {
             renderer_.MarkCastersChanged();
             return;
         }
@@ -4109,11 +4208,16 @@ void RasterDelegate::Sync(const Scene& scene) {
     std::optional<std::vector<Path>> changedMeshes;
     if (changed) {
         changedMeshes = ChangedMeshes(scene, *changed);
+        if (changedMeshes) {
+            changedMeshes->insert(changedMeshes->end(), unshared_.begin(),
+                                  unshared_.end());
+        }
         if (changedMeshes &&
             2 * changedMeshes->size() > syncedMeshes_.size()) {
             changedMeshes.reset();
         }
     }
+    unshared_.clear();
     attempt([&] {
         SyncMeshes(scene, changedMeshes ? &*changedMeshes : nullptr);
     });

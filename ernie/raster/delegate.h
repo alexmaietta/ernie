@@ -56,6 +56,9 @@ inline constexpr std::string_view kMeshDraws = "mesh draws";
 /// Mesh draw calls the first view recorded last frame: one per mesh
 /// drawn directly, one per multi-draw of GPU-culled instances.
 inline constexpr std::string_view kMeshDrawCalls = "mesh draw calls";
+/// Meshes uploaded: one for all the prims of an implicit shape's
+/// geometry (a cube of a size, say), which share it.
+inline constexpr std::string_view kMeshes = "meshes";
 /// Image files' textures still loading, whose materials read a
 /// placeholder (`ernie:textureLoading` async).
 inline constexpr std::string_view kTexturesLoading =
@@ -373,6 +376,18 @@ class RasterDelegate : public RenderDelegate {
         /// cache's samples' boxes.
         bool deformed = false;
         std::vector<Bounds3> sampleBounds;
+        /// Its mesh is shared by the prims of the same geometry
+        /// (`ShareMesh`).
+        bool shared = false;
+    };
+
+    /// A mesh drawn for every prim of the same geometry, an implicit
+    /// shape's (a cube of a size, say) that nothing writes on the GPU:
+    /// added once, its levels of detail simplified once.
+    struct SharedMesh {
+        std::uint32_t handle = 0;
+        std::size_t prims = 0;
+        MeshData data;  ///< As added, to tell it apart from others.
     };
 
     /// A mesh's writer and bounds (`SetMeshWriter`).
@@ -627,6 +642,12 @@ class RasterDelegate : public RenderDelegate {
     /// prims a sync's changes name), dropping those of them gone.
     void SyncMeshes(const Scene& scene,
                     const std::vector<Path>* only = nullptr);
+    /// The mesh of `data`'s geometry shared by the prims drawing it,
+    /// added for the first.
+    std::uint32_t ShareMesh(MeshData data);
+    /// Lets go of a prim's share of `handle`: true once no prim draws
+    /// it, to be removed.
+    bool ReleaseShared(std::uint32_t handle);
     /// The prims a sync's `changes` name that are or were meshes, or
     /// null when meshes beyond them may change (the stage's
     /// subdivision level, a skeleton, skinned meshes posed).
@@ -962,6 +983,12 @@ class RasterDelegate : public RenderDelegate {
     /// it has.
     std::unordered_map<Path, std::size_t> itemIndex_;
     std::optional<std::size_t> meshItemCount_;
+    /// Shared meshes by their geometry's hash, and each one's hash.
+    std::unordered_multimap<std::uint64_t, SharedMesh> sharedMeshes_;
+    std::unordered_map<std::uint32_t, std::uint64_t> sharedHashes_;
+    /// Prims whose shared mesh became their own to write
+    /// (`SetMeshWriter`), added again at the next sync.
+    std::set<Path> unshared_;
     /// The stage's subdivision level's version at the last mesh sync,
     /// which every subdivision surface's key reads.
     std::uint64_t subdivisionVersion_ = 0;

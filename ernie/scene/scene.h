@@ -742,11 +742,14 @@ class Scene {
     /// prims stamped since a cursor; and the prims of each type, so
     /// `Prims` of a type visits only those.
     std::set<std::pair<std::uint64_t, Path>> stamped_;
-    /// `Dependents`, and whether a relationship or prim has changed
-    /// since it was built.
+    /// `Dependents`; the prims whose relationships changed, or which
+    /// were defined anew or removed, since it was last brought up to
+    /// date (only theirs are indexed again); and the targets each prim
+    /// is indexed under, to take it out.
     mutable std::map<Path, std::vector<std::pair<Path, Dirty>>>
         dependents_;
-    mutable bool dependentsStale_ = true;
+    mutable std::set<Path> staleDependents_;
+    mutable std::map<Path, std::vector<Path>> dependencyTargets_;
     /// The columns, by id, and of each `PrimSet` and attribute; the
     /// version of the latest column write of each dirty bit (for the
     /// world transform and visibility caches).
