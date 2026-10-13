@@ -1378,6 +1378,11 @@ inline constexpr std::string_view kShadowNormalOffset =
 /// `CascadeDistributionExponent`); default 3.
 inline constexpr std::string_view kShadowSplitExponent =
     "ernie:shadows:splitExponent";
+/// float, m: the farthest a single view's sun cascades reach along
+/// it (Unreal's `DynamicShadowDistanceMovableLight`), nothing past it
+/// shadowed; 0, the default, for as far as the view sees.
+inline constexpr std::string_view kShadowDistance =
+    "ernie:shadows:distance";
 inline constexpr std::string_view kShadowShowCascades =
     "ernie:shadows:showCascades";
 inline constexpr std::string_view kLodEnable = "ernie:lod:enable";

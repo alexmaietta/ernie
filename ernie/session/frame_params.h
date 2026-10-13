@@ -98,6 +98,9 @@ struct ShadowSettings {
         1.5f;  ///< Receiver offset along the normal, in texels.
     float splitExponent =
         3.0f;  ///< Each cascade's depth over the last's.
+    /// The farthest a single view's cascades reach (m), nothing past
+    /// it shadowed; 0 for as far as the view sees.
+    float distance = 0.0f;
     bool showCascades =
         false;  ///< Tint fragments by cascade, for tuning.
     std::uint32_t lightResolution =

@@ -83,6 +83,7 @@ ernie_add_test_suite(
     device_vulkan_context_test.cpp
     raster_atmosphere_gpu_test.cpp
     raster_batch_gpu_test.cpp
+    raster_cascade_shadow_gpu_test.cpp
     raster_culling_gpu_test.cpp
     raster_delegate_gpu_test.cpp
     raster_gpu_block_encoder_gpu_test.cpp

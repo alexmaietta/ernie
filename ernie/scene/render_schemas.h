@@ -193,6 +193,11 @@
       (::ernie::AttributeMeta{.label = "Split exponent",                                           \
                               .doc = "Each cascade's depth over the last's.",                      \
                               .group = "Shadows", .min = 1.0, .max = 8.0}))                        \
+    X(double, ShadowDistance, ::ernie::tokens::kShadowDistance, 0.0,                               \
+      (::ernie::AttributeMeta{.label = "Distance",                                                 \
+                              .doc = "Farthest the cascades reach (m); 0 for as far as the view "  \
+                                     "sees.",                                                      \
+                              .group = "Shadows", .max = 1e7}))                                    \
     X(bool, ShadowShowCascades, ::ernie::tokens::kShadowShowCascades, false,                       \
       (::ernie::AttributeMeta{.label = "Show cascades", .group = "Shadows"}))                      \
     X(std::string, ShadowWorlds, ::ernie::tokens::kShadowWorlds, ::ernie::tokens::kSeparate,       \

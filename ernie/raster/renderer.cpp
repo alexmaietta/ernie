@@ -5890,6 +5890,11 @@ float RasterRenderer::FitCascadeDistance(
         }
         farthest = std::min(farthest, 1.1f * seenFar);
     }
+    // No farther than a set distance, as Unreal's
+    // DynamicShadowDistance, beyond which nothing is shadowed.
+    if (params.shadows.distance > 0.0f) {
+        farthest = std::min(farthest, params.shadows.distance);
+    }
     // A margin keeps surfaces at exactly the farthest depth, such as
     // flat ground under a nadir camera, inside the last cascade.
     return std::clamp(1.01f * farthest, view.nearPlane * 1.01f,

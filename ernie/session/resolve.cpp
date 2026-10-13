@@ -2919,6 +2919,8 @@ FrameParams FrameParamsOf(const Scene& scene,
         static_cast<float>(options.GetShadowNormalOffset());
     shadows.splitExponent = std::max(
         static_cast<float>(options.GetShadowSplitExponent()), 1.0f);
+    shadows.distance = std::max(
+        static_cast<float>(options.GetShadowDistance()), 0.0f);
     shadows.showCascades = options.GetShadowShowCascades();
     if (!prims.dome.IsEmpty()) {
         params.dome =
