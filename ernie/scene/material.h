@@ -117,6 +117,10 @@ struct MaterialSettings {
     /// surface emits, in cd/m^2 for white (the photometric units of
     /// lights' luminance), upsampled to a spectrum.
     glm::vec3 emission{0.0f};
+    /// The emission varies over the surface as its albedo texture
+    /// does (emissiveColor connected to a texture, which is then the
+    /// albedo's): each point emits `emission` times its albedo.
+    bool emissionTextured = false;
     /// Its temperature in kelvin (`tokens::kThermalTemperature`):
     /// above 0 it emits emissivity times Planck's radiance in every
     /// band.

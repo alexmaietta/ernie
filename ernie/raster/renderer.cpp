@@ -4270,7 +4270,8 @@ void RasterRenderer::WriteMaterialTable() {
         const float peak =
             std::max({emission.r, emission.g, emission.b});
         if (peak > 0.0f) {
-            entry.info[2] = 1;
+            // 2: times the pixel's albedo, a texture's emission.
+            entry.info[2] = settings.emissionTextured ? 2u : 1u;
             const Spectrum emitted =
                 RgbToSpectrum(glm::dvec3(emission / peak));
             const double perNit =

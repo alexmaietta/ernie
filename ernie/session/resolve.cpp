@@ -321,10 +321,11 @@ double ProfileRing(const std::vector<float>& profile, double c) {
     const double t = at - row;
     double sum = 0.0;
     for (int j = 0; j < columns; ++j) {
-        const double below = static_cast<double>(profile[
-            static_cast<std::size_t>(row * columns + j)]);
-        const double above = static_cast<double>(profile[
-            static_cast<std::size_t>((row + 1) * columns + j)]);
+        const double below = static_cast<double>(
+            profile[static_cast<std::size_t>(row * columns + j)]);
+        const double above =
+            static_cast<double>(profile[static_cast<std::size_t>(
+                (row + 1) * columns + j)]);
         sum += (1.0 - t) * below + t * above;
     }
     return sum / columns;
@@ -1220,7 +1221,8 @@ Path ViewChainProduct(const Scene& scene, const Path& settings,
     // The session's own products are its camera's alone.
     const Path session(kSessionRoot);
     for (const Path& product : scene.Prims(kRenderProduct)) {
-        if ((!product.HasPrefix(session) || camera.HasPrefix(session)) &&
+        if ((!product.HasPrefix(session) ||
+             camera.HasPrefix(session)) &&
             looksThrough(product)) {
             return product;
         }
@@ -2885,7 +2887,8 @@ FrameParams FrameParamsOf(const Scene& scene,
     params.minimalColor =
         glm::vec3(options.GetMinimalConstantColor());
     const std::string precision = options.GetSpectralPrecision();
-    if (precision != tokens::kFloat32 && precision != tokens::kFloat16) {
+    if (precision != tokens::kFloat32 &&
+        precision != tokens::kFloat16) {
         throw std::invalid_argument(
             "'" + std::string(tokens::kSpectralPrecision) + "' of '" +
             settings.String() + "' is '" + precision +
@@ -3599,17 +3602,48 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
     // Emission, from the preview surface or else the Material itself,
     // whatever the model.
     const Path& emitter = surface.IsEmpty() ? material : surface;
-    if (GetConnection(scene, emitter, kEmissiveColor)) {
-        throw std::invalid_argument("'" + emitter.String() + "' " +
-                                    std::string(kEmissiveColor) +
-                                    " is connected; only a constant "
-                                    "emissiveColor is supported");
+    // A texture's emission: its scale is the emission's colour and
+    // strength, and its texels the albedo's, which the emission
+    // follows (`MaterialSettings::emissionTextured`), such as a
+    // star's surface. The diffuse colour's texture must be the same,
+    // or none.
+    const std::optional<Connection> emissive =
+        surface.IsEmpty()
+            ? std::nullopt
+            : TextureConnection(scene, surface, kEmissiveColor);
+    if (emissive) {
+        TextureReader reader = TextureReaderOf(
+            scene, *emissive, kEmissiveColor, surface);
+        const glm::vec3 strength(reader.scale);
+        reader.scale = glm::vec4(1.0f);
+        reader.bias = glm::vec4(0.0f);
+        if (settings.albedoTexture &&
+            settings.albedoTexture->Source() != reader.Source()) {
+            throw std::invalid_argument(
+                "'" + emitter.String() + "' " +
+                std::string(kEmissiveColor) + " and " +
+                std::string(kDiffuseColor) +
+                " read different textures; a surface emits as its "
+                "albedo texture varies");
+        }
+        settings.albedoTexture = reader;
+        settings.albedo = glm::vec3(1.0f);
+        settings.emission = glm::max(strength, glm::vec3(0.0f));
+        settings.emissionTextured = true;
+    } else if (GetConnection(scene, emitter, kEmissiveColor)) {
+        throw std::invalid_argument(
+            "'" + emitter.String() + "' " +
+            std::string(kEmissiveColor) +
+            " is connected to what is not a texture; only a constant "
+            "or a texture's emissiveColor is read");
+    } else {
+        const glm::dvec3 emission =
+            surface.IsEmpty()
+                ? view.GetEmissiveColor()
+                : Shader(scene, surface).GetEmissiveColor();
+        settings.emission =
+            glm::max(glm::vec3(emission), glm::vec3(0.0f));
     }
-    const glm::dvec3 emission =
-        surface.IsEmpty() ? view.GetEmissiveColor()
-                          : Shader(scene, surface).GetEmissiveColor();
-    settings.emission =
-        glm::max(glm::vec3(emission), glm::vec3(0.0f));
     // Thermal emission, whatever the model.
     const double temperature = view.GetThermalTemperature();
     if (!(temperature >= 0.0)) {

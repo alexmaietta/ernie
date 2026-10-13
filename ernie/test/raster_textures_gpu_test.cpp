@@ -1605,3 +1605,43 @@ TEST_F(RasterDelegateTest,
     EXPECT_THROW(Render(delegate, scene, "Temperature"),
                  std::invalid_argument);
 }
+
+// A surface whose emissiveColor reads a texture glows as its texels
+// go, unlit: red where they are red, blue where blue; the texture's
+// scale is how bright, twice the scale twice the light.
+TEST_F(RasterDelegateTest, TexturesEmitAsTheirTexelsGo) {
+    constexpr std::int64_t kSide = 64;
+    std::vector<std::uint8_t> texels;
+    for (std::int64_t row = 0; row < kSide; ++row) {
+        for (std::int64_t col = 0; col < kSide; ++col) {
+            const bool left = col < kSide / 2;
+            texels.insert(
+                texels.end(),
+                {static_cast<std::uint8_t>(left ? 255 : 0), 0,
+                 static_cast<std::uint8_t>(left ? 0 : 255), 255});
+        }
+    }
+    Scene scene = TexturedScene();
+    scene.Remove("/World/Sun");
+    ernie::Shader(scene, "/Looks/M/Surface")
+        .SetDiffuseColor(glm::dvec3(0.0));
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetTexture(
+            Tensor::Copy<std::uint8_t>(texels, {kSide, kSide, 4}));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kEmissiveColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    RasterDelegate delegate(*context_);
+    const auto glow = [&](double strength) {
+        scene.Set("/Looks/M/Tex", tokens::kShaderScale,
+                  glm::dvec4(strength, strength, strength, 1.0));
+        return Quadrants(delegate, scene);
+    };
+    const std::vector<float> dim = glow(1.0);
+    const std::vector<float> bright = glow(2.0);
+    // Quadrants' first point is on the left, the second on the right.
+    EXPECT_GT(dim[0], 5.0f * dim[2]) << "red on the left";
+    EXPECT_GT(dim[5], 5.0f * dim[3]) << "blue on the right";
+    EXPECT_GT(dim[0], 0.0f);
+    EXPECT_NEAR(bright[0], 2.0f * dim[0], 0.05f * dim[0]);
+    EXPECT_NEAR(bright[5], 2.0f * dim[5], 0.05f * dim[5]);
+}

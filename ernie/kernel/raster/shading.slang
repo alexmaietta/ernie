@@ -195,8 +195,9 @@ struct LightGpu {
 
 struct MaterialGpu {
     // x: model index; y: the parameter a per-pixel value in the G-buffer replaces, plus 1 (0 for
-    // none; `packSurfaceFlags`); z: 1 when the surface emits; w: the float bits of the share of
-    // incident polarization its diffuse reflection keeps.
+    // none; `packSurfaceFlags`); z: 1 when the surface emits, 2 as its albedo varies (a texture's
+    // emission); w: the float bits of the share of incident polarization its diffuse reflection
+    // keeps.
     uint4 info;
     // The model's core parameters (`BrdfParams::values`).
     float4 params[4];
@@ -3108,8 +3109,10 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let band = min(first + j, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             let dome = bandValue(sh.dome, band);
+            // A texture's emission (info.z 2) varies as the albedo it gives does.
             if (material.info.z != 0 && !unlit) {
-                radiance[j] += emissionBand(ids.x, band);
+                radiance[j] += emissionBand(ids.x, band) *
+                               (material.info.z == 2 ? bandAlbedo[j] : 1.0);
             }
             if (kelvin > 0.0 && !unlit) {
                 radiance[j] += thermalBand(ids.x, band, kelvin);
