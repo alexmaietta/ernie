@@ -1424,12 +1424,20 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
         Scene built = MeshScene();
         std::vector<Path> cubes;
         std::vector<float> rows;
+        // Red, green and blue: the colours as a column too.
+        const std::vector<float> colours = {0.9f, 0.1f, 0.1f, 0.1f, 0.9f,
+                                            0.1f, 0.1f, 0.1f, 0.9f};
         for (int i = 0; i < 3; ++i) {
             const Path cube("/World/Cube" + std::to_string(i));
             ernie::Cube::Define(built, cube).SetSize(4.0);
             const glm::dvec3 at(-8.0 + 8.0 * i, -6.0,
                                 static_cast<double>(lift) * i);
             ernie::SetXform(built, cube, {.translate = at});
+            if (!column) {
+                const auto c = static_cast<std::size_t>(3 * i);
+                ernie::Cube(built, cube).SetDisplayColor(
+                    std::span(colours).subspan(c, 3));
+            }
             cubes.push_back(cube);
             rows.insert(rows.end(), {static_cast<float>(at.x),
                                      static_cast<float>(at.y),
@@ -1438,6 +1446,8 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
         if (column) {
             built.GetColumn(ernie::PrimSet(cubes), tokens::kTranslate)
                 .Write(Tensor::Copy<float>(rows, {3, 3}));
+            built.GetColumn(ernie::PrimSet(cubes), tokens::kDisplayColor)
+                .Write(Tensor::Copy<float>(colours, {3, 3}));
         }
         return built;
     };
@@ -1463,6 +1473,13 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
                                    "/World/Cube2"}),
                    tokens::kTranslate)
         .Write(Tensor::Copy<float>(lifted, {3, 3}));
+    const std::vector<float> colours = {0.9f, 0.1f, 0.1f, 0.1f, 0.9f,
+                                        0.1f, 0.1f, 0.1f, 0.9f};
+    columns
+        .GetColumn(ernie::PrimSet({"/World/Cube0", "/World/Cube1",
+                                   "/World/Cube2"}),
+                   tokens::kDisplayColor)
+        .Write(Tensor::Copy<float>(colours, {3, 3}));
     const Tensor drawn = delegate.Render(columns);
     RasterDelegate fresh(*context_);
     const Tensor alone = fresh.Render(scene(false, 2.0f));

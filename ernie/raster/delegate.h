@@ -425,6 +425,9 @@ class RasterDelegate : public RenderDelegate {
         /// under and the CPU transforms between.
         bool composed = false;
         std::vector<InstanceParent> parents;
+        /// Its prims' constant colours as rows of one array (a column
+        /// of `primvars:displayColor`), if they are: instance colours.
+        Tensor colors;
     };
     /// A prim posed on the GPU: its group (in `gpuXformGroups_`), its
     /// instancer and its row there, and the prim whose world

@@ -1895,7 +1895,8 @@ void RasterDelegate::SetMeshAttributes(const Scene& scene,
                            scene.WriteStream(path, tokens::kNormals));
     }
     const Tensor* colors = Gprim(scene, path).ReadDisplayColor();
-    if (colors != nullptr && IsGpu(colors->Location().kind)) {
+    if (colors != nullptr && IsGpu(colors->Location().kind) &&
+        colors->Elements() != 3) {
         RequireCompute();
         meshes_.SetColors(
             handle, *colors,
@@ -2061,13 +2062,16 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
                    IsGpu(tensor->Location().kind);
         };
         const bool gpuNormals = onGpu(kNormals);
-        const bool gpuColors = onGpu(kDisplayColor);
+        // A constant colour (a value, or one row, as a column's) only
+        // tints the draws (`SyncedMesh::tint`, or a group's instance
+        // colours): the mesh stays, as colours per vertex do not.
+        const Tensor* colours = scene.Read(path, kDisplayColor);
+        const bool constantColour =
+            colours == nullptr || colours->Elements() == 3;
+        const bool gpuColors = onGpu(kDisplayColor) && !constantColour;
         key.second[3] = gpuNormals ? 1 : key.second[3];
         key.second[4] = gpuColors ? 1 : key.second[4];
-        // A constant colour only tints the draws
-        // (`SyncedMesh::tint`): the mesh stays, as colours per vertex
-        // do not.
-        if (scene.Read(path, kDisplayColor) == nullptr) {
+        if (constantColour) {
             key.second[4] = 0;
         }
         // A subdivision surface's level (its own or the stage's) and
@@ -2916,6 +2920,26 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
         Path path;
         GpuXform pose;
     };
+    // The members' constant colours as rows of one array (a column),
+    // each at its pose's row: the group's instance colours.
+    const auto columnColors = [&scene](const std::vector<Member>& members) {
+        const Tensor* whole = nullptr;
+        for (const Member& member : members) {
+            const std::pair<Tensor, std::int64_t>* row =
+                scene.RowOf(member.path, tokens::kDisplayColor);
+            if (row == nullptr || row->second != member.pose.row ||
+                (whole != nullptr && row->first.Data() != whole->Data())) {
+                return Tensor();
+            }
+            whole = &row->first;
+        }
+        if (whole == nullptr || whole->Type() != DType::Float32 ||
+            whole->Rank() != 2 || whole->Shape()[1] != 3 ||
+            !whole->IsContiguous()) {
+            return Tensor();
+        }
+        return *whole;
+    };
     // Prims sharing arrays (one `Scene::Write` of many paths), then
     // each group by its first prim.
     std::map<std::vector<const void*>, std::vector<Member>> byArrays;
@@ -3053,8 +3077,8 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
                         member.path, member.pose.ops[k].first);
                 }
                 for (const std::string_view attribute :
-                     {kXformOpOrder, kXformExtent,
-                      kQuaternionOrder}) {
+                     {kXformOpOrder, kXformExtent, kQuaternionOrder,
+                      kDisplayColor}) {
                     version += scene.AttributeVersion(member.path,
                                                       attribute);
                 }
@@ -3111,6 +3135,7 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
             for (const auto& [op, whole] : first.ops) {
                 group.ops.push_back(op);
             }
+            group.colors = composed ? Tensor() : columnColors(members);
             // Versions count within one scene: another scene's prims
             // at the same paths upload.
             if (version != group.version || group.version == 0 ||
@@ -3197,6 +3222,12 @@ void RasterDelegate::UploadGpuXformGroup(GpuXformGroup& group,
     data.extent = group.extent;
     data.stream = pose.stream;
     data.orientationsWFirst = pose.wFirst;
+    // Its prims' constant colours, a column of them, as instance colours.
+    if (!group.colors.Empty()) {
+        data.colors = group.colors.Location().kind == DeviceKind::Cpu
+                          ? compute.Upload(group.colors)
+                          : group.colors;
+    }
     if (group.handle == 0) {
         group.handle = meshes_.AddInstancer({});
     }
@@ -3410,29 +3441,47 @@ bool RasterDelegate::RefreshGpuXforms(
             return false;
         }
     }
-    // Columns written whole: a group's transform op, its rows in the
-    // group's order (its first and last prims checked), all of them.
+    // Columns written whole: a group's transform op or constant
+    // colours, its rows in the group's order (its first and last prims
+    // checked), all of them.
     for (const ColumnChange& column : columns) {
         const std::vector<Path>& paths = *column.paths;
         const auto first = gpuPosed_.find(paths.front());
         const auto last = gpuPosed_.find(paths.back());
-        if (column.bits != Dirty::Transform ||
-            first == gpuPosed_.end() || last == gpuPosed_.end() ||
+        if (first == gpuPosed_.end() || last == gpuPosed_.end() ||
             first->second.group != last->second.group) {
             return false;
         }
         GpuXformGroup& group = *first->second.group;
-        const auto op =
-            std::ranges::find(group.ops, column.attribute);
-        if (op == group.ops.end() || group.members != paths.size() ||
-            first->second.row != 0 ||
+        if (group.members != paths.size() || first->second.row != 0 ||
             std::size_t{last->second.row} + 1 != paths.size() ||
-            scene.AttributeVersion(paths.front(),
-                                   tokens::kXformOpOrder) >
+            scene.AttributeVersion(paths.front(), tokens::kXformOpOrder) >
                 syncedVersion_) {
             return false;
         }
         Touched& seen = touched[&group];
+        if (column.attribute == tokens::kDisplayColor) {
+            // The group's instance colours, taken whole.
+            const std::pair<Tensor, std::int64_t>* row =
+                scene.RowOf(paths.front(), column.attribute);
+            if (group.composed || row == nullptr ||
+                row->first.Type() != DType::Float32 ||
+                row->first.Rank() != 2 || row->first.Shape()[1] != 3 ||
+                row->first.Shape()[0] != group.rows ||
+                !row->first.IsContiguous()) {
+                return false;
+            }
+            group.colors = row->first;
+            if (seen.path == nullptr) {
+                seen.path = &paths.front();
+            }
+            seen.rewritten = std::max(seen.rewritten, paths.size());
+            continue;
+        }
+        const auto op = std::ranges::find(group.ops, column.attribute);
+        if (column.bits != Dirty::Transform || op == group.ops.end()) {
+            return false;
+        }
         const auto index =
             static_cast<std::size_t>(op - group.ops.begin());
         const std::pair<Tensor, std::int64_t>* row =
