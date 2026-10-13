@@ -21,6 +21,7 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <tuple>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -878,6 +879,13 @@ class MeshDrawable : public RasterDrawable {
         std::size_t count = 0;
         std::uint32_t first = 0;
         bool dirty = false;
+        /// What its draws read of it (`LayoutOf`) when they were last
+        /// written whole: unchanged, new arrays only flip its halves.
+        std::uint64_t drawnLayout = ~0ull;
+        /// Its halves flipped or settled (`FlipInstancer`,
+        /// `SettleMotion`) since `Prepare` last wrote its draws'
+        /// bases.
+        bool rebase = false;
         /// Which half of the double-buffered instance pools holds its
         /// arrays now, as the mesh's `pointSet`.
         std::uint32_t set = 0;
@@ -922,6 +930,14 @@ class MeshDrawable : public RasterDrawable {
     /// Whether an instancer colours its instances, in place of its
     /// prototypes' colours; composed ones do not.
     static bool HasInstanceColors(const Instancer& instancer);
+    /// What draws and cull items read of `instancer` besides its
+    /// halves' bases: its first slot, and which arrays it has.
+    static std::uint64_t LayoutOf(const Instancer& instancer);
+    /// For instancers only flipping their halves since the draws were
+    /// written (`flipped`), their draws' and cull items' bases set
+    /// anew in the copies kept, and those uploaded, not every draw
+    /// built again.
+    void PatchInstanceBases(std::span<const std::uint32_t> flipped);
 
     /// The bounds of a device instancer's positions from its GPU
     /// measurements, widened by its motion between the last two, and
@@ -1342,6 +1358,10 @@ class MeshDrawable : public RasterDrawable {
     /// Whether `cullItemBuffer_` and `cullLevelBuffer_` are out of
     /// date: they change only with the draws (`WriteDraws`).
     bool cullItemsDirty_ = true;
+    /// The draws and cull items as last written (`GpuDraw`s and
+    /// `GpuCullItem`s), for `PatchInstanceBases`.
+    std::vector<std::byte> drawBytes_;
+    std::vector<std::byte> cullItemBytes_;
     /// `Bounds` and `WorldsBounds` as last computed, until the items,
     /// their transforms, points or instances change
     /// (`ForgetBounds`).
@@ -1387,6 +1407,20 @@ class MeshDrawable : public RasterDrawable {
         std::uint32_t draws = 0;
         std::vector<std::vector<VisibleRange>> viewDraws;
         std::vector<std::uint32_t> jobStarts;
+        /// The shadow views' lists after the views', kept while no
+        /// cascade tests bounds on the CPU and each cascade's world,
+        /// shadow mask and culling stay: their jobs, records and
+        /// counts, the totals after them, and the lists.
+        bool shadows = false;
+        std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
+                               bool>>
+            cascades;
+        std::vector<GpuCullJob> shadowJobs;
+        std::vector<glm::uvec4> shadowRecords;
+        std::vector<std::uint32_t> shadowDrawCounts;
+        std::uint32_t shadowVisible = 0;
+        std::uint32_t shadowDrawTotal = 0;
+        std::vector<std::vector<VisibleRange>> shadowLists;
     };
     ViewCullLayout viewLayout_;
     std::unique_ptr<GpuBuffer>

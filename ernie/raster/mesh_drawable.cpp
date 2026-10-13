@@ -2412,7 +2412,8 @@ void MeshDrawable::SettleMotion() {
         it = pending ? std::next(it) : activeMeshes_.erase(it);
     }
     for (auto& [handle, instancer] : instancers_) {
-        drawsDirty_ = drawsDirty_ || instancer.moving;
+        // Only its draws' bases change (`PatchInstanceBases`).
+        instancer.rebase = instancer.rebase || instancer.moving;
         instancer.moving = false;
         instancer.written = false;
         // Views mapped for this frame expire: one handed back later
@@ -2975,7 +2976,7 @@ void MeshDrawable::FlipInstancer(Instancer& instancer) {
         instancer.set ^= 1u;
         instancer.written = true;
         instancer.moving = true;
-        drawsDirty_ = true;
+        instancer.rebase = true;
     }
 }
 
@@ -3142,9 +3143,21 @@ void MeshDrawable::Prepare(const FrameParams& params,
     // instancers, not every frame.
     bool drawsChanged =
         drawsDirty_ || geometryDirty_ || instancesDirty_ ||
-        renderer_.MaterialSetVersion() != drawsMaterials_;
+        renderer_.MaterialSetVersion() != drawsMaterials_ ||
+        drawBytes_.size() != items_.size() * sizeof(GpuDraw);
+    // Instancers given new arrays alone (a simulation's poses every
+    // step) only flip their halves: their draws' bases are patched
+    // (`PatchInstanceBases`), not every draw written again.
+    std::vector<std::uint32_t> flipped;
     for (const auto& [handle, instancer] : instancers_) {
-        drawsChanged = drawsChanged || instancer.dirty;
+        if (!instancer.dirty && !instancer.rebase) {
+            continue;
+        }
+        if (instancer.drawnLayout == LayoutOf(instancer)) {
+            flipped.push_back(handle);
+        } else {
+            drawsChanged = true;
+        }
     }
     if (geometryDirty_) {
         RebuildGeometry();
@@ -3293,6 +3306,11 @@ void MeshDrawable::Prepare(const FrameParams& params,
         WriteDraws();
         drawsDirty_ = false;
         drawsMaterials_ = renderer_.MaterialSetVersion();
+    } else if (!flipped.empty()) {
+        PatchInstanceBases(flipped);
+    }
+    for (auto& [handle, instancer] : instancers_) {
+        instancer.rebase = false;
     }
     WriteBoundsJobs();
     Cull(params, cascades);
@@ -3404,6 +3422,11 @@ void MeshDrawable::WriteDraws() {
     } else if (!draws.empty()) {
         renderer_.Uploads().Write(*draws_,
                                   std::as_bytes(std::span(draws)));
+    }
+    const std::span written = std::as_bytes(std::span(draws));
+    drawBytes_.assign(written.begin(), written.end());
+    for (auto& [handle, instancer] : instancers_) {
+        instancer.drawnLayout = LayoutOf(instancer);
     }
     if (instanceIds_->Size() < bytes(instanceIds)) {
         vkDeviceWaitIdle(context_.Device());
@@ -4176,7 +4199,57 @@ void MeshDrawable::Cull(const FrameParams& params,
     }
     shadowDraws_.clear();
     gpuShadowSlots_.clear();
+    // The shadow views' lists, kept as the views' are while no cascade
+    // tests bounds here (the GPU culls, fits it, or it culls nothing)
+    // and their worlds, masks and culling stay: only their cull blocks
+    // are written again.
+    std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
+                           bool>>
+        cascadeKeys;
+    bool shadowsCacheable = cacheable;
     for (const ShadowCascade& cascade : cascades) {
+        cascadeKeys.emplace_back(cascade.world, cascade.shadowMask,
+                                 cascade.moving);
+        shadowsCacheable = shadowsCacheable &&
+                           (culling_ == Culling::Gpu ||
+                            cascade.gpuFitted || cascade.moving);
+    }
+    const bool reuseShadows = shadowsCacheable && reuse &&
+                              viewLayout_.shadows &&
+                              viewLayout_.cascades == cascadeKeys;
+    const std::size_t jobsBefore = jobs.size();
+    const std::size_t recordsBefore = records.size();
+    const std::size_t countsBefore = cullDrawCounts_.size();
+    if (reuseShadows) {
+        jobs.insert(jobs.end(), viewLayout_.shadowJobs.begin(),
+                    viewLayout_.shadowJobs.end());
+        records.insert(records.end(), viewLayout_.shadowRecords.begin(),
+                       viewLayout_.shadowRecords.end());
+        cullDrawCounts_.insert(cullDrawCounts_.end(),
+                               viewLayout_.shadowDrawCounts.begin(),
+                               viewLayout_.shadowDrawCounts.end());
+        visible = viewLayout_.shadowVisible;
+        draws = viewLayout_.shadowDrawTotal;
+        shadowDraws_ = viewLayout_.shadowLists;
+    }
+    for (const ShadowCascade& cascade : cascades) {
+        if (reuseShadows) {
+            if (cascade.gpuFitted && !cascade.moving) {
+                gpuShadowSlots_.emplace_back(
+                    cascade.gpuMatrix,
+                    static_cast<std::uint32_t>(views.size() /
+                                               kCullViewStride));
+            }
+            Frustum frustum;
+            frustum.planes.fill(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            if (!cascade.moving) {
+                frustum = Frustum::FromMatrix(cascade.lightViewProjection);
+            }
+            pushView(frustum, cascade.lightViewProjection,
+                     1.0f / std::max(cascade.texelWorldSize, 1e-30f),
+                     false);
+            continue;
+        }
         // Views the GPU fits cull there only, their blocks patched
         // (`RecordShadowViews`); those moving across the shutter cull
         // nothing.
@@ -4198,6 +4271,24 @@ void MeshDrawable::Cull(const FrameParams& params,
                  1.0f / std::max(cascade.texelWorldSize, 1e-30f),
                  false, seen ? &*seen : nullptr, !cascade.gpuFitted,
                  cascade.shadowMask, !cascade.moving));
+    }
+    if (!reuseShadows) {
+        viewLayout_.shadows = shadowsCacheable && viewLayout_.valid;
+        if (viewLayout_.shadows) {
+            const auto from = [](const auto& all, std::size_t first) {
+                return std::vector(
+                    all.begin() + static_cast<std::ptrdiff_t>(first),
+                    all.end());
+            };
+            viewLayout_.cascades = cascadeKeys;
+            viewLayout_.shadowJobs = from(jobs, jobsBefore);
+            viewLayout_.shadowRecords = from(records, recordsBefore);
+            viewLayout_.shadowDrawCounts =
+                from(cullDrawCounts_, countsBefore);
+            viewLayout_.shadowVisible = visible;
+            viewLayout_.shadowDrawTotal = draws;
+            viewLayout_.shadowLists = shadowDraws_;
+        }
     }
     if (!gpuShadowSlots_.empty()) {
         Reserve(context_, gpuShadowSlotBuffer_,
@@ -4323,8 +4414,57 @@ void MeshDrawable::WriteCullItems() {
         }
         std::memcpy(&entry.info[1], &flags, sizeof(flags));
     }
-    UploadCull(cullItemBuffer_, std::as_bytes(std::span(items)));
+    const std::span written = std::as_bytes(std::span(items));
+    cullItemBytes_.assign(written.begin(), written.end());
+    UploadCull(cullItemBuffer_, written);
     UploadCull(cullLevelBuffer_, std::as_bytes(std::span(levels)));
+}
+
+std::uint64_t MeshDrawable::LayoutOf(const Instancer& instancer) {
+    const bool orientations =
+        instancer.composed ||
+        (instancer.onDevice ? !instancer.device.orientations.Empty()
+                            : !instancer.data.orientations.empty());
+    const bool scales =
+        instancer.composed ||
+        (instancer.onDevice ? !instancer.device.scales.Empty()
+                            : !instancer.data.scales.empty());
+    return std::uint64_t{instancer.first} << 8 |
+           std::uint64_t{orientations} << 0 |
+           std::uint64_t{scales} << 1 |
+           std::uint64_t{HasInstanceColors(instancer)} << 2 |
+           std::uint64_t{instancer.composed} << 3;
+}
+
+void MeshDrawable::PatchInstanceBases(
+    std::span<const std::uint32_t> flipped) {
+    ERNIE_ZONE("Mesh patch instance bases");
+    const bool items =
+        !cullItemsDirty_ &&
+        cullItemBytes_.size() == items_.size() * sizeof(GpuCullItem);
+    for (std::size_t i = 0; i < items_.size(); ++i) {
+        const std::optional<std::uint32_t>& handle = items_[i].instancer;
+        if (!handle || std::ranges::find(flipped, *handle) == flipped.end()) {
+            continue;
+        }
+        const Instancer& instancer = instancers_.at(*handle);
+        const std::array<std::uint32_t, 2> bases{
+            InstanceBase(instancer), InstanceBase(instancer, true)};
+        std::memcpy(drawBytes_.data() + i * sizeof(GpuDraw) +
+                        offsetof(GpuDraw, motion),
+                    bases.data(), sizeof(bases));
+        if (items) {
+            std::memcpy(cullItemBytes_.data() +
+                            i * sizeof(GpuCullItem) +
+                            offsetof(GpuCullItem, levels) +
+                            2 * sizeof(std::uint32_t),
+                        bases.data(), sizeof(bases));
+        }
+    }
+    renderer_.Uploads().Write(*draws_, drawBytes_);
+    if (items) {
+        UploadCull(cullItemBuffer_, cullItemBytes_);
+    }
 }
 
 void MeshDrawable::UploadCull(std::unique_ptr<GpuBuffer>& buffer,
