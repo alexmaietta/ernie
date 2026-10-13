@@ -450,6 +450,11 @@ class MeshDrawable : public RasterDrawable {
 
     /// @throws std::invalid_argument for an unknown mesh.
     void RemoveMesh(std::uint32_t mesh);
+    /// `RemoveMesh` of each of `meshes` in one pass over the draw
+    /// items, as a new scene drops every mesh of the last.
+    /// @throws std::invalid_argument for an unknown mesh, removing
+    /// none.
+    void RemoveMeshes(std::span<const std::uint32_t> meshes);
 
     /// Adds an instancer and returns its handle.
     /// @throws std::invalid_argument as `SetInstances`.

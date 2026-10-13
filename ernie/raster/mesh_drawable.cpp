@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace ernie {
@@ -1801,15 +1802,29 @@ MeshDrawable::Pool(std::span<const std::byte> bytes) const {
 }
 
 void MeshDrawable::RemoveMesh(std::uint32_t mesh) {
-    if (meshes_.erase(mesh) == 0) {
-        throw std::invalid_argument("Unknown mesh " +
-                                    std::to_string(mesh));
+    RemoveMeshes(std::span(&mesh, 1));
+}
+
+void MeshDrawable::RemoveMeshes(std::span<const std::uint32_t> meshes) {
+    if (meshes.empty()) {
+        return;
     }
-    std::erase_if(items_, [mesh](const MeshItem& item) {
-        return item.mesh == mesh;
+    for (const std::uint32_t mesh : meshes) {
+        if (!meshes_.contains(mesh)) {
+            throw std::invalid_argument("Unknown mesh " +
+                                        std::to_string(mesh));
+        }
+    }
+    const std::unordered_set<std::uint32_t> removed(meshes.begin(),
+                                                    meshes.end());
+    for (const std::uint32_t mesh : removed) {
+        meshes_.erase(mesh);
+        activeMeshes_.erase(mesh);
+        writers_.erase(mesh);
+    }
+    std::erase_if(items_, [&removed](const MeshItem& item) {
+        return removed.contains(item.mesh);
     });
-    activeMeshes_.erase(mesh);
-    writers_.erase(mesh);
     ForgetBounds();
     itemPipelines_.clear();
     geometryDirty_ = true;

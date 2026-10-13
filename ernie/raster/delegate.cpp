@@ -1861,6 +1861,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
     std::set<Path> seen;
     std::vector<std::string> errors;
     std::vector<Path> paths;
+    // Meshes replaced or gone, removed at once at the end: one at a
+    // time, a new scene's sync took quadratic time in its meshes.
+    std::vector<std::uint32_t> dropped;
     bool skinned = false;
     for (const std::string_view type :
          {kMesh, kCube, kSphere, kCylinder, kCone, kCapsule,
@@ -2008,7 +2011,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
         synced.key = key;
         synced.versions = versions;
         if (it != syncedMeshes_.end() && it->second.handle != 0) {
-            meshes_.RemoveMesh(it->second.handle);
+            dropped.push_back(it->second.handle);
         }
         try {
             // A skinned mesh or point cache at rest, which the GPU
@@ -2073,10 +2076,11 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             continue;
         }
         if (it->second.handle != 0) {
-            meshes_.RemoveMesh(it->second.handle);
+            dropped.push_back(it->second.handle);
         }
         it = syncedMeshes_.erase(it);
     }
+    meshes_.RemoveMeshes(dropped);
     skinned_ = skinned;
     posedTimeCode_ = scene.AttributeVersion(Path::Root(), kTimeCode);
     if (skinned) {
