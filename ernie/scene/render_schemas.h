@@ -373,7 +373,11 @@
                               .doc = "A built-in filter (lens, qe, noise, adc, cie, exposure) or " \
                                      "a custom filter's id; its parameters are inputs:*.",         \
                               .group = "Filter",                                                   \
-                              .options = {"lens", "qe", "noise", "adc", "cie", "exposure"}}))
+                              .options = {"lens", "qe", "noise", "adc", "cie", "exposure"}}))      \
+    X(bool, FilterEnabled, ::ernie::tokens::kFilterEnabled, true,                                  \
+      (::ernie::AttributeMeta{.label = "Enabled",                                                  \
+                              .doc = "Off, the chain runs without it (bypassed).",                 \
+                              .group = "Filter"}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_RENDER_SETTINGS_BASE_ALL(X)                                                          \

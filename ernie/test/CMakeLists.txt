@@ -55,7 +55,6 @@ ernie_add_test_suite(
     util_tiff_test.cpp
     util_reflectance_library_test.cpp
     util_ies_test.cpp
-    util_cloud_noise_test.cpp
     util_cloud_phase_test.cpp
     util_cloud_transport_test.cpp
     util_nanovdb_test.cpp
@@ -216,6 +215,7 @@ if(TARGET ernie_app)
         app_file_dialog_test.cpp
         app_panel_test.cpp
         app_prim_schemas_test.cpp
+        app_sensor_chain_test.cpp
         app_session_test.cpp
         app_theme_test.cpp
         app_timeline_test.cpp

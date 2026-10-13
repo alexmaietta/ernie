@@ -1137,6 +1137,10 @@ FilterStepsOf(const Scene& scene, const std::vector<Path>& filters) {
                 "'" + filter.String() +
                 "' is not a SensorFilter prim");
         }
+        // A bypassed filter is left out.
+        if (!SensorFilterPrim(scene, filter).GetFilterEnabled()) {
+            continue;
+        }
         SensorFilterStep step;
         step.type = SensorFilterPrim(scene, filter).GetFilterType();
         if (step.type.empty()) {
@@ -1177,6 +1181,46 @@ FilterStepsOf(const Scene& scene, const std::vector<Path>& filters) {
 }
 
 }  // namespace
+
+std::vector<SensorFilterStep>
+SensorFilterStepsOf(const Scene& scene,
+                    const std::vector<Path>& filters) {
+    return FilterStepsOf(scene, filters);
+}
+
+Path ViewChainProduct(const Scene& scene, const Path& settings,
+                      const Path& camera) {
+    using namespace tokens;
+    if (camera.IsEmpty()) {
+        return {};
+    }
+    const auto looksThrough = [&](const Path& product) {
+        if (!scene.Has(product) ||
+            scene.TypeOf(product) != kRenderProduct) {
+            return false;
+        }
+        const std::vector<Path> cameras =
+            RenderProduct(scene, product).GetCamera();
+        return !cameras.empty() && cameras.front() == camera;
+    };
+    const Path resolved =
+        ResolveRenderPrims(scene, settings).settings;
+    if (!resolved.IsEmpty()) {
+        for (const Path& product :
+             RenderSettings(scene, resolved).GetProducts()) {
+            if (looksThrough(product)) {
+                return product;
+            }
+        }
+    }
+    const Path session(kSessionRoot);
+    for (const Path& product : scene.Prims(kRenderProduct)) {
+        if (!product.HasPrefix(session) && looksThrough(product)) {
+            return product;
+        }
+    }
+    return {};
+}
 
 std::vector<RenderProductSpec>
 ResolveRenderProducts(const Scene& scene,

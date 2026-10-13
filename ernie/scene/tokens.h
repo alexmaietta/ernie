@@ -1213,6 +1213,10 @@ inline constexpr std::string_view kSensorFilter =
 /// "exposure", or the id of a custom filter (`SensorFilterModel`),
 /// whose parameters are the prim's inputs:* attributes.
 inline constexpr std::string_view kFilterType = "ernie:filter:type";
+/// bool, a SensorFilter prim's (Ernie): false bypasses it, the chain
+/// running without it; default true.
+inline constexpr std::string_view kFilterEnabled =
+    "ernie:filter:enabled";
 inline constexpr std::string_view kSourceName =
     "sourceName";  ///< RenderVar name, e.g. "LdrColor".
 /// float luminance (cd/m^2) of the scene's ambient light: white,

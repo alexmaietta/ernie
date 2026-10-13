@@ -18,6 +18,7 @@ ernie_add_library(
     profiler_panel.cpp
     properties_panel.cpp
     property_fields.cpp
+    sensor_chain.cpp
     session.cpp
     settings_panel.cpp
     stage_panel.cpp

@@ -209,6 +209,24 @@ ResolveRenderProducts(const Scene& scene,
                       std::span<const Path> products,
                       const Path& settings);
 
+/// The RenderProduct whose sensor chain a view through `camera` runs,
+/// as that camera's own sensor (a thermal camera's bolometer, say):
+/// the first of `settings`' products looking through it, else the
+/// first such product of the scene outside the session root; empty
+/// for none, when the view runs its settings' first product's chain
+/// (`DefaultFilterChain` without products).
+Path ViewChainProduct(const Scene& scene, const Path& settings,
+                      const Path& camera);
+
+/// The chain the SensorFilter prims `filters` make, in order, as a
+/// product's `ernie:filters` resolves: each one's type and inputs,
+/// bypassed ones (`ernie:filter:enabled` false) left out.
+/// @throws std::invalid_argument for a path that is not a
+/// SensorFilter prim or one without a type.
+std::vector<SensorFilterStep>
+SensorFilterStepsOf(const Scene& scene,
+                    const std::vector<Path>& filters);
+
 /// Resolves the prims a render of `scene` with the RenderSettings
 /// prim `settings` uses.
 /// @throws std::invalid_argument if `settings` is not empty and not a
