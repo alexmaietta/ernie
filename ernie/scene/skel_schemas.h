@@ -38,7 +38,8 @@
       (::ernie::AttributeMeta{.label = "Animation",                                                \
                               .doc = "The SkelAnimation posing its joints; unset, the rest pose.", \
                               .group = "Skeleton", .options = {::ernie::tokens::kSkelAnimation},   \
-                              .dirty = ::ernie::Dirty::Points}))
+                              .dirty = ::ernie::Dirty::Points,                                     \
+                              .targetDirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_SKEL_ANIMATION_ATTRIBUTES(X)                                                         \
     X(std::vector<std::string>, Joints, ::ernie::tokens::kJoints, std::vector<std::string>{},      \

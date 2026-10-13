@@ -169,7 +169,8 @@
     X(::ernie::Path, Skeleton, ::ernie::tokens::kSkelSkeleton, ::ernie::Path(),                    \
       (::ernie::AttributeMeta{.doc = "The Skeleton skinning it; unset, it is not skinned.",        \
                               .group = "Skinning", .options = {::ernie::tokens::kSkeleton},        \
-                              .dirty = ::ernie::Dirty::Topology}))                                 \
+                              .dirty = ::ernie::Dirty::Topology,                                   \
+                              .targetDirty = ::ernie::Dirty::Points}))                                 \
     X(std::vector<std::string>, SkelJoints, ::ernie::tokens::kSkelJoints,                          \
       std::vector<std::string>{},                                                                  \
       (::ernie::AttributeMeta{.doc = "The Skeleton's joints its joint indices count, in their "    \
@@ -281,7 +282,8 @@
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \
                               .group = "Ground", .options = {::ernie::tokens::kMaterial},          \
-                              .dirty = ::ernie::Dirty::Material}))                                 \
+                              .dirty = ::ernie::Dirty::Material,                                   \
+                              .targetDirty = ::ernie::Dirty::Material}))                                 \
     X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
       (::ernie::AttributeMeta{.label = "Temperature",                                              \
                               .doc = "Kelvin, in place of its material's; 0 for the "              \

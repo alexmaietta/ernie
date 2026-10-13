@@ -99,6 +99,14 @@ struct AttributeMeta {
     /// What changing it stamps (`DirtyOf`): `Dirty::Points` for bulk
     /// positions, say. Unset, any other edit (`Dirty::Params`).
     std::optional<Dirty> dirty{};
+    /// Whether it applies to the prim's descendants too, as
+    /// `ernie:world` does: changing it stamps them as well, as
+    /// transforms and visibility do.
+    bool inherited = false;
+    /// For a relationship: what a change at or under any of its
+    /// targets stamps the prim holding it with (`Scene::Changes`), as
+    /// a material's edits reach the prims bound to it. Unset, none.
+    std::optional<Dirty> targetDirty{};
     /// For a list of targets usually holding one (a product's camera,
     /// or a batch's cameras): the plural name Python reads the list
     /// by, its own name then reading the first target alone.

@@ -287,6 +287,53 @@ TEST(Scene, TransformAndVisibilityEditsDirtyDescendants) {
     EXPECT_EQ(BitsOf(hidden, "/World"), Dirty::None);
 }
 
+TEST(Scene, DeclaredInheritanceAndRelationshipsReachDependents) {
+    Scene scene;
+    scene.Define("/World/Rover/Wheel", tokens::kMesh);
+    scene.Define("/World/Rock", tokens::kMesh);
+    scene.Define("/Looks/Grey", tokens::kMaterial);
+    scene.Define("/Looks/Grey/Shader", tokens::kShader);
+    scene.Set("/World/Rock", tokens::kMaterialBinding, Path("/Looks/Grey"));
+    scene.Define("/World/Skin", tokens::kMesh)
+        .Set(tokens::kSkelSkeleton, Path("/World/Skel"));
+    scene.Define("/World/Skel", tokens::kSkeleton)
+        .Set(tokens::kSkelAnimationSource, Path("/World/Anim"));
+    scene.Define("/World/Anim", tokens::kSkelAnimation);
+    ChangeCursor cursor;
+    scene.Changes(cursor);
+
+    // An inherited attribute (ernie:world) stamps the descendants.
+    scene.Set("/World/Rover", tokens::kWorld, 3);
+    const std::vector<Change> world = scene.Changes(cursor);
+    EXPECT_EQ(BitsOf(world, "/World/Rover/Wheel"), Dirty::Params);
+    EXPECT_EQ(BitsOf(world, "/World/Rock"), Dirty::None);
+
+    // A change under a material reaches the prims bound to it.
+    scene.Set("/Looks/Grey/Shader", "inputs:roughness", 0.5);
+    const std::vector<Change> shaded = scene.Changes(cursor);
+    EXPECT_EQ(BitsOf(shaded, "/World/Rock"), Dirty::Material);
+    EXPECT_EQ(BitsOf(shaded, "/World/Rover/Wheel"), Dirty::None);
+
+    // And on through a chain: the animation, its skeleton, the mesh.
+    scene.Set("/World/Anim", "user:speed", 2.0);
+    const std::vector<Change> posed = scene.Changes(cursor);
+    EXPECT_EQ(BitsOf(posed, "/World/Skel"), Dirty::Points);
+    EXPECT_EQ(BitsOf(posed, "/World/Skin"), Dirty::Points);
+
+    // Rebinding moves what reaches it; removing the target reaches
+    // those still bound.
+    scene.Set("/World/Rock", tokens::kMaterialBinding, Path("/Looks/Red"));
+    scene.Changes(cursor);
+    scene.Set("/Looks/Grey", "user:note", 1.0);
+    EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rock"), Dirty::None);
+    scene.Set("/World/Rover/Wheel", tokens::kMaterialBinding,
+              Path("/Looks/Grey"));
+    scene.Changes(cursor);
+    scene.Remove("/Looks/Grey");
+    EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rover/Wheel"),
+              Dirty::Material);
+}
+
 TEST(Scene, RemovalsAndRetypesAreReported) {
     Scene scene;
     scene.Define("/World/Rover/Wheel", tokens::kMesh);

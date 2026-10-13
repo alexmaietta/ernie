@@ -26,7 +26,8 @@
     X(int, World, ::ernie::tokens::kWorld, -1,                                                     \
       (::ernie::AttributeMeta{.doc = "The world the prim and its descendants are in, of a "        \
                                      "batch's environments; -1 shared by every world.",            \
-                              .group = "Prim", .min = -1.0, .max = 1048576.0}))                    \
+                              .group = "Prim", .min = -1.0, .max = 1048576.0,                      \
+                              .inherited = true}))                                                 \
     X(std::string, QuaternionOrder, ::ernie::tokens::kQuaternionOrder, ::ernie::tokens::kXyzw,     \
       (::ernie::AttributeMeta{.doc = "Component order of the quaternions in the prim's arrays: "   \
                                      "xyzw (USD, Warp, PhysX) or wxyz (Isaac Lab, MuJoCo).",       \
@@ -51,7 +52,8 @@
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \
                               .group = "Geometry", .options = {::ernie::tokens::kMaterial},        \
-                              .dirty = ::ernie::Dirty::Material}))                                 \
+                              .dirty = ::ernie::Dirty::Material,                                   \
+                              .targetDirty = ::ernie::Dirty::Material}))                                 \
     X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
       (::ernie::AttributeMeta{.label = "Temperature",                                              \
                               .doc = "Kelvin, in place of its material's; 0 for the "              \

@@ -75,6 +75,44 @@ Dirty DirtyOf(std::string_view attribute) {
     return Dirty::Params;
 }
 
+namespace {
+
+/// The declared attributes that apply to descendants too
+/// (`AttributeMeta::inherited`).
+bool IsInherited(std::string_view attribute) {
+    static const std::set<std::string_view, std::less<>> inherited = [] {
+        std::set<std::string_view, std::less<>> names;
+        for (const PrimTypeDef* type : PrimTypes()) {
+            for (const AttributeDef& def : type->attributes) {
+                if (def.meta.inherited) {
+                    names.insert(def.name);
+                }
+            }
+        }
+        return names;
+    }();
+    return inherited.contains(attribute);
+}
+
+/// The declared relationships whose targets' changes reach the prims
+/// holding them, with what they stamp (`AttributeMeta::targetDirty`).
+const std::map<std::string_view, Dirty, std::less<>>& TargetDirties() {
+    static const std::map<std::string_view, Dirty, std::less<>> bits = [] {
+        std::map<std::string_view, Dirty, std::less<>> declared;
+        for (const PrimTypeDef* type : PrimTypes()) {
+            for (const AttributeDef& def : type->attributes) {
+                if (def.meta.targetDirty) {
+                    declared[def.name] |= *def.meta.targetDirty;
+                }
+            }
+        }
+        return declared;
+    }();
+    return bits;
+}
+
+}  // namespace
+
 bool Prim::IsValid() const {
     return scene_ != nullptr && scene_->Has(path_);
 }
@@ -184,7 +222,8 @@ const Scene::PrimData& Scene::Find(const Path& path) const {
     return it->second;
 }
 
-void Scene::Stamp(const Path& path, PrimData& prim, Dirty bit) {
+void Scene::Stamp(const Path& path, PrimData& prim, Dirty bit,
+                  bool descendants) {
     if (bit == Dirty::None) {
         return;  // nothing to record, and no stamp of its own
     }
@@ -199,7 +238,8 @@ void Scene::Stamp(const Path& path, PrimData& prim, Dirty bit) {
         }
     };
     restamp(path, prim);
-    if (bit == Dirty::Transform || bit == Dirty::Visibility) {
+    if (descendants || bit == Dirty::Transform ||
+        bit == Dirty::Visibility) {
         for (auto it = prims_.upper_bound(path);
              it != prims_.end() && it->first.HasPrefix(path); ++it) {
             restamp(it->first, it->second);
@@ -218,7 +258,10 @@ void Scene::Stamp(const Path& path, PrimData& prim,
     if (IsXformAttribute(attribute)) {
         prim.ownTransform = version_;
     }
-    Stamp(path, prim, DirtyOf(attribute));
+    if (TargetDirties().contains(attribute)) {
+        dependentsStale_ = true;
+    }
+    Stamp(path, prim, DirtyOf(attribute), IsInherited(attribute));
 }
 
 Scene::PrimData& Scene::CreateIfMissing(const Path& path) {
@@ -248,6 +291,7 @@ Prim Scene::Define(const Path& path, std::string_view type) {
             prim.samples.clear();
             animated_.erase(path);
             removed_[path] = version_;
+            dependentsStale_ = true;
             Stamp(path, prim, Dirty::Added);
         }
         if (!prim.type.empty()) {
@@ -369,6 +413,7 @@ bool Scene::Remove(const Path& path) {
     }
     prims_.erase(first, last);
     ++removals_;
+    dependentsStale_ = true;
     return true;
 }
 
@@ -950,6 +995,35 @@ bool Scene::IsVisible(const Path& path) const {
     return true;
 }
 
+const std::map<Path, std::vector<std::pair<Path, Dirty>>>&
+Scene::Dependents() const {
+    if (!dependentsStale_) {
+        return dependents_;
+    }
+    dependents_.clear();
+    for (const auto& [path, prim] : prims_) {
+        for (const auto& [attribute, bit] : TargetDirties()) {
+            const auto value = prim.values.find(attribute);
+            if (value == prim.values.end()) {
+                continue;
+            }
+            const auto depend = [&](const Path& target) {
+                if (!target.IsEmpty()) {
+                    dependents_[target].emplace_back(path, bit);
+                }
+            };
+            if (const auto* target = value->second.Get<Path>()) {
+                depend(*target);
+            } else if (const auto* targets =
+                           value->second.Get<std::vector<Path>>()) {
+                std::ranges::for_each(*targets, depend);
+            }
+        }
+    }
+    dependentsStale_ = false;
+    return dependents_;
+}
+
 std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
     std::map<Path, Dirty> changed;
     for (const auto& [path, when] : removed_) {
@@ -977,6 +1051,26 @@ std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
         }
         if (bits != Dirty::None) {
             changed[path] |= bits;
+        }
+    }
+    // Changes at or under a relationship's targets reach the prims
+    // holding it, as a material's reach the prims bound to it, and on
+    // through theirs (an animation, its skeleton, the skinned meshes).
+    const auto& dependents = Dependents();
+    for (bool more = !dependents.empty() && !changed.empty(); more;) {
+        more = false;
+        for (const auto& [target, sources] : dependents) {
+            const auto at = changed.lower_bound(target);
+            if (at == changed.end() || !at->first.HasPrefix(target)) {
+                continue;
+            }
+            for (const auto& [source, bit] : sources) {
+                if (prims_.contains(source)) {
+                    Dirty& bits = changed[source];
+                    more = more || !Any(bits, bit);
+                    bits |= bit;
+                }
+            }
         }
     }
     cursor.version = version_;

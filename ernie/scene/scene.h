@@ -523,7 +523,15 @@ class Scene {
     const PrimData& Find(const Path& path) const;
     void Stamp(const Path& path, PrimData& prim,
                std::string_view attribute);
-    void Stamp(const Path& path, PrimData& prim, Dirty bit);
+    /// Stamps `bit` on the prim, and on its descendants for
+    /// `descendants`, transforms and visibility.
+    void Stamp(const Path& path, PrimData& prim, Dirty bit,
+               bool descendants = false);
+    /// The prims whose relationships (`AttributeMeta::targetDirty`)
+    /// name each target, with what a change at or under it stamps
+    /// them; built again after relationships change.
+    const std::map<Path, std::vector<std::pair<Path, Dirty>>>&
+    Dependents() const;
     PrimData& CreateIfMissing(const Path& path);
     /// Writes `tensor` as `attribute` of `prim`, replacing any value;
     /// `row` records the tensor and row it came from (`RowOf`), and
@@ -559,6 +567,11 @@ class Scene {
     /// prims stamped since a cursor; and the prims of each type, so
     /// `Prims` of a type visits only those.
     std::set<std::pair<std::uint64_t, Path>> stamped_;
+    /// `Dependents`, and whether a relationship or prim has changed
+    /// since it was built.
+    mutable std::map<Path, std::vector<std::pair<Path, Dirty>>>
+        dependents_;
+    mutable bool dependentsStale_ = true;
     std::map<std::string, std::set<Path>, std::less<>> byType_;
     std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;
