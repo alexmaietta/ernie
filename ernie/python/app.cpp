@@ -876,6 +876,15 @@ void BindApp(nb::module_& parent) {
             "\"prores\" or \"none\") in the background.")
         .def_prop_ro("recording", &Viewer::Recording,
                      "Whether a sequence is recording.")
+        .def_prop_ro("eco_paused", &Viewer::EcoPaused,
+                     "Whether eco mode (RenderSettings "
+                     "ernie:ecoMode:enabled, as Omniverse's) has paused "
+                     "the viewport's rendering, nothing having changed "
+                     "for ernie:ecoMode:maxFramesWithoutChange frames.")
+        .def("redraw", &Viewer::Redraw,
+             "Counts as a change for eco mode: for what changes the "
+             "image outside the scene, such as GPU arrays written in "
+             "place.")
         .def_prop_ro("recording_progress", &Viewer::RecordingProgress,
                      "A recording sequence's frames written and all.")
         .def("stop_recording", &Viewer::StopRecording,

@@ -148,6 +148,15 @@
       (::ernie::AttributeMeta{.doc = "Measure each frame's luminance, for automatic exposure and " \
                                      "meters.",                                                    \
                               .group = "Image"}))                                                  \
+    X(bool, EcoMode, ::ernie::tokens::kEcoMode, false,                                             \
+      (::ernie::AttributeMeta{.label = "Enabled",                                                  \
+                              .doc = "The viewer stops rendering once nothing has changed for "    \
+                                     "the frames below, as Omniverse's ECO mode.",                 \
+                              .group = "Eco mode"}))                                               \
+    X(int, EcoModeFrames, ::ernie::tokens::kEcoModeFrames, 500,                                    \
+      (::ernie::AttributeMeta{.label = "Frames without change",                                    \
+                              .doc = "Unchanged frames before the viewer stops rendering.",        \
+                              .group = "Eco mode", .min = 1.0, .max = 10000.0}))                   \
     X(std::string, Culling, ::ernie::tokens::kCulling, ::ernie::tokens::kGpu,                      \
       (::ernie::AttributeMeta{.doc = "What lies outside a view is skipped: whole draws (cpu), "    \
                                      "then every instance (gpu).",                                 \

@@ -52,6 +52,7 @@ inline constexpr const char* kStepForward =
     "\xee\x8f\xaa";                                     ///< U+E3EA
 inline constexpr const char* kRepeat = "\xee\x85\x86";  ///< U+E146
 inline constexpr const char* kVideo = "\xee\x86\xa5";   ///< U+E1A5
+inline constexpr const char* kLeaf = "\xee\x8b\x9e";  ///< U+E2DE
 inline constexpr const char* kDownload =
     "\xee\x82\xb2";  ///< U+E0B2, saving (captures)
 

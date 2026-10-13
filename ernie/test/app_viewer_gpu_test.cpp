@@ -1115,6 +1115,35 @@ TEST_F(ViewerTest, CapturesRenderVarsAnewAtAScaleOfTheViewport) {
     std::filesystem::remove_all(dir);
 }
 
+TEST_F(ViewerTest, EcoModePausesRenderingUntilSomethingChanges) {
+    const auto pausedAfter = [&](int frames) {
+        for (int i = 0; i < frames; ++i) {
+            EXPECT_TRUE(viewer_->Step());
+        }
+        return viewer_->EcoPaused();
+    };
+    EXPECT_FALSE(pausedAfter(8)) << "off by default";
+    RenderSettings(scene_, "/Render/Settings")
+        .SetEcoMode(true)
+        .SetEcoModeFrames(3);
+    EXPECT_FALSE(pausedAfter(1)) << "the settings' edit is a change";
+    EXPECT_TRUE(pausedAfter(4)) << "paused once still for 3 frames";
+    EXPECT_TRUE(pausedAfter(4)) << "and stays paused";
+    // An edit renders again, then pauses after 3 frames.
+    SetXform(scene_, "/World/Cube",
+             {.translate = glm::dvec3(0.5, 0.0, 0.0)});
+    EXPECT_FALSE(pausedAfter(1));
+    EXPECT_TRUE(pausedAfter(4));
+    // As does a redraw asked for.
+    viewer_->Redraw();
+    EXPECT_FALSE(pausedAfter(1));
+    // A screenshot still renders the frame it writes.
+    viewer_->GetCaptureOptions().folder = TempFile("eco");
+    viewer_->Screenshot();
+    EXPECT_FALSE(pausedAfter(1));
+    std::filesystem::remove_all(TempFile("eco"));
+}
+
 TEST_F(ViewerTest, HidesItsViewportUi) {
     ViewportDisplay display = viewer_->GetViewportDisplay();
     EXPECT_TRUE(display.ui);

@@ -758,6 +758,15 @@ class Viewer {
     /// Whether a sequence is recording, and its frames written and
     /// all; `StopRecording` ends it early, encoding what it wrote.
     bool Recording() const;
+
+    /// Whether eco mode (RenderSettings `ernie:ecoMode:enabled`, as
+    /// Omniverse's) has paused the viewport's rendering, nothing it
+    /// shows having changed for `ernie:ecoMode:maxFramesWithoutChange`
+    /// frames; it keeps its last image until something does.
+    bool EcoPaused() const;
+    /// Counts as a change for eco mode: for what changes the image
+    /// outside the scene, such as GPU arrays written in place.
+    void Redraw();
     std::pair<std::int64_t, std::int64_t> RecordingProgress() const;
     void StopRecording();
     /// Whether a recorded sequence's video is still encoding.

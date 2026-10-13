@@ -522,6 +522,41 @@ struct Viewer::State {
         return stops;
     }
     Lighting lighting = Lighting::Stage;
+    /// Eco mode (`tokens::kEcoMode`), as Omniverse's: what the
+    /// viewport showed, the frames since it last changed, and whether
+    /// rendering is paused on its last image.
+    struct ViewState {
+        std::uint64_t scene = 0;
+        std::uint64_t overlays = 0;
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+        std::string var;
+        int band = 0;
+        bool busy = false;  ///< A capture or recording waits on it.
+        std::uint64_t redraws = 0;  ///< See `Viewer::Redraw`.
+        bool operator==(const ViewState&) const = default;
+    };
+    ViewState lastView;
+    /// What the viewport overlay was last drawn from
+    /// (`UpdateViewportOverlay`), its version then included.
+    struct ViewportOverlayKey {
+        std::uint64_t scene = 0;
+        std::uint64_t overlay = 0;
+        bool grid = false;
+        bool lights = false;
+        bool cameras = false;
+        bool selection = false;
+        std::vector<Path> selected;
+        Path camera;
+        float scale = 0.0f;
+        glm::dvec3 target{0.0};
+        double distance = 0.0;
+        bool operator==(const ViewportOverlayKey&) const = default;
+    };
+    ViewportOverlayKey viewportOverlayKey;
+    std::uint64_t unchangedFrames = 0;
+    std::uint64_t redraws = 0;
+    bool ecoPaused = false;
     bool clockPaused = false;  ///< See `SetClockPaused`.
     double clockStep = 0.0;    ///< See `StepClock`.
     Timeline timeline;         ///< See `GetTimeline`.
@@ -1597,6 +1632,7 @@ struct Viewer::State {
             DrawToolStrip(origin);
             DrawAxisIndicator(origin, size);
             DrawToast(origin, size);
+            DrawEcoLeaf(origin, size);
         }
         if (!renderError.empty()) {
             // At the bottom left, beside the axis indicator.
@@ -1911,6 +1947,22 @@ struct Viewer::State {
             }
             return;
         }
+        // Drawn again only when what it shows may have changed, so a
+        // still view changes nothing (eco mode, `EcoPause`).
+        ViewportOverlayKey key{scene.Version(),
+                               overlay.Version(),
+                               display.grid,
+                               display.lights,
+                               display.cameras,
+                               display.selection,
+                               selection,
+                               activeCamera,
+                               contentScale,
+                               controller.target,
+                               controller.distance};
+        if (key == viewportOverlayKey) {
+            return;
+        }
         overlay.Clear();
         if (display.grid) {
             DrawGrid(overlay);
@@ -1946,6 +1998,8 @@ struct Viewer::State {
                 }
             }
         }
+        key.overlay = overlay.Version();
+        viewportOverlayKey = std::move(key);
     }
 
     /// Kit's ground grid: lines a power of ten apart suiting the
@@ -3324,6 +3378,36 @@ struct Viewer::State {
         }
     }
 
+    /// Whether eco mode pauses this frame's rendering: on in the
+    /// settings, and nothing the viewport shows changed (the scene,
+    /// its overlays, the image's size, var and band, a capture or
+    /// recording waiting, `Viewer::Redraw`) for its frames.
+    bool EcoPause() {
+        ViewState view;
+        view.scene = scene.Version();
+        for (const std::string& name : scene.OverlayNames()) {
+            if (const Overlay* overlay = scene.FindOverlay(name)) {
+                view.overlays += overlay->Version();
+            }
+        }
+        const VkExtent2D extent = viewport->Extent();
+        view.width = extent.width;
+        view.height = extent.height;
+        view.var = viewVar;
+        view.band = viewBand;
+        view.busy = capture.has_value() || recording.has_value();
+        view.redraws = redraws;
+        unchangedFrames = view == lastView ? unchangedFrames + 1 : 0;
+        lastView = std::move(view);
+        const RenderSettings settings =
+            RenderSettings::OrFallbacks(scene, settingsSource);
+        ecoPaused = settings.GetEcoMode() &&
+                    unchangedFrames >=
+                        static_cast<std::uint64_t>(
+                            std::max(settings.GetEcoModeFrames(), 1));
+        return ecoPaused;
+    }
+
     void RecordViewport(VkCommandBuffer commands) {
         const VkClearColorValue clear{{theme.background.r,
                                        theme.background.g,
@@ -3381,6 +3465,11 @@ struct Viewer::State {
             delegate->SetViewVar(capture && !capture->var.empty()
                                      ? capture->var
                                      : viewVar);
+            // Eco mode: nothing to draw again, the last image stays
+            // (already sampled by the UI).
+            if (EcoPause()) {
+                return;
+            }
             // The sensor clock runs with the viewer, a frame's
             // seconds a frame, unless paused, plus any step asked
             // for; with the timeline playing every frame, or a
@@ -3667,6 +3756,30 @@ struct Viewer::State {
         draw->AddText(ImVec2(low.x + pad, low.y + 0.5f * pad),
                       ImGui::GetColorU32(ToImVec4(theme.text)),
                       text.c_str());
+    }
+
+    /// A green leaf at the bottom right of the viewport while eco mode
+    /// has paused rendering.
+    void DrawEcoLeaf(const ImVec2& origin, const ImVec2& size) {
+        if (!ecoPaused) {
+            return;
+        }
+        const float scale = 1.5f;
+        const float pad = 12.0f * contentScale;
+        const float height = ImGui::GetFontSize() * scale;
+        const ImVec2 text = ImGui::CalcTextSize(icons::kLeaf);
+        const ImVec2 extent(text.x * scale, text.y * scale);
+        const ImVec2 at(origin.x + size.x - extent.x - pad,
+                        origin.y + size.y - height - pad);
+        ImGui::GetWindowDrawList()->AddText(
+            ImGui::GetFont(), height, at,
+            ImGui::GetColorU32(ImVec4(0.30f, 0.78f, 0.35f, 1.0f)),
+            icons::kLeaf);
+        if (ImGui::IsMouseHoveringRect(
+                at, ImVec2(at.x + extent.x, at.y + height))) {
+            ImGui::SetTooltip(
+                "Eco mode: rendering paused until something changes");
+        }
     }
 
     /// Shows `text` at the bottom of the viewport for a few seconds.
@@ -4936,6 +5049,14 @@ void Viewer::RecordSequence(const SequenceOptions& options) {
 
 bool Viewer::Recording() const {
     return state_->recording.has_value();
+}
+
+bool Viewer::EcoPaused() const {
+    return state_->ecoPaused;
+}
+
+void Viewer::Redraw() {
+    ++state_->redraws;
 }
 
 std::pair<std::int64_t, std::int64_t>
