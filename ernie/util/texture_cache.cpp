@@ -85,6 +85,13 @@ void TextureCache::Write(std::string_view key,
     Prune();
 }
 
+void TextureCache::Remove(std::string_view key) const {
+    if (directory_) {
+        std::error_code error;
+        fs::remove(PathOf(key), error);
+    }
+}
+
 void TextureCache::Prune() const {
     ERNIE_ZONE("Texture cache prune");
     struct Entry {

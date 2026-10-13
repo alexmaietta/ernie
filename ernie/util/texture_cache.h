@@ -43,6 +43,9 @@ class TextureCache {
     void Write(std::string_view key,
                const TextureData& texture) const;
 
+    /// Forgets the texture cached under `key`, if any.
+    void Remove(std::string_view key) const;
+
   private:
     std::filesystem::path PathOf(std::string_view key) const;
     void Prune() const;

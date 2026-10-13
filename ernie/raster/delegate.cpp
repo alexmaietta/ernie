@@ -1038,6 +1038,44 @@ void RasterDelegate::DeliverTexture(
     }
 }
 
+void RasterDelegate::EvictTextures(bool cache) {
+    ERNIE_ZONE("Evict textures");
+    // No frame in flight may read what goes.
+    vkDeviceWaitIdle(context_.Device());
+    if (cache) {
+        const auto forget = [&](const std::string& key) {
+            textureCache_.Remove(key + std::string(kCompressedKey));
+        };
+        for (const auto& [key, texture] : sharedTextures_) {
+            forget(key);
+        }
+        for (const auto& [key, loading] : loadingTextures_) {
+            forget(key);
+        }
+        for (const auto& [key, compressing] : compressingTextures_) {
+            forget(key);
+        }
+    }
+    for (auto& [path, material] : materials_) {
+        RasterMaterial& gpu = renderer_.Material(material.id);
+        for (std::size_t slot = 0; slot < material.textures.size();
+             ++slot) {
+            gpu.SetTexture(static_cast<MaterialTextureSlot>(slot),
+                           nullptr, material.readers[slot]);
+            material.textures[slot].clear();
+            material.pending[slot].clear();
+        }
+    }
+    // Loads under way finish on their threads, unread.
+    loadingTextures_.clear();
+    compressingTextures_.clear();
+    failedTextures_.clear();
+    sharedTextures_.clear();
+    // The next sync syncs every material again, as for a new scene.
+    sceneId_ = 0;
+    settledVersion_ = {~0ull, ~0ull};
+}
+
 TextureWait RasterDelegate::WaitForTextures(const Scene& scene,
                                             double timeoutSeconds) {
     ERNIE_ZONE("Wait for textures");

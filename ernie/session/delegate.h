@@ -419,6 +419,15 @@ class RenderDelegate {
         return {};
     }
 
+    /// Drops every texture the materials read, so that the next sync
+    /// loads them afresh (as a first run would, placeholders and
+    /// all); with `cache`, their copies in the texture cache too, so
+    /// that they are decoded and compressed again. Nothing by
+    /// default.
+    virtual void EvictTextures(bool cache) {
+        static_cast<void>(cache);
+    }
+
     /// World bounds of what the delegate draws as of its last `Sync`
     /// or `Update`, for framing cameras; none if nothing has finite
     /// bounds (an infinite ground plane does not count).

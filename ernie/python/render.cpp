@@ -719,6 +719,16 @@ void BindRender(nb::module_& m) {
             "once none is missing; returns what is still loading or "
             "failed.")
         .def(
+            "evict_textures",
+            [](Renderer& r, bool cache) {
+                nb::gil_scoped_release release;
+                r.Delegate().EvictTextures(cache);
+            },
+            nb::arg("cache") = false,
+            "Drops every texture the materials read, so the next "
+            "render loads them afresh; with `cache`, their copies in "
+            "the texture cache too.")
+        .def(
             "sync",
             [](Renderer& r, const Scene& scene) {
                 nb::gil_scoped_release release;

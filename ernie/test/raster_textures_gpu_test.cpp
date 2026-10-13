@@ -1090,6 +1090,19 @@ TEST_F(RasterDelegateTest, WaitForTexturesFinishesTheirLoading) {
         EXPECT_GT(green[i + 1], 3.0f * green[i]);
     }
 
+    // Evicted, its upload goes; waiting again brings it back.
+    const std::uint64_t held = delegate.Stats().gpuBytes;
+    delegate.EvictTextures(false);
+    EXPECT_LT(delegate.Stats().gpuBytes, held);
+    EXPECT_TRUE(
+        delegate
+            .WaitForTextures(scene,
+                             std::numeric_limits<double>::infinity())
+            .Complete());
+    const std::vector<float> again = Quadrants(delegate, scene);
+    for (std::size_t i = 0; i < again.size(); i += 3) {
+        EXPECT_GT(again[i + 1], 3.0f * again[i]);
+    }
     ernie::Shader(scene, "/Looks/M/Tex")
         .SetFile(::testing::TempDir() + "no_such_texture.png");
     const ernie::TextureWait missing = delegate.WaitForTextures(

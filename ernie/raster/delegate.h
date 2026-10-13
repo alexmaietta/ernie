@@ -240,6 +240,11 @@ class RasterDelegate : public RenderDelegate {
     TextureWait WaitForTextures(const Scene& scene,
                                 double timeoutSeconds) override;
 
+    /// Drops image files' and stored textures, virtual ones' tiles
+    /// and loads under way; materials read their constants until the
+    /// next sync loads them again.
+    void EvictTextures(bool cache) override;
+
     /// The union of the terrain's and the meshes' bounds.
     std::optional<Bounds3> SceneBounds() const override;
 

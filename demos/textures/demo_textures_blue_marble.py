@@ -204,6 +204,12 @@ class Demo(ernie.demo.Demo):
                 self.settings, "texture_loading_debug", on
             ),
         )
+        # Back to a first load: the GPU's textures go, and with the
+        # cache's copies decoding and compression start over too.
+        widgets.button("Evict textures", lambda: self.evict(False))
+        widgets.button(
+            "Evict textures and cache", lambda: self.evict(True)
+        )
         self.place()
         if viewer is not None:
             viewer.active_camera = self.camera.path
@@ -285,6 +291,19 @@ class Demo(ernie.demo.Demo):
             ernie.look_at_transform(
                 eye, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)
             ),
+        )
+
+    def evict(self, cache):
+        """Drops the textures of the viewport's renderer, or the
+        demo's own without a viewer."""
+        if self.viewer is not None:
+            self.viewer.evict_textures(cache)
+        else:
+            self.renderer.evict_textures(cache)
+        self.report(
+            "Textures and their cache evicted"
+            if cache
+            else "Textures evicted"
         )
 
     def report(self, text, error=False):

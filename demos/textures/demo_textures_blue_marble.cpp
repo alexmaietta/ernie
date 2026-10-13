@@ -185,6 +185,11 @@ class BlueMarbleDemo : public app::Demo {
                 RenderSettings(GetScene(), "/Render/Settings")
                     .SetTextureLoadingDebug(on);
             });
+        // Back to a first load: the GPU's textures go, and with the
+        // cache's copies decoding and compression start over too.
+        Widgets().Button("Evict textures", [this] { Evict(false); });
+        Widgets().Button("Evict textures and cache",
+                         [this] { Evict(true); });
         Place();
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
@@ -262,6 +267,19 @@ class BlueMarbleDemo : public app::Demo {
         Camera(GetScene(), "/World/Camera")
             .SetTransform(LookAtTransform(eye, {0.0, 0.0, 0.0},
                                           {0.0, 0.0, 1.0}));
+    }
+
+    /// Drops the textures (`RenderDelegate::EvictTextures`) of the
+    /// viewport's renderer, or the demo's own without a viewer.
+    void Evict(bool cache) {
+        if (app::Viewer* viewer = GetViewer()) {
+            viewer->Delegate().EvictTextures(cache);
+        } else {
+            GetRenderer().Delegate().EvictTextures(cache);
+        }
+        Report(cache ? "Textures and their cache evicted"
+                     : "Textures evicted",
+               false);
     }
 
     /// A message in the viewer's log, else printed.
