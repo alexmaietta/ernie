@@ -558,7 +558,16 @@ class RasterDelegate : public RenderDelegate {
     bool
     NeedsMetering(const Scene& scene, const RenderPrims& base,
                   std::span<const RenderProductSpec> specs) const;
-    void SyncMeshes(const Scene& scene);
+    /// Syncs every mesh prim, or with `only` those of its paths (the
+    /// prims a sync's changes name), dropping those of them gone.
+    void SyncMeshes(const Scene& scene,
+                    const std::vector<Path>* only = nullptr);
+    /// The prims a sync's `changes` name that are or were meshes, or
+    /// null when meshes beyond them may change (the stage's
+    /// subdivision level, a skeleton, skinned meshes posed).
+    std::optional<std::vector<Path>>
+    ChangedMeshes(const Scene& scene,
+                  std::span<const Change> changes) const;
     /// Gives the mesh `synced` (added at rest) its skin, from its
     /// binding and, for a subdivision surface, its stencils.
     void AddSkin(const Scene& scene, const Path& path,
@@ -601,7 +610,19 @@ class RasterDelegate : public RenderDelegate {
     std::vector<PointsItem> PointsItems(const Scene& scene) const;
     std::uint32_t MaterialOf(const Scene& scene,
                              const Path& prim) const;
-    std::vector<MeshItem> Items(const Scene& scene) const;
+    /// The draws of the synced meshes and instancers. With `touched`,
+    /// only those meshes' draws (and those `SyncMeshes` re-added or
+    /// dropped) are built again, the rest kept from the last; without,
+    /// all are.
+    std::vector<MeshItem> Items(const Scene& scene,
+                                const std::set<Path>* touched = nullptr);
+    /// The meshes whose draws a sync's `changes` may change, or null
+    /// when they may change draws beyond their own prims' meshes (a
+    /// material, a light linking, an ancestor's world...), so that
+    /// every draw is built again.
+    std::optional<std::set<Path>>
+    TouchedMeshes(const Scene& scene,
+                  std::span<const Change> changes) const;
 
     ComputeInterop& RequireCompute();
     /// Reads the frame's lasers' pattern image arrays on the GPU into
@@ -838,6 +859,19 @@ class RasterDelegate : public RenderDelegate {
         std::clamp(std::thread::hardware_concurrency(), 1u, 6u),
         "Texture loader"};
     std::map<Path, SyncedMesh> syncedMeshes_;
+    /// Each synced mesh's draw as `Items` last built it, none for a
+    /// hidden mesh or a prototype's, and the meshes `SyncMeshes`
+    /// re-added or dropped since, whose draws are built again.
+    std::map<Path, std::optional<MeshItem>> meshItems_;
+    std::set<Path> remeshed_;
+    /// The stage's subdivision level's version at the last mesh sync,
+    /// which every subdivision surface's key reads.
+    std::uint64_t subdivisionVersion_ = 0;
+    /// Instancers' prototypes and the meshes under them, as `Items`
+    /// last found them.
+    std::set<Path> prototypes_;
+    std::map<Path, std::vector<Path>> prototypeMeshes_;
+    std::set<Path> inPrototypes_;
     std::map<Path, SyncedInstancer> instancers_;
     std::map<Path, SyncedPoints> syncedPoints_;
     /// The drawn geometry's light link groups and the lights' masks

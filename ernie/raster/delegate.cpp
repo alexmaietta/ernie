@@ -1855,7 +1855,36 @@ void RasterDelegate::SetMeshNodes(const Scene& scene,
                           static_cast<std::size_t>(host.Elements())));
 }
 
-void RasterDelegate::SyncMeshes(const Scene& scene) {
+std::optional<std::vector<Path>>
+RasterDelegate::ChangedMeshes(const Scene& scene,
+                              std::span<const Change> changes) const {
+    using namespace tokens;
+    // Skinned meshes are posed every sync, and read their skeletons.
+    if (skinned_ || scene.AttributeVersion(Path::Root(),
+                                           kSubdivisionRefineLevel) !=
+                        subdivisionVersion_) {
+        return std::nullopt;
+    }
+    std::vector<Path> meshes;
+    for (const Change& change : changes) {
+        const Path& path = change.path;
+        if (path.IsRoot()) {
+            continue;
+        }
+        const std::string_view type =
+            scene.Has(path) ? scene.TypeOf(path) : std::string_view();
+        if (type == kSkeleton || type == kSkelAnimation) {
+            return std::nullopt;
+        }
+        if (IsMeshType(type) || syncedMeshes_.contains(path)) {
+            meshes.push_back(path);
+        }
+    }
+    return meshes;
+}
+
+void RasterDelegate::SyncMeshes(const Scene& scene,
+                                const std::vector<Path>* only) {
     ERNIE_ZONE("Sync meshes");
     using namespace tokens;
     std::set<Path> seen;
@@ -1865,12 +1894,22 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
     // time, a new scene's sync took quadratic time in its meshes.
     std::vector<std::uint32_t> dropped;
     bool skinned = false;
-    for (const std::string_view type :
-         {kMesh, kCube, kSphere, kCylinder, kCone, kCapsule,
-          kPlane}) {
-        const std::vector<Path> ofType = scene.Prims(type);
-        paths.insert(paths.end(), ofType.begin(), ofType.end());
+    if (only != nullptr) {
+        for (const Path& path : *only) {
+            if (scene.Has(path) && IsMeshType(scene.TypeOf(path))) {
+                paths.push_back(path);
+            }
+        }
+    } else {
+        for (const std::string_view type :
+             {kMesh, kCube, kSphere, kCylinder, kCone, kCapsule,
+              kPlane}) {
+            const std::vector<Path> ofType = scene.Prims(type);
+            paths.insert(paths.end(), ofType.begin(), ofType.end());
+        }
     }
+    subdivisionVersion_ =
+        scene.AttributeVersion(Path::Root(), kSubdivisionRefineLevel);
     for (const Path& path : paths) {
         seen.insert(path);
         Key key =
@@ -2068,20 +2107,32 @@ void RasterDelegate::SyncMeshes(const Scene& scene) {
             errors.push_back(Describe(path, "mesh", error));
         }
         syncedMeshes_[path] = synced;
+        remeshed_.insert(path);
     }
-    for (auto it = syncedMeshes_.begin();
-         it != syncedMeshes_.end();) {
-        if (seen.contains(it->first)) {
-            ++it;
-            continue;
-        }
+    // Those gone: of all, or of those named.
+    const auto drop = [&](std::map<Path, SyncedMesh>::iterator it) {
         if (it->second.handle != 0) {
             dropped.push_back(it->second.handle);
         }
-        it = syncedMeshes_.erase(it);
+        remeshed_.insert(it->first);
+        return syncedMeshes_.erase(it);
+    };
+    if (only != nullptr) {
+        for (const Path& path : *only) {
+            const auto it = syncedMeshes_.find(path);
+            if (it != syncedMeshes_.end() && !seen.contains(path)) {
+                drop(it);
+            }
+        }
+    } else {
+        for (auto it = syncedMeshes_.begin();
+             it != syncedMeshes_.end();) {
+            it = seen.contains(it->first) ? std::next(it) : drop(it);
+        }
     }
     meshes_.RemoveMeshes(dropped);
-    skinned_ = skinned;
+    // Only meshes without skins sync in part (`ChangedMeshes`).
+    skinned_ = only != nullptr ? skinned_ || skinned : skinned;
     posedTimeCode_ = scene.AttributeVersion(Path::Root(), kTimeCode);
     if (skinned) {
         PoseSkins(scene, errors);
@@ -3397,11 +3448,15 @@ void RasterDelegate::SyncLinks(const Scene& scene) {
 
 void RasterDelegate::Sync(const Scene& scene) {
     ERNIE_ZONE("Sync");
+    // What changed since the last sync; none for a new scene, which
+    // syncs whole.
+    std::optional<std::vector<Change>> changed;
     if (scene.Id() != sceneId_) {
         sceneId_ = scene.Id();
         cursor_.version = scene.Version();
     } else {
-        const std::vector<Change> changes = scene.Changes(cursor_);
+        const std::vector<Change>& changes =
+            changed.emplace(scene.Changes(cursor_));
         // Changes only to cameras and render prims, such as a batch's
         // poses and worlds every step, leave the synced materials,
         // terrain, meshes and draws as they are (lights and settings
@@ -3422,6 +3477,10 @@ void RasterDelegate::Sync(const Scene& scene) {
         if (!posing && RefreshGpuXforms(scene, changes)) {
             renderer_.MarkCastersChanged();
             return;
+        }
+        // Posing moves meshes the changes do not name.
+        if (posing) {
+            changed.reset();
         }
     }
     // What casts shadows may have moved: the terrain's horizon over
@@ -3451,7 +3510,18 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] {
         SyncHeightfield(scene, ResolveRenderPrims(scene, {}).terrain);
     });
-    attempt([&] { SyncMeshes(scene); });
+    // Only the meshes the changes name, unless they are most of them.
+    std::optional<std::vector<Path>> changedMeshes;
+    if (changed) {
+        changedMeshes = ChangedMeshes(scene, *changed);
+        if (changedMeshes &&
+            2 * changedMeshes->size() > syncedMeshes_.size()) {
+            changedMeshes.reset();
+        }
+    }
+    attempt([&] {
+        SyncMeshes(scene, changedMeshes ? &*changedMeshes : nullptr);
+    });
     // GPU-posed prims first: instancers under them compose under
     // their instances.
     attempt([&] { SyncGpuXforms(scene); });
@@ -3459,11 +3529,27 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] { SyncPoints(scene); });
     // Light linking's groups of what is drawn, before the draws that
     // carry them.
+    const bool linked = !links_.groups.empty();
     attempt([&] { SyncLinks(scene); });
     attempt([&] { points_.SetItems(PointsItems(scene)); });
     // The draws, so the meshes' bounds are known as soon as the scene
-    // syncs.
-    attempt([&] { meshes_.SetItems(Items(scene)); });
+    // syncs: only those of the meshes changed, when the changes reach
+    // no further and no light links group the draws.
+    std::optional<std::set<Path>> touched;
+    if (changed && !errors.empty()) {
+        changed.reset();
+    }
+    if (changed && !linked && links_.groups.empty()) {
+        touched = TouchedMeshes(scene, *changed);
+        // Most of them, as a simulation writes every body: all at once.
+        if (touched && 2 * (touched->size() + remeshed_.size()) >
+                           syncedMeshes_.size()) {
+            touched.reset();
+        }
+    }
+    attempt([&] {
+        meshes_.SetItems(Items(scene, touched ? &*touched : nullptr));
+    });
     syncedVersion_ = scene.Version();
     if (!errors.empty()) {
         std::string message = errors.front();
@@ -3474,35 +3560,113 @@ void RasterDelegate::Sync(const Scene& scene) {
     }
 }
 
-std::vector<MeshItem>
-RasterDelegate::Items(const Scene& scene) const {
-    ERNIE_ZONE("Sync items");
-    std::set<Path> prototypes;
-    for (const auto& [path, synced] : instancers_) {
-        for (const Path& prototype :
-             PointInstancer(scene, path).GetPrototypes()) {
-            prototypes.insert(prototype);
-        }
+std::optional<std::set<Path>>
+RasterDelegate::TouchedMeshes(const Scene& scene,
+                              std::span<const Change> changes) const {
+    using namespace tokens;
+    // Under a prim posed on the GPU, a mesh's draw follows its group
+    // (`GpuAnchorOf`), which other prims' arrays change.
+    if (!gpuPosed_.empty()) {
+        return std::nullopt;
     }
-    // The meshes of each prototype, which may be a mesh or a subtree
-    // of them (as USD's are), by their nearest prototype ancestor.
-    std::map<Path, std::vector<Path>> prototypeMeshes;
-    std::set<Path> inPrototypes;
-    for (const auto& [path, synced] : syncedMeshes_) {
-        for (Path at = path; !at.IsEmpty(); at = at.Parent()) {
-            if (prototypes.contains(at)) {
-                prototypeMeshes[at].push_back(path);
-                inPrototypes.insert(path);
-                break;
+    const auto only = [](Dirty bits, Dirty allowed) {
+        return (static_cast<std::uint32_t>(bits) &
+                ~static_cast<std::uint32_t>(allowed)) == 0;
+    };
+    std::set<Path> touched;
+    for (const Change& change : changes) {
+        if (IsViewChange(scene, change)) {
+            continue;
+        }
+        const Path& path = change.path;
+        const std::string_view type =
+            scene.Has(path) ? scene.TypeOf(path) : std::string_view();
+        // A mesh's own draw, whatever changed, or one gone.
+        if (IsMeshType(type) || syncedMeshes_.contains(path) ||
+            remeshed_.contains(path)) {
+            touched.insert(path);
+            continue;
+        }
+        // Moving or hiding a prim stamps the meshes beneath it, which
+        // come as changes of their own; a new grouping holds none
+        // yet; points and an instancer's own draws are built again
+        // anyway, but not its prototypes.
+        if (only(change.bits, Dirty::Transform | Dirty::Visibility) ||
+            ((type == kXform || type == kScope) &&
+             only(change.bits, Dirty::Added | Dirty::Transform |
+                                   Dirty::Visibility)) ||
+            type == kPoints ||
+            (type == kPointInstancer &&
+             !Any(change.bits,
+                  Dirty::Topology | Dirty::Added | Dirty::Removed))) {
+            continue;
+        }
+        // A material, a light, an ancestor's world or binding...
+        return std::nullopt;
+    }
+    return touched;
+}
+
+std::vector<MeshItem>
+RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
+    ERNIE_ZONE("Sync items");
+    // Instancers' prototypes, and the meshes of each, which may be a
+    // mesh or a subtree of them (as USD's are), by their nearest
+    // prototype ancestor: found in full, or for the meshes touched.
+    // The meshes whose draws are built again, besides all.
+    const std::set<Path>* const rebuilt[] = {touched, &remeshed_};
+    const auto prototypeOf = [this](const Path& mesh) {
+        for (Path at = mesh; !at.IsEmpty(); at = at.Parent()) {
+            if (prototypes_.contains(at)) {
+                return at;
             }
             if (at == Path::Root()) {
                 break;
             }
         }
-    }
-    const auto isPrototype = [&inPrototypes](const Path& path) {
-        return inPrototypes.contains(path);
+        return Path();
     };
+    if (touched == nullptr) {
+        prototypes_.clear();
+        prototypeMeshes_.clear();
+        inPrototypes_.clear();
+        for (const auto& [path, synced] : instancers_) {
+            for (const Path& prototype :
+                 PointInstancer(scene, path).GetPrototypes()) {
+                prototypes_.insert(prototype);
+            }
+        }
+        for (const auto& [path, synced] : syncedMeshes_) {
+            if (const Path prototype = prototypeOf(path);
+                !prototype.IsEmpty()) {
+                prototypeMeshes_[prototype].push_back(path);
+                inPrototypes_.insert(path);
+            }
+        }
+    } else {
+        for (const std::set<Path>* paths : rebuilt) {
+            for (const Path& path : *paths) {
+                const Path prototype = syncedMeshes_.contains(path)
+                                           ? prototypeOf(path)
+                                           : Path();
+                if (prototype.IsEmpty() == !inPrototypes_.contains(path)) {
+                    continue;
+                }
+                if (prototype.IsEmpty()) {
+                    inPrototypes_.erase(path);
+                    for (auto& [at, meshes] : prototypeMeshes_) {
+                        std::erase(meshes, path);
+                    }
+                } else {
+                    inPrototypes_.insert(path);
+                    std::vector<Path>& meshes = prototypeMeshes_[prototype];
+                    meshes.insert(std::lower_bound(meshes.begin(),
+                                                   meshes.end(), path),
+                                  path);
+                }
+            }
+        }
+    }
     const auto shade = [this, &scene](const Path& mesh,
                                       const SyncedMesh& synced,
                                       MeshItem& item) {
@@ -3515,11 +3679,12 @@ RasterDelegate::Items(const Scene& scene) const {
             mesh, Gprim(scene, mesh).GetThermalTemperature());
     };
 
-    std::vector<MeshItem> items;
-    for (const auto& [path, synced] : syncedMeshes_) {
-        if (synced.handle == 0 || isPrototype(path) ||
+    // Each mesh's own draw, none when hidden or in a prototype.
+    const auto build = [&](const Path& path, const SyncedMesh& synced)
+        -> std::optional<MeshItem> {
+        if (synced.handle == 0 || inPrototypes_.contains(path) ||
             !scene.IsVisible(path)) {
-            continue;
+            return std::nullopt;
         }
         MeshItem item;
         item.mesh = synced.handle;
@@ -3540,7 +3705,32 @@ RasterDelegate::Items(const Scene& scene) const {
         item.linkGroup = links_.GroupOf(path);
         item.world = WorldOf(scene, path);
         shade(path, synced, item);
-        items.push_back(std::move(item));
+        return item;
+    };
+    if (touched == nullptr) {
+        meshItems_.clear();
+        for (const auto& [path, synced] : syncedMeshes_) {
+            meshItems_.emplace(path, build(path, synced));
+        }
+    } else {
+        for (const std::set<Path>* paths : rebuilt) {
+            for (const Path& path : *paths) {
+                const auto synced = syncedMeshes_.find(path);
+                if (synced == syncedMeshes_.end()) {
+                    meshItems_.erase(path);
+                } else {
+                    meshItems_[path] = build(path, synced->second);
+                }
+            }
+        }
+    }
+    remeshed_.clear();
+    std::vector<MeshItem> items;
+    items.reserve(meshItems_.size());
+    for (const auto& [path, item] : meshItems_) {
+        if (item) {
+            items.push_back(*item);
+        }
     }
     for (const auto& [path, synced] : instancers_) {
         if (synced.handle == 0 || !scene.IsVisible(path)) {
@@ -3565,8 +3755,8 @@ RasterDelegate::Items(const Scene& scene) const {
                 ? GpuAnchorOf(scene, path).value_or(GpuAnchor{}).frame
                 : scene.WorldTransform(path);
         for (std::size_t k = 0; k < targets.size(); ++k) {
-            const auto meshes = prototypeMeshes.find(targets[k]);
-            if (meshes == prototypeMeshes.end() || lists[k].empty()) {
+            const auto meshes = prototypeMeshes_.find(targets[k]);
+            if (meshes == prototypeMeshes_.end() || lists[k].empty()) {
                 continue;
             }
             // From the prototype's parent's frame, which instances

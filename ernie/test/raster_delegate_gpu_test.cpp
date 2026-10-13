@@ -1368,3 +1368,42 @@ TEST_F(RasterDelegateTest, ShadowDistancesFitWhatACubeCameraSees) {
     EXPECT_GT(fitted, 60.0f);
     EXPECT_LT(fitted, 200.0f);
 }
+
+TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
+    Scene scene = MeshScene();
+    ernie::Xform::Define(scene, "/World/Group");
+    for (const char* name : {"A", "B"}) {
+        const Path cube = Path("/World/Group").Child(name);
+        ernie::Cube::Define(scene, cube).SetSize(6.0).SetDisplayColor(
+            {0.2, 0.8, 0.3});
+        ernie::SetXform(scene, cube,
+                        {.translate = {name[0] == 'A' ? -4.0 : 4.0, 8.0, 0.0}});
+    }
+    RasterDelegate delegate(*context_);
+    delegate.Render(scene);
+    // Each edit reaches only some meshes' draws: the renderer kept in
+    // step draws as a new one syncing the whole scene does.
+    const auto expectFresh = [&](const char* edit) {
+        const Tensor kept = delegate.Render(scene);
+        RasterDelegate fresh(*context_);
+        const Tensor whole = fresh.Render(scene);
+        ASSERT_EQ(kept.Elements(), whole.Elements());
+        EXPECT_EQ(std::memcmp(kept.Data(), whole.Data(),
+                              static_cast<std::size_t>(kept.Elements())),
+                  0)
+            << edit;
+    };
+    ernie::Cube(scene, "/World/Group/A").SetDisplayColor({0.9, 0.1, 0.9});
+    expectFresh("a mesh's colour");
+    ernie::SetXform(scene, "/World/Group/B", {.translate = {6.0, -8.0, 0.0}});
+    expectFresh("a mesh's transform");
+    ernie::SetXform(scene, "/World/Group", {.translate = {0.0, 4.0, 0.0}});
+    expectFresh("its group's transform");
+    ernie::Xform(scene, "/World/Group").SetVisibility(tokens::kInvisible);
+    expectFresh("its group hidden");
+    ernie::Xform(scene, "/World/Group").SetVisibility(tokens::kInherited);
+    expectFresh("its group shown");
+    scene.Remove("/World/Group/B");
+    ernie::Cube::Define(scene, "/World/Group/C").SetSize(3.0);
+    expectFresh("a mesh removed and another added");
+}
