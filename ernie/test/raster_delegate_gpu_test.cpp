@@ -851,6 +851,34 @@ TEST_F(RasterDelegateTest, MeshesWithoutNormalsShadeSmooth) {
         << "the slopes still differ";
 }
 
+// Two faces sharing an edge, coloured per face (uniform) without a
+// material: each its own colour up to the edge, its points shared.
+TEST_F(RasterDelegateTest, UniformColoursColourEachFace) {
+    Scene scene = MeshScene();
+    const std::array<float, 18> points{-4, -4, 0, 0, -4, 0, 0, 4, 0,
+                                       -4, 4,  0, 4, -4, 0, 4, 4, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const std::array<float, 6> colours{1, 0, 0, 0, 1, 0};
+    ernie::Mesh::Define(scene, "/World/Faces")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}));
+    scene.Write("/World/Faces", tokens::kDisplayColor,
+                Tensor::Copy<float>(colours, {2, 3}));
+    RasterDelegate delegate(*context_);
+    const Tensor image = delegate.Render(scene);
+    for (const float x : {-3.0f, -0.3f}) {
+        const std::uint8_t* t = TexelAt(scene, image, {x, 0, 0});
+        EXPECT_GT(t[0], t[1] + 100) << "red at " << x;
+    }
+    for (const float x : {0.3f, 3.0f}) {
+        const std::uint8_t* t = TexelAt(scene, image, {x, 0, 0});
+        EXPECT_GT(t[1], t[0] + 100) << "green at " << x;
+    }
+}
+
 // The ridge's six points and four triangles, written on the GPU.
 constexpr const char* kRidgeWriterSlang = R"(
 struct Push {

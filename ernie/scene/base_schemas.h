@@ -47,8 +47,9 @@
     X(::ernie::OrArray<glm::dvec3>, DisplayColor, ::ernie::tokens::kDisplayColor,                  \
       glm::dvec3(0.5),                                                                             \
       (::ernie::AttributeMeta{.label = "Display colour",                                           \
-                              .doc = "Linear RGB of the whole prim; colours per vertex are "       \
-                                     "written as an array instead.",                               \
+                              .doc = "Linear RGB of the whole prim; colours per vertex, face "     \
+                                     "vertex or face are written as an array instead (its "        \
+                                     ":interpolation as USD's, else by count; perhaps indexed).",  \
                               .group = "Geometry", .color = true}))                                \
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = "Material", .doc = "The Material prim it is drawn with.",   \

@@ -34,6 +34,8 @@ static const uint kHasInstanceTemperatures = 2048;
 static const uint kHasInstanceVisibility = 4096;
 // Normals per triangle corner (`cornerNormals`, face-varying or uniform) in place of per point.
 static const uint kHasCornerNormals = 8192;
+// Colours per triangle corner (`cornerColors`, face-varying or uniform) in place of per point.
+static const uint kHasCornerColors = 16384;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -58,7 +60,8 @@ struct MeshDraw {
     // `indices`); y: its slot in `activeCounts` plus 1, 0 for all its triangles drawn; z: with a
     // slot, the points it holds; w its thermal network's first node in `nodeTemperatures`.
     uint4 uv;
-    // x: the mesh's first corner in `cornerNormals` (as `uv.x` in `uvs`); yzw unused.
+    // x: the mesh's first corner in `cornerNormals` (as `uv.x` in `uvs`), y in `cornerColors`; zw
+    // unused.
     uint4 corners;
 }
 
@@ -103,6 +106,8 @@ struct MeshResources {
     // Normals per corner of every mesh's triangles (`kHasCornerNormals`), its levels of detail's
     // too.
     float* cornerNormals;
+    // Colours per corner (`kHasCornerColors`), as `cornerNormals`.
+    float* cornerColors;
 }
 [[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
 static float* points = meshResources.points;
@@ -125,6 +130,7 @@ static float* tangents = meshResources.tangents;
 static float* instanceTemperatures = meshResources.instanceTemperatures;
 static float* instanceVisible = meshResources.instanceVisible;
 static float* cornerNormals = meshResources.cornerNormals;
+static float* cornerColors = meshResources.cornerColors;
 // The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
 // normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
 // the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
@@ -281,7 +287,9 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
         v.normal = lerp(before.normal, now.normal, motion);
         v.tangent = lerp(before.tangent, now.tangent, motion);
     }
-    v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
+    v.color = (flags & kHasCornerColors) != 0 ? load3(cornerColors, d.corners.y + triangleCorner)
+              : (flags & kHasColors) != 0     ? load3(colors, index)
+                                              : d.tint.rgb;
     if ((flags & kHasInstanceColors) != 0) {
         v.color = load3(instanceColors, d.motion.x + instance);
     }

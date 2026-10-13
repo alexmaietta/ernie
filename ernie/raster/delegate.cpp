@@ -2209,6 +2209,17 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
             }
         }
         key.second[4] = gpuColors ? 1 : key.second[4];
+        // Colours on the host may be indexed, per corner by their
+        // interpolation (slot 4 too).
+        if (!gpuColors) {
+            for (const std::string_view suffix :
+                 {kIndicesSuffix, kInterpolationSuffix}) {
+                key.second[4] = key.second[4] * 0x100000001b3ull ^
+                                scene.AttributeVersion(
+                                    path, std::string(kDisplayColor) +
+                                              std::string(suffix));
+            }
+        }
         if (constantColour) {
             key.second[4] = 0;
         }

@@ -903,6 +903,10 @@ class MeshDrawable : public RasterDrawable {
         /// (`MeshData::cornerNormals`), in corners.
         std::vector<float> lodCornerNormals;
         std::uint32_t firstCornerNormal = 0;
+        /// The same for colours per corner
+        /// (`MeshData::cornerColors`).
+        std::vector<float> lodCornerColors;
+        std::uint32_t firstCornerColor = 0;
     };
 
     struct Instancer {
@@ -1275,6 +1279,9 @@ class MeshDrawable : public RasterDrawable {
     std::unique_ptr<GpuBuffer>
         cornerNormals_;  ///< Meshes' normals per corner
                          ///< (`Mesh::firstCornerNormal`).
+    std::unique_ptr<GpuBuffer>
+        cornerColors_;  ///< Meshes' colours per corner
+                        ///< (`Mesh::firstCornerColor`).
     /// Every recomputing mesh's `Mesh::adjacency`, one after another.
     std::unique_ptr<GpuBuffer> adjacency_;
     PipelineLayout normalsLayout_;

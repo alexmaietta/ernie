@@ -309,6 +309,55 @@ TEST(MeshDataOf, ReadsNormalsPerCornerWithAnyInterpolation) {
     EXPECT_TRUE(data.cornerNormals.empty());
 }
 
+// The two quads coloured per face (uniform): each face's colour at
+// every corner of its triangles; indexed, the same; one per point
+// stays per point; one value is the constant colour, no array.
+TEST(MeshDataOf, ReadsColoursPerCornerWithAnyInterpolation) {
+    Scene scene;
+    const std::array<float, 18> points{0, 0, 0, 1, 0, 0, 1, 1, 0,
+                                       0, 1, 0, 2, 0, 0, 2, 1, 0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    const std::array<float, 6> faces{1, 0, 0, 0, 1, 0};
+    ernie::Mesh::Define(scene, "/Mesh")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}));
+    scene.Write("/Mesh", tokens::kDisplayColor,
+                Tensor::Copy<float>(faces, {2, 3}));
+    ernie::MeshData data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_TRUE(data.colors.empty());
+    ASSERT_EQ(data.cornerColors.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerColors[0], 1.0f) << "face 0's red";
+    EXPECT_EQ(data.cornerColors[3 * 6 + 1], 1.0f) << "face 1's green";
+
+    const std::array<std::int32_t, 2> swapped{1, 0};
+    scene.Write("/Mesh", "primvars:displayColor:indices",
+                Tensor::Copy<std::int32_t>(swapped, {2}));
+    scene.Set("/Mesh", "primvars:displayColor:interpolation",
+              std::string("uniform"));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    ASSERT_EQ(data.cornerColors.size(), 3u * 12u);
+    EXPECT_EQ(data.cornerColors[1], 1.0f)
+        << "face 0's green, indexed";
+
+    scene.Clear("/Mesh", "primvars:displayColor:indices");
+    scene.Clear("/Mesh", "primvars:displayColor:interpolation");
+    const std::array<float, 18> perPoint{};
+    scene.Write("/Mesh", tokens::kDisplayColor,
+                Tensor::Copy<float>(perPoint, {6, 3}));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_EQ(data.colors.size(), 18u);
+    EXPECT_TRUE(data.cornerColors.empty());
+
+    const std::array<float, 3> one{0.2f, 0.4f, 0.6f};
+    scene.Write("/Mesh", tokens::kDisplayColor,
+                Tensor::Copy<float>(one, {1, 3}));
+    data = ernie::MeshDataOf(scene, "/Mesh");
+    EXPECT_TRUE(data.colors.empty() && data.cornerColors.empty());
+}
+
 TEST(MeshDataOf,
      ReadsTextureCoordinatesPerTriangleCornerWithAnyInterpolation) {
     // Two triangles over four points: 6 face vertices, 2 faces.

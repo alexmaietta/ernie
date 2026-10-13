@@ -3957,14 +3957,41 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
             }
         }
     }
+    // Colours one per point; or per face corner (faceVarying or
+    // uniform, perhaps indexed), which the triangles' corners carry;
+    // a constant one tints the mesh instead.
+    std::vector<float> faceCornerColors;
     if (const Tensor* colors = view.ReadDisplayColor()) {
-        if (static_cast<std::size_t>(colors->Elements()) ==
+        const std::string attribute(kDisplayColor);
+        const std::string interpolation = GetToken(
+            scene, mesh,
+            attribute + std::string(kInterpolationSuffix), "");
+        const bool indexed =
+            scene.Read(mesh,
+                       attribute + std::string(kIndicesSuffix)) !=
+            nullptr;
+        const bool gpu = IsGpu(colors->Location().kind);
+        if (!indexed &&
+            (interpolation.empty() || interpolation == "vertex") &&
+            static_cast<std::size_t>(colors->Elements()) ==
                 data.points.size() &&
             count > 1) {
             data.colors =
-                IsGpu(colors->Location().kind)
-                    ? std::vector<float>(data.points.size(), 0.0f)
+                gpu ? std::vector<float>(data.points.size(), 0.0f)
                     : FloatsOf(*colors, 3, kDisplayColor);
+        } else if (!gpu && !gpuIndices && !faceIndices.empty() &&
+                   colors->Elements() > 3 &&
+                   interpolation != "constant") {
+            try {
+                auto [values, kind] =
+                    CornerValuesOf(scene, mesh, attribute, 3, count,
+                                   faceCounts, faceIndices, true);
+                if (kind != "constant") {
+                    faceCornerColors = std::move(values);
+                }
+            } catch (const std::invalid_argument&) {
+                // Of no count it could be: the constant colour.
+            }
         }
     }
     // Without the triangles on the host, no texture coordinates.
@@ -3981,7 +4008,8 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
                                   cornerUvs, *level,
                                   options.stencils);
     }
-    if (!cornerUvs.empty() || !faceCornerNormals.empty()) {
+    if (!cornerUvs.empty() || !faceCornerNormals.empty() ||
+        !faceCornerColors.empty()) {
         const std::vector<std::uint32_t> faceVertices =
             TriangulatedCorners(faceCounts).faceVertices;
         if (!cornerUvs.empty()) {
@@ -4000,6 +4028,17 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
                                     3 * faceVertices[c]),
                             3,
                             data.cornerNormals.begin() +
+                                static_cast<std::ptrdiff_t>(3 * c));
+            }
+        }
+        if (!faceCornerColors.empty()) {
+            data.cornerColors.resize(3 * faceVertices.size());
+            for (std::size_t c = 0; c < faceVertices.size(); ++c) {
+                std::copy_n(faceCornerColors.begin() +
+                                static_cast<std::ptrdiff_t>(
+                                    3 * faceVertices[c]),
+                            3,
+                            data.cornerColors.begin() +
                                 static_cast<std::ptrdiff_t>(3 * c));
             }
         }

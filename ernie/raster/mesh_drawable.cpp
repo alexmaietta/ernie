@@ -48,6 +48,9 @@ constexpr std::uint32_t kHasInstanceVisibility = 4096;
 /// Normals per triangle corner (face-varying or uniform), in place of
 /// per point.
 constexpr std::uint32_t kHasCornerNormals = 8192;
+/// Colours per triangle corner (face-varying or uniform), in place of
+/// per point.
+constexpr std::uint32_t kHasCornerColors = 16384;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -68,7 +71,8 @@ struct GpuDraw {
                           ///< coordinate pool, its slot of active
                           ///< counts plus 1 (0 for none) and the
                           ///< points it holds; unused.
-    /// The mesh's first corner in the corner normal pool; unused.
+    /// The mesh's first corner in the corner normal pool and in the
+    /// corner colour pool; unused.
     std::uint32_t corners[4];
 };
 static_assert(sizeof(GpuDraw) == 288,
@@ -440,8 +444,10 @@ struct MeshResources {
     VkDeviceAddress instanceVisible;
     /// Normals per corner (`MeshDrawable::cornerNormals_`).
     VkDeviceAddress cornerNormals;
+    /// Colours per corner (`MeshDrawable::cornerColors_`).
+    VkDeviceAddress cornerColors;
 };
-static_assert(sizeof(MeshResources) == 160,
+static_assert(sizeof(MeshResources) == 168,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -699,21 +705,63 @@ LodUvs(const std::vector<std::vector<glm::vec2>>& pointUvs,
     return uvs;
 }
 
-/// Per point of `data`, the distinct corner normals at it.
+/// Per point of `data`, the distinct values of `corners` (three per
+/// triangle corner: normals, colours) at it.
 std::vector<std::vector<glm::vec3>>
-PointNormals(const MeshData& data) {
-    std::vector<std::vector<glm::vec3>> normals(data.points.size() /
-                                                3);
+PointCornerValues(const MeshData& data,
+                  const std::vector<float>& corners) {
+    std::vector<std::vector<glm::vec3>> values(data.points.size() /
+                                               3);
     for (std::size_t c = 0; c < data.indices.size(); ++c) {
-        const glm::vec3 n(data.cornerNormals[3 * c],
-                          data.cornerNormals[3 * c + 1],
-                          data.cornerNormals[3 * c + 2]);
-        std::vector<glm::vec3>& at = normals[data.indices[c]];
-        if (std::find(at.begin(), at.end(), n) == at.end()) {
-            at.push_back(n);
+        const glm::vec3 v(corners[3 * c], corners[3 * c + 1],
+                          corners[3 * c + 2]);
+        std::vector<glm::vec3>& at = values[data.indices[c]];
+        if (std::find(at.begin(), at.end(), v) == at.end()) {
+            at.push_back(v);
         }
     }
-    return normals;
+    return values;
+}
+
+/// Colours for the corners of simplified triangles `lodIndices`,
+/// whose corners are points of the full mesh: a point's own, or where
+/// faces of several colours meet, the one nearest the triangle's
+/// other corners', as `LodUvs` picks texture coordinates.
+std::vector<float> LodCornerColors(
+    const std::vector<std::vector<glm::vec3>>& pointColors,
+    std::span<const std::uint32_t> lodIndices) {
+    std::vector<float> colors;
+    colors.reserve(3 * lodIndices.size());
+    for (std::size_t t = 0; t + 2 < lodIndices.size(); t += 3) {
+        glm::vec3 reference(0.0f);
+        float weight = 0.0f;
+        for (std::size_t k = 0; k < 3; ++k) {
+            const std::vector<glm::vec3>& at =
+                pointColors[lodIndices[t + k]];
+            if (at.size() == 1) {
+                reference += at[0];
+                weight += 1.0f;
+            }
+        }
+        if (weight > 0.0f) {
+            reference /= weight;
+        } else if (!pointColors[lodIndices[t]].empty()) {
+            reference = pointColors[lodIndices[t]][0];
+        }
+        for (std::size_t k = 0; k < 3; ++k) {
+            glm::vec3 best(0.0f);
+            float distance = std::numeric_limits<float>::infinity();
+            for (const glm::vec3& c :
+                 pointColors[lodIndices[t + k]]) {
+                if (glm::distance(c, reference) < distance) {
+                    distance = glm::distance(c, reference);
+                    best = c;
+                }
+            }
+            colors.insert(colors.end(), {best.x, best.y, best.z});
+        }
+    }
+    return colors;
 }
 
 /// Normals for the corners of simplified triangles `lodIndices`,
@@ -1021,6 +1069,13 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
         throw std::invalid_argument(
             "Mesh corner normals must come one per corner");
     }
+    if (!data.cornerColors.empty() &&
+        (data.cornerColors.size() != 3 * data.indices.size() ||
+         (!data.levels.empty() && data.lodCornerColors.size() !=
+                                      3 * data.lodIndices.size()))) {
+        throw std::invalid_argument(
+            "Mesh corner colours must come one per corner");
+    }
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
     mesh.data = std::move(data);
@@ -1063,6 +1118,8 @@ void MeshDrawable::ForgetTriangleNormals(Mesh& mesh) {
     }
     mesh.data.cornerNormals.clear();
     mesh.lodCornerNormals.clear();
+    mesh.data.cornerColors.clear();
+    mesh.lodCornerColors.clear();
 }
 
 void MeshDrawable::BuildLevels(Mesh& mesh) const {
@@ -1074,6 +1131,7 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
     mesh.lodIndices.clear();
     mesh.lodUvs.clear();
     mesh.lodCornerNormals.clear();
+    mesh.lodCornerColors.clear();
     // Levels the mesh comes with (a subdivision surface's coarser
     // tessellations), taken as they are.
     if (!data.levels.empty()) {
@@ -1106,19 +1164,37 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
                 data.lodCornerNormals.begin() +
                     static_cast<std::ptrdiff_t>(3 * end));
         }
+        if (!data.cornerColors.empty()) {
+            mesh.lodCornerColors.assign(
+                data.lodCornerColors.begin(),
+                data.lodCornerColors.begin() +
+                    static_cast<std::ptrdiff_t>(3 * end));
+        }
         mesh.data.levels = {};
         mesh.data.lodIndices = {};
         mesh.data.lodUvs = {};
         mesh.data.lodCornerNormals = {};
+        mesh.data.lodCornerColors = {};
         return;
     }
-    // Points on a seam or a hard edge (several texture coordinates or
-    // normals at them) stay as they are, so the levels keep both.
+    // Points on a seam, a hard edge or a colour boundary (several
+    // texture coordinates, normals or colours at them) stay as they
+    // are, so the levels keep them.
     std::vector<std::vector<glm::vec2>> pointUvs;
     std::vector<std::vector<glm::vec3>> pointNormals;
+    std::vector<std::vector<glm::vec3>> pointColors;
     std::vector<unsigned char> locked;
-    if (!data.uvs.empty() || !data.cornerNormals.empty()) {
+    if (!data.uvs.empty() || !data.cornerNormals.empty() ||
+        !data.cornerColors.empty()) {
         locked.assign(data.points.size() / 3, 0);
+    }
+    if (!data.cornerColors.empty()) {
+        pointColors = PointCornerValues(data, data.cornerColors);
+        for (std::size_t p = 0; p < pointColors.size(); ++p) {
+            if (pointColors[p].size() > 1) {
+                locked[p] = meshopt_SimplifyVertex_Lock;
+            }
+        }
     }
     if (!data.uvs.empty()) {
         pointUvs = PointUvs(data);
@@ -1129,7 +1205,7 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
         }
     }
     if (!data.cornerNormals.empty()) {
-        pointNormals = PointNormals(data);
+        pointNormals = PointCornerValues(data, data.cornerNormals);
         for (std::size_t p = 0; p < pointNormals.size(); ++p) {
             if (pointNormals[p].size() > 1) {
                 locked[p] = meshopt_SimplifyVertex_Lock;
@@ -1147,6 +1223,10 @@ void MeshDrawable::BuildLevels(Mesh& mesh) const {
     if (!data.cornerNormals.empty()) {
         mesh.lodCornerNormals = LodCornerNormals(
             pointNormals, data.points, mesh.lodIndices);
+    }
+    if (!data.cornerColors.empty()) {
+        mesh.lodCornerColors =
+            LodCornerColors(pointColors, mesh.lodIndices);
     }
 }
 
@@ -1461,7 +1541,8 @@ void MeshDrawable::SetIndices(std::uint32_t mesh,
     // nothing; nor do triangles around the points from them.
     target.levelsPending = false;
     if (target.levels.size() > 1 || target.recomputeNormals ||
-        !target.data.cornerNormals.empty()) {
+        !target.data.cornerNormals.empty() ||
+        !target.data.cornerColors.empty()) {
         target.levels.resize(1);
         target.lodIndices.clear();
         target.lodUvs.clear();
@@ -1590,7 +1671,8 @@ void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
         // Levels simplified from the placeholders mean nothing.
         target.levelsPending = false;
         if (target.levels.size() > 1 || target.recomputeNormals ||
-            !target.data.cornerNormals.empty()) {
+            !target.data.cornerNormals.empty() ||
+            !target.data.cornerColors.empty()) {
             target.levels.resize(1);
             target.lodIndices.clear();
             target.lodUvs.clear();
@@ -2790,6 +2872,7 @@ void MeshDrawable::RebuildGeometry() {
     topologyMeshes_.clear();
     std::vector<float> uvs;
     std::vector<float> cornerNormals;
+    std::vector<float> cornerColors;
     // Smooth tangents, per point of every mesh, where an anisotropic
     // material shades one (none held otherwise).
     const bool tangents =
@@ -2860,6 +2943,14 @@ void MeshDrawable::RebuildGeometry() {
         cornerNormals.insert(cornerNormals.end(),
                              mesh.lodCornerNormals.begin(),
                              mesh.lodCornerNormals.end());
+        mesh.firstCornerColor =
+            static_cast<std::uint32_t>(cornerColors.size() / 3);
+        cornerColors.insert(cornerColors.end(),
+                            mesh.data.cornerColors.begin(),
+                            mesh.data.cornerColors.end());
+        cornerColors.insert(cornerColors.end(),
+                            mesh.lodCornerColors.begin(),
+                            mesh.lodCornerColors.end());
         mesh.firstIndex = static_cast<std::uint32_t>(indices.size());
         mesh.firstVertex =
             static_cast<std::uint32_t>(points.size() / 3);
@@ -2985,6 +3076,7 @@ void MeshDrawable::RebuildGeometry() {
     indices_ = Pool(std::as_bytes(std::span(indices)));
     uvs_ = StorageBuffer(context_, uvs);
     cornerNormals_ = StorageBuffer(context_, cornerNormals);
+    cornerColors_ = StorageBuffer(context_, cornerColors);
     adjacency_ = StorageBuffer(context_, adjacency);
     // Cleared on the GPU before each use.
     normalSums_ = std::make_unique<GpuBuffer>(
@@ -3759,6 +3851,9 @@ void MeshDrawable::WriteDraws() {
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
         flags |=
             mesh.data.cornerNormals.empty() ? 0u : kHasCornerNormals;
+        flags |= item.vertexColors && !mesh.data.cornerColors.empty()
+                     ? kHasCornerColors
+                     : 0u;
         flags |= mesh.tangents ? kHasTangents : 0u;
         flags |= thermal_ ? kThermal : 0u;
         flags |= mesh.hasTemperatures ? kHasTemperatures : 0u;
@@ -3766,6 +3861,7 @@ void MeshDrawable::WriteDraws() {
                      ? kHasNodes
                      : 0u;
         draw.corners[0] = mesh.firstCornerNormal;
+        draw.corners[1] = mesh.firstCornerColor;
         draw.uv[0] = mesh.firstUv;
         draw.uv[1] = mesh.countSlot;
         draw.uv[2] =
@@ -4177,7 +4273,8 @@ void MeshDrawable::WriteResources() {
             address(tangents_),
             address(instanceTemperatures_),
             address(instanceVisible_),
-            address(cornerNormals_)};
+            address(cornerNormals_),
+            address(cornerColors_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);

@@ -20,6 +20,10 @@ struct MeshData {
     std::vector<float> cornerNormals;
     std::vector<float>
         colors;  ///< Empty, or linear r, g, b per vertex.
+    /// Empty, or linear r, g, b per triangle corner (per entry of
+    /// `indices`), for face-varying and uniform colours. In place of
+    /// `colors`.
+    std::vector<float> cornerColors;
     /// Empty, or texture coordinates s, t per triangle corner (per
     /// entry of `indices`), so face-varying coordinates need no split
     /// vertices.
@@ -44,6 +48,9 @@ struct MeshData {
     /// Empty, or x, y, z per entry of `lodIndices` (with
     /// `cornerNormals`).
     std::vector<float> lodCornerNormals;
+    /// Empty, or r, g, b per entry of `lodIndices` (with
+    /// `cornerColors`).
+    std::vector<float> lodCornerColors;
 };
 
 /// Where each corner of `TriangulateFaces`' triangles comes from: its
