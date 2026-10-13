@@ -450,6 +450,7 @@ class RasterDelegate : public RenderDelegate {
         std::uint32_t row = 0;
         bool reset = false;
         std::optional<Path> frame;
+        bool operator==(const GpuPosed&) const = default;
     };
     /// Where a prim under a GPU-posed prim is posed (`GpuAnchorOf`):
     /// that prim (`at`) and its instance, the world transform of its
@@ -971,6 +972,10 @@ class RasterDelegate : public RenderDelegate {
     /// writes relative to the frame's origin.
     bool anchoredViews_ = false;
     std::unordered_map<Path, GpuPosed> gpuPosed_;
+    /// Whether the last `SyncGpuXforms` posed other prims, or the same
+    /// ones otherwise (their groups, rows or frames): every draw under
+    /// them is built again (`Items`).
+    bool gpuPosedChanged_ = false;
     /// The scene's version at the last full `Sync`: prims below
     /// GPU-posed ones whose own transform ops are older changed only
     /// with their ancestors (`RefreshGpuXforms`).

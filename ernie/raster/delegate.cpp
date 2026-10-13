@@ -3072,6 +3072,9 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
         it = gpuXformGroups_.erase(it);
     }
 
+    // What posed what before, to tell whether the draws under them
+    // need building again.
+    const std::unordered_map<Path, GpuPosed> before = std::move(gpuPosed_);
     gpuPosed_.clear();
     for (const auto& [key, members] : groups) {
         try {
@@ -3189,6 +3192,7 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
                                       "GPU transforms", error));
         }
     }
+    gpuPosedChanged_ = gpuPosedChanged_ || gpuPosed_ != before;
     if (!errors.empty()) {
         throw std::invalid_argument("Cannot upload " +
                                     errors.front());
@@ -4075,13 +4079,20 @@ void RasterDelegate::Sync(const Scene& scene) {
         SyncMeshes(scene, changedMeshes ? &*changedMeshes : nullptr);
     });
     // GPU-posed prims first: instancers under them compose under
-    // their instances. With none, only a changed prim's own transform
-    // written as GPU arrays makes some, so the scene is not searched.
+    // their instances. Searched for only when a change may pose
+    // others: a posed prim's own (moved, added, removed), or a prim
+    // whose transform became GPU arrays.
     const bool gpuXforms =
-        !changed || !gpuPosed_.empty() ||
+        !changed ||
         std::ranges::any_of(*changed, [this, &scene](const Change& change) {
-            if (!Any(change.bits, Dirty::Transform | Dirty::Added) ||
-                !scene.Has(change.path)) {
+            if (!Any(change.bits,
+                     Dirty::Transform | Dirty::Added | Dirty::Removed)) {
+                return false;
+            }
+            if (gpuPosed_.contains(change.path)) {
+                return true;
+            }
+            if (!scene.Has(change.path)) {
                 return false;
             }
             try {
@@ -4121,6 +4132,8 @@ void RasterDelegate::Sync(const Scene& scene) {
     attempt([&] {
         meshes_.SetItems(Items(scene, touched ? &*touched : nullptr));
     });
+    // The draws under GPU-posed prims are built as they are posed now.
+    gpuPosedChanged_ = false;
     syncedVersion_ = scene.Version();
     if (!errors.empty()) {
         std::string message = errors.front();
@@ -4136,8 +4149,8 @@ RasterDelegate::TouchedMeshes(const Scene& scene,
                               std::span<const Change> changes) const {
     using namespace tokens;
     // Under a prim posed on the GPU, a mesh's draw follows its group
-    // (`GpuAnchorOf`), which other prims' arrays change.
-    if (!gpuPosed_.empty()) {
+    // (`GpuAnchorOf`): when the groups changed, every such draw.
+    if (gpuPosedChanged_) {
         return std::nullopt;
     }
     std::set<Path> touched;

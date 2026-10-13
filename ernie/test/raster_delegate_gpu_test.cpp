@@ -1536,3 +1536,49 @@ TEST_F(RasterDelegateTest, ColumnsOfVisibilityHideAndShowInstances) {
     EXPECT_LE(worst(shown, every.Render(scene(false, false))), 2);
     EXPECT_GT(worst(hidden, shown), 50) << "the middle cube came back";
 }
+
+TEST_F(RasterDelegateTest, EditsBesideGpuPosedGroupsRedrawAsAFullSyncWould) {
+    Scene scene = MeshScene();
+    const std::vector<Path> bodies = {"/World/Body0", "/World/Body1",
+                                      "/World/Body2"};
+    std::vector<float> rows;
+    for (int i = 0; i < 3; ++i) {
+        const glm::dvec3 at(-8.0 + 8.0 * i, -6.0, 0.0);
+        ernie::Cube::Define(scene, bodies[static_cast<std::size_t>(i)])
+            .SetSize(4.0)
+            .SetXform({.translate = at});
+        rows.insert(rows.end(), {static_cast<float>(at.x),
+                                 static_cast<float>(at.y), 0.0f});
+    }
+    // Posed as one group, from a column.
+    scene.GetColumn(ernie::PrimSet(bodies), tokens::kTranslate)
+        .Write(Tensor::Copy<float>(rows, {3, 3}));
+    ernie::Cube::Define(scene, "/World/Lone")
+        .SetSize(3.0)
+        .SetXform({.translate = {0.0, 8.0, 0.0}});
+    RasterDelegate delegate(*context_);
+    delegate.Render(scene);
+    const auto expectFresh = [&](const char* edit) {
+        const Tensor kept = delegate.Render(scene);
+        RasterDelegate fresh(*context_);
+        const Tensor whole = fresh.Render(scene);
+        ASSERT_EQ(kept.Elements(), whole.Elements());
+        int worst = 0;
+        for (std::int64_t i = 0; i < kept.Elements(); ++i) {
+            worst = std::max(worst,
+                             std::abs(int{kept.As<std::uint8_t>()[i]} -
+                                      int{whole.As<std::uint8_t>()[i]}));
+        }
+        EXPECT_LE(worst, 2) << edit;
+    };
+    ernie::Cube(scene, "/World/Lone").SetDisplayColor({0.9, 0.2, 0.2});
+    expectFresh("a lone cube's colour");
+    ernie::SetXform(scene, "/World/Lone", {.translate = {4.0, 8.0, 0.0}});
+    expectFresh("a lone cube moved");
+    ernie::Cube(scene, bodies[1]).SetDisplayColor({0.2, 0.2, 0.9});
+    expectFresh("a posed cube's own colour");
+    ernie::Cube::Define(scene, "/World/New").SetSize(2.0);
+    expectFresh("a cube added");
+    scene.Remove(bodies[2]);
+    expectFresh("a posed cube removed, the group posed anew");
+}
