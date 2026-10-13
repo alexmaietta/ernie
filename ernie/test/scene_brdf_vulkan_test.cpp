@@ -909,3 +909,27 @@ TEST_F(BrdfVulkanTest,
     EXPECT_GT(at(brushed, 0.0),
               1.5 * at(brushed, glm::half_pi<double>()));
 }
+
+TEST_F(BrdfVulkanTest,
+       OpenPbrMetalsEdgeTintShapesTheirEnvironmentToo) {
+    // The F82 tint changes a metal's reflection of light from all
+    // around towards grazing, as it does a light's, and hardly at all
+    // head on, where F82's term vanishes.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    const std::vector<float> plain =
+        OpenPbrParams(model, {{1, 1.0f}, {4, 0.2f}});
+    const std::vector<float> tinted = OpenPbrParams(
+        model,
+        {{1, 1.0f}, {4, 0.2f}, {6, 0.5f}, {7, 0.5f}, {8, 0.5f}});
+    const auto environment = [&](const std::vector<float>& params,
+                                 double mu) {
+        return Evaluate("open_pbr", params,
+                        {{mu, mu, 1.0, 1.0, glm::dvec3(0.9)}}, 0.0,
+                        "environment")[0]
+            .g;
+    };
+    EXPECT_NEAR(environment(tinted, 1.0), environment(plain, 1.0),
+                0.02 * environment(plain, 1.0));
+    EXPECT_LT(environment(tinted, 0.1),
+              0.95 * environment(plain, 0.1));
+}

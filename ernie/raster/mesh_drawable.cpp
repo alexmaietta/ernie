@@ -40,6 +40,7 @@ constexpr std::uint32_t kHasTemperatures = 256;
 /// The mesh has a thermal network's nodes and their temperatures
 /// (`SetNodeIds`, `SetNodeTemperatures`).
 constexpr std::uint32_t kHasNodes = 512;
+constexpr std::uint32_t kHasTangents = 1024;
 /// The draw's light link group (`LinkGroups`), in the flags' high
 /// bits.
 constexpr std::uint32_t kLinkGroupShift = 24;
@@ -259,6 +260,54 @@ std::pair<std::int64_t, std::int64_t> OpWidths(InstanceOpKind kind) {
 
 /// Per point of a mesh of `count` points, the triangles of `indices`
 /// around it: offsets (count + 1) into the triangle indices that
+/// Per point of a mesh, its smooth tangent along which its texture
+/// coordinates' u grows (unnormalized): the sum over its triangles of
+/// each one's unit dP/du weighted by its area, from `uvs` per corner
+/// of `indices`. Zero where no triangle around a point has u varying.
+///
+/// Reference: E. Lengyel, "Computing Tangent Space Basis Vectors for
+/// an Arbitrary Mesh", Terathon Software, 2001.
+std::vector<float> TangentsOf(std::span<const float> points,
+                              std::span<const std::uint32_t> indices,
+                              std::span<const float> uvs) {
+    std::vector<float> tangents(points.size(), 0.0f);
+    const auto point = [&](std::uint32_t i) {
+        return glm::vec3(points[3 * i], points[3 * i + 1],
+                         points[3 * i + 2]);
+    };
+    for (std::size_t first = 0;
+         first + 2 < indices.size() && 2 * first + 5 < uvs.size();
+         first += 3) {
+        const glm::vec3 p0 = point(indices[first]);
+        const glm::vec3 e1 = point(indices[first + 1]) - p0;
+        const glm::vec3 e2 = point(indices[first + 2]) - p0;
+        const glm::vec2 uv0(uvs[2 * first], uvs[2 * first + 1]);
+        const glm::vec2 d1 =
+            glm::vec2(uvs[2 * first + 2], uvs[2 * first + 3]) - uv0;
+        const glm::vec2 d2 =
+            glm::vec2(uvs[2 * first + 4], uvs[2 * first + 5]) - uv0;
+        const float det = d1.x * d2.y - d2.x * d1.y;
+        const glm::vec3 dpdu =
+            (e1 * d2.y - e2 * d1.y) / (det != 0.0f ? det : 1.0f);
+        const float length = glm::length(dpdu);
+        if (det == 0.0f || !(length > 0.0f)) {
+            continue;
+        }
+        const glm::vec3 weighted =
+            dpdu / length * glm::length(glm::cross(e1, e2));
+        for (std::size_t c = 0; c < 3; ++c) {
+            const std::size_t at =
+                3 * std::size_t{indices[first + c]};
+            if (at + 2 < tangents.size()) {
+                tangents[at] += weighted.x;
+                tangents[at + 1] += weighted.y;
+                tangents[at + 2] += weighted.z;
+            }
+        }
+    }
+    return tangents;
+}
+
 /// follow them.
 std::vector<std::uint32_t>
 TrianglesAround(std::span<const std::uint32_t> indices,
@@ -367,8 +416,11 @@ struct MeshResources {
     /// temperatures (`MeshDrawable::nodeIds_`, `nodeTemperatures_`).
     VkDeviceAddress nodeIds;
     VkDeviceAddress nodeTemperatures;
+    /// Smooth tangents per point of the meshes an anisotropic
+    /// material shades (`MeshDrawable::tangents_`).
+    VkDeviceAddress tangents;
 };
-static_assert(sizeof(MeshResources) == 128,
+static_assert(sizeof(MeshResources) == 136,
               "MeshResources must match mesh.slang");
 
 /// The mesh passes, which write the renderer's G-buffer.
@@ -2408,6 +2460,14 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
     std::vector<float> uvs;
+    // Smooth tangents, per point of every mesh, where an anisotropic
+    // material shades one (none held otherwise).
+    const bool tangents =
+        std::ranges::any_of(meshes_, [](const auto& entry) {
+            return entry.second.wantsTangents &&
+                   !entry.second.data.uvs.empty();
+        });
+    std::vector<float> tangentPool;
     // Points and triangles in use, by slot; device ones start as
     // every one, until copied in.
     std::vector<std::int32_t> counts;
@@ -2468,6 +2528,16 @@ void MeshDrawable::RebuildGeometry() {
         const std::size_t count = mesh.data.points.size();
         points.insert(points.end(), mesh.data.points.begin(),
                       mesh.data.points.end());
+        mesh.tangents =
+            tangents && mesh.wantsTangents && !mesh.data.uvs.empty();
+        if (mesh.tangents) {
+            const std::vector<float> own = TangentsOf(
+                mesh.data.points, mesh.data.indices, mesh.data.uvs);
+            tangentPool.insert(tangentPool.end(), own.begin(),
+                               own.end());
+        } else if (tangents) {
+            tangentPool.resize(tangentPool.size() + count, 0.0f);
+        }
         if (mesh.data.normals.empty()) {
             normals.resize(normals.size() + count, 0.0f);
         } else {
@@ -2559,6 +2629,8 @@ void MeshDrawable::RebuildGeometry() {
     }
     points_ = Pool(std::as_bytes(std::span(points)));
     normals_ = Pool(std::as_bytes(std::span(normals)));
+    tangents_ =
+        tangents ? StorageBuffer(context_, tangentPool) : nullptr;
     colors_ = Pool(std::as_bytes(std::span(colors)));
     temperatures_ = Pool(std::as_bytes(std::span(temperatures)));
     nodeIds_ = Pool(std::as_bytes(std::span(nodeIds)));
@@ -3049,6 +3121,23 @@ void MeshDrawable::Prepare(const FrameParams& params,
         thermal_ = params.thermal.enable;
         drawsDirty_ = true;
     }
+    // Meshes an anisotropic material shades take smooth tangents,
+    // made with the geometry when that changes.
+    {
+        std::set<std::uint32_t> wanted;
+        for (const MeshItem& item : items_) {
+            if (renderer_.MaterialReadsTangents(item.material)) {
+                wanted.insert(item.mesh);
+            }
+        }
+        for (auto& [handle, mesh] : meshes_) {
+            const bool wants = wanted.contains(handle);
+            if (wants != mesh.wantsTangents) {
+                mesh.wantsTangents = wants;
+                geometryDirty_ = true;
+            }
+        }
+    }
     // The per-draw data changes only with the draws, meshes or
     // instancers, not every frame.
     bool drawsChanged =
@@ -3256,6 +3345,7 @@ void MeshDrawable::WriteDraws() {
                      ? kHasColors
                      : 0u;
         flags |= mesh.data.uvs.empty() ? 0u : kHasUvs;
+        flags |= mesh.tangents ? kHasTangents : 0u;
         flags |= thermal_ ? kThermal : 0u;
         flags |= mesh.hasTemperatures ? kHasTemperatures : 0u;
         flags |= !mesh.nodeIds.empty() && mesh.hasNodeTemperatures
@@ -3651,7 +3741,8 @@ void MeshDrawable::WriteResources() {
             address(activeCounts_),
             address(temperatures_),
             address(nodeIds_),
-            address(nodeTemperatures_)};
+            address(nodeTemperatures_),
+            address(tangents_)};
         Reserve(context_, meshResources_[culled], sizeof(resources),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device);

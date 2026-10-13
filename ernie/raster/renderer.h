@@ -175,6 +175,13 @@ class RasterRenderer {
         return tangents_;
     }
 
+    /// Whether material `id` reads its surfaces' tangents
+    /// (`BrdfRegistry::kTangentsFeature`), for which drawables give
+    /// their meshes smooth ones.
+    bool MaterialReadsTangents(std::uint32_t id) const {
+        return id < tangentMaterials_.size() && tangentMaterials_[id];
+    }
+
     /// Whether material `id` is transparent: partly opaque (a
     /// constant opacity below 1, without a cutout threshold) or
     /// letting light through (`BrdfRegistry::kTransmissionFeature`).
@@ -1422,8 +1429,10 @@ class RasterRenderer {
     /// (`BrdfRegistry::kTangentsFeature`), for the G-buffer to hold
     /// them.
     bool tangents_ = false;
-    /// Per material id, `TransparentMaterial`.
+    /// Per material id, `TransparentMaterial` and
+    /// `MaterialReadsTangents`.
     std::vector<bool> transparentMaterials_;
+    std::vector<bool> tangentMaterials_;
     /// Per model, shading variant and features, the transparent
     /// surfaces' compositing (shading.slang's `transmitMain`); and
     /// the copy of their result into the raster radiance

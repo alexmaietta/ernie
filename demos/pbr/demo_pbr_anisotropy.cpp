@@ -45,7 +45,7 @@ constexpr double kFocal = 50.0;     // mm
 constexpr double kAperture = 36.0;  // mm, horizontal
 constexpr glm::dvec3 kEye(0.0, -6.5, 1.6);
 constexpr glm::dvec3 kTarget(0.0, 0.0, 0.7);
-constexpr double kAnisotropy = 0.7;
+constexpr double kAnisotropy = 0.85;
 constexpr double kRoughness = 0.35;
 constexpr double kSky = 0.4;  // the studio's intensity
 constexpr double kSun = 0.6;
@@ -294,10 +294,10 @@ class AnisotropyDemo : public app::Demo {
                   kAnisotropy);
         DefineMesh(scene, "/World/Plate", Plate(kCentres[0]), look);
         DefineMesh(scene, "/World/Disc", Disc(kCentres[1]), look);
-        // Finely tessellated: its tangents are each triangle's.
+        // Its tangents are smooth, so a coarse sphere streaks evenly.
         Sphere::Define(scene, "/World/Ball")
             .SetRadius(kRadius)
-            .SetTessellationLevel(256)
+            .SetTessellationLevel(32)
             .SetMaterialBinding(look);
         SetXform(scene, "/World/Ball", {.translate = kCentres[2]});
         Camera::Define(scene, "/World/Camera")

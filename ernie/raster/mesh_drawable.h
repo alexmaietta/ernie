@@ -835,6 +835,12 @@ class MeshDrawable : public RasterDrawable {
         /// on the GPU when they move: a mesh with normals whose
         /// points, but not normals, come from the device.
         bool recomputeNormals = false;
+        /// Whether an anisotropic material shades it
+        /// (`RasterRenderer::MaterialReadsTangents`), and whether it
+        /// holds smooth tangents for it (`tangents_`, from its rest
+        /// points and texture coordinates).
+        bool wantsTangents = false;
+        bool tangents = false;
         /// Per point, the triangles around it (`adjacency_`), for
         /// recomputing normals: offsets (points + 1) then triangle
         /// indices, from `firstAdjacency`.
@@ -1165,6 +1171,9 @@ class MeshDrawable : public RasterDrawable {
     std::uint32_t pointTotal_ = 0;
     std::uint32_t instanceTotal_ = 0;
     std::shared_ptr<GpuBuffer> normals_;
+    /// Per point, the smooth tangents of meshes that want them
+    /// (`Mesh::tangents`), zero for the others; null when none does.
+    std::unique_ptr<GpuBuffer> tangents_;
     std::shared_ptr<GpuBuffer> colors_;
     /// Meshes' temperatures, a float per point (`SetTemperatures`).
     std::shared_ptr<GpuBuffer> temperatures_;

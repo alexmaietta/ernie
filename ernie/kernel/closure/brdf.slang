@@ -84,6 +84,10 @@ public struct EnvironmentResponse {
     public float roughness0;
     public float3 specular1;
     public float roughness1;
+    // The normal the first lobe mirrors the viewer about, in the surface's frame
+    // (`BrdfInput::light` and `view`'s): bent for an anisotropic lobe, whose reflections stretch
+    // across its tangent; the normal, (0, 0, 1), otherwise.
+    public float3 normal0;
 }
 
 // A purely diffuse response of weight `albedo`.
@@ -94,6 +98,7 @@ public EnvironmentResponse diffuseEnvironment(float3 albedo) {
     r.roughness0 = 1.0;
     r.specular1 = float3(0.0);
     r.roughness1 = 1.0;
+    r.normal0 = float3(0.0, 0.0, 1.0);
     return r;
 }
 
@@ -320,6 +325,13 @@ public float2 environmentBrdf(float roughness, float mu) {
 public float3 energyCompensation(float3 f0, float roughness, float mu) {
     let ab = environmentBrdf(roughness, saturate(mu));
     return 1.0 + f0 * (1.0 / max(ab.x + ab.y, 1e-3) - 1.0);
+}
+
+// The cosine at which Schlick's Fresnel times the split sum's scale plus bias, A + B, equals its
+// f0 A + B for every f0: (1 - mu)^5 = B / (A + B). A model's own Fresnel there (an exact
+// dielectric's, a tinted metal's, a thin film's) stands in for Schlick's in the split sum.
+public float environmentCosine(float2 ab) {
+    return 1.0 - pow(saturate(ab.y / max(ab.x + ab.y, 1e-6)), 0.2);
 }
 
 // `energyCompensation` for direct light: the geometric mean of the factors at the incidence and

@@ -54,7 +54,9 @@ def disc_mean(image, point, inner, outer):
     radii (fractions of the ball's) about the ball at `point`."""
     col, row, scale = project(point)
     rows, cols = np.mgrid[0 : image.shape[0], 0 : image.shape[1]]
-    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (scale * RADIUS)
+    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (
+        scale * RADIUS
+    )
     mask = (r >= inner) & (r < outer)
     return srgb_to_linear(
         image[..., :3][mask].astype(np.float64).mean(axis=0) / 255.0
@@ -101,7 +103,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
         ).set(
             tokens.TRANSFORM,
@@ -123,14 +127,20 @@ class Demo(ernie.demo.Demo):
             on_change=self.roughen,
         )
         self.widgets.slider(
-            "Sun phase angle", 0.0, 150.0, PHASE, on_change=self.light_at
+            "Sun phase angle",
+            0.0,
+            150.0,
+            PHASE,
+            on_change=self.light_at,
         )
         if viewer is not None:
             viewer.active_camera = camera.path
             viewer.look_at(EYE, TARGET)
 
     def roughen(self, roughness):
-        self.looks[1].prim.set("inputs:base_diffuse_roughness", roughness)
+        self.looks[1].prim.set(
+            "inputs:base_diffuse_roughness", roughness
+        )
 
     def light_at(self, degrees):
         """The sun `degrees` round from behind the camera to the right,
@@ -164,10 +174,12 @@ class Demo(ernie.demo.Demo):
             f"{lambert:.3f}, rough {rough:.3f}"
         )
         assert 0.35 < lambert < 0.75, "Lambert's limb darkens as cos"
-        assert rough > lambert + 0.1, "the rough ball's limb is flatter"
-        assert (
-            abs(self.limb_darkening(smooth, 1) - lambert) < 0.02
-        ), "roughness 0 is Lambert"
+        assert rough > lambert + 0.1, (
+            "the rough ball's limb is flatter"
+        )
+        assert abs(self.limb_darkening(smooth, 1) - lambert) < 0.02, (
+            "roughness 0 is Lambert"
+        )
 
 
 if __name__ == "__main__":

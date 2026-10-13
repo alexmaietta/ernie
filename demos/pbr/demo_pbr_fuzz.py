@@ -46,7 +46,9 @@ def studio(rows=64, cols=128):
     azimuth = 360.0 * (np.arange(cols) + 0.5) / cols
     e, a = np.meshgrid(elevation, azimuth, indexing="ij")
     sky = np.where(
-        e > 0.0, 0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))), 0.03
+        e > 0.0,
+        0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))),
+        0.03,
     )
     for centre in (240.0, 330.0):
         box = (np.abs(e - 35.0) < 15.0) & (np.abs(a - centre) < 18.0)
@@ -76,7 +78,9 @@ def disc_mean(image, point, inner, outer):
     radii (fractions of the ball's) about the ball at `point`."""
     col, row, scale = project(point)
     rows, cols = np.mgrid[0 : image.shape[0], 0 : image.shape[1]]
-    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (scale * RADIUS)
+    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (
+        scale * RADIUS
+    )
     mask = (r >= inner) & (r < outer)
     return srgb_to_linear(
         image[..., :3][mask].astype(np.float64).mean(axis=0) / 255.0
@@ -137,7 +141,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
         ).set(
             tokens.TRANSFORM,
@@ -163,7 +169,9 @@ class Demo(ernie.demo.Demo):
             0.0,
             1.0,
             FUZZ_ROUGHNESS,
-            on_change=lambda value: self.fuzz("fuzz_roughness", value),
+            on_change=lambda value: self.fuzz(
+                "fuzz_roughness", value
+            ),
         )
         self.widgets.slider(
             "Sun azimuth (0 behind the balls)",
@@ -200,7 +208,9 @@ class Demo(ernie.demo.Demo):
         image = np.asarray(self.renderer.render(self.scene))
         weights = np.array([0.2126, 0.7152, 0.0722])
         return [
-            float(disc_mean(image, ball_centre(i), 0.8, 0.97) @ weights)
+            float(
+                disc_mean(image, ball_centre(i), 0.8, 0.97) @ weights
+            )
             for i in range(len(CLOTHS))
         ]
 

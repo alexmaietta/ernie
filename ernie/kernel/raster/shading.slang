@@ -1123,14 +1123,26 @@ float3 pixelTangent(int4 pixel) {
     return unpackTangent(heapTextureArrays[pass.gbuffer.x].Load(pixel).xy);
 }
 
+// The surface's frame about unit normal `n`: the pixel's `tangent` made perpendicular to it where
+// it has one, else `orthonormalBasis`'s.
+void surfaceFrame(float3 n, float3 tangent, out float3 t, out float3 b) {
+    let along = tangent - dot(tangent, n) * n;
+    if (dot(along, along) > 1e-12) {
+        t = normalize(along);
+        b = cross(n, t);
+    } else {
+        orthonormalBasis(n, t, b);
+    }
+}
+
 // The `BrdfInput` of `brdfInputOf` with the pixel's unresolved slopes and the bands', in the
-// frame of the pixel's tangent made perpendicular to n where it has one.
+// surface's frame (`surfaceFrame`).
 BrdfInput bandInputOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
                       Bands bands) {
-    let along = bands.tangent - dot(bands.tangent, n) * n;
-    var input = dot(along, along) > 1e-12
-                    ? brdfInputIn(normalize(along), cross(n, normalize(along)), n, l, v, albedo)
-                    : brdfInputOf(n, l, v, albedo);
+    float3 t;
+    float3 b;
+    surfaceFrame(n, bands.tangent, t, b);
+    var input = brdfInputIn(t, b, n, l, v, albedo);
     input.slopeVariance = slopeVariance;
     input.wavelengths = bands.wavelengths;
     input.colours = bands.colours;
@@ -2910,8 +2922,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         let probe = environmentOf(n, v, float3(1.0), slopeVariance, params, neutralBands(tangent));
         let mirror = 2.0 * dot(n, v) * n - v;
         if (any(probe.specular0 > 0.0)) {
-            lobes[0] = domeLobe(mirror, probe.roughness0);
-            lobes[0].w *= shadowed ? coneOcclusion(occlusionState, mirror, probe.roughness0) : 1.0;
+            // About the model's normal for its first lobe, bent where it is anisotropic.
+            float3 t;
+            float3 b;
+            surfaceFrame(n, tangent, t, b);
+            let bent = normalize(probe.normal0.x * t + probe.normal0.y * b + probe.normal0.z * n);
+            let mirror0 = 2.0 * dot(bent, v) * bent - v;
+            lobes[0] = domeLobe(mirror0, probe.roughness0);
+            lobes[0].w *= shadowed ? coneOcclusion(occlusionState, mirror0, probe.roughness0) : 1.0;
         }
         if (any(probe.specular1 > 0.0)) {
             lobes[1] = domeLobe(mirror, probe.roughness1);

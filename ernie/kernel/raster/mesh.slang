@@ -25,6 +25,8 @@ static const uint kThermal = 128;
 static const uint kHasTemperatures = 256;
 // The mesh has a thermal network's nodes and their temperatures (`nodeIds`).
 static const uint kHasNodes = 512;
+// Smooth tangents per point, for anisotropic materials, in place of a triangle's own.
+static const uint kHasTangents = 1024;
 
 struct MeshDraw {
     // World transform of the mesh, or of the instancer for instanced draws.
@@ -83,6 +85,8 @@ struct MeshResources {
     // temperatures from its first (`MeshDraw.uv.w`).
     uint* nodeIds;
     float* nodeTemperatures;
+    // Smooth tangents per point (`kHasTangents`), as `normals`.
+    float* tangents;
 }
 [[vk::binding(10, 0)]] ConstantBuffer<MeshResources> meshResources;
 static float* points = meshResources.points;
@@ -101,6 +105,7 @@ static int* activeCounts = meshResources.activeCounts;
 static float* temperatures = meshResources.temperatures;
 static uint* nodeIds = meshResources.nodeIds;
 static float* nodeTemperatures = meshResources.nodeTemperatures;
+static float* tangents = meshResources.tangents;
 // The material's textures (`materialTexture` slots, `MaterialTextureSlot`): albedo; tangent-space
 // normals as `surface.textures.y` says (1 stored as n * 127 + 128 in 8 bits, with the deviation of
 // the slopes each texel covers in alpha, `MipFilter::NormalSlopes`, as the detail normal map; from
@@ -163,6 +168,7 @@ float3 rotate(float4 q, float3 v) {
 struct MeshVertex {
     float3 world;
     float3 normal;
+    float3 tangent;
     float3 color;
     float kelvin;
     float2 uv;
@@ -176,6 +182,7 @@ struct MeshVertex {
 struct Placed {
     float3 world;
     float3 normal;
+    float3 tangent;
 }
 
 Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint instanceBase,
@@ -183,14 +190,18 @@ Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint 
     let flags = d.offsets.w;
     var p = load3(points, pointBase + d.points.x + corner);
     var n = (flags & kHasNormals) != 0 ? load3(normals, d.offsets.y + corner) : float3(0.0);
+    // A tangent lies in the surface, so moves as its points do (without their translation).
+    var t = (flags & kHasTangents) != 0 ? load3(tangents, d.offsets.y + corner) : float3(0.0);
     if ((flags & kInstanced) != 0) {
         let i = instanceBase + instance;
         p = transformPoint(d.prototype, p);
         n = transformNormal(d.prototype, n);
+        t = mul((float3x3)d.prototype, t);
         if ((flags & kHasScales) != 0) {
             let scale = load3(scales, i);
             p = p * scale;
             n = n / scale;
+            t = t * scale;
         }
         if ((flags & kHasOrientations) != 0) {
             let q = float4(orientations[4 * i], orientations[4 * i + 1], orientations[4 * i + 2],
@@ -198,12 +209,14 @@ Placed placeVertex(MeshDraw d, uint corner, uint instance, uint pointBase, uint 
             let unit = q / max(length(q), 1e-20);
             p = rotate(unit, p);
             n = rotate(unit, n);
+            t = rotate(unit, t);
         }
         p = p + load3(positions, i);
     }
     Placed placed;
     placed.world = transformPoint(model, p);
     placed.normal = transformNormal(model, n);
+    placed.tangent = mul((float3x3)model, t);
     return placed;
 }
 
@@ -234,10 +247,12 @@ MeshVertex meshVertex(uint vertexIndex, uint instanceIndex, DrawCall call, float
     MeshVertex v;
     v.world = now.world;
     v.normal = now.normal;
+    v.tangent = now.tangent;
     if (motion != 1.0) {
         let before = placeVertex(d, corner, instance, d.motion.w, d.motion.y, d.previous);
         v.world = lerp(before.world, now.world, motion);
         v.normal = lerp(before.normal, now.normal, motion);
+        v.tangent = lerp(before.tangent, now.tangent, motion);
     }
     v.color = (flags & kHasColors) != 0 ? load3(colors, index) : d.tint.rgb;
     if ((flags & kHasInstanceColors) != 0) {
@@ -271,6 +286,7 @@ struct VertexOutput {
     float kelvin : KELVIN;
     float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
+    float3 tangent : TANGENT;
     nointerpolation uint instance : INSTANCE;
     nointerpolation uint item : ITEM;
 }
@@ -286,6 +302,7 @@ struct LayeredVertexOutput {
     float kelvin : KELVIN;
     float2 uv : TEXCOORD;
     float3 barycentric : BARYCENTRIC;
+    float3 tangent : TANGENT;
     nointerpolation uint instance : INSTANCE;
     nointerpolation uint item : ITEM;
     uint layer : SV_RenderTargetArrayIndex;
@@ -305,6 +322,7 @@ LayeredVertexOutput meshVertexMain(uint vertexIndex : SV_VertexID, uint instance
     out.kelvin = v.kelvin;
     out.uv = v.uv;
     out.barycentric = barycentric[v.corner];
+    out.tangent = v.tangent;
     out.instance = v.instance;
     out.item = v.item;
     return out;
@@ -646,6 +664,10 @@ GBuffer meshGBuffer(VertexOutput in) {
                                          linkGroupFlags((d.offsets.w >> kLinkGroupShift) & 31u),
                                      textured.slopeVariance + detail.slopeVariance,
                                      textured.metallic));
-    out.tangent = (d.offsets.w & kHasUvs) != 0 ? packTangent(tangent) : float2(0.0);
+    // The mesh's smooth tangents where it has them, else its triangle's own.
+    out.tangent = (d.offsets.w & kHasTangents) != 0 && dot(in.tangent, in.tangent) > 0.0
+                      ? packTangent(in.tangent)
+                  : (d.offsets.w & kHasUvs) != 0 ? packTangent(tangent)
+                                                 : float2(0.0);
     return out;
 }

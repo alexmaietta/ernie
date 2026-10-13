@@ -44,7 +44,9 @@ def studio(rows=64, cols=128):
     azimuth = 360.0 * (np.arange(cols) + 0.5) / cols
     e, a = np.meshgrid(elevation, azimuth, indexing="ij")
     sky = np.where(
-        e > 0.0, 0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))), 0.03
+        e > 0.0,
+        0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))),
+        0.03,
     )
     for centre in (240.0, 330.0):
         box = (np.abs(e - 35.0) < 15.0) & (np.abs(a - centre) < 18.0)
@@ -73,7 +75,9 @@ def disc_pixels(image, point):
     """The RGB (0 to 255) of the pixels on the ball at `point`."""
     col, row, scale = project(point)
     rows, cols = np.mgrid[0 : image.shape[0], 0 : image.shape[1]]
-    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (scale * RADIUS)
+    r = np.hypot(cols + 0.5 - col, rows + 0.5 - row) / (
+        scale * RADIUS
+    )
     return image[..., :3][r < 0.95].astype(np.float64)
 
 
@@ -114,7 +118,9 @@ class Demo(ernie.demo.Demo):
         self.looks = []
         for i in range(len(SCALES)):
             look = scene.define(
-                f"/World/Looks/Film{i}", ernie.Material, brdf="open_pbr"
+                f"/World/Looks/Film{i}",
+                ernie.Material,
+                brdf="open_pbr",
             )
             look.prim.set("inputs:thin_film_weight", 1.0)
             look.prim.set("inputs:thin_film_ior", FILM_IOR)
@@ -133,7 +139,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
         ).set(
             tokens.TRANSFORM,
@@ -148,7 +156,10 @@ class Demo(ernie.demo.Demo):
         )
 
         self.widgets.combo(
-            "Base", [name for name, *_ in BASES], 0, on_change=self.base
+            "Base",
+            [name for name, *_ in BASES],
+            0,
+            on_change=self.base,
         )
         self.widgets.slider(
             "Middle ball's film (um)",
@@ -169,7 +180,9 @@ class Demo(ernie.demo.Demo):
             0.0,
             1.0,
             1.0,
-            on_change=lambda weight: self.film("thin_film_weight", weight),
+            on_change=lambda weight: self.film(
+                "thin_film_weight", weight
+            ),
         )
         if viewer is not None:
             viewer.active_camera = camera.path
@@ -182,7 +195,9 @@ class Demo(ernie.demo.Demo):
 
     def thicken(self, thickness):
         for look, scale in zip(self.looks, SCALES):
-            look.prim.set("inputs:thin_film_thickness", scale * thickness)
+            look.prim.set(
+                "inputs:thin_film_thickness", scale * thickness
+            )
 
     def base(self, index):
         _, colour, metalness, roughness = BASES[index]
@@ -193,7 +208,10 @@ class Demo(ernie.demo.Demo):
 
     def balls(self):
         image = np.asarray(self.renderer.render(self.scene))
-        return [disc_pixels(image, ball_centre(i)) for i in range(len(SCALES))]
+        return [
+            disc_pixels(image, ball_centre(i))
+            for i in range(len(SCALES))
+        ]
 
     def test_final(self):
         filmed = self.balls()
@@ -207,11 +225,13 @@ class Demo(ernie.demo.Demo):
                 f" (bare {chroma(b):.1f}), mean RGB {mean.round(1)}"
             )
         for f, b in zip(filmed, bare):
-            assert chroma(f) > chroma(b) + 10.0, "the film colours the steel"
+            assert chroma(f) > chroma(b) + 10.0, (
+                "the film colours the steel"
+            )
         hues = np.array([mean / mean.sum() for mean in means])
-        assert np.abs(hues[1:] - hues[:-1]).sum(axis=1).min() > 0.03, (
-            "each thickness has a colour of its own"
-        )
+        assert (
+            np.abs(hues[1:] - hues[:-1]).sum(axis=1).min() > 0.03
+        ), "each thickness has a colour of its own"
 
 
 if __name__ == "__main__":

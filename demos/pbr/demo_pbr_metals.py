@@ -9,8 +9,6 @@ References:
 - N. Hoffman, "Generalization of Adobe's Fresnel Model", 2023.
 """
 
-import math
-
 import numpy as np
 
 import ernie
@@ -43,7 +41,9 @@ def studio(rows=64, cols=128):
     azimuth = 360.0 * (np.arange(cols) + 0.5) / cols
     e, a = np.meshgrid(elevation, azimuth, indexing="ij")
     sky = np.where(
-        e > 0.0, 0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))), 0.03
+        e > 0.0,
+        0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))),
+        0.03,
     )
     for centre in (240.0, 330.0):
         box = (np.abs(e - 35.0) < 15.0) & (np.abs(a - centre) < 18.0)
@@ -207,9 +207,9 @@ class Demo(ernie.demo.Demo):
         assert tinted[2] / tinted[0] < 0.96 * plain[2] / plain[0], (
             "the F82 tint colours gold's grazing reflection"
         )
-        assert np.abs(rough.astype(int) - image.astype(int)).mean() > 1.0, (
-            "roughness blurs the reflections"
-        )
+        assert (
+            np.abs(rough.astype(int) - image.astype(int)).mean() > 1.0
+        ), "roughness blurs the reflections"
 
 
 if __name__ == "__main__":

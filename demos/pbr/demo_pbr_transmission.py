@@ -45,7 +45,9 @@ def studio(rows=64, cols=128):
     azimuth = 360.0 * (np.arange(cols) + 0.5) / cols
     e, a = np.meshgrid(elevation, azimuth, indexing="ij")
     sky = np.where(
-        e > 0.0, 0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))), 0.03
+        e > 0.0,
+        0.2 + 0.6 * np.sin(np.radians(np.maximum(e, 0.0))),
+        0.03,
     )
     for centre in (240.0, 330.0):
         box = (np.abs(e - 35.0) < 15.0) & (np.abs(a - centre) < 18.0)
@@ -93,9 +95,9 @@ def project(point):
 def window(image, point, half=20):
     """The RGB (0 to 255) of the pixels within `half` of `point`."""
     col, row = (int(x) for x in project(point))
-    return image[row - half : row + half, col - half : col + half, :3].astype(
-        np.float64
-    )
+    return image[
+        row - half : row + half, col - half : col + half, :3
+    ].astype(np.float64)
 
 
 class Demo(ernie.demo.Demo):
@@ -199,7 +201,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
         ).set(
             tokens.TRANSFORM,
@@ -294,7 +298,9 @@ class Demo(ernie.demo.Demo):
         # Most of the ball, which turns the wall over about its edge.
         behind_ball = window(wall, BALL, 55)
         bent = np.abs(window(image, BALL, 55) - behind_ball).mean()
-        straight = np.abs(window(unbent, BALL, 55) - behind_ball).mean()
+        straight = np.abs(
+            window(unbent, BALL, 55) - behind_ball
+        ).mean()
         pane = window(image, PANE).mean(axis=(0, 1))
         behind = window(wall, PANE).mean(axis=(0, 1))
         half = window(image, PANEL).mean()
@@ -314,9 +320,11 @@ class Demo(ernie.demo.Demo):
             "the pane tints the wall green"
         )
         low, high = sorted((full, through))
-        assert low + 0.2 * (high - low) < half < high - 0.2 * (high - low), (
-            "the half-opaque panel blends with the wall"
-        )
+        assert (
+            low + 0.2 * (high - low)
+            < half
+            < high - 0.2 * (high - low)
+        ), "the half-opaque panel blends with the wall"
 
 
 if __name__ == "__main__":

@@ -39,6 +39,9 @@ import brdf;
 //   reflectance, here per band rather than in its Fourier form, the bands being wavelengths).
 // - C. Kulla and A. Conty, "Revisiting Physically Based Shading at Imageworks", SIGGRAPH 2017
 //   course (albedo scaling, mean Fresnel).
+// - R. Guy and M. Agopian, "Physically Based Rendering in Filament", 2018, section 4.6.1 (the
+//   bent reflection vector of an anisotropic lobe's image-based lighting).
+//   https://google.github.io/filament/Filament.html
 // - B. Burley, "Physically-Based Shading at Disney", SIGGRAPH 2012 course, and E. Heitz,
 //   "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), 2014
 //   (anisotropic GGX and its height-correlated Smith visibility).
@@ -446,21 +449,26 @@ public struct OpenPbr : IBrdf {
                                          s.slopeVariance);
         let ab = environmentBrdf(roughness, mu);
         let f0 = dielectricF0(m);
-        var dielectricF0s = m.specularWeight * m.tint * f0;
-        var metalF0s = m.specularWeight * m.base;
-        if (m.filmWeight > 0.0) {
-            float3 dielectric;
-            float3 metal;
-            fresnels(m, mu, s.wavelengths, dielectric, metal);
-            dielectricF0s = lerp(dielectricF0s, dielectric, m.filmWeight);
-            metalF0s = lerp(metalF0s, metal, m.filmWeight);
-        }
-        let dielectric = (dielectricF0s * ab.x + m.specularWeight * m.tint * ab.y) *
+        // The dielectric's exact Fresnel, the metal's F82 tint and the film's interference at
+        // the split sum's cosine, rather than Schlick's.
+        float3 dielectricFresnel;
+        float3 metalFresnel;
+        fresnels(m, environmentCosine(ab), s.wavelengths, dielectricFresnel, metalFresnel);
+        let dielectric = dielectricFresnel * (ab.x + ab.y) *
                          energyCompensation(float3(f0), roughness, mu);
-        let metal = (metalF0s * ab.x + m.specularWeight * m.tint * ab.y) *
-                    energyCompensation(m.base, roughness, mu);
+        let metal = metalFresnel * (ab.x + ab.y) * energyCompensation(m.base, roughness, mu);
         var r = diffuseEnvironment(float3(0.0));
         r.roughness0 = roughness;
+        if (m.anisotropy > 0.0) {
+            // Mirrored about a normal bent towards the plane across the rough tangent, so the
+            // reflections stretch along it (Filament's bent reflection vector).
+            let b = float3(0.0, 1.0, 0.0);
+            let bentNormal = cross(cross(b, s.view), b);
+            let bend = m.anisotropy * saturate(5.0 * m.specularRoughness);
+            if (dot(bentNormal, bentNormal) > 1e-8) {
+                r.normal0 = normalize(lerp(float3(0.0, 0.0, 1.0), normalize(bentNormal), bend));
+            }
+        }
         r.specular0 = lerp(dielectric, metal, m.metalness);
         r.diffuse = (1.0 - m.metalness) * (1.0 - m.transmission) *
                     max(1.0 - dielectric, float3(0.0)) *

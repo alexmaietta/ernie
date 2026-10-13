@@ -4336,6 +4336,7 @@ void RasterRenderer::WriteMaterialTable() {
     std::vector<float> extended;
     modelFeatures_.assign(registered.size(), 0u);
     transparentMaterials_.assign(count, false);
+    tangentMaterials_.assign(count, false);
     for (const auto& [id, material] : materials_) {
         MaterialGpu& entry = table[id];
         const auto model =
@@ -4376,6 +4377,8 @@ void RasterRenderer::WriteMaterialTable() {
             ((settings.opacity < 1.0f && !settings.opacityTexture) ||
              (features & BrdfRegistry::kTransmissionFeature) != 0);
         transparentMaterials_[id] = transparent;
+        tangentMaterials_[id] =
+            (features & BrdfRegistry::kTangentsFeature) != 0;
         entry.transparency[0] =
             transparent ? std::clamp(settings.opacity, 0.0f, 1.0f)
                         : 1.0f;
