@@ -15,12 +15,14 @@
 #include "ernie/session/product_frame.h"
 #include "ernie/util/log.h"
 #include "ernie/util/profile.h"
+#include "ernie/util/raster_source.h"
 #include "ernie/util/texture_file.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -1251,6 +1253,46 @@ RasterDelegate::UploadBaked(const std::filesystem::path& output,
         CachedReader(reader));
 }
 
+void RasterDelegate::SetPlanetFromFile(
+    const std::filesystem::path& file, const glm::dvec3& radii,
+    const PlanetHeightsOptions& options) {
+    ERNIE_ZONE("Planet heights file");
+    std::shared_ptr<const RasterSource> source = OpenRaster(file);
+    const LatLongGrid grid =
+        options.grid.value_or(source->Grid().value_or(
+            LatLongGrid{-180.0, 90.0, 360.0 / source->Width(),
+                        180.0 / source->Height()}));
+    // The file's quads along a face, at the equator: faces of up to
+    // 1024 (whole pages of 256), the rest of the depth paged.
+    const double cells =
+        90.0 / std::min(grid.degreesAcross, grid.degreesDown);
+    const auto wanted = static_cast<std::uint32_t>(
+        std::min(std::ceil(cells), double{1u << 20}));
+    constexpr std::uint32_t kBaseCells = 1024;
+    const std::uint32_t base =
+        std::clamp(std::bit_ceil(std::max(wanted, 1u)),
+                   PlanetPages::kPageCells, kBaseCells);
+    std::uint32_t depth = 0;
+    while ((std::uint64_t{base} << depth) < wanted) {
+        ++depth;
+    }
+    const PlanetTile faces =
+        PlanetFacesOf(*source, options, radii, base);
+    const auto side = static_cast<std::size_t>(base) + 1;
+    std::array<RasterView, CubeSphereLod::kFaces> views;
+    for (std::size_t face = 0; face < views.size(); ++face) {
+        views[face].data = faces.heights.data() + face * side * side;
+        views[face].width = side;
+        views[face].height = side;
+    }
+    planet_.SetHeights(radii, views, faces.slopes, faces.ranges);
+    if (depth > 0) {
+        planet_.SetPages(std::make_unique<PlanetPages>(
+            context_, std::move(source), options, radii, base,
+            depth));
+    }
+}
+
 void RasterDelegate::SyncHeightfield(const Scene& scene,
                                      const Path& terrain) {
     ERNIE_ZONE("Sync heightfield");
@@ -1261,6 +1303,35 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
         terrain.IsEmpty()
             ? std::nullopt
             : std::optional<TerrainView>(TerrainView(scene, terrain));
+    // A planet's heights from a file: faces of up to 1024 quads read
+    // at once, finer ones paged in as views need them.
+    if (prim && !prim->GetHeightsFile().empty() &&
+        (prim->HasPlanetRadius() || prim->HasPlanetRadii())) {
+        const Key key =
+            KeyOf(scene, terrain,
+                  {kHeightsFile, kHeightsUnit, kHeightsReference,
+                   kPlanetRadius, kPlanetRadii});
+        if (heightfield_ == key) {
+            return;
+        }
+        heightfield_ = key;
+        try {
+            if (terrain_.HasHeightfield()) {
+                terrain_.ClearHeightfield();
+            }
+            SetPlanetFromFile(
+                prim->GetHeightsFile(),
+                prim->HasPlanetRadii()
+                    ? prim->GetPlanetRadii()
+                    : glm::dvec3(prim->GetPlanetRadius()),
+                PlanetHeightsOptions{prim->GetHeightsUnit(),
+                                     prim->GetHeightsReference(),
+                                     std::nullopt});
+        } catch (const std::exception& error) {
+            throw UploadError(terrain, kHeightsFile, error.what());
+        }
+        return;
+    }
     const Tensor* written = prim ? prim->GetHeights() : nullptr;
     if (written == nullptr) {
         if (heightfield_) {
@@ -3377,8 +3448,11 @@ void RasterDelegate::UpdatePrims(
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
     // Textures that finished loading take their placeholders' places;
-    // a frame that waits for all of them waits here.
-    FinishTextureLoads(WaitsForTextures(scene, prims.settings));
+    // a frame that waits for all of them waits here, and for a
+    // planet's height pages as it prepares.
+    const bool waits = WaitsForTextures(scene, prims.settings);
+    FinishTextureLoads(waits);
+    planet_.SetWaitForPages(waits);
     prims_ = prims;
     // Lights under prims posed on the GPU (a lamp on a robot's link):
     // posed there under their instances, the renderer fitting their

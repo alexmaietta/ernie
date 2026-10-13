@@ -254,3 +254,127 @@ TEST(PlanetHeights, NeedFaceCellsAndAGrid) {
     raster.grid = LatLongGrid{0.0, 90.0, 0.0, 1.0};
     EXPECT_THROW(PlanetHeightsOf(raster, 4), std::invalid_argument);
 }
+
+// A tile's heights are unfiltered, so a grid twice as fine has the
+// same heights at the coarse grid's points, and neighbouring tiles
+// the same along their shared edge: patches drawn from different
+// levels' tiles meet without cracks.
+TEST(PlanetHeights, TilesAgreeAcrossDepthsAndEdges) {
+    MemoryRaster raster(720, 360, RasterSampleType::Float32);
+    raster.Fill([](double latitude, double longitude) {
+        return std::sin(3.0 * latitude / kDegrees) *
+               std::cos(5.0 * longitude / kDegrees);
+    });
+    const glm::dvec3 radii(1e6);
+    for (std::uint32_t face = 0; face < CubeSphereLod::kFaces;
+         ++face) {
+        const ernie::PlanetTile coarse = ernie::PlanetTileOf(
+            raster, {}, radii, 32, face, 0, 0, 32);
+        const ernie::PlanetTile fine = ernie::PlanetTileOf(
+            raster, {}, radii, 64, face, 0, 0, 64);
+        for (std::uint32_t j = 0; j <= 32; ++j) {
+            for (std::uint32_t i = 0; i <= 32; ++i) {
+                ASSERT_EQ(coarse.heights[j * 33 + i],
+                          fine.heights[2 * j * 65 + 2 * i])
+                    << "face " << face << " at " << i << ", " << j;
+            }
+        }
+        const ernie::PlanetTile left = ernie::PlanetTileOf(
+            raster, {}, radii, 64, face, 0, 0, 32);
+        const ernie::PlanetTile right = ernie::PlanetTileOf(
+            raster, {}, radii, 64, face, 32, 0, 32);
+        for (std::uint32_t j = 0; j <= 32; ++j) {
+            ASSERT_EQ(left.heights[j * 33 + 32],
+                      right.heights[j * 33])
+                << "face " << face << " row " << j;
+        }
+    }
+    EXPECT_THROW(
+        ernie::PlanetTileOf(raster, {}, radii, 64, 0, 40, 0, 32),
+        std::invalid_argument);
+}
+
+// A field linear in space, h = H x, rises along the surface at H / R
+// times the x axis's tangential part: the tiles' slopes along their
+// grid lines are its component along each, here as on the faces whose
+// lines run across the seam and around the poles.
+TEST(PlanetHeights, TileSlopesFollowTheSurfaceGradient) {
+    constexpr double kRadius = 1e6;
+    constexpr double kRise = 1e4;
+    MemoryRaster raster(1440, 720, RasterSampleType::Float32);
+    raster.Fill([](double latitude, double longitude) {
+        return kRise * std::cos(latitude / kDegrees) *
+               std::cos(longitude / kDegrees);
+    });
+    const std::uint32_t cells = 32;
+    for (std::uint32_t face = 0; face < CubeSphereLod::kFaces;
+         ++face) {
+        const ernie::PlanetTile tile =
+            ernie::PlanetTileOf(raster, {}, glm::dvec3(kRadius),
+                                cells, face, 0, 0, cells);
+        const double scale = 2.0 / cells;
+        const auto direction = [&](double i, double j) {
+            return CubeSphereLod::FaceDirection(face, i * scale - 1.0,
+                                                j * scale - 1.0);
+        };
+        for (std::uint32_t j = 1; j < cells; j += 5) {
+            for (std::uint32_t i = 1; i < cells; i += 5) {
+                const glm::dvec3 d = direction(i, j);
+                const glm::dvec3 gradient =
+                    kRise / kRadius * (glm::dvec3(1, 0, 0) - d.x * d);
+                const glm::dvec3 u = glm::normalize(
+                    direction(i + 1, j) - direction(i - 1, j));
+                const glm::dvec3 v = glm::normalize(
+                    direction(i, j + 1) - direction(i, j - 1));
+                const glm::vec2 slope =
+                    tile.slopes[j * (cells + 1) + i];
+                EXPECT_NEAR(slope.x, glm::dot(gradient, u),
+                            0.02 * kRise / kRadius)
+                    << "face " << face << " at " << i << ", " << j;
+                EXPECT_NEAR(slope.y, glm::dot(gradient, v),
+                            0.02 * kRise / kRadius)
+                    << "face " << face << " at " << i << ", " << j;
+            }
+        }
+    }
+}
+
+// A quad's range takes in a peak between its corners, which bilinear
+// heights miss; the whole planet's faces are its tiles stitched.
+TEST(PlanetHeights, QuadRangesHoldWhatTheirCornersMiss) {
+    MemoryRaster raster(720, 360, RasterSampleType::Float32);
+    raster.Fill([](double, double) { return 0.0; });
+    // A one-sample peak at about latitude 0.25, longitude 0.25:
+    // inside the quad of face 0 (centred on longitude 0) right of its
+    // centre.
+    raster.Set(360, 179, 500.0);
+    const glm::dvec3 radii(1e6);
+    const ernie::PlanetTile faces =
+        ernie::PlanetFacesOf(raster, {}, radii, 256);
+    ASSERT_EQ(faces.heights.size(), 6u * 257u * 257u);
+    ASSERT_EQ(faces.ranges.size(), 6u * 256u * 256u);
+    const ernie::PlanetTile face0 = ernie::PlanetTileOf(
+        raster, {}, radii, 256, 0, 0, 0, 256, true);
+    for (std::size_t i = 0; i < face0.heights.size(); ++i) {
+        ASSERT_EQ(faces.heights[i], face0.heights[i]) << i;
+    }
+    float highest = 0.0f;
+    std::size_t peak = 0;
+    for (std::size_t i = 0; i < 256u * 256u; ++i) {
+        if (faces.ranges[i].y > highest) {
+            highest = faces.ranges[i].y;
+            peak = i;
+        }
+        EXPECT_LE(faces.ranges[i].x, 0.0f);
+    }
+    EXPECT_FLOAT_EQ(highest, 500.0f);
+    // Its corners, bilinear between samples a quarter degree apart
+    // over a quad of a third of one, stay well below.
+    const std::size_t col = peak % 256;
+    const std::size_t row = peak / 256;
+    for (const std::size_t corner :
+         {row * 257 + col, row * 257 + col + 1, (row + 1) * 257 + col,
+          (row + 1) * 257 + col + 1}) {
+        EXPECT_LT(faces.heights[corner], 500.0f);
+    }
+}

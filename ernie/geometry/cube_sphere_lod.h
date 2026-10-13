@@ -262,6 +262,16 @@ class CubeSphereLod {
     void SetLeaves(std::uint32_t face,
                    std::span<const glm::vec2> leaves);
 
+    /// Widens the heights of face `face`'s nodes to `ranges`, its
+    /// data quads' (min, max) heights row by row (`FaceCells()`
+    /// squared): for a surface finer than the data's vertices, which
+    /// it is drawn from where finer heights are paged in, rather than
+    /// their bilinear blend.
+    /// @throws std::invalid_argument for a count other than
+    /// `FaceCells()` squared or a face out of range.
+    void SetCellRanges(std::uint32_t face,
+                       std::span<const glm::vec2> ranges);
+
     /// The (min, max) height over every face, min above max without
     /// valid samples.
     glm::vec2 HeightRange() const;
@@ -368,6 +378,9 @@ class CubeSphereLod {
     /// Each face's vertex heights, invalid ones 0 as drawn, for
     /// refined nodes' bounds; empty after `SetLeaves`.
     std::array<std::vector<float>, kFaces> heights_;
+    /// Each face's data quads' (min, max) heights, when set
+    /// (`SetCellRanges`).
+    std::array<std::vector<glm::vec2>, kFaces> cellRanges_;
     /// Each face's largest height difference between neighbouring
     /// vertices: a refined node w data quads across spans at most 2 w
     /// of it.

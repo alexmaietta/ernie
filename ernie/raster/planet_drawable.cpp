@@ -63,7 +63,8 @@ constexpr VkShaderStageFlags kGraphics =
 
 /// Frame (0 and 1), material (5) and planet (10 its uniforms, which
 /// name its heights and gradients in the bindless heap; 12 its LOD
-/// patches; 14 their anchors) bindings; see planet.slang.
+/// patches; 14 their anchors; 15 the height pages' pool; 16 the page
+/// each patch reads) bindings; see planet.slang.
 constexpr DescriptorBinding kBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
@@ -71,7 +72,11 @@ constexpr DescriptorBinding kBindings[] = {
     {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kGraphics},
     {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
     {14, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
+    {16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kGraphics},
 };
+static_assert(sizeof(PlanetPages::Ref) == 16,
+              "PlanetPages::Ref must match planet.slang");
 
 std::vector<ShaderModuleSource>
 PlanetModules(bool pushbroom = false) {
@@ -92,6 +97,9 @@ Frustum Shifted(Frustum frustum, const glm::vec3& offset) {
     }
     return frustum;
 }
+
+std::vector<std::vector<std::uint32_t>>
+PackedGradientMips(std::vector<glm::vec2> level, std::size_t side);
 
 /// A face's slopes along increasing column and row, per vertex:
 /// central differences of the heights over the distance between the
@@ -114,8 +122,6 @@ PackedFaceGradients(const CubeSphereLod& lod, std::uint32_t face,
                                  face, static_cast<std::uint32_t>(c1),
                                  static_cast<std::uint32_t>(r1))));
     };
-    std::size_t w = side;
-    std::size_t h = side;
     std::vector<glm::vec2> level(side * side);
     for (std::size_t row = 0; row < side; ++row) {
         const std::size_t north = row > 0 ? row - 1 : row;
@@ -133,6 +139,15 @@ PackedFaceGradients(const CubeSphereLod& lod, std::uint32_t face,
                 static_cast<float>(du), static_cast<float>(dv));
         }
     }
+    return PackedGradientMips(std::move(level), side);
+}
+
+/// Slopes `level` (`side` squared) and their mip chain packed as half
+/// floats, each level averaging 2 x 2 of the one before.
+std::vector<std::vector<std::uint32_t>>
+PackedGradientMips(std::vector<glm::vec2> level, std::size_t side) {
+    std::size_t w = side;
+    std::size_t h = side;
     std::vector<std::vector<std::uint32_t>> mips;
     while (true) {
         std::vector<std::uint32_t> packed(level.size());
@@ -192,7 +207,10 @@ PlanetDrawable::PlanetDrawable(RasterRenderer& renderer)
       layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       uniforms_(renderer.Context(), kUniformsStride,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                BufferMemory::Device) {
+                BufferMemory::Device),
+      emptyPool_(renderer.Context(), 16,
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 BufferMemory::Device) {
     std::vector<ShaderModuleSource> modules = PlanetModules();
     modules.push_back({"planet_shadow", shaders::kPlanetShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
@@ -249,12 +267,16 @@ void PlanetDrawable::ReservePatches(std::size_t count) {
     anchorBuffer_ = std::make_unique<GpuBuffer>(
         renderer_.Context(), capacity * sizeof(glm::vec4),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    pageRefBuffer_ = std::make_unique<GpuBuffer>(
+        renderer_.Context(), capacity * sizeof(PlanetPages::Ref),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
 }
 
 void PlanetDrawable::ClearHeights() {
     vkDeviceWaitIdle(renderer_.Context().Device());
     heights_.reset();
     gradients_.reset();
+    pages_.reset();
     lod_ = CubeSphereLod();
     patches_.clear();
     anchors_.clear();
@@ -272,7 +294,9 @@ void PlanetDrawable::SetHeights(
 
 void PlanetDrawable::SetHeights(
     const glm::dvec3& radii,
-    std::span<const RasterView, CubeSphereLod::kFaces> faces) {
+    std::span<const RasterView, CubeSphereLod::kFaces> faces,
+    std::span<const glm::vec2> slopes,
+    std::span<const glm::vec2> ranges) {
     CubeSphereLod lod(std::max({radii.x, radii.y, radii.z}), faces,
                       kLodLeafCells);
     lod.SetRadii(radii);
@@ -280,6 +304,23 @@ void PlanetDrawable::SetHeights(
     if (side > renderer_.Context().Limits().maxImageDimension2D) {
         throw std::invalid_argument(
             "Planet faces exceed the device's maximum texture size");
+    }
+    const std::size_t points = std::size_t{side} * side;
+    const std::size_t quads =
+        std::size_t{lod.FaceCells()} * lod.FaceCells();
+    if ((!slopes.empty() &&
+         slopes.size() != CubeSphereLod::kFaces * points) ||
+        (!ranges.empty() &&
+         ranges.size() != CubeSphereLod::kFaces * quads)) {
+        throw std::invalid_argument(
+            "Planet slopes and ranges need one per vertex and quad");
+    }
+    if (!ranges.empty()) {
+        for (std::uint32_t face = 0; face < CubeSphereLod::kFaces;
+             ++face) {
+            lod.SetCellRanges(face,
+                              ranges.subspan(face * quads, quads));
+        }
     }
     std::vector<std::vector<float>> packed(CubeSphereLod::kFaces);
     std::vector<std::vector<std::vector<std::uint32_t>>> gradients;
@@ -295,7 +336,17 @@ void PlanetDrawable::SetHeights(
                     raster.IsValid(h) ? h : 0.0f;
             }
         }
-        gradients.push_back(PackedFaceGradients(lod, face, values));
+        gradients.push_back(
+            slopes.empty() ? PackedFaceGradients(lod, face, values)
+                           : PackedGradientMips(
+                                 std::vector<glm::vec2>(
+                                     slopes.begin() +
+                                         static_cast<std::ptrdiff_t>(
+                                             face * points),
+                                     slopes.begin() +
+                                         static_cast<std::ptrdiff_t>(
+                                             (face + 1) * points)),
+                                 side));
     }
 
     vkDeviceWaitIdle(renderer_.Context().Device());
@@ -331,13 +382,49 @@ void PlanetDrawable::SetHeights(
     gradients_ = std::move(gradientImage);
 }
 
+void PlanetDrawable::SetPages(std::unique_ptr<PlanetPages> pages) {
+    if (pages != nullptr &&
+        (!HasHeights() || pages->BaseCells() != lod_.FaceCells())) {
+        throw std::invalid_argument(
+            "A planet's pages refine its heights' faces");
+    }
+    vkDeviceWaitIdle(renderer_.Context().Device());
+    pages_ = std::move(pages);
+}
+
 std::uint64_t PlanetDrawable::GpuBytes() const {
     std::uint64_t bytes = uniforms_.Size() + patchBuffer_->Size() +
-                          anchorBuffer_->Size();
+                          anchorBuffer_->Size() +
+                          pageRefBuffer_->Size();
     if (heights_ != nullptr) {
         bytes += heights_->Bytes() + gradients_->Bytes();
     }
+    if (pages_ != nullptr) {
+        bytes += pages_->Pool().Size();
+    }
     return bytes;
+}
+
+void PlanetDrawable::FindPages() {
+    pageRefs_.assign(patches_.size(), PlanetPages::Ref{});
+    if (pages_ == nullptr) {
+        return;
+    }
+    // A patch on level l of k refinements has vertices every 2^l fine
+    // cells, depth k - l's points: the pages there, or the deepest.
+    const std::uint32_t k = lod_.Refinement();
+    for (std::size_t i = 0; i < patches_.size(); ++i) {
+        const LodPatch& patch = patches_[i];
+        if (patch.level >= k) {
+            continue;
+        }
+        const std::uint32_t depth =
+            std::min(k - patch.level, pages_->Depth());
+        const std::uint32_t shift = k - depth;
+        pageRefs_[i] =
+            pages_->Find(patch.face, depth, patch.originX >> shift,
+                         patch.originY >> shift);
+    }
 }
 
 std::optional<Bounds3> PlanetDrawable::BodyBounds() const {
@@ -596,12 +683,31 @@ void PlanetDrawable::Prepare(
             first,
             static_cast<std::uint32_t>(patches_.size()) - first};
     }
+    // The pages the patches read: those made so far, or, waiting,
+    // every one they want, a depth more each pass.
+    if (pages_ != nullptr) {
+        pages_->BeginFrame(++frames_, renderer_.Uploads());
+    }
+    FindPages();
+    if (pages_ != nullptr && waitForPages_) {
+        for (std::uint32_t pass = 0;
+             pass <= pages_->Depth() && pages_->Pending() > 0 &&
+             pages_->Complete(renderer_.Uploads());
+             ++pass) {
+            FindPages();
+        }
+    }
+    if (pages_ != nullptr) {
+        pages_->Submit();
+    }
     if (!patches_.empty()) {
         ReservePatches(patches_.size());
         renderer_.Uploads().Write(*patchBuffer_,
                                   std::as_bytes(std::span(patches_)));
         renderer_.Uploads().Write(*anchorBuffer_,
                                   std::as_bytes(std::span(anchors_)));
+        renderer_.Uploads().Write(
+            *pageRefBuffer_, std::as_bytes(std::span(pageRefs_)));
     }
     prepared_ = true;
 }
@@ -617,6 +723,9 @@ PlanetDrawable::Resources(const RasterFrame& frame,
         uniforms_, view * kUniformsStride, sizeof(PlanetUniforms)));
     resources.push_back(DescriptorResource::Of(*patchBuffer_));
     resources.push_back(DescriptorResource::Of(*anchorBuffer_));
+    resources.push_back(DescriptorResource::Of(
+        pages_ != nullptr ? pages_->Pool() : emptyPool_));
+    resources.push_back(DescriptorResource::Of(*pageRefBuffer_));
     return resources;
 }
 

@@ -12,6 +12,7 @@ struct VertexOutput {
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint face : FACE;
     nointerpolation uint level : LEVEL;
+    nointerpolation uint4 page : PAGE;
 }
 
 // The vertex stage's outputs: the fragment stage's inputs (`VertexOutput`, in the same order)
@@ -25,6 +26,7 @@ struct LayeredVertexOutput {
     float3 barycentric : BARYCENTRIC;
     nointerpolation uint face : FACE;
     nointerpolation uint level : LEVEL;
+    nointerpolation uint4 page : PAGE;
     uint layer : SV_RenderTargetArrayIndex;
 }
 
@@ -42,6 +44,7 @@ LayeredVertexOutput vertexMain(uint vertexIndex : SV_VertexID, uint instanceInde
     out.barycentric = barycentric[v.corner];
     out.face = v.face;
     out.level = v.level;
+    out.page = v.page;
     return out;
 }
 
@@ -99,7 +102,7 @@ float3 latLongAlbedo(uint face, float2 grid) {
 [shader("fragment")]
 GBuffer fragmentMain(VertexOutput in) {
     float3 up;
-    let normal = planetNormal(in.face, in.grid, up);
+    let normal = planetNormal(in.face, in.grid, in.page, up);
     var shadingNormal = normal;
     float slopeVariance;
     var modulation = triplanarDetail(in.world, shadingNormal, slopeVariance);

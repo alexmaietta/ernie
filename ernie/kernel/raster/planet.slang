@@ -3,7 +3,8 @@
 // passes. Besides the frame (bindings 0 and 1, frame.slang) and material (5, surface.slang)
 // the passes bind
 //   10 PlanetUniforms, whose `textures` name the heights and height gradients in the bindless
-//   heap, 12 LOD patches, 14 patch anchors.
+//   heap, 12 LOD patches, 14 patch anchors, 15 the height pages' pool, 16 the page each patch
+//   reads.
 __exported import frame;
 import bindless;
 import brdf;
@@ -42,6 +43,17 @@ public struct PlanetUniforms {
 // Per patch: xyz the radius-high point above its origin vertex relative to the frame's origin,
 // computed in double on the host, so vertices are small offsets from it.
 [[vk::binding(14, 0)]] public StructuredBuffer<float4> anchors;
+// Pages of heights finer than the faces (`PlanetPages`), 257 x 257 points each, row by row: per
+// point the height's float bits and its slopes along increasing column and row as two halves.
+[[vk::binding(15, 0)]] public StructuredBuffer<uint2> heightPages;
+// Per patch, the page it reads (`PlanetPages::Ref`): its slot (kNoPage for the faces' heights),
+// its depth j (its points 2^j times finer than the faces'), and its first point's column and row
+// on that depth's grid.
+[[vk::binding(16, 0)]] public StructuredBuffer<uint4> patchPages;
+
+public static const uint kNoPage = 0xffffffffu;
+static const int kPageCells = 256;
+static const uint kPageSide = 257;
 
 public struct FaceFrame {
     public float3 normal;
@@ -120,9 +132,26 @@ float3 directionOffset(uint face, int2 g, int2 origin, out float3 direction) {
     return (dab.x * f.u + dab.y * f.v) / length0 + pointA * inverse;
 }
 
-// The height at fine grid point `g`: the data's, bilinear between its vertices.
-public float heightAt(uint face, int2 g) {
+// Point `c` of page `slot`.
+uint2 pagePoint(uint slot, int2 c) {
+    return heightPages[slot * kPageSide * kPageSide + uint(c.y) * kPageSide + uint(c.x)];
+}
+
+// The height at fine grid point `g`: the page's (`page`, `patchPages`), else the faces' data,
+// bilinear between their points.
+public float heightAt(uint face, int2 g, uint4 page) {
     let k = p.refine.x;
+    if (page.x != kNoPage) {
+        let shift = k - page.y;
+        let cell = (g >> shift) - int2(page.zw);
+        let next = min(cell + 1, int2(kPageCells, kPageCells));
+        let t = float2(g & int((1u << shift) - 1u)) / float(1u << shift);
+        let h00 = asfloat(pagePoint(page.x, cell).x);
+        let h10 = asfloat(pagePoint(page.x, int2(next.x, cell.y)).x);
+        let h01 = asfloat(pagePoint(page.x, int2(cell.x, next.y)).x);
+        let h11 = asfloat(pagePoint(page.x, next).x);
+        return lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y);
+    }
     let cell = g >> k;
     let last = int(p.dims.x);
     let next = min(cell + 1, int2(last, last));
@@ -150,7 +179,7 @@ public float3 surfaceNormal(float3 d) {
 // sqrt(q), q = sum d_i^2 shape_i, along direction d; their difference r(d) (d - dA) + (r(d) -
 // r(dA)) dA takes r(d) - r(dA) from q - qA = sum (d - dA)_i (d + dA)_i shape_i rather than
 // subtraction. Heights rise along the ellipsoid's normal.
-float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, out float h) {
+float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, uint4 page, out float h) {
     float3 direction;
     let offset = directionOffset(face, g, origin, direction);
     let directionA = direction - offset;
@@ -162,7 +191,7 @@ float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, out float h) 
     let dq = dot(offset * (direction + directionA), p.shape.xyz);
     let dr = -dq / (rootQ * rootQA * (rootQ + rootQA));
     let base = offset / rootQ + dr * directionA;
-    h = heightAt(face, g);
+    h = heightAt(face, g, page);
     return anchor + p.body.x * base + (h * p.body.y) * surfaceNormal(direction);
 }
 
@@ -173,6 +202,7 @@ public struct PlanetVertex {
     public uint face;
     public uint corner;
     public uint level;
+    public uint4 page;  // the page it reads (`patchPages`)
 }
 
 // One vertex of a cube-sphere LOD patch (`CubeSphereLod`): two triangles per grid quad, six
@@ -186,6 +216,7 @@ public PlanetVertex planetVertex(uint vertexIndex, uint instanceIndex) {
                            uint2(0, 1));
     let tile = patches[draw.first + instanceIndex];
     let anchor = anchors[draw.first + instanceIndex].xyz;
+    let page = patchPages[draw.first + instanceIndex];
     let cells = p.dims.w;
     let quad = vertexIndex / 6;
     let corner = vertexIndex % 6;
@@ -196,15 +227,15 @@ public PlanetVertex planetVertex(uint vertexIndex, uint instanceIndex) {
     let odd = int2(local & uint2(1, 1));
 
     float h;
-    let world = surfacePoint(tile.w, g, origin, anchor, h);
+    let world = surfacePoint(tile.w, g, origin, anchor, page, h);
     var target = world;
     var hTarget = h;
     if (odd.x != 0 || odd.y != 0) {
         let step = odd.x != 0 && odd.y != 0 ? int2(spacing, -spacing) : odd * spacing;
         float h0;
         float h1;
-        target = 0.5 * (surfacePoint(tile.w, g + step, origin, anchor, h0) +
-                        surfacePoint(tile.w, g - step, origin, anchor, h1));
+        target = 0.5 * (surfacePoint(tile.w, g + step, origin, anchor, page, h0) +
+                        surfacePoint(tile.w, g - step, origin, anchor, page, h1));
         hTarget = 0.5 * (h0 + h1);
     }
     let range = morphRange(tile.z);
@@ -217,23 +248,42 @@ public PlanetVertex planetVertex(uint vertexIndex, uint instanceIndex) {
     v.face = tile.w;
     v.corner = corner;
     v.level = tile.z;
+    v.page = page;
     return v;
 }
 
-// The surface normal at grid point `grid` of `face` from the gradient texture rather than from
-// the mesh, so shading does not change as levels morph; filtered over the pixel's footprint
-// through the gradients' mips (fragment shaders only: it takes screen derivatives). `up` is the
-// ellipsoid's normal there.
-public float3 planetNormal(uint face, float2 grid, out float3 up) {
+// The slopes at grid point `grid` of page `page`, bilinear between its points.
+float2 pageSlope(uint4 page, float2 grid) {
+    let c = clamp(grid * float(1u << page.y) - float2(page.zw), 0.0, float(kPageCells));
+    let c0 = min(int2(floor(c)), int2(kPageCells - 1, kPageCells - 1));
+    let t = c - float2(c0);
+    let s00 = unpackHalf2x16ToFloat(pagePoint(page.x, c0).y);
+    let s10 = unpackHalf2x16ToFloat(pagePoint(page.x, c0 + int2(1, 0)).y);
+    let s01 = unpackHalf2x16ToFloat(pagePoint(page.x, c0 + int2(0, 1)).y);
+    let s11 = unpackHalf2x16ToFloat(pagePoint(page.x, c0 + int2(1, 1)).y);
+    return lerp(lerp(s00, s10, t.x), lerp(s01, s11, t.x), t.y);
+}
+
+// The surface normal at grid point `grid` of `face` from the slopes of its page (`page`) or the
+// gradient texture rather than from the mesh, so shading does not change as levels morph; the
+// texture's filtered over the pixel's footprint through its mips (fragment shaders only: it takes
+// screen derivatives), the page's already filtered to its points' spacing. `up` is the ellipsoid's
+// normal there.
+public float3 planetNormal(uint face, float2 grid, uint4 page, out float3 up) {
     let f = faceFrame(face);
     up = surfaceNormal(faceDirection(face, faceCoords(grid)));
     let tu = normalize(f.u - up * dot(up, f.u));
     let tv = normalize(f.v - up * dot(up, f.v));
     let size = float(p.dims.x + 1);
-    let slope = heapTextureArrays[p.textures.y]
+    let faces = heapTextureArrays[p.textures.y]
                     .Sample(clampSampler(), float3((grid + 0.5) / size, float(face)))
-                    .xy *
-                p.body.y;
+                    .xy;
+    // A page's points are unfiltered beyond their spacing: where a pixel spans more than one, the
+    // faces' slopes filtered through their mips take over.
+    let footprint = max(length(ddx(grid)), length(ddy(grid))) * float(1u << page.y);
+    let coarse = page.x != kNoPage ? saturate(log2(max(footprint, 1e-6))) : 1.0;
+    let slope =
+        (coarse < 1.0 ? lerp(pageSlope(page, grid), faces, coarse) : faces) * p.body.y;
     // The gradient from its components along the two grid directions, which meet at an angle.
     let c = dot(tu, tv);
     let gradient = ((slope.x - c * slope.y) * tu + (slope.y - c * slope.x) * tv) /

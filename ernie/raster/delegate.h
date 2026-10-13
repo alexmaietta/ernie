@@ -512,6 +512,12 @@ class RasterDelegate : public RenderDelegate {
     std::shared_ptr<const MaterialTexture>
     UploadBaked(const std::filesystem::path& output,
                 const std::string& key, const TextureReader& reader);
+    /// Draws the planet of semi-axes `radii` from the latitude-
+    /// longitude heights in `file`: faces of up to 1024 quads read
+    /// now, finer ones paged (`PlanetPages`).
+    void SetPlanetFromFile(const std::filesystem::path& file,
+                           const glm::dvec3& radii,
+                           const PlanetHeightsOptions& options);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.

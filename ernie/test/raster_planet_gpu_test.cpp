@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/geometry/cube_sphere_lod.h"
+#include "ernie/geometry/planet_heights.h"
 #include "ernie/raster/delegate.h"
 #include "ernie/raster/planet_drawable.h"
 #include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/dem.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/util/raster_source.h"
 #include "support/delegate_scenes.h"
 #include "support/vulkan_fixture.h"
 
@@ -19,6 +22,8 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <numbers>
 #include <stdexcept>
 #include <vector>
@@ -373,4 +378,144 @@ TEST_F(RasterDelegateTest, APlanetsAlbedoTextureWrapsItByLatLong) {
     EXPECT_GT(west[0], 2 * std::max(west[1], west[2]) + 10);
     const auto east = centre(quarter);
     EXPECT_GT(east[1], 2 * std::max(east[0], east[2]) + 10);
+}
+
+// A Moon from an 8192 x 4096 height file (LOLA's LDEM layout: int16
+// half metres about the radius, from 0 degrees east): faces of 1024
+// quads read at once and pages of the file's 2048 paged in. From 20
+// km up the ground draws as a planet of the file's 2048-quad faces
+// does, waiting for every page; frames that do not wait draw coarser
+// ones first and come to the same.
+TEST_F(RasterDelegateTest, APlanetFromAHeightsFilePagesInItsDetail) {
+    constexpr std::uint32_t kWidth = 8192;
+    constexpr std::uint32_t kHeight = 4096;
+    const std::filesystem::path data =
+        std::filesystem::path(::testing::TempDir()) /
+        "paged_ldem.img";
+    {
+        std::vector<std::int16_t> samples(std::size_t{kWidth} *
+                                          kHeight);
+        for (std::uint32_t row = 0; row < kHeight; ++row) {
+            const double latitude =
+                (90.0 - (row + 0.5) * 180.0 / kHeight) *
+                std::numbers::pi / 180.0;
+            for (std::uint32_t col = 0; col < kWidth; ++col) {
+                const double longitude = (col + 0.5) * 360.0 /
+                                         kWidth * std::numbers::pi /
+                                         180.0;
+                const double metres =
+                    2000.0 * std::sin(3.0 * latitude) *
+                        std::cos(2.0 * longitude) +
+                    300.0 * std::sin(2000.0 * latitude) *
+                        std::sin(2000.0 * longitude);
+                samples[std::size_t{row} * kWidth + col] =
+                    static_cast<std::int16_t>(
+                        std::lround(2.0 * metres));
+            }
+        }
+        std::ofstream(data, std::ios::binary)
+            .write(reinterpret_cast<const char*>(samples.data()),
+                   static_cast<std::streamsize>(samples.size() * 2));
+        std::ofstream(data.parent_path() / "paged_ldem.lbl")
+            << "PDS_VERSION_ID = PDS3\n^IMAGE = \"paged_ldem.img\"\n"
+               "OBJECT = IMAGE\n  LINES = 4096\n  LINE_SAMPLES = "
+               "8192\n"
+               "  SAMPLE_TYPE = LSB_INTEGER\n  SAMPLE_BITS = 16\n"
+               "  SCALING_FACTOR = 0.5\n  OFFSET = 1737400\n"
+               "END_OBJECT = IMAGE\nOBJECT = IMAGE_MAP_PROJECTION\n"
+               "  MAP_PROJECTION_TYPE = \"SIMPLE CYLINDRICAL\"\n"
+               "  MAP_RESOLUTION = 22.7555555555555556\n"
+               "  CENTER_LATITUDE = 0\n  MAXIMUM_LATITUDE = 90\n"
+               "  WESTERNMOST_LONGITUDE = 0\n"
+               "END_OBJECT = IMAGE_MAP_PROJECTION\nEND\n";
+    }
+    const auto scene = [&](bool file, std::string_view loading) {
+        Scene s = PlanetScene(64);
+        ernie::Terrain moon(s, "/World/Moon");
+        if (file) {
+            s.Clear("/World/Moon", tokens::kHeights);
+            moon.SetHeightsFile(data.string())
+                .SetHeightsReference(kMoon);
+        } else {
+            ernie::PlanetHeightsOptions options;
+            options.reference = kMoon;
+            const ernie::PlanetTile faces = ernie::PlanetFacesOf(
+                *ernie::OpenRaster(data), options, glm::dvec3(kMoon),
+                2048);
+            moon.SetHeights(
+                Tensor::Copy<float>(faces.heights, {6, 2049, 2049}));
+        }
+        ernie::RenderSettings(s, "/Render/Settings")
+            .SetTextureLoading(std::string(loading));
+        // Shaded by its slopes alone, against a low light.
+        moon.SetColorMode(std::string(tokens::kHillshade))
+            .SetHillshadeAltitude(20.0);
+        // 20 km over 30 N 40 E, looking down the slope to the east.
+        const glm::dvec3 up = ernie::BodyDirection(30.0, 40.0);
+        const glm::dvec3 east =
+            glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), up));
+        const glm::dvec3 eye = up * (kMoon + 20000.0);
+        PlaceCamera(s, eye, eye + east * 30000.0 - up * 20000.0, up,
+                    {10.0, 1e7});
+        return s;
+    };
+
+    Scene tensor = scene(false, tokens::kComplete);
+    RasterDelegate reference(*context_);
+    const Tensor expected = reference.Render(tensor);
+    ASSERT_GT(Covered(expected), std::size_t{kSize} * kSize * 9 / 10)
+        << "ground fills the view";
+
+    Scene file = scene(true, tokens::kComplete);
+    RasterDelegate complete(*context_);
+    const Tensor waited = complete.Render(file);
+    const ernie::PlanetPages* pages = complete.Planet().Pages();
+    ASSERT_NE(pages, nullptr);
+    EXPECT_EQ(pages->Depth(), 1u);
+    EXPECT_GT(pages->Resident(), 0u);
+    EXPECT_EQ(pages->Pending(), 0u);
+    // Mean difference of the images' channels, in 8-bit steps.
+    const auto differ = [](const Tensor& a, const Tensor& b) {
+        double sum = 0.0;
+        for (std::int64_t i = 0; i < a.Elements(); ++i) {
+            sum += std::abs(int(a.As<std::uint8_t>()[i]) -
+                            int(b.As<std::uint8_t>()[i]));
+        }
+        return sum / static_cast<double>(a.Elements());
+    };
+    const double paged = differ(waited, expected);
+    EXPECT_LT(paged, 2.0);
+    // The faces alone, without their pages, miss the file's detail.
+    {
+        Scene coarse = scene(false, tokens::kComplete);
+        ernie::PlanetHeightsOptions options;
+        options.reference = kMoon;
+        const ernie::PlanetTile faces =
+            ernie::PlanetFacesOf(*ernie::OpenRaster(data), options,
+                                 glm::dvec3(kMoon), 1024);
+        ernie::Terrain(coarse, "/World/Moon")
+            .SetHeights(
+                Tensor::Copy<float>(faces.heights, {6, 1025, 1025}));
+        RasterDelegate delegate(*context_);
+        const double alone =
+            differ(delegate.Render(coarse), expected);
+        EXPECT_GT(alone, 1.0);
+        EXPECT_GT(alone, 5.0 * paged);
+    }
+
+    Scene streamed = scene(true, tokens::kAsync);
+    RasterDelegate async(*context_);
+    async.Render(streamed);
+    EXPECT_GT(async.Planet().Pages()->Pending(), 0u)
+        << "the first frame draws the faces";
+    Tensor last;
+    for (int frame = 0;
+         frame < 200 &&
+         (frame == 0 || async.Planet().Pages()->Pending() > 0);
+         ++frame) {
+        last = async.Render(streamed);
+    }
+    EXPECT_EQ(async.Planet().Pages()->Pending(), 0u);
+    last = async.Render(streamed);
+    EXPECT_LT(differ(last, waited), 0.5);
 }

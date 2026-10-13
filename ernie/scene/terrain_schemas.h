@@ -66,7 +66,22 @@
       (::ernie::AttributeMeta{.label = "Finest cell", .doc = "World units. A planet's LOD "        \
                                      "refines below its heights' quads, bilinear between them, "   \
                                      "down to quads about this size; 0 stops at the heights'.",   \
-                              .group = "Terrain", .max = 1e6}))
+                              .group = "Terrain", .max = 1e6}))                                    \
+    X(std::string, HeightsFile, ::ernie::tokens::kHeightsFile, "",                                 \
+      (::ernie::AttributeMeta{.label = "Heights file", .doc = "A planet's heights as a "          \
+                                     "latitude-longitude raster (TIFF, PDS3, PNG or JPEG; the "    \
+                                     "whole body from 180 W unless the file says), in place of "   \
+                                     "the heights: faces of up to 1024 quads read at once, finer " \
+                                     "ones paged in as views need them.",                          \
+                              .group = "Terrain", .asset = true}))                                 \
+    X(double, HeightsUnit, ::ernie::tokens::kHeightsUnit, 1.0,                                     \
+      (::ernie::AttributeMeta{.label = "Heights unit", .doc = "World units in a unit of the "     \
+                                     "heights file's values: 1000 for kilometres.",                \
+                              .group = "Terrain", .max = 1e6}))                                    \
+    X(double, HeightsReference, ::ernie::tokens::kHeightsReference, 0.0,                           \
+      (::ernie::AttributeMeta{.label = "Heights reference", .doc = "World units subtracted from " \
+                                     "the heights file's values: the radius, for files of radii.", \
+                              .group = "Terrain"}))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \
     X(double, MagnitudeLimit, ::ernie::tokens::kStarsMagnitudeLimit, 99.0,                         \

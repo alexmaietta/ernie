@@ -8,6 +8,7 @@
 #include "ernie/geometry/cube_sphere_lod.h"
 #include "ernie/geometry/frustum.h"
 #include "ernie/raster/drawable.h"
+#include "ernie/raster/planet_pages.h"
 #include "ernie/raster/renderer.h"
 #include "ernie/raster/terrain_drawable.h"
 #include "ernie/util/raster_view.h"
@@ -44,7 +45,13 @@ namespace ernie {
 /// Normals come from a per-vertex gradient texture with mips, so
 /// shading is independent of the mesh level, and the material's
 /// detail textures are projected triplanar in world space. Its albedo
-/// map, a planar raster, is not applied.
+/// map, a planar raster, is not applied; its albedo texture is, in
+/// latitude and longitude.
+///
+/// Heights finer than the faces can be paged in as views need them
+/// (`SetPages`): patches finer than the faces read the deepest page
+/// made so far for where they lie, or every page they want in frames
+/// that wait for them.
 ///
 /// Options are `TerrainParams`, as for flat terrain.
 class PlanetDrawable : public RasterDrawable {
@@ -72,9 +79,33 @@ class PlanetDrawable : public RasterDrawable {
 
     /// As above on the ellipsoid of semi-axes `radii` along x, y and
     /// z (`CubeSphereLod::SetRadii`), heights along its normals.
+    /// Given `slopes` (per vertex as `PlanetTile::slopes`, face by
+    /// face), the normals come from them rather than the heights'
+    /// differences; given `ranges` (per quad as
+    /// `PlanetTile::ranges`), the LOD's bounds widen to them
+    /// (`CubeSphereLod::SetCellRanges`), as finer pages (`SetPages`)
+    /// need.
     void SetHeights(
         const glm::dvec3& radii,
-        std::span<const RasterView, CubeSphereLod::kFaces> faces);
+        std::span<const RasterView, CubeSphereLod::kFaces> faces,
+        std::span<const glm::vec2> slopes = {},
+        std::span<const glm::vec2> ranges = {});
+
+    /// Draws patches finer than the heights from `pages` (none: from
+    /// the heights, bilinear), whose base faces must be the heights'.
+    /// @throws std::invalid_argument for pages of other faces.
+    void SetPages(std::unique_ptr<PlanetPages> pages);
+
+    const PlanetPages* Pages() const {
+        return pages_.get();
+    }
+
+    /// Whether frames wait for every page their patches want
+    /// (`PlanetPages::Complete`) rather than drawing coarser pages
+    /// until those arrive.
+    void SetWaitForPages(bool wait) {
+        waitForPages_ = wait;
+    }
 
     /// Drops the heights, so nothing is drawn. Waits for the device
     /// to go idle.
@@ -168,6 +199,9 @@ class PlanetDrawable : public RasterDrawable {
     /// pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
     void ReservePatches(std::size_t count);
+    /// Finds the page each patch reads (`pageRefs_`), asking for
+    /// those missing.
+    void FindPages();
     /// Appends the patches `lod_` selects and their anchors.
     void Select(const glm::dvec3& eye,
                 std::span<const LodRange> ranges,
@@ -198,6 +232,14 @@ class PlanetDrawable : public RasterDrawable {
     std::vector<BindlessHeap::Slot> heapSlots_;
     std::unique_ptr<GpuBuffer> patchBuffer_;
     std::unique_ptr<GpuBuffer> anchorBuffer_;
+    /// Per patch, the page it reads (`PlanetPages::Ref`).
+    std::unique_ptr<GpuBuffer> pageRefBuffer_;
+    std::vector<PlanetPages::Ref> pageRefs_;
+    std::unique_ptr<PlanetPages> pages_;
+    /// Bound in place of the pages' pool without pages.
+    GpuBuffer emptyPool_;
+    bool waitForPages_ = false;
+    std::uint64_t frames_ = 0;
 
     CubeSphereLod lod_;
     std::vector<LodPatch> patches_;

@@ -939,6 +939,16 @@ inline constexpr std::string_view kPlanetRadii = "ernie:radii";
 /// double, world units: a planet's finest LOD quad
 /// (`TerrainParams::finestCell`).
 inline constexpr std::string_view kFinestCell = "ernie:finestCell";
+/// asset: a planet's heights as a latitude-longitude raster file
+/// (TIFF, PDS3, PNG or JPEG), paged in as views need them, in place
+/// of `heights`.
+inline constexpr std::string_view kHeightsFile = "ernie:heights:file";
+/// double: world units in a unit of the heights file's values.
+inline constexpr std::string_view kHeightsUnit = "ernie:heights:unit";
+/// double, world units: subtracted from the heights file's values
+/// (the radius, for files of radii).
+inline constexpr std::string_view kHeightsReference =
+    "ernie:heights:reference";
 /// int4 (first column, first row, columns, rows): the cells that
 /// changed with the last write of heights on a GPU, so only their
 /// gradients and LOD bounds are rebuilt; absent for all.

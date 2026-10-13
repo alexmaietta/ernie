@@ -291,6 +291,26 @@ glm::vec2 CubeSphereLod::NodeHeights(std::uint32_t face,
     const auto take = [&range](float h) {
         range = glm::vec2(std::min(range.x, h), std::max(range.y, h));
     };
+    // With finer heights paged in, the data quads it covers range
+    // wider.
+    if (const std::vector<glm::vec2>& quads = cellRanges_[face];
+        !quads.empty()) {
+        const std::uint32_t last = faceCells_ - 1;
+        for (std::uint32_t row = std::min(row0 >> refinement_, last);
+             row <= std::min((row0 + cells - 1) >> refinement_, last);
+             ++row) {
+            for (std::uint32_t col =
+                     std::min(col0 >> refinement_, last);
+                 col <=
+                 std::min((col0 + cells - 1) >> refinement_, last);
+                 ++col) {
+                const glm::vec2& quad =
+                    quads[std::size_t{row} * faceCells_ + col];
+                take(quad.x);
+                take(quad.y);
+            }
+        }
+    }
     if (cells < (1u << refinement_)) {
         for (const std::uint32_t corner : {0u, 1u, 2u, 3u}) {
             take(FineHeight(face, col0 + (corner & 1u) * cells,
@@ -319,6 +339,48 @@ void CubeSphereLod::SetLeaves(std::uint32_t face,
     }
     trees_[face].SetLeaves(leaves);
     heights_[face].clear();
+    cellRanges_[face].clear();
+}
+
+void CubeSphereLod::SetCellRanges(std::uint32_t face,
+                                  std::span<const glm::vec2> ranges) {
+    if (face >= kFaces) {
+        throw std::invalid_argument("Cube sphere face out of range");
+    }
+    if (ranges.size() != std::size_t{faceCells_} * faceCells_) {
+        throw std::invalid_argument(
+            "Cube sphere cell ranges need one per data quad");
+    }
+    cellRanges_[face].assign(ranges.begin(), ranges.end());
+    // The data's leaves widen to their quads', and the largest step
+    // between neighbours to the widest quad.
+    const std::uint32_t leaves = trees_[face].LeavesPerSide();
+    const std::uint32_t cells = LeafCells();
+    std::vector<glm::vec2> widened(std::size_t{leaves} * leaves);
+    for (std::uint32_t y = 0; y < leaves; ++y) {
+        for (std::uint32_t x = 0; x < leaves; ++x) {
+            glm::vec2 leaf = trees_[face].NodeHeights(0, x, y);
+            if (leaf.x <= leaf.y) {
+                for (std::uint32_t row = y * cells;
+                     row < (y + 1) * cells; ++row) {
+                    for (std::uint32_t col = x * cells;
+                         col < (x + 1) * cells; ++col) {
+                        const glm::vec2& quad =
+                            ranges[std::size_t{row} * faceCells_ +
+                                   col];
+                        leaf = glm::vec2(std::min(leaf.x, quad.x),
+                                         std::max(leaf.y, quad.y));
+                    }
+                }
+            }
+            widened[std::size_t{y} * leaves + x] = leaf;
+        }
+    }
+    trees_[face].SetLeaves(widened);
+    for (const glm::vec2& quad : ranges) {
+        maxStep_[face] = std::max(
+            maxStep_[face], static_cast<double>(quad.y - quad.x));
+    }
 }
 
 glm::vec2 CubeSphereLod::HeightRange() const {
