@@ -24,6 +24,7 @@ ernie_add_library(
     texture_bake.cpp
     texture_cache.cpp
     texture_file.cpp
+    tiff.cpp
     PUBLIC
     ernie_glm
     ernie_dlpack
