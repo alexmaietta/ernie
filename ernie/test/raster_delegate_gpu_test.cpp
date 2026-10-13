@@ -851,6 +851,84 @@ TEST_F(RasterDelegateTest, MeshesWithoutNormalsShadeSmooth) {
         << "the slopes still differ";
 }
 
+// The ridge's six points and four triangles, written on the GPU.
+constexpr const char* kRidgeWriterSlang = R"(
+struct Push {
+    float* points;
+    uint* indices;
+    int* counts;
+}
+[[vk::push_constant]] ConstantBuffer<Push> push;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main() {
+    let corners = float3[6](float3(-4, -4, 0), float3(0, -4, 1.5), float3(0, 4, 1.5),
+                            float3(-4, 4, 0), float3(4, -4, 0), float3(4, 4, 0));
+    for (int i = 0; i < 6; ++i) {
+        push.points[3 * i] = corners[i].x;
+        push.points[3 * i + 1] = corners[i].y;
+        push.points[3 * i + 2] = corners[i].z;
+    }
+    let triangles = uint[12](0, 1, 2, 0, 2, 3, 1, 4, 5, 1, 5, 2);
+    for (int i = 0; i < 12; ++i) {
+        push.indices[i] = triangles[i];
+    }
+    push.counts[0] = 6;
+    push.counts[1] = 12;
+}
+)";
+
+// The ridge again, its triangles written on the GPU by a writer, so
+// no list of the triangles around its points is known on the host:
+// its normals summed on the GPU each frame still shade it smooth.
+TEST_F(RasterDelegateTest, MeshesWrittenOnTheGpuShadeSmooth) {
+    const ernie::ShaderCompiler compiler;
+    const std::array<ernie::ShaderModuleSource, 1> modules{
+        {{"ridge_writer", kRidgeWriterSlang}}};
+    const ernie::PipelineLayout layout(*context_, {}, 32);
+    const ernie::ComputePipeline pipeline(
+        *context_, layout, compiler.CompileSpirv(modules, "main"));
+    Scene scene = MeshScene();
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    const std::vector<float> points(18, 0.0f);
+    const std::vector<std::int32_t> counts(4, 3);
+    const std::vector<std::int32_t> indices(12, 0);
+    ernie::Mesh::Define(scene, "/World/Ridge")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {4}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {12}))
+        .SetMaterialBinding("/Looks/Red");
+    RasterDelegate delegate(*context_);
+    ernie::MeshWriteTarget written;
+    delegate.SetMeshWriter(
+        "/World/Ridge", [&](VkCommandBuffer commands,
+                            const ernie::MeshWriteTarget& target) {
+            written = target;
+            vkCmdBindPipeline(commands,
+                              VK_PIPELINE_BIND_POINT_COMPUTE,
+                              pipeline.Handle());
+            struct {
+                VkDeviceAddress points, indices, counts;
+            } push{target.points, target.indices, target.counts};
+            layout.PushConstants(commands, &push, sizeof(push));
+            vkCmdDispatch(commands, 1, 1, 1);
+        });
+    const auto red = [&](const Tensor& image, float x) {
+        const float z = 1.5f * (1.0f - std::abs(x) / 4.0f);
+        return static_cast<int>(TexelAt(scene, image, {x, 0, z})[0]);
+    };
+    const Tensor image = delegate.Render(scene);
+    EXPECT_EQ(written.normals, 0u)
+        << "its normals are the renderer's";
+    EXPECT_NEAR(red(image, -0.3f), red(image, 0.3f), 12)
+        << "no edge at the ridge";
+    EXPECT_GT(red(image, 3.5f), red(image, -3.5f) + 30)
+        << "the slopes still differ";
+}
+
 // The ridge with a normal per face (uniform): a hard edge, each slope
 // as flat as its foot; then the same as an indexed face-varying
 // primvar, which takes the place of `normals`.

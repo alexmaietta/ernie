@@ -847,6 +847,11 @@ class MeshDrawable : public RasterDrawable {
         /// Whether its normals are ours, made for a mesh added
         /// without any (`ForgetTriangleNormals`).
         bool generatedNormals = false;
+        /// Whether those follow triangles written on the GPU, summed
+        /// each frame by mesh_normals.slang's topology passes from
+        /// `firstNormalSum` in `normalSums_`.
+        bool topologyNormals = false;
+        std::uint32_t firstNormalSum = 0;
         /// Whether an anisotropic material shades it
         /// (`RasterRenderer::MaterialReadsTangents`), and whether it
         /// holds smooth tangents for it (`tangents_`, from its rest
@@ -1007,11 +1012,10 @@ class MeshDrawable : public RasterDrawable {
     /// Simplifies a mesh's coarser levels of detail from its host
     /// data.
     void BuildLevels(Mesh& mesh) const;
-    /// Forgets the normals that follow the host's triangles once a
-    /// mesh's triangles come from the GPU (a writer, device indices):
-    /// those made for a mesh added without any, and normals per
-    /// corner. It shades each triangle's own then, and a writer sees
-    /// no normals.
+    /// Once a mesh's triangles come from the GPU (a writer, device
+    /// indices), around whose points no list is known: normals made
+    /// for it follow those triangles instead (`topologyNormals`), and
+    /// normals per corner, of the host's triangles, are forgotten.
     static void ForgetTriangleNormals(Mesh& mesh);
     void RebuildInstances();
     /// Lays out the composed instancers: their raw arrays' and
@@ -1241,6 +1245,16 @@ class MeshDrawable : public RasterDrawable {
     PipelineLayout normalsLayout_;
     std::unique_ptr<ComputePipeline>
         normalsPipeline_;  ///< mesh_normals.slang.
+    /// mesh_normals.slang's topology passes: clear, largest triangle,
+    /// add, normalise.
+    std::array<std::unique_ptr<ComputePipeline>, 4>
+        topologyPipelines_;
+    /// Their fixed-point sums, each topology mesh's from its
+    /// `Mesh::firstNormalSum`.
+    std::unique_ptr<GpuBuffer> normalSums_;
+    /// The meshes whose normals follow their GPU triangles
+    /// (`Mesh::topologyNormals`), every frame.
+    std::vector<std::uint32_t> topologyMeshes_;
     PipelineLayout composeLayout_;
     std::unique_ptr<ComputePipeline>
         composePipeline_;  ///< instance_compose.slang.

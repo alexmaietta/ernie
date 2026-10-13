@@ -188,12 +188,15 @@ struct RefineConstants {
 };
 
 /// mesh_normals.slang's bindings: points, indices, adjacency and the
-/// normals it writes.
+/// normals it writes; the topology passes' fixed-point sums and the
+/// points and triangles in use.
 constexpr DescriptorBinding kNormalsBindings[] = {
     {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
     {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
+    {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kCompute},
 };
 
 /// instance_compose.slang's bindings: raw arrays, ops, instance
@@ -786,6 +789,16 @@ MeshDrawable::MeshDrawable(RasterRenderer& renderer)
     normalsPipeline_ = std::make_unique<ComputePipeline>(
         context_, normalsLayout_,
         renderer_.Compiler().CompileSpirv(normals, "normalsMain"));
+    constexpr std::array<const char*, 4> kTopologyPasses = {
+        "topologyClearMain", "topologyLargestMain", "topologyAddMain",
+        "topologyNormalizeMain"};
+    for (std::size_t pass = 0; pass < kTopologyPasses.size();
+         ++pass) {
+        topologyPipelines_[pass] = std::make_unique<ComputePipeline>(
+            context_, normalsLayout_,
+            renderer_.Compiler().CompileSpirv(normals,
+                                              kTopologyPasses[pass]));
+    }
     const std::vector<ShaderModuleSource> compose{
         {"instance_compose", shaders::kInstanceComposeSlang}};
     composePipeline_ = std::make_unique<ComputePipeline>(
@@ -1046,8 +1059,7 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
 
 void MeshDrawable::ForgetTriangleNormals(Mesh& mesh) {
     if (mesh.generatedNormals) {
-        mesh.data.normals.clear();
-        mesh.generatedNormals = false;
+        mesh.topologyNormals = true;
     }
     mesh.data.cornerNormals.clear();
     mesh.lodCornerNormals.clear();
@@ -1261,6 +1273,10 @@ void MeshDrawable::SetNormals(std::uint32_t mesh,
         geometryDirty_ = true;
     }
     target.generatedNormals = false;
+    if (target.topologyNormals) {
+        target.topologyNormals = false;
+        geometryDirty_ = true;
+    }
     // Normals per point from now on, in place of any per corner.
     if (!target.data.cornerNormals.empty()) {
         target.data.cornerNormals.clear();
@@ -1896,7 +1912,8 @@ void MeshDrawable::RecordWriters(VkCommandBuffer commands) const {
             points_->Address() +
             VkDeviceSize{PointBase(mesh) + mesh.firstVertex} * 3 *
                 sizeof(float);
-        if (!mesh.data.normals.empty()) {
+        // Its own normals; those made for it follow its triangles.
+        if (!mesh.data.normals.empty() && !mesh.generatedNormals) {
             target.normals =
                 normals_->Address() +
                 VkDeviceSize{mesh.firstVertex} * 3 * sizeof(float);
@@ -2724,6 +2741,8 @@ void MeshDrawable::RebuildGeometry() {
     std::vector<float> nodeTemperatures;
     std::vector<std::uint32_t> indices;
     std::vector<std::uint32_t> adjacency;
+    std::size_t normalSums = 0;
+    topologyMeshes_.clear();
     std::vector<float> uvs;
     std::vector<float> cornerNormals;
     // Smooth tangents, per point of every mesh, where an anisotropic
@@ -2861,6 +2880,13 @@ void MeshDrawable::RebuildGeometry() {
             static_cast<std::uint32_t>(adjacency.size());
         adjacency.insert(adjacency.end(), mesh.adjacency.begin(),
                          mesh.adjacency.end());
+        // Three sums per point and its largest triangle's.
+        if (mesh.topologyNormals) {
+            mesh.firstNormalSum =
+                static_cast<std::uint32_t>(normalSums);
+            normalSums += mesh.data.points.size() + 1;
+            topologyMeshes_.push_back(handle);
+        }
         mesh.pointsDirty = false;
     }
     vkDeviceWaitIdle(context_.Device());
@@ -2915,6 +2941,11 @@ void MeshDrawable::RebuildGeometry() {
     uvs_ = StorageBuffer(context_, uvs);
     cornerNormals_ = StorageBuffer(context_, cornerNormals);
     adjacency_ = StorageBuffer(context_, adjacency);
+    // Cleared on the GPU before each use.
+    normalSums_ = std::make_unique<GpuBuffer>(
+        context_,
+        std::max<VkDeviceSize>(normalSums * sizeof(std::int32_t), 16),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
     pendingNormals_.clear();
     pendingSkins_.clear();
     for (auto& [handle, mesh] : meshes_) {
@@ -5222,17 +5253,66 @@ void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
     // Skinned meshes posed, then normals that follow moving points,
     // before any pass draws them.
     RecordSkins(commands);
-    if (!pendingNormals_.empty()) {
-        ERNIE_GPU_ZONE(context_, commands, "Mesh normals");
-        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          normalsPipeline_->Handle());
+    const auto shaderBarrier = [&] {
+        VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT |
+                                VK_ACCESS_2_SHADER_WRITE_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    if (!pendingNormals_.empty() || !topologyMeshes_.empty()) {
         const DescriptorResource resources[] = {
             DescriptorResource::Of(*points_),
             DescriptorResource::Of(*indices_),
             DescriptorResource::Of(*adjacency_),
-            DescriptorResource::Of(*normals_)};
+            DescriptorResource::Of(*normals_),
+            DescriptorResource::Of(*normalSums_),
+            DescriptorResource::Of(*activeCounts_)};
         normalsLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                             resources);
+    }
+    // Normals of meshes whose triangles are written on the GPU, each
+    // frame: their sums cleared, scaled by the largest triangle,
+    // added to and normalised.
+    if (!topologyMeshes_.empty()) {
+        ERNIE_GPU_ZONE(context_, commands, "Mesh topology normals");
+        for (std::size_t pass = 0; pass < topologyPipelines_.size();
+             ++pass) {
+            vkCmdBindPipeline(commands,
+                              VK_PIPELINE_BIND_POINT_COMPUTE,
+                              topologyPipelines_[pass]->Handle());
+            for (const std::uint32_t handle : topologyMeshes_) {
+                const Mesh& mesh = meshes_.at(handle);
+                const auto points = static_cast<std::uint32_t>(
+                    mesh.data.points.size() / 3);
+                const auto triangles = static_cast<std::uint32_t>(
+                    mesh.data.indices.size() / 3);
+                const std::uint32_t constants[8] = {
+                    mesh.firstVertex, mesh.firstIndex,
+                    points,           triangles,
+                    PointBase(mesh),  mesh.firstNormalSum,
+                    mesh.countSlot,   0};
+                normalsLayout_.PushConstants(commands, constants,
+                                             sizeof(constants));
+                const std::uint32_t threads = pass == 0
+                                                  ? 3 * points + 1
+                                              : pass == 3 ? points
+                                                          : triangles;
+                vkCmdDispatch(commands, (threads + 63) / 64, 1, 1);
+            }
+            shaderBarrier();
+        }
+    }
+    if (!pendingNormals_.empty()) {
+        ERNIE_GPU_ZONE(context_, commands, "Mesh normals");
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          normalsPipeline_->Handle());
         for (const std::uint32_t handle : pendingNormals_) {
             const Mesh& mesh = meshes_.at(handle);
             const auto count = static_cast<std::uint32_t>(
@@ -5249,16 +5329,7 @@ void MeshDrawable::RecordCull(VkCommandBuffer commands) const {
                                          sizeof(constants));
             vkCmdDispatch(commands, (count + 63) / 64, 1, 1);
         }
-        VkMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
-        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-        barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
-        barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-        VkDependencyInfo dependency{
-            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-        dependency.memoryBarrierCount = 1;
-        dependency.pMemoryBarriers = &barrier;
-        vkCmdPipelineBarrier2(commands, &dependency);
+        shaderBarrier();
     }
     if (cullJobs_.empty()) {
         return;
