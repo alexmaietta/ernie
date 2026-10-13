@@ -9,6 +9,7 @@
 
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <array>
@@ -385,7 +386,7 @@ std::optional<Value> Widget(Viewer& viewer, const Path& path,
             typed = std::string(buffer.data());
         }
         ImGui::SameLine(0.0f, spacing);
-        if (ImGui::Button(icons::kFolderOpen, ImVec2(button, 0.0f))) {
+        if (IconButton("##file", icons::kFolderOpen, button)) {
             FileDialogOptions options;
             options.title = "Choose " + field.label;
             options.start = current;
@@ -585,6 +586,37 @@ bool MatchesFilter(std::string_view label, std::string_view attribute,
                    }) != text.end();
     };
     return contains(label) || contains(attribute);
+}
+
+void DrawIconCentred(ImDrawList* draw, const char* icon, ImVec2 centre,
+                     ImU32 colour) {
+    unsigned int codepoint = 0;
+    ImTextCharFromUtf8(&codepoint, icon, nullptr);
+    const ImFontGlyph* glyph =
+        ImGui::GetFontBaked()->FindGlyphNoFallback(
+            static_cast<ImWchar>(codepoint));
+    ImVec2 at;
+    if (glyph != nullptr) {
+        at = ImVec2(centre.x - 0.5f * (glyph->X0 + glyph->X1),
+                    centre.y - 0.5f * (glyph->Y0 + glyph->Y1));
+    } else {
+        const ImVec2 size = ImGui::CalcTextSize(icon);
+        at = ImVec2(centre.x - 0.5f * size.x,
+                    centre.y - 0.5f * size.y);
+    }
+    draw->AddText(ImVec2(std::round(at.x), std::round(at.y)), colour,
+                  icon);
+}
+
+bool IconButton(const char* id, const char* icon, float size) {
+    const bool clicked = ImGui::Button(id, ImVec2(size, size));
+    const ImVec2 low = ImGui::GetItemRectMin();
+    const ImVec2 high = ImGui::GetItemRectMax();
+    DrawIconCentred(ImGui::GetWindowDrawList(), icon,
+                    ImVec2(0.5f * (low.x + high.x),
+                           0.5f * (low.y + high.y)),
+                    ImGui::GetColorU32(ImGuiCol_Text));
+    return clicked;
 }
 
 bool ResetSquare(const Viewer& viewer, bool authored) {

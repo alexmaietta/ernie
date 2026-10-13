@@ -4,6 +4,7 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/create.h"
 #include "ernie/app/icons.h"
+#include "ernie/app/property_fields.h"
 #include "ernie/app/logs.h"
 #include "ernie/app/menu.h"
 #include "ernie/app/prim_icons.h"
@@ -224,29 +225,6 @@ const char* LightingName(Lighting lighting) {
         return "Default Light";
     }
     return "";
-}
-
-/// Draws the icon glyph `icon` (one UTF-8 character) centred on
-/// `centre` by its ink, not its advance, which icon fonts leave
-/// uneven.
-void DrawIconCentred(ImDrawList* draw, const char* icon,
-                     ImVec2 centre, ImU32 colour) {
-    unsigned int codepoint = 0;
-    ImTextCharFromUtf8(&codepoint, icon, nullptr);
-    const ImFontGlyph* glyph =
-        ImGui::GetFontBaked()->FindGlyphNoFallback(
-            static_cast<ImWchar>(codepoint));
-    ImVec2 at;
-    if (glyph != nullptr) {
-        at = ImVec2(centre.x - 0.5f * (glyph->X0 + glyph->X1),
-                    centre.y - 0.5f * (glyph->Y0 + glyph->Y1));
-    } else {
-        const ImVec2 size = ImGui::CalcTextSize(icon);
-        at = ImVec2(centre.x - 0.5f * size.x,
-                    centre.y - 0.5f * size.y);
-    }
-    draw->AddText(ImVec2(std::round(at.x), std::round(at.y)), colour,
-                  icon);
 }
 
 /// A backend's name as menus show it: "raster" as "Raster".
