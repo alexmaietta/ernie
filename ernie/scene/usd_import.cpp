@@ -6,6 +6,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/value.h"
 #include "ernie/usd/plugin_api.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -131,7 +132,10 @@ Plugin LoadPlugin() {
 const Plugin& GetPlugin() {
     static std::once_flag once;
     static Plugin plugin;
-    std::call_once(once, [] { plugin = LoadPlugin(); });
+    std::call_once(once, [] {
+        ERNIE_ZONE("USD plugin load");
+        plugin = LoadPlugin();
+    });
     return plugin;
 }
 
@@ -397,6 +401,8 @@ bool UsdImportAvailable(std::string* reason) {
 UsdImportResult ImportUsd(Scene& scene, const Path& root,
                           const std::filesystem::path& file,
                           const UsdImportOptions& options) {
+    ERNIE_ZONE("USD import");
+    ERNIE_ZONE_TEXT(file.string());
     const Plugin& plugin = GetPlugin();
     if (plugin.import == nullptr) {
         throw std::runtime_error(plugin.error);

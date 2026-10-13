@@ -3605,6 +3605,7 @@ void RasterDelegate::SyncPoints(const Scene& scene) {
 
 std::vector<PointsItem>
 RasterDelegate::PointsItems(const Scene& scene) const {
+    ERNIE_ZONE("Sync points items");
     std::vector<PointsItem> items;
     for (const auto& [path, synced] : syncedPoints_) {
         if (synced.handle == 0 || !scene.IsVisible(path)) {
@@ -3647,6 +3648,7 @@ RasterDelegate::PointsItems(const Scene& scene) const {
 }
 
 void RasterDelegate::SyncLinks(const Scene& scene) {
+    ERNIE_ZONE("Sync light links");
     const RenderPrims prims = ResolveRenderPrims(scene, {});
     std::vector<Path> geometry;
     for (const auto& [path, synced] : syncedMeshes_) {

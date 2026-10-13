@@ -6,6 +6,7 @@
 
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/profile.h"
 
 #include <algorithm>
 #include <atomic>
@@ -311,6 +312,7 @@ Prim Scene::Define(const Path& path, std::string_view type) {
 }
 
 Prim Scene::Clone(const Path& source, const Path& destination) {
+    ERNIE_ZONE("Scene clone");
     if (!Has(source)) {
         throw std::invalid_argument("Cannot clone '" +
                                     source.String() +
@@ -396,6 +398,7 @@ Prim Scene::Clone(const Path& source, const Path& destination) {
 }
 
 bool Scene::Remove(const Path& path) {
+    ERNIE_ZONE("Scene remove");
     if (path.IsRoot()) {
         throw std::invalid_argument("Cannot remove the root prim");
     }
@@ -491,6 +494,7 @@ void Scene::Set(const Path& path, std::string_view attribute,
     // A new time code: every sampled attribute at it.
     if (path.IsRoot() && attribute == tokens::kTimeCode &&
         !animated_.empty()) {
+        ERNIE_ZONE("Scene time code");
         const double time = TimeCode();
         for (const Path& animated : animated_) {
             PrimData& data = Find(animated);
@@ -586,6 +590,7 @@ void Scene::Unmap(const Path& path, std::string_view attribute,
 
 void Scene::Unmap(const PrimSet& prims, std::string_view attribute,
                   std::uintptr_t stream) {
+    ERNIE_ZONE("Scene unmap rows");
     for (const Path& path : prims.Paths()) {
         if (!Find(path).tensors.contains(attribute)) {
             throw std::invalid_argument(
@@ -617,6 +622,7 @@ void Scene::Write(std::span<const Path> paths,
 
 void Scene::Write(const PrimSet& prims, std::string_view attribute,
                   const Tensor& rows, std::uintptr_t stream) {
+    ERNIE_ZONE("Scene write rows");
     if (rows.Rank() == 0 ||
         rows.Shape()[0] != static_cast<std::int64_t>(prims.Size())) {
         throw std::invalid_argument(
@@ -1010,6 +1016,7 @@ Scene::Dependents() const {
     if (!dependentsStale_) {
         return dependents_;
     }
+    ERNIE_ZONE("Scene dependents");
     dependents_.clear();
     for (const auto& [path, prim] : prims_) {
         for (const auto& [attribute, bit] : TargetDirties()) {
@@ -1035,6 +1042,7 @@ Scene::Dependents() const {
 }
 
 std::vector<Change> Scene::Changes(ChangeCursor& cursor) const {
+    ERNIE_ZONE("Scene changes");
     std::map<Path, Dirty> changed;
     for (const auto& [path, when] : removed_) {
         if (when > cursor.version) {

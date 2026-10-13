@@ -19,6 +19,7 @@
 #include "ernie/session/skinning.h"
 #include "ernie/session/volumes.h"
 #include "ernie/util/astronomy.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/atmosphere.h"
 #include "ernie/util/ies.h"
 #include "ernie/util/reflectance_library.h"
@@ -788,6 +789,7 @@ Path BoundMaterial(const Scene& scene, const Path& prim) {
 
 RenderPrims ResolveRenderPrims(const Scene& scene,
                                const Path& settings) {
+    ERNIE_ZONE("Resolve render prims");
     RenderPrims prims;
     if (!settings.IsEmpty()) {
         if (!scene.Has(settings) ||
@@ -1234,6 +1236,7 @@ std::vector<RenderProductSpec>
 ResolveRenderProducts(const Scene& scene,
                       std::span<const Path> products,
                       const Path& settings) {
+    ERNIE_ZONE("Resolve render products");
     using namespace tokens;
     const Path resolved =
         ResolveRenderPrims(scene, settings).settings;
