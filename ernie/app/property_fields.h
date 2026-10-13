@@ -32,6 +32,9 @@ struct PropertyField {
         Matrix,  ///< A 4 x 4 matrix, edited row by row (column
                  ///< vectors, translation in the last).
         Text,
+        /// A file's path (an asset attribute): its text, and a button
+        /// choosing it in the viewer's file dialog.
+        File,
         Target,  ///< A relationship to one prim, of type `options[0]`
                  ///< when given.
         /// A float array as a curve over [0, 1], edited by dragging

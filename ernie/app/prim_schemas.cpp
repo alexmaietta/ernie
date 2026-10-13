@@ -81,7 +81,9 @@ std::optional<PropertyField> FieldOf(const AttributeDef& def) {
         kind = Kind::Matrix;
         break;
     case AttributeKind::Token:
-        kind = def.meta.options.empty() ? Kind::Text : Kind::Token;
+        kind = !def.meta.options.empty() ? Kind::Token
+               : def.meta.asset          ? Kind::File
+                                         : Kind::Text;
         break;
     case AttributeKind::Relationship:
         kind = Kind::Target;

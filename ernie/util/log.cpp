@@ -5,9 +5,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#include <string>
 
 #ifndef ERNIE_VERSION
 #define ERNIE_VERSION "unknown"
+#endif
+#ifndef ERNIE_BUILD_TYPE
+#define ERNIE_BUILD_TYPE "unknown"
 #endif
 
 namespace ernie::log {
@@ -69,6 +73,30 @@ void Detail(std::string_view message) {
 
 std::string_view Version() {
     return ERNIE_VERSION;
+}
+
+std::string_view BuildDate() {
+    return __DATE__ " " __TIME__;
+}
+
+std::string_view BuildType() {
+    // Empty when a single-configuration build sets none.
+    constexpr std::string_view type = ERNIE_BUILD_TYPE;
+    return type.empty() ? "unknown" : type;
+}
+
+std::string_view Compiler() {
+#if defined(__clang__)
+    return "Clang " __clang_version__;
+#elif defined(__GNUC__)
+    return "GCC " __VERSION__;
+#elif defined(_MSC_VER)
+    static const std::string compiler =
+        "MSVC " + std::to_string(_MSC_FULL_VER);
+    return compiler;
+#else
+    return "unknown";
+#endif
 }
 
 }  // namespace ernie::log

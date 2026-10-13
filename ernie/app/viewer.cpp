@@ -29,7 +29,9 @@
 #include "ernie/scene/xform.h"
 #include "ernie/session/delegate.h"
 #include "ernie/session/resolve.h"
+#include "ernie/util/disk_cache.h"
 #include "ernie/util/image.h"
+#include "ernie/util/log.h"
 #include "ernie/util/profile.h"
 
 #define GLFW_INCLUDE_NONE
@@ -297,6 +299,45 @@ std::optional<std::uint64_t> HostResidentBytes() {
     return std::nullopt;
 }
 
+/// Ernie's documentation and repository, for the Help menu.
+constexpr const char* kDocumentation =
+    "https://alexmaietta.github.io/ernie/";
+constexpr const char* kRepository =
+    "https://github.com/alexmaietta/ernie";
+
+/// Opens `target` (a URL or a folder) in the desktop's own
+/// application, in the background; false if that could not start.
+bool OpenExternally(const std::string& target) {
+#if defined(_WIN32)
+    const std::string command = "start \"\" \"" + target + "\"";
+#elif defined(__APPLE__)
+    const std::string command = "open '" + target + "' &";
+#else
+    const std::string command =
+        "xdg-open '" + target + "' >/dev/null 2>&1 &";
+#endif
+    return std::system(command.c_str()) == 0;
+}
+
+/// The operating system and architecture Ernie runs on.
+std::string PlatformName() {
+#if defined(_WIN32)
+    std::string name = "Windows";
+#elif defined(__APPLE__)
+    std::string name = "macOS";
+#elif defined(__linux__)
+    std::string name = "Linux";
+#else
+    std::string name = "unknown";
+#endif
+#if defined(__x86_64__) || defined(_M_X64)
+    name += ", x86-64";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    name += ", ARM64";
+#endif
+    return name;
+}
+
 const char* WireframeName(std::optional<Wireframe> mode) {
     if (!mode) {
         return "Wireframe";
@@ -305,7 +346,7 @@ const char* WireframeName(std::optional<Wireframe> mode) {
     case Wireframe::Off:
         return "Shaded";
     case Wireframe::Overlay:
-        return "Shaded Wireframe";
+        return "Wireframe Overlay";
     case Wireframe::HiddenLine:
         return "Hidden Line";
     }
@@ -1508,6 +1549,27 @@ struct Viewer::State {
                 ImGui::Separator();
             }
             if (menu == "Help") {
+                const std::string docs = kDocumentation;
+                const std::pair<const char*, std::string> links[] = {
+                    {"Documentation", docs},
+                    {"Viewer Guide",
+                     docs + "getting-started/viewer/"},
+                    {"Demos", docs + "getting-started/demos/"},
+                    {"Python API", docs + "api/python/scene/"},
+                    {"C++ API", docs + "api/cpp/"}};
+                for (const auto& [label, url] : links) {
+                    if (ImGui::MenuItem(label)) {
+                        OpenLink(url);
+                    }
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Report an Issue")) {
+                    OpenLink(std::string(kRepository) + "/issues");
+                }
+                if (ImGui::MenuItem("Source Code")) {
+                    OpenLink(kRepository);
+                }
+                ImGui::Separator();
                 ImGui::MenuItem("Keyboard and Mouse", nullptr,
                                 &showControls);
                 ImGui::MenuItem("About Ernie", nullptr, &showAbout);
@@ -2446,6 +2508,9 @@ struct Viewer::State {
                 {2048, 1080},
             }};
             for (const auto& [width, height] : presets) {
+                if (width == 1280) {
+                    ImGui::Separator();
+                }
                 const std::string label = std::to_string(width) +
                                           " x " +
                                           std::to_string(height);
@@ -2747,7 +2812,6 @@ struct Viewer::State {
         if (menu::BeginSubmenu("Toolbar")) {
             menu::Check("Renderer", &display.toolbarRenderer);
             menu::Check("Render Var", &display.toolbarVar);
-            menu::Check("Render Mode", &display.toolbarRenderMode);
             menu::Check("Camera", &display.toolbarCamera);
             menu::Check("Lighting", &display.toolbarLighting);
             ImGui::EndMenu();
@@ -2850,26 +2914,10 @@ struct Viewer::State {
             minimal.reset();
             wireframe.reset();
         }
-        if (menu::BeginSubmenu("Debug View")) {
-            DrawVarItems();
-            ImGui::EndMenu();
+        menu::Section("Rendering Mode");
+        if (menu::Option("Default", !wireframe)) {
+            wireframe.reset();
         }
-        ImGui::Separator();
-        bool cameraLight = lighting == Lighting::Camera;
-        if (menu::Check("Camera Light", &cameraLight)) {
-            lighting =
-                cameraLight ? Lighting::Camera : Lighting::Stage;
-        }
-    }
-
-    /// Kit's camera menu: the viewer's perspective camera, its
-    /// orthographic views from the top, front and right, the scene's
-    /// cameras, and a new camera where the view is.
-    /// The rendering mode button's items: shaded, shaded with the
-    /// triangles' edges over it, or hidden line (edges on flat,
-    /// unlit surfaces), each overriding the render settings'
-    /// `ernie:wireframe` in the viewport only; or the settings' own.
-    void DrawRenderModeItems() {
         for (const Wireframe mode :
              {Wireframe::Off, Wireframe::Overlay,
               Wireframe::HiddenLine}) {
@@ -2879,14 +2927,15 @@ struct Viewer::State {
                 wireframe = mode;
             }
         }
-        ImGui::Separator();
-        if (menu::Option("From Settings", !wireframe)) {
-            wireframe.reset();
+        if (menu::BeginSubmenu("Debug View")) {
+            DrawVarItems();
+            ImGui::EndMenu();
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("The render settings' own mode "
-                              "(ernie:wireframe), shaded unless "
-                              "they say otherwise");
+        ImGui::Separator();
+        bool cameraLight = lighting == Lighting::Camera;
+        if (menu::Check("Camera Light", &cameraLight)) {
+            lighting =
+                cameraLight ? Lighting::Camera : Lighting::Stage;
         }
     }
 
@@ -2939,6 +2988,9 @@ struct Viewer::State {
         ImGui::PopID();
     }
 
+    /// Kit's camera menu: the viewer's perspective camera, its
+    /// orthographic views from the top, front and right, the scene's
+    /// cameras, and a new camera where the view is.
     void DrawCameraMenu() {
         const bool viewer = activeCamera == PerspectiveCamera();
         const std::vector<Path> cameras = ViewableCameras(scene);
@@ -3362,21 +3414,6 @@ struct Viewer::State {
             DrawBandCombo(comboWidth);
         }
 
-        // The rendering mode, as Kit's: shaded, wireframe over it, or
-        // hidden line, overriding the render settings' in the
-        // viewport only; or theirs.
-        if (display.toolbarRenderMode) {
-            ImGui::SameLine();
-            const std::string modeLabel =
-                std::string(icons::kBox) + "  " +
-                (wireframe ? WireframeName(*wireframe)
-                           : "From Settings");
-            if (pill("##renderMode", modeLabel.c_str())) {
-                DrawRenderModeItems();
-                ImGui::EndCombo();
-            }
-        }
-
         // The camera, as Kit's "Perspective", and its lens and
         // exposure behind a chevron.
         if (display.toolbarCamera) {
@@ -3512,18 +3549,129 @@ struct Viewer::State {
             ImGui::End();
         }
         if (showAbout) {
-            if (ImGui::Begin("About Ernie", &showAbout,
-                             ImGuiWindowFlags_NoDocking |
-                                 ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::TextUnformatted("Ernie");
-                ImGui::TextDisabled("A spectral, physically based "
-                                    "sensor renderer on Vulkan");
-                ImGui::Separator();
-                ImGui::Text("Device: %s", gpu->DeviceName().c_str());
-                ImGui::Text("Renderer: %s", renderer.c_str());
-                ImGui::Text("Dear ImGui %s", ImGui::GetVersion());
-            }
+            DrawAbout();
+        }
+    }
+
+    /// Help > About Ernie: the version and build, the device, the
+    /// folders Ernie reads and writes (each to open), the libraries
+    /// it shows its interface with, and its licence; all of it to
+    /// copy for a bug report.
+    void DrawAbout() {
+        if (!ImGui::Begin("About Ernie", &showAbout,
+                          ImGuiWindowFlags_NoDocking |
+                              ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::End();
+            return;
+        }
+        ImGui::Text("Ernie %s", std::string(log::Version()).c_str());
+        ImGui::TextDisabled("A spectral, physically based sensor "
+                            "renderer on Vulkan");
+        // Every row, as text for the clipboard too.
+        std::string report =
+            "Ernie " + std::string(log::Version()) + "\n";
+        const auto section = [&](const char* title) {
+            ImGui::SeparatorText(title);
+            report += std::string("\n") + title + "\n";
+            return ImGui::BeginTable(title, 3,
+                                     ImGuiTableFlags_SizingFixedFit);
+        };
+        // A row; with `folder`, a button opening it.
+        const auto row = [&](const char* label,
+                             const std::string& value,
+                             bool folder = false) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("%s", label);
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(value.c_str());
+            ImGui::TableNextColumn();
+            if (folder) {
+                ImGui::PushID(label);
+                if (ImGui::SmallButton("Open")) {
+                    std::error_code error;
+                    std::filesystem::create_directories(value, error);
+                    OpenLink(value);
+                }
+                ImGui::PopID();
+            }
+            report += std::string("  ") + label + ": " + value + "\n";
+        };
+        if (section("Build")) {
+            row("Version", std::string(log::Version()));
+            row("Built", std::string(log::BuildDate()));
+            row("Configuration", std::string(log::BuildType()));
+            row("Compiler", std::string(log::Compiler()));
+            row("Platform", PlatformName());
+            ImGui::EndTable();
+        }
+        if (section("Device")) {
+            row("GPU", gpu->DeviceName());
+            row("Driver", gpu->DriverDescription());
+            row("Vulkan", gpu->VulkanVersion());
+            row("Renderer", renderer);
+            ImGui::EndTable();
+        }
+        if (section("Folders")) {
+            // The caches (off when their variable is empty or "0"),
+            // the demos' fetched data, captures, the scene and the
+            // working directory.
+            const std::pair<const char*,
+                            std::optional<std::filesystem::path>>
+                caches[] = {
+                    {"Shader cache",
+                     CacheDirectory("ERNIE_SHADER_CACHE", "shaders")},
+                    {"Texture cache",
+                     CacheDirectory("ERNIE_TEXTURE_CACHE",
+                                    "textures")},
+                    {"Cloud cache",
+                     CacheDirectory("ERNIE_CLOUD_CACHE", "clouds")},
+                    {"Demo data", CacheDirectory("ERNIE_CACHE", "")}};
+            for (const auto& [label, folder] : caches) {
+                row(label, folder ? folder->string() : "off",
+                    folder.has_value());
+            }
+            row("Captures", captureOptions.folder.string(), true);
+            if (!scenePath.empty()) {
+                row("Scene file", scenePath.string());
+            }
+            std::error_code error;
+            row("Working directory",
+                std::filesystem::current_path(error).string(), true);
+            ImGui::EndTable();
+        }
+        if (section("Libraries")) {
+            row("Dear ImGui", ImGui::GetVersion());
+            row("ImPlot", IMPLOT_VERSION);
+            row("GLFW", glfwGetVersionString());
+            ImGui::EndTable();
+        }
+        if (section("Licence")) {
+            row("Ernie", "BSD-3-Clause");
+            ImGui::EndTable();
+        }
+        ImGui::Spacing();
+        if (ImGui::Button("Copy to Clipboard")) {
+            ImGui::SetClipboardText(report.c_str());
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("All of it as text, for a bug report");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Documentation")) {
+            OpenLink(kDocumentation);
+        }
+        ImGui::End();
+    }
+
+    /// Opens `target` (a URL or folder) outside the viewer; failing
+    /// that, logs it and puts it on the clipboard to open by hand.
+    void OpenLink(const std::string& target) {
+        if (!OpenExternally(target)) {
+            ImGui::SetClipboardText(target.c_str());
+            self.Log(LogLevel::Warning,
+                     "Could not open " + target +
+                         "; it is on the clipboard");
         }
     }
 

@@ -36,4 +36,12 @@ void Detail(std::string_view message);
 /// Ernie's version, such as "0.4.0".
 std::string_view Version();
 
+/// When Ernie's core was compiled ("Oct 13 2026 09:12:45"), the build
+/// configuration ("Release", "Debug", ...; "unknown" without one) and
+/// the compiler ("GCC 14.2.0", "Clang 19.1.0"): the About window's
+/// and bug reports'.
+std::string_view BuildDate();
+std::string_view BuildType();
+std::string_view Compiler();
+
 }  // namespace ernie::log

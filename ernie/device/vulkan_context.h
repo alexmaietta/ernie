@@ -151,6 +151,15 @@ class VulkanContext {
         return deviceName_;
     }
 
+    /// The device's driver, e.g. "NVIDIA 610.57.04", and the Vulkan
+    /// version it supports, e.g. "1.4.312".
+    const std::string& DriverDescription() const {
+        return driver_;
+    }
+    const std::string& VulkanVersion() const {
+        return vulkanVersion_;
+    }
+
     /// Device UUID, which CUDA reports too, for matching devices
     /// across APIs.
     const std::array<std::uint8_t, VK_UUID_SIZE>& DeviceUuid() const {
@@ -374,6 +383,8 @@ class VulkanContext {
     PFN_vkVoidFunction exportMemory_ = nullptr;
     PFN_vkVoidFunction exportSemaphore_ = nullptr;
     std::string deviceName_;
+    std::string driver_;
+    std::string vulkanVersion_;
     std::array<std::uint8_t, VK_UUID_SIZE> deviceUuid_{};
     VkPhysicalDeviceLimits limits_{};
     bool rayQuery_ = false;

@@ -40,7 +40,8 @@ ernie_add_library(
     ernie_basisu
     ernie_zstd
     ernie_bc7enc)
-# The banner's version (log.h).
+# The banner's version and the About window's build configuration
+# (log.h).
 set_source_files_properties(
     log.cpp PROPERTIES COMPILE_DEFINITIONS
-                       ERNIE_VERSION="${ERNIE_VERSION}")
+    "ERNIE_VERSION=\"${ERNIE_VERSION}\";ERNIE_BUILD_TYPE=\"$<CONFIG>\"")

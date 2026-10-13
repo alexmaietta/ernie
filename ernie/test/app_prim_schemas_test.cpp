@@ -79,7 +79,7 @@ TEST(PrimSchemasTest, LightPanelsComeFromTheRegistry) {
     const std::vector<PropertySection> sky =
         SchemaOf(scene, "/Sky", brdfs, filters);
     EXPECT_EQ(FieldOf(sky, tokens::kTextureFile)->kind,
-              PropertyField::Kind::Text);
+              PropertyField::Kind::File);
     EXPECT_EQ(FieldOf(sky, tokens::kLightTexture), nullptr);
 }
 
@@ -118,6 +118,12 @@ TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
     EXPECT_EQ(
         Titles(SchemaOf(scene, "/Looks/Rock/Tex", brdfs, filters)),
         (std::vector<std::string>{"Shader", "Texture", "Prim"}));
+    // Its image file, chosen through the file dialog.
+    EXPECT_EQ(
+        FieldOf(SchemaOf(scene, "/Looks/Rock/Tex", brdfs, filters),
+                tokens::kFile)
+            ->kind,
+        PropertyField::Kind::File);
     EXPECT_EQ(
         Titles(SchemaOf(scene, "/Looks/Rock/Node", brdfs, filters)),
         (std::vector<std::string>{

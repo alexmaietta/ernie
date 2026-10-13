@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/property_fields.h"
+#include "ernie/app/file_dialog.h"
+#include "ernie/app/icons.h"
 
 #include "ernie/app/session.h"
 #include "ernie/app/viewer.h"
@@ -107,6 +109,7 @@ Value Shown(const Scene& scene, const Path& path,
                          NumberOf(field.fallback));
     case Kind::Token:
     case Kind::Text:
+    case Kind::File:
         return GetToken(scene, path, field.attribute,
                         TextOf(field.fallback));
     case Kind::Color:
@@ -298,8 +301,10 @@ std::string ArrayText(const Tensor& array) {
                : text + " on the GPU";
 }
 
-/// The field's widget for `shown`; the new value when edited.
-std::optional<Value> Widget(Viewer& viewer,
+/// The field's widget for `shown` on the prim at `path`; the new
+/// value when edited (a file chosen in the dialog sets it itself,
+/// later).
+std::optional<Value> Widget(Viewer& viewer, const Path& path,
                             const PropertyField& field,
                             const Value& shown) {
     using Kind = PropertyField::Kind;
@@ -360,6 +365,47 @@ std::optional<Value> Widget(Viewer& viewer,
             return std::string(buffer.data());
         }
         break;
+    }
+    case Kind::File: {
+        // The path as text, then a button choosing it in the file
+        // dialog, which sets it when the user confirms.
+        const float button = ImGui::GetFrameHeight();
+        const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+        std::array<char, 1024> buffer{};
+        const std::string current = TextOf(shown);
+        std::strncpy(buffer.data(), current.c_str(),
+                     buffer.size() - 1);
+        ImGui::SetNextItemWidth(std::max(
+            ImGui::GetContentRegionAvail().x - button - spacing,
+            1.0f));
+        std::optional<Value> typed;
+        if (ImGui::InputText("##v", buffer.data(), buffer.size(),
+                             ImGuiInputTextFlags_EnterReturnsTrue) &&
+            current != buffer.data()) {
+            typed = std::string(buffer.data());
+        }
+        ImGui::SameLine(0.0f, spacing);
+        if (ImGui::Button(icons::kFolderOpen, ImVec2(button, 0.0f))) {
+            FileDialogOptions options;
+            options.title = "Choose " + field.label;
+            options.start = current;
+            viewer.OpenFileDialog(
+                std::move(options),
+                [path, attribute = field.attribute](
+                    Viewer& chooser,
+                    const std::filesystem::path& chosen) {
+                    try {
+                        chooser.Edit(path, attribute,
+                                     chosen.string());
+                    } catch (const std::exception& failure) {
+                        chooser.Log(LogLevel::Error, failure.what());
+                    }
+                });
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Choose the file");
+        }
+        return typed;
     }
     case Kind::Color: {
         glm::vec3 value(Vec3Of(shown));
@@ -643,8 +689,9 @@ std::string DrawPropertyFields(Viewer& viewer, const Path& path,
                                   "per element; reset it to edit "
                                   "one value for all");
             }
-        } else if (const std::optional<Value> edited = Widget(
-                       viewer, field, Shown(scene, path, field))) {
+        } else if (const std::optional<Value> edited =
+                       Widget(viewer, path, field,
+                              Shown(scene, path, field))) {
             try {
                 if (edited->Empty()) {
                     viewer.ClearAttribute(path, field.attribute);

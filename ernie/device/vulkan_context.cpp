@@ -411,6 +411,12 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     c.limits_ = properties.properties.limits;
     // Warp's banner, once Ernie runs on a device.
     const std::uint32_t api = properties.properties.apiVersion;
+    c.driver_ =
+        std::string(driver.driverName) + " " + driver.driverInfo;
+    c.vulkanVersion_ =
+        std::to_string(VK_API_VERSION_MAJOR(api)) + "." +
+        std::to_string(VK_API_VERSION_MINOR(api)) + "." +
+        std::to_string(VK_API_VERSION_PATCH(api));
     const std::string banner =
         "Ernie " + std::string(log::Version()) + " initialized:\n" +
         "   Vulkan " + std::to_string(VK_API_VERSION_MAJOR(api)) +

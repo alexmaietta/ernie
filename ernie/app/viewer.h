@@ -88,8 +88,8 @@ struct ViewerOptions {
 /// type" menu (the eye) and heads-up display settings choose. None of
 /// it renders into the scene's own render products.
 struct ViewportDisplay {
-    bool lights = true;   ///< Every light's gizmo: its shape and the
-                          ///< direction it shines.
+    bool lights = false;  ///< Every light's gizmo: its shape and the
+                          ///< direction it shines; off by default.
     bool cameras = true;  ///< Every scene camera's frustum.
     bool grid = false;    ///< A grid on the ground (z = 0) with the x
                           ///< and y axes.
@@ -114,11 +114,8 @@ struct ViewportDisplay {
     /// settings and eye menus always show, and the eye menu's Toolbar
     /// submenu shows these again.
     bool toolbarRenderer =
-        true;  ///< The renderer and render settings.
+        true;  ///< The renderer, rendering mode and render settings.
     bool toolbarVar = true;  ///< The render var the viewport shows.
-    /// The rendering mode: shaded, wireframe or hidden line, or the
-    /// render settings' own.
-    bool toolbarRenderMode = true;
     bool toolbarCamera =
         true;  ///< The camera the viewport looks through.
     bool toolbarLighting =
