@@ -1,6 +1,6 @@
 # Volumes
 
-Volumes are participating media such as engine plumes, smoke and dust, after OpenUSD's UsdVol schemas. A `Volume` prim names its fields with relationships `field:<name>`, each to a field prim. An `OpenVDBAsset` field reads one grid of a NanoVDB file. The Volume's bound Material says how the fields shade.
+Volumes are participating media such as engine plumes, smoke and dust, after OpenUSD's UsdVol schemas. A `Volume` prim names its fields with relationships `field:<name>`, each to a field prim. An `OpenVDBAsset` field reads one grid of an OpenVDB or NanoVDB file. The Volume's bound Material says how the fields shade.
 
 ```python
 import ernie
@@ -14,7 +14,7 @@ scene.define("/Looks/Exhaust", ernie.Material, density=20.0)
 
 ## Grids
 
-Ernie reads NanoVDB files (`.nvdb`), uncompressed. The GPU walks each grid's tree in place, so sparse grids stay sparse in memory. Convert OpenVDB files (`.vdb`) first, with OpenVDB's `nanovdb_convert` (without `-z` or `-b`) or with Warp (`wp.Volume.load_from_nvdb`, `save_to_nvdb`).
+Ernie reads OpenVDB files (`.vdb`) and uncompressed NanoVDB files (`.nvdb`). The GPU walks each grid's tree in place, NanoVDB's layout, so sparse grids stay sparse in memory: an OpenVDB file's grids are read with OpenVDB (Blosc and zip compression included) and converted to NanoVDB as they load, with their statistics. OpenVDB is built into Ernie statically, with oneTBB, Blosc and zlib, and none of their symbols are exported, so an application that loads its own copies (Houdini, Isaac Sim) is unaffected. A build configured with `-DERNIE_OPENVDB=OFF` reads NanoVDB alone; convert OpenVDB files for it with OpenVDB's `nanovdb_convert` (without `-z` or `-b`).
 
 `fieldName` picks a grid of the file by name, and `fieldIndex` picks among grids of the same name. Without a name, `fieldIndex` counts every grid in the file. Every grid type NanoVDB stores as floats is read: float, half, Fp4, Fp8, Fp16 and FpN. A vec3f grid is read as the lengths of its vectors.
 

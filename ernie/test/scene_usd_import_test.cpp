@@ -494,11 +494,8 @@ def Xform "Shot"
                 11.5, 1e-6);
 }
 
-TEST_F(UsdImportTest, VolumesNameTheirFieldsAndNanoVdbFiles) {
-    // An OpenVDB file with a NanoVDB conversion beside it, and one
-    // without.
+TEST_F(UsdImportTest, VolumesNameTheirFieldsAndFiles) {
     std::ofstream(dir_ / "smoke.vdb") << "vdb";
-    std::ofstream(dir_ / "smoke.nvdb") << "nvdb";
     std::ofstream(dir_ / "fire.vdb") << "vdb";
     const std::filesystem::path file = dir_ / "volume.usda";
     std::ofstream(file) << R"(#usda 1.0
@@ -540,8 +537,7 @@ def Xform "Fx"
                                "field:temperature", Path()),
               Path("/World/Fx/Smoke/Heat"));
     EXPECT_TRUE(Token("/World/Fx/Smoke/Density", tokens::kFilePath)
-                    .ends_with("smoke.nvdb"))
-        << "the NanoVDB file beside it";
+                    .ends_with("smoke.vdb"));
     EXPECT_EQ(Token("/World/Fx/Smoke/Density", tokens::kFieldName),
               "density");
     EXPECT_EQ(scene_.Get<int>(Path("/World/Fx/Smoke/Heat"),
@@ -549,10 +545,8 @@ def Xform "Fx"
               1);
     EXPECT_TRUE(Token("/World/Fx/Smoke/Heat", tokens::kFilePath)
                     .ends_with("fire.vdb"));
-    ASSERT_EQ(result.warnings.size(), 1u);
-    EXPECT_NE(result.warnings.front().find("nanovdb_convert"),
-              std::string::npos)
-        << result.warnings.front();
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
 }
 
 TEST_F(UsdImportTest, LightsKeepTheirLinks) {

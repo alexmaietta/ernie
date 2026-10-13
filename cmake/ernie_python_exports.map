@@ -1,0 +1,9 @@
+/* The symbols Ernie's Python module exports on Linux (ernie/python/CMakeLists.txt): its init
+   function alone. Ernie and the third-party libraries linked in (OpenEXR, OpenVDB, oneTBB, zlib)
+   stay local, so they cannot clash with an application's own copies. */
+{
+  global:
+    PyInit__ernie;
+  local:
+    *;
+};

@@ -13,6 +13,7 @@ ernie_add_library(
     log.cpp
     mapped_file.cpp
     nanovdb.cpp
+    openvdb.cpp
     noise.cpp
     pds.cpp
     profile_report.cpp
@@ -36,6 +37,7 @@ ernie_add_library(
     ernie_json
     ernie_stb
     ernie_nanovdb
+    ernie_openvdb
     ernie_openexr
     ernie_basisu
     ernie_zstd

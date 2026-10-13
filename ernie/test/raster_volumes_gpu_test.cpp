@@ -114,6 +114,41 @@ TEST_F(RasterDelegateTest, AVolumeDimsWhatIsBehindIt) {
     }
 }
 
+TEST_F(RasterDelegateTest, OpenVdbFilesRenderAsNanoVdbOnes) {
+    if (!ernie::OpenVdbAvailable()) {
+        GTEST_SKIP() << "built without OpenVDB";
+    }
+    // tools/vdb_fixtures.cpp: cube.nvdb's cube as OpenVDB's
+    // "density", then a second "density" of twos.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::string vdb =
+        (std::filesystem::path(ERNIE_TEST_FIXTURES) / "volumes" /
+         "cube.vdb")
+            .string();
+    ernie::OpenVDBAsset(scene, "/World/Cube/Density")
+        .SetFilePath(vdb)
+        .SetFieldName("density");
+    const std::vector<double> once = CentreSpectrum(delegate, scene);
+    ernie::OpenVDBAsset(scene, "/World/Cube/Density")
+        .SetFieldIndex(1);
+    const std::vector<double> twice = CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> bare = CentreSpectrum(delegate, scene);
+    ASSERT_EQ(once.size(), bare.size());
+    for (std::size_t b = 0; b < bare.size(); ++b) {
+        ASSERT_GT(bare[b], 0.0) << "band " << b;
+        const double expected = std::exp(-kSigma * kDepth);
+        EXPECT_NEAR(once[b] / bare[b], expected, 0.02 * expected)
+            << "band " << b;
+        EXPECT_NEAR(twice[b] / bare[b], expected * expected,
+                    0.04 * expected * expected)
+            << "band " << b << ": the second grid of the name";
+    }
+}
+
 TEST_F(RasterDelegateTest,
        AVolumeOutOfViewIsNotMarchedAndComesBackWhole) {
     // Behind the camera, the volume is not marched and the view shows

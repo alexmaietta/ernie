@@ -205,5 +205,42 @@ TEST(NanoVdb, RejectsOtherAndCompressedFiles) {
     }
 }
 
+// tools/vdb_fixtures.cpp: cube.nvdb's cube as OpenVDB's "density", a
+// second "density" of twos and a vec3f "velocity", Blosc-compressed.
+TEST(NanoVdb, ReadsOpenVdbFilesAsNanoVdb) {
+    if (!OpenVdbAvailable()) {
+        GTEST_SKIP() << "built without OpenVDB";
+    }
+    const std::filesystem::path path =
+        std::filesystem::path(ERNIE_TEST_FIXTURES) / "volumes" /
+        "cube.vdb";
+    const std::vector<NanoVdbGrid> grids = ReadGrids(path);
+    ASSERT_EQ(grids.size(), 3u);
+    // In the file's order, which OpenVDB chose.
+    EXPECT_EQ(grids[0].name, "density");
+    EXPECT_EQ(grids[0].type, NanoVdbType::Float);
+    EXPECT_EQ(grids[1].name, "density");
+    EXPECT_EQ(grids[2].name, "velocity");
+    EXPECT_EQ(grids[2].type, NanoVdbType::Vec3f);
+    EXPECT_TRUE(grids[2].Vector());
+
+    // Where cube.nvdb's voxels are, with statistics.
+    const NanoVdbGrid& cube = ReadNanoVdb(Cube())[0];
+    EXPECT_EQ(grids[0].indexMin, cube.indexMin);
+    EXPECT_EQ(grids[0].indexMax, cube.indexMax);
+    const glm::dvec3 origin(grids[0].indexToGrid *
+                            glm::dvec4(0, 0, 0, 1));
+    EXPECT_NEAR(origin.x, -0.75, 1e-12);
+    EXPECT_NEAR(grids[0].voxelSize.z, 0.1, 1e-12);
+    EXPECT_TRUE(grids[0].hasStatistics);
+    EXPECT_EQ(grids[0].maxValue, 1.0);
+
+    const NanoVdbGrid* second = FindNanoVdbGrid(grids, "density", 1);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->maxValue, 2.0);
+    EXPECT_THROW(ReadGrids(path.parent_path() / "missing.vdb"),
+                 std::runtime_error);
+}
+
 }  // namespace
 }  // namespace ernie

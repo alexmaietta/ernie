@@ -684,30 +684,13 @@ class Importer {
 
     /// The file the asset value `asset` of the prim `path` names, for
     /// Ernie to read: its resolved path, unpacked first into the
-    /// package cache when it is inside a package (a .usdz's texture),
-    /// and a NanoVDB file beside an OpenVDB one in its place.
+    /// package cache when it is inside a package (a .usdz's texture or
+    /// volume).
     std::string Asset(const std::string& path,
                       const SdfAssetPath& asset) {
-        std::string text = AssetText(asset);
-        if (ArIsPackageRelativePath(text)) {
-            text = Unpacked(path, text);
-        }
-        if (TfStringEndsWith(text, ".vdb")) {
-            const std::filesystem::path nanovdb =
-                std::filesystem::path(text).replace_extension(
-                    ".nvdb");
-            std::error_code error;
-            if (std::filesystem::exists(nanovdb, error)) {
-                return nanovdb.string();
-            }
-            Warn(
-                path + ": " + text +
-                " is OpenVDB, which Ernie does not read; convert it "
-                "to " +
-                nanovdb.filename().string() +
-                " beside it with nanovdb_convert (without -z or -b)");
-        }
-        return text;
+        const std::string text = AssetText(asset);
+        return ArIsPackageRelativePath(text) ? Unpacked(path, text)
+                                             : text;
     }
 
     /// The file inside a package at the package-relative path

@@ -96,6 +96,30 @@ struct NanoVdbGrid {
 std::vector<NanoVdbGrid>
 ReadNanoVdb(const std::filesystem::path& path);
 
+/// Every grid in an OpenVDB file (.vdb), in file order, read with
+/// OpenVDB and converted to NanoVDB with NanoVDB's tools, statistics
+/// included. A grid of a type NanoVDB lacks (strings, say) keeps its
+/// place and name, of type `Unknown` without a buffer.
+///
+/// References:
+/// - K. Museth, "VDB: High-Resolution Sparse Volumes with Dynamic
+///   Topology", ACM Transactions on Graphics 32(3), 27, 2013.
+///   https://doi.org/10.1145/2487228.2487235
+/// - nanovdb/tools/CreateNanoGrid.h (`openToNanoVDB`), OpenVDB
+///   13.1.0.
+/// @throws std::runtime_error if the file cannot be read, or Ernie
+/// was built without OpenVDB (`ERNIE_OPENVDB` off).
+std::vector<NanoVdbGrid>
+ReadOpenVdb(const std::filesystem::path& path);
+
+/// Whether Ernie was built with OpenVDB (`ERNIE_OPENVDB`), so that
+/// `ReadOpenVdb` reads files.
+bool OpenVdbAvailable();
+
+/// The grids of a volume file: an OpenVDB file (.vdb, `ReadOpenVdb`)
+/// or a NanoVDB one (`ReadNanoVdb`).
+std::vector<NanoVdbGrid> ReadGrids(const std::filesystem::path& path);
+
 /// The grids of a raw NanoVDB buffer, one or more grids back to back
 /// as NanoVDB keeps them in memory (Warp's `Volume.array()`).
 /// @throws std::runtime_error if the buffer does not start with a

@@ -246,6 +246,14 @@ jobs:
           path: .deps/openusd-*/
           key: openusd-${{ runner.os == 'macOS' && 'macos' || format('linux-{0}', matrix.cc) }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
           fail-on-cache-miss: true
+      # OpenVDB with oneTBB, Blosc and zlib (cmake/third_party/openvdb.cmake), built once per
+      # compiler and pin; its install directory is named for both.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .deps/openvdb-*/
+            !.deps/openvdb-work
+          key: openvdb-${{ matrix.name }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openvdb*.cmake') }}
       - name: Configure
         if: runner.os == 'Linux'
         run: >
@@ -354,6 +362,12 @@ jobs:
             .deps/*-src
             .deps/*-subbuild
           key: deps-${{ hashFiles('cmake/third_party/**') }}
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .deps/openvdb-*/
+            !.deps/openvdb-work
+          key: openvdb-sanitize-${{ hashFiles('cmake/third_party/openvdb*.cmake') }}
       - name: Configure
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo

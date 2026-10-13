@@ -759,7 +759,7 @@ VolumePass::Load(const VolumeFieldParams& field,
     auto found = grids_.find(key);
     if (found == grids_.end() || found->second.written != written) {
         ERNIE_ZONE("Volume grid read");
-        const std::vector<NanoVdbGrid> grids = ReadNanoVdb(path);
+        const std::vector<NanoVdbGrid> grids = ReadGrids(path);
         const NanoVdbGrid* grid =
             FindNanoVdbGrid(grids, field.gridName, field.gridIndex);
         if (grid == nullptr) {
