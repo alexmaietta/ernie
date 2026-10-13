@@ -5,6 +5,7 @@
 #include "ernie/scene/schema.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
+#include "ernie/session/resolve.h"
 
 #include <algorithm>
 #include <cmath>
@@ -192,8 +193,8 @@ void SetIfChanged(Scene& scene, const Path& path,
 
 }  // namespace
 
-void UpdateSessionLights(Scene& scene,
-                         const glm::dmat4& cameraWorld) {
+void UpdateSessionLights(Scene& scene, const glm::dmat4& cameraWorld,
+                         double illuminance) {
     if (!scene.Has(DefaultLightPath())) {
         scene.Define(DefaultLightPath(), tokens::kDistantLight)
             .Set(tokens::kTransform,
@@ -211,6 +212,38 @@ void UpdateSessionLights(Scene& scene,
     }
     SetIfChanged(scene, CameraLightPath(), tokens::kTransform,
                  LocalFromWorld(scene, CameraLightPath(), rotation));
+    if (illuminance > 0.0) {
+        for (const Path& light :
+             {CameraLightPath(), DefaultLightPath()}) {
+            SetIfChanged(scene, light,
+                         tokens::kPhotometricIlluminance,
+                         illuminance);
+        }
+    }
+}
+
+double KeyIlluminance(const Scene& scene) {
+    double key = 0.0;
+    for (const Path& path : scene.Prims(tokens::kDistantLight)) {
+        if (!IsSessionPath(path) && scene.IsVisible(path)) {
+            try {
+                key = std::max(key, SunIlluminanceOf(scene, path));
+            } catch (const std::invalid_argument&) {
+                // A light that cannot resolve lights nothing.
+            }
+        }
+    }
+    return key > 0.0 ? key : M_PI;
+}
+
+double KeyedExposureTime(const CameraParams& camera,
+                         double illuminance) {
+    // An 18% grey Lambertian surface facing `illuminance` lux has a
+    // luminance of 0.18 E / pi; keyed, it shows 0.18.
+    CameraParams perSecond = camera;
+    perSecond.exposureStops = 0.0;
+    perSecond.exposureTime = 1.0;
+    return M_PI / (illuminance * perSecond.LinearExposureScale());
 }
 
 bool HasStageLights(const Scene& scene) {

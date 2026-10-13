@@ -29,7 +29,10 @@
 namespace ernie::app {
 
 /// How the viewport lights the scene. The viewer opens with `Stage`
-/// when the scene has lights and `Default` otherwise.
+/// when the scene has lights and `Default` otherwise. The `Camera`
+/// and `Default` lights are as bright as the active camera's exposure
+/// needs to show an 18% grey surface facing them at middle grey: a
+/// sun's illuminance through a camera set for daylight.
 enum class Lighting {
     Stage,    ///< The scene's own lights, as a headless render draws
               ///< them; black without any.
@@ -598,7 +601,9 @@ class Viewer {
     /// fraction of a second), `Camera` (the default) takes the
     /// camera's own exposure attributes as they are, and `Default` is
     /// automatic through the viewer's own camera and the camera's own
-    /// through a scene camera.
+    /// through a scene camera. The viewer's own camera keys its
+    /// exposure time to the scene's brightest DistantLight
+    /// (`app::KeyIlluminance`) until something else sets it.
     enum class Exposure { Default, Auto, Camera };
     Exposure GetExposure() const;
     void SetExposure(Exposure exposure);

@@ -787,6 +787,26 @@ TEST(SunIrradianceOf, RelativeLightsFollowTheirColourAndTemperature) {
     EXPECT_LT(cool[13], cool[2]);
 }
 
+TEST(SunIlluminanceOf, IsTheLuxOnASurfaceFacingTheLight) {
+    Scene photometric;
+    ernie::DistantLight::Define(photometric, "/Sun")
+        .SetPhotometricIlluminance(100000.0);
+    EXPECT_NEAR(ernie::SunIlluminanceOf(photometric, "/Sun"),
+                100000.0, 1000.0)
+        << "a photometric sun's own illuminance";
+    Scene relative;
+    ernie::DistantLight::Define(relative, "/Sun");
+    EXPECT_NEAR(ernie::SunIlluminanceOf(relative, "/Sun"), M_PI, 0.05)
+        << "a white surface facing intensity 1 reads 1 cd/m^2";
+    Scene physical;
+    ernie::DistantLight::Define(physical, "/Sun")
+        .SetPhysicalIlluminant(std::string(ernie::tokens::kSun))
+        .SetIrradiance(1361.0);
+    EXPECT_NEAR(ernie::SunIlluminanceOf(physical, "/Sun"), 128000.0,
+                10000.0)
+        << "the solar constant's illuminance, about 128 klux";
+}
+
 TEST(OverscanOf, WidensTheRasterViewForDistortion) {
     ernie::CameraParams camera;
     camera.width = 64;

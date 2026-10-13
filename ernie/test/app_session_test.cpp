@@ -334,6 +334,40 @@ TEST(SessionTest, SessionLightsAreDefinedOnceAndFollowTheCamera) {
     LaserLight::Define(scene, "/World/Laser");
     EXPECT_TRUE(HasStageLights(scene))
         << "lasers light the stage too";
+
+    UpdateSessionLights(scene, camera, 2000.0);
+    for (const Path& light :
+         {CameraLightPath(), DefaultLightPath()}) {
+        EXPECT_EQ(
+            scene.Get(light, tokens::kPhotometricIlluminance, 0.0),
+            2000.0)
+            << "the session lights take the illuminance asked";
+    }
+}
+
+TEST(SessionTest, CamerasKeyToTheBrightestSun) {
+    Scene scene;
+    EXPECT_DOUBLE_EQ(KeyIlluminance(scene), M_PI)
+        << "intensity 1's without a sun";
+    UpdateSessionLights(scene, glm::dmat4(1.0), 1e5);
+    EXPECT_DOUBLE_EQ(KeyIlluminance(scene), M_PI)
+        << "the session's own lights do not count";
+    DistantLight::Define(scene, "/World/Sun")
+        .SetPhotometricIlluminance(1e5);
+    DistantLight::Define(scene, "/World/Fill")
+        .SetPhotometricIlluminance(1e3);
+    EXPECT_NEAR(KeyIlluminance(scene), 1e5, 1e3);
+
+    CameraParams camera;
+    camera.exposureStops = 5.0;
+    camera.exposureTime = 0.25;
+    EXPECT_DOUBLE_EQ(KeyedExposureTime(camera, M_PI), 1.0)
+        << "f/1 for 1 s sees intensity 1 at middle grey, whatever "
+           "the compensation";
+    // Sunny 16: about 1/100 s at f/16 and ISO 100 in a bright sun.
+    camera.fStop = 16.0;
+    EXPECT_NEAR(std::log2(KeyedExposureTime(camera, 1e5) / 0.01), 0.0,
+                1.0);
 }
 
 TEST(SessionTest, UnionSkipsMissingBounds) {

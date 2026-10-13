@@ -266,6 +266,13 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
                                    const Path& light,
                                    const SpectralBands& bands);
 
+/// The illuminance in lux the DistantLight at `light` gives a surface
+/// facing it: 683 lm/W times its spectral irradiance
+/// (`SunIrradianceOf`) weighted by the CIE photopic luminosity
+/// function.
+/// @throws std::invalid_argument as `SunIrradianceOf`.
+double SunIlluminanceOf(const Scene& scene, const Path& light);
+
 /// The DistantLight or SphereLight at `path` as a `Light` for
 /// `bands`:
 /// - distant: towards the light along its +z axis, its spectrum as

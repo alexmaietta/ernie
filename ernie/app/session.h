@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include "ernie/scene/camera.h"
 #include "ernie/scene/orbit_controller.h"
 #include "ernie/scene/path.h"
 #include "ernie/scene/scene.h"
@@ -83,10 +84,25 @@ const Path& CameraLightPath();
 /// sun from above with shadows.
 const Path& DefaultLightPath();
 
-/// Defines the session lights if missing, and turns the camera light
-/// to shine along the -z axis of `cameraWorld`; sets nothing that is
-/// already so.
-void UpdateSessionLights(Scene& scene, const glm::dmat4& cameraWorld);
+/// Defines the session lights if missing, turns the camera light to
+/// shine along the -z axis of `cameraWorld` and gives both
+/// `illuminance` lux on a surface facing them (when above 0); sets
+/// nothing that is already so.
+void UpdateSessionLights(Scene& scene, const glm::dmat4& cameraWorld,
+                         double illuminance = 0.0);
+
+/// The illuminance in lux a camera keyed to the scene's light expects
+/// on a surface facing it: the brightest visible DistantLight's
+/// outside the session root (`SunIlluminanceOf`), or pi, a light of
+/// intensity 1's, without one.
+double KeyIlluminance(const Scene& scene);
+
+/// The exposure time in seconds that keys `camera` to `illuminance`
+/// lux, its f-stop, ISO and responsivity kept: an 18% grey surface
+/// facing the light shows middle grey before the camera's exposure
+/// stops, which stay its compensation (automatic exposure's too).
+double KeyedExposureTime(const CameraParams& camera,
+                         double illuminance);
 
 /// Whether the scene has a visible light outside the session root.
 bool HasStageLights(const Scene& scene);

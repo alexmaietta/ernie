@@ -515,6 +515,51 @@ struct Viewer::State {
     double compensation = 0.0;
     std::optional<double>
         autoStops;  ///< The automatic exposure's stops, as it adapts.
+    /// The version of the viewer camera's exposure time as last
+    /// keyed to the scene's light (`KeyViewerExposure`), to stop
+    /// keying it once something else sets it.
+    std::optional<std::uint64_t> keyedExposure;
+
+    /// Keys the viewer camera's shutter to the scene's brightest sun
+    /// (`KeyIlluminance`, `KeyedExposureTime`), so sunlit and studio
+    /// scenes alike open exposed, until a script or the Properties
+    /// panel sets its exposure time. Its exposure stops stay
+    /// compensation.
+    void KeyViewerExposure() {
+        const Path& camera = PerspectiveCamera();
+        if (!scene.Has(camera)) {
+            return;
+        }
+        const std::uint64_t version =
+            scene.AttributeVersion(camera, tokens::kExposureTime);
+        if (keyedExposure && version != 0 &&
+            version != *keyedExposure) {
+            return;
+        }
+        const double time = KeyedExposureTime(
+            CameraParamsOf(scene, camera, ViewportWidth(),
+                           ViewportHeight()),
+            KeyIlluminance(scene));
+        if (const Value* current =
+                scene.Get(camera, tokens::kExposureTime);
+            current == nullptr || !(*current == Value(time))) {
+            scene.Set(camera, tokens::kExposureTime, time);
+        }
+        keyedExposure =
+            scene.AttributeVersion(camera, tokens::kExposureTime);
+    }
+
+    /// The illuminance of the session lights: what an 18% grey
+    /// surface facing them needs to show middle grey through the
+    /// active camera, within a starlit night's and a bright day's.
+    double SessionLightIlluminance() {
+        const double scale =
+            CameraParamsOf(scene, activeCamera, ViewportWidth(),
+                           ViewportHeight())
+                .LinearExposureScale();
+        return scale > 0.0 ? std::clamp(M_PI / scale, 1e-3, 2e5)
+                           : M_PI;
+    }
 
     bool AutoExposing() const {
         return exposure == Viewer::Exposure::Auto ||
@@ -1119,6 +1164,7 @@ struct Viewer::State {
     void ResetSession() {
         SetSelection({});
         history.Reset();
+        keyedExposure.reset();
         if (!settingsChosen || !scene.Has(settingsSource)) {
             settingsSource = FirstUserSettings();
         }
@@ -3868,8 +3914,10 @@ struct Viewer::State {
                                        theme.background.b, 1.0f}};
         bool drawn = false;
         try {
+            KeyViewerExposure();
             UpdateSessionLights(scene,
-                                scene.WorldTransform(activeCamera));
+                                scene.WorldTransform(activeCamera),
+                                SessionLightIlluminance());
             std::map<std::string, Value, std::less<>> overrides;
             overrides.emplace(tokens::kCameraRel, activeCamera);
             if (lighting == Lighting::Camera) {

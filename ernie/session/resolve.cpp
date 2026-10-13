@@ -1450,6 +1450,19 @@ std::vector<float> SunIrradianceOf(const Scene& scene,
                                 LightIntensity(sun));
 }
 
+double SunIlluminanceOf(const Scene& scene, const Path& light) {
+    // 10 nm bands over the CIE function's range.
+    const SpectralBands visible{360.0, 830.0, 47};
+    const std::vector<float> irradiance =
+        SunIrradianceOf(scene, light, visible);
+    double lux = 0.0;
+    for (int band = 0; band < visible.count; ++band) {
+        lux += static_cast<double>(irradiance[band]) *
+               CieXyz(visible.Centre(band)).y;
+    }
+    return kLuminousEfficacy * lux * visible.Width();
+}
+
 namespace {
 
 /// A laser line's spectral power per band of `bands`, W nm^-1: a

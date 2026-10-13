@@ -354,9 +354,9 @@ def test_create_makes_every_type_and_undoes(viewer):
 
 
 def test_auto_exposure_keys_bright_scenes_to_middle_grey():
-    # A grey cube under 100,000 lux: through the viewer's camera
-    # (exposure 1, f/1, 1 s) the camera's own exposure is white;
-    # automatic exposure brings it to the middle.
+    # A grey cube under 100,000 lux: automatic exposure brings it to
+    # the middle, as does the viewer camera's own, its shutter keyed
+    # to the sun; a 1 s exposure at f/1 is white.
     image_module = pytest.importorskip("PIL.Image")
     scene = cube_scene(lit=False)
     scene.define(
@@ -407,4 +407,12 @@ def test_auto_exposure_keys_bright_scenes_to_middle_grey():
     viewer.exposure = app.Exposure.CAMERA
     assert not viewer.auto_exposing
     viewer.step()
-    assert centre() == 255, "the camera's own exposure: blown out"
+    # The viewer's camera keys its shutter to the sun.
+    camera = app.Viewer.perspective_camera
+    assert scene.get(camera, "exposure:time") == pytest.approx(
+        math.pi / 100000.0, rel=0.02
+    )
+    assert 60 < centre() < 220, "the camera's own exposure, keyed"
+    scene.set(camera, "exposure:time", 1.0)
+    viewer.step()
+    assert centre() == 255, "a 1 s exposure in the sun: blown out"
