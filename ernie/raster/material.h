@@ -129,18 +129,22 @@ std::shared_ptr<const MaterialTexture>
 UploadMaterialTexture(const VulkanContext& context,
                       const TextureData& prepared);
 
-/// Whether `file` is an 8-bit PNG or JPEG with a side over
-/// `kVirtualTextureSide`, which albedo reads as a virtual texture:
-/// prepared in 8 bits (`PrepareLargeAlbedo`), since as floats a
-/// 21600 x 10800 Earth would be 3.7 GB.
-bool IsLargeImageFile(const std::filesystem::path& file);
+/// Whether albedo from `file` is baked a band of rows at a time into
+/// a DDS file and read as a virtual texture of it (`BakeAlbedo`):
+/// rasters read in parts (TIFF, PDS3 and `.mosaic` files), and 8-bit
+/// PNG and JPEG with a side over `kVirtualTextureSide`, which as
+/// floats would be too large (a 21600 x 10800 Earth, 3.7 GB).
+bool IsBakedImageFile(const std::filesystem::path& file);
 
-/// The albedo of such a file as `PrepareMaterialTexture` would make
-/// it, in 8 bits throughout (`LoadRgba8Mips`): sRGB, or the bytes as
-/// linear values (UNORM) when `reader` reads it raw.
-/// @throws std::runtime_error if it cannot be read.
-PreparedTexture PrepareLargeAlbedo(const std::filesystem::path& file,
-                                   const TextureReader& reader);
+/// Begins baking albedo `file` into DDS file `output` as
+/// `PrepareMaterialTexture` and BC7 would store it: sRGB, or the
+/// bytes as linear values when `reader` reads it raw; encoded with
+/// `encoder` where given, else on the CPU (`RasterBake`).
+/// @throws what `OpenRaster` and `RasterBake` throw.
+std::unique_ptr<RasterBake>
+BakeAlbedo(const std::filesystem::path& file,
+           const std::filesystem::path& output,
+           const TextureReader& reader, BlockEncoder* encoder);
 
 /// `prepared` as a DDS file stores it (`TextureCache`).
 TextureData StoredOf(const PreparedTexture& prepared);

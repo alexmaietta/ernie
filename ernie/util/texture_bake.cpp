@@ -482,6 +482,15 @@ TextureData BakeTexture(const std::filesystem::path& input,
                        return static_cast<char>(std::tolower(c));
                    });
     const std::string name = input.string();
+    // Rasters read in parts bake a band at a time.
+    if (extension == ".tif" || extension == ".tiff" ||
+        extension == ".img" || extension == ".lbl" ||
+        extension == ".mosaic") {
+        RasterBake bake(OpenRaster(input), output, options);
+        while (!bake.Step(~std::uint64_t{0}, true)) {
+        }
+        return LoadTextureFile(output);
+    }
     if (options.role != TextureRole::Normal &&
         (extension == ".png" || extension == ".jpg" ||
          extension == ".jpeg") &&

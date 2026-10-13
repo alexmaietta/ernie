@@ -1031,8 +1031,8 @@ TEST_F(RasterDelegateTest,
         EXPECT_GT(green[i + 1], green[i + 2]) << "texel " << i / 3;
     }
     ernie::RenderSettings(scene, "/Render/Settings")
-        std::vector<std::filesystem::path>
-            entries;
+        .SetTextureLoadingDebug(false);
+    std::vector<std::filesystem::path> entries;
     for (const auto& entry :
          std::filesystem::directory_iterator(cache)) {
         entries.push_back(entry.path());
@@ -1059,6 +1059,78 @@ TEST_F(RasterDelegateTest,
     }
     UnsetEnv("ERNIE_TEXTURE_CACHE");
     std::filesystem::remove_all(cache);
+}
+
+TEST_F(RasterDelegateTest,
+       MosaicAlbedosBakeIntoTheirCacheAsOneImage) {
+    // A .mosaic of 2 x 2 tiles, red, green, blue and white: baked a
+    // band at a time into the texture cache, it renders as the tensor
+    // of the tiles joined does.
+    if (!context_->SupportsTextureCompressionBc()) {
+        GTEST_SKIP() << "The device cannot sample BC7";
+    }
+    const std::filesystem::path dir =
+        std::filesystem::path(::testing::TempDir()) / "mosaic_albedo";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir / "cache");
+    SetEnv("ERNIE_TEXTURE_CACHE", (dir / "cache").string().c_str());
+    constexpr int kTile = 64;
+    const std::array<std::array<std::uint8_t, 3>, 4> colours{
+        {{230, 20, 20},
+         {20, 230, 20},
+         {20, 20, 230},
+         {230, 230, 230}}};
+    std::vector<std::uint8_t> joined(4 * kTile * kTile * 4);
+    for (int tile = 0; tile < 4; ++tile) {
+        const auto& c = colours[static_cast<std::size_t>(tile)];
+        std::vector<std::uint8_t> texels;
+        for (int i = 0; i < kTile * kTile; ++i) {
+            texels.insert(texels.end(), {c[0], c[1], c[2], 255});
+        }
+        const std::string name =
+            "tile" + std::to_string(tile) + ".png";
+        ASSERT_NE(stbi_write_png((dir / name).string().c_str(), kTile,
+                                 kTile, 4, texels.data(), kTile * 4),
+                  0);
+        for (int y = 0; y < kTile; ++y) {
+            std::copy_n(texels.data() + y * kTile * 4, kTile * 4,
+                        joined.data() +
+                            ((tile / 2 * kTile + y) * 2 * kTile +
+                             tile % 2 * kTile) *
+                                4);
+        }
+    }
+    {
+        std::ofstream file(dir / "world.mosaic");
+        file << "tile0.png tile1.png\ntile2.png tile3.png\n";
+    }
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetWrapS("clamp")
+        .SetWrapT("clamp")
+        .SetTexture(Tensor::Copy<std::uint8_t>(
+            joined, {2 * kTile, 2 * kTile, 4}));
+    RasterDelegate twin(*context_);
+    const std::vector<float> expected = Quadrants(twin, scene);
+    scene.Clear("/Looks/M/Tex", tokens::kShaderTexture);
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetFile((dir / "world.mosaic").string());
+    RasterDelegate delegate(*context_);
+    const std::vector<float> mosaic = Quadrants(delegate, scene);
+    for (std::size_t i = 0; i < mosaic.size(); ++i) {
+        EXPECT_NEAR(mosaic[i], expected[i],
+                    0.03f * expected[i] + 1e-3f)
+            << "value " << i;
+    }
+    std::size_t cached = 0;
+    for (const auto& entry :
+         std::filesystem::directory_iterator(dir / "cache")) {
+        EXPECT_EQ(entry.path().extension(), ".dds");
+        ++cached;
+    }
+    EXPECT_EQ(cached, 1u);
 }
 
 TEST_F(RasterDelegateTest, WaitForTexturesFinishesTheirLoading) {

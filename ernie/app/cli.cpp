@@ -99,9 +99,10 @@ int BakeTextureMain(std::span<const std::string> args) {
         R"(Usage: ernie bake-texture input output.dds [options]
        ernie bake-texture --mosaic 4x2 tile1.png ... tile8.png output.dds [options]
 
-Bakes a PNG, JPEG or EXR image into a DDS file for Ernie's textures: every mip, filtered as its
-role says, then block-compressed (BC7 for colour and data, BC5 for normal maps), as virtual
-textures (ernie:virtualTexture) need.
+Bakes a PNG, JPEG, EXR, TIFF or PDS3 image, or a .mosaic of tiles, into a DDS file for Ernie's
+textures: every mip, filtered as its role says, then block-compressed (BC7 for colour and data,
+BC5 for normal maps), as virtual textures (ernie:virtualTexture) need. TIFF, PDS3 and .mosaic
+inputs bake a band of rows at a time, so may be larger than memory.
 
   --role colour|normal|data    what the image holds (default colour: sRGB colour)
   --format bc1|bc3|bc4|bc5|bc7|rgba8

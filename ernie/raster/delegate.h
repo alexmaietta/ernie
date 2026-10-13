@@ -328,9 +328,11 @@ class RasterDelegate : public RenderDelegate {
         /// memory taken) on the loader thread rather than the
         /// frame's.
         std::optional<TextureCompression> compression;
-        /// A large albedo (`IsLargeImageFile`), prepared in 8 bits,
-        /// read with `reader` as a virtual texture.
-        bool large = false;
+        /// In place of `prepared`, an albedo baked a band at a time
+        /// (`IsBakedImageFile`) into `output`, to read with `reader`
+        /// as a virtual texture.
+        std::shared_ptr<RasterBake> bake;
+        std::filesystem::path output;
         TextureReader reader;
     };
 
@@ -497,12 +499,16 @@ class RasterDelegate : public RenderDelegate {
     /// Uploads an image file's prepared texture, as stored
     /// (`StoredOf`), under `key` (`UploadKey`); with `cache` (a BC7
     /// one just compressed) a loader thread also writes it to
-    /// `textureCache_`. A large albedo (`large`, its reader) reads as
-    /// a virtual texture of it.
+    /// `textureCache_`.
     std::shared_ptr<const MaterialTexture>
     UploadPrepared(std::shared_ptr<const TextureData> stored,
-                   const std::string& key, bool cache,
-                   const TextureReader* large = nullptr);
+                   const std::string& key, bool cache);
+    /// The texture of an albedo bake finished into `output` (moved
+    /// into `textureCache_` under `key`), mapped, read with `reader`
+    /// as a virtual texture.
+    std::shared_ptr<const MaterialTexture>
+    UploadBaked(const std::filesystem::path& output,
+                const std::string& key, const TextureReader& reader);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -773,10 +779,12 @@ class RasterDelegate : public RenderDelegate {
         loadingTextures_;
     std::map<std::string, std::string> failedTextures_;
     /// Image files' textures loaded and being compressed to BC7 a
-    /// part a frame (`FinishTextureLoads`), by upload key.
+    /// part a frame (`FinishTextureLoads`), by upload key: a
+    /// compression, or an albedo's bake into `output`.
     struct CompressingTexture {
-        TextureCompression compression;
-        bool large = false;
+        std::optional<TextureCompression> compression;
+        std::shared_ptr<RasterBake> bake;
+        std::filesystem::path output;
         TextureReader reader;
     };
     std::map<std::string, CompressingTexture> compressingTextures_;

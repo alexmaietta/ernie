@@ -90,7 +90,7 @@ Rgba8ImageSize(const std::filesystem::path& file);
 std::vector<std::vector<std::uint8_t>>
 LoadRgba8Mips(const std::filesystem::path& file, bool srgb);
 
-/// Bakes the PNG, JPEG or EXR image `input` into a DDS file `output`
+/// Bakes the image `input` into a DDS file `output`
 /// for Ernie's textures: every mip down to 1 x 1, filtered as its
 /// role says before compression, stored as `options` says; what
 /// virtual textures need (`ernie:virtualTexture`), and a quarter to
@@ -100,7 +100,9 @@ LoadRgba8Mips(const std::filesystem::path& file, bool srgb);
 /// 8-bit PNG and JPEG colour and data bake in 8 bits, each mip made
 /// from the last and dropped once encoded (about 4 bytes a texel of
 /// the image beyond the output); normal maps, EXR and 16-bit images
-/// through floats (16 bytes a texel for every mip).
+/// through floats (16 bytes a texel for every mip). TIFF, PDS3 and
+/// `.mosaic` colour and data bake a band at a time (`RasterBake`),
+/// the stored texture returned mapped from `output`.
 ///
 /// References:
 /// - R. Geldreich, "bc7enc_rdo" (bc7enc and rgbcx).

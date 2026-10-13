@@ -8,6 +8,7 @@
 #include <glm/gtc/packing.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -645,24 +646,31 @@ PreparedOf(const TextureData& texture) {
     return out;
 }
 
-bool IsLargeImageFile(const std::filesystem::path& file) {
+bool IsBakedImageFile(const std::filesystem::path& file) {
+    std::string extension = file.extension().string();
+    std::transform(extension.begin(), extension.end(),
+                   extension.begin(), [](unsigned char c) {
+                       return static_cast<char>(std::tolower(c));
+                   });
+    if (extension == ".tif" || extension == ".tiff" ||
+        extension == ".img" || extension == ".lbl" ||
+        extension == ".mosaic") {
+        return true;
+    }
     const std::optional<glm::uvec2> size = Rgba8ImageSize(file);
     return size && std::max(size->x, size->y) > kVirtualTextureSide;
 }
 
-PreparedTexture PrepareLargeAlbedo(const std::filesystem::path& file,
-                                   const TextureReader& reader) {
-    ERNIE_ZONE("Prepare large albedo");
-    const glm::uvec2 size =
-        Rgba8ImageSize(file).value_or(glm::uvec2(0));
-    const bool raw = reader.colorSpace == TextureColorSpace::Raw;
-    PreparedTexture prepared;
-    prepared.width = size.x;
-    prepared.height = size.y;
-    prepared.format =
-        raw ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_R8G8B8A8_SRGB;
-    prepared.mips = LoadRgba8Mips(file, !raw);
-    return prepared;
+std::unique_ptr<RasterBake>
+BakeAlbedo(const std::filesystem::path& file,
+           const std::filesystem::path& output,
+           const TextureReader& reader, BlockEncoder* encoder) {
+    ERNIE_ZONE("Begin albedo bake");
+    BakeOptions options;
+    options.srgb = reader.colorSpace != TextureColorSpace::Raw;
+    options.encoder = encoder;
+    return std::make_unique<RasterBake>(OpenRaster(file), output,
+                                        options);
 }
 
 std::shared_ptr<const MaterialTexture>
