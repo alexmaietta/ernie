@@ -34,8 +34,8 @@
 // relative to the mesh's, index count, error in mesh units as bits, unused), 10 the views' depth
 // pyramids (one layer per view of the chunk), 11 each view's visibility of each instance in its
 // previous frame, one bit per (view, instance id), 12 meshes' points and triangle indices in use
-// (int32 pairs by slot, `CullItem.info.w`). Of those, 7, 8, 10 and 11 are bound; the rest are read
-// by address.
+// (int32 pairs by slot, `CullItem.info.w`), 13 whether each instance is drawn (`kHasVisibility`).
+// Of those, 7, 8, 10 and 11 are bound; the rest are read by address.
 //
 // References:
 // - U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015 Advances in
@@ -97,6 +97,8 @@ struct CullConstants {
     float* scales;
     uint4* lods;
     int* activeCounts;
+    // Whether each instance is drawn, double-buffered as `positions` (flag kHasVisibility).
+    float* visible;
 }
 
 // Bindings, what it writes (atomically) and the depth pyramids: 7 the visible instance ids, 8
@@ -115,6 +117,7 @@ static float* orientations = constants.orientations;
 static float* scales = constants.scales;
 static uint4* lods = constants.lods;
 static int* activeCounts = constants.activeCounts;
+static float* visible = constants.visible;
 
 static const uint kGroup = 64;
 static const uint kMaxLods = 8;
@@ -125,6 +128,8 @@ static const uint kMoved = 4;  // the instancer's transform moved since the last
 // A draw without an instancer: its one instance is its transform's, with no instance arrays
 // or ids to read.
 static const uint kNoInstances = 8;
+// Its instances may be hidden, each by `visible` (0 hides it): those are never kept.
+static const uint kHasVisibility = 16;
 
 static const uint kFrustum = 0;
 static const uint kOccluders = 1;
@@ -349,7 +354,9 @@ void cullMain(uint3 group : SV_GroupID, uint thread : SV_GroupIndex) {
         if (k < job.range.z) {
             id = (asuint(item.info.y) & kNoInstances) != 0 ? 0u : instanceIds[job.range.y + k];
             let placed = place(item, id);
-            var keep = inFrustum(placed, view);
+            let hidden = (asuint(item.info.y) & kHasVisibility) != 0 &&
+                         visible[item.lods.z + id] == 0.0;
+            var keep = !hidden && inFrustum(placed, view);
             if (mode == kOccluders) {
                 keep = keep && !occluded(placed, view, layer);
             } else if (mode == kTwoPassFirst) {

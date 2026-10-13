@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// A field of cubes riding a travelling wave, every cube's pose and
-// colour written each frame as two columns (one array each, mapped and
-// written in place): one change per array however many cubes.
+// A field of cubes riding a travelling wave, every cube's pose, colour
+// and temperature (seen with thermal emission on) written each frame
+// as three columns (one array each, mapped and written in place): one
+// change per array however many cubes.
 
 #include "ernie/app/demo.h"
 #include "ernie/app/viewer.h"
@@ -76,6 +77,8 @@ class ColumnsDemo : public app::Demo {
         poses_ = scene.GetColumn(field, tokens::kTranslate);
         colours_ = scene.GetColumn(field, tokens::kDisplayColor);
         colours_.Write(Tensor::Zeros(DType::Float32, {kSide * kSide, 3}));
+        kelvin_ = scene.GetColumn(field, tokens::kThermalTemperature);
+        kelvin_.Write(Tensor::Zeros(DType::Float32, {kSide * kSide}));
         Place();
     }
 
@@ -100,16 +103,18 @@ class ColumnsDemo : public app::Demo {
         Place();
         std::vector<ColumnChange> columns;
         const std::vector<Change> rest = GetScene().Changes(cursor, columns);
-        Check(columns.size() == 2 && rest.empty(),
-              "a frame's writes are two column changes, none per cube");
+        Check(columns.size() == 3 && rest.empty(),
+              "a frame's writes are three column changes, none per cube");
     }
 
   private:
-    /// Every cube's row of both columns, written in place.
+    /// Every cube's row of each column, written in place: crests warm
+    /// (350 K), troughs cold (250 K).
     void Place() {
         const Device host{};
         float* poses = poses_.Map(host).As<float>();
         float* colours = colours_.Map(host).As<float>();
+        float* kelvin = kelvin_.Map(host).As<float>();
         for (int i = 0; i < kSide * kSide; ++i) {
             const glm::dvec3 p = PlaceAt(i, time_);
             const glm::dvec3 c = ColourAt(p.z);
@@ -117,18 +122,21 @@ class ColumnsDemo : public app::Demo {
                 poses[3 * i + k] = static_cast<float>(p[k]);
                 colours[3 * i + k] = static_cast<float>(c[k]);
             }
+            kelvin[i] = static_cast<float>(300.0 + 50.0 * p.z / kAmplitude);
         }
         poses_.Unmap();
         colours_.Unmap();
+        kelvin_.Unmap();
     }
 
     Column poses_;
     Column colours_;
+    Column kelvin_;
     double time_ = 0.0;
 };
 
 }  // namespace
 
 ERNIE_REGISTER_DEMO(ColumnsDemo, "batched", "columns",
-                    "4096 cubes riding a wave, every pose and colour "
-                    "written each frame as two columns.");
+                    "4096 cubes riding a wave, every pose, colour and "
+                    "temperature written each frame as three columns.");

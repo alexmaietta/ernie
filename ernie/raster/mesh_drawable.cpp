@@ -132,8 +132,9 @@ struct CullConstants {
     VkDeviceAddress scales;
     VkDeviceAddress lods;
     VkDeviceAddress activeCounts;
+    VkDeviceAddress visible;  ///< Instances' visibility, if any.
 };
-static_assert(sizeof(CullConstants) == 104,
+static_assert(sizeof(CullConstants) == 112,
               "CullConstants must match cull.slang");
 
 /// active_draws.slang's bindings: counts in use and the draws.
@@ -360,6 +361,8 @@ constexpr std::uint32_t kCullMoved =
     4;  ///< The instancer's transform moved since the last frame.
 /// A draw without an instancer: its one instance is its transform's.
 constexpr std::uint32_t kCullNoInstances = 8;
+/// Its instancer hides some instances (`instanceVisible_`): never kept.
+constexpr std::uint32_t kCullVisibility = 16;
 
 /// Grows `buffer` to hold `bytes`, waiting for the device first if it
 /// replaces one in use.
@@ -4559,6 +4562,9 @@ void MeshDrawable::WriteCullItems() {
                      : !instancer.data.scales.empty())) {
                 flags |= kCullScales;
             }
+            if (HasInstanceVisibility(instancer)) {
+                flags |= kCullVisibility;
+            }
         }
         std::memcpy(&entry.info[1], &flags, sizeof(flags));
         PoseCullItem(entry, transforms_[i], previousTransforms_[i],
@@ -4725,7 +4731,9 @@ void MeshDrawable::Dispatch(VkCommandBuffer commands, VkImageView hzb,
         orientations_->Address(),
         scales_->Address(),
         cullLevelBuffer_->Address(),
-        activeCounts_->Address()};
+        activeCounts_->Address(),
+        instanceVisible_ != nullptr ? instanceVisible_->Address()
+                                    : VkDeviceAddress{0}};
     cullLayout_.PushConstants(commands, &constants,
                               sizeof(constants));
     vkCmdDispatch(commands, groupsX, groupsY, 1);

@@ -3190,3 +3190,40 @@ TEST_F(RasterDelegateTest, ShadowLinksChooseWhatCastsALampsShadows) {
     EXPECT_NEAR(RadianceAt(delegate, scene, 3.0f, 0.0f), lit,
                 0.02f * lit);
 }
+
+TEST_F(RasterDelegateTest, ColumnsOfTemperatureHeatTheirInstances) {
+    // Three cubes posed as one group by a column of translations, a
+    // column of temperatures each theirs: the middle one, under the
+    // view's centre, reads its row, written again whole.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    ernie::Material(scene, "/Looks/Grey").SetThermalTemperature(300.0);
+    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    const std::vector<ernie::Path> cubes = {"/World/Box0", "/World/Box1",
+                                            "/World/Box2"};
+    std::vector<float> rows;
+    for (int i = 0; i < 3; ++i) {
+        const float x = -40.0f + 40.0f * static_cast<float>(i);
+        ernie::Cube::Define(scene, cubes[static_cast<std::size_t>(i)])
+            .SetSize(20.0)
+            .SetMaterialBinding("/Looks/Grey")
+            .SetXform({.translate = {x, 0.0, 10.0}});
+        rows.insert(rows.end(), {x, 0.0f, 10.0f});
+    }
+    const ernie::PrimSet boxes(cubes);
+    scene.GetColumn(boxes, tokens::kTranslate)
+        .Write(Tensor::Copy<float>(rows, {3, 3}));
+    ernie::Column kelvin = scene.GetColumn(boxes, tokens::kThermalTemperature);
+    const std::vector<float> warm = {310.0f, 420.5f, 530.0f};
+    kelvin.Write(Tensor::Copy<float>(warm, {3}));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto centre = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return At<float>(MapVars(outputs).at("Temperature"), c, c, 0);
+    };
+    EXPECT_NEAR(centre(), 420.5f, 1e-3);
+    const std::vector<float> hot = {310.0f, 777.25f, 530.0f};
+    kelvin.Write(Tensor::Copy<float>(hot, {3}));
+    EXPECT_NEAR(centre(), 777.25f, 1e-3);
+}

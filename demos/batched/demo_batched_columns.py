@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""A field of cubes riding a travelling wave, every cube's pose and
-colour written each frame as two columns (one array each, mapped and
-written in place): one change per array however many cubes. With
+"""A field of cubes riding a travelling wave, every cube's pose, colour
+and temperature (seen with thermal emission on) written each frame as
+three columns (one array each, mapped and written in place): one
+change per array however many cubes. With
 `--rows cuda` the wave is computed with PyTorch on the GPU and
 written into the renderer's own arrays."""
 
@@ -21,10 +22,10 @@ SPEED = 6.0  # m/s
 
 
 def wave(t, xp, device=None):
-    """Every cube's place and colour at `t` seconds, (n, 3) float32
-    arrays of `xp` (NumPy, or PyTorch on `device`): on the grid, lifted
-    by a ring wave travelling out from the centre, blue in its troughs
-    and orange on its crests."""
+    """Every cube's place, colour and temperature at `t` seconds, (n,
+    3), (n, 3) and (n,) arrays of `xp` (NumPy, or PyTorch on `device`):
+    on the grid, lifted by a ring wave travelling out from the centre,
+    blue and 250 K in its troughs, orange and 350 K on its crests."""
     half = 0.5 * (SIDE - 1) * SPACING
     if xp is np:
         i = np.arange(SIDE * SIDE, dtype=np.float64)
@@ -39,7 +40,8 @@ def wave(t, xp, device=None):
     colours = xp.stack(
         [0.1 + 0.9 * h, 0.3 + 0.2 * h, 0.9 - 0.8 * h], 1
     )
-    return places, colours
+    kelvin = 300.0 + 50.0 * z / AMPLITUDE
+    return places, colours, kelvin
 
 
 class Demo(ernie.demo.Demo):
@@ -77,7 +79,7 @@ class Demo(ernie.demo.Demo):
             tokens.TRANSFORM,
             ernie.look_at_transform((0.0, -70.0, 45.0), (0.0, 0.0, 0.0)),
         )
-        places, _ = wave(0.0, np)
+        places = wave(0.0, np)[0]
         paths = []
         for i in range(SIDE * SIDE):
             path = f"/World/Field/Cube{i}"
@@ -90,20 +92,21 @@ class Demo(ernie.demo.Demo):
         self.poses = scene.column(field, tokens.TRANSLATE)
         self.colours = scene.column(field, tokens.DISPLAY_COLOR)
         self.colours.write(np.zeros((SIDE * SIDE, 3), np.float32))
+        self.kelvin = scene.column(field, tokens.THERMAL_TEMPERATURE)
+        self.kelvin.write(np.zeros(SIDE * SIDE, np.float32))
         self.time = 0.0
         self.place()
 
     def place(self):
-        """Every cube's row of both columns, written in place."""
+        """Every cube's row of each column, written in place."""
+        columns = (self.poses, self.colours, self.kelvin)
         if self.device == "cuda":
             torch = self.torch
-            places, colours = wave(self.time, torch, "cuda")
-            for column, rows in ((self.poses, places), (self.colours, colours)):
+            for column, rows in zip(columns, wave(self.time, torch, "cuda")):
                 with column.map("cuda") as mapped:
                     torch.from_dlpack(mapped).copy_(rows)
         else:
-            places, colours = wave(self.time, np)
-            for column, rows in ((self.poses, places), (self.colours, colours)):
+            for column, rows in zip(columns, wave(self.time, np)):
                 with column.map("cpu") as mapped:
                     np.asarray(mapped)[:] = rows
 
@@ -113,7 +116,7 @@ class Demo(ernie.demo.Demo):
 
     def test_post_step(self):
         # Rows read as each cube's own attribute.
-        places, _ = wave(self.time, np)
+        places = wave(self.time, np)[0]
         for i in (0, SIDE * SIDE // 2 + 7, SIDE * SIDE - 1):
             at = self.scene.world_transform(f"/World/Field/Cube{i}")
             assert all(

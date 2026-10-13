@@ -3246,6 +3246,7 @@ void BindScene(nb::module_& m) {
         {"INVISIBLE", tokens::kInvisible},
         {"POINTS", tokens::kPoints},
         {"NORMALS", tokens::kNormals},
+        {"THERMAL_TEMPERATURE", tokens::kThermalTemperature},
         {"THERMAL_TEMPERATURES", tokens::kThermalTemperatures},
         {"THERMAL_NODE_IDS", tokens::kThermalNodeIds},
         {"THERMAL_NODE_TEMPERATURES",
