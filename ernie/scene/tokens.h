@@ -426,6 +426,7 @@ inline constexpr std::string_view kUvSphere = "uv";
 inline constexpr std::string_view kIcosphere = "icosphere";
 inline constexpr std::string_view kCubeSphere = "cubeSphere";
 inline constexpr std::string_view kHealpix = "healpix";
+inline constexpr std::string_view kAdaptiveSphere = "adaptive";
 
 // Material binding (UsdShade MaterialBindingAPI): a Path.
 inline constexpr std::string_view kMaterialBinding =

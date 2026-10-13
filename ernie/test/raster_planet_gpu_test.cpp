@@ -5,6 +5,7 @@
 #include "ernie/raster/planet_drawable.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/dem.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/schema.h"
@@ -530,4 +531,153 @@ TEST_F(RasterDelegateTest, APlanetFromAHeightsFilePagesInItsDetail) {
     EXPECT_EQ(async.Planet().Pages()->Pending(), 0u);
     last = async.Render(streamed);
     EXPECT_LT(differ(last, waited), 0.5);
+}
+
+namespace {
+
+constexpr double kEarth = 6371000.0;
+
+/// An adaptive Sphere of `radius` at `transform`, grey under a Sun
+/// straight down the eye's up `sun`, and the frame's camera of focal
+/// length `focal` at `size` pixels.
+Scene AdaptiveSphereScene(double radius, const glm::dmat4& transform,
+                          const glm::dvec3& sun, std::uint32_t size) {
+    Scene scene;
+    ernie::Sphere::Define(scene, "/World/Body")
+        .SetRadius(radius)
+        .SetTessellation(std::string(tokens::kAdaptiveSphere))
+        .SetMaterialBinding("/Looks/Grey");
+    scene.Set("/World/Body", tokens::kTransform, transform);
+    ernie::Material::Define(scene, "/Looks/Grey")
+        .SetAlbedo(glm::dvec3(0.5));
+    scene.Define("/World/Sun", tokens::kDistantLight)
+        .Set(tokens::kTransform, ernie::DistantLightTransform(sun));
+    ernie::RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(size, size))
+        .SetClearColor(glm::dvec3(0.0, 0.0, 1.0));
+    return scene;
+}
+
+}  // namespace
+
+// An Earth-sized adaptive sphere from a kilometre up, looking level:
+// the horizon lies acos(R / (R + h)) below the view's centre, as the
+// exact sphere's, wherever the body is. A cube sphere's mesh of 16
+// quads a face edge sags kilometres between its vertices, over the
+// eye.
+TEST_F(RasterDelegateTest, AnAdaptiveSpheresHorizonIsTheSpheres) {
+    constexpr std::uint32_t kSide = 128;
+    constexpr double kAltitude = 1000.0;
+    constexpr double kFocal = 100.0;
+    const double dip = std::acos(kEarth / (kEarth + kAltitude));
+    const double halfHeight = 0.5 * 15.2908 / kFocal;
+    const double expected =
+        0.5 * kSide + std::tan(dip) / halfHeight * 0.5 * kSide;
+    for (const glm::dvec3 centre :
+         {glm::dvec3(0.0), glm::dvec3(1.5e11, -4.0e10, 2.0e9)}) {
+        Scene scene = AdaptiveSphereScene(
+            kEarth, glm::translate(glm::dmat4(1.0), centre),
+            {0.3, 0.2, 1.0}, kSide);
+        const glm::dvec3 up(0.0, 0.0, 1.0);
+        const glm::dvec3 eye = centre + (kEarth + kAltitude) * up;
+        ernie::Camera::Define(scene, "/World/Camera")
+            .SetFocalLength(kFocal)
+            .SetClippingRange(glm::dvec2(1.0, 1e8));
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform(
+                      eye, eye + glm::dvec3(1.0, 0.0, 0.0), up));
+        RasterDelegate delegate(*context_);
+        const Tensor image = delegate.Render(scene);
+        EXPECT_EQ(delegate.Spheres().Count(), 1u);
+        EXPECT_GT(delegate.Spheres().PatchCount(), 0u);
+        EXPECT_EQ(delegate.Meshes().DrawCount(0), 0u)
+            << "not drawn as its mesh too";
+        const auto* pixels = image.As<std::uint8_t>();
+        for (const std::uint32_t col : {8u, kSide / 2, kSide - 8}) {
+            std::uint32_t row = 0;
+            while (row < kSide &&
+                   IsClear(pixels + (row * kSide + col) * 4)) {
+                ++row;
+            }
+            EXPECT_NEAR(static_cast<double>(row), expected, 1.5)
+                << "column " << col << " about " << centre.x;
+        }
+    }
+}
+
+// A sphere turned a quarter about x and squashed to half along its
+// own z, seen from +x: its short axis lies across the view, so it
+// stands twice as tall as wide (to within the eye's perspective at
+// three radii).
+TEST_F(RasterDelegateTest,
+       AnAdaptiveSphereScaledUnevenlyIsAnEllipsoid) {
+    const glm::dmat4 transform = glm::scale(
+        glm::rotate(glm::dmat4(1.0), std::numbers::pi / 2.0,
+                    glm::dvec3(1.0, 0.0, 0.0)),
+        glm::dvec3(1.0, 1.0, 0.5));
+    Scene scene =
+        AdaptiveSphereScene(kMoon, transform, {1.0, 0.3, 0.2}, kSize);
+    PlaceCamera(scene, {3.0 * kMoon, 0.0, 0.0}, {0.0, 0.0, 0.0},
+                {0.0, 0.0, 1.0}, {1e4, 1e8});
+    RasterDelegate delegate(*context_);
+    const Tensor image = delegate.Render(scene);
+    const auto* pixels = image.As<std::uint8_t>();
+    std::size_t wide = 0;
+    std::size_t tall = 0;
+    for (std::uint32_t i = 0; i < kSize; ++i) {
+        wide +=
+            IsClear(pixels + (kSize / 2 * kSize + i) * 4) ? 0u : 1u;
+        tall +=
+            IsClear(pixels + (i * kSize + kSize / 2) * 4) ? 0u : 1u;
+    }
+    ASSERT_GT(wide, kSize / 16);
+    EXPECT_NEAR(static_cast<double>(tall) / static_cast<double>(wide),
+                2.0, 0.2);
+}
+
+// An adaptive sphere's albedo texture wraps it by its own latitude
+// and longitude: turned a quarter east about z, the quarter of the
+// map at 45 degrees west (red) faces 45 degrees east.
+TEST_F(RasterDelegateTest, AnAdaptiveSpheresTextureTurnsWithIt) {
+    constexpr std::int64_t kWidth = 64;
+    constexpr std::int64_t kHeight = 32;
+    const std::array<std::array<std::uint8_t, 3>, 4> quarters{
+        {{0, 0, 255}, {255, 0, 0}, {0, 255, 0}, {255, 255, 255}}};
+    std::vector<std::uint8_t> texels;
+    for (std::int64_t row = 0; row < kHeight; ++row) {
+        for (std::int64_t col = 0; col < kWidth; ++col) {
+            const auto& c =
+                quarters[static_cast<std::size_t>(col * 4 / kWidth)];
+            texels.insert(texels.end(), {c[0], c[1], c[2], 255});
+        }
+    }
+    const double quarter = std::numbers::pi / 4.0;
+    const glm::dvec3 towards(std::cos(quarter), std::sin(quarter),
+                             0.0);
+    Scene scene = AdaptiveSphereScene(
+        kMoon,
+        glm::rotate(glm::dmat4(1.0), 2.0 * quarter,
+                    glm::dvec3(0.0, 0.0, 1.0)),
+        towards, kSize);
+    ernie::Shader::Define(scene, "/Looks/Grey/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface)
+        .SetDiffuseColor(glm::dvec3(0.5));
+    ernie::Shader::Define(scene, "/Looks/Grey/Tex")
+        .SetInfoId(tokens::kUsdUVTexture)
+        .SetSourceColorSpace("raw")
+        .SetTexture(
+            Tensor::Copy<std::uint8_t>(texels, {kHeight, kWidth, 4}));
+    ernie::Connect(scene, "/Looks/Grey", tokens::kSurfaceOutput,
+                   "/Looks/Grey/Surface", tokens::kSurfaceOutput);
+    ernie::Connect(scene, "/Looks/Grey/Surface",
+                   tokens::kDiffuseColor, "/Looks/Grey/Tex",
+                   "outputs:rgb");
+    PlaceCamera(scene, 4.0 * kMoon * towards, {0.0, 0.0, 0.0},
+                {0.0, 0.0, 1.0}, {1e4, 1e8});
+    RasterDelegate delegate(*context_);
+    const Tensor image = delegate.Render(scene);
+    const auto* texel = image.As<std::uint8_t>() +
+                        (kSize / 2 * kSize + kSize / 2) * 4;
+    EXPECT_GT(texel[0], 2 * std::max(texel[1], texel[2]) + 10);
 }

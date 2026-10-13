@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """The Sun, its planets and the Moon at their true sizes and distances on a
 chosen date (no motion), lit by the Sun as a sphere light, their orbits
-drawn as overlays split finely where they pass the eye. Each body wears a
-latitude-longitude map streamed as a virtual texture: NASA's where one is
-small enough, else Solar System Scope's (CC BY 4.0, from NASA's data); the
-Sun's own generated, emitted through its material. The panel picks the
-date and a body to go to.
+drawn as overlays split finely where they pass the eye. Each body is an
+adaptive sphere, finer towards the eye, and wears a latitude-longitude map
+streamed as a virtual texture: NASA's where one is small enough, else Solar
+System Scope's (CC BY 4.0, from NASA's data); the Sun's own generated,
+emitted through its material. The panel picks the date and a body to go
+to.
 
 References:
 - E. M. Standish, "Keplerian Elements for Approximate Positions of the
@@ -322,8 +323,7 @@ class Demo(ernie.demo.Demo):
                 f"/World/{name}",
                 ernie.Sphere,
                 radius=equator,
-                tessellation=tokens.CUBE_SPHERE,
-                tessellation_level=64 if i == SUN else 128,
+                tessellation=tokens.ADAPTIVE_SPHERE,
                 material_binding=look,
             )
             scene.define(look, ernie.Material)

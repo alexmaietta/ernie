@@ -34,6 +34,13 @@ public struct PlanetUniforms {
     // height's slope along the directions of increasing column and row, before exaggeration,
     // filterable unlike the heights; zw unused.
     public uint4 textures;
+    // xyz: the body-fixed axes x, y and z in the world's (`TerrainParams::planetRotation`).
+    public float4 rotation[3];
+}
+
+// Body-fixed vector `v` in the world's axes.
+public float3 toWorld(float3 v) {
+    return p.rotation[0].xyz * v.x + p.rotation[1].xyz * v.y + p.rotation[2].xyz * v.z;
 }
 
 [[vk::binding(10, 0)]] public ConstantBuffer<PlanetUniforms> p;
@@ -178,7 +185,8 @@ public float3 surfaceNormal(float3 d) {
 // relative to the frame's origin. Base points lie on the ellipsoid at radius r(d) = body.x /
 // sqrt(q), q = sum d_i^2 shape_i, along direction d; their difference r(d) (d - dA) + (r(d) -
 // r(dA)) dA takes r(d) - r(dA) from q - qA = sum (d - dA)_i (d + dA)_i shape_i rather than
-// subtraction. Heights rise along the ellipsoid's normal.
+// subtraction. Heights rise along the ellipsoid's normal. `anchor` is in the world's axes, the
+// rest in the body's until rotated.
 float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, uint4 page, out float h) {
     float3 direction;
     let offset = directionOffset(face, g, origin, direction);
@@ -192,7 +200,7 @@ float3 surfacePoint(uint face, int2 g, int2 origin, float3 anchor, uint4 page, o
     let dr = -dq / (rootQ * rootQA * (rootQ + rootQA));
     let base = offset / rootQ + dr * directionA;
     h = heightAt(face, g, page);
-    return anchor + p.body.x * base + (h * p.body.y) * surfaceNormal(direction);
+    return anchor + toWorld(p.body.x * base + (h * p.body.y) * surfaceNormal(direction));
 }
 
 public struct PlanetVertex {
@@ -268,7 +276,7 @@ float2 pageSlope(uint4 page, float2 grid) {
 // gradient texture rather than from the mesh, so shading does not change as levels morph; the
 // texture's filtered over the pixel's footprint through its mips (fragment shaders only: it takes
 // screen derivatives), the page's already filtered to its points' spacing. `up` is the ellipsoid's
-// normal there.
+// normal there. Both are in the body's axes (`toWorld`).
 public float3 planetNormal(uint face, float2 grid, uint4 page, out float3 up) {
     let f = faceFrame(face);
     up = surfaceNormal(faceDirection(face, faceCoords(grid)));

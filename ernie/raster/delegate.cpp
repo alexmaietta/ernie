@@ -478,6 +478,14 @@ std::vector<float> BinShape(const Shape& shape,
     return values;
 }
 
+/// Whether `path` is a Sphere tessellated `adaptive`, which
+/// `AdaptiveSpheres` draws rather than its mesh.
+bool IsAdaptiveSphere(const Scene& scene, const Path& path) {
+    return scene.TypeOf(path) == tokens::kSphere &&
+           Sphere(scene, path).GetTessellation() ==
+               tokens::kAdaptiveSphere;
+}
+
 }  // namespace
 
 GroundParams GroundParamsOf(const Scene& scene, const Path& ground) {
@@ -530,8 +538,8 @@ RasterDelegate::RasterDelegate(const VulkanContext& context,
                                BrdfRegistry brdfs)
     : context_(context),
       renderer_(context, presentFormat, std::move(brdfs)),
-      terrain_(renderer_), planet_(renderer_), meshes_(renderer_),
-      ground_(renderer_), points_(renderer_) {
+      terrain_(renderer_), planet_(renderer_), spheres_(renderer_),
+      meshes_(renderer_), ground_(renderer_), points_(renderer_) {
     points_.SetAnchors(&meshes_);
 }
 
@@ -555,7 +563,8 @@ const RendererInfo& RasterDelegate::Info() const {
 std::optional<Bounds3> RasterDelegate::SceneBounds() const {
     std::optional<Bounds3> bounds;
     for (const std::optional<Bounds3>& drawable :
-         {terrain_.Bounds(), planet_.BodyBounds(), meshes_.Bounds(),
+         {terrain_.Bounds(), planet_.BodyBounds(),
+          spheres_.BodyBounds(), meshes_.Bounds(),
           points_.Bounds()}) {
         if (!drawable) {
             continue;
@@ -611,7 +620,7 @@ RenderStats RasterDelegate::Stats() const {
     RenderStats stats;
     stats.gpuBytes =
         renderer_.GpuBytes() + terrain_.GpuBytes() +
-        planet_.GpuBytes() +
+        planet_.GpuBytes() + spheres_.GpuBytes() +
         (viewTargets_ != nullptr ? viewTargets_->GpuBytes() : 0);
     // Material textures once each, however many materials share them.
     for (const auto& [key, cached] : sharedTextures_) {
@@ -635,12 +644,13 @@ RenderStats RasterDelegate::Stats() const {
             }
         }
     }
-    stats.triangles = terrain_.TriangleCount() +
-                      planet_.TriangleCount() +
-                      meshes_.TriangleCount();
+    stats.triangles =
+        terrain_.TriangleCount() + planet_.TriangleCount() +
+        spheres_.TriangleCount() + meshes_.TriangleCount();
     stats.counters.emplace_back(raster_stats::kTerrainPatches,
                                 terrain_.PatchCount() +
-                                    planet_.PatchCount());
+                                    planet_.PatchCount() +
+                                    spheres_.PatchCount());
     stats.counters.emplace_back(
         raster_stats::kTerrainLodLevels,
         std::max(terrain_.Lod().Levels(), planet_.Lod().Levels()));
@@ -4046,6 +4056,9 @@ RasterDelegate::Items(const Scene& scene,
             item.prototype = glm::mat4(anchor->below);
             item.instancer = anchor->instancer;
             item.instances = {anchor->row};
+        } else if (IsAdaptiveSphere(scene, path)) {
+            // Drawn by `spheres_` (`UpdatePrims`).
+            return std::nullopt;
         } else {
             item.transform = scene.WorldTransform(path);
         }
@@ -4514,6 +4527,37 @@ void RasterDelegate::UpdatePrims(
                                      .GetThermalTemperature());
     terrain_.SetParams(terrain);
     planet_.SetParams(terrain);
+    // Adaptive spheres, but those under prims posed on the GPU, which
+    // draw their meshes. Invalid radii are the meshes' errors.
+    {
+        std::vector<AdaptiveSphere> spheres;
+        for (const Path& path : scene.Prims(tokens::kSphere)) {
+            if (inPrototypes_.contains(path) ||
+                !scene.IsVisible(path) ||
+                !IsAdaptiveSphere(scene, path) ||
+                GpuAnchorOf(scene, path)) {
+                continue;
+            }
+            const double radius = Sphere(scene, path).GetRadius();
+            if (!(radius > 0.0) || !std::isfinite(radius)) {
+                continue;
+            }
+            AdaptiveSphere sphere = AdaptiveSphere::Of(
+                scene.WorldTransform(path), radius);
+            if (!(glm::all(glm::greaterThan(sphere.radii,
+                                            glm::dvec3(0.0))) &&
+                  std::isfinite(glm::length(sphere.radii)))) {
+                continue;
+            }
+            sphere.material = MaterialOf(scene, path);
+            sphere.primId = PrimIdOf(path);
+            sphere.linkGroup = links_.GroupOf(path);
+            sphere.temperature = CheckedTemperature(
+                path, Gprim(scene, path).GetThermalTemperature());
+            spheres.push_back(sphere);
+        }
+        spheres_.SetSpheres(spheres, terrain.lod);
+    }
     ground_.SetEnabled(!prims_.ground.IsEmpty());
     if (!prims_.ground.IsEmpty()) {
         GroundParams ground = GroundParamsOf(scene, prims_.ground);
@@ -4541,8 +4585,8 @@ void RasterDelegate::UpdatePrims(
         std::unique(highlighted.begin(), highlighted.end()),
         highlighted.end());
     renderer_.SetHighlight(highlighted, highlightColour_);
-    RasterDrawable* drawables[] = {&terrain_, &planet_, &meshes_,
-                                   &ground_, &points_};
+    RasterDrawable* drawables[] = {&terrain_, &planet_, &spheres_,
+                                   &meshes_,  &ground_, &points_};
     if (overlays) {
         frame.overlays = *overlays;
     }
@@ -4688,7 +4732,7 @@ void RasterDelegate::Record(VkCommandBuffer commands,
         viewTargetsOptIn_ = viewOptIn_;
     }
     const RasterDrawable* drawables[] = {
-        &terrain_, &planet_, &meshes_, &ground_, &points_};
+        &terrain_, &planet_, &spheres_, &meshes_, &ground_, &points_};
     // The frame's passes under one zone, as the profiler's tree shows
     // them.
     ERNIE_GPU_ZONE(context_, commands, "Rendering");
@@ -5221,8 +5265,9 @@ RasterDelegate::StepAsync(const Scene& scene,
         const std::vector<RenderTargets*> targets =
             minimalTargets != nullptr ? std::vector<RenderTargets*>{}
                                       : TargetsOf(*frame->images);
-        const RasterDrawable* drawables[] = {
-            &terrain_, &planet_, &meshes_, &ground_, &points_};
+        const RasterDrawable* drawables[] = {&terrain_, &planet_,
+                                             &spheres_, &meshes_,
+                                             &ground_,  &points_};
         // Every view of the product renders in this one submission,
         // sharing the shadow passes.
         ERNIE_ZONE_TEXT(spec.product.String());

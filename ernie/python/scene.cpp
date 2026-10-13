@@ -2964,6 +2964,7 @@ void BindScene(nb::module_& m) {
         {"ICOSPHERE", tokens::kIcosphere},
         {"CUBE_SPHERE", tokens::kCubeSphere},
         {"HEALPIX", tokens::kHealpix},
+        {"ADAPTIVE_SPHERE", tokens::kAdaptiveSphere},
         {"SPHERE_LIGHT", tokens::kSphereLight},
         {"RECT_LIGHT", tokens::kRectLight},
         {"DISK_LIGHT", tokens::kDiskLight},

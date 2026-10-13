@@ -2,6 +2,7 @@
 ernie_add_library(
     ernie_raster
     SOURCES
+    adaptive_spheres.cpp
     atmosphere_luts.cpp
     delegate.cpp
     gpu_block_encoder.cpp

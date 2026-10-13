@@ -37,12 +37,14 @@
     X(std::string, Tessellation, ::ernie::tokens::kTessellation, ::ernie::tokens::kUvSphere,       \
       (::ernie::AttributeMeta{.doc = "uv: latitude rings and meridians; icosphere: a divided "     \
                                      "icosahedron; cubeSphere: a cube's faces as planet "          \
-                                     "Terrains'; healpix: HEALPix's equal-area pixels. Each "      \
-                                     "has equirectangular texture coordinates.",                   \
+                                     "Terrains'; healpix: HEALPix's equal-area pixels; adaptive: " \
+                                     "a planet's cube-sphere LOD, finer towards the eye, exact "   \
+                                     "at any scale (raster; a cube sphere elsewhere). Each has "   \
+                                     "equirectangular texture coordinates.",                       \
                               .group = "Shape",                                                    \
                               .options = {::ernie::tokens::kUvSphere, ::ernie::tokens::kIcosphere, \
-                                          ::ernie::tokens::kCubeSphere,                            \
-                                          ::ernie::tokens::kHealpix}}))                            \
+                                          ::ernie::tokens::kCubeSphere, ::ernie::tokens::kHealpix, \
+                                          ::ernie::tokens::kAdaptiveSphere}}))                     \
     X(int, TessellationLevel, ::ernie::tokens::kTessellationLevel, 0,                              \
       (::ernie::AttributeMeta{.label = "Level", .doc = "UV stacks, icosphere subdivisions, cube "  \
                                      "quads a face edge or HEALPix N_side; 0 for some 2,000 to "   \

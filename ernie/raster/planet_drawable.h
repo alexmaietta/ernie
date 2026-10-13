@@ -30,8 +30,9 @@ namespace ernie {
 /// `RasterDrawable` that renders six cube-face heightfields projected
 /// onto a sphere (`CubeSphereLod`).
 ///
-/// The body is centred at the world's origin, with its body-fixed
-/// frame the world's (z north, x towards longitude 0). Heights live
+/// The body is centred at `TerrainParams::planetCentre`, its
+/// body-fixed frame (z north, x towards longitude 0) turned by
+/// `TerrainParams::planetRotation`. Heights live
 /// in a six-layer `R32_SFLOAT` image the vertex shader reads; each
 /// frame `CubeSphereLod` selects patches at continuous levels of
 /// detail, culled by the frustum and the horizon, and each patch is
@@ -59,8 +60,11 @@ class PlanetDrawable : public RasterDrawable {
     /// Grid quads along a level-0 LOD node; patches are half this.
     static constexpr std::uint32_t kLodLeafCells = 64;
 
-    /// A planet drawn by `renderer`, which must outlive it.
-    explicit PlanetDrawable(RasterRenderer& renderer);
+    /// A planet drawn by `renderer`, which must outlive it, with the
+    /// pipelines of `sharing` if given (bodies of `AdaptiveSpheres`),
+    /// else its own.
+    explicit PlanetDrawable(RasterRenderer& renderer,
+                            const PlanetDrawable* sharing = nullptr);
     ~PlanetDrawable() override;
     PlanetDrawable(const PlanetDrawable&) = delete;
     PlanetDrawable& operator=(const PlanetDrawable&) = delete;
@@ -158,6 +162,11 @@ class PlanetDrawable : public RasterDrawable {
         return origin_ - params_.planetCentre;
     }
 
+    /// `Offset` in the body-fixed axes.
+    glm::dvec3 BodyOffset() const {
+        return glm::transpose(params_.planetRotation) * Offset();
+    }
+
     const char* ProfileName() const override {
         return "Planets";
     }
@@ -195,9 +204,20 @@ class PlanetDrawable : public RasterDrawable {
         std::uint32_t count = 0;
     };
 
+    /// The layout and pipelines, shared by bodies of one shape.
+    struct Pipelines {
+        explicit Pipelines(const VulkanContext& context);
+        PipelineLayout layout;
+        std::array<std::unique_ptr<GraphicsPipeline>, 2> gbuffer;
+        std::unique_ptr<GraphicsPipeline> shadow;
+    };
+
     /// The G-buffer pipeline for a frame camera's views, or a
     /// pushbroom's.
     void CreateGBufferPipeline(bool pushbroom);
+    /// The body's point `body` (body-fixed, about its centre)
+    /// relative to the origin, world axes.
+    glm::dvec3 WorldOf(const glm::dvec3& body) const;
     void ReservePatches(std::size_t count);
     /// Finds the page each patch reads (`pageRefs_`), asking for
     /// those missing.
@@ -217,11 +237,8 @@ class PlanetDrawable : public RasterDrawable {
                      bool shadow = false) const;
 
     RasterRenderer& renderer_;
-    PipelineLayout layout_;
-    std::array<std::unique_ptr<GraphicsPipeline>, 2>
-        gbufferPipelines_;
+    std::shared_ptr<Pipelines> pipelines_;
     bool pushbroom_ = false;
-    std::unique_ptr<GraphicsPipeline> shadowPipeline_;
     TerrainParams params_;
 
     GpuBuffer uniforms_;
@@ -249,8 +266,10 @@ class PlanetDrawable : public RasterDrawable {
     std::uint64_t triangles_ = 0;
     double firstRange_ = 0.0;
     bool frozen_ = false;
-    std::vector<glm::dvec3> lodEyes_;  ///< In world coordinates.
-    std::vector<Frustum> lodFrusta_;   ///< Relative to each eye.
+    /// About the body's centre, body-fixed axes.
+    std::vector<glm::dvec3> lodEyes_;
+    std::vector<Frustum> lodFrusta_;  ///< Relative to each eye, body
+                                      ///< axes.
     glm::dvec3 origin_{0.0};
     bool prepared_ = false;
     float minHeight_ = 0.0f;

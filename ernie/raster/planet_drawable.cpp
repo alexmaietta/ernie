@@ -38,8 +38,10 @@ struct PlanetUniforms {
     float shape[4];
     /// The heights' and gradients' bindless heap slots; unused.
     std::uint32_t textures[4];
+    /// The body-fixed axes in the world's, each xyz and a pad.
+    float rotation[12];
 };
-static_assert(sizeof(PlanetUniforms) == 384,
+static_assert(sizeof(PlanetUniforms) == 432,
               "PlanetUniforms must match planet.slang");
 
 constexpr VkDeviceSize kUniformsStride = 512;
@@ -94,6 +96,16 @@ PlanetModules(bool pushbroom = false) {
 Frustum Shifted(Frustum frustum, const glm::vec3& offset) {
     for (glm::vec4& plane : frustum.planes) {
         plane.w -= glm::dot(glm::vec3(plane), offset);
+    }
+    return frustum;
+}
+
+/// `frustum` in other axes, `toAxes` taking its axes' vectors to
+/// theirs (a rotation).
+Frustum Rotated(Frustum frustum, const glm::dmat3& toAxes) {
+    for (glm::vec4& plane : frustum.planes) {
+        const glm::vec3 normal(toAxes * glm::dvec3(plane));
+        plane = glm::vec4(normal, plane.w);
     }
     return frustum;
 }
@@ -202,15 +214,24 @@ std::uint32_t RefinementFor(const CubeSphereLod& lod,
 
 }  // namespace
 
-PlanetDrawable::PlanetDrawable(RasterRenderer& renderer)
+PlanetDrawable::Pipelines::Pipelines(const VulkanContext& context)
+    : layout(context, kBindings, sizeof(DrawConstants)) {}
+
+PlanetDrawable::PlanetDrawable(RasterRenderer& renderer,
+                               const PlanetDrawable* sharing)
     : renderer_(renderer),
-      layout_(renderer.Context(), kBindings, sizeof(DrawConstants)),
       uniforms_(renderer.Context(), kUniformsStride,
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 BufferMemory::Device),
       emptyPool_(renderer.Context(), 16,
                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                  BufferMemory::Device) {
+    ReservePatches(kInitialPatchCapacity);
+    if (sharing != nullptr) {
+        pipelines_ = sharing->pipelines_;
+        return;
+    }
+    pipelines_ = std::make_shared<Pipelines>(renderer_.Context());
     std::vector<ShaderModuleSource> modules = PlanetModules();
     modules.push_back({"planet_shadow", shaders::kPlanetShadowSlang});
     const std::vector<std::uint32_t> shadowVertex =
@@ -220,10 +241,9 @@ PlanetDrawable::PlanetDrawable(RasterRenderer& renderer)
     shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
     shadow.depthBias = true;
     shadow.depthClamp = true;
-    shadowPipeline_ = std::make_unique<GraphicsPipeline>(
-        renderer_.Context(), layout_, shadow);
+    pipelines_->shadow = std::make_unique<GraphicsPipeline>(
+        renderer_.Context(), pipelines_->layout, shadow);
     CreateGBufferPipeline(false);
-    ReservePatches(kInitialPatchCapacity);
 }
 
 PlanetDrawable::~PlanetDrawable() {
@@ -245,9 +265,13 @@ void PlanetDrawable::CreateGBufferPipeline(bool pushbroom) {
                              RenderTargets::kGBufferFormats.end());
     desc.depthFormat = RenderTargets::kDepthFormat;
     desc.depthCompare = RenderTargets::kDepthCompare;
-    gbufferPipelines_[pushbroom ? 1 : 0] =
+    pipelines_->gbuffer[pushbroom ? 1 : 0] =
         std::make_unique<GraphicsPipeline>(renderer_.Context(),
-                                           layout_, desc);
+                                           pipelines_->layout, desc);
+}
+
+glm::dvec3 PlanetDrawable::WorldOf(const glm::dvec3& body) const {
+    return params_.planetRotation * body - Offset();
 }
 
 void PlanetDrawable::ReservePatches(std::size_t count) {
@@ -460,7 +484,7 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
     const double high = lod_.Radius() + std::max(h1, 0.0);
     // The origin follows the camera within `kRebaseReach`.
     constexpr double kRebaseReach = 1024.0;
-    std::vector<glm::dvec3> eyes{Offset()};
+    std::vector<glm::dvec3> eyes{BodyOffset()};
     eyes.insert(eyes.end(), lodEyes_.begin(), lodEyes_.end());
     glm::dvec3 lowest(std::numeric_limits<double>::max());
     glm::dvec3 highest(std::numeric_limits<double>::lowest());
@@ -474,8 +498,16 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
     }
     lowest = glm::max(lowest, glm::dvec3(-high));
     highest = glm::min(highest, glm::dvec3(high));
-    return Bounds3{glm::vec3(lowest - Offset()),
-                   glm::vec3(highest - Offset())};
+    // The body-fixed box's in the world's axes.
+    const glm::dmat3& rotation = params_.planetRotation;
+    glm::dmat3 extent;
+    for (int i = 0; i < 3; ++i) {
+        extent[i] = glm::abs(rotation[i]);
+    }
+    const glm::dvec3 centre = WorldOf(0.5 * (lowest + highest));
+    const glm::dvec3 half = extent * (0.5 * (highest - lowest));
+    return Bounds3{glm::vec3(centre - half),
+                   glm::vec3(centre + half)};
 }
 
 void PlanetDrawable::Select(const glm::dvec3& eye,
@@ -487,9 +519,8 @@ void PlanetDrawable::Select(const glm::dvec3& eye,
     for (std::size_t i = first; i < patches_.size(); ++i) {
         const LodPatch& patch = patches_[i];
         const glm::dvec3 anchor =
-            lod_.BasePoint(lod_.FineDirection(
-                patch.face, patch.originX, patch.originY)) -
-            Offset();
+            WorldOf(lod_.BasePoint(lod_.FineDirection(
+                patch.face, patch.originX, patch.originY)));
         anchors_.emplace_back(glm::vec3(anchor), 0.0f);
     }
 }
@@ -525,7 +556,7 @@ void PlanetDrawable::Prepare(
     ERNIE_ZONE("Planet prepare");
     prepared_ = false;
     pushbroom_ = frame.camera.pushbroom;
-    if (gbufferPipelines_[pushbroom_ ? 1 : 0] == nullptr) {
+    if (pipelines_->gbuffer[pushbroom_ ? 1 : 0] == nullptr) {
         CreateGBufferPipeline(pushbroom_);
     }
     if (!HasHeights()) {
@@ -557,6 +588,13 @@ void PlanetDrawable::Prepare(
     uniforms.hillshade[0] = towards.x;
     uniforms.hillshade[1] = towards.y;
     uniforms.hillshade[2] = towards.z;
+    for (int axis = 0; axis < 3; ++axis) {
+        for (int i = 0; i < 3; ++i) {
+            uniforms.rotation[4 * axis + i] =
+                static_cast<float>(params_.planetRotation[axis][i]);
+        }
+    }
+    const glm::dmat3 toBody = glm::transpose(params_.planetRotation);
 
     const LodSettings& lod = params_.lod;
     const std::size_t views = frame.Views();
@@ -565,10 +603,12 @@ void PlanetDrawable::Prepare(
         lodFrusta_.clear();
         for (std::size_t v = 0; v < views; ++v) {
             const CameraView view = frame.View(v);
-            lodEyes_.push_back(Offset() + glm::dvec3(view.eye));
-            lodFrusta_.push_back(
+            lodEyes_.push_back(toBody *
+                               (Offset() + glm::dvec3(view.eye)));
+            lodFrusta_.push_back(Rotated(
                 Shifted(Frustum::FromMatrix(view.ViewProjection()),
-                        -view.eye));
+                        -view.eye),
+                toBody));
         }
     }
     frozen_ = lod.freeze;
@@ -619,7 +659,7 @@ void PlanetDrawable::Prepare(
                               BufferMemory::Device);
     }
     for (std::size_t v = 0; v < views; ++v) {
-        const glm::vec3 eye(lodEyes_[v] - Offset());
+        const glm::vec3 eye(WorldOf(lodEyes_[v]));
         uniforms.lodEye[0] = eye.x;
         uniforms.lodEye[1] = eye.y;
         uniforms.lodEye[2] = eye.z;
@@ -638,11 +678,9 @@ void PlanetDrawable::Prepare(
             if (v == 0) {
                 lod_.SelectAll(patches_);
                 for (const LodPatch& patch : patches_) {
-                    const glm::dvec3 anchor =
-                        lod_.BasePoint(lod_.FineDirection(
-                            patch.face, patch.originX,
-                            patch.originY)) -
-                        Offset();
+                    const glm::dvec3 anchor = WorldOf(lod_.BasePoint(
+                        lod_.FineDirection(patch.face, patch.originX,
+                                           patch.originY)));
                     anchors_.emplace_back(glm::vec3(anchor), 0.0f);
                 }
             }
@@ -669,13 +707,15 @@ void PlanetDrawable::Prepare(
         }
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
-        const glm::vec3 eye(lodEyes_.front() - Offset());
+        const glm::vec3 eye(WorldOf(lodEyes_.front()));
         // A view the GPU poses, or moving across the shutter, draws
         // every patch: its matrix here is only an estimate, or one of
         // its sub-frames'.
         const ShadowCascade& cascade = cascades[c];
-        const Frustum light = Shifted(
-            Frustum::FromMatrix(cascade.lightViewProjection), -eye);
+        const Frustum light = Rotated(
+            Shifted(Frustum::FromMatrix(cascade.lightViewProjection),
+                    -eye),
+            toBody);
         const bool culls = !cascade.moving && !cascade.gpuFitted;
         Select(lodEyes_.front(), ShadowRanges(ranges, cascade),
                culls ? &light : nullptr);
@@ -745,7 +785,8 @@ void PlanetDrawable::DrawPatches(VkCommandBuffer commands,
         shadow && frame.shadowFromFrame ? 1u : 0u;
     constants.view = frame.view;
     constants.shadowLayer = shadow ? frame.shadowLayer : 0u;
-    layout_.PushConstants(commands, &constants, sizeof(constants));
+    pipelines_->layout.PushConstants(commands, &constants,
+                                     sizeof(constants));
     const std::uint32_t cells = lod_.PatchCells();
     vkCmdDraw(commands, 6 * cells * cells, range.count, 0, 0);
 }
@@ -759,9 +800,9 @@ void PlanetDrawable::RecordShadow(
         return;
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      shadowPipeline_->Handle());
-    layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                 Resources(frame, 0));
+                      pipelines_->shadow->Handle());
+    pipelines_->layout.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            Resources(frame, 0));
     DrawPatches(commands, cascadeRanges_[cascade],
                 lightViewProjection, frame, true);
 }
@@ -776,9 +817,9 @@ void PlanetDrawable::RecordColor(VkCommandBuffer commands,
     }
     vkCmdBindPipeline(
         commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        gbufferPipelines_[pushbroom_ ? 1 : 0]->Handle());
-    layout_.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                 Resources(frame, view));
+        pipelines_->gbuffer[pushbroom_ ? 1 : 0]->Handle());
+    pipelines_->layout.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            Resources(frame, view));
     DrawPatches(commands, mainRanges_[view], glm::mat4(1.0f), frame);
 }
 

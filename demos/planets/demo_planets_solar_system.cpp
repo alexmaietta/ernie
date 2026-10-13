@@ -2,11 +2,11 @@
 // The Sun, its planets and the Moon at their true sizes and distances
 // on a chosen date (no motion), lit by the Sun as a sphere light,
 // their orbits drawn as overlays split finely where they pass the
-// eye. Each body wears a latitude-longitude map streamed as a virtual
-// texture: NASA's where one is small enough, else Solar System
-// Scope's (CC BY 4.0, from NASA's data); the Sun's own generated,
-// emitted through its material. The panel picks the date and a body
-// to go to.
+// eye. Each body is an adaptive sphere, finer towards the eye, and
+// wears a latitude-longitude map streamed as a virtual texture:
+// NASA's where one is small enough, else Solar System Scope's (CC BY
+// 4.0, from NASA's data); the Sun's own generated, emitted through
+// its material. The panel picks the date and a body to go to.
 //
 // References:
 // - E. M. Standish, "Keplerian Elements for Approximate Positions of
@@ -491,8 +491,7 @@ class SolarSystemDemo : public app::Demo {
             const Path look("/World/Looks/" + name);
             Sphere::Define(scene, "/World/" + name)
                 .SetRadius(body.equator)
-                .SetTessellation(std::string(tokens::kCubeSphere))
-                .SetTessellationLevel(i == kSun ? 64 : 128)
+                .SetTessellation(std::string(tokens::kAdaptiveSphere))
                 .SetMaterialBinding(look);
             Material::Define(scene, look);
             Shader::Define(scene, look.String() + "/Surface")

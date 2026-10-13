@@ -79,6 +79,9 @@ struct TerrainParams {
         45.0f;  ///< Hillshade's light, degrees above the horizon.
     /// A planet's centre, world: its transform's translation.
     glm::dvec3 planetCentre{0.0};
+    /// A planet's body-fixed axes in the world's, columns x, y and z:
+    /// a rotation.
+    glm::dmat3 planetRotation{1.0};
     /// A planet's finest LOD quad, world units: the LOD refines below
     /// the data's quads, heights bilinear between them, down to about
     /// this. 0 stops at the data's.

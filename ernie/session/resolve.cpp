@@ -19,9 +19,9 @@
 #include "ernie/session/skinning.h"
 #include "ernie/session/volumes.h"
 #include "ernie/util/astronomy.h"
-#include "ernie/util/profile.h"
 #include "ernie/util/atmosphere.h"
 #include "ernie/util/ies.h"
+#include "ernie/util/profile.h"
 #include "ernie/util/reflectance_library.h"
 #include "ernie/util/solar.h"
 #include "ernie/util/spectrum.h"
@@ -3768,12 +3768,17 @@ MeshData PrimitiveMeshOf(const Scene& scene, const Path& path) {
     if (type == kSphere) {
         const Sphere sphere(scene, path);
         const std::string name = sphere.GetTessellation();
+        // An adaptive sphere's mesh, for what draws meshes, is a cube
+        // sphere's.
         const std::optional<SphereTessellation> tessellation =
-            SphereTessellationNamed(name);
+            name == kAdaptiveSphere ? SphereTessellation::CubeSphere
+                                    : SphereTessellationNamed(name);
         if (!tessellation) {
             throw std::invalid_argument(
                 "'" + path.String() + "' has unknown tessellation '" +
-                name + "'; use uv, icosphere, cubeSphere or healpix");
+                name +
+                "'; use uv, icosphere, cubeSphere, healpix or "
+                "adaptive");
         }
         return TessellatedSphere(
             f(sphere.GetRadius()), *tessellation,

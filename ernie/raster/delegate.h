@@ -4,6 +4,7 @@
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/offscreen_target.h"
 #include "ernie/geometry/primitives.h"
+#include "ernie/raster/adaptive_spheres.h"
 #include "ernie/raster/gpu_block_encoder.h"
 #include "ernie/raster/ground_drawable.h"
 #include "ernie/raster/mesh_drawable.h"
@@ -280,6 +281,11 @@ class RasterDelegate : public RenderDelegate {
 
     const PlanetDrawable& Planet() const {
         return planet_;
+    }
+
+    /// Spheres tessellated `adaptive`, drawn as cube-sphere LODs.
+    const AdaptiveSpheres& Spheres() const {
+        return spheres_;
     }
 
     const GroundDrawable& Ground() const {
@@ -745,6 +751,7 @@ class RasterDelegate : public RenderDelegate {
     RasterRenderer renderer_;
     TerrainDrawable terrain_;
     PlanetDrawable planet_;
+    AdaptiveSpheres spheres_;
     MeshDrawable meshes_;
     GroundDrawable ground_;
     PointsDrawable points_;

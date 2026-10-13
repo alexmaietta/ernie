@@ -103,7 +103,7 @@ float3 latLongAlbedo(uint face, float2 grid) {
 GBuffer fragmentMain(VertexOutput in) {
     float3 up;
     let normal = planetNormal(in.face, in.grid, in.page, up);
-    var shadingNormal = normal;
+    var shadingNormal = toWorld(normal);
     float slopeVariance;
     var modulation = triplanarDetail(in.world, shadingNormal, slopeVariance);
     if (surface.textures.x > 0.0) {
