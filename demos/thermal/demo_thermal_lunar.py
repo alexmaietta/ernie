@@ -144,7 +144,8 @@ class Demo(ernie.demo.Demo):
         self.place_sun(AZIMUTH)
 
         # Visible light for sunlit regolith; the thermal camera a
-        # microbolometer over 8 to 14 um, ironbow from 80 to 400 K.
+        # microbolometer over 8 to 14 um, ironbow over the range the last
+        # frame showed (80 to 400 K before one), so the night side reads.
         self.visible = self.define_camera(
             "Visible", VISIBLE_PRODUCT, (380.0, 720.0), 17, ["LdrColor"]
         )
@@ -157,7 +158,7 @@ class Demo(ernie.demo.Demo):
             (
                 "Display",
                 "thermalDisplay",
-                {"automatic": 0.0, "low": 80.0, "high": 400.0, "palette": 2.0},
+                {"automatic": 1.0, "low": 80.0, "high": 400.0, "palette": 2.0},
             ),
             ("Exposure", "exposure", {}),
         ):

@@ -154,7 +154,9 @@ class LunarThermalDemo : public app::Demo {
         PlaceSun(kAzimuth);
 
         // Visible light for sunlit regolith; the thermal camera a
-        // microbolometer over 8 to 14 um, ironbow from 80 to 400 K.
+        // microbolometer over 8 to 14 um, ironbow over the range the
+        // last frame showed (80 to 400 K before one), so the night side
+        // reads.
         DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0}, 17,
                      {"LdrColor"});
         DefineCamera(kThermalCamera, kThermalProduct, {8000.0, 14000.0},
@@ -169,7 +171,7 @@ class LunarThermalDemo : public app::Demo {
         SensorFilterPrim::Define(scene, chain.Child("Display"))
             .SetFilterType("thermalDisplay");
         for (const auto& [name, value] :
-             {std::pair{"automatic", 0.0f}, std::pair{"low", 80.0f},
+             {std::pair{"automatic", 1.0f}, std::pair{"low", 80.0f},
               std::pair{"high", 400.0f}, std::pair{"palette", 2.0f}}) {
             scene.Set(chain.Child("Display"), "inputs:" + std::string(name),
                       value);

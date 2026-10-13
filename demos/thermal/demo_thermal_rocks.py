@@ -37,7 +37,7 @@ FINES = 50.0  # J m^-2 K^-1 s^-1/2: regolith fines' thermal inertia
 ROCK = 1500.0  # bare rock's
 INERTIAS = [25.0, 50.0, 100.0, 200.0, 400.0, 800.0, 1600.0]
 ALBEDOS = [0.05, 0.1, 0.15, 0.25]
-START_HOUR = 22.0  # local solar time
+START_HOUR = 16.0  # local solar time: lit; the night is the slider's
 
 RESOLUTION = (400, 300)
 FOCAL_LENGTH = 24.0  # mm
@@ -77,10 +77,20 @@ def maps():
 
 
 def terrain():
-    """The patch's points, face counts, indices and texture coordinates."""
+    """The patch's points, smooth normals, face counts, indices and
+    texture coordinates."""
     s = np.linspace(-HALF, HALF, GRID + 1)
     x, y = np.meshgrid(s, s)
     points = np.stack([x, y, height(x, y)], -1).reshape(-1, 3)
+    # The heights' gradient by central differences, so slopes shade and
+    # take their temperatures smoothly rather than face by face.
+    e = 0.05
+    dx = (height(x + e, y) - height(x - e, y)) / (2.0 * e)
+    dy = (height(x, y + e) - height(x, y - e)) / (2.0 * e)
+    normals = np.stack([-dx, -dy, np.ones_like(dx)], -1).reshape(
+        -1, 3
+    )
+    normals /= np.linalg.norm(normals, axis=1, keepdims=True)
     st = np.stack(
         [(x + HALF) / (2.0 * HALF), (y + HALF) / (2.0 * HALF)], -1
     )
@@ -93,6 +103,7 @@ def terrain():
     ).ravel()
     return (
         points,
+        normals.astype(np.float32),
         np.full(GRID * GRID, 4),
         indices,
         st.reshape(-1, 2).astype(np.float32),
@@ -166,11 +177,12 @@ class Demo(ernie.demo.Demo):
         )
         scene.connect(surface.path, tokens.DIFFUSE_COLOR, albedo_map.path,
                       "outputs:rgb")  # fmt: skip
-        points, counts, indices, st = terrain()
+        points, normals, counts, indices, st = terrain()
         world.define(
             "Terrain",
             ernie.Mesh,
             points=points,
+            normals=normals,
             face_vertex_counts=counts,
             face_vertex_indices=indices,
             material_binding=look.path,
@@ -184,7 +196,7 @@ class Demo(ernie.demo.Demo):
         self.place_sun(START_HOUR)
 
         # Visible light by day; a microbolometer over 8 to 14 um, ironbow
-        # from 80 to 400 K.
+        # over the range the last frame showed (80 to 400 K before one).
         self.visible = self.define_camera(
             "Visible",
             VISIBLE_PRODUCT,
@@ -202,7 +214,7 @@ class Demo(ernie.demo.Demo):
                 "Display",
                 "thermalDisplay",
                 {
-                    "automatic": 0.0,
+                    "automatic": 1.0,
                     "low": 80.0,
                     "high": 400.0,
                     "palette": 2.0,
@@ -346,7 +358,10 @@ class Demo(ernie.demo.Demo):
             col, row = project(x, y)
             return float(kelvin[row, col])
 
-        # 10 pm: the fresh crater's rocky ejecta against old fines.
+        # 10 pm: the fresh crater's rocky ejecta against old fines (a
+        # frame first for the display's gain to take the night's range).
+        self.place_sun(22.0)
+        self.render_all()
         _, thermal, night = self.render_all()
         rocky = kelvin_at(night, -40.0, 30.0 - 22.0 * 1.15)
         fines = kelvin_at(night, -60.0, -85.0)

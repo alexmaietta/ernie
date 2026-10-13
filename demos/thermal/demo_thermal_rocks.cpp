@@ -61,8 +61,9 @@ constexpr std::array<Crater, 5> kCraters = {
     Crater{5.0, -5.0, 9.0, 0.7}};
 constexpr double kFines =
     50.0;  // J m^-2 K^-1 s^-1/2: regolith fines' thermal inertia
-constexpr double kRock = 1500.0;     // bare rock's
-constexpr double kStartHour = 22.0;  // local solar time
+constexpr double kRock = 1500.0;  // bare rock's
+constexpr double kStartHour =
+    16.0;  // local solar time: lit; the night is the slider's
 
 constexpr glm::dvec2 kResolution(400.0, 300.0);
 constexpr double kFocalLength = 24.0;  // mm
@@ -182,7 +183,8 @@ class RocksThermalDemo : public app::Demo {
         PlaceSun(kStartHour);
 
         // Visible light by day; a microbolometer over 8 to 14 um,
-        // ironbow from 80 to 400 K.
+        // ironbow over the range the last frame showed (80 to 400 K
+        // before one).
         DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0},
                      17, {"LdrColor"});
         DefineCamera(kThermalCamera, kThermalProduct,
@@ -198,7 +200,7 @@ class RocksThermalDemo : public app::Demo {
         SensorFilterPrim::Define(scene, chain.Child("Display"))
             .SetFilterType("thermalDisplay");
         for (const auto& [name, value] :
-             {std::pair{"automatic", 0.0f}, std::pair{"low", 80.0f},
+             {std::pair{"automatic", 1.0f}, std::pair{"low", 80.0f},
               std::pair{"high", 400.0f},
               std::pair{"palette", 2.0f}}) {
             scene.Set(chain.Child("Display"),
@@ -243,7 +245,11 @@ class RocksThermalDemo : public app::Demo {
             return images.kelvin[static_cast<std::size_t>(
                 pixel.y * Cols() + pixel.x)];
         };
-        // 10 pm: the fresh crater's rocky ejecta against old fines.
+        // 10 pm: the fresh crater's rocky ejecta against old fines (a
+        // frame first for the display's gain to take the night's
+        // range).
+        PlaceSun(22.0);
+        RenderAll();
         const Images night = RenderAll();
         const double rocky =
             kelvinAt(night, -40.0, 30.0 - 22.0 * 1.15);
@@ -298,16 +304,31 @@ class RocksThermalDemo : public app::Demo {
 
     double hour_ = kStartHour;
 
-    /// The patch: a grid of quads over the heights, with texture
-    /// coordinates across it.
+    /// The patch: a grid of quads over the heights, with smooth
+    /// normals and texture coordinates across it.
     void DefineTerrain(const Path& look) {
         std::vector<double> points;
+        std::vector<float> normals;
         std::vector<float> st;
         for (int i = 0; i <= kGrid; ++i) {
             const double y = -kHalf + 2.0 * kHalf * i / kGrid;
             for (int j = 0; j <= kGrid; ++j) {
                 const double x = -kHalf + 2.0 * kHalf * j / kGrid;
                 points.insert(points.end(), {x, y, Height(x, y)});
+                // The heights' gradient by central differences, so
+                // slopes shade and take their temperatures smoothly
+                // rather than face by face.
+                constexpr double e = 0.05;
+                const glm::dvec3 n = glm::normalize(glm::dvec3(
+                    -(Height(x + e, y) - Height(x - e, y)) /
+                        (2.0 * e),
+                    -(Height(x, y + e) - Height(x, y - e)) /
+                        (2.0 * e),
+                    1.0));
+                normals.insert(normals.end(),
+                               {static_cast<float>(n.x),
+                                static_cast<float>(n.y),
+                                static_cast<float>(n.z)});
                 st.insert(
                     st.end(),
                     {static_cast<float>((x + kHalf) / (2.0 * kHalf)),
@@ -328,6 +349,7 @@ class RocksThermalDemo : public app::Demo {
         Scene& scene = GetScene();
         Mesh::Define(scene, "/World/Terrain")
             .SetPoints(Tensor::Copy<double>(points, {count, 3}))
+            .SetNormals(Tensor::Copy<float>(normals, {count, 3}))
             .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
                 std::vector<std::int64_t>(kGrid * kGrid, 4),
                 {kGrid * kGrid}))
