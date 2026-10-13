@@ -189,6 +189,13 @@ def create_parser(demo_class=Demo):
         "chrome://tracing (implies --profile)",
     )
     parser.add_argument(
+        "--profile-warmup",
+        type=int,
+        metavar="N",
+        help="first frames the profile leaves out (default 5); 0 "
+        "keeps the scene's loading (implies --profile)",
+    )
+    parser.add_argument(
         "--test",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -246,8 +253,13 @@ def options_from_args(args):
     options.benchmark_seconds = args.benchmark or None
     options.profile_json = args.profile_json or ""
     options.profile_trace = args.profile_trace or ""
+    if args.profile_warmup is not None:
+        options.profile_warmup = args.profile_warmup
     options.profile = bool(
-        args.profile or args.profile_json or args.profile_trace
+        args.profile
+        or args.profile_json
+        or args.profile_trace
+        or args.profile_warmup is not None
     )
     options.test = args.test
     options.output = args.output or ""
