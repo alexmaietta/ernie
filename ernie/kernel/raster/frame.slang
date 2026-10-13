@@ -123,6 +123,11 @@ public struct Shadows {
     public uint4 debug;
     // 16 Poisson disk samples in the unit disk, two per float4.
     public float4 poisson[8];
+    // A shadow pass's caster bias in its map's depth (a distant light's cascade, as Unreal
+    // Engine's CSM): x constant, y per unit of the surface's slope to the light, z the largest
+    // slope, w 1 with one; the slope part is the rasterizer's (`vkCmdSetDepthBias`) but where a
+    // pass writes its own depth (`casterDepthBias`).
+    public float4 casterBias;
 }
 
 // The frame's resources (renderer's `FrameResources`): every view's Uniforms, so a pass binds them
@@ -164,11 +169,28 @@ public struct ShadowPosition {
     public uint layer : SV_RenderTargetArrayIndex;
 }
 
+// Pushed away from the light by the pass's constant caster bias (`Shadows::casterBias`).
 public ShadowPosition shadowPosition(float3 world) {
     ShadowPosition out;
     out.position = mul(shadowViewProj(), float4(world, 1.0));
+    if (draw.shadowFromFrame != 0 && s.casterBias.w > 0.0) {
+        out.position.z += s.casterBias.x * out.position.w;
+    }
     out.layer = draw.shadowLayer;
     return out;
+}
+
+// The whole caster bias (`Shadows::casterBias`) for a pass that writes its own depth, at a surface
+// whose cosine to the light is `nDotL`: the constant one and the slope one, as Unreal Engine's
+// ComputeDepthBiasDirectionalSpot (ShadowDepthVertexShader.usf); 0 without one.
+public float casterDepthBias(float nDotL) {
+    if (draw.shadowFromFrame == 0 || s.casterBias.w <= 0.0) {
+        return 0.0;
+    }
+    let c = abs(nDotL);
+    let slope = c > 0.0 ? clamp(sqrt(saturate(1.0 - c * c)) / c, 0.0, s.casterBias.z)
+                        : s.casterBias.z;
+    return s.casterBias.x + s.casterBias.y * slope;
 }
 
 public float viewDepth(float3 world) {

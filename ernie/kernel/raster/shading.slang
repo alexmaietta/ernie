@@ -706,15 +706,199 @@ float lightVisibility(LightGpu light, float3 world, float3 n, float nDotL, float
     if (at.cascade >= uint(light.cone.w)) {
         return 1.0;
     }
-    let first = int(light.cone.z);
-    var visibility = lightVisibilityIn(light, world, n, nDotL, pixel, first + int(at.cascade));
+    let first = uint(light.cone.z);
+    var visibility = cascadeVisibility(light, first + at.cascade, world, n);
     if (at.next > 0.0) {
-        visibility = lerp(visibility,
-                          lightVisibilityIn(light, world, n, nDotL, pixel,
-                                            first + int(at.cascade) + 1),
-                          at.next);
+        visibility =
+            lerp(visibility, cascadeVisibility(light, first + at.cascade + 1, world, n), at.next);
     }
     return lerp(visibility, 1.0, at.out);
+}
+
+// Unreal Engine's cascaded shadow maps' filtering, its defaults (shadow_cascades.h): comparisons
+// fade in over the casters' constant bias, kCsmDepthBias kShadowBias half-texels, that much
+// shorter facing away from the light down to 1 - kCsmReceiverBias of it. Soft shadows search and
+// filter at most kMaxSoftKernelTexels texels: Unreal's 40 (`r.Shadow.MaxSoftKernelSize`) cuts a
+// wide sun's penumbrae short in fine cascades, so the 64 lights' filters reach.
+static const float kCsmBiasHalfTexels = 5.0;
+static const float kCsmReceiverBias = 0.9;
+static const float kMaxSoftKernelTexels = 64.0;
+// Unreal's PCSS samples: blockers searched, and the filter's.
+static const uint kPcssSearchSamples = 16;
+static const uint kPcssSamples = 32;
+
+// Sample `i` of `count` spread evenly over the unit disk (a Vogel spiral): the same for every
+// pixel, where Unreal turns them per pixel and frame for its temporal antialiasing to average.
+float2 diskSample(uint i, uint count) {
+    let r = sqrt((float(i) + 0.5) / float(count));
+    let a = 2.39996323 * float(i);
+    return r * float2(cos(a), sin(a));
+}
+
+// The depth stored at `texel` of shadow view `view`, `texels` across in its layer's corner,
+// clamped to its edge texels.
+float cascadeDepth(uint view, int2 texel, float texels) {
+    let t = clamp(texel, int2(0), int2(int(texels) - 1));
+    return lightShadowMaps.Load(int4(t, int(view), 0)).x;
+}
+
+// Unreal's soft comparison of a receiver at `depth` with depth `stored`: 1 lit, 0 shadowed,
+// fading in over 1 / `scale` closer to the light than the caster.
+float softCompare(float stored, float depth, float scale) {
+    return saturate((stored - depth) * scale + 1.0);
+}
+
+// Unreal's Manual5x5PCF (ShadowFilteringCommon.ush): the 6x6 texels round `uv`, weighted
+// bilinearly at the edges, through `softCompare`.
+float manual5x5Pcf(uint view, float2 uv, float texels, float depth, float scale) {
+    let at = uv * texels - 0.5;
+    let f = frac(at);
+    let base = int2(floor(at)) - 2;
+    var sum = 0.0;
+    for (int j = 0; j < 6; ++j) {
+        let wy = j == 0 ? 1.0 - f.y : (j == 5 ? f.y : 1.0);
+        for (int i = 0; i < 6; ++i) {
+            let wx = i == 0 ? 1.0 - f.x : (i == 5 ? f.x : 1.0);
+            sum += wx * wy * softCompare(cascadeDepth(view, base + int2(i, j), texels), depth, scale);
+        }
+    }
+    return 0.04 * sum;
+}
+
+// `m` scaling by 1 + `scaleMinusOne` along unit `direction` (Unreal's
+// GenerateDirectionalScale2x2Matrix).
+float2x2 directionalScale(float2 direction, float scaleMinusOne) {
+    return float2x2(1.0 + scaleMinusOne * direction.x * direction.x,
+                    scaleMinusOne * direction.y * direction.x,
+                    scaleMinusOne * direction.x * direction.y,
+                    1.0 + scaleMinusOne * direction.y * direction.y);
+}
+
+// Unreal's DirectionalPCSS (ShadowPercentageCloserFiltering.ush) at `uv` and `depth` of shadow
+// view `view`, `texels` across: blockers searched over the light's footprint from the map's near
+// plane (`tanUv` its angular radius's tangent in map widths per unit of depth), their average
+// depth's penumbra filtered, elongated across the blockers' edge, then sharpened where they lie to
+// one side. `plane` is the receiver's plane's normal in the map's (u, v, depth), whose depth
+// across each sample offsets its comparison; `scale` the soft comparison's.
+float directionalPcss(uint view, float2 uv, float texels, float depth, float scale, float tanUv,
+                      float3 plane) {
+    let oriented = plane.z < 0.0 ? -plane : plane;
+    let biasFactor = 1.0 / max(abs(oriented.z), length(oriented) * 0.0872665);
+    let biasDot = oriented.xy * biasFactor;
+    let minFilter = 1.0 / texels;
+    let maxKernel = kMaxSoftKernelTexels / texels;
+    // As Unreal's clamp(PCSSMinFilterSize, MaxKernelSize, SearchRadius), its search dilated
+    // threefold.
+    let searchRadius = min(max(3.0 * minFilter, maxKernel), depth * tanUv);
+
+    var depthSum = 0.0;
+    var weight = 0.0;
+    var offsetSum = float2(0.0);
+    var offsetSquares = float2(0.0);
+    var crossSum = 0.0;
+    for (uint i = 0; i < kPcssSearchSamples; ++i) {
+        let s = diskSample(i, kPcssSearchSamples);
+        let offset = s * searchRadius;
+        let stored = cascadeDepth(view, int2(floor((uv + offset) * texels)), texels);
+        if (depth - stored > max(dot(biasDot, offset), 0.0)) {
+            depthSum += stored;
+            weight += 1.0;
+            offsetSum += s;
+            offsetSquares += s * s;
+            crossSum += s.x * s.y;
+        }
+    }
+    if (weight == 0.0) {
+        return 1.0;
+    }
+    if (weight >= float(kPcssSearchSamples)) {
+        return 0.0;
+    }
+    let blocker = depthSum / weight;
+    let occluderDistance = depth - blocker;
+    let penumbra = min(tanUv * occluderDistance, maxKernel);
+    // The disk filter as wide as the penumbra, whose profile across an edge it then is: Unreal
+    // narrows it to 0.75 (RandomFilterScale) for looks, which would shrink the light's size.
+    let rawRadius = penumbra;
+    let radius = max(minFilter, rawRadius);
+    let gradient = offsetSum / weight;
+
+    // Elongated along the blockers' edge (Unreal's PCSS_ANTI_ALIASING_METHOD 2): by their
+    // offsets' covariance where they spread along a line, else across their mean offset.
+    let nonDiagonal = weight * crossSum - gradient.x * gradient.y;
+    let diagonal = float2(weight * offsetSquares.x - gradient.x * gradient.x,
+                          weight * offsetSquares.y - gradient.y * gradient.y);
+    let trace = diagonal.x + diagonal.y;
+    let t = sqrt(max(trace * trace - 4.0 * (diagonal.x * diagonal.y - nonDiagonal * nonDiagonal),
+                     0.0));
+    let largest = 0.5 * (trace + t);
+    let smallest = max(0.5 * (trace - t), 1e-12);
+    let eigenVector = float2(largest - diagonal.y, nonDiagonal);
+    let longest = dot(eigenVector, eigenVector) > 0.0 ? normalize(eigenVector) : float2(1.0, 0.0);
+    let eigenFactor = sqrt(largest / smallest) - 1.3;
+    var covarianceFade = saturate((weight >= 2.0 ? 1.0 : 0.0) * eigenFactor);
+    covarianceFade *= saturate(1.0 - 5.0 * (length(gradient) - 0.5));
+    let across = float2(gradient.y, -gradient.x);
+    let averageAxis = dot(across, across) > 0.0 ? normalize(across) : float2(1.0, 0.0);
+    let axisMix = lerp(averageAxis, longest, covarianceFade);
+    let axis = dot(axisMix, axisMix) > 0.0 ? normalize(axisMix) : float2(1.0, 0.0);
+    let elliptical = min(lerp(length(gradient) * weight, 8.0 * eigenFactor, covarianceFade),
+                         6.0 - 3.0 * covarianceFade) *
+                     (minFilter / radius);
+    let shape = directionalScale(axis, elliptical);
+
+    var lit = 0.0;
+    for (uint j = 0; j < kPcssSamples; ++j) {
+        let offset = mul(shape, diskSample(j, kPcssSamples)) * radius;
+        let stored = cascadeDepth(view, int2(floor((uv + offset) * texels)), texels);
+        lit += softCompare(stored, depth - max(dot(biasDot, offset), 0.0), scale);
+    }
+    var visibility = lit / float(kPcssSamples);
+
+    // Sharpened where the blockers lie to one side (PCSS_ENABLE_POST_PCF_SHARPENING).
+    let spacing = sqrt(1.0 / (float(kPcssSamples) * 3.14159265));
+    let fading = saturate(1.5 * (length(gradient) - spacing));
+    let sharpness = lerp(1.0, clamp(minFilter / max(rawRadius, 1e-12), 1.0, 4.0), fading);
+    return saturate(sharpness * (visibility - 0.5) + 0.5);
+}
+
+// Unreal Engine's cascaded shadow map projection (ShadowProjectionPixelShader.usf) of a distant
+// light's cascade `view` at `world`, whose surface normal is `n`: lit off the map; the 5x5 PCF,
+// squared, as Unreal corrects its over-blur (ApplyPCFOverBlurCorrection); or for a light with a
+// size its PCSS, whose penumbra keeps the light's true width, not squared. Casters carry the bias
+// (`Shadows::casterBias`): the receiver is not offset.
+float cascadeVisibility(LightGpu light, uint view, float3 world, float3 n) {
+    let m = lightViews[view];
+    let clip = mul(m, float4(world, 1.0));
+    let uv = float2(0.5 * clip.x + 0.5, 0.5 - 0.5 * clip.y);
+    if (any(uv < float2(0.0)) || any(uv > float2(1.0))) {
+        return 1.0;
+    }
+    let depth = min(clip.z, 0.99999);
+    let texels = light.map.x;
+    let texelWorld = lightTexelWorld(light, view);
+    let perWorld = length(m[2].xyz);
+    // Comparisons fade in over the casters' constant bias (Unreal's ComputeTransitionSize).
+    let scale = 1.0 / max(0.5 * kCsmBiasHalfTexels * texelWorld * perWorld, 1e-5);
+    let tanRadius = light.extentY.w;
+    if (tanRadius > 0.0) {
+        // The receiver's plane in the map's (u, v, depth), across two of its tangents.
+        let tangent = normalize(cross(n, abs(n.z) < 0.9 ? float3(0.0, 0.0, 1.0)
+                                                        : float3(1.0, 0.0, 0.0)));
+        let bitangent = cross(n, tangent);
+        let along = float3(0.5 * dot(m[0].xyz, tangent), -0.5 * dot(m[1].xyz, tangent),
+                           dot(m[2].xyz, tangent));
+        let across = float3(0.5 * dot(m[0].xyz, bitangent), -0.5 * dot(m[1].xyz, bitangent),
+                            dot(m[2].xyz, bitangent));
+        // Its angular radius in map widths per unit of depth: depth spans 1 / perWorld, the map
+        // 2 / |row 0| (Unreal's TanLightSourceAngle * SZ / SW).
+        let tanUv = tanRadius * length(m[0].xyz) / (2.0 * perWorld);
+        return directionalPcss(view, uv, texels, depth, scale, tanUv, cross(along, across));
+    }
+    let nDotL = saturate(dot(n, light.position.xyz));
+    let visibility =
+        manual5x5Pcf(view, uv, texels, depth, scale * lerp(1.0 - kCsmReceiverBias, 1.0, nDotL));
+    return visibility * visibility;
 }
 
 // `lightVisibility` in shadow view `view`, or with a negative one in the view each tap falls in.

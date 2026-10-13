@@ -183,7 +183,7 @@ PointsDrawable::PointsDrawable(RasterRenderer& renderer)
     shadow.vertexSpirv = shadowVertex;
     shadow.fragmentSpirv = shadowFragment;
     shadow.depthFormat = VK_FORMAT_D32_SFLOAT;
-    shadow.depthBiasSlope = 1.5f;
+    shadow.depthBias = true;
     shadow.depthClamp = true;
     shadowPipeline_ =
         std::make_unique<GraphicsPipeline>(context_, layout_, shadow);

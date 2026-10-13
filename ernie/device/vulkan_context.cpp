@@ -597,6 +597,11 @@ VulkanContext::Create(const VulkanContextOptions& options) {
     // For shadow maps that clamp casters in front of their near
     // plane onto it.
     features.features.depthClamp = supported.features.depthClamp;
+    // For casters' slope-scaled depth bias up to a largest slope
+    // (`vkCmdSetDepthBias`'s clamp).
+    features.features.depthBiasClamp =
+        supported.features.depthBiasClamp;
+    c.depthBiasClamp_ = supported.features.depthBiasClamp == VK_TRUE;
     // For fragment shaders that write storage buffers or use atomics.
     features.features.fragmentStoresAndAtomics =
         supported.features.fragmentStoresAndAtomics;

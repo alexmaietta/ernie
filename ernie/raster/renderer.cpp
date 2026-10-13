@@ -64,8 +64,11 @@ struct ShadowUniforms {
     float minimal[4];
     std::uint32_t debug[4];
     float poisson[32];
+    /// A shadow pass's caster bias in its map's depth: constant, per
+    /// unit of slope, the largest slope, 1 with one.
+    float casterBias[4];
 };
-static_assert(sizeof(ShadowUniforms) == 480,
+static_assert(sizeof(ShadowUniforms) == 496,
               "ShadowUniforms must match frame.slang");
 
 struct ShadingUniforms {
@@ -3048,12 +3051,34 @@ void RasterRenderer::WriteLights(
     std::vector<std::byte> blocks(firstLayeredView_ *
                                   kLightShadowBlockStride);
     for (std::size_t v = 0; v < lightViews_.size(); ++v) {
-        matrices.push_back(lightViews_[v].lightViewProjection);
+        const ShadowCascade& view = lightViews_[v];
+        matrices.push_back(view.lightViewProjection);
         if (v < firstLayeredView_) {
-            std::memcpy(
-                blocks.data() + v * kLightShadowBlockStride,
-                glm::value_ptr(lightViews_[v].lightViewProjection),
-                sizeof(glm::mat4));
+            std::byte* block =
+                blocks.data() + v * kLightShadowBlockStride;
+            std::memcpy(block,
+                        glm::value_ptr(view.lightViewProjection),
+                        sizeof(glm::mat4));
+            // A cascade's caster bias, as Unreal's CSM: in its
+            // depth, which its matrix's third row scales from world
+            // units; the rasterizer adds the slope part
+            // (`RecordShadowMaps`).
+            if (view.splitFar > 0.0f) {
+                const glm::mat4& m = view.lightViewProjection;
+                const float depthPerWorld =
+                    glm::length(glm::vec3(m[0][2], m[1][2], m[2][2]));
+                const float constant =
+                    CascadeCasterBias(view.texelWorldSize) *
+                    depthPerWorld;
+                const float bias[4] = {constant,
+                                       constant *
+                                           kCsmSlopeScaleDepthBias *
+                                           kShadowSlopeBias,
+                                       kMaxSlopeDepthBias, 1.0f};
+                std::memcpy(block +
+                                offsetof(ShadowUniforms, casterBias),
+                            bias, sizeof(bias));
+            }
         }
     }
     if (!matrices.empty()) {
@@ -5249,6 +5274,7 @@ void RasterRenderer::RecordShadowMaps(
                     : lightResolution_;
             shadow.extent = {texels, texels};
             BeginRendering(commands, shadow);
+            SetShadowDepthBias(commands, &lightViews_[v]);
             // Each view draws with its own Shadows block's matrix,
             // which the light pass fits for lights posed on the GPU.
             RasterFrame own = frame;
@@ -5273,6 +5299,29 @@ void RasterRenderer::RecordShadowMaps(
     }
 }
 
+void RasterRenderer::SetShadowDepthBias(
+    VkCommandBuffer commands, const ShadowCascade* view) const {
+    if (view == nullptr || view->splitFar <= 0.0f) {
+        // As before Unreal's: 1.5 times the depth's slope.
+        vkCmdSetDepthBias(commands, 0.0f, 0.0f, 1.5f);
+        return;
+    }
+    // The rasterizer's slope term is its factor times the depth's
+    // change across a texel, the slope times the texel's depth: per
+    // texel, Unreal's slope bias, up to kMaxSlopeDepthBias.
+    const glm::mat4& m = view->lightViewProjection;
+    const float texelDepth =
+        view->texelWorldSize *
+        glm::length(glm::vec3(m[0][2], m[1][2], m[2][2]));
+    const float factor = CascadeCasterBias(1.0f) *
+                         kCsmSlopeScaleDepthBias * kShadowSlopeBias;
+    vkCmdSetDepthBias(commands, 0.0f,
+                      context_.SupportsDepthBiasClamp()
+                          ? factor * kMaxSlopeDepthBias * texelDepth
+                          : 0.0f,
+                      factor);
+}
+
 void RasterRenderer::RecordLayeredLightShadows(
     VkCommandBuffer commands, const RasterFrame& frame,
     std::span<const RasterDrawable* const> drawables) const {
@@ -5291,6 +5340,7 @@ void RasterRenderer::RecordLayeredLightShadows(
         shadow.layers = lightShadowMaps_->Desc().layers;
         shadow.loadDepth = fromBase;
         BeginRendering(commands, shadow);
+        SetShadowDepthBias(commands, nullptr);
         for (std::size_t p = 0; p < layeredPasses_.size(); ++p) {
             const LayeredPass& pass = layeredPasses_[p];
             if (pass.fromBase != fromBase) {
@@ -5812,7 +5862,8 @@ float RasterRenderer::FitCascadeDistance(
             kVisibleFitTurn &&
         glm::length(glm::dvec3(params.camera.transform[3]) -
                     seen_->pose.eye) <=
-            kVisibleFitEyeShift * seen_->nearest) {
+            kVisibleFitEyeShift *
+                static_cast<double>(seen_->nearest)) {
         float seenFar = seen_->farthest;
         if (const std::optional<Bounds3>& box = volumes_->Bounds()) {
             for (int i = 0; i < 8; ++i) {

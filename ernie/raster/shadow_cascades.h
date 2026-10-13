@@ -63,6 +63,37 @@ inline constexpr float kCascadeSnapTexels = 4.0f;
 /// sphere's centre (Unreal's `DepthRangeClamp`, 5000 cm).
 inline constexpr float kCascadeMinDepthHalf = 50.0f;
 
+/// Unreal Engine's cascaded shadow map biases and filtering, its
+/// defaults: `r.Shadow.CSMDepthBias`,
+/// `r.Shadow.CSMSlopeScaleDepthBias`, a light's `ShadowBias` and
+/// `ShadowSlopeBias`, `r.Shadow.ShadowMaxSlopeScaleDepthBias`,
+/// `r.Shadow.CSMReceiverBias` and `r.Shadow.MaxSoftKernelSize`
+/// (texels). Casters move away from the light by kCsmDepthBias
+/// kShadowBias half-texels, plus as much times
+/// kCsmSlopeScaleDepthBias kShadowSlopeBias per unit of their slope
+/// to it, up to kMaxSlopeDepthBias; shading's comparisons fade in
+/// over the constant part (`CascadeCasterBias`). Soft shadows reach
+/// 64 texels rather than Unreal's 40, which cuts a wide sun's
+/// penumbrae short in fine cascades.
+///
+/// Reference: Unreal Engine 5, FProjectedShadowInfo::
+/// UpdateShaderDepthBias and ComputeTransitionSize
+/// (ShadowRendering.cpp).
+inline constexpr float kCsmDepthBias = 10.0f;
+inline constexpr float kCsmSlopeScaleDepthBias = 3.0f;
+inline constexpr float kShadowBias = 0.5f;
+inline constexpr float kShadowSlopeBias = 0.5f;
+inline constexpr float kMaxSlopeDepthBias = 1.0f;
+inline constexpr float kCsmReceiverBias = 0.9f;
+inline constexpr float kMaxSoftKernelTexels = 64.0f;
+
+/// A cascade's constant caster bias in world units, for its texels
+/// `texelWorld` across: Unreal's CSM depth bias times the light's,
+/// in units of half a texel (its sphere's radius over its texels).
+constexpr float CascadeCasterBias(float texelWorld) {
+    return kCsmDepthBias * kShadowBias * 0.5f * texelWorld;
+}
+
 /// View-space split depths from `nearPlane` to `farPlane`, each
 /// cascade `exponent` times as deep as the last (Unreal's
 /// `CascadeDistributionExponent`; 1 for uniform splits).

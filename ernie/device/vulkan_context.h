@@ -171,6 +171,11 @@ class VulkanContext {
         return depthClamp_;
     }
 
+    /// Whether a depth bias can be clamped (`vkCmdSetDepthBias`).
+    bool SupportsDepthBiasClamp() const {
+        return depthBiasClamp_;
+    }
+
     /// Whether fragment shaders can write storage buffers and images
     /// and use atomics there.
     bool SupportsFragmentAtomics() const {
@@ -371,6 +376,7 @@ class VulkanContext {
     bool sparseResidency_ = false;
     bool integerDotProduct_ = false;
     bool depthClamp_ = false;
+    bool depthBiasClamp_ = false;
     bool fragmentAtomics_ = false;
     bool multiDrawIndirect_ = false;
     bool pipelineStatistics_ = false;

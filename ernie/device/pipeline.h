@@ -159,8 +159,9 @@ struct GraphicsPipelineDesc {
     VkColorComponentFlags colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    float depthBiasSlope =
-        0.0f;  ///< Slope-scaled depth bias, e.g. for shadow maps.
+    /// Depth bias, e.g. for shadow maps, set by the pass drawing
+    /// (`vkCmdSetDepthBias`, dynamic state), before its draws.
+    bool depthBias = false;
     /// Clamp depth to the attachment's range rather than clip at the
     /// near and far planes, where the device supports it
     /// (`VulkanContext::SupportsDepthClamp`): a shadow map's casters

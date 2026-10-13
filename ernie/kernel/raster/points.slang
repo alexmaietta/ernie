@@ -324,9 +324,11 @@ float shadowFragment(ShadowVertexOutput in) : SV_Depth {
     }
     // The sphere's surface facing the light over this texel.
     let across = in.corner.x * lightAxis(0) + in.corner.y * lightAxis(1);
-    let front = in.sphere.xyz + in.sphere.w * (across - sqrt(1.0 - rho2) * lightAxis(2));
+    let facing = sqrt(1.0 - rho2);
+    let front = in.sphere.xyz + in.sphere.w * (across - facing * lightAxis(2));
     let clip = mul(shadowViewProj(), float4(front, 1.0));
-    return clip.z / clip.w;
+    // Its own depth, so the caster bias whole: the surface turns `facing` towards the light.
+    return clip.z / clip.w + casterDepthBias(facing);
 }
 
 // Culling: each job's view (x 0 a raster view, its Uniforms in `cullViews`, `draw.records`

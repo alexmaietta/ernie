@@ -335,12 +335,10 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context,
     raster.cullMode = VK_CULL_MODE_NONE;
     raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     raster.lineWidth = 1.0f;
-    raster.depthBiasEnable =
-        desc.depthBiasSlope != 0.0f ? VK_TRUE : VK_FALSE;
+    raster.depthBiasEnable = desc.depthBias ? VK_TRUE : VK_FALSE;
     raster.depthClampEnable =
         desc.depthClamp && context.SupportsDepthClamp() ? VK_TRUE
                                                         : VK_FALSE;
-    raster.depthBiasSlopeFactor = desc.depthBiasSlope;
     VkPipelineMultisampleStateCreateInfo multisample{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -374,12 +372,12 @@ GraphicsPipeline::GraphicsPipeline(const VulkanContext& context,
     blend.attachmentCount =
         static_cast<std::uint32_t>(blendAttachments.size());
     blend.pAttachments = blendAttachments.data();
-    const std::array<VkDynamicState, 2> dynamicStates = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    const std::array<VkDynamicState, 3> dynamicStates = {
+        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_DEPTH_BIAS};
     VkPipelineDynamicStateCreateInfo dynamic{
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-    dynamic.dynamicStateCount =
-        static_cast<std::uint32_t>(dynamicStates.size());
+    dynamic.dynamicStateCount = desc.depthBias ? 3u : 2u;
     dynamic.pDynamicStates = dynamicStates.data();
 
     VkPipelineRenderingCreateInfo rendering{

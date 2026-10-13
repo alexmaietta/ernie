@@ -778,6 +778,12 @@ class RasterRenderer {
     void RecordLayeredLightShadows(
         VkCommandBuffer commands, const RasterFrame& frame,
         std::span<const RasterDrawable* const> drawables) const;
+    /// Sets the rasterizer's depth bias for the casters of light view
+    /// `view`, or with none of the layered passes': a cascade's the
+    /// slope part of Unreal's CSM caster bias (its Shadows block
+    /// holds the constant part); other maps' a slope-scaled bias.
+    void SetShadowDepthBias(VkCommandBuffer commands,
+                            const ShadowCascade* view) const;
     void WriteLights(const FrameParams& params,
                      const std::optional<Bounds3>& bounds);
     /// The temperature models' pass's pipeline, made on first use.
