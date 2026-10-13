@@ -15,6 +15,7 @@
 #include "ernie/device/pipeline.h"
 #include "ernie/device/swapchain.h"
 #include "ernie/device/vulkan_context.h"
+#include "ernie/raster/delegate.h"
 #include "ernie/scene/camera.h"
 #include "ernie/scene/camera_schemas.h"
 #include "ernie/scene/light_schemas.h"
@@ -534,6 +535,10 @@ struct Viewer::State {
         int band = 0;
         bool busy = false;  ///< A capture or recording waits on it.
         std::uint64_t redraws = 0;  ///< See `Viewer::Redraw`.
+        /// The renderer's own progress: what it holds and counts
+        /// (`RenderStats`) changes as it streams or loads.
+        std::uint64_t gpuBytes = 0;
+        std::vector<std::pair<std::string, std::uint64_t>> counters;
         bool operator==(const ViewState&) const = default;
     };
     ViewState lastView;
@@ -1643,7 +1648,6 @@ struct Viewer::State {
             DrawToolStrip(origin);
             DrawAxisIndicator(origin, size);
             DrawToast(origin, size);
-            DrawEcoLeaf(origin, size);
         }
         if (!renderError.empty()) {
             // At the bottom left, beside the axis indicator.
@@ -3245,6 +3249,25 @@ struct Viewer::State {
                 "Capture a screenshot (F10); the Capture "
                 "panel sets where and what");
         }
+        // Eco mode's leaf, left of Capture, while it has paused
+        // rendering.
+        if (ecoPaused) {
+            const std::string ecoLabel =
+                std::string(icons::kLeaf) + "  Eco";
+            const float ecoWidth =
+                ImGui::CalcTextSize(ecoLabel.c_str()).x;
+            ImGui::SetCursorScreenPos(ImVec2(
+                right - lightWidth - shotWidth - style.ItemSpacing.x -
+                    ecoWidth - style.FramePadding.x,
+                origin.y + pad + style.FramePadding.y));
+            ImGui::TextColored(ImVec4(0.30f, 0.78f, 0.35f, 1.0f), "%s",
+                               ecoLabel.c_str());
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Eco mode: rendering paused until something "
+                    "changes");
+            }
+        }
         ImGui::PopStyleVar(4);
         ImGui::PopStyleColor(5);
     }
@@ -3416,8 +3439,19 @@ struct Viewer::State {
         view.height = extent.height;
         view.var = viewVar;
         view.band = viewBand;
-        view.busy = capture.has_value() || recording.has_value();
         view.redraws = redraws;
+        RenderStats stats = delegate->Stats();
+        view.gpuBytes = stats.gpuBytes;
+        view.counters = std::move(stats.counters);
+        // Textures still loading show placeholders: keep rendering
+        // until they are in.
+        const bool loading = std::ranges::any_of(
+            view.counters, [](const auto& counter) {
+                return counter.first == raster_stats::kTexturesLoading &&
+                       counter.second > 0;
+            });
+        view.busy = capture.has_value() || recording.has_value() ||
+                    loading;
         unchangedFrames = view == lastView ? unchangedFrames + 1 : 0;
         lastView = std::move(view);
         const RenderSettings settings =
@@ -3777,30 +3811,6 @@ struct Viewer::State {
         draw->AddText(ImVec2(low.x + pad, low.y + 0.5f * pad),
                       ImGui::GetColorU32(ToImVec4(theme.text)),
                       text.c_str());
-    }
-
-    /// A green leaf at the bottom right of the viewport while eco mode
-    /// has paused rendering.
-    void DrawEcoLeaf(const ImVec2& origin, const ImVec2& size) {
-        if (!ecoPaused) {
-            return;
-        }
-        const float scale = 1.5f;
-        const float pad = 12.0f * contentScale;
-        const float height = ImGui::GetFontSize() * scale;
-        const ImVec2 text = ImGui::CalcTextSize(icons::kLeaf);
-        const ImVec2 extent(text.x * scale, text.y * scale);
-        const ImVec2 at(origin.x + size.x - extent.x - pad,
-                        origin.y + size.y - height - pad);
-        ImGui::GetWindowDrawList()->AddText(
-            ImGui::GetFont(), height, at,
-            ImGui::GetColorU32(ImVec4(0.30f, 0.78f, 0.35f, 1.0f)),
-            icons::kLeaf);
-        if (ImGui::IsMouseHoveringRect(
-                at, ImVec2(at.x + extent.x, at.y + height))) {
-            ImGui::SetTooltip(
-                "Eco mode: rendering paused until something changes");
-        }
     }
 
     /// Shows `text` at the bottom of the viewport for a few seconds.

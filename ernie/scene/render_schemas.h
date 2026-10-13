@@ -148,7 +148,7 @@
       (::ernie::AttributeMeta{.doc = "Measure each frame's luminance, for automatic exposure and " \
                                      "meters.",                                                    \
                               .group = "Image"}))                                                  \
-    X(bool, EcoMode, ::ernie::tokens::kEcoMode, false,                                             \
+    X(bool, EcoMode, ::ernie::tokens::kEcoMode, true,                                              \
       (::ernie::AttributeMeta{.label = "Enabled",                                                  \
                               .doc = "The viewer stops rendering once nothing has changed for "    \
                                      "the frames below, as Omniverse's ECO mode.",                 \

@@ -1122,10 +1122,11 @@ TEST_F(ViewerTest, EcoModePausesRenderingUntilSomethingChanges) {
         }
         return viewer_->EcoPaused();
     };
-    EXPECT_FALSE(pausedAfter(8)) << "off by default";
-    RenderSettings(scene_, "/Render/Settings")
-        .SetEcoMode(true)
-        .SetEcoModeFrames(3);
+    RenderSettings settings(scene_, "/Render/Settings");
+    EXPECT_TRUE(settings.GetEcoMode()) << "on by default";
+    settings.SetEcoMode(false).SetEcoModeFrames(3);
+    EXPECT_FALSE(pausedAfter(8)) << "never paused when off";
+    settings.SetEcoMode(true);
     EXPECT_FALSE(pausedAfter(1)) << "the settings' edit is a change";
     EXPECT_TRUE(pausedAfter(4)) << "paused once still for 3 frames";
     EXPECT_TRUE(pausedAfter(4)) << "and stays paused";

@@ -1382,7 +1382,7 @@ inline constexpr std::string_view kExposureCompensation =
 /// automatic exposure and exposure meters, read back from a later
 /// frame (`RenderDelegate::MeteredLuminance`); default off.
 inline constexpr std::string_view kMeter = "ernie:meter";
-/// RenderSettings `ernie:ecoMode:enabled` (bool, default off) and
+/// RenderSettings `ernie:ecoMode:enabled` (bool, default on) and
 /// `ernie:ecoMode:maxFramesWithoutChange` (int, default 500), as
 /// Omniverse's RTX ECO mode: the viewer stops rendering the viewport
 /// once nothing it shows has changed for that many frames, keeping
