@@ -230,6 +230,10 @@ class Demo(ernie.demo.Demo):
             "Blocks (K)", 250.0, 400.0, BLOCK_TEMPERATURE, on_change=heat
         )
         self.show(1)
+        if viewer is not None:
+            display = viewer.viewport_display
+            display.lights = False
+            viewer.viewport_display = display
 
     def define_camera(
         self, name, product, spectral, bands, variables, filters=()

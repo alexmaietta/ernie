@@ -3076,11 +3076,39 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
     anchoredViews_ = false;
     meshes_.SetAnchoredViews({});
     const RenderPrims prims = ResolveRenderPrims(scene, settings);
-    // The view runs the first product's chain (`DefaultFilterChain`
-    // without products), holding every var and the AOV slots of what
-    // that chain writes.
-    const std::vector<SensorFilterStep> filters =
-        ResolveRenderProducts(scene, {}, settings).front().filters;
+    // The view runs the chain of a product looking through its
+    // camera, as that camera's own sensor (a thermal camera's
+    // bolometer, say): the settings' products first, then the
+    // scene's; else the first product's (`DefaultFilterChain` without
+    // products). It holds every var and the AOV slots of what that
+    // chain writes.
+    const std::vector<RenderProductSpec> own =
+        ResolveRenderProducts(scene, {}, settings);
+    std::vector<SensorFilterStep> filters = own.front().filters;
+    const auto looksThrough = [&](const RenderProductSpec& spec) {
+        return !prims.camera.IsEmpty() && spec.camera == prims.camera;
+    };
+    if (const auto it = std::ranges::find_if(own, looksThrough);
+        it != own.end()) {
+        filters = it->filters;
+    } else {
+        for (const Path& product :
+             scene.Prims(tokens::kRenderProduct)) {
+            if (product.HasPrefix(Path(tokens::kSessionRoot))) {
+                continue;
+            }
+            const RenderProduct view(scene, product);
+            const std::vector<Path> cameras = view.GetCamera();
+            if (!cameras.empty() && cameras.front() == prims.camera) {
+                const Path chosen[] = {product};
+                filters =
+                    ResolveRenderProducts(scene, chosen, settings)
+                        .front()
+                        .filters;
+                break;
+            }
+        }
+    }
     viewAovs_ =
         filters.empty()
             ? std::vector<std::string>{}

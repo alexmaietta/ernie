@@ -156,8 +156,8 @@ class ThermalDemo : public app::Demo {
                         {"Visible", "Thermal camera", "Temperature",
                          "Brightness temperature"},
                         1, [this](std::size_t index) { Show(index); });
-        Widgets().Slider("Blocks (K)", 250.0, 400.0, kBlockTemperature,
-                         [this](double kelvin) {
+        Widgets().Slider("Blocks (K)", 250.0, 400.0,
+                         kBlockTemperature, [this](double kelvin) {
                              for (const char* finish : kFinishes) {
                                  Material(GetScene(),
                                           Path("/World/Looks/" +
@@ -166,6 +166,12 @@ class ThermalDemo : public app::Demo {
                              }
                          });
         Show(1);
+        if (viewer != nullptr) {
+            app::ViewportDisplay display =
+                viewer->GetViewportDisplay();
+            display.lights = false;
+            viewer->SetViewportDisplay(display);
+        }
     }
 
     /// The visible and thermal camera's images, and false-colour
