@@ -23,6 +23,8 @@ set(ERNIE_VERSION "${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
+option(ERNIE_BUILD_BENCHMARKS
+       "Build ernie_benchmarks, Ernie's benchmark suites" OFF)
 option(ERNIE_BUILD_DEMOS
        "Build a program for each of Ernie's C++ demos" OFF)
 option(
@@ -166,4 +168,8 @@ endif()
 if(ERNIE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(ernie/test)
+endif()
+
+if(ERNIE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()
