@@ -413,6 +413,9 @@ class VolumePass {
     glm::dvec3 origin_{0.0};
     glm::vec3 originShift_{0.0f};
     std::uint32_t views_ = 0;
+    /// Per view of the last `Set`, whether any volume lies in its
+    /// frustum, for it to march.
+    std::vector<bool> viewMarches_;
     std::uint32_t seed_ = 0;
     VolumeSettings settings_;
     bool active_ = false;

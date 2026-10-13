@@ -114,6 +114,35 @@ TEST_F(RasterDelegateTest, AVolumeDimsWhatIsBehindIt) {
     }
 }
 
+TEST_F(RasterDelegateTest,
+       AVolumeOutOfViewIsNotMarchedAndComesBackWhole) {
+    // Behind the camera, the volume is not marched and the view shows
+    // what it does without it; back in view, it dims what is behind
+    // it as it did, not from the history of the frames it was away.
+    constexpr double kSigma = 1.2;
+    RasterDelegate delegate(*context_);
+    Scene scene = VolumeScene(kSigma, 0.0);
+    const std::vector<double> through =
+        CentreSpectrum(delegate, scene);
+    ernie::Volume volume(scene, "/World/Cube");
+    volume.GetPrim().SetXform(
+        {.translate = glm::dvec3(0.0, 0.0, 10.0)});
+    const std::vector<double> away = CentreSpectrum(delegate, scene);
+    CentreSpectrum(delegate, scene);
+    volume.GetPrim().SetXform(
+        {.translate = glm::dvec3(0.0, 0.0, 1.0)});
+    const std::vector<double> back = CentreSpectrum(delegate, scene);
+    scene.Set("/World/Cube", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const std::vector<double> bare = CentreSpectrum(delegate, scene);
+    for (std::size_t b = 0; b < bare.size(); ++b) {
+        EXPECT_NEAR(away[b], bare[b], 1e-4 * bare[b]) << "band " << b;
+        EXPECT_NEAR(back[b], through[b], 0.01 * through[b])
+            << "band " << b;
+        EXPECT_LT(through[b], 0.8 * bare[b]) << "band " << b;
+    }
+}
+
 TEST_F(RasterDelegateTest, CloudDropletsLetTheirForwardPeakThrough) {
     // Cloud droplets' narrow forward peak counts as light let through
     // (Bouthors et al.'s modified Mie): the ground behind the cube

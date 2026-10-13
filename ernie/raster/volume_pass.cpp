@@ -1388,6 +1388,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     std::vector<std::uint32_t> runs(
         4 * std::max<std::size_t>(views_, 1), 0);
     std::vector<std::uint32_t> lists;
+    viewMarches_.assign(views_, true);
     {
         ERNIE_ZONE("Volume view lists");
         for (std::uint32_t v = 0; v < views_; ++v) {
@@ -1409,6 +1410,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             runs[4 * v + 1] =
                 static_cast<std::uint32_t>(lists.size()) -
                 runs[4 * v];
+            viewMarches_[v] = runs[4 * v + 1] != 0;
             runs[4 * v + 2] =
                 static_cast<std::uint32_t>(lists.size());
             for (std::size_t i = 0; i < instances.size(); ++i) {
@@ -2098,6 +2100,20 @@ void VolumePass::Record(VkCommandBuffer commands,
                         std::uint32_t height, bool pushbroom,
                         bool sky) const {
     if (!active_) {
+        return;
+    }
+    // Nothing to march where none of this dispatch's views has a
+    // volume in its frustum (their light and shadows, which reach the
+    // views, are found apart): skipped, its history not held, so the
+    // first frame one comes back into view marches it in full. Not
+    // with the Temperature var, which the march writes.
+    bool marches = targets.HoldsMediaTemperature();
+    for (std::uint32_t v = firstView;
+         v < firstView + std::max(targets.RasterLayers(), 1u); ++v) {
+        marches =
+            marches || v >= viewMarches_.size() || viewMarches_[v];
+    }
+    if (!marches) {
         return;
     }
     ERNIE_ZONE("Record volumes");
