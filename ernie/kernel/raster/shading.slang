@@ -328,7 +328,16 @@ struct ShadingResources {
     // The distant lights' long-range visibility maps (long_range.slang's `visibilityMain`, an
     // array), a layer each in `LightGpu::map.w`.
     uint longRangeVisibility;
-    uint padding0;
+    // A terrain's sun horizon maps (terrain_sun_horizon.slang, an array), a layer for each distant
+    // light casting shadows (`LightGpu::patternLayout.x` its index plus 1): the point setting the
+    // horizon towards the light's azimuth (`sunHorizonVisibility`). Their grid: the north-west
+    // corner's x and y relative to the frame's origin, the texel size and the terrain's vertical
+    // exaggeration; their width, height, the terrain's prim id, and 1 with them; the frame
+    // origin's height (subtracted from the terrain's) and the heights' cell size.
+    uint sunHorizonMap;
+    float4 sunHorizonGrid;
+    uint4 sunHorizonInfo;
+    float4 sunHorizonHeights;
 }
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShadingResources> resources;
@@ -784,6 +793,97 @@ float4 longRangeGroup(LightGpu light, float3 world, float4 wavelengths) {
         result[k] = longRangeAt(held, wavelengths[k]);
     }
     return result;
+}
+
+// The share of a disc whose brightness falls as mu^alpha from its centre (Hestroffer and Magnan's
+// limb darkening, as `sunDisc`) above a straight horizon `x` radii below its centre: across rows y
+// radii above the centre, each row's light (1 - y^2)^((alpha + 1) / 2) (its chord's, in closed
+// form), integrated as cos(phi)^(alpha + 2) over y = sin(phi).
+float limbVisible(float x, float alpha) {
+    if (x >= 1.0) {
+        return 1.0;
+    }
+    if (x <= -1.0) {
+        return 0.0;
+    }
+    let low = asin(-x);
+    let power = alpha + 2.0;
+    var part = 0.0;
+    var whole = 0.0;
+    for (uint i = 0; i < 16; ++i) {
+        let s = (float(i) + 0.5) / 16.0;
+        part += pow(cos(lerp(low, 0.5 * PI, s)), power);
+        whole += pow(cos(lerp(-0.5 * PI, 0.5 * PI, s)), power);
+    }
+    return saturate(part * (0.5 * PI - low) / (whole * PI));
+}
+
+// The share of distant light `light`'s disc (towards `toLight`) that the terrain's horizon
+// towards it leaves `world` on the terrain, from its layer of the sun horizon maps
+// (terrain_sun_horizon.slang): the elevation of the point setting the horizon of each texel about
+// it, seen from `world` itself (its height and its place along the light's azimuth), bilinear,
+// under the light's, the disc limb-darkened at 550 nm. 1 off the map. It sees the whole terrain,
+// on screen or not, at the map's resolution.
+//
+// Reference: V. Timonen and J. Westerholm, "Scalable Height Field Self-Shadowing", Computer
+// Graphics Forum 29(2):723-731, 2010.
+float sunHorizonVisibility(LightGpu light, float3 world, float3 toLight) {
+    let grid = resources.sunHorizonGrid;
+    let size = int2(resources.sunHorizonInfo.xy);
+    let offset = float2(world.x - grid.x, grid.y - world.y);
+    let cell = offset / grid.z - 0.5;
+    if (any(cell < float2(-0.5)) || any(cell > float2(size) - 0.5)) {
+        return 1.0;
+    }
+    let base = int2(floor(cell));
+    let f = cell - float2(base);
+    let maps = heapTextureArrays[resources.sunHorizonMap];
+    let layer = int(light.patternLayout.x) - 1;
+    // Across the grid (columns east, rows south) towards the light, and where `world` lies along
+    // that way, in cells, as the map's points do; its height before exaggeration.
+    let cellSize = resources.sunHorizonHeights.y;
+    let across = float2(light.position.x, -light.position.y);
+    let azimuth = dot(across, across) > 1e-12 ? normalize(across) : float2(1.0, 0.0);
+    let along = dot(offset / cellSize - 0.5, azimuth);
+    let height = (world.z + resources.sunHorizonHeights.x) / grid.w;
+    float tangents[4];
+    for (uint i = 0; i < 4; ++i) {
+        let at = clamp(base + int2(int(i & 1u), int(i >> 1)), int2(0), size - 1);
+        let point = maps.Load(int4(at, layer, 0)).xy;
+        let ahead = point.y - along;
+        // No ground there, or its point not ahead of `world`: no horizon from it.
+        tangents[i] = point.x > -1e29 && ahead > 0.0
+                          ? max((point.x - height) / max(ahead * cellSize, 1e-3), -10.0)
+                          : -10.0;
+    }
+    let tangent = lerp(lerp(tangents[0], tangents[1], f.x), lerp(tangents[2], tangents[3], f.x),
+                       f.y) *
+                  grid.w;
+    let radius = atan(light.extentY.w);
+    let above = asin(clamp(toLight.z, -1.0, 1.0)) - atan(tangent);
+    return limbVisible(above / max(radius, 1e-6), limbDarkening(550.0));
+}
+
+// How much the terrain's horizon towards `light` (`sunHorizonVisibility`) shadows `world` beside
+// its shadow maps: none where the map that sees it (`lightView`) has texels at most half the
+// horizon map's, all where they are as coarse, past its cascades or without maps. Within the
+// last cascade's fade out (whose visibility already fades to lit) it takes over in the fade's
+// first quarter, so that where both shadow, what the fade lets through stays dark.
+float sunHorizonWeight(LightGpu light, float3 world) {
+    if (light.cone.w <= 0.0) {
+        return 1.0;
+    }
+    var out = 0.0;
+    if (hasCascades(light)) {
+        let at = cascadeAt(light, world);
+        if (at.cascade >= uint(light.cone.w)) {
+            return 1.0;
+        }
+        out = saturate(4.0 * at.out);
+    }
+    let m = lightViews[lightView(light, world)];
+    let texel = 2.0 / max(length(m[0].xyz) * light.map.x, 1e-30);
+    return max(saturate(2.0 * texel / resources.sunHorizonGrid.z - 1.0), out);
 }
 
 // The long-range visibility `held` at the maps' wavelengths, at `wavelength` (nm): linear in the
@@ -3059,8 +3159,16 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            let visibility = lightVisibility(light, shadowPoint, surfaceNormal,
+            var visibility = lightVisibility(light, shadowPoint, surfaceNormal,
                                              dot(surfaceNormal, toLight), float2(id.xy));
+            // A distant light over the terrain: the terrain's horizon towards it too, wherever
+            // its shadow maps' texels are coarser than the horizon map's, as far as the view sees.
+            if (type == 0 && light.patternLayout.x != 0 && resources.sunHorizonInfo.w != 0 &&
+                ids.y == resources.sunHorizonInfo.z) {
+                let horizon = sunHorizonVisibility(light, world, toLight);
+                visibility = lerp(visibility, min(visibility, horizon),
+                                  sunHorizonWeight(light, shadowPoint));
+            }
             scale *= visibility * volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;

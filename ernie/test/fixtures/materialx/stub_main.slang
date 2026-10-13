@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // The entry point tests compile generated MaterialX code under, after
-// stub_bridge.slang, in a module importing the generated one; in groups
-// of 2x2 quads, as MaterialX's code takes derivatives.
+// stub_bridge.slang and the generated code; in groups of 2x2 quads, as
+// MaterialX's code takes derivatives.
 
 [shader("compute")]
 [numthreads(8, 8, 1)]

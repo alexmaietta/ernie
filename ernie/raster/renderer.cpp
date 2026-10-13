@@ -738,9 +738,15 @@ struct ShadingResources {
     /// The distant lights' long-range visibility maps
     /// (`LongRangeShadows::Visibility`, an array).
     std::uint32_t longRangeVisibility;
-    std::uint32_t padding;
+    /// A terrain's sun horizon maps (`SunHorizon`, an array), its
+    /// grid, size and heights, 0 in `sunHorizonInfo[3]` without them.
+    std::uint32_t sunHorizonMap;
+    float sunHorizonGrid[4];
+    std::uint32_t sunHorizonInfo[4];
+    float sunHorizonHeights[4];
 };
-static_assert(sizeof(ShadingResources) == 176 &&
+static_assert(sizeof(ShadingResources) == 224 &&
+                  offsetof(ShadingResources, sunHorizonGrid) == 176 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
                   offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
@@ -3214,6 +3220,23 @@ void RasterRenderer::WriteLights(
         for (std::size_t v = first;
              v < first + count && v < lightViews_.size(); ++v) {
             lightViews_[v].shadowMask = params.lights[i].shadowMask;
+        }
+    }
+    // Every distant light casting shadows, a dome's directions aside,
+    // has a layer of a terrain's sun horizon maps in their order, its
+    // index plus 1 in `patternLayout[0]` (a distant light having no
+    // pattern), which drawables set afresh each frame.
+    horizonLights_.clear();
+    sunHorizon_ = SunHorizon{};
+    for (std::size_t i = 0;
+         i < params.lights.size() && i < table.size(); ++i) {
+        const LightParams& light = params.lights[i];
+        if (light.type == LightType::Distant && light.shadows &&
+            !light.domeDiffuse && params.shadows.enabled &&
+            glm::length(light.direction) > 0.0f) {
+            horizonLights_.push_back(glm::normalize(light.direction));
+            table[i].patternLayout[0] =
+                static_cast<std::uint32_t>(horizonLights_.size());
         }
     }
     // Minimal shading's main light, the brightest distant light, and
@@ -7000,6 +7023,16 @@ void RasterRenderer::WriteShadingResources(
         texture(Kind::Texture2D, terrainHorizon_.heights != nullptr
                                      ? *terrainHorizon_.heights
                                      : *noHeights_);
+    resources.sunHorizonMap =
+        texture(Kind::Texture2DArray, sunHorizon_.image != nullptr
+                                          ? *sunHorizon_.image
+                                          : *noHorizon_);
+    std::copy(sunHorizon_.grid.begin(), sunHorizon_.grid.end(),
+              resources.sunHorizonGrid);
+    std::copy(sunHorizon_.info.begin(), sunHorizon_.info.end(),
+              resources.sunHorizonInfo);
+    std::copy(sunHorizon_.heights.begin(), sunHorizon_.heights.end(),
+              resources.sunHorizonHeights);
     resources.atmosphereTransmittance =
         texture(Kind::Texture2DArray, atmosphere_->Transmittance());
     resources.atmosphereMultiple = texture(

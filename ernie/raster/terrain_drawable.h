@@ -434,6 +434,38 @@ class TerrainDrawable : public RasterDrawable {
                            const ComputePipeline& pipeline) const;
     /// Tells the renderer the grid's extent, for its casters' view.
     void SetCastersExtent();
+
+    /// The sun horizon maps (terrain_sun_horizon.slang) that distant
+    /// lights' shadows over the terrain read beyond the cascades'
+    /// fine reach (`RasterRenderer::SunHorizon`), a layer for each of
+    /// `RasterRenderer::HorizonLights`: the point setting the
+    /// horizon towards the light's azimuth (its height, and how far
+    /// along the azimuth it lies), at `sunHorizonScale_`
+    /// cells per texel (so at most `kMaxSunHorizon` texels a side),
+    /// marched over `heightMaxima_`, the heights' maxima in mips. A
+    /// layer is recomputed when the heights change or its light's
+    /// azimuth turns more than `kSunHorizonTurn` radians from the one
+    /// it was computed for.
+    static constexpr std::uint32_t kMaxSunHorizon = 2048;
+    static constexpr float kSunHorizonTurn = 3e-4f;
+    PipelineLayout sunHorizonLayout_;
+    std::unique_ptr<ComputePipeline> heightMaxPipeline_;
+    std::unique_ptr<ComputePipeline> sunHorizonPipeline_;
+    std::unique_ptr<GpuImage> heightMaxima_;
+    std::unique_ptr<GpuImage> sunHorizon_;
+    std::uint32_t sunHorizonScale_ = 1;
+    /// Each light's direction across the grid (columns east, rows
+    /// south) this frame, and each layer's at its last computation.
+    std::vector<glm::vec2> sunAzimuths_;
+    mutable std::vector<std::optional<glm::vec2>> sunHorizonAzimuths_;
+    mutable bool heightMaximaDirty_ = true;
+    /// Makes the sun horizon maps, with a layer for each of `lights`
+    /// at least, the maxima and their pipelines for the current
+    /// heights, when missing.
+    void EnsureSunHorizon(std::uint32_t lights);
+    /// Records the maxima, when the heights changed, and the layers
+    /// of the sun horizon maps whose lights turned.
+    void RecordSunHorizon(VkCommandBuffer commands) const;
 };
 
 }  // namespace ernie

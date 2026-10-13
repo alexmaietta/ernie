@@ -134,6 +134,8 @@ extern const char kTerrainColorSlang[];
 extern const char kTerrainUpdateSlang[];
 /// Horizon maps of heights, for dome occlusion over terrain.
 extern const char kTerrainHorizonSlang[];
+/// Horizons of heights towards the sun, for its shadows over terrain.
+extern const char kTerrainSunHorizonSlang[];
 
 /// Planet modules: shared resources and cube-sphere grid vertex, and
 /// the passes.

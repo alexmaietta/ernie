@@ -382,6 +382,37 @@ class RasterRenderer {
         terrainHorizon_ = horizon;
     }
 
+    /// A terrain's sun horizon maps (terrain_sun_horizon.slang), a
+    /// layer for each of `HorizonLights`, which those lights' shadows
+    /// over it read where the cascades' texels are coarser
+    /// (shading.slang's `sunHorizonVisibility`).
+    struct SunHorizon {
+        const GpuImage* image = nullptr;
+        /// Its north-west corner's x and y relative to the frame's
+        /// origin, its texel size and the terrain's vertical
+        /// exaggeration.
+        std::array<float, 4> grid{};
+        /// Its width and height, the terrain's prim id, and 1.
+        std::array<std::uint32_t, 4> info{};
+        /// The frame origin's height (subtracted from the terrain's)
+        /// and the heights' cell size.
+        std::array<float, 4> heights{};
+    };
+
+    /// Towards each distant light casting shadows this frame (a
+    /// dome's directions aside), in the order of their layers of a
+    /// terrain's sun horizon maps. Known before drawables prepare
+    /// (`RasterDrawable::Prepare`).
+    const std::vector<glm::vec3>& HorizonLights() const {
+        return horizonLights_;
+    }
+
+    /// Sets the sun horizon maps this frame's shading reads; none
+    /// unless a drawable sets them each frame.
+    void SetSunHorizon(const SunHorizon& horizon) {
+        sunHorizon_ = horizon;
+    }
+
     /// As `SetDomeMap(map)`, with `lighting` (when not nullptr)
     /// lighting the scene in its place: the map without a sun lit as
     /// a distant light of its own (`ExtractDomeSun`), while the sky
@@ -1441,6 +1472,8 @@ class RasterRenderer {
     /// their place otherwise.
     bool domeShadowed_ = false;
     TerrainHorizon terrainHorizon_;
+    std::vector<glm::vec3> horizonLights_;
+    SunHorizon sunHorizon_;
     std::unique_ptr<GpuImage>
         noHorizon_;  ///< Binds in place of a terrain's horizon map.
     std::unique_ptr<GpuImage>

@@ -124,6 +124,27 @@ constexpr DescriptorBinding kHorizonBindings[] = {
      VK_SHADER_STAGE_COMPUTE_BIT},
 };
 
+/// terrain_sun_horizon.slang's bindings: the finer level of the
+/// heights' maxima (or the heights), the level to write, every level
+/// of the maxima, and the sun horizon map's layer to write.
+constexpr DescriptorBinding kSunHorizonBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// terrain_sun_horizon.slang's constants.
+struct SunHorizonConstants {
+    std::uint32_t size[4];
+    float values[4];
+    float sun[4];
+};
+
 /// terrain_horizon.slang's constants.
 struct HorizonConstants {
     std::uint32_t size[4];
@@ -210,7 +231,9 @@ TerrainDrawable::TerrainDrawable(RasterRenderer& renderer)
       updateLayout_(renderer.Context(), kUpdateBindings,
                     sizeof(UpdateConstants)),
       horizonLayout_(renderer.Context(), kHorizonBindings,
-                     sizeof(HorizonConstants)) {
+                     sizeof(HorizonConstants)),
+      sunHorizonLayout_(renderer.Context(), kSunHorizonBindings,
+                        sizeof(SunHorizonConstants)) {
     const std::vector<ShaderModuleSource> update{
         {"terrain_update", shaders::kTerrainUpdateSlang}};
     const auto compile = [&](const char* entry) {
@@ -296,6 +319,8 @@ void TerrainDrawable::ClearHeightfield() {
     readbackPending_ = {};
     horizon_.reset();
     horizonDirty_ = true;
+    heightMaxima_.reset();
+    sunHorizon_.reset();
     renderer_.SetTerrainExtent(std::nullopt);
 }
 
@@ -307,9 +332,11 @@ void TerrainDrawable::SetCastersExtent() {
 
 void TerrainDrawable::SetHeightfield(const RasterView& raster) {
     CheckRasterView(raster, "Heightfield", 2);
-    // The horizon map follows the new heights, at their size.
+    // The horizon maps follow the new heights, at their size.
     horizon_.reset();
     horizonDirty_ = true;
+    heightMaxima_.reset();
+    sunHorizon_.reset();
     noData_ = raster.noData;
     const std::uint32_t maxSize =
         renderer_.Context().Limits().maxImageDimension2D;
@@ -405,6 +432,8 @@ void TerrainDrawable::AllocateHeightfield(std::uint32_t width,
     height_ = height;
     horizon_.reset();
     horizonDirty_ = true;
+    heightMaxima_.reset();
+    sunHorizon_.reset();
     heights_ = std::make_unique<GpuImage>(
         context, ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT,
                            VK_IMAGE_USAGE_SAMPLED_BIT});
@@ -554,6 +583,7 @@ void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {
         readbackPending_[slot] = true;
         pendingRect_.reset();
         horizonDirty_ = true;
+        heightMaximaDirty_ = true;
     }
     // The horizon map, after the heights it follows, when dome
     // occlusion reads it.
@@ -561,6 +591,167 @@ void TerrainDrawable::RecordCull(VkCommandBuffer commands) const {
         RecordHorizon(commands);
         horizonDirty_ = false;
     }
+    // The sun horizon maps, after them too, when distant lights'
+    // shadows read them.
+    if (sunHorizon_ != nullptr && !sunAzimuths_.empty()) {
+        RecordSunHorizon(commands);
+    }
+}
+
+void TerrainDrawable::EnsureSunHorizon(std::uint32_t lights) {
+    if (heightMaxPipeline_ == nullptr) {
+        const std::vector<ShaderModuleSource> modules{
+            {"terrain_sun_horizon",
+             shaders::kTerrainSunHorizonSlang}};
+        heightMaxPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), sunHorizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "heightMaxMain"));
+        sunHorizonPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), sunHorizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "sunHorizonMain"));
+    }
+    const auto width = static_cast<std::uint32_t>(width_);
+    const auto height = static_cast<std::uint32_t>(height_);
+    if (heightMaxima_ == nullptr) {
+        std::uint32_t mips = 1;
+        while ((std::max(width, height) >> mips) > 0) {
+            ++mips;
+        }
+        heightMaxima_ = std::make_unique<GpuImage>(
+            renderer_.Context(),
+            ImageDesc{width, height, 1, mips, VK_FORMAT_R32_SFLOAT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                          VK_IMAGE_USAGE_STORAGE_BIT});
+        heightMaximaDirty_ = true;
+        sunHorizon_.reset();
+    }
+    if (sunHorizon_ != nullptr &&
+        sunHorizon_->Desc().layers >= lights) {
+        return;
+    }
+    // A layer for each light, all computed afresh.
+    const std::uint32_t longest = std::max(width, height);
+    sunHorizonScale_ =
+        (longest + kMaxSunHorizon - 1) / kMaxSunHorizon;
+    sunHorizon_ = std::make_unique<GpuImage>(
+        renderer_.Context(),
+        ImageDesc{(width + sunHorizonScale_ - 1) / sunHorizonScale_,
+                  (height + sunHorizonScale_ - 1) / sunHorizonScale_,
+                  std::max(lights, 1u), 1, VK_FORMAT_R32G32_SFLOAT,
+                  VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_STORAGE_BIT,
+                  false, true});
+    sunHorizonAzimuths_.assign(sunHorizon_->Desc().layers,
+                               std::nullopt);
+}
+
+void TerrainDrawable::RecordSunHorizon(
+    VkCommandBuffer commands) const {
+    // The layers whose lights turned, or all with new heights.
+    std::vector<std::uint32_t> layers;
+    for (std::uint32_t layer = 0; layer < sunAzimuths_.size();
+         ++layer) {
+        const std::optional<glm::vec2>& was =
+            sunHorizonAzimuths_[layer];
+        if (heightMaximaDirty_ || !was ||
+            std::acos(std::clamp(glm::dot(*was, sunAzimuths_[layer]),
+                                 -1.0f, 1.0f)) > kSunHorizonTurn) {
+            layers.push_back(layer);
+        }
+    }
+    if (layers.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(renderer_.Context(), commands,
+                   "Terrain sun horizon");
+    const auto barrier = [&] {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    // Each pass writes one of `target` (a level of the maxima) and
+    // `layer` (of the sun horizon maps), the other bound unused.
+    const auto dispatch = [&](const ComputePipeline& pipeline,
+                              VkImageView finer, VkImageLayout layout,
+                              VkImageView target, std::uint32_t layer,
+                              const SunHorizonConstants& constants) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          pipeline.Handle());
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(finer, layout),
+            DescriptorResource::Of(target, VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(heightMaxima_->View(),
+                                   VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(sunHorizon_->LayerView(layer),
+                                   VK_IMAGE_LAYOUT_GENERAL)};
+        sunHorizonLayout_.Push(
+            commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        sunHorizonLayout_.PushConstants(commands, &constants,
+                                        sizeof(constants));
+        vkCmdDispatch(commands, (constants.size[2] + 7) / 8,
+                      (constants.size[3] + 7) / 8, 1);
+    };
+    heightMaxima_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    sunHorizon_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    if (heightMaximaDirty_) {
+        // Level 0 from the heights, then each level from the last.
+        const auto width = static_cast<std::uint32_t>(width_);
+        const auto height = static_cast<std::uint32_t>(height_);
+        SunHorizonConstants constants{};
+        constants.size[0] = width;
+        constants.size[1] = height;
+        constants.size[2] = width;
+        constants.size[3] = height;
+        constants.values[0] = noData_.value_or(0.0f);
+        constants.values[1] = noData_ ? 1.0f : 0.0f;
+        dispatch(*heightMaxPipeline_, heights_->View(),
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                 heightMaxima_->MipView(0), 0, constants);
+        for (std::uint32_t mip = 1; mip < heightMaxima_->Desc().mips;
+             ++mip) {
+            barrier();
+            constants.size[0] = std::max(width >> (mip - 1), 1u);
+            constants.size[1] = std::max(height >> (mip - 1), 1u);
+            constants.size[2] = std::max(width >> mip, 1u);
+            constants.size[3] = std::max(height >> mip, 1u);
+            constants.values[1] = 0.0f;
+            dispatch(*heightMaxPipeline_,
+                     heightMaxima_->MipView(mip - 1),
+                     VK_IMAGE_LAYOUT_GENERAL,
+                     heightMaxima_->MipView(mip), 0, constants);
+        }
+        heightMaximaDirty_ = false;
+        barrier();
+    }
+    SunHorizonConstants constants{};
+    constants.size[0] = static_cast<std::uint32_t>(width_);
+    constants.size[1] = static_cast<std::uint32_t>(height_);
+    constants.size[2] = sunHorizon_->Desc().width;
+    constants.size[3] = sunHorizon_->Desc().height;
+    constants.values[0] = static_cast<float>(sunHorizonScale_);
+    constants.values[1] = static_cast<float>(pixelSize_);
+    constants.sun[2] = static_cast<float>(heightMaxima_->Desc().mips);
+    for (const std::uint32_t layer : layers) {
+        constants.sun[0] = sunAzimuths_[layer].x;
+        constants.sun[1] = sunAzimuths_[layer].y;
+        dispatch(*sunHorizonPipeline_, heightMaxima_->MipView(0),
+                 VK_IMAGE_LAYOUT_GENERAL, heightMaxima_->MipView(0),
+                 layer, constants);
+        sunHorizonAzimuths_[layer] = sunAzimuths_[layer];
+    }
+    sunHorizon_->Transition(commands,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    heightMaxima_->Transition(
+        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 float TerrainDrawable::HorizonLevel(std::size_t level) const {
@@ -881,6 +1072,32 @@ void TerrainDrawable::Prepare(
         }
     }
     renderer_.SetTerrainHorizon(horizon);
+    // The sun horizon maps for the shadows of the distant lights that
+    // cast them, a layer each.
+    sunAzimuths_.clear();
+    const std::vector<glm::vec3>& lights = renderer_.HorizonLights();
+    if (HasHeightfield() && !lights.empty()) {
+        EnsureSunHorizon(static_cast<std::uint32_t>(lights.size()));
+        for (const glm::vec3& toLight : lights) {
+            // Across the grid: columns east, rows south. A light
+            // overhead has no azimuth, nor a horizon that hides it.
+            const glm::vec2 across(toLight.x, -toLight.y);
+            sunAzimuths_.push_back(glm::length(across) > 1e-6f
+                                       ? glm::normalize(across)
+                                       : glm::vec2(1.0f, 0.0f));
+        }
+        RasterRenderer::SunHorizon sun;
+        sun.image = sunHorizon_.get();
+        sun.grid = {static_cast<float>(originX_ - origin_.x),
+                    static_cast<float>(originY_ - origin_.y),
+                    static_cast<float>(pixelSize_ * sunHorizonScale_),
+                    params_.exaggeration};
+        sun.info = {sunHorizon_->Desc().width,
+                    sunHorizon_->Desc().height, params_.primId, 1};
+        sun.heights = {static_cast<float>(origin_.z),
+                       static_cast<float>(pixelSize_), 0.0f, 0.0f};
+        renderer_.SetSunHorizon(sun);
+    }
     if (!HasHeightfield()) {
         return;
     }

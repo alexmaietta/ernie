@@ -431,6 +431,125 @@ TEST_F(CascadeShadowTest, ReferenceTheGroundFromOrbit) {
     ExpectExact(*context_, reference);
 }
 
+namespace {
+
+/// A flat terrain 5 km across with a wall 300 m high and 200 m thick
+/// along y through x = 0, under distant lights 20 degrees up towards
+/// each of `azimuths` (degrees from +x), seen straight down from 4 km
+/// over x = -500 with the cascades only 10 m long: past them the
+/// terrain's sun horizon maps alone shadow it. The green channel
+/// along the image's middle rows at each world x in `xs`.
+std::vector<double> WallShadows(const ernie::VulkanContext& context,
+                                const std::vector<double>& azimuths,
+                                const std::vector<double>& xs) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    constexpr int kCells = 257;
+    constexpr double kCell = 20.0;
+    const double half = 0.5 * (kCells - 1) * kCell;
+    std::vector<float> heights(kCells * kCells, 0.0f);
+    for (int row = 0; row < kCells; ++row) {
+        for (int col = 0; col < kCells; ++col) {
+            const double x = -half + col * kCell;
+            if (std::abs(x) <= 100.0) {
+                heights[row * kCells + col] = 300.0f;
+            }
+        }
+    }
+    Scene scene;
+    Terrain::Define(scene, "/World/Ground")
+        .SetHeights(Tensor::Copy<float>(heights, {kCells, kCells}))
+        .SetOrigin(glm::dvec2(-half, half))
+        .SetCellSize(kCell)
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    for (std::size_t i = 0; i < azimuths.size(); ++i) {
+        const std::string path = "/World/Sun" + std::to_string(i);
+        DistantLight::Define(scene, path)
+            .SetAngle(0.53)
+            .SetIrradiance(4.0);
+        const double a = glm::radians(azimuths[i]);
+        const double e = glm::radians(20.0);
+        scene.Set(path, tokens::kTransform,
+                  DistantLightTransform({std::cos(e) * std::cos(a),
+                                         std::cos(e) * std::sin(a),
+                                         std::sin(e)}));
+    }
+    constexpr std::uint32_t kWidth = 640;
+    constexpr std::uint32_t kHeight = 360;
+    constexpr double kAltitude = 4000.0;
+    constexpr double kEyeX = -500.0;
+    Camera::Define(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetFocalLength(24.0)
+        .SetHorizontalAperture(36.0)
+        .SetVerticalAperture(36.0 * kHeight / kWidth)
+        .SetClippingRange(glm::dvec2(1.0, 1e5))
+        .SetExposure(-8.0);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({kEyeX, 0.0, kAltitude},
+                              {kEyeX, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kWidth, kHeight))
+        .SetAmbient(0.0)
+        .SetShadowDistance(10.0);
+    RasterDelegate delegate(context);
+    Tensor image;
+    for (int frame = 0; frame < 3; ++frame) {
+        image = delegate.Render(scene);
+    }
+    const auto* pixels = image.As<std::uint8_t>();
+    // Straight down: columns along +x, 18 / 24 of the altitude either
+    // side. Linear green, from sRGB.
+    std::vector<double> greens;
+    for (const double x : xs) {
+        const double u = (x - kEyeX) / (kAltitude * 18.0 / 24.0);
+        const auto col =
+            static_cast<std::size_t>((u + 1.0) * 0.5 * kWidth);
+        double sum = 0.0;
+        for (std::size_t row = kHeight / 2 - 8; row < kHeight / 2 + 8;
+             ++row) {
+            const double s =
+                pixels[(row * kWidth + col) * 4 + 1] / 255.0;
+            sum += s <= 0.04045 ? s / 12.92
+                                : std::pow((s + 0.055) / 1.055, 2.4);
+        }
+        greens.push_back(sum / 16.0);
+    }
+    return greens;
+}
+
+}  // namespace
+
+// Past the cascades, the terrain's horizon towards the sun shadows
+// it: a wall 300 m high under a sun 20 degrees up from +x shades the
+// ground west of it out to 824 m, its penumbra metres wide.
+TEST_F(CascadeShadowTest, TheTerrainsHorizonShadowsPastTheCascades) {
+    // Shadowed: 150 and 700 m west of the wall; lit: 1100 m west and
+    // east of it.
+    const std::vector<double> green = WallShadows(
+        *context_, {0.0}, {-250.0, -800.0, -1200.0, 400.0});
+    const double lit = 0.5 * (green[2] + green[3]);
+    ASSERT_GT(lit, 0.05);
+    ASSERT_LT(lit, 0.9) << "short of white";
+    EXPECT_NEAR(green[3], green[2], 0.1 * lit);
+    EXPECT_LT(green[0], 0.1 * lit) << "150 m into the shadow";
+    EXPECT_LT(green[1], 0.1 * lit) << "100 m short of its end";
+}
+
+// No distant light is special: each casting shadows has its own sun
+// horizon map. Two equal suns from either side each shadow the side
+// away from them, which the other alone lights.
+TEST_F(CascadeShadowTest, EveryDistantLightHasItsOwnHorizon) {
+    const std::vector<double> green = WallShadows(
+        *context_, {0.0, 180.0}, {-500.0, -1300.0, 500.0, 1300.0});
+    ASSERT_GT(green[1], 0.05);
+    ASSERT_LT(green[1], 0.9) << "lit by both, short of white";
+    EXPECT_NEAR(green[0] / green[1], 0.5, 0.12) << "west of the wall";
+    EXPECT_NEAR(green[2] / green[3], 0.5, 0.12) << "east of the wall";
+}
+
 // A moon far towards the sun, beyond the cascades' casters
 // (`kLongRangeStart`), casts through the sun's long-range view, after
 // its cascades.
