@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Terrain horizons towards the sun, for the sun's shadows over the whole terrain whatever the
-// distance (shading.slang's `sunHorizonVisibility`), where the cascades' texels grow coarse.
+// distance (shading.slang's `flatHorizonVisibility`), where the cascades' texels grow coarse.
 //
 // `heightMaxMain` builds a chain of the heights' maxima: level 0 the heights with no-data and NaN
 // cells as kNoHeight, each level after the highest of the 2 x 2 cells under a texel (and of the

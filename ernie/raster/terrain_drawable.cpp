@@ -1105,16 +1105,18 @@ void TerrainDrawable::Prepare(
         }
         RasterRenderer::SunHorizon sun;
         sun.image = sunHorizon_.get();
-        sun.grid = {static_cast<float>(originX_ - origin_.x),
-                    static_cast<float>(originY_ - origin_.y),
-                    static_cast<float>(pixelSize_ * sunHorizonScale_),
-                    params_.exaggeration};
-        sun.info = {sunHorizon_->Desc().width,
-                    sunHorizon_->Desc().height, params_.primId, 1};
-        sun.heights = {static_cast<float>(origin_.z),
-                       static_cast<float>(pixelSize_),
-                       static_cast<float>(group), 0.0f};
-        renderer_.SetSunHorizon(sun);
+        sun.ids = {0, params_.primId,
+                   RasterRenderer::SunHorizon::kFlat, group};
+        sun.size = {sunHorizon_->Desc().width,
+                    sunHorizon_->Desc().height, 0, 0};
+        sun.scale = {
+            static_cast<float>(pixelSize_ * sunHorizonScale_),
+            params_.exaggeration, static_cast<float>(pixelSize_),
+            static_cast<float>(origin_.z)};
+        sun.place = {static_cast<float>(originX_ - origin_.x),
+                     static_cast<float>(originY_ - origin_.y), 0.0f,
+                     0.0f};
+        renderer_.AddSunHorizon(sun);
     }
     if (!HasHeightfield()) {
         return;

@@ -657,6 +657,89 @@ TEST_F(CascadeShadowTest, LightLinksFilterWhatTemperatureModelsSee) {
     EXPECT_NEAR(linked, 300.0f, 8.0f);
 }
 
+// A planet Terrain's horizon shadows it past the cascades too: on a
+// Moon-sized body a ridge 6 km high and 11 km wide along a meridian,
+// under a sun 10 degrees up from the east, shades the ground west of
+// its foot for the d where the ground, falling away as d^2 / 2R,
+// meets the ray from its top, H - d tan 10 = -d^2 / 2R: 36 km (34 on
+// flat ground). Seen from 300 km up with the cascades only 10 m long.
+TEST_F(CascadeShadowTest, APlanetsHorizonShadowsPastTheCascades) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    constexpr double kMoon = 1737.4e3;
+    constexpr int kCells = 1024;
+    constexpr int kPoints = kCells + 1;
+    // Face 0 (+x): columns along +y, the ridge about y = 0.
+    std::vector<float> heights(6 * kPoints * kPoints, 0.0f);
+    for (int row = 0; row < kPoints; ++row) {
+        for (int col = kCells / 2 - 2; col <= kCells / 2 + 2; ++col) {
+            heights[row * kPoints + col] = 6000.0f;
+        }
+    }
+    Scene scene;
+    Terrain::Define(scene, "/World/Moon")
+        .SetHeights(
+            Tensor::Copy<float>(heights, {6, kPoints, kPoints}))
+        .SetPlanetRadius(kMoon)
+        .SetMaterialBinding("/Looks/Grey");
+    Material::Define(scene, "/Looks/Grey").SetAlbedo(glm::dvec3(0.5));
+    const double e = glm::radians(10.0);
+    DistantLight::Define(scene, "/World/Sun")
+        .SetAngle(0.53)
+        .SetIrradiance(20.0);
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform({std::sin(e), std::cos(e), 0.0}));
+    constexpr std::uint32_t kWidth = 640;
+    constexpr std::uint32_t kHeight = 360;
+    constexpr double kAltitude = 300e3;
+    constexpr double kEyeY = -30e3;
+    Camera::Define(scene, "/World/Camera")
+        .SetSensorNoise(false)
+        .SetFocalLength(24.0)
+        .SetHorizontalAperture(36.0)
+        .SetVerticalAperture(36.0 * kHeight / kWidth)
+        .SetClippingRange(glm::dvec2(1e3, 1e7))
+        .SetExposure(-8.0);
+    scene.Set("/World/Camera", tokens::kTransform,
+              LookAtTransform({kMoon + kAltitude, kEyeY, 0.0},
+                              {kMoon, kEyeY, 0.0}, {0.0, 0.0, 1.0}));
+    RenderSettings::Define(scene, "/Render/Settings")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kWidth, kHeight))
+        .SetAmbient(0.0)
+        .SetShadowDistance(10.0);
+    RasterDelegate delegate(*context_);
+    Tensor image;
+    for (int frame = 0; frame < 3; ++frame) {
+        image = delegate.Render(scene);
+    }
+    const auto* pixels = image.As<std::uint8_t>();
+    // Straight down at the body: columns along +y, 18 / 24 of the
+    // altitude either side. Linear green, from sRGB.
+    const auto green = [&](double y) {
+        const double u = (y - kEyeY) / (kAltitude * 18.0 / 24.0);
+        const auto col =
+            static_cast<std::size_t>((u + 1.0) * 0.5 * kWidth);
+        double sum = 0.0;
+        for (std::size_t row = kHeight / 2 - 8; row < kHeight / 2 + 8;
+             ++row) {
+            const double s =
+                pixels[(row * kWidth + col) * 4 + 1] / 255.0;
+            sum += s <= 0.04045 ? s / 12.92
+                                : std::pow((s + 0.055) / 1.055, 2.4);
+        }
+        return sum / 16.0;
+    };
+    // Its foot at y = -5.4 km: shadowed to y = -41.6 km. The sun is
+    // lower to the west, the ground there dimmer for it.
+    const double lit = green(-60e3);
+    ASSERT_GT(lit, 0.03);
+    ASSERT_LT(lit, 0.9) << "short of white";
+    EXPECT_GT(green(40e3), lit) << "east of the ridge, a higher sun";
+    EXPECT_LT(green(-15e3), 0.1 * lit) << "10 km into the shadow";
+    EXPECT_LT(green(-35e3), 0.1 * lit) << "7 km short of its end";
+}
+
 // A moon far towards the sun, beyond the cascades' casters
 // (`kLongRangeStart`), casts through the sun's long-range view, after
 // its cascades.

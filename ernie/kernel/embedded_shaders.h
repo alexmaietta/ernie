@@ -136,6 +136,11 @@ extern const char kTerrainUpdateSlang[];
 extern const char kTerrainHorizonSlang[];
 /// Horizons of heights towards the sun, for its shadows over terrain.
 extern const char kTerrainSunHorizonSlang[];
+/// The cube sphere's face mapping, for kernels outside the planet
+/// passes.
+extern const char kCubeSphereSlang[];
+/// Planet Terrains' horizons towards each distant light.
+extern const char kPlanetSunHorizonSlang[];
 
 /// Planet modules: shared resources and cube-sphere grid vertex, and
 /// the passes.

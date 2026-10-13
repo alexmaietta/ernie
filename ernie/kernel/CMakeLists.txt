@@ -86,6 +86,8 @@ set(ernie_shaders
     raster/terrain_update.slang=kTerrainUpdateSlang
     raster/terrain_horizon.slang=kTerrainHorizonSlang
     raster/terrain_sun_horizon.slang=kTerrainSunHorizonSlang
+    raster/cube_sphere.slang=kCubeSphereSlang
+    raster/planet_sun_horizon.slang=kPlanetSunHorizonSlang
     raster/views.slang=kViewsSlang
     raster/volume.slang=kVolumeSlang
     texture/bc7.slang=kBc7Slang

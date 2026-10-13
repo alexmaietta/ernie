@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/raster/planet_drawable.h"
 
+#include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/util/profile.h"
 
@@ -22,6 +23,28 @@ namespace ernie {
 namespace {
 
 constexpr std::size_t kInitialPatchCapacity = 256;
+
+/// planet_sun_horizon.slang's bindings: the finer level of the faces'
+/// heights' maxima (or the heights), the level to write, every level
+/// of the maxima, and the sun horizon maps to write.
+constexpr DescriptorBinding kSunHorizonBindings[] = {
+    {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+     VK_SHADER_STAGE_COMPUTE_BIT},
+};
+
+/// planet_sun_horizon.slang's constants.
+struct SunHorizonConstants {
+    std::uint32_t size[4];
+    float sun[4];
+    float body[4];
+    float shape[4];
+};
 
 /// LOD levels the uniforms carry morph ranges for.
 constexpr std::uint32_t kMorphLevels = 32;
@@ -300,6 +323,8 @@ void PlanetDrawable::ClearHeights() {
     vkDeviceWaitIdle(renderer_.Context().Device());
     heights_.reset();
     gradients_.reset();
+    heightMaxima_.reset();
+    sunHorizon_.reset();
     pages_.reset();
     lod_ = CubeSphereLod();
     patches_.clear();
@@ -404,6 +429,9 @@ void PlanetDrawable::SetHeights(
     maxHeight_ = range.x <= range.y ? range.y : 0.0f;
     heights_ = std::move(heights);
     gradients_ = std::move(gradientImage);
+    // The sun horizon maps follow the new heights, at their size.
+    heightMaxima_.reset();
+    sunHorizon_.reset();
 }
 
 void PlanetDrawable::SetPages(std::unique_ptr<PlanetPages> pages) {
@@ -423,10 +451,192 @@ std::uint64_t PlanetDrawable::GpuBytes() const {
     if (heights_ != nullptr) {
         bytes += heights_->Bytes() + gradients_->Bytes();
     }
+    if (heightMaxima_ != nullptr) {
+        bytes += heightMaxima_->Bytes();
+    }
+    if (sunHorizon_ != nullptr) {
+        bytes += sunHorizon_->Bytes();
+    }
     if (pages_ != nullptr) {
         bytes += pages_->Pool().Size();
     }
     return bytes;
+}
+
+void PlanetDrawable::EnsureSunHorizon(std::uint32_t lights) {
+    if (sunHorizonLayout_ == nullptr) {
+        sunHorizonLayout_ = std::make_unique<PipelineLayout>(
+            renderer_.Context(), kSunHorizonBindings,
+            sizeof(SunHorizonConstants));
+        const std::vector<ShaderModuleSource> modules{
+            {"cube_sphere", shaders::kCubeSphereSlang},
+            {"planet_sun_horizon", shaders::kPlanetSunHorizonSlang}};
+        heightMaxPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), *sunHorizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "planetHeightMaxMain"));
+        sunHorizonPipeline_ = std::make_unique<ComputePipeline>(
+            renderer_.Context(), *sunHorizonLayout_,
+            renderer_.Compiler().CompileSpirv(modules,
+                                              "planetHorizonMain"));
+    }
+    const std::uint32_t points = lod_.FaceCells() + 1;
+    if (heightMaxima_ == nullptr) {
+        std::uint32_t mips = 1;
+        while ((points >> mips) > 0) {
+            ++mips;
+        }
+        heightMaxima_ = std::make_unique<GpuImage>(
+            renderer_.Context(),
+            ImageDesc{points, points, CubeSphereLod::kFaces, mips,
+                      VK_FORMAT_R32_SFLOAT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                          VK_IMAGE_USAGE_STORAGE_BIT,
+                      false, true});
+        heightMaximaDirty_ = true;
+        sunHorizon_.reset();
+        // New heights: their reach found afresh (`Prepare`).
+        sunHorizonExaggeration_ =
+            std::numeric_limits<float>::quiet_NaN();
+    }
+    const std::uint32_t layers =
+        CubeSphereLod::kFaces * std::max(lights, 1u);
+    if (sunHorizon_ != nullptr &&
+        sunHorizon_->Desc().layers >= layers) {
+        return;
+    }
+    // Layers for every light, all marched afresh.
+    const std::uint32_t texels =
+        std::min(lod_.FaceCells(), kMaxSunHorizon);
+    sunHorizon_ = std::make_unique<GpuImage>(
+        renderer_.Context(),
+        ImageDesc{texels, texels, layers, 1, VK_FORMAT_R32G32_SFLOAT,
+                  VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_STORAGE_BIT,
+                  false, true});
+    sunHorizonDirections_.assign(layers / CubeSphereLod::kFaces,
+                                 std::nullopt);
+}
+
+void PlanetDrawable::RecordCull(VkCommandBuffer commands) const {
+    if (sunHorizon_ != nullptr && !sunDirections_.empty()) {
+        RecordSunHorizon(commands);
+    }
+}
+
+void PlanetDrawable::RecordSunHorizon(
+    VkCommandBuffer commands) const {
+    // The lights whose layers are due: turned against the body, or
+    // all with new heights; none for lights the body needs no horizon
+    // towards, whose layers are left to march once it does.
+    std::vector<std::uint32_t> due;
+    for (std::uint32_t light = 0; light < sunDirections_.size();
+         ++light) {
+        std::optional<glm::dvec3>& was = sunHorizonDirections_[light];
+        const std::optional<glm::dvec3>& now = sunDirections_[light];
+        if (!now) {
+            if (heightMaximaDirty_) {
+                was.reset();
+            }
+            continue;
+        }
+        if (heightMaximaDirty_ || !was ||
+            std::acos(std::clamp(glm::dot(*was, *now), -1.0, 1.0)) >
+                kSunHorizonTurn) {
+            due.push_back(light);
+        }
+    }
+    if (due.empty()) {
+        return;
+    }
+    ERNIE_GPU_ZONE(renderer_.Context(), commands,
+                   "Planet sun horizon");
+    const auto barrier = [&] {
+        VkMemoryBarrier2 memory{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        memory.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+        memory.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        memory.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        VkDependencyInfo dependency{
+            VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &memory;
+        vkCmdPipelineBarrier2(commands, &dependency);
+    };
+    // Each pass writes one of `target` (a level of the maxima) and
+    // the sun horizon maps, the other bound unused; a layer per face.
+    const auto dispatch = [&](const ComputePipeline& pipeline,
+                              VkImageView finer, VkImageLayout layout,
+                              VkImageView target,
+                              const SunHorizonConstants& constants,
+                              std::uint32_t side) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          pipeline.Handle());
+        const DescriptorResource resources[] = {
+            DescriptorResource::Of(finer, layout),
+            DescriptorResource::Of(target, VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(heightMaxima_->View(),
+                                   VK_IMAGE_LAYOUT_GENERAL),
+            DescriptorResource::Of(sunHorizon_->View(),
+                                   VK_IMAGE_LAYOUT_GENERAL)};
+        sunHorizonLayout_->Push(
+            commands, VK_PIPELINE_BIND_POINT_COMPUTE, resources);
+        sunHorizonLayout_->PushConstants(commands, &constants,
+                                         sizeof(constants));
+        vkCmdDispatch(commands, (side + 7) / 8, (side + 7) / 8,
+                      CubeSphereLod::kFaces);
+    };
+    heightMaxima_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    sunHorizon_->Transition(commands, VK_IMAGE_LAYOUT_GENERAL);
+    if (heightMaximaDirty_) {
+        // Level 0 from the heights, then each level from the last.
+        const std::uint32_t points = lod_.FaceCells() + 1;
+        SunHorizonConstants constants{};
+        constants.size[0] = points;
+        constants.size[1] = points;
+        dispatch(*heightMaxPipeline_, heights_->View(),
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                 heightMaxima_->MipView(0), constants, points);
+        for (std::uint32_t mip = 1; mip < heightMaxima_->Desc().mips;
+             ++mip) {
+            barrier();
+            constants.size[0] = std::max(points >> (mip - 1), 1u);
+            constants.size[1] = std::max(points >> mip, 1u);
+            dispatch(
+                *heightMaxPipeline_, heightMaxima_->MipView(mip - 1),
+                VK_IMAGE_LAYOUT_GENERAL, heightMaxima_->MipView(mip),
+                constants, constants.size[1]);
+        }
+        heightMaximaDirty_ = false;
+        barrier();
+    }
+    const std::uint32_t texels = sunHorizon_->Desc().width;
+    SunHorizonConstants constants{};
+    constants.size[0] = lod_.FaceCells();
+    constants.size[1] = texels;
+    constants.size[2] = heightMaxima_->Desc().mips;
+    constants.sun[3] = sunHorizonReach_;
+    constants.body[0] = static_cast<float>(lod_.Radius());
+    constants.body[1] = params_.exaggeration;
+    for (int i = 0; i < 3; ++i) {
+        const double ratio = lod_.Radius() / lod_.Radii()[i];
+        constants.shape[i] = static_cast<float>(ratio * ratio);
+    }
+    for (const std::uint32_t light : due) {
+        const glm::dvec3& towards = *sunDirections_[light];
+        constants.size[3] = light * CubeSphereLod::kFaces;
+        constants.sun[0] = static_cast<float>(towards.x);
+        constants.sun[1] = static_cast<float>(towards.y);
+        constants.sun[2] = static_cast<float>(towards.z);
+        dispatch(*sunHorizonPipeline_, heightMaxima_->MipView(0),
+                 VK_IMAGE_LAYOUT_GENERAL, heightMaxima_->MipView(0),
+                 constants, texels);
+        sunHorizonDirections_[light] = sunDirections_[light];
+    }
+    sunHorizon_->Transition(commands,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    heightMaxima_->Transition(
+        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void PlanetDrawable::FindPages() {
@@ -609,6 +819,75 @@ void PlanetDrawable::Prepare(
         }
     }
     const glm::dmat3 toBody = glm::transpose(params_.planetRotation);
+
+    // The sun horizon maps for the shadows of the distant lights that
+    // cast them, six layers each, on a body with relief.
+    sunDirections_.clear();
+    const std::vector<RasterRenderer::HorizonLight>& lights =
+        renderer_.HorizonLights();
+    if (maxHeight_ > minHeight_ && !lights.empty()) {
+        EnsureSunHorizon(static_cast<std::uint32_t>(lights.size()));
+        // Marched at another exaggeration: every light's afresh, as
+        // far as the body's relief now rises over the horizon.
+        if (sunHorizonExaggeration_ != params_.exaggeration) {
+            sunHorizonExaggeration_ = params_.exaggeration;
+            sunHorizonDirections_.assign(sunHorizonDirections_.size(),
+                                         std::nullopt);
+            const glm::dvec3& radii = lod_.Radii();
+            const double e = params_.exaggeration;
+            const double low =
+                std::min(minHeight_ * e, maxHeight_ * e);
+            const double high =
+                std::max(minHeight_ * e, maxHeight_ * e);
+            const double inner =
+                std::min({radii.x, radii.y, radii.z}) + low;
+            const double outer =
+                std::max({radii.x, radii.y, radii.z}) + high;
+            const double cell = 0.5 * std::numbers::pi /
+                                static_cast<double>(lod_.FaceCells());
+            sunHorizonReach_ = static_cast<float>(
+                1.1 *
+                    std::acos(std::clamp(inner / outer, -1.0, 1.0)) +
+                4.0 * cell);
+        }
+        const std::uint32_t group = params_.linkGroup & 31u;
+        for (const RasterRenderer::HorizonLight& light : lights) {
+            // None for a light that does not light the body, or whose
+            // shadows it does not cast (light linking).
+            if (((light.lightMask >> group) & 1u) == 0 ||
+                ((light.shadowMask >> group) & 1u) == 0) {
+                sunDirections_.emplace_back();
+                continue;
+            }
+            sunDirections_.push_back(
+                glm::normalize(toBody * glm::dvec3(light.towards)));
+        }
+        const std::uint32_t texels = sunHorizon_->Desc().width;
+        RasterRenderer::SunHorizon sun;
+        sun.image = sunHorizon_.get();
+        sun.ids = {0, params_.primId,
+                   RasterRenderer::SunHorizon::kPlanet, group};
+        sun.size = {lod_.FaceCells(), texels, 0, 0};
+        sun.scale = {static_cast<float>(lod_.Radius() * 0.5 *
+                                        std::numbers::pi / texels),
+                     params_.exaggeration, 0.0f, 0.0f};
+        const glm::dvec3 centre = -Offset();
+        sun.place = {static_cast<float>(centre.x),
+                     static_cast<float>(centre.y),
+                     static_cast<float>(centre.z),
+                     static_cast<float>(lod_.Radius())};
+        for (int i = 0; i < 3; ++i) {
+            const double ratio = lod_.Radius() / lod_.Radii()[i];
+            sun.shape[static_cast<std::size_t>(i)] =
+                static_cast<float>(ratio * ratio);
+            for (int j = 0; j < 3; ++j) {
+                sun.axes[static_cast<std::size_t>(i)]
+                        [static_cast<std::size_t>(j)] =
+                    static_cast<float>(params_.planetRotation[i][j]);
+            }
+        }
+        renderer_.AddSunHorizon(sun);
+    }
 
     const LodSettings& lod = params_.lod;
     const std::size_t views = frame.Views();

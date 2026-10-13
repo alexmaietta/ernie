@@ -382,22 +382,41 @@ class RasterRenderer {
         terrainHorizon_ = horizon;
     }
 
-    /// A terrain's sun horizon maps (terrain_sun_horizon.slang), a
-    /// layer for each of `HorizonLights`, which those lights' shadows
-    /// over it read where the cascades' texels are coarser
-    /// (shading.slang's `sunHorizonVisibility`).
+    /// A terrain's sun horizon maps, which the shadows of the lights
+    /// of `HorizonLights` over it read where the cascades' texels are
+    /// coarser (shading.slang's `SunHorizonTerrain`): a flat
+    /// Terrain's (terrain_sun_horizon.slang), a layer for each light,
+    /// or a planet Terrain's (planet_sun_horizon.slang), six layers,
+    /// a cube face each, for each light.
     struct SunHorizon {
+        static constexpr std::uint32_t kFlat = 0;
+        static constexpr std::uint32_t kPlanet = 1;
+
         const GpuImage* image = nullptr;
-        /// Its north-west corner's x and y relative to the frame's
-        /// origin, its texel size and the terrain's vertical
-        /// exaggeration.
-        std::array<float, 4> grid{};
-        /// Its width and height, the terrain's prim id, and 1.
-        std::array<std::uint32_t, 4> info{};
-        /// The frame origin's height (subtracted from the terrain's),
-        /// the heights' cell size and the terrain's light link group.
-        std::array<float, 4> heights{};
+        /// y: the terrain's prim id, z: `kFlat` or `kPlanet`, w: its
+        /// light link group (x: the maps' heap slot, the renderer's).
+        std::array<std::uint32_t, 4> ids{};
+        /// A flat Terrain's map's width and height; a planet's data
+        /// quads along a face and map texels along one.
+        std::array<std::uint32_t, 4> size{};
+        /// x: a texel's world size, y: the terrain's vertical
+        /// exaggeration; a flat Terrain's z: the heights' cell size,
+        /// w: the frame origin's height (subtracted from the
+        /// terrain's).
+        std::array<float, 4> scale{};
+        /// A flat Terrain's map's north-west corner x and y relative
+        /// to the frame's origin; a planet's centre relative to it,
+        /// and its radius.
+        std::array<float, 4> place{};
+        /// A planet's (radius / a_i)^2 for its semi-axes a_i.
+        std::array<float, 4> shape{};
+        /// A planet's body-fixed axes x, y and z in the world's.
+        std::array<std::array<float, 4>, 3> axes{};
     };
+
+    /// The most sun horizon terrains a frame shades with
+    /// (`AddSunHorizon`).
+    static constexpr std::size_t kMaxSunHorizons = 8;
 
     /// A distant light casting shadows this frame (a dome's
     /// directions aside), in the order of their layers of a terrain's
@@ -417,10 +436,13 @@ class RasterRenderer {
         return horizonLights_;
     }
 
-    /// Sets the sun horizon maps this frame's shading reads; none
-    /// unless a drawable sets them each frame.
-    void SetSunHorizon(const SunHorizon& horizon) {
-        sunHorizon_ = horizon;
+    /// Adds a terrain's sun horizon maps to this frame's, which
+    /// drawables add afresh each frame; past `kMaxSunHorizons`, none.
+    void AddSunHorizon(const SunHorizon& horizon) {
+        if (horizon.image != nullptr &&
+            sunHorizons_.size() < kMaxSunHorizons) {
+            sunHorizons_.push_back(horizon);
+        }
     }
 
     /// As `SetDomeMap(map)`, with `lighting` (when not nullptr)
@@ -1483,7 +1505,10 @@ class RasterRenderer {
     bool domeShadowed_ = false;
     TerrainHorizon terrainHorizon_;
     std::vector<HorizonLight> horizonLights_;
-    SunHorizon sunHorizon_;
+    std::vector<SunHorizon> sunHorizons_;
+    /// `sunHorizons_` as shading reads them (shading.slang's
+    /// `SunHorizonTerrain`), made the first time a frame has any.
+    mutable std::unique_ptr<GpuBuffer> sunHorizonTable_;
     std::unique_ptr<GpuImage>
         noHorizon_;  ///< Binds in place of a terrain's horizon map.
     std::unique_ptr<GpuImage>

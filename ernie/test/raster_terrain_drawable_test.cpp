@@ -335,11 +335,11 @@ TEST_F(TerrainRendererTest, FitsTheRequestedCascadesWhenTheSunIsUp) {
     renderer.Update(params);
     EXPECT_GT(renderer.GpuBytes(), bytes1024);
 
-    // Below the horizon: one map over the scene rather than cascades
-    // over the view, as on a planet, whose up is not +z.
+    // From below +z's horizon too: cascades over the view, as a
+    // planet's lights from any direction need, +z being no up there.
     params.sunDirection = glm::vec3(0.0f, 0.6f, -0.8f);
     renderer.Update(params);
-    EXPECT_EQ(renderer.Cascades().size(), 1u);
+    EXPECT_EQ(renderer.Cascades().size(), 2u);
 
     params.sunDirection = glm::vec3(0.0f, 0.0f, 1.0f);
     params.shadows.enabled = false;

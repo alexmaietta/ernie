@@ -199,6 +199,8 @@ class PlanetDrawable : public RasterDrawable {
                       const RasterFrame& frame, std::size_t cascade,
                       const glm::mat4& lightViewProjection,
                       const ShadowCasters& casters) const override;
+    /// Records the sun horizon maps' passes when they are due.
+    void RecordCull(VkCommandBuffer commands) const override;
     void RecordColor(VkCommandBuffer commands,
                      const RasterFrame& frame, std::size_t view,
                      DrawPhase phase = DrawPhase::All) const override;
@@ -281,6 +283,45 @@ class PlanetDrawable : public RasterDrawable {
     bool prepared_ = false;
     float minHeight_ = 0.0f;
     float maxHeight_ = 0.0f;
+
+    /// The sun horizon maps (planet_sun_horizon.slang) that distant
+    /// lights' shadows over the body read beyond the cascades' fine
+    /// reach (`RasterRenderer::SunHorizon`): for each of
+    /// `RasterRenderer::HorizonLights` six layers, a cube face each,
+    /// at most `kMaxSunHorizon` texels (and a data cell) across, of
+    /// the point setting the horizon towards the light, marched over
+    /// `heightMaxima_`, the faces' heights' maxima in mips (the faces
+    /// only: finer pages stay the cascades'). A light's layers are
+    /// recomputed when the heights change or it turns more than
+    /// `kSunHorizonTurn` radians against the body; none for a body
+    /// without relief.
+    static constexpr std::uint32_t kMaxSunHorizon = 1024;
+    static constexpr double kSunHorizonTurn = 3e-4;
+    std::unique_ptr<PipelineLayout> sunHorizonLayout_;
+    std::unique_ptr<ComputePipeline> heightMaxPipeline_;
+    std::unique_ptr<ComputePipeline> sunHorizonPipeline_;
+    std::unique_ptr<GpuImage> heightMaxima_;
+    std::unique_ptr<GpuImage> sunHorizon_;
+    /// Towards each light this frame, body-fixed, none for a light
+    /// the body needs no horizon towards (light linking), and each
+    /// light's at its layers' last computation.
+    std::vector<std::optional<glm::dvec3>> sunDirections_;
+    mutable std::vector<std::optional<glm::dvec3>>
+        sunHorizonDirections_;
+    mutable bool heightMaximaDirty_ = true;
+    /// The farthest angle a point of the body rises above another's
+    /// horizon, which the march goes to.
+    float sunHorizonReach_ = 0.0f;
+    /// The vertical exaggeration the maps were marched at: the
+    /// curvature makes them depend on it.
+    float sunHorizonExaggeration_ = 0.0f;
+    /// Makes the sun horizon maps, with layers for `lights` lights at
+    /// least, the maxima and their pipelines for the current heights,
+    /// when missing.
+    void EnsureSunHorizon(std::uint32_t lights);
+    /// Records the maxima, when the heights changed, and the layers
+    /// of the lights that turned.
+    void RecordSunHorizon(VkCommandBuffer commands) const;
 };
 
 }  // namespace ernie

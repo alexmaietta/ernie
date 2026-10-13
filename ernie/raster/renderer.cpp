@@ -701,6 +701,19 @@ struct FrameResources {
 static_assert(sizeof(FrameResources) == 24,
               "FrameResources must match frame.slang");
 
+/// shading.slang's SunHorizonTerrain: a terrain's sun horizon maps
+/// (`RasterRenderer::SunHorizon`), their heap slot in `ids[0]`.
+struct SunHorizonGpu {
+    std::uint32_t ids[4];
+    std::uint32_t size[4];
+    float scale[4];
+    float place[4];
+    float shape[4];
+    float axes[3][4];
+};
+static_assert(sizeof(SunHorizonGpu) == 128,
+              "SunHorizonGpu must match shading.slang");
+
 /// shading.slang's ShadingResources: its buffers' addresses, then its
 /// textures' and samplers' indices in the bindless heap.
 struct ShadingResources {
@@ -738,15 +751,12 @@ struct ShadingResources {
     /// The distant lights' long-range visibility maps
     /// (`LongRangeShadows::Visibility`, an array).
     std::uint32_t longRangeVisibility;
-    /// A terrain's sun horizon maps (`SunHorizon`, an array), its
-    /// grid, size and heights, 0 in `sunHorizonInfo[3]` without them.
-    std::uint32_t sunHorizonMap;
-    float sunHorizonGrid[4];
-    std::uint32_t sunHorizonInfo[4];
-    float sunHorizonHeights[4];
+    /// The terrains' sun horizon maps (`SunHorizonGpu`), how many.
+    std::uint32_t sunHorizonCount;
+    VkDeviceAddress sunHorizons;
 };
-static_assert(sizeof(ShadingResources) == 224 &&
-                  offsetof(ShadingResources, sunHorizonGrid) == 176 &&
+static_assert(sizeof(ShadingResources) == 184 &&
+                  offsetof(ShadingResources, sunHorizons) == 176 &&
                   offsetof(ShadingResources, sigmoidTable) == 96 &&
                   offsetof(ShadingResources, volumeShadows) == 144,
               "ShadingResources must match shading.slang and "
@@ -1094,6 +1104,7 @@ ShadingModules(const BrdfModel& brdf,
          {"atmosphere", shaders::kAtmosphereSlang},
          {"laser_beams", shaders::kLaserBeamsSlang},
          {"gbuffer", shaders::kGBufferSlang},
+         {"cube_sphere", shaders::kCubeSphereSlang},
          {"shading",
           "import " + BrdfModuleName(brdf) +
               ";\ntypealias ActiveBrdf = " + brdf.typeName + ";\n" +
@@ -2706,8 +2717,10 @@ void RasterRenderer::WriteLights(
                     : std::numeric_limits<std::uint32_t>::max());
             std::vector<ShadowCascade> views;
             bool cascaded = false;
+            // From any direction: world +z is no horizon on a planet
+            // or in space, nor to a wall lit from below.
             if (distant && light.shadows && !light.posedOnGpu &&
-                !light.domeDiffuse && cascadeFit_ && axis.z > 0.0f) {
+                !light.domeDiffuse && cascadeFit_) {
                 views = FitViewCascades(axis, own);
                 if (lightViews_.size() + views.size() >
                     kMaxLightShadowViews) {
@@ -3227,7 +3240,7 @@ void RasterRenderer::WriteLights(
     // index plus 1 in `patternLayout[0]` (a distant light having no
     // pattern), which drawables set afresh each frame.
     horizonLights_.clear();
-    sunHorizon_ = SunHorizon{};
+    sunHorizons_.clear();
     for (std::size_t i = 0;
          i < params.lights.size() && i < table.size(); ++i) {
         const LightParams& light = params.lights[i];
@@ -7025,16 +7038,38 @@ void RasterRenderer::WriteShadingResources(
         texture(Kind::Texture2D, terrainHorizon_.heights != nullptr
                                      ? *terrainHorizon_.heights
                                      : *noHeights_);
-    resources.sunHorizonMap =
-        texture(Kind::Texture2DArray, sunHorizon_.image != nullptr
-                                          ? *sunHorizon_.image
-                                          : *noHorizon_);
-    std::copy(sunHorizon_.grid.begin(), sunHorizon_.grid.end(),
-              resources.sunHorizonGrid);
-    std::copy(sunHorizon_.info.begin(), sunHorizon_.info.end(),
-              resources.sunHorizonInfo);
-    std::copy(sunHorizon_.heights.begin(), sunHorizon_.heights.end(),
-              resources.sunHorizonHeights);
+    // The terrains' sun horizon maps, their table updated in the
+    // command stream as the resources are (below).
+    std::vector<SunHorizonGpu> horizons;
+    for (const SunHorizon& horizon : sunHorizons_) {
+        SunHorizonGpu entry{};
+        std::copy(horizon.ids.begin(), horizon.ids.end(), entry.ids);
+        entry.ids[0] = texture(Kind::Texture2DArray, *horizon.image);
+        std::copy(horizon.size.begin(), horizon.size.end(),
+                  entry.size);
+        std::copy(horizon.scale.begin(), horizon.scale.end(),
+                  entry.scale);
+        std::copy(horizon.place.begin(), horizon.place.end(),
+                  entry.place);
+        std::copy(horizon.shape.begin(), horizon.shape.end(),
+                  entry.shape);
+        for (std::size_t a = 0; a < 3; ++a) {
+            std::copy(horizon.axes[a].begin(), horizon.axes[a].end(),
+                      entry.axes[a]);
+        }
+        horizons.push_back(entry);
+    }
+    if (!horizons.empty() && sunHorizonTable_ == nullptr) {
+        sunHorizonTable_ = std::make_unique<GpuBuffer>(
+            context_, kMaxSunHorizons * sizeof(SunHorizonGpu),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            BufferMemory::Device);
+    }
+    resources.sunHorizonCount =
+        static_cast<std::uint32_t>(horizons.size());
+    resources.sunHorizons =
+        sunHorizonTable_ != nullptr ? sunHorizonTable_->Address() : 0;
     resources.atmosphereTransmittance =
         texture(Kind::Texture2DArray, atmosphere_->Transmittance());
     resources.atmosphereMultiple = texture(
@@ -7058,7 +7093,8 @@ void RasterRenderer::WriteShadingResources(
     // and before those reading this.
     VkMemoryBarrier2 before{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
     before.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    before.srcAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    before.srcAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT |
+                           VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
     before.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     before.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
     VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
@@ -7067,11 +7103,17 @@ void RasterRenderer::WriteShadingResources(
     vkCmdPipelineBarrier2(commands, &dependency);
     vkCmdUpdateBuffer(commands, shadingResources_->Handle(), 0,
                       sizeof(resources), &resources);
+    if (!horizons.empty()) {
+        vkCmdUpdateBuffer(commands, sunHorizonTable_->Handle(), 0,
+                          horizons.size() * sizeof(SunHorizonGpu),
+                          horizons.data());
+    }
     VkMemoryBarrier2 after{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
     after.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     after.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
     after.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT;
+    after.dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT |
+                          VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
     dependency.pMemoryBarriers = &after;
     vkCmdPipelineBarrier2(commands, &dependency);
 }
