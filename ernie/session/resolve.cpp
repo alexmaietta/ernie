@@ -4170,11 +4170,13 @@ Image ImageOfTensor(const Tensor& tensor, ImageEncoding encoding) {
 }
 
 std::optional<GpuXform> GpuXformOf(const Scene& scene,
-                                   const Path& path) {
+                                   const Path& path, bool host) {
     using namespace tokens;
     const auto onGpu = [&](std::string_view attribute) {
         const Tensor* tensor = scene.Read(path, attribute);
-        return tensor != nullptr && IsGpu(tensor->Location().kind);
+        return tensor != nullptr &&
+               (IsGpu(tensor->Location().kind) ||
+                (host && scene.RowOf(path, attribute) != nullptr));
     };
     const auto fail = [&](const std::string& why) {
         return std::invalid_argument("Cannot pose '" + path.String() +

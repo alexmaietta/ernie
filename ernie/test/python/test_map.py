@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from test_cuda import instancer_scene
 
+import ernie
 from ernie import tokens
 
 
@@ -71,3 +72,21 @@ def test_only_written_arrays_map(renderer):
     scene = instancer_scene(np.zeros((1, 3), np.float32))
     with pytest.raises(ValueError, match="not a written array"):
         scene.map("/World/Rocks", tokens.POINTS)
+
+
+def test_columns_write_and_map_rows_of_many_prims():
+    scene = ernie.Scene()
+    for path, x in (("/A", 1.0), ("/B", 4.0)):
+        scene.define(path, "Xform").set_xform(translate=(x, 0.0, 0.0))
+    bodies = ernie.PrimSet(["/A", "/B"])
+    poses = scene.column(bodies, tokens.TRANSLATE)
+    np.testing.assert_array_equal(poses.read()[:, 0], [1.0, 4.0])
+    with poses.map("cpu") as rows:
+        rows[:, 0] += 10.0
+    np.testing.assert_array_equal(
+        np.asarray(scene.read("/B", tokens.TRANSLATE)), [14.0, 0.0, 0.0]
+    )
+    poses.write(np.zeros((2, 3), np.float32))
+    np.testing.assert_array_equal(poses.read(), np.zeros((2, 3)))
+    with pytest.raises(ValueError):
+        poses.map("cuda")

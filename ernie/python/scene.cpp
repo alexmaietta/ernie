@@ -66,6 +66,40 @@ struct AttributeMapping {
     }
 };
 
+/// A column's rows mapped for writing in place (`Column.map`): a
+/// context manager returning the array and unmapping on exit.
+struct ColumnMapping {
+    nb::object column;
+    nb::object stream;
+    nb::object array;
+    bool unmapped = false;
+
+    void Unmap(nb::handle override) {
+        if (unmapped) {
+            return;
+        }
+        unmapped = true;
+        nb::cast<Column&>(column).Unmap(
+            StreamOf(override.is_valid() && !override.is_none()
+                         ? override
+                         : nb::handle(stream)));
+    }
+};
+
+/// A device by name: "cpu", "cuda" or "cuda:N".
+Device DeviceFromName(std::string_view name) {
+    if (name == "cpu") {
+        return {};
+    }
+    if (name == "cuda") {
+        return {DeviceKind::Cuda, 0};
+    }
+    if (name.starts_with("cuda:")) {
+        return {DeviceKind::Cuda, std::stoi(std::string(name.substr(5)))};
+    }
+    throw nb::value_error("expected \"cpu\", \"cuda\" or \"cuda:N\"");
+}
+
 /// A 4 x 4 NumPy array of `matrix` in math convention: column
 /// vectors, translation in the last column.
 nb::object MatrixToPython(const glm::dmat4& matrix) {
@@ -1701,6 +1735,86 @@ void BindScene(nb::module_& m) {
             "`stream` (the mapping's "
             "when None).");
 
+    nb::class_<ColumnMapping>(
+        m, "ColumnMapping",
+        "A column's rows mapped for writing in place (Column.map); a "
+        "context manager returning the array and unmapping on exit.")
+        .def_ro("array", &ColumnMapping::array, "The writable rows.")
+        .def("__enter__",
+             [](ColumnMapping& mapping) { return mapping.array; })
+        .def(
+            "__exit__",
+            [](ColumnMapping& mapping, nb::handle, nb::handle,
+               nb::handle) { mapping.Unmap({}); },
+            nb::arg("type").none(), nb::arg("value").none(),
+            nb::arg("traceback").none())
+        .def(
+            "unmap",
+            [](ColumnMapping& mapping, nb::handle stream) {
+                mapping.Unmap(stream);
+            },
+            nb::arg("stream").none() = nb::none(),
+            "Commits the writes, on the GPU after the work queued on "
+            "`stream` (the mapping's when None).");
+
+    nb::class_<Column>(
+        m, "Column",
+        "One attribute of many prims as rows of one array, as a "
+        "simulation keeps its bodies' poses (Scene.column): written "
+        "whole from any DLPack array, CPU or CUDA, without copying, or "
+        "mapped and written in place on a device, each write one "
+        "change however many prims.")
+        .def_prop_ro("prims",
+                     [](const Column& column) { return column.Prims(); })
+        .def_prop_ro("attribute",
+                     [](const Column& column) {
+                         return std::string(column.Attribute());
+                     })
+        .def(
+            "write",
+            [](Column& column, const AnyArray& array, nb::handle stream) {
+                column.Write(TensorFromArray(array), StreamOf(stream));
+            },
+            nb::arg("array"), nb::arg("stream").none() = nb::none(),
+            "Takes `array` (one row per prim, any DLPack array) as the "
+            "attribute without copying; for a CUDA array, `stream` is "
+            "the one its contents are written on.")
+        .def(
+            "map",
+            [](nb::handle self, std::string_view device,
+               nb::handle stream) {
+                Column& column = nb::cast<Column&>(self);
+                ColumnMapping mapping;
+                mapping.column = nb::borrow(self);
+                mapping.stream = nb::borrow(stream);
+                mapping.array = ArrayFromTensor(
+                    column.Map(DeviceFromName(device), StreamOf(stream)),
+                    true);
+                return mapping;
+            },
+            nb::arg("device") = "cuda",
+            nb::arg("stream").none() = nb::none(),
+            "The rows on `device` (\"cpu\", \"cuda\", \"cuda:N\") to "
+            "write in place: `with column.map(\"cuda\") as rows:`, "
+            "unmapped on exit. A renderer's own storage when it offers "
+            "it, so nothing is copied; else the rows written last, if "
+            "there; else on the CPU the prims' values gathered.")
+        .def(
+            "unmap",
+            [](Column& column, nb::handle stream) {
+                column.Unmap(StreamOf(stream));
+            },
+            nb::arg("stream").none() = nb::none(),
+            "Commits writes into mapped rows, on the GPU after the work "
+            "queued on `stream`.")
+        .def(
+            "read",
+            [](const Column& column) {
+                return ArrayFromTensor(column.Read());
+            },
+            "The rows as they are, without copying once written or "
+            "mapped.");
+
     nb::class_<Scene>(
         m, "Scene",
         "A USD-shaped scene: typed prims named by Path holding "
@@ -1891,6 +2005,10 @@ void BindScene(nb::module_& m) {
             "Commits writes into a mapped array: renderers read it "
             "again, on the GPU after the "
             "work queued on `stream`.")
+        .def("column", &Scene::GetColumn, nb::arg("prims"),
+             nb::arg("attribute"), nb::keep_alive<0, 1>(),
+             "`attribute` of `prims` (a PrimSet) as one Column, to write "
+             "whole or map on a device.")
         .def(
             "unmap",
             [](Scene& scene, const PrimSet& prims,
@@ -2776,14 +2894,13 @@ void BindScene(nb::module_& m) {
            int octaves, double lacunarity, double gain,
            std::uint32_t seed) {
             const GradientNoise noise(seed);
-            const auto count =
-                static_cast<std::int64_t>(points.shape(0));
+            const auto count = static_cast<std::int64_t>(points.shape(0));
             Tensor values = Tensor::Zeros(DType::Float64, {count});
             double* out = values.As<double>();
             for (std::int64_t i = 0; i < count; ++i) {
                 const double* p = points.data() + 3 * i;
-                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]),
-                                   octaves, lacunarity, gain);
+                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]), octaves,
+                                   lacunarity, gain);
             }
             return ArrayFromTensor(values);
         },
@@ -2809,8 +2926,8 @@ void BindScene(nb::module_& m) {
                 glm::ivec3(static_cast<int>(values.shape(0)),
                            static_cast<int>(values.shape(1)),
                            static_cast<int>(values.shape(2))),
-                voxelSize,
-                glm::dvec3(origin[0], origin[1], origin[2]), name);
+                voxelSize, glm::dvec3(origin[0], origin[1], origin[2]),
+                name);
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 bytes, {static_cast<std::int64_t>(bytes.size())}));
         },

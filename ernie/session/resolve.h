@@ -658,7 +658,9 @@ struct GpuXform {
 };
 
 /// The prim's GPU pose, or none when none of its transform ops is a
-/// GPU array.
+/// GPU array. With `host`, ops that are rows of a CPU array written
+/// for many prims at once (a column, `Scene::Write` of a `PrimSet`)
+/// count as GPU arrays too, for a renderer to upload whole.
 /// @throws std::invalid_argument when some are but the prim cannot be
 /// posed on the GPU: a suffixed or inverted op, an op that is not a
 /// row of a GPU array written with the others, an array of the wrong
@@ -667,7 +669,8 @@ struct GpuXform {
 /// transform), or arrays that are not contiguous float32 of the same
 /// number of rows.
 std::optional<GpuXform> GpuXformOf(const Scene& scene,
-                                   const Path& path);
+                                   const Path& path,
+                                   bool host = false);
 
 /// Whether the quaternions in the prim's arrays put w first
 /// (`tokens::kQuaternionOrder`).

@@ -651,6 +651,10 @@ class RasterDelegate : public RenderDelegate {
     std::vector<AnchoredView>
     AnchoredViewsOf(const Scene& scene,
                     std::span<const Path> cameras) const;
+    /// The prim's pose from GPU arrays (`GpuXformOf`), or with compute
+    /// interop from rows of a host column, which groups upload whole;
+    /// none when its ops are not all such rows.
+    std::optional<GpuXform> PoseOf(const Scene& scene, const Path& path);
     /// Hands the drawable a group's arrays from one of its prims'
     /// pose.
     void UploadGpuXformGroup(GpuXformGroup& group,
@@ -920,6 +924,9 @@ class RasterDelegate : public RenderDelegate {
     WorkerPool textureLoaders_{
         std::clamp(std::thread::hardware_concurrency(), 1u, 6u),
         "Texture loader"};
+    /// What the scenes it syncs keep columns mapped on its compute
+    /// device in (`Scene::SetColumnStorage`).
+    std::shared_ptr<ColumnStorage> columnStorage_;
     std::map<Path, SyncedMesh> syncedMeshes_;
     /// Each synced mesh's draw as `Items` last built it, none for a
     /// hidden mesh or a prototype's, and the meshes `SyncMeshes`

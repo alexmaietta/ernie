@@ -598,6 +598,42 @@ const BrdfRegistry& RasterDelegate::Brdfs() const {
 
 namespace {
 
+/// Where the scenes the delegate renders keep columns mapped on its
+/// compute device (`Column::Map`): the arrays it draws from, written
+/// in place (`MapArray`), else for prims it does not draw from such
+/// arrays yet the rows as they are, there, until a sync does.
+class DelegateColumns final : public ColumnStorage {
+  public:
+    explicit DelegateColumns(RasterDelegate& delegate)
+        : delegate_(delegate) {}
+
+    std::optional<Rows> Allocate(Scene& scene, const PrimSet& prims,
+                                 std::string_view attribute, Device device,
+                                 std::uintptr_t stream) override {
+        ComputeInterop* compute = delegate_.Compute();
+        if (compute == nullptr || device != compute->Location()) {
+            return std::nullopt;
+        }
+        try {
+            return Rows{delegate_.MapArray(scene, prims, attribute, stream),
+                        true};
+        } catch (const std::invalid_argument&) {
+        }
+        try {
+            const Tensor host = scene.GetColumn(prims, attribute).Read();
+            if (host.Location().kind != DeviceKind::Cpu) {
+                return std::nullopt;
+            }
+            return Rows{compute->Upload(host.Contiguous()), false};
+        } catch (const std::invalid_argument&) {
+            return std::nullopt;
+        }
+    }
+
+  private:
+    RasterDelegate& delegate_;
+};
+
 /// The render targets of a frame's images: one set, or one per chunk
 /// of a batch's views.
 std::vector<RenderTargets*> TargetsOf(FrameImages& images) {
@@ -2886,7 +2922,7 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
     std::vector<std::string> errors;
     for (const Path& path : scene.Prims()) {
         try {
-            std::optional<GpuXform> pose = GpuXformOf(scene, path);
+            std::optional<GpuXform> pose = PoseOf(scene, path);
             if (!pose || pose->ops.empty()) {
                 continue;
             }
@@ -3100,10 +3136,38 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
     }
 }
 
+std::optional<GpuXform> RasterDelegate::PoseOf(const Scene& scene,
+                                               const Path& path) {
+    std::optional<GpuXform> pose = GpuXformOf(scene, path);
+    if (pose || Compute() == nullptr) {
+        return pose;
+    }
+    // Rows of a column on the host: posed as GPU arrays are, uploaded
+    // whole when written; prims mixing them with other ops stay posed
+    // on the CPU.
+    try {
+        return GpuXformOf(scene, path, true);
+    } catch (const std::invalid_argument&) {
+        return std::nullopt;
+    }
+}
+
 void RasterDelegate::UploadGpuXformGroup(GpuXformGroup& group,
-                                         const GpuXform& pose,
+                                         const GpuXform& given,
                                          std::int64_t rows) {
     ComputeInterop& compute = RequireCompute();
+    // Rows of a column on the host go to the device whole, each op's
+    // array once.
+    GpuXform pose = given;
+    for (auto& [op, whole] : pose.ops) {
+        if (whole.Location().kind == DeviceKind::Cpu) {
+            whole = compute.Upload(whole);
+            (op == tokens::kTranslate ? pose.translate
+             : op == tokens::kOrient  ? pose.orient
+             : op == tokens::kScale   ? pose.scale
+                                      : whole) = whole;
+        }
+    }
     if (group.composed) {
         ComposedInstanceData data;
         for (const auto& [op, whole] : pose.ops) {
@@ -3392,8 +3456,7 @@ bool RasterDelegate::RefreshGpuXforms(
     std::vector<std::pair<GpuXformGroup*, GpuXform>> uploads;
     try {
         for (const auto& [group, seen] : touched) {
-            std::optional<GpuXform> pose =
-                GpuXformOf(scene, *seen.path);
+            std::optional<GpuXform> pose = PoseOf(scene, *seen.path);
             if (seen.rewritten != group->members || !pose ||
                 pose->wFirst != group->wFirst || pose->ops.empty()) {
                 return false;
@@ -3829,6 +3892,12 @@ void RasterDelegate::SyncLinks(const Scene& scene) {
 
 void RasterDelegate::Sync(const Scene& scene) {
     ERNIE_ZONE("Sync");
+    // Columns the scene maps on the compute device live in the arrays
+    // drawn from (`DelegateColumns`).
+    if (columnStorage_ == nullptr) {
+        columnStorage_ = std::make_shared<DelegateColumns>(*this);
+    }
+    scene.SetColumnStorage(columnStorage_);
     // What changed since the last sync; none for a new scene, which
     // syncs whole.
     std::optional<std::vector<Change>> changed;
@@ -3921,14 +3990,14 @@ void RasterDelegate::Sync(const Scene& scene) {
     // written as GPU arrays makes some, so the scene is not searched.
     const bool gpuXforms =
         !changed || !gpuPosed_.empty() ||
-        std::ranges::any_of(*changed, [&scene](const Change& change) {
+        std::ranges::any_of(*changed, [this, &scene](const Change& change) {
             if (!Any(change.bits, Dirty::Transform | Dirty::Added) ||
                 !scene.Has(change.path)) {
                 return false;
             }
             try {
                 const std::optional<GpuXform> pose =
-                    GpuXformOf(scene, change.path);
+                    PoseOf(scene, change.path);
                 return pose && !pose->ops.empty();
             } catch (const std::invalid_argument&) {
                 return true;

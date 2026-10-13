@@ -399,6 +399,65 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
                     51.0f);
 }
 
+TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
+    Scene scene;
+    for (const char* path : {"/A", "/B"}) {
+        scene.Define(path, tokens::kXform);
+    }
+    ernie::SetXform(scene, "/A", {.translate = {1, 2, 3}});
+    ernie::SetXform(scene, "/B", {.translate = {4, 5, 6}});
+    ernie::Column poses =
+        scene.GetColumn(ernie::PrimSet({"/A", "/B"}), tokens::kTranslate);
+    // Read before written: the prims' values, gathered.
+    const Tensor before = poses.Read();
+    ASSERT_EQ(before.Shape(), (std::vector<std::int64_t>{2, 3}));
+    EXPECT_FLOAT_EQ(before.As<float>()[4], 5.0f);
+
+    // Mapped on the host: gathered, bound, written in place.
+    ChangeCursor cursor;
+    const ernie::Device cpu{};
+    Tensor rows = poses.Map(cpu);
+    scene.Changes(cursor);
+    rows.As<float>()[0] = 10.0f;
+    poses.Unmap();
+    std::vector<ernie::ColumnChange> columns;
+    EXPECT_TRUE(scene.Changes(cursor, columns).empty());
+    EXPECT_EQ(columns.size(), 1u);
+    EXPECT_FLOAT_EQ(scene.Read("/A", tokens::kTranslate)->As<float>()[0],
+                    10.0f);
+    EXPECT_EQ(poses.Map(cpu).Data(), rows.Data()) << "mapped again";
+    // Nothing holds them on a GPU.
+    EXPECT_THROW(poses.Map({ernie::DeviceKind::Cuda, 0}),
+                 std::invalid_argument);
+
+    // A consumer's storage, used once offered and asked for no more.
+    struct Storage : ernie::ColumnStorage {
+        int asked = 0;
+        Tensor rows = Tensor::Zeros(ernie::DType::Float32, {2, 3});
+        std::optional<Rows> Allocate(Scene&, const ernie::PrimSet&,
+                                     std::string_view, ernie::Device,
+                                     std::uintptr_t) override {
+            ++asked;
+            return Rows{rows};
+        }
+    };
+    const auto storage = std::make_shared<Storage>();
+    scene.SetColumnStorage(storage);
+    EXPECT_EQ(poses.Map(cpu).Data(), storage->rows.Data());
+    EXPECT_EQ(poses.Map(cpu).Data(), storage->rows.Data());
+    EXPECT_EQ(storage->asked, 1);
+    EXPECT_EQ(poses.Read().Data(), storage->rows.Data());
+    // Rows written take over from it; a copy of the scene has none.
+    const Tensor own = Tensor::Zeros(ernie::DType::Float32, {2, 3});
+    poses.Write(own);
+    EXPECT_EQ(poses.Read().Data(), own.Data());
+    Scene copy = scene;
+    EXPECT_THROW(copy.GetColumn(ernie::PrimSet({"/A", "/B"}),
+                                tokens::kTranslate)
+                     .Map({ernie::DeviceKind::Cuda, 0}),
+                 std::invalid_argument);
+}
+
 TEST(Scene, RemovalsAndRetypesAreReported) {
     Scene scene;
     scene.Define("/World/Rover/Wheel", tokens::kMesh);

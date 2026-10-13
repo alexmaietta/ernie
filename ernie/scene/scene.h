@@ -15,6 +15,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <span>
 #include <string>
@@ -189,6 +190,77 @@ class PrimSet {
     mutable std::uint64_t id_ = 0;
 };
 
+/// Storage a consumer of columns offers for them on a device it reads
+/// them on, such as a renderer's interop buffers: a column mapped
+/// there (`Column::Map`) is then written where the consumer reads it,
+/// copying nothing. Attached with `Scene::SetColumnStorage`.
+class ColumnStorage {
+  public:
+    /// Rows a consumer offers, and whether they are storage it keeps
+    /// (mapped again, the same rows) rather than a copy made there
+    /// for now.
+    struct Rows {
+        Tensor rows;
+        bool kept = true;
+    };
+
+    virtual ~ColumnStorage() = default;
+    /// Rows of `prims`' `attribute` on `device` holding their values
+    /// now, which the scene then holds as the column (`Scene::Write`);
+    /// nullopt when it offers none there. Work filling them is
+    /// ordered on `stream`.
+    virtual std::optional<Rows>
+    Allocate(Scene& scene, const PrimSet& prims, std::string_view attribute,
+             Device device, std::uintptr_t stream) = 0;
+};
+
+/// One attribute of many prims as rows of one array, as a simulation
+/// keeps its bodies' poses: written whole from any array (CPU or CUDA,
+/// DLPack, no copy), or mapped and written in place on the device
+/// asked for, each write one change (`ColumnChange`) whatever the
+/// number of prims. From `Scene::GetColumn`.
+class Column {
+  public:
+    Column() = default;
+
+    const PrimSet& Prims() const {
+        return prims_;
+    }
+    std::string_view Attribute() const {
+        return attribute_;
+    }
+
+    /// Takes `rows` (one per prim) as the attribute, sharing its
+    /// memory; for CUDA rows written on `stream` (as `Scene::Write`).
+    /// @throws std::invalid_argument as `Scene::Write` of a `PrimSet`.
+    void Write(const Tensor& rows, std::uintptr_t stream = 1);
+
+    /// The rows on `device` to write in place until `Unmap`: storage a
+    /// consumer offers there (`ColumnStorage`), else the rows written
+    /// last if they are there, else on the CPU the prims' values
+    /// gathered as rows (float32).
+    /// @throws std::invalid_argument when nothing holds the rows on
+    /// `device`: `Write` an array there first.
+    Tensor Map(Device device, std::uintptr_t stream = 1);
+
+    /// Ends `Map`: the rows changed, in order after `stream`'s work.
+    void Unmap(std::uintptr_t stream = 1);
+
+    /// The rows as they are, sharing the column's memory once written
+    /// or mapped; before that, the prims' values gathered on the CPU.
+    Tensor Read() const;
+
+  private:
+    friend class Scene;
+    Column(Scene& scene, PrimSet prims, std::string attribute)
+        : scene_(&scene), prims_(std::move(prims)),
+          attribute_(std::move(attribute)) {}
+
+    Scene* scene_ = nullptr;
+    PrimSet prims_;
+    std::string attribute_;
+};
+
 /// A lightweight, USD-shaped scene for Ernie: a tree of typed prims
 /// named by `Path`, each holding attributes by USD name, plus change
 /// tracking for render delegates.
@@ -319,6 +391,16 @@ class Scene {
     /// @throws std::invalid_argument as `Unmap`, unmapping none.
     void Unmap(const PrimSet& prims, std::string_view attribute,
                std::uintptr_t stream = 1);
+
+    /// `attribute` of `prims` as one column (`Column`), to write whole
+    /// or map on a device. Checked when first written or mapped.
+    Column GetColumn(const PrimSet& prims, std::string_view attribute);
+
+    /// Attaches `storage` (held weakly) as where columns mapped on its
+    /// devices live (`Column::Map`); null detaches it. A renderer
+    /// attaches its own to the scenes it renders, changing nothing of
+    /// theirs, hence const. Copies of the scene start without.
+    void SetColumnStorage(std::weak_ptr<ColumnStorage> storage) const;
 
     /// The CUDA stream the latest contents of tensor `attribute` were
     /// written on (as `Write`).
@@ -570,7 +652,7 @@ class Scene {
 
     /// Rows of one tensor that many prims' attribute is (`Write` of a
     /// `PrimSet`), written again or unmapped whole in one step.
-    struct Column {
+    struct ColumnData {
         std::shared_ptr<const std::vector<Path>> paths;  ///< Rows.
         std::vector<Path> sorted;  ///< `paths` in order, for lookups.
         std::string attribute;
@@ -580,10 +662,21 @@ class Scene {
         /// Its first write, which stamped its prims one by one.
         std::uint64_t boundAt = 0;
         std::pair<std::uint64_t, std::string> key;  ///< `columnOf_`'s.
+        /// Its rows are storage a `ColumnStorage` offered.
+        bool provided = false;
     };
+    friend class Column;
+    /// Gives `prims` its id (`PrimSet::id_`) if it has none.
+    static void IdentifyPrimSet(const PrimSet& prims);
+    /// `prims`' `attribute` now, one float32 row each, on the CPU.
+    /// @throws std::invalid_argument for a prim without it, or rows
+    /// of different sizes.
+    Tensor GatherRows(const PrimSet& prims, std::string_view attribute) const;
     /// The column `prims`' `attribute` is, if they are resolved in
     /// this scene and still its rows; null otherwise.
-    Column* ColumnOf(const PrimSet& prims, std::string_view attribute);
+    ColumnData* ColumnOf(const PrimSet& prims, std::string_view attribute);
+    const ColumnData* ColumnOf(const PrimSet& prims,
+                               std::string_view attribute) const;
     /// Brings `prim`'s `attribute`, a column's row, up to the column's
     /// latest tensor.
     void Refresh(const PrimData& prim, std::string_view attribute) const;
@@ -657,11 +750,24 @@ class Scene {
     /// The columns, by id, and of each `PrimSet` and attribute; the
     /// version of the latest column write of each dirty bit (for the
     /// world transform and visibility caches).
-    std::map<std::uint64_t, Column> columns_;
+    std::map<std::uint64_t, ColumnData> columns_;
     std::map<std::pair<std::uint64_t, std::string>, std::uint64_t>
         columnOf_;
     std::uint64_t nextColumn_ = 1;
     std::array<std::uint64_t, kStampCount> columnStamps_{};
+    /// `SetColumnStorage`'s, which copies of the scene do not take.
+    struct StorageLink {
+        std::weak_ptr<ColumnStorage> storage;
+        StorageLink() = default;
+        StorageLink(const StorageLink&) {}
+        StorageLink& operator=(const StorageLink&) {
+            storage.reset();
+            return *this;
+        }
+        StorageLink(StorageLink&&) noexcept = default;
+        StorageLink& operator=(StorageLink&&) noexcept = default;
+    };
+    mutable StorageLink columnStorage_;
     std::map<std::string, std::set<Path>, std::less<>> byType_;
     std::map<std::string, Overlay, std::less<>> overlays_;
     std::uint64_t version_ = 0;
