@@ -938,6 +938,14 @@ class MeshDrawable : public RasterDrawable {
     /// anew in the copies kept, and those uploaded, not every draw
     /// built again.
     void PatchInstanceBases(std::span<const std::uint32_t> flipped);
+    /// The draws' and cull items' entries of the items `SetItems` or
+    /// `SettleMotion` re-posed (`posedItems_`) set anew in the copies
+    /// kept.
+    void PatchItems();
+    /// Uploads the copies kept, once patched.
+    void UploadPatched();
+    /// Whether the cull items' copy is current, to patch.
+    bool CullItemsKept() const;
 
     /// The bounds of a device instancer's positions from its GPU
     /// measurements, widened by its motion between the last two, and
@@ -1362,6 +1370,10 @@ class MeshDrawable : public RasterDrawable {
     /// `GpuCullItem`s), for `PatchInstanceBases`.
     std::vector<std::byte> drawBytes_;
     std::vector<std::byte> cullItemBytes_;
+    /// Items moved, retinted or reheated with the layout kept
+    /// (`SetItems`), or settled (`SettleMotion`): patched at the next
+    /// `Prepare`.
+    std::vector<std::size_t> posedItems_;
     /// `Bounds` and `WorldsBounds` as last computed, until the items,
     /// their transforms, points or instances change
     /// (`ForgetBounds`).

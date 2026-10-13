@@ -512,6 +512,49 @@ TransformBox(const glm::mat4& transform, const glm::vec3& low,
     return {outLow, outHigh};
 }
 
+/// What a draw takes of its item that may change without its layout:
+/// its transforms (now and at the last frame), its prototype's, its
+/// tint and its temperature (when drawn thermal).
+void PoseDraw(GpuDraw& draw, const glm::mat4& model,
+              const glm::mat4& previous, const glm::mat4& prototype,
+              const glm::vec3& tint, float temperature) {
+    std::memcpy(draw.model, glm::value_ptr(model), sizeof(draw.model));
+    std::memcpy(draw.previous, glm::value_ptr(previous),
+                sizeof(draw.previous));
+    std::memcpy(draw.prototype, glm::value_ptr(prototype),
+                sizeof(draw.prototype));
+    draw.tint[0] = tint.r;
+    draw.tint[1] = tint.g;
+    draw.tint[2] = tint.b;
+    draw.tint[3] = temperature;
+}
+
+/// The same of a cull item: its transforms, its prototype's box
+/// [`low`, `high`] as a sphere, and whether it moved; its other flags
+/// (`info[1]`) kept.
+void PoseCullItem(GpuCullItem& entry, const glm::mat4& model,
+                  const glm::mat4& previous, const glm::mat4& prototype,
+                  const glm::vec3& low, const glm::vec3& high) {
+    const auto [boxLow, boxHigh] = TransformBox(prototype, low, high);
+    const glm::vec3 centre = 0.5f * (boxLow + boxHigh);
+    std::memcpy(entry.model, glm::value_ptr(model), sizeof(entry.model));
+    entry.sphere[0] = centre.x;
+    entry.sphere[1] = centre.y;
+    entry.sphere[2] = centre.z;
+    entry.sphere[3] = 0.5f * glm::length(boxHigh - boxLow);
+    entry.info[0] = MaxScale(model);
+    entry.info[2] = MaxScale(prototype);
+    std::uint32_t flags = 0;
+    std::memcpy(&flags, &entry.info[1], sizeof(flags));
+    flags &= ~kCullMoved;
+    if (previous != model) {
+        flags |= kCullMoved;
+        std::memcpy(entry.previousModel, glm::value_ptr(previous),
+                    sizeof(entry.previousModel));
+    }
+    std::memcpy(&entry.info[1], &flags, sizeof(flags));
+}
+
 /// Simplified levels of detail of `data`'s triangles after the full
 /// mesh, each of about half the triangles of the one before and
 /// simplified from the full mesh, appended to `indices`; none for
@@ -2339,6 +2382,47 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
                 "Instance worlds must match the instances, sorted");
         }
     }
+    // The same draws only moved, retinted or reheated (a few prims
+    // edited): their entries are patched (`PatchItems`), the layout,
+    // its cull lists and the other draws kept.
+    const auto sameLayout = [](const MeshItem& a, const MeshItem& b) {
+        return a.mesh == b.mesh && a.instancer == b.instancer &&
+               a.instances == b.instances && a.world == b.world &&
+               a.instanceWorlds == b.instanceWorlds &&
+               a.material == b.material && a.primId == b.primId &&
+               a.linkGroup == b.linkGroup &&
+               a.vertexColors == b.vertexColors;
+    };
+    if (!drawsDirty_ && items.size() == items_.size() &&
+        drawBytes_.size() == items_.size() * sizeof(GpuDraw) &&
+        std::ranges::equal(items, items_, sameLayout)) {
+        const auto relative = [&](glm::dmat4 world) {
+            world[3] -= glm::dvec4(origin_, 0.0);
+            return glm::mat4(world);
+        };
+        for (std::size_t i = 0; i < items.size(); ++i) {
+            MeshItem& item = items[i];
+            MeshItem& was = items_[i];
+            if (item.transform == was.transform &&
+                item.prototype == was.prototype && item.tint == was.tint &&
+                item.temperature == was.temperature) {
+                continue;
+            }
+            // Moved from where it was.
+            if (item.transform != was.transform) {
+                previous_[i] = was.transform;
+                previousTransforms_[i] = relative(was.transform);
+                transforms_[i] = relative(item.transform);
+                itemsMoving_ = true;
+            }
+            was = std::move(item);
+            posedItems_.push_back(i);
+        }
+        if (!posedItems_.empty()) {
+            ForgetBounds();
+        }
+        return;
+    }
     std::vector<std::vector<WorldRange>> ranges;
     for (const MeshItem& item : items) {
         std::vector<WorldRange> runs;
@@ -2389,10 +2473,13 @@ void MeshDrawable::SetItems(std::vector<MeshItem> items) {
 void MeshDrawable::SettleMotion() {
     if (itemsMoving_) {
         itemsMoving_ = false;
+        // Those that moved stand still: their entries patched
+        // (`PatchItems`).
         for (std::size_t i = 0; i < items_.size(); ++i) {
             if (previous_[i] != items_[i].transform) {
                 previous_[i] = items_[i].transform;
-                drawsDirty_ = true;
+                previousTransforms_[i] = transforms_[i];
+                posedItems_.push_back(i);
             }
         }
     }
@@ -3306,9 +3393,12 @@ void MeshDrawable::Prepare(const FrameParams& params,
         WriteDraws();
         drawsDirty_ = false;
         drawsMaterials_ = renderer_.MaterialSetVersion();
-    } else if (!flipped.empty()) {
+    } else if (!flipped.empty() || !posedItems_.empty()) {
         PatchInstanceBases(flipped);
+        PatchItems();
+        UploadPatched();
     }
+    posedItems_.clear();
     for (auto& [handle, instancer] : instancers_) {
         instancer.rebase = false;
     }
@@ -3338,17 +3428,9 @@ void MeshDrawable::WriteDraws() {
                 ? item.material
                 : RasterRenderer::kDefaultMaterial);
         GpuDraw& draw = draws[i];
-        std::memcpy(draw.model, glm::value_ptr(transforms_[i]),
-                    sizeof(draw.model));
-        std::memcpy(draw.previous,
-                    glm::value_ptr(previousTransforms_[i]),
-                    sizeof(draw.previous));
-        std::memcpy(draw.prototype, glm::value_ptr(item.prototype),
-                    sizeof(draw.prototype));
-        draw.tint[0] = item.tint.r;
-        draw.tint[1] = item.tint.g;
-        draw.tint[2] = item.tint.b;
-        draw.tint[3] = thermal_ ? item.temperature : 0.0f;
+        PoseDraw(draw, transforms_[i], previousTransforms_[i],
+                 item.prototype, item.tint,
+                 thermal_ ? item.temperature : 0.0f);
         draw.offsets[0] = mesh.firstIndex;
         draw.offsets[1] = mesh.firstVertex;
         draw.offsets[2] =
@@ -4368,18 +4450,7 @@ void MeshDrawable::WriteCullItems() {
                                     errorBits, 0u);
             }
         }
-        const auto [low, high] =
-            TransformBox(item.prototype, mesh.low, mesh.high);
-        const glm::vec3 centre = 0.5f * (low + high);
         GpuCullItem& entry = items[i];
-        std::memcpy(entry.model, glm::value_ptr(transforms_[i]),
-                    sizeof(entry.model));
-        entry.sphere[0] = centre.x;
-        entry.sphere[1] = centre.y;
-        entry.sphere[2] = centre.z;
-        entry.sphere[3] = 0.5f * glm::length(high - low);
-        entry.info[0] = MaxScale(transforms_[i]);
-        entry.info[2] = MaxScale(item.prototype);
         std::memcpy(&entry.info[3], &mesh.countSlot,
                     sizeof(mesh.countSlot));
         entry.levels[0] = first->second;
@@ -4406,13 +4477,9 @@ void MeshDrawable::WriteCullItems() {
                 flags |= kCullScales;
             }
         }
-        if (previousTransforms_[i] != transforms_[i]) {
-            flags |= kCullMoved;
-            std::memcpy(entry.previousModel,
-                        glm::value_ptr(previousTransforms_[i]),
-                        sizeof(entry.previousModel));
-        }
         std::memcpy(&entry.info[1], &flags, sizeof(flags));
+        PoseCullItem(entry, transforms_[i], previousTransforms_[i],
+                     item.prototype, mesh.low, mesh.high);
     }
     const std::span written = std::as_bytes(std::span(items));
     cullItemBytes_.assign(written.begin(), written.end());
@@ -4436,12 +4503,56 @@ std::uint64_t MeshDrawable::LayoutOf(const Instancer& instancer) {
            std::uint64_t{instancer.composed} << 3;
 }
 
+bool MeshDrawable::CullItemsKept() const {
+    return !cullItemsDirty_ &&
+           cullItemBytes_.size() == items_.size() * sizeof(GpuCullItem);
+}
+
+void MeshDrawable::PatchItems() {
+    if (posedItems_.empty()) {
+        return;
+    }
+    ERNIE_ZONE("Mesh patch items");
+    std::ranges::sort(posedItems_);
+    const auto [last, end] = std::ranges::unique(posedItems_);
+    posedItems_.erase(last, end);
+    const bool items = CullItemsKept();
+    for (const std::size_t i : posedItems_) {
+        const MeshItem& item = items_[i];
+        GpuDraw draw;
+        std::byte* drawAt = drawBytes_.data() + i * sizeof(GpuDraw);
+        std::memcpy(&draw, drawAt, sizeof(draw));
+        PoseDraw(draw, transforms_[i], previousTransforms_[i],
+                 item.prototype, item.tint,
+                 thermal_ ? item.temperature : 0.0f);
+        std::memcpy(drawAt, &draw, sizeof(draw));
+        if (items) {
+            const Mesh& mesh = meshes_.at(item.mesh);
+            GpuCullItem entry;
+            std::byte* entryAt =
+                cullItemBytes_.data() + i * sizeof(GpuCullItem);
+            std::memcpy(&entry, entryAt, sizeof(entry));
+            PoseCullItem(entry, transforms_[i], previousTransforms_[i],
+                         item.prototype, mesh.low, mesh.high);
+            std::memcpy(entryAt, &entry, sizeof(entry));
+        }
+    }
+}
+
+void MeshDrawable::UploadPatched() {
+    renderer_.Uploads().Write(*draws_, drawBytes_);
+    if (CullItemsKept()) {
+        UploadCull(cullItemBuffer_, cullItemBytes_);
+    }
+}
+
 void MeshDrawable::PatchInstanceBases(
     std::span<const std::uint32_t> flipped) {
+    if (flipped.empty()) {
+        return;
+    }
     ERNIE_ZONE("Mesh patch instance bases");
-    const bool items =
-        !cullItemsDirty_ &&
-        cullItemBytes_.size() == items_.size() * sizeof(GpuCullItem);
+    const bool items = CullItemsKept();
     for (std::size_t i = 0; i < items_.size(); ++i) {
         const std::optional<std::uint32_t>& handle = items_[i].instancer;
         if (!handle || std::ranges::find(flipped, *handle) == flipped.end()) {
@@ -4460,10 +4571,6 @@ void MeshDrawable::PatchInstanceBases(
                             2 * sizeof(std::uint32_t),
                         bases.data(), sizeof(bases));
         }
-    }
-    renderer_.Uploads().Write(*draws_, drawBytes_);
-    if (items) {
-        UploadCull(cullItemBuffer_, cullItemBytes_);
     }
 }
 
