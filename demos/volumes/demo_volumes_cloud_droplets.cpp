@@ -74,7 +74,11 @@ std::vector<std::uint8_t> MakeCumulus() {
                         inside, 1.0 - glm::length(p - blob.centre) /
                                           blob.radius);
                 }
-                inside *= std::clamp((p.z - 900.0) / 150.0, 0.0, 1.0);
+                // Rounded into the base, whose crease the collectors
+                // would show.
+                const double ramp =
+                    std::clamp((p.z - 900.0) / 300.0, 0.0, 1.0);
+                inside *= ramp * ramp * (3.0 - 2.0 * ramp);
                 if (inside <= 0.0) {
                     continue;
                 }

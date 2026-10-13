@@ -1961,6 +1961,9 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
         // little): through the transmittance up to the surface, `collectedAt`, already.
         float collectedScale = 0.0;
         float collectedAt = 1.0;
+        // Steps since the ray left the piece of cloud it collected for, and the pieces collected.
+        uint gapSteps = 0;
+        uint pieces = 0;
         // The last step's position and density, for where between it and the next the density
         // reached the surface's.
         float previousT = -1e30;
@@ -2042,6 +2045,25 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
             } else if (hasDensity) {
                 let level = levelFor(volume.density, length(indexStep) * dt);
                 rho = max(sampleFieldAt(volume.density, local, level, densityAccessor), 0.0);
+            }
+            // Past a gap after the piece of cloud it collected for (two steps below half the
+            // surface's density, or empty space skipped), that piece's collectors' light as much
+            // as it held back, and the next piece's own from where the ray reaches its surface: a
+            // ray grazing one cloud's thin edge then into another behind it takes the far one's,
+            // not the edge's all the way.
+            if (collected && pieces + 1 < kCollectedPieces) {
+                let skipped = previousT < t - 1.5 * stepDt;
+                gapSteps = skipped ? 2u : rho < 0.5 * material.phase.z ? gapSteps + 1 : 0u;
+                if (gapSteps >= 2) {
+                    let held = saturate(1.0 - transmittance / max(collectedAt, 1e-9));
+                    for (uint g = 0; g < groups; ++g) {
+                        emitted[g] += collectedTints[g] * (collectedScale * held);
+                    }
+                    collected = false;
+                    collectedScale = 0.0;
+                    gapSteps = 0;
+                    ++pieces;
+                }
             }
             let sigma = rho * volume.params.x;
             // The powder effect (`VolumeMaterialGpu::extras`) on the light scattered in.
@@ -2821,8 +2843,10 @@ int transportDim(int k) {
 // A light map's header's float4s, and the iterations finding each collector.
 static const uint kLightMapHeader = 3;
 static const uint kCollectorIterations = 6;
+// The most pieces of cloud along a ray whose collectors it finds (`collectorScattering`).
+static const uint kCollectedPieces = 3;
 // The fewest texels across a slab's filtered surface (`slabAt`).
-static const float kSlabTexels = 4.0;
+static const float kSlabTexels = 8.0;
 
 // Texels across instance `volume`'s light map at its finest (`VolumePass`'s, after its bounds).
 uint lightMapSizeOf(VolumeGpu volume) {
@@ -3194,7 +3218,9 @@ static const float kDiffuseTransport = 0.11;
 
 // The optical depth from `p` (relative to the frame's origin) along unit `towards` through
 // instance `volume`'s density as far as its first gap (two steps below half its material's
-// surface density), or `whole` (its optical depth through everything) without one near.
+// surface density), or `whole` (its optical depth through everything) without one near. The gap
+// is soft, each step's emptiness ramping in below the surface's density, so the depth does not
+// jump between neighbouring points whose paths graze a thin gap or miss it.
 float localDepth(VolumeGpu volume, float3 p, float3 towards, float whole) {
     let surface = volumeMaterials[volume.info.x].phase.z;
     var accessor = accessorOf(volume.density);
@@ -3203,16 +3229,20 @@ float localDepth(VolumeGpu volume, float3 p, float3 towards, float whole) {
                    dot(volume.toLocal[2].xyz, towards));
     let dt = 2.0 * volume.params.w;
     float depth = 0.0;
-    uint below = 0;
-    for (uint i = 1; i <= 64; ++i) {
+    float marched = 0.0;
+    // How much of the path so far is still `p`'s piece, and the last step's emptiness.
+    float own = 1.0;
+    float empty = 0.0;
+    for (uint i = 1; i <= 64 && own > 1e-3; ++i) {
         let rho = max(sampleField(volume.density, o + d * (float(i) * dt), accessor), 0.0);
-        below = rho < 0.5 * surface ? below + 1 : 0;
-        if (below >= 2) {
-            return min(depth, whole);
-        }
-        depth += rho * volume.params.x * dt;
+        let emptiness = 1.0 - smoothstep(0.0, 0.5 * surface, rho);
+        own *= 1.0 - emptiness * empty;
+        empty = emptiness;
+        let step = rho * volume.params.x * dt;
+        depth += own * step;
+        marched += step;
     }
-    return whole;
+    return min(depth + own * max(whole - marched, 0.0), whole);
 }
 
 // `collectorScattering` for `p`'s own piece of cloud, `sunDepth` its optical depth in it.
@@ -3249,7 +3279,12 @@ float collectorsOfPiece(VolumeGpu volume, LightMapFrame frame, float3 p, float3 
         float sum = 0.0;
         float found = 0.0;
         for (uint n = 0; n < kCollectorIterations; ++n) {
+            // Moved off the surface (past a cloud's edge in the light's view), settled where it
+            // was: its radiance for the iterations left, so the mean does not jump with how far
+            // the iteration got.
             if (n > 0 && !slabAt(frame, p, toEye, sunDepth, c, size, slab)) {
+                sum += radiance * float(kCollectorIterations - n);
+                found += float(kCollectorIterations - n);
                 break;
             }
             let q = transportAt(set, slab.muL, slab.thickness, slab.depth, slab.muV, slab.psi);

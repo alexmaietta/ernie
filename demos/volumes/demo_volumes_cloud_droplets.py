@@ -50,7 +50,9 @@ def make_cumulus():
     for centre, radius in BLOBS:
         distance = np.linalg.norm(points - np.array(centre), axis=1)
         inside = np.maximum(inside, 1.0 - distance / radius)
-    inside *= np.clip((points[:, 2] - 900.0) / 150.0, 0.0, 1.0)
+    # Rounded into the base, whose crease the collectors would show.
+    base_ramp = np.clip((points[:, 2] - 900.0) / 300.0, 0.0, 1.0)
+    inside *= base_ramp * base_ramp * (3.0 - 2.0 * base_ramp)
     billows = 0.5 + 0.5 * ernie.fbm_noise(
         points / 450.0, octaves=5, seed=7
     )
