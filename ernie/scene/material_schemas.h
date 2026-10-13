@@ -38,6 +38,16 @@
                               .doc = "The reflectance model, a BrdfRegistry id; unset with a "     \
                                      "UsdPreviewSurface connected, \"preview_surface\".",          \
                               .group = "Surface"}))                                                \
+    X(std::string, MaterialXFile, ::ernie::tokens::kMaterialXFile, "",                             \
+      (::ernie::AttributeMeta{.label = "MaterialX file",                                           \
+                              .doc = "A MaterialX document (.mtlx) whose material this is, in "    \
+                                     "place of a network on outputs:mtlx:surface.",                \
+                              .group = "MaterialX", .asset = true}))                               \
+    X(std::string, MaterialXElement, ::ernie::tokens::kMaterialXElement, "",                       \
+      (::ernie::AttributeMeta{.label = "MaterialX element",                                        \
+                              .doc = "The material (or shader) of the file to render, by name "    \
+                                     "path; empty, its first renderable one.",                     \
+                              .group = "MaterialX"}))                                              \
     X(glm::dvec3, Albedo, ::ernie::tokens::kAlbedo, glm::dvec3(1.0),                               \
       (::ernie::AttributeMeta{.doc = "Linear RGB", .group = "Surface", .color = true}))            \
     X(std::vector<float>, Reflectance, ::ernie::tokens::kReflectance, std::vector<float>{},        \

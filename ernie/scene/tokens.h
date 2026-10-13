@@ -1115,6 +1115,22 @@ inline constexpr std::string_view kDetailHexSharpness =
 inline constexpr std::string_view kShader = "Shader";
 inline constexpr std::string_view kInfoId =
     "info:id";  ///< The shader's type, a token.
+// A Material's MaterialX surface: a network of Shader prims of
+// MaterialX node definitions (info:id "ND_standard_surface_
+// surfaceshader" and the like) its outputs:mtlx:surface connects to,
+// as UsdShade's mtlx render context holds it, or a material of a
+// MaterialX document (.mtlx) it names.
+//
+// Reference: Academy Software Foundation, "MaterialX Specification",
+// https://materialx.org/Specification.html
+inline constexpr std::string_view kMtlxSurface =
+    "outputs:mtlx:surface";
+inline constexpr std::string_view kMaterialXFile =
+    "ernie:materialx:file";  ///< asset: a .mtlx document.
+/// token: the element of it to render, by name path (a material, or
+/// a shader); empty, its first renderable one.
+inline constexpr std::string_view kMaterialXElement =
+    "ernie:materialx:element";
 inline constexpr std::string_view kUsdPreviewSurface =
     "UsdPreviewSurface";
 inline constexpr std::string_view kUsdUVTexture = "UsdUVTexture";

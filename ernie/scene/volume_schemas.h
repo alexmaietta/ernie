@@ -22,8 +22,8 @@
 // clang-format off
 #define ERNIE_FIELD_ASSET_ATTRIBUTES(X)                                                            \
     X(std::string, FilePath, ::ernie::tokens::kFilePath, "",                                       \
-      (::ernie::AttributeMeta{.doc = "The grid's file: NanoVDB (.nvdb), uncompressed; convert "    \
-                                     ".vdb files first (nanovdb_convert).",                        \
+      (::ernie::AttributeMeta{.doc = "The grid's file: OpenVDB (.vdb) or NanoVDB (.nvdb), "        \
+                                     "uncompressed.",                                              \
                               .group = "Field", .asset = true,                                     \
                               .dirty = ::ernie::Dirty::Points}))                                   \
     X(std::string, FieldName, ::ernie::tokens::kFieldName, "",                                     \

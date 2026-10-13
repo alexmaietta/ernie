@@ -5,6 +5,7 @@ ernie_add_library(
     delegate.cpp
     frame_params.cpp
     light_links.cpp
+    materialx.cpp
     outputs.cpp
     resolve.cpp
     skinning.cpp
@@ -12,4 +13,11 @@ ernie_add_library(
     PUBLIC
     ernie_device
     ernie_geometry
-    ernie_scene)
+    ernie_scene
+    PRIVATE
+    ernie_materialx)
+# MaterialX's data libraries in a build (materialx.h, MaterialXLibraries).
+set_source_files_properties(
+    materialx.cpp
+    PROPERTIES COMPILE_DEFINITIONS
+               "ERNIE_MATERIALX_LIBRARIES_BUILD_PATH=\"${ERNIE_MATERIALX_LIBRARIES}\"")
