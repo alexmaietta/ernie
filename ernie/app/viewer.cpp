@@ -331,12 +331,31 @@ class InfoPanel final : public Panel {
         std::uint64_t triangles = 0;
         std::uint64_t points = 0;     ///< Of Points prims.
         std::uint64_t instances = 0;  ///< Of PointInstancers.
+        // The sensors: cameras, render products (and those the
+        // settings render each step), their vars and filters, and per
+        // frame the pixels they write and the spectral samples
+        // (pixels times bands) they integrate.
+        std::uint64_t cameras = 0;
+        std::uint64_t products = 0;
+        std::uint64_t rendered = 0;
+        std::uint64_t vars = 0;
+        std::uint64_t filters = 0;
+        std::uint64_t pixels = 0;
+        std::uint64_t samples = 0;
     };
 
-    void Count(const Scene& scene);
+    void Count(const Scene& scene, const Path& settings);
+
+    /// The viewport's sensor: its size and camera, the camera's bands
+    /// and channels, the chain it runs and the var it shows.
+    static void DrawViewportSensor(
+        Viewer& viewer,
+        const std::function<void(const char*, const std::string&)>&
+            row);
 
     const Scene* scene_ = nullptr;
     std::uint64_t version_ = 0;
+    Path settings_;
     Counts counts_;
 };
 
@@ -3958,8 +3977,49 @@ struct Viewer::State {
 
 namespace {
 
-void InfoPanel::Count(const Scene& scene) {
+void InfoPanel::Count(const Scene& scene, const Path& settings) {
     counts_ = Counts{};
+    // The sensors, each product's pixels from its resolution (its
+    // settings' unless its own) times its cameras, a batch's views.
+    std::set<Path> rendered;
+    try {
+        if (!settings.IsEmpty() && scene.Has(settings)) {
+            const std::vector<Path> listed =
+                RenderSettings(scene, settings).GetProducts();
+            rendered.insert(listed.begin(), listed.end());
+        }
+    } catch (const std::exception&) {
+    }
+    for (const Path& product : scene.Prims(tokens::kRenderProduct)) {
+        if (product.String().starts_with("/__")) {
+            continue;
+        }
+        ++counts_.products;
+        counts_.rendered += rendered.contains(product) ? 1u : 0u;
+        try {
+            const Path chosen[] = {product};
+            const RenderProductSpec spec =
+                ResolveRenderProducts(scene, chosen, settings)
+                    .front();
+            counts_.vars += spec.vars.size();
+            counts_.filters += spec.filters.size();
+            const std::uint64_t pixels =
+                std::uint64_t{spec.resolution.width} *
+                spec.resolution.height *
+                std::max<std::uint64_t>(spec.cameras.size(), 1);
+            counts_.pixels += pixels;
+            if (!spec.camera.IsEmpty()) {
+                const CameraParams camera = CameraParamsOf(
+                    scene, spec.camera, spec.resolution.width,
+                    spec.resolution.height);
+                counts_.samples +=
+                    pixels *
+                    static_cast<std::uint64_t>(camera.bands.count);
+            }
+        } catch (const std::exception&) {
+            // The product renders nothing until it resolves.
+        }
+    }
     std::map<std::string, std::uint64_t> types;
     const auto rows = [&](const Path& path, std::string_view name) {
         const Tensor* tensor = scene.Read(path, name);
@@ -3975,6 +4035,7 @@ void InfoPanel::Count(const Scene& scene) {
         ++counts_.prims;
         const std::string& type = scene.TypeOf(path);
         ++types[type.empty() ? "(untyped)" : type];
+        counts_.cameras += type == tokens::kCamera ? 1u : 0u;
         if (type == "Mesh") {
             counts_.meshPoints += rows(path, tokens::kPoints);
             // Fanned, a face of n corners makes n - 2 triangles.
@@ -4000,10 +4061,12 @@ void InfoPanel::Count(const Scene& scene) {
 
 void InfoPanel::Draw(Viewer& viewer) {
     const Scene& scene = viewer.GetScene();
-    if (&scene != scene_ || scene.Version() != version_) {
-        Count(scene);
+    if (&scene != scene_ || scene.Version() != version_ ||
+        viewer.Settings() != settings_) {
+        Count(scene, viewer.Settings());
         scene_ = &scene;
         version_ = scene.Version();
+        settings_ = viewer.Settings();
     }
     const RenderStats stats = viewer.Stats();
     constexpr ImGuiTableFlags kFlags =
@@ -4019,9 +4082,9 @@ void InfoPanel::Draw(Viewer& viewer) {
     const auto count = [&](const char* label, std::uint64_t value) {
         row(label, FormatCount(value));
     };
-    // Three columns of sections side by side, as the bottom dock is
+    // Four columns of sections side by side, as the bottom dock is
     // wide and short.
-    if (!ImGui::BeginTable("##info", 3,
+    if (!ImGui::BeginTable("##info", 4,
                            ImGuiTableFlags_SizingStretchSame)) {
         return;
     }
@@ -4066,7 +4129,73 @@ void InfoPanel::Draw(Viewer& viewer) {
         }
         ImGui::EndTable();
     }
+    ImGui::TableNextColumn();
+    ImGui::SeparatorText("Sensors");
+    if (ImGui::BeginTable("##sensors", 2, kFlags)) {
+        count("Cameras", counts_.cameras);
+        row("Render products", FormatCount(counts_.products) + " (" +
+                                   FormatCount(counts_.rendered) +
+                                   " each step)");
+        count("Render vars", counts_.vars);
+        count("Sensor filters", counts_.filters);
+        count("Pixels a frame", counts_.pixels);
+        count("Spectral samples", counts_.samples);
+        DrawViewportSensor(viewer, row);
+        ImGui::EndTable();
+    }
     ImGui::EndTable();
+}
+
+void InfoPanel::DrawViewportSensor(
+    Viewer& viewer,
+    const std::function<void(const char*, const std::string&)>& row) {
+    const Scene& scene = viewer.GetScene();
+    const Path& camera = viewer.ActiveCamera();
+    const auto [width, height] = viewer.ViewportResolution();
+    row("Viewport", std::to_string(width) + " x " +
+                        std::to_string(height) + ", " +
+                        FormatCount(std::uint64_t{width} * height) +
+                        " pixels");
+    row("Camera", camera.String());
+    try {
+        const CameraParams params =
+            CameraParamsOf(scene, camera, width, height);
+        char bands[64];
+        std::snprintf(bands, sizeof(bands), "%d over %.0f to %.0f nm",
+                      params.bands.count, params.bands.minNm,
+                      params.bands.maxNm);
+        row("Bands", bands);
+        std::string channels;
+        for (const SensorChannel& channel : params.sensor.channels) {
+            channels += (channels.empty() ? "" : ", ") + channel.name;
+        }
+        row("Channels", channels);
+        const Path product =
+            ViewChainProduct(scene, viewer.Settings(), camera);
+        if (product.IsEmpty()) {
+            row("Chain", "default");
+        } else {
+            const std::vector<Path> filters =
+                RenderProduct(scene, product).GetFilters();
+            const auto bypassed = std::ranges::count_if(
+                filters, [&](const Path& filter) {
+                    return scene.Has(filter) &&
+                           scene.TypeOf(filter) ==
+                               tokens::kSensorFilter &&
+                           !SensorFilterPrim(scene, filter)
+                                .GetFilterEnabled();
+                });
+            row("Chain",
+                product.String() + ", " +
+                    std::to_string(filters.size()) + " filters" +
+                    (bypassed > 0 ? ", " + std::to_string(bypassed) +
+                                        " bypassed"
+                                  : ""));
+        }
+    } catch (const std::exception& error) {
+        row("Sensor", error.what());
+    }
+    row("Shown", viewer.ViewVar());
 }
 
 }  // namespace
@@ -4971,6 +5100,11 @@ void Viewer::SetVsync(bool vsync) {
         ImGui_ImplVulkan_SetMinImageCount(
             state_->swapchain->MinImageCount());
     }
+}
+
+std::pair<std::uint32_t, std::uint32_t>
+Viewer::ViewportResolution() const {
+    return {state_->ViewportWidth(), state_->ViewportHeight()};
 }
 
 void Viewer::SetRenderResolution(

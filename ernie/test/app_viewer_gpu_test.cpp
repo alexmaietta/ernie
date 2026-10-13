@@ -1448,3 +1448,19 @@ TEST_F(ViewerTest, ViewStagesShowTheImageAfterAFilter) {
     EXPECT_GT(stageLow, 40);
     EXPECT_LT(stageHigh - stageLow, 20) << "every channel, before it";
 }
+
+TEST_F(ViewerTest, InfoPanelDrawsTheSensors) {
+    // The Sensors column over a customized chain, one filter
+    // bypassed, and a product the settings render each step.
+    Scene& scene = viewer_->GetScene();
+    const Path product =
+        CustomizeChain(scene, viewer_->ActiveCamera());
+    SensorFilterPrim(scene, Path(product.String() + "Chain/noise"))
+        .SetFilterEnabled(false);
+    RenderSettings(scene, "/Render/Settings").SetProducts({product});
+    for (int i = 0; i < 4; ++i) {
+        viewer_->FocusPanel("Info");
+        ASSERT_TRUE(viewer_->Step());
+    }
+    EXPECT_NE(viewer_->FindPanel("Info"), nullptr);
+}

@@ -623,6 +623,8 @@ class Viewer {
     /// own, times `scale`; `fill` fits the image to the panel,
     /// letterboxed, else it shows a texel per pixel, centred. The
     /// camera's aspect follows the resolution.
+    /// The viewport image's size, as it renders now.
+    std::pair<std::uint32_t, std::uint32_t> ViewportResolution() const;
     void SetRenderResolution(
         std::optional<std::pair<std::uint32_t, std::uint32_t>> size,
         float scale = 1.0f, bool fill = true);
