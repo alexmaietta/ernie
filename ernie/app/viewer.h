@@ -114,8 +114,11 @@ struct ViewportDisplay {
     /// settings and eye menus always show, and the eye menu's Toolbar
     /// submenu shows these again.
     bool toolbarRenderer =
-        true;  ///< The renderer, rendering mode and render settings.
+        true;  ///< The renderer and render settings.
     bool toolbarVar = true;  ///< The render var the viewport shows.
+    /// The rendering mode: shaded, wireframe or hidden line, or the
+    /// render settings' own.
+    bool toolbarRenderMode = true;
     bool toolbarCamera =
         true;  ///< The camera the viewport looks through.
     bool toolbarLighting =

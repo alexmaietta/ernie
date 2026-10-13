@@ -305,7 +305,7 @@ const char* WireframeName(std::optional<Wireframe> mode) {
     case Wireframe::Off:
         return "Shaded";
     case Wireframe::Overlay:
-        return "Wireframe Overlay";
+        return "Shaded Wireframe";
     case Wireframe::HiddenLine:
         return "Hidden Line";
     }
@@ -2400,7 +2400,14 @@ struct Viewer::State {
             if (menu::Option("Viewport Size", !r.custom)) {
                 r.custom = false;
             }
-            const std::array<std::pair<int, int>, 6> presets{{
+            // Small ones first, as sensors and learned policies'
+            // cameras render, then the display's.
+            const std::array<std::pair<int, int>, 11> presets{{
+                {64, 64},
+                {128, 128},
+                {256, 256},
+                {320, 240},
+                {640, 400},
                 {1280, 720},
                 {1920, 1080},
                 {2560, 1440},
@@ -2710,6 +2717,7 @@ struct Viewer::State {
         if (menu::BeginSubmenu("Toolbar")) {
             menu::Check("Renderer", &display.toolbarRenderer);
             menu::Check("Render Var", &display.toolbarVar);
+            menu::Check("Render Mode", &display.toolbarRenderMode);
             menu::Check("Camera", &display.toolbarCamera);
             menu::Check("Lighting", &display.toolbarLighting);
             ImGui::EndMenu();
@@ -2812,19 +2820,6 @@ struct Viewer::State {
             minimal.reset();
             wireframe.reset();
         }
-        menu::Section("Rendering Mode");
-        if (menu::Option("Default", !wireframe)) {
-            wireframe.reset();
-        }
-        for (const Wireframe mode :
-             {Wireframe::Off, Wireframe::Overlay,
-              Wireframe::HiddenLine}) {
-            if (menu::Option(WireframeName(mode), wireframe == mode,
-                             mode == Wireframe::Overlay ? "Z"
-                                                        : nullptr)) {
-                wireframe = mode;
-            }
-        }
         if (menu::BeginSubmenu("Debug View")) {
             DrawVarItems();
             ImGui::EndMenu();
@@ -2840,48 +2835,78 @@ struct Viewer::State {
     /// Kit's camera menu: the viewer's perspective camera, its
     /// orthographic views from the top, front and right, the scene's
     /// cameras, and a new camera where the view is.
-    /// A settings button at the right of the menu's last row (left of
-    /// its `shortcut`), as Kit's camera list has: selects `camera`
-    /// and shows its properties, the Stage panel showing the
-    /// session's prims for the viewer's own.
-    void PropertiesButton(const Path& camera, const char* shortcut) {
-        const ImGuiStyle& style = ImGui::GetStyle();
+    /// The rendering mode button's items: shaded, shaded with the
+    /// triangles' edges over it, or hidden line (edges on flat,
+    /// unlit surfaces), each overriding the render settings'
+    /// `ernie:wireframe` in the viewport only; or the settings' own.
+    void DrawRenderModeItems() {
+        for (const Wireframe mode :
+             {Wireframe::Off, Wireframe::Overlay,
+              Wireframe::HiddenLine}) {
+            if (menu::Option(WireframeName(mode), wireframe == mode,
+                             mode == Wireframe::Overlay ? "Z"
+                                                        : nullptr)) {
+                wireframe = mode;
+            }
+        }
+        ImGui::Separator();
+        if (menu::Option("From Settings", !wireframe)) {
+            wireframe.reset();
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("The render settings' own mode "
+                              "(ernie:wireframe), shaded unless "
+                              "they say otherwise");
+        }
+    }
+
+    /// Spaces a camera row's shortcut ends with, the room for its
+    /// settings button (`PropertiesButton`).
+    static constexpr const char* kGearRoom = "     ";
+
+    /// A settings icon at the right of the menu's last row, after its
+    /// shortcut, as Kit's camera list has: selects `camera` and shows
+    /// its properties, the Stage panel showing the session's prims
+    /// for the viewer's own.
+    void PropertiesButton(const Path& camera) {
         const ImGuiWindow* menuWindow = ImGui::GetCurrentWindow();
-        const float width = ImGui::CalcTextSize(icons::kSettings).x +
-                            2.0f * style.FramePadding.x;
-        // Where the row's shortcut column starts (the menu's), else
-        // its right edge; on the row's line, so the menu's layout
-        // carries on below it.
-        // ImGui draws the shortcut at its column's offset plus what
-        // the row has to spare beyond the columns' width.
+        const ImVec2 icon = ImGui::CalcTextSize(icons::kSettings);
+        // At the right end of the row's shortcut column, in the room
+        // its shortcut keeps there (`kGearRoom`); ImGui draws the
+        // column at its offset plus what the row has to spare beyond
+        // the columns' width. From the columns' widths, not the
+        // window's, so the menu keeps its size; on the row's line, so
+        // its layout carries on below.
         const ImGuiMenuColumns& columns = menuWindow->DC.MenuColumns;
         const float rowStart = ImGui::GetItemRectMin().x;
-        const float rowEnd = ImGui::GetItemRectMax().x;
         const float spare =
-            std::max(rowEnd - rowStart -
+            std::max(ImGui::GetItemRectMax().x - rowStart -
                          static_cast<float>(columns.TotalWidth),
                      0.0f);
-        const float right =
-            shortcut != nullptr && *shortcut != '\0'
-                ? rowStart +
-                      static_cast<float>(columns.OffsetShortcut) +
-                      spare - style.ItemSpacing.x
-                : rowEnd;
-        ImGui::SameLine(right - width - menuWindow->Pos.x +
+        // The shortcut column ends a spacing before the mark's, every
+        // menu item declaring one; offsets locked from the last
+        // frame.
+        const float right = rowStart + spare +
+                            static_cast<float>(columns.OffsetMark) -
+                            static_cast<float>(columns.Spacing);
+        ImGui::SameLine(right - icon.x - menuWindow->Pos.x +
                         menuWindow->Scroll.x);
         ImGui::PushID(camera.String().c_str());
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-        if (ImGui::SmallButton(icons::kSettings)) {
+        if (ImGui::InvisibleButton("##properties", icon)) {
             SetSelection({camera});
             self.FocusPanel("Properties");
             ImGui::CloseCurrentPopup();
         }
-        ImGui::PopStyleColor();
-        if (ImGui::IsItemHovered()) {
+        const bool hovered = ImGui::IsItemHovered();
+        ImGui::GetWindowDrawList()->AddText(
+            ImGui::GetItemRectMin(),
+            ImGui::GetColorU32(hovered ? ImGuiCol_Text
+                                       : ImGuiCol_TextDisabled),
+            icons::kSettings);
+        if (hovered) {
             ImGui::SetTooltip("Select it and show its properties");
         }
         ImGui::PopID();
-        ImGui::SetCursorScreenPos(after);
     }
 
     void DrawCameraMenu() {
@@ -2906,10 +2931,8 @@ struct Viewer::State {
                         : Label(camera);
                 ImGui::PushID(camera.String().c_str());
                 ImGui::SetNextItemAllowOverlap();
-                // Room on the right for its settings button.
-                const bool chosen =
-                    menu::Option((label + "        ").c_str(),
-                                 camera == activeCamera);
+                const bool chosen = menu::Option(
+                    label.c_str(), camera == activeCamera, kGearRoom);
                 ImGui::PopID();
                 if (chosen) {
                     SetActive(camera);
@@ -2917,24 +2940,24 @@ struct Viewer::State {
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s", camera.String().c_str());
                 }
-                PropertiesButton(camera, nullptr);
+                PropertiesButton(camera);
             }
             ImGui::EndMenu();
         }
+        // The views of the viewer's own camera, each row's settings
+        // button its properties.
         for (int v = -1; v < 3; ++v) {
-            if (v == -1) {
-                ImGui::SetNextItemAllowOverlap();
-            }
+            ImGui::PushID(v);
+            ImGui::SetNextItemAllowOverlap();
+            const std::string shortcut =
+                std::string(kViews[v + 1].shortcut) + kGearRoom;
             if (menu::Option(kViews[v + 1].name,
                              viewer && orthographicView == v,
-                             kViews[v + 1].shortcut)) {
+                             shortcut.c_str())) {
                 ChooseView(v);
             }
-            // The viewer's own camera, which every view moves.
-            if (v == -1) {
-                PropertiesButton(PerspectiveCamera(),
-                                 kViews[0].shortcut);
-            }
+            PropertiesButton(PerspectiveCamera());
+            ImGui::PopID();
         }
         ImGui::Separator();
         if (menu::Action("Create from View")) {
@@ -3278,6 +3301,21 @@ struct Viewer::State {
         if (display.toolbarVar &&
             viewVar == render_vars::kSpectralRadiance) {
             DrawBandCombo(comboWidth);
+        }
+
+        // The rendering mode, as Kit's: shaded, wireframe over it, or
+        // hidden line, overriding the render settings' in the
+        // viewport only; or theirs.
+        if (display.toolbarRenderMode) {
+            ImGui::SameLine();
+            const std::string modeLabel =
+                std::string(icons::kBox) + "  " +
+                (wireframe ? WireframeName(*wireframe)
+                           : "From Settings");
+            if (pill("##renderMode", modeLabel.c_str())) {
+                DrawRenderModeItems();
+                ImGui::EndCombo();
+            }
         }
 
         // The camera, as Kit's "Perspective", and its lens and
