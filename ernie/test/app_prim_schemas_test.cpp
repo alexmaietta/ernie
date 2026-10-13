@@ -131,6 +131,31 @@ TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
             "Primvar reader", "Thermal", "Prim"}));
 }
 
+TEST(PrimSchemasTest, InheritedAttributesShowTheirAncestorsValue) {
+    // A box in an environment's world shows that world, unset itself.
+    Scene scene;
+    scene.Define("/Env", tokens::kXform).Set(tokens::kWorld, 3);
+    scene.Define("/Env/Group", tokens::kXform);
+    scene.Define("/Env/Group/Box", tokens::kCube);
+    scene.Define("/Shared", tokens::kCube);
+    const BrdfRegistry brdfs = BrdfRegistry::WithBuiltins();
+    const SensorFilterRegistry filters =
+        SensorFilterRegistry::WithStandard();
+
+    const std::vector<PropertySection> box =
+        SchemaOf(scene, "/Env/Group/Box", brdfs, filters);
+    const PropertyField* world = FieldOf(box, tokens::kWorld);
+    ASSERT_NE(world, nullptr);
+    EXPECT_EQ(world->fallback, Value(3));
+    EXPECT_NE(world->tooltip.find("Inherited from /Env"),
+              std::string::npos);
+
+    const PropertyField* shared = FieldOf(
+        SchemaOf(scene, "/Shared", brdfs, filters), tokens::kWorld);
+    ASSERT_NE(shared, nullptr);
+    EXPECT_EQ(shared->fallback, Value(-1)) << "no ancestor sets one";
+}
+
 TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
     Scene scene;
     scene.Define("/Capsule", tokens::kCapsule);

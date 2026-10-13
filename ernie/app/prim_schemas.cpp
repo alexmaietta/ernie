@@ -357,6 +357,34 @@ void DynamicSectionsOf(const Scene& scene, const Path& path,
     }
 }
 
+/// Shows an inherited attribute unset on the prim at `path` (such as
+/// `ernie:world`) at the value it takes from its nearest ancestor
+/// that sets it, rather than at the fallback, naming that ancestor.
+void InheritedFallbacks(const Scene& scene, const Path& path,
+                        const PrimTypeDef& type,
+                        std::vector<PropertySection>& sections) {
+    for (PropertySection& section : sections) {
+        for (PropertyField& field : section.fields) {
+            const AttributeDef* def = type.Find(field.attribute);
+            if (def == nullptr || !def->meta.inherited ||
+                scene.Get(path, field.attribute) != nullptr) {
+                continue;
+            }
+            for (Path at = path.Parent();
+                 !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
+                if (const Value* value =
+                        scene.Get(at, field.attribute)) {
+                    field.fallback = *value;
+                    field.tooltip +=
+                        (field.tooltip.empty() ? "" : "\n") +
+                        std::string("Inherited from ") + at.String();
+                    break;
+                }
+            }
+        }
+    }
+}
+
 }  // namespace
 
 std::vector<PropertySection> CameraSchema() {
@@ -402,6 +430,7 @@ SchemaOf(const Scene& scene, const Path& path,
             SectionsOf(*registered);
         DynamicSectionsOf(scene, path, type, brdfs, filters,
                           sections);
+        InheritedFallbacks(scene, path, *registered, sections);
         return sections;
     }
     std::vector<PropertySection> sections;
