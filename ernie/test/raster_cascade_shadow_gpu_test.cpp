@@ -433,15 +433,18 @@ TEST_F(CascadeShadowTest, ReferenceTheGroundFromOrbit) {
 
 namespace {
 
+constexpr std::uint32_t kWallWidth = 640;
+constexpr std::uint32_t kWallHeight = 360;
+constexpr double kWallAltitude = 4000.0;
+constexpr double kWallEyeX = -500.0;
+
 /// A flat terrain 5 km across with a wall 300 m high and 200 m thick
-/// along y through x = 0, under distant lights 20 degrees up towards
-/// each of `azimuths` (degrees from +x), seen straight down from 4 km
-/// over x = -500 with the cascades only 10 m long: past them the
-/// terrain's sun horizon maps alone shadow it. The green channel
-/// along the image's middle rows at each world x in `xs`.
-std::vector<double> WallShadows(const ernie::VulkanContext& context,
-                                const std::vector<double>& azimuths,
-                                const std::vector<double>& xs) {
+/// along y through x = 0, under distant lights of `irradiance` 20
+/// degrees up towards each of `azimuths` (degrees from +x), seen
+/// straight down from 4 km over x = -500 with the cascades only 10 m
+/// long: past them the terrain's sun horizon maps alone shadow it.
+ernie::Scene WallScene(const std::vector<double>& azimuths,
+                       double irradiance) {
     using namespace ernie;
     namespace tokens = ernie::tokens;
     constexpr int kCells = 257;
@@ -467,7 +470,7 @@ std::vector<double> WallShadows(const ernie::VulkanContext& context,
         const std::string path = "/World/Sun" + std::to_string(i);
         DistantLight::Define(scene, path)
             .SetAngle(0.53)
-            .SetIrradiance(4.0);
+            .SetIrradiance(irradiance);
         const double a = glm::radians(azimuths[i]);
         const double e = glm::radians(20.0);
         scene.Set(path, tokens::kTransform,
@@ -475,43 +478,53 @@ std::vector<double> WallShadows(const ernie::VulkanContext& context,
                                          std::cos(e) * std::sin(a),
                                          std::sin(e)}));
     }
-    constexpr std::uint32_t kWidth = 640;
-    constexpr std::uint32_t kHeight = 360;
-    constexpr double kAltitude = 4000.0;
-    constexpr double kEyeX = -500.0;
     Camera::Define(scene, "/World/Camera")
         .SetSensorNoise(false)
         .SetFocalLength(24.0)
         .SetHorizontalAperture(36.0)
-        .SetVerticalAperture(36.0 * kHeight / kWidth)
+        .SetVerticalAperture(36.0 * kWallHeight / kWallWidth)
         .SetClippingRange(glm::dvec2(1.0, 1e5))
         .SetExposure(-8.0);
     scene.Set("/World/Camera", tokens::kTransform,
-              LookAtTransform({kEyeX, 0.0, kAltitude},
-                              {kEyeX, 0.0, 0.0}, {0.0, 1.0, 0.0}));
+              LookAtTransform({kWallEyeX, 0.0, kWallAltitude},
+                              {kWallEyeX, 0.0, 0.0},
+                              {0.0, 1.0, 0.0}));
     RenderSettings::Define(scene, "/Render/Settings")
         .SetCamera("/World/Camera")
-        .SetResolution(glm::dvec2(kWidth, kHeight))
+        .SetResolution(glm::dvec2(kWallWidth, kWallHeight))
         .SetAmbient(0.0)
         .SetShadowDistance(10.0);
-    RasterDelegate delegate(context);
-    Tensor image;
+    return scene;
+}
+
+/// The image column of `WallScene`'s camera that sees world x `x`:
+/// straight down, columns along +x, 18 / 24 of the altitude either
+/// side.
+std::size_t WallColumn(double x) {
+    const double u = (x - kWallEyeX) / (kWallAltitude * 18.0 / 24.0);
+    return static_cast<std::size_t>((u + 1.0) * 0.5 * kWallWidth);
+}
+
+/// `WallScene` with lights of irradiance 4: the linear green (from
+/// sRGB) along the image's middle rows at each world x in `xs`.
+std::vector<double> WallShadows(const ernie::VulkanContext& context,
+                                const std::vector<double>& azimuths,
+                                const std::vector<double>& xs) {
+    ernie::RasterDelegate delegate(context);
+    const ernie::Scene scene = WallScene(azimuths, 4.0);
+    ernie::Tensor image;
     for (int frame = 0; frame < 3; ++frame) {
         image = delegate.Render(scene);
     }
     const auto* pixels = image.As<std::uint8_t>();
-    // Straight down: columns along +x, 18 / 24 of the altitude either
-    // side. Linear green, from sRGB.
     std::vector<double> greens;
     for (const double x : xs) {
-        const double u = (x - kEyeX) / (kAltitude * 18.0 / 24.0);
-        const auto col =
-            static_cast<std::size_t>((u + 1.0) * 0.5 * kWidth);
+        const std::size_t col = WallColumn(x);
         double sum = 0.0;
-        for (std::size_t row = kHeight / 2 - 8; row < kHeight / 2 + 8;
-             ++row) {
+        for (std::size_t row = kWallHeight / 2 - 8;
+             row < kWallHeight / 2 + 8; ++row) {
             const double s =
-                pixels[(row * kWidth + col) * 4 + 1] / 255.0;
+                pixels[(row * kWallWidth + col) * 4 + 1] / 255.0;
             sum += s <= 0.04045 ? s / 12.92
                                 : std::pow((s + 0.055) / 1.055, 2.4);
         }
@@ -548,6 +561,44 @@ TEST_F(CascadeShadowTest, EveryDistantLightHasItsOwnHorizon) {
     ASSERT_LT(green[1], 0.9) << "lit by both, short of white";
     EXPECT_NEAR(green[0] / green[1], 0.5, 0.12) << "west of the wall";
     EXPECT_NEAR(green[2] / green[3], 0.5, 0.12) << "east of the wall";
+}
+
+// Temperature models see the horizon too: under the Sun's 1361 W/m^2
+// 20 degrees up, black ground in zero-capacitance balance is at
+// (E sin 20 / sigma)^(1/4), about 300 K, and in the wall's shadow
+// past the cascades near the sink's 3 K.
+TEST_F(CascadeShadowTest, TheTerrainsHorizonCoolsItsShadow) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    Scene scene = WallScene({0.0}, 1361.0);
+    RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    Material(scene, "/Looks/Grey")
+        .SetThermalModel("balance")
+        .SetThermalModelParams({1.0f, 1.0f});
+    const Path var("/Render/Vars/Temperature");
+    RenderVar::Define(scene, var).SetSourceName("Temperature");
+    RenderProduct::Define(scene, "/Render/Out")
+        .SetCamera("/World/Camera")
+        .SetResolution(glm::dvec2(kWallWidth, kWallHeight));
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    RasterDelegate delegate(*context_);
+    const Path product[] = {"/Render/Out"};
+    Tensor kelvin;
+    for (int frame = 0; frame < 3; ++frame) {
+        kelvin = delegate.Step(scene, product)
+                     .at("/Render/Out")
+                     .vars.at("Temperature")
+                     .Map(MapDevice::Cpu)
+                     .tensor.Contiguous();
+    }
+    const auto at = [&](double x) {
+        return kelvin.As<float>()[(kWallHeight / 2) * kWallWidth +
+                                  WallColumn(x)];
+    };
+    EXPECT_NEAR(at(-1200.0), 300.0f, 8.0f) << "lit, 1100 m west";
+    EXPECT_LT(at(-250.0), 50.0f) << "150 m into the shadow";
+    EXPECT_LT(at(-800.0), 50.0f) << "100 m short of its end";
 }
 
 // A moon far towards the sun, beyond the cascades' casters

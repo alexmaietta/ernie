@@ -886,6 +886,20 @@ float sunHorizonWeight(LightGpu light, float3 world) {
     return max(saturate(2.0 * texel / resources.sunHorizonGrid.z - 1.0), out);
 }
 
+// `visibility`, the share of `light` its shadow maps leave `world` (read at `shadowPoint`), with
+// the terrain's horizon towards it (`sunHorizonVisibility`) where the surface is the terrain's
+// (prim `primId`) and the light a distant one casting shadows, wherever its maps' texels are
+// coarser than the horizon map's, as far as the view sees.
+float withTerrainHorizon(LightGpu light, float3 world, float3 shadowPoint, float3 toLight,
+                         uint primId, float visibility) {
+    if (uint(light.position.w) != 0 || light.patternLayout.x == 0 ||
+        resources.sunHorizonInfo.w == 0 || primId != resources.sunHorizonInfo.z) {
+        return visibility;
+    }
+    let horizon = sunHorizonVisibility(light, world, toLight);
+    return lerp(visibility, min(visibility, horizon), sunHorizonWeight(light, shadowPoint));
+}
+
 // The long-range visibility `held` at the maps' wavelengths, at `wavelength` (nm): linear in the
 // limb darkening exponent, on which the disc's weighting depends.
 float longRangeAt(float4 held, float wavelength) {
@@ -2812,7 +2826,9 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
         let nDotL = dot(n, toLight);
         var visibility = 0.0;
         if (nDotL > 0.0) {
-            visibility = lightVisibility(light, world, n, nDotL, float2(id.xy));
+            visibility = withTerrainHorizon(light, world, world, toLight, ids.y,
+                                            lightVisibility(light, world, n, nDotL,
+                                                            float2(id.xy)));
             input.irradiance += irradiance * nDotL * visibility;
         }
         if (irradiance > input.sunIrradiance) {
@@ -3159,16 +3175,10 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         if (nDotL <= 0.0 || scale <= 0.0) {
             scale = 0.0;
         } else {
-            var visibility = lightVisibility(light, shadowPoint, surfaceNormal,
-                                             dot(surfaceNormal, toLight), float2(id.xy));
-            // A distant light over the terrain: the terrain's horizon towards it too, wherever
-            // its shadow maps' texels are coarser than the horizon map's, as far as the view sees.
-            if (type == 0 && light.patternLayout.x != 0 && resources.sunHorizonInfo.w != 0 &&
-                ids.y == resources.sunHorizonInfo.z) {
-                let horizon = sunHorizonVisibility(light, world, toLight);
-                visibility = lerp(visibility, min(visibility, horizon),
-                                  sunHorizonWeight(light, shadowPoint));
-            }
+            let visibility = withTerrainHorizon(
+                light, world, shadowPoint, toLight, ids.y,
+                lightVisibility(light, shadowPoint, surfaceNormal, dot(surfaceNormal, toLight),
+                                float2(id.xy)));
             scale *= visibility * volumeTransmittance(light, shadowPoint);
         }
         lightDirections[k] = toLight;
