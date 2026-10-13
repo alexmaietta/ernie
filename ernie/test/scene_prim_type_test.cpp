@@ -10,8 +10,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstdint>
 #include <map>
 #include <optional>
+#include <span>
+#include <stdexcept>
 #include <set>
 #include <string>
 #include <vector>
@@ -412,4 +416,44 @@ TEST(PrimType, DeclarationsSayWhatTheirChangesStamp) {
     EXPECT_EQ(ernie::DirtyOf(tokens::kPrototypes),
               ernie::Dirty::Topology);
     EXPECT_EQ(ernie::DirtyOf("user:speed"), ernie::Dirty::Params);
+}
+
+TEST(PrimType, SettersTakeRangesOfNumbers) {
+    Scene scene;
+    ernie::SphereLight lamp =
+        ernie::SphereLight::Define(scene, "/World/Lamp");
+    // Vectors from any contiguous range, exactly as many numbers.
+    lamp.SetColor(std::array<float, 3>{0.5f, 0.25f, 1.0f});
+    EXPECT_EQ(lamp.GetColor(), glm::dvec3(0.5, 0.25, 1.0));
+    const std::vector<int> ones = {1, 1, 1};
+    lamp.SetColor(std::span<const int>(ones));
+    EXPECT_EQ(lamp.GetColor(), glm::dvec3(1.0));
+    EXPECT_THROW(lamp.SetColor(std::vector<float>{1.0f, 2.0f}),
+                 std::invalid_argument);
+    // Float arrays from numbers of any type.
+    lamp.SetSpectrum(std::vector<double>{400.0, 1.0, 700.0, 0.5});
+    EXPECT_EQ(lamp.GetSpectrum(),
+              (std::vector<float>{400.0f, 1.0f, 700.0f, 0.5f}));
+
+    // Tensors of a shape, one dimension by default.
+    ernie::Mesh mesh = ernie::Mesh::Define(scene, "/World/Mesh");
+    const std::vector<float> points = {0, 0, 0, 1, 0, 0, 0, 1, 0};
+    mesh.SetPoints(points, {3, 3});
+    ASSERT_NE(mesh.GetPoints(), nullptr);
+    EXPECT_EQ(mesh.GetPoints()->Shape(),
+              (std::vector<std::int64_t>{3, 3}));
+    EXPECT_EQ(mesh.GetPoints()->Type(), ernie::DType::Float32);
+    mesh.SetFaceVertexIndices(std::vector<std::int32_t>{0, 1, 2});
+    EXPECT_EQ(mesh.GetFaceVertexIndices()->Shape(),
+              (std::vector<std::int64_t>{3}));
+    EXPECT_THROW(mesh.SetPoints(points, {2, 3}), std::invalid_argument);
+
+    // OrArray arrays as float32 rows of a vector's numbers.
+    mesh.WriteDisplayColor(std::vector<double>{1, 0, 0, 0, 1, 0, 0, 0, 1});
+    ASSERT_NE(mesh.ReadDisplayColor(), nullptr);
+    EXPECT_EQ(mesh.ReadDisplayColor()->Shape(),
+              (std::vector<std::int64_t>{3, 3}));
+    EXPECT_EQ(mesh.ReadDisplayColor()->Type(), ernie::DType::Float32);
+    EXPECT_THROW(mesh.WriteDisplayColor(std::vector<float>{1, 0}),
+                 std::invalid_argument);
 }

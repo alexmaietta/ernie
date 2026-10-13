@@ -13,7 +13,9 @@
 #include <cstddef>
 #include <initializer_list>
 #include <optional>
+#include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -64,6 +66,8 @@ enum class AttributeKind {
                     ///< descriptions.
     Matrix,  ///< A `glm::dmat4` (math convention), written as 4 rows
              ///< of 4.
+    TokenArray,  ///< A `std::vector<std::string>`, such as joint
+                 ///< names.
 };
 
 /// How an attribute is described and edited. Declared with designated
@@ -291,6 +295,21 @@ template <> struct AttributeTraits<std::vector<float>> {
     /// A float array, a 2- to 4-vector or a single number (an array
     /// of one) as an array.
     static std::optional<std::vector<float>> From(const Value& value);
+};
+
+template <> struct AttributeTraits<std::vector<std::string>> {
+    static constexpr AttributeKind kKind = AttributeKind::TokenArray;
+    using Result = std::vector<std::string>;
+    using Arg = std::vector<std::string>;
+    /// The authored tokens, or `fallback` when unset or of another
+    /// type.
+    static std::vector<std::string>
+    Read(const Scene& scene, const Path& path, std::string_view name,
+         const std::vector<std::string>& fallback);
+    /// A list of strings, or one string as a list of one (an empty
+    /// list arrives from Python as an empty float array).
+    static std::optional<std::vector<std::string>>
+    From(const Value& value);
 };
 
 /// Bulk data: reads the written tensor or null (there is no
@@ -533,6 +552,27 @@ class SchemaView {
                                               token, value);         \
         return static_cast<Self&>(*this);                            \
     }                                                                \
+    /** For a vector or float array attribute: its numbers from any  \
+     * contiguous range (`std::array`, `std::vector`, `std::span`),  \
+     * copied. @throws std::invalid_argument if a vector's numbers   \
+     * are not as many as it has. */                                 \
+    template <typename R>                                            \
+        requires ::ernie::detail::SetsFromNumbers<Type, R>           \
+    Self& Set##Name(const R& values) {                               \
+        return Set##Name(                                            \
+            ::ernie::detail::FromNumbers<Type>(values));             \
+    }                                                                \
+    /** For a tensor attribute: a copy of the numbers of any         \
+     * contiguous range, of `shape` (one dimension when empty), on   \
+     * the host; GPU arrays are written as tensors (DLPack). */      \
+    template <typename R, typename T = Type>                         \
+        requires(std::is_same_v<T, ::ernie::Tensor> &&               \
+                 ::ernie::detail::NumberRange<R>)                    \
+    Self& Set##Name(const R& values,                                 \
+                    std::vector<std::int64_t> shape = {}) {          \
+        return Set##Name(::ernie::detail::TensorFromNumbers(         \
+            values, std::move(shape)));                              \
+    }                                                                \
     Self& Clear##Name() {                                            \
         Edit().Clear(GetPath(), token);                              \
         return static_cast<Self&>(*this);                            \
@@ -551,6 +591,17 @@ class SchemaView {
     Self& Write##Name(::ernie::Tensor array) {                       \
         Edit().Write(GetPath(), token, std::move(array));            \
         return static_cast<Self&>(*this);                            \
+    }                                                                \
+    /** For an `OrArray` attribute: writes a float32 copy of the     \
+     * numbers of any contiguous range as its array, rows of a       \
+     * vector's numbers. @throws std::invalid_argument if they do    \
+     * not fill whole rows. */                                       \
+    template <typename R, typename T = Type>                         \
+        requires(::ernie::kIsOrArray<T> &&                           \
+                 ::ernie::detail::NumberRange<R>)                    \
+    Self& Write##Name(const R& values) {                             \
+        return Write##Name(                                          \
+            ::ernie::detail::ArrayFromNumbers<T>(values));           \
     }
 
 /// The body of a view class `Class` deriving from `Base`
@@ -667,6 +718,104 @@ void WriteAttribute(Scene& scene, const Path& path,
     } else {
         scene.Set(path, name, Value(value));
     }
+}
+
+/// A contiguous range of numbers on the host: a `std::array`,
+/// `std::vector`, `std::span` or C array of them.
+template <typename R>
+concept NumberRange =
+    std::ranges::contiguous_range<R> && std::ranges::sized_range<R> &&
+    std::is_arithmetic_v<std::ranges::range_value_t<R>> &&
+    !std::is_same_v<std::ranges::range_value_t<R>, bool>;
+
+/// The numbers in a vector attribute of type `T`; 0 for other types.
+/// Quaternions and matrices take none: four numbers may put w first
+/// or last, sixteen may be rows or columns.
+template <typename T> inline constexpr std::size_t kVectorSize = 0;
+template <> inline constexpr std::size_t kVectorSize<glm::dvec2> = 2;
+template <> inline constexpr std::size_t kVectorSize<glm::dvec3> = 3;
+template <> inline constexpr std::size_t kVectorSize<glm::dvec4> = 4;
+
+/// The type an attribute declared as `T` holds as a value.
+template <typename T> struct ValueTypeOf {
+    using Type = T;
+};
+template <typename T> struct ValueTypeOf<OrArray<T>> {
+    using Type = T;
+};
+template <typename T>
+using ValueType = typename ValueTypeOf<T>::Type;
+
+/// Whether the setter of an attribute declared as `T` takes `R` as
+/// numbers: a vector's, or a float array's, where `R` is not already
+/// its own type.
+template <typename T, typename R>
+concept SetsFromNumbers =
+    NumberRange<R> &&
+    (kVectorSize<ValueType<T>> > 0 ||
+     std::is_same_v<ValueType<T>, std::vector<float>>) &&
+    !std::is_convertible_v<const R&, typename AttributeTraits<T>::Arg>;
+
+/// `values` as the value of an attribute declared as `T`.
+/// @throws std::invalid_argument if a vector's numbers are not as
+/// many as it has.
+template <typename T, NumberRange R>
+ValueType<T> FromNumbers(const R& values) {
+    using V = ValueType<T>;
+    const std::span numbers(values);
+    if constexpr (kVectorSize<V> > 0) {
+        constexpr std::size_t n = kVectorSize<V>;
+        if (numbers.size() != n) {
+            throw std::invalid_argument(
+                "Expected " + std::to_string(n) + " numbers, not " +
+                std::to_string(numbers.size()));
+        }
+        V vector(0.0);
+        for (std::size_t i = 0; i < n; ++i) {
+            vector[static_cast<glm::length_t>(i)] =
+                static_cast<double>(numbers[i]);
+        }
+        return vector;
+    } else {
+        return V(numbers.begin(), numbers.end());
+    }
+}
+
+/// `values` as the float32 array of an `OrArray<T>` attribute: rows
+/// of a vector's numbers, else one dimension.
+/// @throws std::invalid_argument if the numbers do not fill whole
+/// rows.
+template <typename T, NumberRange R> Tensor ArrayFromNumbers(const R& values) {
+    const std::span numbers(values);
+    const std::vector<float> floats(numbers.begin(), numbers.end());
+    const auto count = static_cast<std::int64_t>(floats.size());
+    constexpr auto n =
+        static_cast<std::int64_t>(kVectorSize<ValueType<T>>);
+    if constexpr (n > 0) {
+        if (count % n != 0) {
+            throw std::invalid_argument(
+                "Expected rows of " + std::to_string(n) +
+                " numbers, not " + std::to_string(count) + " numbers");
+        }
+        return Tensor::Copy<float>(floats, {count / n, n});
+    } else {
+        return Tensor::Copy<float>(floats, {count});
+    }
+}
+
+/// `values` as a tensor of `shape`, one dimension when empty, of the
+/// range's own element type.
+/// @throws std::invalid_argument if the shape's elements are not as
+/// many as the values.
+template <NumberRange R>
+Tensor TensorFromNumbers(const R& values,
+                         std::vector<std::int64_t> shape) {
+    const std::span numbers(values);
+    using E = std::remove_cv_t<typename decltype(numbers)::element_type>;
+    if (shape.empty()) {
+        shape = {static_cast<std::int64_t>(numbers.size())};
+    }
+    return Tensor::Copy<E>(std::span<const E>(numbers), std::move(shape));
 }
 
 /// The `AttributeDef` of an attribute declared as `T` with `fallback`
