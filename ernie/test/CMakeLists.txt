@@ -51,6 +51,7 @@ ernie_add_test_suite(
     util_image_test.cpp
     util_texture_bake_test.cpp
     util_texture_file_test.cpp
+    util_raster_source_test.cpp
     util_tiff_test.cpp
     util_reflectance_library_test.cpp
     util_ies_test.cpp

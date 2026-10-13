@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ernie/util/mapped_file.h"
+#include "ernie/util/raster_source.h"
 
 #include <array>
 #include <cstddef>
@@ -17,7 +18,7 @@ namespace ernie {
 /// A TIFF or GeoTIFF image read in place from its mapped file: its
 /// layout, and rectangles of its samples decoded on demand, so that
 /// images larger than memory (planetary mosaics and elevation models,
-/// gigapixel photographs) read a part at a time.
+/// gigapixel photographs) read a part at a time (`RasterSource`).
 ///
 /// Classic TIFF and BigTIFF, either byte order; strips or tiles of
 /// interleaved samples (PlanarConfiguration 1); 8-, 16- and 32-bit
@@ -33,38 +34,25 @@ namespace ernie {
 ///   https://www.awaresystems.be/imaging/tiff/bigtiff.html
 /// - OGC, "GeoTIFF Standard" 1.1, 2019 (ModelPixelScale,
 ///   ModelTiepoint); GDAL's GDAL_NODATA tag (42113).
-class TiffImage {
+class TiffImage : public RasterSource {
   public:
-    /// How each sample is stored.
-    enum class SampleType {
-        UInt8,
-        UInt16,
-        Int16,
-        UInt32,
-        Int32,
-        Float32,
-    };
+    using SampleType = RasterSampleType;
 
     /// @throws std::runtime_error if the file cannot be read, is not
     /// a TIFF, or holds a layout or encoding it does not read.
     explicit TiffImage(const std::filesystem::path& path);
 
-    std::uint32_t Width() const {
+    std::uint32_t Width() const override {
         return width_;
     }
-    std::uint32_t Height() const {
+    std::uint32_t Height() const override {
         return height_;
     }
-    /// Samples per pixel (1 grey or elevation, 3 RGB, 4 RGBA).
-    std::uint32_t Channels() const {
+    std::uint32_t Channels() const override {
         return channels_;
     }
-    SampleType Type() const {
+    SampleType Type() const override {
         return type_;
-    }
-    /// Bytes of one sample.
-    std::uint32_t SampleBytes() const {
-        return bits_ / 8;
     }
 
     /// GeoTIFF's ModelPixelScale (x, y, z) and ModelTiepoint (raster
@@ -76,20 +64,18 @@ class TiffImage {
         return tiepoint_;
     }
     /// GDAL's no-data value, when present.
-    std::optional<double> NoData() const {
+    std::optional<double> NoData() const override {
         return noData_;
     }
+    /// From the tie point and pixel scale, when both are present and
+    /// the model space is in degrees (a geographic grid).
+    std::optional<LatLongGrid> Grid() const override;
 
-    /// The samples of columns [x, x + w) and rows [y, y + h), rows
-    /// top to bottom, interleaved, in the host's byte order: w * h *
-    /// Channels() * SampleBytes() bytes at `out`.
     /// @throws std::out_of_range for a rectangle past the image;
     /// std::runtime_error for a damaged strip or tile.
     void Read(std::uint32_t x, std::uint32_t y, std::uint32_t w,
-              std::uint32_t h, std::span<std::byte> out) const;
-
-    /// The whole image (`Read` of every pixel).
-    std::vector<std::byte> ReadAll() const;
+              std::uint32_t h,
+              std::span<std::byte> out) const override;
 
   private:
     /// Strip or tile `chunk` decoded (predictor undone, host byte

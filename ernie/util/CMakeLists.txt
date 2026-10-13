@@ -13,8 +13,10 @@ ernie_add_library(
     mapped_file.cpp
     nanovdb.cpp
     noise.cpp
+    pds.cpp
     profile_report.cpp
     profiler.cpp
+    raster_source.cpp
     reflectance_library.cpp
     regolith.cpp
     scattering.cpp

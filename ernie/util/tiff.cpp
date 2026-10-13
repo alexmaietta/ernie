@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <bit>
 #include <climits>
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -548,11 +549,26 @@ void TiffImage::Read(std::uint32_t x, std::uint32_t y,
     }
 }
 
-std::vector<std::byte> TiffImage::ReadAll() const {
-    std::vector<std::byte> out(std::size_t{width_} * height_ *
-                               channels_ * SampleBytes());
-    Read(0, 0, width_, height_, out);
-    return out;
+std::optional<LatLongGrid> TiffImage::Grid() const {
+    if (!pixelScale_ || !tiepoint_) {
+        return std::nullopt;
+    }
+    const std::array<double, 3>& scale = *pixelScale_;
+    const std::array<double, 6>& tie = *tiepoint_;
+    const LatLongGrid grid{tie[3] - tie[0] * scale[0],
+                           tie[4] + tie[1] * scale[1], scale[0],
+                           scale[1]};
+    // Degrees: within a turn of longitude and between the poles
+    // (metres of a projected grid are far larger).
+    constexpr double kSlack = 1e-6;
+    if (!(grid.degreesAcross > 0.0) || !(grid.degreesDown > 0.0) ||
+        grid.degreesAcross * width_ > 360.0 + kSlack ||
+        grid.degreesDown * height_ > 180.0 + kSlack ||
+        std::abs(grid.west) > 360.0 ||
+        std::abs(grid.north) > 90.0 + kSlack) {
+        return std::nullopt;
+    }
+    return grid;
 }
 
 }  // namespace ernie
