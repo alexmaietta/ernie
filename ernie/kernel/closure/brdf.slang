@@ -24,7 +24,21 @@ public struct BrdfInput {
     // filtered normal map's, `MipFilter::NormalSlopes`), 0 when there are none. Models with a
     // roughness widen it by this, as the same slopes would at a finer scale; others ignore it.
     public float slopeVariance;
+    // The wavelengths (nm) of the three bands in the RGB slots, for models whose reflectance
+    // depends on them beyond their colours (a thin film's interference); 550 where the host has
+    // none.
+    public float3 wavelengths;
+    // The model's colour parameters (`BrdfParam::colour`) in its order, each as the host's
+    // spectral uplift of its RGB at the three bands, as the albedo is: white where the host has
+    // none, and for colours past `kBrdfColours`.
+    public float3 colours[kBrdfColours];
 }
+
+// The most colour parameters a host uplifts into `BrdfInput::colours`.
+public static const uint kBrdfColours = 4;
+// Parameters packed with the material (`BrdfParams::values`); the rest, up to 48, behind
+// `BrdfParams::extended`.
+public static const uint kBrdfCoreParams = 16;
 
 // Hapke's mean slope angle theta-bar (radians) widened by unresolved slopes of per-axis variance
 // `slopeVariance`. Hapke's roughness distribution has Gaussian slopes of variance
@@ -34,12 +48,23 @@ public float widenedMeanSlope(float thetaBar, float slopeVariance) {
     return atan(sqrt(tanT * tanT + 2.0 * slopeVariance / PI));
 }
 
-// Up to 16 model parameters in the order the model declares them.
+// Up to 48 model parameters in the order the model declares them: the first 16 packed with the
+// material, read with it; the rest behind `extended`, read only where the model asks for them (a
+// layer a material uses), after the material's feature bits (`BrdfModel::features`). `extended`
+// is null for models of 16 or fewer.
 public struct BrdfParams {
     public float4 values[4];
+    public float* extended;
 
     public float get(uint i) {
-        return values[i / 4][i % 4];
+        return i < kBrdfCoreParams ? values[i / 4][i % 4] : extended[1 + i - kBrdfCoreParams];
+    }
+
+    // The material's features (`BrdfModel::features`): the layers it uses. Only for models with
+    // extended parameters, whose materials always have them (a pointer's comparison with null
+    // would need 64-bit integers).
+    public uint features() {
+        return asuint(extended[0]);
     }
 }
 
@@ -114,6 +139,10 @@ public BrdfInput brdfInputOf(float3 n, float3 l, float3 v, float3 albedo) {
     input.cosPsi = cosPsi;
     input.albedo = albedo;
     input.slopeVariance = 0.0;
+    input.wavelengths = float3(550.0);
+    for (uint c = 0; c < kBrdfColours; ++c) {
+        input.colours[c] = float3(1.0);
+    }
     return input;
 }
 
@@ -210,4 +239,86 @@ public float doubleHenyeyGreenstein(float b, float c, float cosG) {
     let back = (1.0 - b2) / pow(max(1.0 - 2.0 * b * cosG + b2, 1e-6), 1.5);
     let forward = (1.0 - b2) / pow(max(1.0 + 2.0 * b * cosG + b2, 1e-6), 1.5);
     return 0.5 * (1.0 + c) * back + 0.5 * (1.0 - c) * forward;
+}
+
+// GGX microfacet helpers shared by the models with specular lobes.
+//
+// References:
+// - E. Heitz, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT
+//   3(2), 2014.
+// - E. Turquin, "Practical multiple scattering compensation for microfacet models", ILM, 2019.
+// - B. Karis, "Physically Based Shading on Mobile", 2014 (analytic environment BRDF).
+
+// GGX normal distribution D(h) for alpha^2 `a2` (Trowbridge and Reitz 1975; Walter et al. 2007).
+public float ggx(float nDotH, float a2) {
+    let d = nDotH * nDotH * (a2 - 1.0) + 1.0;
+    return a2 / (PI * d * d);
+}
+
+// Height-correlated Smith visibility G / (4 mu0 mu) for GGX (Heitz 2014).
+public float smithVisibility(float mu0, float mu, float a2) {
+    let lambdaV = mu0 * sqrt(mu * mu * (1.0 - a2) + a2);
+    let lambdaL = mu * sqrt(mu0 * mu0 * (1.0 - a2) + a2);
+    return 0.5 / max(lambdaV + lambdaL, 1e-8);
+}
+
+public float3 schlick(float3 f0, float vDotH) {
+    let m = pow(saturate(1.0 - vDotH), 5.0);
+    return f0 + (1.0 - f0) * m;
+}
+
+// The split-sum environment BRDF's scale and bias on f0 for perceptual roughness `roughness` at
+// cos(e) `mu`, from Lazarov's analytic fit (Karis 2014), so no lookup table is needed.
+public float2 environmentBrdf(float roughness, float mu) {
+    let c0 = float4(-1.0, -0.0275, -0.572, 0.022);
+    let c1 = float4(1.0, 0.0425, 1.04, -0.04);
+    let r = roughness * c0 + c1;
+    let a004 = min(r.x * r.x, exp2(-9.28 * mu)) * r.x + r.y;
+    return float2(-1.04, 1.04) * a004 + r.zw;
+}
+
+// The factor restoring the energy a GGX lobe of perceptual roughness `roughness` loses to its
+// single-scattering approximation, for reflectance `f0` at cos(e) `mu`: 1 + f0 (1 / E - 1), E the
+// lobe's directional albedo for f0 = 1 (the environment BRDF's scale plus bias), as Filament does.
+public float3 energyCompensation(float3 f0, float roughness, float mu) {
+    let ab = environmentBrdf(roughness, saturate(mu));
+    return 1.0 + f0 * (1.0 / max(ab.x + ab.y, 1e-3) - 1.0);
+}
+
+// `energyCompensation` for direct light: the geometric mean of the factors at the incidence and
+// emission angles, so the BRDF stays reciprocal (it equals the emission one when they match).
+public float3 reciprocalCompensation(float3 f0, float roughness, float mu0, float mu) {
+    return sqrt(energyCompensation(f0, roughness, mu0) * energyCompensation(f0, roughness, mu));
+}
+
+// The perceptual roughness of a lobe of `roughness` widened by unresolved slopes of `variance`.
+public float widenedRoughness(float roughness, float variance) {
+    let alpha = roughness * roughness;
+    return sqrt(sqrt(min(alpha * alpha + 2.0 * max(variance, 0.0), 1.0)));
+}
+
+// Fresnel's reflectance of unpolarized light at cos(i) `cosI` onto a dielectric of relative index
+// of refraction `eta` (from the side of index 1; eta < 1 from inside), 1 past the critical angle.
+//
+// Reference: M. Born and E. Wolf, "Principles of Optics", 7th ed., Cambridge, 1999, sec. 1.5.
+public float fresnelDielectric(float cosI, float eta) {
+    let c = saturate(cosI);
+    let sinT2 = (1.0 - c * c) / (eta * eta);
+    if (sinT2 >= 1.0) {
+        return 1.0;
+    }
+    let cosT = sqrt(1.0 - sinT2);
+    let rs = (c - eta * cosT) / (c + eta * cosT);
+    let rp = (eta * c - cosT) / (eta * c + cosT);
+    return 0.5 * (rs * rs + rp * rp);
+}
+
+// The hemispherical mean of `fresnelDielectric` (cosine weighted) onto a dielectric of eta >= 1,
+// as fitted by Kulla and Conty: the light a smooth dielectric reflects from all around.
+//
+// Reference: C. Kulla and A. Conty, "Revisiting Physically Based Shading at Imageworks",
+// SIGGRAPH 2017 course: Physically Based Shading in Theory and Practice.
+public float meanFresnelDielectric(float eta) {
+    let n = max(eta, 1.0);
+    return (n - 1.0) / (4.08567 + 1.00071 * n);
 }

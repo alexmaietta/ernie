@@ -36,6 +36,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -3449,6 +3450,25 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
         settings.brdfParams.push_back(Number(scene, inputs,
                                              "inputs:" + param.name,
                                              param.defaultValue));
+    }
+    // A colour parameter's three from its one colour input.
+    for (const std::size_t first : model->Colours()) {
+        const Value* value =
+            scene.Get(inputs, "inputs:" + model->params[first].name);
+        std::optional<glm::dvec3> colour;
+        if (const auto* d =
+                value ? value->Get<glm::dvec3>() : nullptr) {
+            colour = *d;
+        } else if (const auto* f =
+                       value ? value->Get<glm::vec3>() : nullptr) {
+            colour = glm::dvec3(*f);
+        }
+        for (int c = 0; colour && c < 3; ++c) {
+            const std::size_t at =
+                first + static_cast<std::size_t>(c);
+            settings.brdfParams[at] =
+                static_cast<float>((*colour)[c]);
+        }
     }
     if (preview) {
         const Shader shader(scene, surface);

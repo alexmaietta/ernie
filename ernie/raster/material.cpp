@@ -45,7 +45,7 @@ struct SurfaceUniforms {
     float opacityUv[8];
     float opacity[4];  ///< Opacity, its cutout threshold, has a
                        ///< texture, unused.
-    float params[BrdfRegistry::kMaxParams];
+    float params[BrdfRegistry::kCoreParams];
     /// Minimal shading's diffuse, glossy and emission mode: the
     /// model's roughness and metallic and 1 when it has a roughness;
     /// the emission, linear RGB cd/m^2.
@@ -1073,7 +1073,7 @@ void RasterMaterial::WriteUniform() {
     u.opacity[2] =
         bound(Slot::Opacity, settings.opacityTexture.has_value());
     const std::size_t count =
-        std::min(brdfParams.size(), BrdfRegistry::kMaxParams);
+        std::min(brdfParams.size(), BrdfRegistry::kCoreParams);
     if (count > 0) {
         std::memcpy(u.params, brdfParams.data(),
                     count * sizeof(float));

@@ -45,8 +45,8 @@ public struct Surface {
     // surface is cut out (y, 0 for none) and whether an opacity texture replaces x (z).
     public float4 opacityUv[2];
     public float4 opacity;
-    // Parameters of the active reflectance model.
-    public BrdfParams brdf;
+    // Parameters of the active reflectance model, its core ones (`BrdfParams::values`).
+    public float4 brdf[4];
     // Minimal shading's diffuse, glossy and emission mode (`kMinimalGlossy`): the model's
     // roughness and metallic, and 1 when it has a roughness (else no highlights); the emission,
     // linear RGB cd/m^2.

@@ -1115,11 +1115,13 @@ class RasterRenderer {
         requiredVars_;  ///< The vars the last `Update`'s frame needs.
 
     PipelineLayout shadingLayout_;
-    /// Per model, whether for a pushbroom's views and shading variant
-    /// (renderer.cpp's `ShadingVariantOf`), the variants a frame has
+    /// Per model, whether for a pushbroom's views, shading variant
+    /// (renderer.cpp's `ShadingVariantOf`) and the model's features
+    /// in use (`BrdfModel::features`), the variants a frame has
     /// needed so far.
-    std::map<std::tuple<std::size_t, bool, std::uint32_t>,
-             std::unique_ptr<ComputePipeline>>
+    std::map<
+        std::tuple<std::size_t, bool, std::uint32_t, std::uint32_t>,
+        std::unique_ptr<ComputePipeline>>
         shadingPipelines_;
     /// The last `Update`'s shading variant.
     std::uint32_t shadingVariant_ = 0;
@@ -1385,6 +1387,13 @@ class RasterRenderer {
     std::array<std::array<std::unique_ptr<ComputePipeline>, 2>, 2>
         skyPipelines_;
     std::vector<std::size_t> modelsInUse_;
+    /// Per registered model, the union of its materials' features
+    /// (`BrdfModel::features`), which its shading pipeline compiles
+    /// in.
+    std::vector<std::uint32_t> modelFeatures_;
+    /// Models' parameters past `BrdfRegistry::kCoreParams`, each
+    /// material's after its features (`BrdfParams::extended`).
+    std::unique_ptr<GpuBuffer> brdfExtended_;
     SpectralBands bands_;
     /// The frame's thermal emission, for the material table.
     ThermalSettings thermal_;

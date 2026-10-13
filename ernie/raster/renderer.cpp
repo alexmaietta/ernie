@@ -444,17 +444,19 @@ constexpr VkDeviceSize kProfileBytes = LightParams::kProfileRows *
 
 struct MaterialGpu {
     std::uint32_t info[4];
-    float params[BrdfRegistry::kMaxParams];
+    float params[BrdfRegistry::kCoreParams];
     float reflectance[SpectralBands::kMaxBands];
     /// Spectral radiance the surface emits per band (W m^-2 sr^-1
     /// nm^-1).
     float emission[SpectralBands::kMaxBands];
     /// Thermal emissivity per band.
     float emissivity[SpectralBands::kMaxBands];
-    /// x: its rms surface height, m, for laser speckle; y: its
-    /// temperature in kelvin (0 for none, or thermal emission off);
-    /// zw unused.
-    float surface[4];
+    /// Its rms surface height, m, for laser speckle; its temperature
+    /// in kelvin (0 for none, or thermal emission off).
+    float surface[2];
+    /// The address of its features and parameters past the core ones
+    /// (`BrdfParams::extended`), 0 for none.
+    std::uint64_t extended;
 };
 static_assert(sizeof(MaterialGpu) == 864,
               "MaterialGpu must match shading.slang");
@@ -971,34 +973,80 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
     return variant | (lights << kShadeLightsShift);
 }
 
+/// `brdf`'s module compiled with the features `features` its
+/// materials use (`BrdfModel::features`), and shading's constants
+/// for its colours (`BrdfParam::colour`): how many, their red
+/// parameters, which of them a material with those features reads,
+/// and the feature each needs (0 for none), so shading uplifts at
+/// each band only those the pixel's material reads.
+std::string BrdfModuleSource(const BrdfModel& brdf,
+                             std::uint32_t features) {
+    if (!brdf.features) {
+        return brdf.slang;
+    }
+    return "#define BRDF_FEATURES " + std::to_string(features) +
+           "u\n" + brdf.slang;
+}
+
+std::string BrdfColourSource(const BrdfModel& brdf,
+                             std::uint32_t features) {
+    const std::vector<std::size_t> colours = brdf.Colours();
+    std::string params;
+    std::string used;
+    std::string bits;
+    for (std::size_t c = 0; c < BrdfRegistry::kMaxColours; ++c) {
+        const bool present = c < colours.size();
+        const std::uint32_t feature =
+            present ? brdf.params[colours[c]].feature : 0u;
+        const char* comma = c > 0 ? ", " : "";
+        params += comma + std::to_string(present ? colours[c] : 0);
+        used += comma;
+        used += present && (feature == 0 || (features & feature) != 0)
+                    ? "1"
+                    : "0";
+        bits += comma + std::to_string(feature);
+    }
+    return "static const uint kBrdfColourCount = " +
+           std::to_string(colours.size()) +
+           ";\nstatic const uint4 kBrdfColourParams = uint4(" +
+           params +
+           ");\nstatic const uint4 kBrdfColourUsed = uint4(" + used +
+           ");\nstatic const uint4 kBrdfColourFeatures = uint4(" +
+           bits + ");\n";
+}
+
 /// The modules of the shading and sky passes with `brdf` as the
-/// active model, `patterns`' light patterns and `temperatures`'
-/// temperature models, for a frame camera's views or a pushbroom's,
-/// shading.slang compiled as shading variant `variant`.
+/// active model, its materials using features `features`,
+/// `patterns`' light patterns and `temperatures`' temperature models,
+/// for a frame camera's views or a pushbroom's, shading.slang
+/// compiled as shading variant `variant`.
 std::vector<ShaderModuleSource>
 ShadingModules(const BrdfModel& brdf,
                const LightPatternRegistry& patterns,
                const TemperatureModelRegistry& temperatures,
-               bool pushbroom, std::uint32_t variant = kFullShading) {
+               bool pushbroom, std::uint32_t variant = kFullShading,
+               std::uint32_t features = 0) {
     std::vector<ShaderModuleSource> modules =
         LightPatternModules(patterns);
     for (ShaderModuleSource& module :
          TemperatureModelModules(temperatures)) {
         modules.push_back(std::move(module));
     }
-    modules.insert(modules.end(),
-                   {{"brdf", std::string(BrdfSlang())},
-                    {BrdfModuleName(brdf), brdf.slang},
-                    ProjectionModule(pushbroom),
-                    {"bindless", shaders::kBindlessSlang},
-                    {"atmosphere", shaders::kAtmosphereSlang},
-                    {"laser_beams", shaders::kLaserBeamsSlang},
-                    {"gbuffer", shaders::kGBufferSlang},
-                    {"shading", "import " + BrdfModuleName(brdf) +
-                                    ";\ntypealias ActiveBrdf = " +
-                                    brdf.typeName + ";\n" +
-                                    ShadingVariantSource(variant) +
-                                    shaders::kShadingSlang}});
+    modules.insert(
+        modules.end(),
+        {{"brdf", std::string(BrdfSlang())},
+         {BrdfModuleName(brdf), BrdfModuleSource(brdf, features)},
+         ProjectionModule(pushbroom),
+         {"bindless", shaders::kBindlessSlang},
+         {"atmosphere", shaders::kAtmosphereSlang},
+         {"laser_beams", shaders::kLaserBeamsSlang},
+         {"gbuffer", shaders::kGBufferSlang},
+         {"shading",
+          "import " + BrdfModuleName(brdf) +
+              ";\ntypealias ActiveBrdf = " + brdf.typeName + ";\n" +
+              BrdfColourSource(brdf, features) +
+              ShadingVariantSource(variant) +
+              shaders::kShadingSlang}});
     return modules;
 }
 
@@ -2240,6 +2288,11 @@ void RasterRenderer::SetMaterial(std::uint32_t id,
     if (const std::optional<float> roughness = param("roughness")) {
         gloss =
             glm::vec2(*roughness, param("metallic").value_or(0.0f));
+    } else if (const std::optional<float> specular =
+                   param("specular_roughness")) {
+        // OpenPBR's names.
+        gloss = glm::vec2(*specular,
+                          param("base_metalness").value_or(0.0f));
     }
     Material(id).Update(settings, params, gloss);
 }
@@ -4063,7 +4116,10 @@ RasterRenderer::LensPipeline(const std::string& lens,
 
 const ComputePipeline&
 RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
-    const auto key = std::tuple(model, pushbroom, shadingVariant_);
+    const std::uint32_t features =
+        model < modelFeatures_.size() ? modelFeatures_[model] : 0u;
+    const auto key =
+        std::tuple(model, pushbroom, shadingVariant_, features);
     if (const auto it = shadingPipelines_.find(key);
         it != shadingPipelines_.end()) {
         return *it->second;
@@ -4073,7 +4129,7 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
     try {
         spirv = compiler_.CompileSpirv(
             ShadingModules(brdf, lightPatterns_, temperatureModels_,
-                           pushbroom, shadingVariant_),
+                           pushbroom, shadingVariant_, features),
             "shadeMain");
     } catch (const std::invalid_argument& error) {
         throw std::invalid_argument(
@@ -4144,6 +4200,11 @@ void RasterRenderer::WriteMaterialTable() {
     std::vector<float> temperatureData;
     std::set<std::size_t> models;
     const std::span<const BrdfModel> registered = brdfs_.Models();
+    // Models' parameters past the core ones, each material's after
+    // its features; entries' `extended` their offsets plus 1 (0 for
+    // none) until the buffer is made.
+    std::vector<float> extended;
+    modelFeatures_.assign(registered.size(), 0u);
     for (const auto& [id, material] : materials_) {
         MaterialGpu& entry = table[id];
         const auto model =
@@ -4169,8 +4230,22 @@ void RasterRenderer::WriteMaterialTable() {
         const std::vector<float>& params = material->Params();
         std::copy_n(params.begin(),
                     std::min<std::size_t>(params.size(),
-                                          BrdfRegistry::kMaxParams),
+                                          BrdfRegistry::kCoreParams),
                     entry.params);
+        // Its features and the rest of its parameters, for models of
+        // more than the core's: their offset until the buffer is
+        // made.
+        const std::uint32_t features =
+            model->features ? model->features(params) : 0u;
+        modelFeatures_[index] |= features;
+        if (params.size() > BrdfRegistry::kCoreParams) {
+            entry.extended = extended.size() + 1;
+            extended.push_back(std::bit_cast<float>(features));
+            extended.insert(extended.end(),
+                            params.begin() +
+                                BrdfRegistry::kCoreParams,
+                            params.end());
+        }
         std::vector<float> shape =
             material->Reflectance().Bin(bands_);
         const float luminance = material->Luminance();
@@ -4334,6 +4409,26 @@ void RasterRenderer::WriteMaterialTable() {
     }
     uploads_.Write(*temperatureMaterials_,
                    std::as_bytes(std::span(temperatureTable)));
+    if (!extended.empty()) {
+        const VkDeviceSize extendedBytes =
+            extended.size() * sizeof(float);
+        if (brdfExtended_ == nullptr ||
+            brdfExtended_->Size() < extendedBytes) {
+            vkDeviceWaitIdle(context_.Device());
+            brdfExtended_ = std::make_unique<GpuBuffer>(
+                context_, extendedBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+        }
+        uploads_.Write(*brdfExtended_,
+                       std::as_bytes(std::span(extended)));
+        for (MaterialGpu& entry : table) {
+            if (entry.extended != 0) {
+                entry.extended = brdfExtended_->Address() +
+                                 (entry.extended - 1) * sizeof(float);
+            }
+        }
+    }
     const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
     if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
         vkDeviceWaitIdle(context_.Device());
@@ -6612,7 +6707,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             vkCmdBindPipeline(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE,
                 shadingPipelines_
-                    .at({model, pushbroom_, shadingVariant_})
+                    .at({model, pushbroom_, shadingVariant_,
+                         modelFeatures_[model]})
                     ->Handle());
             shadingLayout_.Push(
                 commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);

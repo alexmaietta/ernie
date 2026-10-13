@@ -2052,6 +2052,40 @@ TEST_F(RasterDelegateTest, TheFullDomeModeShadowsTheSunOfAnHdrSky) {
 }
 
 TEST_F(RasterDelegateTest,
+       OpenPbrKeepsAWhiteFurnacesLightAndItsCoatColourTintsIt) {
+    // A white OpenPBR surface under a uniform dome reflects what a
+    // white Lambertian one does, its specular taking what its diffuse
+    // loses, with a clear coat too; a red coat (its colour a colour
+    // input, uplifted on the GPU) lets through red alone.
+    Scene scene = FlatScene();
+    scene.Remove("/World/Sun");
+    ernie::DomeLight::Define(scene, "/World/Sky").SetIntensity(1.0);
+    ernie::Material grey(scene, "/Looks/Grey");
+    grey.SetAlbedo(glm::dvec3(1.0));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto centre = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return glm::vec3(At<float>(vars.at("HdrColor"), c, c, 0),
+                         At<float>(vars.at("HdrColor"), c, c, 1),
+                         At<float>(vars.at("HdrColor"), c, c, 2));
+    };
+    const glm::vec3 lambert = centre();
+    ASSERT_GT(lambert.g, 0.5f);
+    grey.SetBrdf("open_pbr");
+    scene.Set("/Looks/Grey", "inputs:base_diffuse_roughness", 0.5);
+    EXPECT_NEAR(centre().g / lambert.g, 1.0f, 0.05f) << "uncoated";
+    scene.Set("/Looks/Grey", "inputs:coat_weight", 1.0);
+    EXPECT_NEAR(centre().g / lambert.g, 1.0f, 0.05f) << "coated";
+    scene.Set("/Looks/Grey", "inputs:coat_color",
+              glm::dvec3(1.0, 0.05, 0.05));
+    const glm::vec3 red = centre();
+    EXPECT_GT(red.r, 0.5f * lambert.r);
+    EXPECT_LT(red.b, 0.3f * red.r) << "the coat lets through red";
+}
+
+TEST_F(RasterDelegateTest,
        TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
     // FlatScene's floor and a 6 m cube under a uniform dome. In the
     // directions mode the dome's diffuse light comes from 16 shadowed

@@ -34,54 +34,6 @@ import brdf;
 //   Physical in Call of Duty: Black Ops II", SIGGRAPH 2013 course (analytic environment BRDF).
 //   https://www.unrealengine.com/en-US/blog/physically-based-shading-on-mobile
 
-// GGX normal distribution D(h) for alpha^2 `a2` (Trowbridge and Reitz 1975; Walter et al. 2007).
-float ggx(float nDotH, float a2) {
-    let d = nDotH * nDotH * (a2 - 1.0) + 1.0;
-    return a2 / (PI * d * d);
-}
-
-// Height-correlated Smith visibility G / (4 mu0 mu) for GGX (Heitz 2014).
-float smithVisibility(float mu0, float mu, float a2) {
-    let lambdaV = mu0 * sqrt(mu * mu * (1.0 - a2) + a2);
-    let lambdaL = mu * sqrt(mu0 * mu0 * (1.0 - a2) + a2);
-    return 0.5 / max(lambdaV + lambdaL, 1e-8);
-}
-
-float3 schlick(float3 f0, float vDotH) {
-    let m = pow(saturate(1.0 - vDotH), 5.0);
-    return f0 + (1.0 - f0) * m;
-}
-
-// The split-sum environment BRDF's scale and bias on f0 for perceptual roughness `roughness` at
-// cos(e) `mu`, from Lazarov's analytic fit (Karis 2014), so no lookup table is needed.
-float2 environmentBrdf(float roughness, float mu) {
-    let c0 = float4(-1.0, -0.0275, -0.572, 0.022);
-    let c1 = float4(1.0, 0.0425, 1.04, -0.04);
-    let r = roughness * c0 + c1;
-    let a004 = min(r.x * r.x, exp2(-9.28 * mu)) * r.x + r.y;
-    return float2(-1.04, 1.04) * a004 + r.zw;
-}
-
-// The factor restoring the energy a GGX lobe of perceptual roughness `roughness` loses to its
-// single-scattering approximation, for reflectance `f0` at cos(e) `mu`: 1 + f0 (1 / E - 1), E the
-// lobe's directional albedo for f0 = 1 (the environment BRDF's scale plus bias), as Filament does.
-float3 energyCompensation(float3 f0, float roughness, float mu) {
-    let ab = environmentBrdf(roughness, saturate(mu));
-    return 1.0 + f0 * (1.0 / max(ab.x + ab.y, 1e-3) - 1.0);
-}
-
-// `energyCompensation` for direct light: the geometric mean of the factors at the incidence and
-// emission angles, so the BRDF stays reciprocal (it equals the emission one when they match).
-float3 reciprocalCompensation(float3 f0, float roughness, float mu0, float mu) {
-    return sqrt(energyCompensation(f0, roughness, mu0) * energyCompensation(f0, roughness, mu));
-}
-
-// The perceptual roughness of a lobe of `roughness` widened by unresolved slopes of `variance`.
-float widenedRoughness(float roughness, float variance) {
-    let alpha = roughness * roughness;
-    return sqrt(sqrt(min(alpha * alpha + 2.0 * max(variance, 0.0), 1.0)));
-}
-
 public struct PreviewSurface : IBrdf {
     // The split-sum approximation (Karis 2013): each lobe's weight is its f0 times the
     // environment BRDF's scale plus its bias, and the diffuse lobe keeps what the dielectric's

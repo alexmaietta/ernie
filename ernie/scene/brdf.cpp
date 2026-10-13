@@ -5,7 +5,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
+#include <span>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace ernie {
@@ -184,6 +187,113 @@ BrdfModel PreviewSurface() {
         shaders::kBrdfPreviewSurfaceSlang};
 }
 
+// OpenPBR's layers, as open_pbr.slang's kOpenPbrCoat, kOpenPbrFuzz
+// and kOpenPbrThinFilm.
+constexpr std::uint32_t kOpenPbrCoat = 1;
+constexpr std::uint32_t kOpenPbrFuzz = 2;
+constexpr std::uint32_t kOpenPbrThinFilm = 4;
+
+BrdfModel OpenPbr() {
+    BrdfModel model{
+        "open_pbr",
+        "OpenPBR Surface",
+        "OpenPBR Surface's reflectance: a dielectric base (an "
+        "energy-preserving Oren-Nayar diffuse under a GGX lobe of "
+        "exact Fresnel) mixed with an F82-tint metal, an optional "
+        "thin film's interference at each band's wavelength, an "
+        "optional coat and an optional fuzz, layered by albedo "
+        "scaling. The albedo input is base_color. Layers no "
+        "material of a scene has are compiled out, and a material "
+        "without one skips it.",
+        {"J. Andersson, A. Portsmouth et al., \"OpenPBR Surface "
+         "Specification\", v1.1, Academy Software Foundation, 2024. "
+         "https://academysoftwarefoundation.github.io/OpenPBR/",
+         "J. Portsmouth, P. Kutz and S. Hill, \"EON: A practical "
+         "energy-preserving rough diffuse BRDF\", Journal of "
+         "Computer Graphics Techniques 14(1), 2025.",
+         "N. Hoffman, \"Generalization of Adobe's Fresnel Model\", "
+         "2023; P. Kutz, M. Hasan and P. Edmondson, \"Novel aspects "
+         "of the Adobe Standard Material\", 2021.",
+         "T. Zeltner, B. Burley and M. J.-Y. Chiang, \"Practical "
+         "Multiple-Scattering Sheen Using Linearly Transformed "
+         "Cosines\", SIGGRAPH 2022 Talks.",
+         "L. Belcour and P. Barla, \"A Practical Extension to "
+         "Microfacet Theory for the Modeling of Varying "
+         "Iridescence\", ACM Transactions on Graphics 36(4), 2017.",
+         "C. Kulla and A. Conty, \"Revisiting Physically Based "
+         "Shading at Imageworks\", SIGGRAPH 2017 course.",
+         "W. Jakob and J. Hanika, \"A Low-Dimensional Function "
+         "Space for Efficient Spectral Upsampling\", Computer "
+         "Graphics Forum 38(2), 2019 (its colours' spectra)."},
+        {{"base_weight", "Base weight", "", 1.0f, 0.0f, 1.0f, false,
+          "Scales the base colour."},
+         {"base_metalness", "Metalness", "", 0.0f, 0.0f, 1.0f, false,
+          "0 dielectric, 1 metal of the base colour."},
+         {"base_diffuse_roughness", "Diffuse roughness", "", 0.0f,
+          0.0f, 1.0f, false,
+          "The diffuse's Oren-Nayar roughness; 0 is Lambert."},
+         {"specular_weight", "Specular weight", "", 1.0f, 0.0f, 1.0f,
+          false, "Scales the specular lobe."},
+         {"specular_roughness", "Specular roughness", "", 0.3f, 0.0f,
+          1.0f, false,
+          "Perceptual roughness; the GGX alpha is its square."},
+         {"specular_ior", "Specular IOR", "", 1.5f, 1.0f, 3.0f, false,
+          "The dielectric's index of refraction."},
+         {"specular_color", "Specular colour", "", 1.0f, 0.0f, 1.0f,
+          false,
+          "Tints the dielectric's reflection, and the metal's near "
+          "grazing (F82 tint).",
+          true},
+         {"specular_color_g", "Specular colour G", "", 1.0f, 0.0f,
+          1.0f, false, "specular_color's green."},
+         {"specular_color_b", "Specular colour B", "", 1.0f, 0.0f,
+          1.0f, false, "specular_color's blue."},
+         {"coat_weight", "Coat", "", 0.0f, 0.0f, 1.0f, false,
+          "Coverage of a clear coat over the base."},
+         {"fuzz_weight", "Fuzz", "", 0.0f, 0.0f, 1.0f, false,
+          "Coverage of a fuzz (sheen) over everything."},
+         {"thin_film_weight", "Thin film", "", 0.0f, 0.0f, 1.0f,
+          false, "Coverage of a thin film on the base's specular."},
+         {"coat_roughness", "Coat roughness", "", 0.0f, 0.0f, 1.0f,
+          false, "The coat's perceptual roughness."},
+         {"coat_ior", "Coat IOR", "", 1.6f, 1.0f, 3.0f, false,
+          "The coat's index of refraction."},
+         {"coat_darkening", "Coat darkening", "", 1.0f, 0.0f, 1.0f,
+          false,
+          "How much the light the coat reflects back down darkens "
+          "the base."},
+         {"fuzz_roughness", "Fuzz roughness", "", 0.5f, 0.0f, 1.0f,
+          false, "The fuzz's roughness."},
+         {"coat_color", "Coat colour", "", 1.0f, 0.0f, 1.0f, false,
+          "What the coat lets through to the base and back.", true,
+          kOpenPbrCoat},
+         {"coat_color_g", "Coat colour G", "", 1.0f, 0.0f, 1.0f,
+          false, "coat_color's green."},
+         {"coat_color_b", "Coat colour B", "", 1.0f, 0.0f, 1.0f,
+          false, "coat_color's blue."},
+         {"fuzz_color", "Fuzz colour", "", 1.0f, 0.0f, 1.0f, false,
+          "The fuzz's colour.", true, kOpenPbrFuzz},
+         {"fuzz_color_g", "Fuzz colour G", "", 1.0f, 0.0f, 1.0f,
+          false, "fuzz_color's green."},
+         {"fuzz_color_b", "Fuzz colour B", "", 1.0f, 0.0f, 1.0f,
+          false, "fuzz_color's blue."},
+         {"thin_film_thickness", "Thin film thickness", "um", 0.5f,
+          0.0f, 2.0f, false, "The film's thickness."},
+         {"thin_film_ior", "Thin film IOR", "", 1.4f, 1.0f, 3.0f,
+          false, "The film's index of refraction."}},
+        "OpenPbr",
+        shaders::kBrdfOpenPbrSlang};
+    // A layer where its weight is above 0.
+    model.features = [](std::span<const float> p) {
+        std::uint32_t bits = 0;
+        bits |= p.size() > 9 && p[9] > 0.0f ? kOpenPbrCoat : 0u;
+        bits |= p.size() > 10 && p[10] > 0.0f ? kOpenPbrFuzz : 0u;
+        bits |= p.size() > 11 && p[11] > 0.0f ? kOpenPbrThinFilm : 0u;
+        return bits;
+    };
+    return model;
+}
+
 }  // namespace
 
 std::vector<float> BrdfModel::Defaults() const {
@@ -195,6 +305,16 @@ std::vector<float> BrdfModel::Defaults() const {
     return values;
 }
 
+std::vector<std::size_t> BrdfModel::Colours() const {
+    std::vector<std::size_t> colours;
+    for (std::size_t i = 0; i < params.size(); ++i) {
+        if (params[i].colour) {
+            colours.push_back(i);
+        }
+    }
+    return colours;
+}
+
 BrdfRegistry BrdfRegistry::WithBuiltins() {
     BrdfRegistry registry;
     registry.Add(Lambert());
@@ -203,6 +323,7 @@ BrdfRegistry BrdfRegistry::WithBuiltins() {
     registry.Add(OrenNayar());
     registry.Add(Hapke());
     registry.Add(PreviewSurface());
+    registry.Add(OpenPbr());
     return registry;
 }
 
@@ -224,8 +345,25 @@ void BrdfRegistry::Add(BrdfModel model) {
                                     model.id);
     }
     if (model.params.size() > kMaxParams) {
-        throw std::invalid_argument("BRDF " + model.id +
-                                    " has more than 16 parameters");
+        throw std::invalid_argument(
+            "BRDF " + model.id + " has more than " +
+            std::to_string(kMaxParams) + " parameters");
+    }
+    const std::vector<std::size_t> colours = model.Colours();
+    if (colours.size() > kMaxColours) {
+        throw std::invalid_argument(
+            "BRDF " + model.id + " has more than " +
+            std::to_string(kMaxColours) + " colours");
+    }
+    for (const std::size_t colour : colours) {
+        if (colour + 2 >= model.params.size() ||
+            model.params[colour + 1].colour ||
+            model.params[colour + 2].colour) {
+            throw std::invalid_argument(
+                "BRDF " + model.id + " colour " +
+                model.params[colour].name +
+                " lacks its green and blue parameters");
+        }
     }
     for (const BrdfParam& param : model.params) {
         if (!(param.minValue < param.maxValue) ||

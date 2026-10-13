@@ -32,8 +32,8 @@ BrdfModel Custom(std::string id) {
 TEST(BrdfRegistry, BuiltinsAreDocumentedAndValid) {
     const BrdfRegistry registry = BrdfRegistry::WithBuiltins();
     const std::vector<std::string> ids = {
-        "lambert",    "lommel_seeliger", "lunar_lambert",
-        "oren_nayar", "hapke",           "preview_surface"};
+        "lambert", "lommel_seeliger", "lunar_lambert", "oren_nayar",
+        "hapke",   "preview_surface", "open_pbr"};
     ASSERT_EQ(registry.Models().size(), ids.size());
     for (const std::string& id : ids) {
         const BrdfModel* model = registry.Find(id);
@@ -49,6 +49,18 @@ TEST(BrdfRegistry, BuiltinsAreDocumentedAndValid) {
     }
     EXPECT_EQ(registry.Find("phong"), nullptr);
     EXPECT_EQ(registry.Find("hapke")->params.size(), 6u);
+    // OpenPBR's colours, its layers' bits from their weights, and its
+    // parameters past the core ones.
+    const BrdfModel& open = *registry.Find("open_pbr");
+    EXPECT_EQ(open.Colours(), (std::vector<std::size_t>{6, 16, 19}));
+    EXPECT_GT(open.params.size(), BrdfRegistry::kCoreParams);
+    ASSERT_TRUE(open.features);
+    std::vector<float> values = open.Defaults();
+    EXPECT_EQ(open.features(values), 0u);
+    values[9] = 0.5f;   // coat_weight
+    values[11] = 1.0f;  // thin_film_weight
+    EXPECT_EQ(open.features(values), 1u | 4u);
+    EXPECT_FALSE(registry.Find("hapke")->features);
     EXPECT_NE(std::string(ernie::BrdfSlang()).find("interface IBrdf"),
               std::string::npos);
     const auto modules = ernie::BrdfModules(*registry.Find("hapke"));
@@ -81,6 +93,10 @@ TEST(BrdfRegistry, AddsCustomModelsAndRejectsInvalidOnes) {
     tooMany.params.assign(BrdfRegistry::kMaxParams + 1,
                           tooMany.params[0]);
     EXPECT_THROW(registry.Add(tooMany), std::invalid_argument);
+    // A colour needs its green and blue after it.
+    BrdfModel shortColour = Custom("short_colour");
+    shortColour.params.back().colour = true;
+    EXPECT_THROW(registry.Add(shortColour), std::invalid_argument);
 
     for (const BrdfParam& bad :
          {BrdfParam{"k", "", "", 0.5f, 1.0f, 1.0f, false, ""},

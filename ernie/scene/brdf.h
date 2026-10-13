@@ -4,6 +4,8 @@
 #include "ernie/util/shader_source.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -22,6 +24,15 @@ struct BrdfParam {
     float maxValue = 1.0f;
     bool logarithmic = false;  ///< Edit on a logarithmic scale.
     std::string description;
+    /// The first of three parameters (red, green, blue) of one colour
+    /// input, `inputs:<name>`, which the shaders uplift to a spectrum
+    /// at each band on the GPU (`BrdfInput::colours`, in the order of
+    /// the model's colours). The next two are its green and blue.
+    bool colour = false;
+    /// The feature bit (`BrdfModel::features`) without which the
+    /// model never reads this colour, so a scene none of whose
+    /// materials have it does not uplift it; 0 for always.
+    std::uint32_t feature = 0;
 };
 
 /// A reflectance model: shader source plus parameter metadata.
@@ -52,25 +63,40 @@ struct BrdfModel {
     std::string typeName;  ///< Slang struct implementing `IBrdf`,
                            ///< e.g. "Hapke".
     std::string slang;
+    /// The layers a material of these parameters uses, as bits, for
+    /// models whose layers cost nothing where no material has them:
+    /// the renderer compiles the model with `BRDF_FEATURES` defined
+    /// as the union over the scene's materials of it (so code under
+    /// a bit none has falls away), and gives each material's own to
+    /// `BrdfParams::features`. Empty for models without layers.
+    std::function<std::uint32_t(std::span<const float>)> features;
 
     /// Default value of every parameter, in order.
     std::vector<float> Defaults() const;
+    /// The indices of its colour parameters' red ones, in order.
+    std::vector<std::size_t> Colours() const;
 };
 
 /// Reflectance models available to a renderer, keyed by
 /// `BrdfModel::id`.
 class BrdfRegistry {
   public:
-    /// Most parameters a model may declare; the shaders pack them
-    /// into four vec4s.
-    static constexpr std::size_t kMaxParams = 16;
+    /// Most parameters a model may declare: the first
+    /// `kCoreParams`, packed with each material, and the rest in a
+    /// buffer the shaders read only where the model asks for them
+    /// (`BrdfParams::extended`).
+    static constexpr std::size_t kMaxParams = 48;
+    static constexpr std::size_t kCoreParams = 16;
+    /// Most colour parameters (`BrdfParam::colour`) a model may
+    /// declare.
+    static constexpr std::size_t kMaxColours = 4;
 
     /// An empty registry.
     BrdfRegistry() = default;
 
     /// A registry with the built-in models: "lambert",
-    /// "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke" and
-    /// "preview_surface".
+    /// "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke",
+    /// "preview_surface" and "open_pbr".
     static BrdfRegistry WithBuiltins();
 
     /// Adds `model`. Its shader source is only checked superficially
@@ -78,7 +104,8 @@ class BrdfRegistry {
     /// (`RasterRenderer::AddBrdf` compiles eagerly).
     /// @throws std::invalid_argument if the id is empty, not an
     /// identifier or taken, there are more than `kMaxParams`
-    /// parameters, a parameter's range is empty or excludes its
+    /// parameters or `kMaxColours` colours, a colour lacks its green
+    /// and blue, a parameter's range is empty or excludes its
     /// default, or its Slang source is empty or does not mention
     /// `typeName`.
     void Add(BrdfModel model);

@@ -586,7 +586,7 @@ TEST_F(TerrainRendererTest,
     }
     EXPECT_EQ(renderer.Brdfs().Find("broken"), nullptr);
     EXPECT_THROW(renderer.AddBrdf(half), std::invalid_argument);
-    EXPECT_EQ(renderer.Brdfs().Models().size(), 7u);
+    EXPECT_EQ(renderer.Brdfs().Models().size(), 8u);
 }
 
 TEST_F(TerrainRendererTest, AlbedoAndExposureScaleTheShading) {

@@ -198,7 +198,8 @@ struct MaterialGpu {
     // none; `packSurfaceFlags`); z: 1 when the surface emits; w: the float bits of the share of
     // incident polarization its diffuse reflection keeps.
     uint4 info;
-    BrdfParams params;
+    // The model's core parameters (`BrdfParams::values`).
+    float4 params[4];
     // Reflectance per band normalised to luminance 1 (G-buffer albedo.x scales it), four per
     // float4.
     float4 reflectance[16];
@@ -208,8 +209,10 @@ struct MaterialGpu {
     // Thermal emissivity per band, four per float4.
     float4 emissivity[16];
     // x: its rms surface height, m (`laserSpeckle`); y: its temperature in kelvin, 0 for none or
-    // with thermal emission off; zw unused.
-    float4 surface;
+    // with thermal emission off.
+    float2 surface;
+    // Its features and parameters past the core ones (`BrdfParams::extended`), null for none.
+    float* extended;
 }
 
 struct ShadingConstants {
@@ -1081,12 +1084,63 @@ float3 facingNormal(float3 n, float3 v) {
     return facing >= kMinFacing ? n : normalize(n + (kMinFacing - facing) * v);
 }
 
+// Three bands' wavelengths and the active model's colour parameters at them (`BrdfInput`'s).
+struct Bands {
+    float3 wavelengths;
+    float3 colours[kBrdfColours];
+}
+
+// Bands of 550 nm and white colours, for what depends on neither (a lobe's roughness, the
+// facets' index).
+Bands neutralBands() {
+    Bands b;
+    b.wavelengths = float3(550.0);
+    for (uint c = 0; c < kBrdfColours; ++c) {
+        b.colours[c] = float3(1.0);
+    }
+    return b;
+}
+
+// The `BrdfInput` of `brdfInputOf` with the pixel's unresolved slopes and the bands'.
+BrdfInput bandInputOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
+                      Bands bands) {
+    var input = brdfInputOf(n, l, v, albedo);
+    input.slopeVariance = slopeVariance;
+    input.wavelengths = bands.wavelengths;
+    input.colours = bands.colours;
+    return input;
+}
+
+// The active model's colour parameters (`BrdfParam::colour`) of a pixel's material as sigmoid
+// spectra (Jakob and Hanika 2019): coefficients (xyz) and scale (w), uplifted here on the GPU
+// from their RGB like the pixel's modulation, w -1 (white) for those its material does not read:
+// colours none of the scene's materials read are compiled out (`kBrdfColourUsed`), and a colour
+// of a layer this material lacks (`kBrdfColourFeatures`) is skipped.
+//
+// Reference: W. Jakob and J. Hanika, "A Low-Dimensional Function Space for Efficient Spectral
+// Upsampling", Computer Graphics Forum 38(2), 2019.
+void colourSpectra(BrdfParams params, out float4 spectra[kBrdfColours]) {
+    for (uint c = 0; c < kBrdfColours; ++c) {
+        spectra[c] = float4(0.0, 0.0, 0.0, -1.0);
+        if (c >= kBrdfColourCount || kBrdfColourUsed[c] == 0) {
+            continue;
+        }
+        if (kBrdfColourFeatures[c] != 0 && (params.features() & kBrdfColourFeatures[c]) == 0) {
+            continue;
+        }
+        let first = kBrdfColourParams[c];
+        let rgb = max(float3(params.get(first), params.get(first + 1), params.get(first + 2)),
+                      float3(0.0));
+        let scale = max(rgb.x, max(rgb.y, rgb.z));
+        spectra[c] = float4(scale > 0.0 ? sigmoidCoefficients(rgb / scale) : float3(0.0), scale);
+    }
+}
+
 // Radiance factors of the active model for three bands at once: the bands' albedos go in the RGB
 // slots of BrdfInput, which models treat independently.
 float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
-                       BrdfParams params) {
-    var input = brdfInputOf(n, l, v, albedo);
-    input.slopeVariance = slopeVariance;
+                       BrdfParams params, Bands bands) {
+    let input = bandInputOf(n, l, v, albedo, slopeVariance, bands);
     if (input.mu0 <= 0.0) {
         return float3(0.0);
     }
@@ -1096,9 +1150,8 @@ float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeV
 
 // The active model's specular part of `radianceFactors` (`IBrdf::specularReflection`).
 SpecularReflection specularOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
-                              BrdfParams params) {
-    var input = brdfInputOf(n, l, v, albedo);
-    input.slopeVariance = slopeVariance;
+                              BrdfParams params, Bands bands) {
+    let input = bandInputOf(n, l, v, albedo, slopeVariance, bands);
     ActiveBrdf model;
     var r = model.specularReflection(input, params);
     r.factor = input.mu0 > 0.0 ? max(r.factor, float3(0.0)) : float3(0.0);
@@ -1167,9 +1220,8 @@ float2 specularStokes(float3 l, float3 v, float polarized, float3 field, float i
 // The active model's response to light from all around (`IBrdf::environment`) for the viewer
 // along `v` and the bands' albedos `albedo`.
 EnvironmentResponse environmentOf(float3 n, float3 v, float3 albedo, float slopeVariance,
-                                  BrdfParams params) {
-    var input = brdfInputOf(n, v, v, albedo);
-    input.slopeVariance = slopeVariance;
+                                  BrdfParams params, Bands bands) {
+    let input = bandInputOf(n, v, v, albedo, slopeVariance, bands);
     ActiveBrdf model;
     return model.environment(input, params);
 }
@@ -2802,11 +2854,15 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     let sigma = encodedSigma / (1.0 - encodedSigma);
     let slopeVariance = sigma * sigma;
     // A textured parameter (such as metallic) replaces the material's value per pixel.
-    var params = material.params;
+    BrdfParams params;
+    params.values = material.params;
+    params.extended = material.extended;
     if (material.info.y != 0) {
         let index = material.info.y - 1;
         params.values[index / 4][index % 4] = float((ids.w >> 8) & 0xFFu) / 255.0;
     }
+    float4 spectra[kBrdfColours];
+    colourSpectra(params, spectra);
     // The dome lighting mode: its shadowing (the full mode, from the occlusion passes) and its
     // diffuse light (none in the limited one). The visibility darkens the ambient term too, and
     // the diffuse dome is looked up towards the bent normal, as far as the sky is hidden
@@ -2824,7 +2880,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // roughness does not depend on the albedo, so one probe finds them for every band.
     float4 lobes[2] = {float4(0.0), float4(0.0)};
     if (domeLit) {
-        let probe = environmentOf(n, v, float3(1.0), slopeVariance, params);
+        let probe = environmentOf(n, v, float3(1.0), slopeVariance, params, neutralBands());
         let mirror = 2.0 * dot(n, v) * n - v;
         if (any(probe.specular0 > 0.0)) {
             lobes[0] = domeLobe(mirror, probe.roughness0);
@@ -2840,7 +2896,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     var mirrorStokes = float2(0.0);
     if (stokes != 0 && (lobes[0].w > 0.0 || lobes[1].w > 0.0)) {
         let mirror = 2.0 * dot(n, v) * n - v;
-        let facets = specularOf(n, mirror, v, float3(albedo.x), slopeVariance, params);
+        let facets =
+            specularOf(n, mirror, v, float3(albedo.x), slopeVariance, params, neutralBands());
         mirrorStokes = specularStokes(mirror, v, 0.0, float3(0.0), facets.ior, frameX, frameY);
     }
 
@@ -2994,17 +3051,24 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 unlitIrradiance = float3(0.0);
+        var context = neutralBands();
         for (uint k = 0; k < 3; ++k) {
             let band = min(first + k, bands - 1);
             let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
             bandAlbedo[k] = reflectanceBand(ids.x, band) * albedo.x *
                             modulationAt(coefficients, scale, wavelength);
             unlitIrradiance[k] = bandValue(sh.irradiance, band);
+            context.wavelengths[k] = wavelength;
+            for (uint c = 0; c < kBrdfColourCount && c < kBrdfColours; ++c) {
+                if (spectra[c].w >= 0.0) {
+                    context.colours[c][k] = modulationAt(spectra[c].xyz, spectra[c].w, wavelength);
+                }
+            }
         }
         // How the model reflects light from all around: the scene's ambient light (from every
         // direction alike, so every lobe sees it whole) and the dome's.
         let environment = unlit ? diffuseEnvironment(bandAlbedo)
-                                : environmentOf(n, v, bandAlbedo, slopeVariance, params);
+                                : environmentOf(n, v, bandAlbedo, slopeVariance, params, context);
         // Unlit surfaces show their colour as a white one facing the brightest distant light.
         var radiance = unlit ? unlitIrradiance / PI * bandAlbedo : float3(0.0);
         // Its linear Stokes Q and U, with a polarizer: polarized lights' share of it.
@@ -3067,7 +3131,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let factors =
                 lights[k].shadow.y > 0.5
                     ? environment.diffuse * max(dot(n, lightDirections[k]), 0.0)
-                    : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
+                    : radianceFactors(n, lightDirections[k], v, bandAlbedo, slopeVariance, params,
+                                      context);
             let reflected = lightScales[k] * lightSpectrum / PI * factors;
             radiance += reflected;
             if (stokes != 0) {
@@ -3077,7 +3142,8 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                 var specularPart = float2(0.0);
                 if (lights[k].shadow.y <= 0.5) {
                     let facets =
-                        specularOf(n, lightDirections[k], v, bandAlbedo, slopeVariance, params);
+                        specularOf(n, lightDirections[k], v, bandAlbedo, slopeVariance, params,
+                                   context);
                     specular = min(lightScales[k] * lightSpectrum / PI * facets.factor, reflected);
                     if (any(specular > 0.0)) {
                         let polarization = lights[shv.view.z + k].polarization;

@@ -11,8 +11,13 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -65,20 +70,70 @@ void main(uint3 id : SV_DispatchThreadID) {
     s.cosPsi = c.geometry.w;
     s.albedo = c.albedo.rgb;
     s.slopeVariance = c.albedo.a;
+    // The RGB slots as bands of these wavelengths, the model's colours their RGB.
+    s.wavelengths = float3(610.0, 550.0, 465.0);
+    for (uint k = 0; k < kBrdfColours; ++k) {
+        s.colours[k] = float3(1.0);
+    }
+    COLOURS
     TYPE model;
-    results[id.x] = float4(model.radianceFactor(s, params[0]), 0.0);
+    results[id.x] = float4(MODE, 0.0);
 }
 )";
 
 class BrdfVulkanTest : public ernie::testing::VulkanTest {
   protected:
+    /// A `BrdfParams` (its 16 core values, then the address of the
+    /// rest after the material's features, padded to its stride) and
+    /// the buffer it points into.
+    struct ParamBuffers {
+        std::unique_ptr<GpuBuffer> core;
+        std::unique_ptr<GpuBuffer> extended;
+    };
+
+    ParamBuffers PackParams(const BrdfModel& model,
+                            const std::vector<float>& values) {
+        ParamBuffers buffers;
+        std::vector<float> packed(20, 0.0f);
+        std::copy_n(values.begin(),
+                    std::min<std::size_t>(values.size(), 16),
+                    packed.begin());
+        if (values.size() > 16) {
+            std::vector<float> rest = {std::bit_cast<float>(
+                model.features ? model.features(values) : 0u)};
+            rest.insert(rest.end(), values.begin() + 16,
+                        values.end());
+            buffers.extended = std::make_unique<GpuBuffer>(
+                *context_, rest.size() * sizeof(float),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                BufferMemory::Device);
+            buffers.extended->Write(std::as_bytes(std::span(rest)));
+            const std::uint64_t address = buffers.extended->Address();
+            std::memcpy(&packed[16], &address, sizeof(address));
+        }
+        buffers.core = std::make_unique<GpuBuffer>(
+            *context_, packed.size() * sizeof(float),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        buffers.core->Write(std::as_bytes(std::span(packed)));
+        return buffers;
+    }
+
     /// Evaluates `id`'s `radianceFactor` on the GPU for every
     /// geometry, with unresolved slopes of per-axis variance
     /// `slopeVariance`.
+    ///
+    /// `mode` is what it returns: the radiance factor, or with
+    /// "specular" its specular part, or with "environment" the
+    /// environment response's diffuse plus its specular lobes for a
+    /// viewer at cos(e) mu. `features`, when given, is the
+    /// BRDF_FEATURES the model is compiled with (a renderer's union
+    /// over its materials).
     std::vector<glm::dvec3>
     Evaluate(const std::string& id, const std::vector<float>& values,
              const std::vector<Geometry>& cases,
-             double slopeVariance = 0.0) {
+             double slopeVariance = 0.0,
+             const std::string& mode = "radiance",
+             std::optional<std::uint32_t> features = std::nullopt) {
         const BrdfModel* model = registry_.Find(id);
         if (model == nullptr) {
             throw std::invalid_argument(id);
@@ -87,8 +142,36 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
         harness.replace(harness.find("MODULE"), 6,
                         ernie::BrdfModuleName(*model));
         harness.replace(harness.find("TYPE"), 4, model->typeName);
+        std::string colours;
+        const std::vector<std::size_t> reds = model->Colours();
+        for (std::size_t c = 0; c < reds.size(); ++c) {
+            colours += "s.colours[" + std::to_string(c) +
+                       "] = float3(params[0].get(" +
+                       std::to_string(reds[c]) + "), params[0].get(" +
+                       std::to_string(reds[c] + 1) +
+                       "), params[0].get(" +
+                       std::to_string(reds[c] + 2) + "));\n    ";
+        }
+        harness.replace(harness.find("COLOURS"), 7, colours);
+        const std::string evaluation =
+            mode == "specular"
+                ? "model.specularReflection(s, params[0]).factor"
+            : mode == "environment"
+                ? "environmentSum(model.environment(s, params[0]))"
+                : "model.radianceFactor(s, params[0])";
+        harness.replace(harness.find("MODE"), 4, evaluation);
+        harness += R"(
+float3 environmentSum(EnvironmentResponse r) {
+    return r.diffuse + r.specular0 + r.specular1;
+}
+)";
         std::vector<ShaderModuleSource> modules =
             ernie::BrdfModules(*model);
+        if (features) {
+            modules[1].source = "#define BRDF_FEATURES " +
+                                std::to_string(*features) + "u\n" +
+                                modules[1].source;
+        }
         modules.push_back({"harness", harness});
         const ComputePipeline pipeline(
             *context_, compiler_.CompileSpirv(modules, "main"), 3);
@@ -101,20 +184,16 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
                 packedCases.push_back(static_cast<float>(v));
             }
         }
-        std::vector<float> packedParams(16, 0.0f);
-        std::copy(values.begin(), values.end(), packedParams.begin());
+        const ParamBuffers params = PackParams(*model, values);
         GpuBuffer caseBuffer(
             *context_, packedCases.size() * sizeof(float),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-        GpuBuffer paramBuffer(
-            *context_, packedParams.size() * sizeof(float),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        const GpuBuffer& paramBuffer = *params.core;
         GpuBuffer resultBuffer(*context_,
                                cases.size() * 4 * sizeof(float),
                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                BufferMemory::Readback);
         caseBuffer.Write(std::as_bytes(std::span(packedCases)));
-        paramBuffer.Write(std::as_bytes(std::span(packedParams)));
         const std::array<const GpuBuffer*, 3> buffers = {
             &caseBuffer, &paramBuffer, &resultBuffer};
         context_->Submit([&](VkCommandBuffer commands) {
@@ -536,20 +615,16 @@ class BrdfSamplingTest : public BrdfVulkanTest {
                                static_cast<float>(v.z), 0.0f});
             }
         }
-        std::vector<float> packedParams(16, 0.0f);
-        std::copy(values.begin(), values.end(), packedParams.begin());
+        const ParamBuffers params = PackParams(*model, values);
         GpuBuffer caseBuffer(*context_, packed.size() * sizeof(float),
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                              BufferMemory::Device);
-        GpuBuffer paramBuffer(
-            *context_, packedParams.size() * sizeof(float),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+        const GpuBuffer& paramBuffer = *params.core;
         GpuBuffer resultBuffer(*context_,
                                cases.size() * 5 * 4 * sizeof(float),
                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                BufferMemory::Readback);
         caseBuffer.Write(std::as_bytes(std::span(packed)));
-        paramBuffer.Write(std::as_bytes(std::span(packedParams)));
         const std::array<const GpuBuffer*, 3> buffers = {
             &caseBuffer, &paramBuffer, &resultBuffer};
         context_->Submit([&](VkCommandBuffer commands) {
@@ -657,6 +732,142 @@ TEST_F(BrdfSamplingTest, InputAndEvaluationFollowTheCaseGeometry) {
             EXPECT_NEAR(results[c].evaluated[ch],
                         albedo[ch] * std::max(mu0, 0.0) / kPi, 1e-6)
                 << "case " << c;
+        }
+    }
+}
+
+namespace {
+
+/// OpenPBR's defaults with `changes` (index, value) applied.
+std::vector<float> OpenPbrParams(
+    const BrdfModel& model,
+    std::initializer_list<std::pair<std::size_t, float>> changes) {
+    std::vector<float> values = model.Defaults();
+    for (const auto& [index, value] : changes) {
+        values[index] = value;
+    }
+    return values;
+}
+
+/// A view from `degrees` off the normal (0, 0, 1), and a light above.
+SamplingCase ViewFrom(double degrees) {
+    const double r = glm::radians(degrees);
+    return {{0.0, 0.0, 1.0},
+            {0.0, 0.0, 1.0},
+            {std::sin(r), 0.0, std::cos(r)}};
+}
+
+}  // namespace
+
+TEST_F(BrdfVulkanTest, OpenPbrWithoutSpecularIsLambertWhenSmooth) {
+    // EON's multiple scattering vanishes at roughness 0, leaving
+    // Lambert.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    ExpectMatches(
+        "open_pbr", OpenPbrParams(model, {{3, 0.0f}}),
+        [](const Geometry& g, double a) { return a * g.mu0; });
+}
+
+TEST_F(BrdfSamplingTest,
+       OpenPbrRoughDiffuseKeepsAWhiteSurfacesEnergy) {
+    // EON is energy preserving: a white rough base without specular
+    // reflects all it receives, at any angle.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    for (const float roughness : {0.5f, 1.0f}) {
+        const std::vector<SamplingResult> results =
+            Sample("open_pbr",
+                   OpenPbrParams(model, {{2, roughness}, {3, 0.0f}}),
+                   {ViewFrom(0.0), ViewFrom(45.0), ViewFrom(75.0)},
+                   glm::dvec3(1.0));
+        for (const SamplingResult& result : results) {
+            EXPECT_NEAR(result.sampled.x, 1.0, 0.02) << roughness;
+        }
+    }
+}
+
+TEST_F(BrdfVulkanTest,
+       OpenPbrLayersMaterialsLackCostAndChangeNothing) {
+    // Without a layer in a material (its weight 0) or in what the
+    // model is compiled with (none of the scene's materials has it),
+    // the result is the same as without the layer's code at all; a
+    // layer compiled out is ignored even where a material has it.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    const std::vector<Geometry> cases = GeometryGrid();
+    const std::vector<float> plain = model.Defaults();
+    const std::vector<glm::dvec3> all =
+        Evaluate("open_pbr", plain, cases);
+    const std::vector<glm::dvec3> none =
+        Evaluate("open_pbr", plain, cases, 0.0, "radiance", 0u);
+    const std::vector<float> coated =
+        OpenPbrParams(model, {{9, 1.0f}, {10, 1.0f}, {11, 1.0f}});
+    const std::vector<glm::dvec3> compiledOut =
+        Evaluate("open_pbr", coated, cases, 0.0, "radiance", 0u);
+    const std::vector<glm::dvec3> layered =
+        Evaluate("open_pbr", coated, cases);
+    double changed = 0.0;
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        for (int ch = 0; ch < 3; ++ch) {
+            EXPECT_NEAR(none[c][ch], all[c][ch], 1e-6) << c;
+            EXPECT_NEAR(compiledOut[c][ch], all[c][ch], 1e-6) << c;
+            changed = std::max(changed,
+                               std::abs(layered[c][ch] - all[c][ch]));
+        }
+    }
+    EXPECT_GT(changed, 0.01) << "the layers show where compiled in";
+}
+
+TEST_F(BrdfVulkanTest,
+       OpenPbrThinFilmOfNoThicknessIsTheBareSpecular) {
+    // A film of no thickness reflects as the substrate does; a thin
+    // one's interference differs by wavelength, colouring it.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    const std::vector<Geometry> cases = GeometryGrid(glm::dvec3(0.5));
+    const std::vector<glm::dvec3> bare = Evaluate(
+        "open_pbr", model.Defaults(), cases, 0.0, "specular");
+    const std::vector<glm::dvec3> none = Evaluate(
+        "open_pbr", OpenPbrParams(model, {{11, 1.0f}, {22, 0.0f}}),
+        cases, 0.0, "specular");
+    const std::vector<glm::dvec3> film = Evaluate(
+        "open_pbr", OpenPbrParams(model, {{11, 1.0f}, {22, 0.3f}}),
+        cases, 0.0, "specular");
+    double tinted = 0.0;
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        for (int ch = 0; ch < 3; ++ch) {
+            EXPECT_NEAR(none[c][ch], bare[c][ch],
+                        1e-4 * std::max(1.0, bare[c][ch]))
+                << c;
+        }
+        if (bare[c].g > 1e-3) {
+            tinted = std::max(
+                tinted, std::abs(film[c].r - film[c].b) / film[c].g);
+        }
+    }
+    EXPECT_GT(tinted, 0.1) << "interference colours the film";
+}
+
+TEST_F(BrdfSamplingTest,
+       OpenPbrFuzzReflectsItsAlbedoAsItsEnvironmentSays) {
+    // The sheen's distribution integrates to 1, so a fuzz over a
+    // black base reflects its directional albedo, what `environment`
+    // gives for light from all around.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    for (const float roughness : {0.3f, 0.7f}) {
+        const std::vector<float> fuzz = OpenPbrParams(
+            model, {{3, 0.0f}, {10, 1.0f}, {15, roughness}});
+        for (const double degrees : {0.0, 45.0, 70.0}) {
+            const SamplingResult direct =
+                Sample("open_pbr", fuzz, {ViewFrom(degrees)},
+                       glm::dvec3(0.0))[0];
+            const double mu = std::cos(glm::radians(degrees));
+            const glm::dvec3 environment =
+                Evaluate("open_pbr", fuzz,
+                         {{mu, mu, 1.0, 1.0, glm::dvec3(0.0)}}, 0.0,
+                         "environment")[0];
+            // Little head on, most towards grazing.
+            EXPECT_GT(environment.x, 0.001);
+            EXPECT_NEAR(direct.quadrature.x, environment.x,
+                        0.05 * environment.x + 0.005)
+                << roughness << " " << degrees;
         }
     }
 }
