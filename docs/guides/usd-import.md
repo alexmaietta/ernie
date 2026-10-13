@@ -11,7 +11,7 @@ cmake -S . -B build -DERNIE_USD=ON
 cmake --build build --target ernie_usd
 ```
 
-By default the plugin's first build builds OpenUSD 26.08 from source with OpenUSD's own `build_usd.py`, which also builds the oneTBB, OpenSubdiv and MaterialX it needs. This happens once, takes about half an hour, and works on Linux and macOS. The result is one library with UsdImaging's scene indices but without OpenGL, Metal, Storm, Python or usdview, installed beside the fetched dependencies (`FETCHCONTENT_BASE_DIR`, `build/_deps` by default) in a directory named for the version, the options and the compiler. Configuring and building other targets never wait for it. CI builds it in a job of its own and caches it. The plugin finds it through its rpath.
+By default the plugin's first build builds OpenUSD 26.08 from source with OpenUSD's own `build_usd.py`, which also builds the oneTBB, OpenSubdiv and MaterialX it needs. This happens once, takes about half an hour, and works on Linux, macOS and Windows (from a Visual Studio developer prompt, where `build_usd.py` finds MSVC). The result is one library with UsdImaging's scene indices but without OpenGL, Metal, Storm, Python or usdview, installed beside the fetched dependencies (`FETCHCONTENT_BASE_DIR`, `build/_deps` by default) in a directory named for the version, the options and the compiler. Configuring and building other targets never wait for it. CI builds it in a job of its own and caches it. The plugin (`libernie_usd.so`, `libernie_usd.dylib` or `ernie_usd.dll`) finds it through its rpath; on Windows, which has none, Ernie adds the folders that `ernie_usd.paths` beside the plugin lists to the DLL search path before loading it.
 
 A process must load only one OpenUSD. When Ernie runs inside an application that already has one, such as Isaac Sim, build the plugin against that application's OpenUSD instead, with `-DERNIE_USD_ROOT=<its OpenUSD>` and `-DERNIE_USD_TBB_ROOT=<its oneTBB>`. If the plugin finds another OpenUSD already loaded, the import fails with a message saying so rather than mixing the two.
 
@@ -134,7 +134,6 @@ Between samples, numbers, vectors and matrices interpolate linearly (matrices by
 - Subdivision surfaces refine to one level everywhere: no refinement by distance or screen size yet. Their points written on the GPU draw the control mesh.
 - `BasisCurves` and `NurbsPatch`; volumes' `Field3DAsset` fields.
 - `invisibleIds` on point instancers.
-- Windows: the plugin builds on Linux for now.
 
 ## Demos
 

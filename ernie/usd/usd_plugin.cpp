@@ -3282,20 +3282,25 @@ void CopyError(const std::string& message, char* error,
 
 }  // namespace
 
+// The plugin's entry points, the only symbols it exports.
+#if defined(_WIN32)
+#define ERNIE_USD_EXPORT __declspec(dllexport)
+#else
+#define ERNIE_USD_EXPORT __attribute__((visibility("default")))
+#endif
+
 extern "C" {
 
-__attribute__((visibility("default"))) std::uint32_t
-ernie_usd_abi_version() {
+ERNIE_USD_EXPORT std::uint32_t ernie_usd_abi_version() {
     return ernie::usd_plugin::kAbiVersion;
 }
 
-__attribute__((visibility("default"))) const char*
-ernie_usd_version() {
+ERNIE_USD_EXPORT const char* ernie_usd_version() {
     return ERNIE_USD_STRINGIFY(PXR_MAJOR_VERSION) "." ERNIE_USD_STRINGIFY(
         PXR_MINOR_VERSION) "." ERNIE_USD_STRINGIFY(PXR_PATCH_VERSION);
 }
 
-__attribute__((visibility("default"))) bool
+ERNIE_USD_EXPORT bool
 ernie_usd_import(const ernie::usd_plugin::Request* request,
                  ernie::usd_plugin::Sink* sink, char* error,
                  std::size_t errorSize) {

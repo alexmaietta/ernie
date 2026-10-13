@@ -95,11 +95,18 @@ jobs:
             os: macos-15
             cc: clang
             cxx: clang++
+          - key: windows
+            os: windows-2025
+            cc: cl
+            cxx: cl
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v7
+      # build_usd.py finds MSVC on the path, as in a developer prompt.
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
       - uses: actions/cache@v6
         id: openusd
         with:
@@ -109,7 +116,9 @@ jobs:
         if: steps.openusd.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then brew install ninja; else sudo apt-get update && sudo apt-get install -y ninja-build; fi
+          if [ "$RUNNER_OS" = "macOS" ]; then brew install ninja
+          elif [ "$RUNNER_OS" = "Windows" ]; then choco install -y ninja
+          else sudo apt-get update && sudo apt-get install -y ninja-build; fi
       - uses: actions/setup-python@v7
         if: steps.openusd.outputs.cache-hit != 'true'
         with:
@@ -239,12 +248,11 @@ jobs:
             .deps/*-src
             .deps/*-subbuild
           key: deps-${{ runner.os != 'Linux' && format('{0}-', runner.os) || '' }}${{ hashFiles('cmake/third_party/**') }}
-      # OpenUSD as the openusd job built it, for the USD importer (not on Windows yet).
+      # OpenUSD as the openusd job built it, for the USD importer.
       - uses: actions/cache/restore@v6
-        if: runner.os != 'Windows'
         with:
           path: .deps/openusd-*/
-          key: openusd-${{ runner.os == 'macOS' && 'macos' || format('linux-{0}', matrix.cc) }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
+          key: openusd-${{ runner.os == 'macOS' && 'macos' || runner.os == 'Windows' && 'windows' || format('linux-{0}', matrix.cc) }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
           fail-on-cache-miss: true
       # OpenVDB with oneTBB, Blosc and zlib (cmake/third_party/openvdb.cmake), built once per
       # compiler and pin; its install directory is named for both.
@@ -274,7 +282,7 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           "-DFETCHCONTENT_BASE_DIR=$PWD/.deps"
           -DERNIE_BUILD_TESTS=ON -DERNIE_BUILD_DEMOS=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
-          ${{ runner.os == 'macOS' && '-DERNIE_USD=ON' || '' }}
+          -DERNIE_USD=ON
       - name: Build
         shell: bash
         run: cmake --build build --parallel 4

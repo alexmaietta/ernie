@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <span>
 #include <stdexcept>
@@ -25,6 +26,13 @@
 #include <vector>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 #else
 #include <dlfcn.h>
 #endif
@@ -32,7 +40,9 @@
 namespace ernie {
 namespace {
 
-#if defined(__APPLE__)
+#if defined(_WIN32)
+constexpr const char* kPluginName = "ernie_usd.dll";
+#elif defined(__APPLE__)
 constexpr const char* kPluginName = "libernie_usd.dylib";
 #else
 constexpr const char* kPluginName = "libernie_usd.so";
@@ -45,12 +55,108 @@ struct Plugin {
 };
 
 #if defined(_WIN32)
-Plugin LoadPlugin() {
-    Plugin plugin;
-    plugin.error = "The USD importer is not built for Windows yet";
-    return plugin;
+/// The folder of the binary this code is in: libernie's DLL, the
+/// Python module, or a program linking Ernie statically.
+std::filesystem::path SelfDirectory() {
+    HMODULE module = nullptr;
+    if (GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&UsdImportAvailable),
+            &module) == 0) {
+        return {};
+    }
+    std::wstring name(MAX_PATH, L'\0');
+    DWORD length = 0;
+    while ((length = GetModuleFileNameW(
+                module, name.data(),
+                static_cast<DWORD>(name.size()))) == name.size()) {
+        name.resize(2 * name.size());
+    }
+    if (length == 0) {
+        return {};
+    }
+    name.resize(length);
+    return std::filesystem::path(name).parent_path();
+}
+
+/// The last Windows error's message.
+std::string LastError() {
+    const DWORD code = GetLastError();
+    char* text = nullptr;
+    const DWORD length = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr, code, 0, reinterpret_cast<LPSTR>(&text), 0, nullptr);
+    std::string message = length != 0
+                              ? std::string(text, length)
+                              : "error " + std::to_string(code);
+    LocalFree(text);
+    while (!message.empty() &&
+           (message.back() == '\n' || message.back() == '\r')) {
+        message.pop_back();
+    }
+    return message;
+}
+
+/// Loads the plugin, with the folders its own DLLs are in (OpenUSD's,
+/// listed beside it in ernie_usd.paths, as Windows has no rpath) on
+/// the search path for it and what it loads.
+void* OpenLibrary(const std::filesystem::path& path,
+                  std::string& error) {
+    std::filesystem::path paths = path;
+    paths.replace_extension(".paths");
+    std::ifstream file(paths);
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (!line.empty()) {
+            AddDllDirectory(std::filesystem::path(line).c_str());
+        }
+    }
+    HMODULE library =
+        LoadLibraryExW(path.c_str(), nullptr,
+                       LOAD_LIBRARY_SEARCH_DEFAULT_DIRS |
+                           LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+    if (library == nullptr) {
+        error = LastError();
+    }
+    return library;
+}
+
+void* Symbol(void* library, const char* name) {
+    return reinterpret_cast<void*>(
+        GetProcAddress(static_cast<HMODULE>(library), name));
 }
 #else
+/// The folder of the binary this code is in: libernie, the Python
+/// module, or a program linking Ernie statically.
+std::filesystem::path SelfDirectory() {
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<void*>(&UsdImportAvailable), &info) ==
+            0 ||
+        info.dli_fname == nullptr) {
+        return {};
+    }
+    return std::filesystem::path(info.dli_fname).parent_path();
+}
+
+void* OpenLibrary(const std::filesystem::path& path,
+                  std::string& error) {
+    void* library = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (library == nullptr) {
+        error = dlerror();
+    }
+    return library;
+}
+
+void* Symbol(void* library, const char* name) {
+    return dlsym(library, name);
+}
+#endif
+
 /// Where to look for the plugin, first to last.
 std::vector<std::filesystem::path> Candidates() {
     std::vector<std::filesystem::path> candidates;
@@ -59,14 +165,9 @@ std::vector<std::filesystem::path> Candidates() {
         candidates.emplace_back(path);
         return candidates;
     }
-    // Beside the binary this code is in: libernie, the Python module,
-    // or a program linking Ernie statically.
-    Dl_info info{};
-    if (dladdr(reinterpret_cast<void*>(&UsdImportAvailable), &info) !=
-            0 &&
-        info.dli_fname != nullptr) {
-        const std::filesystem::path self =
-            std::filesystem::path(info.dli_fname).parent_path();
+    // Beside the binary this code is in.
+    if (const std::filesystem::path self = SelfDirectory();
+        !self.empty()) {
         candidates.push_back(self / kPluginName);
         candidates.push_back(self / ".." / "lib" / kPluginName);
     }
@@ -85,9 +186,9 @@ Plugin LoadPlugin() {
             tried += "\n  " + path.string() + " (missing)";
             continue;
         }
-        void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+        std::string error;
+        void* handle = OpenLibrary(path, error);
         if (handle == nullptr) {
-            const std::string error = dlerror();
             plugin.error = "Cannot load the USD importer " +
                            path.string() + ": " + error;
             if (error.find("pxrInternal") != std::string::npos) {
@@ -99,11 +200,11 @@ Plugin LoadPlugin() {
             return plugin;
         }
         const auto abi = reinterpret_cast<ErnieUsdAbiVersionFn>(
-            dlsym(handle, usd_plugin::kAbiVersionSymbol));
+            Symbol(handle, usd_plugin::kAbiVersionSymbol));
         const auto version = reinterpret_cast<ErnieUsdVersionFn>(
-            dlsym(handle, usd_plugin::kVersionSymbol));
+            Symbol(handle, usd_plugin::kVersionSymbol));
         const auto import = reinterpret_cast<ErnieUsdImportFn>(
-            dlsym(handle, usd_plugin::kImportSymbol));
+            Symbol(handle, usd_plugin::kImportSymbol));
         if (abi == nullptr || version == nullptr ||
             import == nullptr) {
             plugin.error =
@@ -128,7 +229,6 @@ Plugin LoadPlugin() {
         tried;
     return plugin;
 }
-#endif
 
 const Plugin& GetPlugin() {
     static std::once_flag once;

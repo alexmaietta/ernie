@@ -28,8 +28,14 @@ set(ERNIE_USD_BUILD_JOBS
     4
     CACHE STRING "Parallel jobs building OpenUSD and its dependencies")
 
+# A library's file to link: its import library on Windows (usd_ms.lib, beside usd_ms.dll), its
+# shared library elsewhere (libusd_ms.so, libusd_ms.dylib).
 if(WIN32)
-    message(FATAL_ERROR "ERNIE_USD: the USD importer plugin builds on Linux and macOS for now")
+    set(ernie_usd_prefix "")
+    set(ernie_usd_suffix "${CMAKE_IMPORT_LIBRARY_SUFFIX}")
+else()
+    set(ernie_usd_prefix "lib")
+    set(ernie_usd_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 
 add_library(ernie_openusd INTERFACE)
@@ -43,7 +49,7 @@ if(ERNIE_USD_ROOT)
         message(FATAL_ERROR "The OpenUSD in ${ernie_usd_dir} has no UsdImaging (Hydra scene indices)")
     endif()
     # One monolithic library, or the per-module ones a default build (or Kit's) makes.
-    set(ernie_usd_libraries "${ernie_usd_dir}/lib/libusd_ms${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(ernie_usd_libraries "${ernie_usd_dir}/lib/${ernie_usd_prefix}usd_ms${ernie_usd_suffix}")
     if(NOT EXISTS "${ernie_usd_libraries}")
         set(ernie_usd_libraries "")
         foreach(
@@ -77,7 +83,7 @@ if(ERNIE_USD_ROOT)
             pxOsd
             usdImaging
             usdSkelImaging)
-            set(library "${ernie_usd_dir}/lib/libusd_${module}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+            set(library "${ernie_usd_dir}/lib/${ernie_usd_prefix}usd_${module}${ernie_usd_suffix}")
             if(EXISTS "${library}")
                 list(APPEND ernie_usd_libraries "${library}")
             endif()
@@ -124,7 +130,7 @@ else()
     string(SUBSTRING "${ernie_usd_options}" 0 10 ernie_usd_options)
     set(ernie_usd_dir
         "${FETCHCONTENT_BASE_DIR}/openusd-${ERNIE_DEP_VERSION_usd}-${ernie_usd_options}")
-    set(ernie_usd_libraries "${ernie_usd_dir}/lib/libusd_ms${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(ernie_usd_libraries "${ernie_usd_dir}/lib/${ernie_usd_prefix}usd_ms${ernie_usd_suffix}")
     string(REPLACE ";" "|" ernie_usd_args_joined "${ernie_usd_args}")
     if(EXISTS "${ernie_usd_dir}/.built")
         # Built already (by an earlier build, or restored from a cache).
@@ -156,3 +162,7 @@ target_link_libraries(ernie_openusd INTERFACE ${ernie_usd_libraries})
 # Where the plugin finds OpenUSD (its plugInfo files beside it) and what it links (oneTBB,
 # OpenSubdiv and MaterialX in the same directory).
 set(ERNIE_USD_RPATH "${ernie_usd_dir}/lib")
+# Windows has no rpath: the folders of the DLLs the plugin loads (usd_ms.dll in lib, oneTBB's,
+# MaterialX's and OpenSubdiv's in lib and bin), which Ernie adds to the search path before loading
+# it (ernie/scene/usd_import.cpp).
+set(ERNIE_USD_DLL_DIRS "${ernie_usd_dir}/lib" "${ernie_usd_dir}/bin")
