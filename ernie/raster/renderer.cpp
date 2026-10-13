@@ -1474,15 +1474,6 @@ glm::vec3 UpFor(const glm::vec3& direction) {
                : glm::vec3(0.0f, 0.0f, 1.0f);
 }
 
-/// World depth spanned by the [0, 1] depth of an orthographic
-/// view-projection.
-float OrthographicDepth(const glm::mat4& viewProjection) {
-    const float gradient = glm::length(
-        glm::vec3(viewProjection[0][2], viewProjection[1][2],
-                  viewProjection[2][2]));
-    return gradient > 0.0f ? 1.0f / gradient : 0.0f;
-}
-
 /// A compute shader that evaluates `model` once, to check that its
 /// module implements `IBrdf`.
 std::vector<ShaderModuleSource>

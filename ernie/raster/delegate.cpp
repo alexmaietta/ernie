@@ -68,12 +68,6 @@ std::vector<std::string_view> ViewHeldVars(std::size_t aovs,
     return vars;
 }
 
-float Number(const Scene& scene, const Path& path,
-             std::string_view attribute, float fallback) {
-    return static_cast<float>(
-        GetNumber(scene, path, attribute, fallback));
-}
-
 /// How 8-bit values of `reader`'s image decode: sRGB unless it says
 /// raw.
 ImageEncoding EncodingOf(const TextureReader& reader) {

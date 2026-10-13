@@ -245,7 +245,7 @@ class TimelinePanel final : public Panel {
         const double rate = stage.GetFramesPerSecond();
         for (const double fps :
              {24.0, 25.0, 30.0, 48.0, 50.0, 60.0, 120.0}) {
-            char label[16];
+            char label[32];
             std::snprintf(label, sizeof(label), "%g fps", fps);
             if (menu::Option(label, rate == fps)) {
                 viewer.Edit(Path::Root(), tokens::kTimeCodesPerSecond,

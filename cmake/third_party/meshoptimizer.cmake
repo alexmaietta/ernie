@@ -9,11 +9,13 @@ include(FetchContent)
 # Linked into Ernie's libraries, not installed beside them.
 set(MESHOPT_INSTALL OFF)
 
+# SYSTEM: its header's own warnings stay out of Ernie's builds.
 FetchContent_Declare(
     meshoptimizer
     GIT_REPOSITORY https://github.com/zeux/meshoptimizer.git
     GIT_TAG ${ERNIE_DEP_VERSION_meshoptimizer}
-    GIT_SHALLOW TRUE)
+    GIT_SHALLOW TRUE
+    SYSTEM)
 FetchContent_MakeAvailable(meshoptimizer)
 set_target_properties(
     meshoptimizer PROPERTIES POSITION_INDEPENDENT_CODE ON
