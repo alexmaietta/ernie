@@ -245,6 +245,11 @@ std::optional<std::uint64_t> FrameOf(const Scene& scene,
 /// empty path.
 Path BoundMaterial(const Scene& scene, const Path& prim);
 
+/// The texture coordinate set (`primvars:<name>`) meshes bound to
+/// `material` read: its textures' (the first's), else "st".
+std::string TextureCoordinateSetOf(const Scene& scene,
+                                   const Path& material);
+
 /// The sun's spectral irradiance at normal incidence per band of
 /// `bands`, in W m^-2 nm^-1, from the DistantLight at `light`:
 /// - physical, when it has `ernie:irradiance` or `ernie:spectrum`:

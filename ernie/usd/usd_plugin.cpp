@@ -306,10 +306,12 @@ struct MeshSource {
 };
 
 /// What Ernie's Mesh takes: points with one normal each, faces, and
-/// texture coordinates per face corner.
+/// texture coordinates per face corner; face-varying and uniform
+/// normals per face corner too.
 struct MeshOut {
     std::vector<float> points;
     std::vector<float> normals;
+    std::vector<float> cornerNormals;
     std::vector<float> colors;
     std::vector<std::int32_t> counts;
     std::vector<std::int32_t> indices;
@@ -345,9 +347,10 @@ bool PerCorner(const Flat& flat) {
 }
 
 /// The faces `faces` of `source` as an Ernie mesh: points split where
-/// a point's corners have different normals or colours (so hard edges
-/// stay hard), the rest shared; faces reversed when left-handed;
-/// texture coordinates per corner.
+/// a point's corners have different colours, the rest shared, so the
+/// source's points keep their indices where they can; faces reversed
+/// when left-handed; texture coordinates, and face-varying and
+/// uniform normals (hard edges), per corner.
 MeshOut BuildMesh(const MeshSource& source,
                   const std::vector<std::size_t>& faces) {
     MeshOut out;
@@ -376,7 +379,8 @@ MeshOut BuildMesh(const MeshSource& source,
                         sizeof(float));
         }
     };
-    const bool normals = source.normals.Valid();
+    const bool cornerNormals = PerCorner(source.normals);
+    const bool normals = source.normals.Valid() && !cornerNormals;
     const bool colors =
         source.color.Valid() &&
         source.color.interpolation != HdPrimvarSchemaTokens->constant;
@@ -429,6 +433,12 @@ MeshOut BuildMesh(const MeshSource& source,
                 }
             }
             out.indices.push_back(it->second);
+            if (cornerNormals) {
+                const float* n = source.normals.At(
+                    ElementOf(source.normals, point, face, corner));
+                out.cornerNormals.insert(out.cornerNormals.end(), n,
+                                         n + 3);
+            }
             for (std::size_t u = 0; u < source.uvs.size(); ++u) {
                 const Flat& uv = source.uvs[u].second;
                 const float* t =
@@ -2702,6 +2712,13 @@ class Importer {
             if (!out.normals.empty()) {
                 sink_.WriteFloats(p, "normals", out.normals.data(),
                                   out.normals.size() / 3, 3);
+            }
+            if (!out.cornerNormals.empty()) {
+                sink_.WriteFloats(p, "primvars:normals",
+                                  out.cornerNormals.data(),
+                                  out.cornerNormals.size() / 3, 3);
+                sink_.SetToken(p, "primvars:normals:interpolation",
+                               "faceVarying");
             }
             if (!out.colors.empty()) {
                 sink_.WriteFloats(p, "primvars:displayColor",

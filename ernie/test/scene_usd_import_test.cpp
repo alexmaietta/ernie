@@ -283,19 +283,24 @@ TEST_F(UsdImportTest, DefaultPrimBecomesTheRootInSceneUnits) {
     EXPECT_NEAR(up.y, 0.0, 1e-12);
 }
 
-TEST_F(UsdImportTest, MeshesSplitHardEdgesAndSubsets) {
+TEST_F(UsdImportTest, MeshesKeepHardEdgesAndSubsets) {
     ernie::ImportUsd(scene_, Path("/World/robot"), file_);
-    // The five faces outside the subset, a vertex per corner since no
-    // two faces share a normal.
+    // The five faces outside the subset over the cube's eight points,
+    // unsplit: their hard edges are face-varying normals, a normal
+    // per corner as texture coordinates are.
     const Path body("/World/robot/Body");
     EXPECT_EQ(scene_.TypeOf(body), "Mesh");
     EXPECT_EQ(
         Ints(scene_.Read(body, tokens::kFaceVertexCounts)).size(),
         5u);
     EXPECT_EQ(Floats(scene_.Read(body, tokens::kPoints)).size(),
+              8u * 3);
+    EXPECT_EQ(scene_.Read(body, tokens::kNormals), nullptr);
+    EXPECT_EQ(Floats(scene_.Read(body, "primvars:normals")).size(),
               20u * 3);
-    EXPECT_EQ(Floats(scene_.Read(body, tokens::kNormals)).size(),
-              20u * 3);
+    EXPECT_EQ(
+        Token("/World/robot/Body", "primvars:normals:interpolation"),
+        "faceVarying");
     EXPECT_EQ(Floats(scene_.Read(body, "primvars:st")).size(),
               20u * 2);
     EXPECT_EQ(scene_.Get<Path>(body, "material:binding", Path()),
@@ -304,7 +309,7 @@ TEST_F(UsdImportTest, MeshesSplitHardEdgesAndSubsets) {
     const Path top("/World/robot/Body/Top");
     EXPECT_EQ(scene_.TypeOf(top), "Mesh");
     const std::vector<float> normals =
-        Floats(scene_.Read(top, tokens::kNormals));
+        Floats(scene_.Read(top, "primvars:normals"));
     ASSERT_EQ(normals.size(), 12u);
     EXPECT_EQ(normals[2], 1.0f);
     EXPECT_EQ(scene_.Get<Path>(top, "material:binding", Path()),

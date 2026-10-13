@@ -2079,6 +2079,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
     }
     subdivisionVersion_ =
         scene.AttributeVersion(Path::Root(), kSubdivisionRefineLevel);
+    // Each material's texture coordinate primvar, found once.
+    std::map<Path, std::string> uvSets;
     for (const Path& path : paths) {
         seen.insert(path);
         Key key =
@@ -2175,6 +2177,24 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
             }
             key.second[11] =
                 key.second[11] * 0x100000001b3ull ^ (hash + 1);
+        }
+        // Its texture coordinates, the primvar its material reads,
+        // perhaps indexed, by their interpolation (slot 11 too).
+        if (scene.TypeOf(path) == kMesh) {
+            const Path material = BoundMaterial(scene, path);
+            auto [set, added] = uvSets.try_emplace(material);
+            if (added) {
+                set->second = std::string(kPrimvarsPrefix) +
+                              TextureCoordinateSetOf(scene, material);
+            }
+            for (const std::string_view suffix :
+                 {std::string_view(), kIndicesSuffix,
+                  kInterpolationSuffix}) {
+                key.second[11] =
+                    key.second[11] * 0x100000001b3ull ^
+                    scene.AttributeVersion(
+                        path, set->second + std::string(suffix));
+            }
         }
         // Triangles written on the GPU too, while their number holds
         // (key slot 2).

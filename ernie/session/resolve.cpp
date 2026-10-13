@@ -3436,6 +3436,11 @@ MeshData SubdividedMeshData(const Mesh& view, const MeshData& data,
 
 }  // namespace
 
+std::string TextureCoordinateSetOf(const Scene& scene,
+                                   const Path& material) {
+    return UvSetOf(scene, material);
+}
+
 MaterialSettings MaterialSettingsOf(const Scene& scene,
                                     const Path& material,
                                     const BrdfRegistry& brdfs) {

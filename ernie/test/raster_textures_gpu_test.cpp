@@ -304,6 +304,17 @@ TEST_F(RasterDelegateTest,
     const Tensor dim = Render(delegate, scene, "LdrColor");
     EXPECT_LT(TexelAt(scene, dim, {-4.0f, 4.0f, 0.0f})[0] + 40,
               topLeft.r);
+
+    // Texture coordinates edited after the mesh is drawn: u mirrored,
+    // green top left.
+    scene.Set("/Looks/M/Tex", tokens::kShaderScale, glm::vec4(1.0f));
+    const std::array<float, 8> mirrored{1, 0, 0, 0, 0, 1, 1, 1};
+    scene.Write("/World/Quad", "primvars:st",
+                Tensor::Copy<float>(mirrored, {4, 2}));
+    const Tensor flipped = Render(delegate, scene, "LdrColor");
+    const std::uint8_t* t =
+        TexelAt(scene, flipped, {-4.0f, 4.0f, 0.0f});
+    EXPECT_TRUE(leads(glm::ivec3(t[0], t[1], t[2]), 1)) << "green";
 }
 
 TEST_F(RasterDelegateTest,
