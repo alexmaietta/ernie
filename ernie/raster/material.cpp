@@ -450,29 +450,141 @@ UploadMaterialTexture(const VulkanContext& context,
 void CompressPreparedTexture(BlockEncoder& encoder,
                              PreparedTexture& prepared) {
     ERNIE_ZONE("Compress texture");
-    TextureFormat format = TextureFormat::Bc7;
-    VkFormat compressed = VK_FORMAT_BC7_UNORM_BLOCK;
-    if (prepared.format == VK_FORMAT_R8G8B8A8_SRGB) {
-        format = TextureFormat::Bc7Srgb;
-        compressed = VK_FORMAT_BC7_SRGB_BLOCK;
-    } else if (prepared.format != VK_FORMAT_R8G8B8A8_UNORM) {
+    TextureCompression compression(std::move(prepared));
+    compression.Step(encoder, ~std::uint64_t{0});
+    prepared = compression.Take();
+}
+
+TextureCompression::TextureCompression(PreparedTexture prepared)
+    : prepared_(std::move(prepared)) {
+    compress_ = prepared_.format == VK_FORMAT_R8G8B8A8_SRGB ||
+                prepared_.format == VK_FORMAT_R8G8B8A8_UNORM;
+    if (!compress_) {
+        mip_ = prepared_.mips.size();  // Nothing to do.
         return;
     }
-    // Every mip encoded before any is replaced, so that a failure
-    // leaves `prepared` whole.
-    std::vector<std::vector<std::uint8_t>> mips;
-    for (std::size_t mip = 0; mip < prepared.mips.size(); ++mip) {
-        const auto shift = static_cast<std::uint32_t>(mip);
-        const std::uint32_t w = std::max(1u, prepared.width >> shift);
-        const std::uint32_t h =
-            std::max(1u, prepared.height >> shift);
-        std::vector<std::uint8_t> blocks(ImageBytes(format, w, h));
-        encoder.Encode(prepared.mips[mip], w, h, format,
-                       reinterpret_cast<std::byte*>(blocks.data()));
-        mips.push_back(std::move(blocks));
+    stored_.format = prepared_.format == VK_FORMAT_R8G8B8A8_SRGB
+                         ? TextureFormat::Bc7Srgb
+                         : TextureFormat::Bc7;
+    stored_.width = prepared_.width;
+    stored_.height = prepared_.height;
+    stored_.mips = static_cast<std::uint32_t>(prepared_.mips.size());
+    std::size_t bytes = 0;
+    for (std::uint32_t mip = 0; mip < stored_.mips; ++mip) {
+        stored_.offsets.push_back(bytes);
+        bytes += ImageBytes(stored_.format,
+                            std::max(1u, stored_.width >> mip),
+                            std::max(1u, stored_.height >> mip));
     }
-    prepared.mips = std::move(mips);
-    prepared.format = compressed;
+    stored_.bytes.resize(bytes);
+}
+
+bool TextureCompression::Step(BlockEncoder& encoder,
+                              std::uint64_t texels) {
+    ERNIE_ZONE("Compress texture part");
+    const TextureFormatInfo info = InfoOf(stored_.format);
+    std::uint64_t budget = texels;
+    while (!Done() && budget > 0) {
+        const auto shift = static_cast<std::uint32_t>(mip_);
+        const std::uint32_t w =
+            std::max(1u, prepared_.width >> shift);
+        const std::uint32_t h =
+            std::max(1u, prepared_.height >> shift);
+        // Whole rows of blocks within the budget, at least one; the
+        // last strip ends at the mip's edge.
+        const std::uint64_t affordable = budget / w / 4 * 4;
+        const auto rows =
+            static_cast<std::uint32_t>(std::min<std::uint64_t>(
+                h - row_, std::max<std::uint64_t>(affordable, 4)));
+        const std::size_t first = std::size_t{row_} * w * 4;
+        const std::span<const std::uint8_t> strip(
+            prepared_.mips[mip_].data() + first,
+            std::size_t{rows} * w * 4);
+        std::byte* out =
+            stored_.bytes.data() + stored_.offsets[mip_] +
+            std::size_t{row_ / 4} * ((w + 3) / 4) * info.blockBytes;
+        encoder.Encode(strip, w, rows, stored_.format, out);
+        budget -=
+            std::min<std::uint64_t>(budget, std::uint64_t{rows} * w);
+        row_ += rows;
+        if (row_ >= h) {
+            ++mip_;
+            row_ = 0;
+        }
+    }
+    return Done();
+}
+
+std::uint64_t TextureCompression::Remaining() const {
+    std::uint64_t texels = 0;
+    for (std::size_t mip = mip_; mip < prepared_.mips.size(); ++mip) {
+        const auto shift = static_cast<std::uint32_t>(mip);
+        texels +=
+            std::uint64_t{std::max(1u, prepared_.width >> shift)} *
+            std::max(1u, prepared_.height >> shift);
+    }
+    if (!Done()) {
+        texels -= std::uint64_t{row_} *
+                  std::max(1u, prepared_.width >>
+                                   static_cast<std::uint32_t>(mip_));
+    }
+    return texels;
+}
+
+PreparedTexture TextureCompression::Take() {
+    if (!Done()) {
+        throw std::logic_error(
+            "TextureCompression::Take before Done");
+    }
+    if (compress_) {
+        compress_ = false;
+        prepared_.format = VkFormatOf(stored_.format);
+        for (std::uint32_t mip = 0; mip < stored_.mips; ++mip) {
+            const std::span<const std::byte> bytes =
+                stored_.Mip(0, mip);
+            const auto* data =
+                reinterpret_cast<const std::uint8_t*>(bytes.data());
+            prepared_.mips[mip].assign(data, data + bytes.size());
+        }
+        stored_ = {};
+    }
+    return std::move(prepared_);
+}
+
+TextureData TextureCompression::TakeStored() {
+    if (!Done()) {
+        throw std::logic_error(
+            "TextureCompression::TakeStored before Done");
+    }
+    if (!compress_) {
+        return StoredOf(prepared_);
+    }
+    compress_ = false;
+    prepared_ = {};
+    return std::move(stored_);
+}
+
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      const TextureData& prepared) {
+    const std::uint32_t maxSize =
+        context.Limits().maxImageDimension2D;
+    if (prepared.width > maxSize || prepared.height > maxSize) {
+        throw std::invalid_argument(
+            "Texture exceeds the device's maximum texture size");
+    }
+    ERNIE_ZONE("Upload texture");
+    auto texture = std::make_shared<MaterialTexture>();
+    texture->image = std::make_unique<GpuImage>(
+        context, ImageDesc{prepared.width, prepared.height, 1,
+                           prepared.mips, VkFormatOf(prepared.format),
+                           VK_IMAGE_USAGE_SAMPLED_BIT});
+    std::vector<std::span<const std::byte>> mips;
+    for (std::uint32_t mip = 0; mip < prepared.mips; ++mip) {
+        mips.push_back(prepared.Mip(0, mip));
+    }
+    texture->image->Upload(mips);
+    return texture;
 }
 
 TextureData StoredOf(const PreparedTexture& prepared) {
@@ -496,6 +608,11 @@ TextureData StoredOf(const PreparedTexture& prepared) {
     texture.width = prepared.width;
     texture.height = prepared.height;
     texture.mips = static_cast<std::uint32_t>(prepared.mips.size());
+    std::size_t total = 0;
+    for (const std::vector<std::uint8_t>& mip : prepared.mips) {
+        total += mip.size();
+    }
+    texture.bytes.reserve(total);
     for (const std::vector<std::uint8_t>& mip : prepared.mips) {
         texture.offsets.push_back(texture.bytes.size());
         const std::span<const std::byte> bytes = Bytes(mip);
@@ -552,11 +669,24 @@ std::shared_ptr<const MaterialTexture>
 UploadMaterialTexture(const VulkanContext& context,
                       MaterialTextureSlot slot, TextureData stored,
                       const TextureReader& reader) {
+    return UploadMaterialTexture(
+        context, slot,
+        std::make_shared<const TextureData>(std::move(stored)),
+        reader);
+}
+
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot,
+                      std::shared_ptr<const TextureData> data,
+                      const TextureReader& reader) {
     // Devices that cannot sample BC blocks read them decoded.
-    if (InfoOf(stored.format).compressed() &&
+    if (InfoOf(data->format).compressed() &&
         !context.SupportsTextureCompressionBc()) {
-        stored = DecodeBlocks(stored);
+        data =
+            std::make_shared<const TextureData>(DecodeBlocks(*data));
     }
+    const TextureData& stored = *data;
     auto texture = std::make_shared<MaterialTexture>();
     const std::uint32_t channels = InfoOf(stored.format).channels;
     if (slot == MaterialTextureSlot::Albedo) {
@@ -577,11 +707,8 @@ UploadMaterialTexture(const VulkanContext& context,
             const VkFormat format =
                 StoredFormat(context, stored, reader);
             texture->virtualTexture =
-                std::make_shared<VirtualTexture>(
-                    context,
-                    std::make_shared<const TextureData>(
-                        std::move(stored)),
-                    format, components);
+                std::make_shared<VirtualTexture>(context, data,
+                                                 format, components);
         } else {
             texture->image =
                 UploadStored(context, stored, reader, components);

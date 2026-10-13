@@ -56,14 +56,14 @@ void GpuBlockEncoder::Encode(std::span<const std::uint8_t> rgba,
     const std::uint32_t across = (width + 3) / 4;
     const std::uint32_t blocks = across * ((height + 3) / 4);
     const std::uint32_t batches = (blocks + kBatch - 1) / kBatch;
-    constexpr VkBufferUsageFlags kStorage =
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    GpuBuffer source(context_, rgba.size(), kStorage,
-                     BufferMemory::Device);
+    // Host-visible both: the texels written and the blocks read in
+    // place, with no staging copies.
+    GpuBuffer& source =
+        Buffer(source_, rgba.size(), BufferMemory::Upload);
     source.Write(std::as_bytes(rgba));
     const VkDeviceSize blockBytes = VkDeviceSize{blocks} * 16;
-    GpuBuffer encoded(context_, blockBytes, kStorage,
-                      BufferMemory::Device);
+    GpuBuffer& encoded =
+        Buffer(encoded_, blockBytes, BufferMemory::Readback);
 
     // Every dispatch's constants, each in its own aligned slice.
     const VkDeviceSize alignment = std::max<VkDeviceSize>(
@@ -77,8 +77,8 @@ void GpuBlockEncoder::Encode(std::span<const std::uint8_t> rgba,
                           blocks, batch * kBatch, {}};
         std::memcpy(constants.data() + stride * batch, &c, sizeof(c));
     }
-    GpuBuffer parameters(context_, constants.size(), kStorage,
-                         BufferMemory::Device);
+    GpuBuffer& parameters =
+        Buffer(parameters_, constants.size(), BufferMemory::Upload);
     parameters.Write(constants);
 
     for (std::uint32_t first = 0; first < batches;
@@ -101,6 +101,18 @@ void GpuBlockEncoder::Encode(std::span<const std::uint8_t> rgba,
         });
     }
     encoded.Read(std::span(out, blockBytes));
+}
+
+GpuBuffer& GpuBlockEncoder::Buffer(std::unique_ptr<GpuBuffer>& buffer,
+                                   VkDeviceSize bytes,
+                                   BufferMemory memory) {
+    if (buffer == nullptr || buffer->Size() < bytes) {
+        buffer.reset();
+        buffer = std::make_unique<GpuBuffer>(
+            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            memory);
+    }
+    return *buffer;
 }
 
 }  // namespace ernie

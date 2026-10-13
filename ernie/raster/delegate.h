@@ -233,6 +233,13 @@ class RasterDelegate : public RenderDelegate {
     /// `raster_stats` counters.
     RenderStats Stats() const override;
 
+    /// Syncs `scene` and waits up to `timeoutSeconds` for the image
+    /// files its materials read to load, then compresses and uploads
+    /// all that did; virtual textures' tiles load as frames ask for
+    /// them (`ernie:textureLoading` complete).
+    TextureWait WaitForTextures(const Scene& scene,
+                                double timeoutSeconds) override;
+
     /// The union of the terrain's and the meshes' bounds.
     std::optional<Bounds3> SceneBounds() const override;
 
@@ -301,7 +308,12 @@ class RasterDelegate : public RenderDelegate {
     /// (`LoadPrepared`), to upload.
     struct LoadedTexture {
         PreparedTexture prepared;
-        bool cached = false;
+        /// The texture cache's copy, mapped, in place of `prepared`.
+        std::optional<TextureData> cached;
+        /// `prepared`'s compression to BC7, begun (its blocks'
+        /// memory taken) on the loader thread rather than the
+        /// frame's.
+        std::optional<TextureCompression> compression;
         /// A large albedo (`IsLargeImageFile`), prepared in 8 bits,
         /// read with `reader` as a virtual texture.
         bool large = false;
@@ -435,10 +447,26 @@ class RasterDelegate : public RenderDelegate {
                   const TextureReader& reader, std::string& pending);
     /// Uploads the image files' textures that finished loading (all,
     /// waiting for them, with `wait`) and gives them to the materials
-    /// waiting (`SyncedMaterial::pending`).
+    /// waiting (`SyncedMaterial::pending`). Compressing them to BC7
+    /// spreads over frames, `kCompressTexelsPerFrame` a frame, but
+    /// for `wait`, which finishes it.
     /// @throws std::invalid_argument naming the materials of those
     /// that failed, with `wait`; otherwise they are logged.
     void FinishTextureLoads(bool wait);
+    /// `FinishTextureLoads`' work: the loads finished (all, with
+    /// `waitLoads`) go to compression, which encodes up to
+    /// `compressTexels`, and those done to the materials; returns the
+    /// errors of those that failed, naming their materials.
+    std::vector<std::string>
+    ProgressTextureLoads(bool waitLoads,
+                         std::uint64_t compressTexels);
+    /// Gives the texture uploaded under `key` (null if it failed with
+    /// `error`) to the materials waiting for it, adding their errors
+    /// to `errors`.
+    void DeliverTexture(
+        const std::string& key,
+        const std::shared_ptr<const MaterialTexture>& texture,
+        const std::string& error, std::vector<std::string>& errors);
     /// What `slot` reads while its texture loads: a grey checker for
     /// albedo, through the material's coordinates, as Omniverse shows
     /// one; nothing (the material's constants) for the rest.
@@ -452,14 +480,15 @@ class RasterDelegate : public RenderDelegate {
     /// The GPU's BC7 encoder, made at first use; null on a device
     /// that cannot sample BC7 or make it.
     BlockEncoder* Encoder();
-    /// Uploads an image file's `prepared` texture, uploaded under
-    /// `key` (`UploadKey`): compressed to BC7 (`Encoder`) and kept in
-    /// `textureCache_` unless it came from there (`cached`). A large
-    /// albedo (`large`, its reader) reads as a virtual texture of the
-    /// cached file, mapped.
+    /// Uploads an image file's prepared texture, as stored
+    /// (`StoredOf`), under `key` (`UploadKey`); with `cache` (a BC7
+    /// one just compressed) a loader thread also writes it to
+    /// `textureCache_`. A large albedo (`large`, its reader) reads as
+    /// a virtual texture of it.
     std::shared_ptr<const MaterialTexture>
-    UploadPrepared(PreparedTexture prepared, const std::string& key,
-                   bool cached, const TextureReader* large = nullptr);
+    UploadPrepared(std::shared_ptr<const TextureData> stored,
+                   const std::string& key, bool cache,
+                   const TextureReader* large = nullptr);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -724,6 +753,18 @@ class RasterDelegate : public RenderDelegate {
     std::map<std::string, std::future<LoadedTexture>>
         loadingTextures_;
     std::map<std::string, std::string> failedTextures_;
+    /// Image files' textures loaded and being compressed to BC7 a
+    /// part a frame (`FinishTextureLoads`), by upload key.
+    struct CompressingTexture {
+        TextureCompression compression;
+        bool large = false;
+        TextureReader reader;
+    };
+    std::map<std::string, CompressingTexture> compressingTextures_;
+    /// Texels compressed a frame that does not wait for its textures:
+    /// some 25 ms of the GPU's, so a planet's texture spreads over a
+    /// couple of seconds of frames rather than stalling one.
+    static constexpr std::uint64_t kCompressTexelsPerFrame = 1u << 22;
     /// `LoadingTexture`'s checker, made at first use.
     std::shared_ptr<const MaterialTexture> loadingAlbedo_;
     /// Decodes and mips image files (`loadingTextures_`); after the

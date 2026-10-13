@@ -81,9 +81,53 @@ struct PreparedTexture {
 
 /// Encodes `prepared`'s RGBA8 mips to BC7 with `encoder` (the GPU's),
 /// in place: a quarter of the memory, sRGB staying sRGB. Textures
-/// already compressed are left as they are.
+/// already compressed are left as they are; on failure `prepared` is
+/// left empty.
 void CompressPreparedTexture(BlockEncoder& encoder,
                              PreparedTexture& prepared);
+
+/// `CompressPreparedTexture` a part at a time, so that a large
+/// texture's encoding spreads over frames rather than stalling one:
+/// each `Step` encodes about a budget of texels, in strips of whole
+/// rows of blocks, mip by mip.
+class TextureCompression {
+  public:
+    /// The compression of `prepared`, of which one already compressed
+    /// (not RGBA8) needs none.
+    explicit TextureCompression(PreparedTexture prepared);
+
+    /// Encodes about `texels` more texels with `encoder`, at least a
+    /// strip of one row of blocks; returns whether every mip now is.
+    bool Step(BlockEncoder& encoder, std::uint64_t texels);
+
+    bool Done() const {
+        return mip_ >= prepared_.mips.size();
+    }
+
+    /// Texels still to encode.
+    std::uint64_t Remaining() const;
+
+    /// The compressed texture, once `Done`; moves it out.
+    PreparedTexture Take();
+
+    /// The same, as a DDS file stores it (`StoredOf`), without a
+    /// copy: the blocks are encoded into it.
+    TextureData TakeStored();
+
+  private:
+    PreparedTexture prepared_;
+    bool compress_ = false;
+    /// The blocks, every mip in one buffer.
+    TextureData stored_;
+    std::size_t mip_ = 0;    ///< The mip being encoded.
+    std::uint32_t row_ = 0;  ///< Its next texel row, a block's first.
+};
+
+/// Uploads a texture `StoredOf` stored, as `UploadMaterialTexture`
+/// does the prepared one.
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      const TextureData& prepared);
 
 /// Whether `file` is an 8-bit PNG or JPEG with a side over
 /// `kVirtualTextureSide`, which albedo reads as a virtual texture:
@@ -146,6 +190,14 @@ UploadMaterialTexture(const VulkanContext& context,
 std::shared_ptr<const MaterialTexture>
 UploadMaterialTexture(const VulkanContext& context,
                       MaterialTextureSlot slot, TextureData texture,
+                      const TextureReader& reader);
+
+/// As above, for a texture shared with its other readers, such as
+/// the texture cache's writer: a virtual texture keeps it.
+std::shared_ptr<const MaterialTexture>
+UploadMaterialTexture(const VulkanContext& context,
+                      MaterialTextureSlot slot,
+                      std::shared_ptr<const TextureData> texture,
                       const TextureReader& reader);
 
 /// Albedo textures with a side over this many texels are virtual

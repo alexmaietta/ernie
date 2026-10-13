@@ -2,6 +2,7 @@
 #include "ernie/device/buffer.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/raster/gpu_block_encoder.h"
+#include "ernie/raster/material.h"
 #include "ernie/util/texture_bake.h"
 #include "support/vulkan_fixture.h"
 
@@ -244,4 +245,38 @@ TEST_F(GpuBlockEncoderTest, LargeImagesEncodeInBatches) {
     EXPECT_GT(Psnr(rgba, kSide, kSide, blocks), 35.0);
     std::printf("[ info ] 1100 x 1100 BC7 on the GPU: %.3f s\n",
                 seconds);
+}
+
+TEST_F(GpuBlockEncoderTest, CompressionInPartsMatchesItWhole) {
+    // A 300 x 200 RGBA8 texture and its mips compressed whole, and a
+    // part of some 5000 texels at a time (strips of whole block rows,
+    // as frames spread it): the same blocks.
+    constexpr std::uint32_t kWidth = 300;
+    constexpr std::uint32_t kHeight = 200;
+    ernie::PreparedTexture prepared;
+    prepared.width = kWidth;
+    prepared.height = kHeight;
+    prepared.format = VK_FORMAT_R8G8B8A8_SRGB;
+    for (std::uint32_t w = kWidth, h = kHeight;;
+         w = std::max(1u, w / 2), h = std::max(1u, h / 2)) {
+        prepared.mips.push_back(Picture(w, h));
+        if (w == 1 && h == 1) {
+            break;
+        }
+    }
+    ernie::ShaderCompiler compiler;
+    GpuBlockEncoder encoder(*context_, compiler);
+    ernie::PreparedTexture whole = prepared;
+    ernie::CompressPreparedTexture(encoder, whole);
+    ernie::TextureCompression parts(prepared);
+    int steps = 0;
+    while (!parts.Step(encoder, 5000)) {
+        ++steps;
+        EXPECT_GT(parts.Remaining(), 0u);
+    }
+    EXPECT_EQ(parts.Remaining(), 0u);
+    EXPECT_GT(steps, 5);
+    const ernie::PreparedTexture compressed = parts.Take();
+    EXPECT_EQ(compressed.format, VK_FORMAT_BC7_SRGB_BLOCK);
+    EXPECT_EQ(compressed.mips, whole.mips);
 }

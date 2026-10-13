@@ -43,6 +43,17 @@ struct RendererInfo {
     std::vector<std::string> viewVars;
 };
 
+/// What `RenderDelegate::WaitForTextures` left: textures still
+/// loading when it timed out, and the errors of those that failed.
+struct TextureWait {
+    std::uint64_t loading = 0;
+    std::vector<std::string> failed;
+
+    bool Complete() const {
+        return loading == 0 && failed.empty();
+    }
+};
+
 /// What a delegate holds, for statistics panels.
 struct RenderStats {
     std::uint64_t gpuBytes = 0;  ///< GPU memory the delegate holds.
@@ -159,7 +170,8 @@ class RenderDelegate {
     /// Registers custom temperature model `model` for materials to
     /// name in `ernie:thermal:model`.
     /// @throws std::invalid_argument if the model is invalid or fails
-    /// to compile, or the backend runs no custom models (the default).
+    /// to compile, or the backend runs no custom models (the
+    /// default).
     virtual void AddTemperatureModel(TemperatureModel model) {
         throw std::invalid_argument(
             "This renderer runs no custom temperature models: " +
@@ -394,6 +406,18 @@ class RenderDelegate {
     }
 
     virtual RenderStats Stats() const = 0;
+
+    /// Waits up to `timeoutSeconds` (infinity for no limit) for the
+    /// textures `scene`'s materials read to load (they load in the
+    /// background, `ernie:textureLoading`), so that a program can
+    /// render only once none is missing. Nothing to wait for by
+    /// default.
+    virtual TextureWait WaitForTextures(const Scene& scene,
+                                        double timeoutSeconds) {
+        static_cast<void>(scene);
+        static_cast<void>(timeoutSeconds);
+        return {};
+    }
 
     /// World bounds of what the delegate draws as of its last `Sync`
     /// or `Update`, for framing cameras; none if nothing has finite

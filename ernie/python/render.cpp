@@ -13,6 +13,7 @@
 #include <nanobind/stl/vector.h>
 
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -203,8 +204,8 @@ namespace {
 /// parameters as `LightPatternFromPython` reads them.
 TemperatureModel TemperatureModelFromPython(
     const std::string& id, const std::string& typeName,
-    const std::string& slang, nb::handle params, const std::string& name,
-    const std::string& description) {
+    const std::string& slang, nb::handle params,
+    const std::string& name, const std::string& description) {
     const LightPatternModel pattern = LightPatternFromPython(
         id, typeName, slang, params, 1.0, false, name, description);
     TemperatureModel model;
@@ -373,6 +374,15 @@ void BindRender(nb::module_& m) {
         .def_prop_ro("mapped", [](const PyRenderVarOutput& v) {
             return v.var.IsMapped();
         });
+
+    nb::class_<TextureWait>(m, "TextureWait",
+                            "What Renderer.wait_for_textures left.")
+        .def_ro("loading", &TextureWait::loading,
+                "Textures still loading when it timed out.")
+        .def_ro("failed", &TextureWait::failed,
+                "The errors of those that failed to load.")
+        .def_prop_ro("complete", &TextureWait::Complete,
+                     "Whether none is loading or failed.");
 
     nb::class_<PyFrame>(m, "Frame",
                         "A rendered frame of a render product.")
@@ -639,12 +649,14 @@ void BindRender(nb::module_& m) {
             "whose `float kelvin(TemperatureInput input, "
             "TemperatureParams p)` gives a pixel's temperature from "
             "its point and normal, the sunlight on it, the "
-            "material's absorptivity, emissivity and own temperature, "
+            "material's absorptivity, emissivity and own "
+            "temperature, "
             "and the time. `params` is {name: default} in order, or "
             "a list of {\"name\", \"default\", \"description\"}; "
             "materials set them in ernie:thermal:model:params, read "
             "with p.get(i), and ernie:thermal:model:data is "
-            "p.data(i). Built in: \"balance\" and \"diurnal\". Raises "
+            "p.data(i). Built in: \"balance\" and \"diurnal\". "
+            "Raises "
             "ValueError for an invalid model or one that fails to "
             "compile, with the compiler's diagnostics.")
         .def_prop_ro(
@@ -688,6 +700,24 @@ void BindRender(nb::module_& m) {
             },
             "GPU memory, triangles and the backend's own counts, by "
             "name.")
+        .def(
+            "wait_for_textures",
+            [](Renderer& r, const Scene& scene,
+               std::optional<double> timeout) {
+                nb::gil_scoped_release release;
+                return r.Delegate().WaitForTextures(
+                    scene,
+                    timeout.value_or(
+                        std::numeric_limits<double>::infinity()));
+            },
+            nb::arg("scene"), nb::arg("timeout") = nb::none(),
+            "Syncs `scene` and waits up to `timeout` seconds (none: "
+            "as "
+            "long as it takes) for the textures its materials read "
+            "to "
+            "load in the background, for a program that renders only "
+            "once none is missing; returns what is still loading or "
+            "failed.")
         .def(
             "sync",
             [](Renderer& r, const Scene& scene) {

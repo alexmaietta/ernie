@@ -27,6 +27,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -1058,6 +1059,45 @@ TEST_F(RasterDelegateTest,
     }
     UnsetEnv("ERNIE_TEXTURE_CACHE");
     std::filesystem::remove_all(cache);
+}
+
+TEST_F(RasterDelegateTest, WaitForTexturesFinishesTheirLoading) {
+    // A green 1024 x 1024 PNG read with ernie:textureLoading async:
+    // WaitForTextures leaves none loading, so the first frame shows
+    // it rather than the placeholder; a missing file's failure is
+    // reported, not thrown.
+    constexpr int kSide = 1024;
+    std::vector<std::uint8_t> texels;
+    for (int i = 0; i < kSide * kSide; ++i) {
+        texels.insert(texels.end(), {20, 230, 20, 255});
+    }
+    const std::string png = ::testing::TempDir() + "waited_green.png";
+    ASSERT_NE(stbi_write_png(png.c_str(), kSide, kSide, 4,
+                             texels.data(), kSide * 4),
+              0);
+    Scene scene = TexturedScene();
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   "/Looks/M/Tex", "outputs:rgb");
+    ernie::Shader(scene, "/Looks/M/Tex").SetFile(png);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetTextureLoading(std::string(tokens::kAsync));
+    RasterDelegate delegate(*context_);
+    const ernie::TextureWait wait = delegate.WaitForTextures(
+        scene, std::numeric_limits<double>::infinity());
+    EXPECT_TRUE(wait.Complete());
+    const std::vector<float> green = Quadrants(delegate, scene);
+    for (std::size_t i = 0; i < green.size(); i += 3) {
+        EXPECT_GT(green[i + 1], 3.0f * green[i]);
+    }
+
+    ernie::Shader(scene, "/Looks/M/Tex")
+        .SetFile(::testing::TempDir() + "no_such_texture.png");
+    const ernie::TextureWait missing = delegate.WaitForTextures(
+        scene, std::numeric_limits<double>::infinity());
+    EXPECT_EQ(missing.loading, 0u);
+    ASSERT_EQ(missing.failed.size(), 1u);
+    EXPECT_NE(missing.failed[0].find("/Looks/M"), std::string::npos)
+        << missing.failed[0];
 }
 
 TEST_F(RasterDelegateTest,

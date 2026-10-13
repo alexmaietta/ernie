@@ -42,8 +42,19 @@ class GpuBlockEncoder : public BlockEncoder {
                 TextureFormat format, std::byte* out) override;
 
   private:
+    /// `buffer`, made again (`bytes` and up, in `memory`) when too
+    /// small: kept from call to call, as textures encode a strip at a
+    /// time (`TextureCompression`).
+    GpuBuffer& Buffer(std::unique_ptr<GpuBuffer>& buffer,
+                      VkDeviceSize bytes, BufferMemory memory);
+
     const VulkanContext& context_;
     std::unique_ptr<ComputePipeline> pipeline_;
+    /// The texels, written by the host; the blocks, read back by it;
+    /// the dispatches' constants.
+    std::unique_ptr<GpuBuffer> source_;
+    std::unique_ptr<GpuBuffer> encoded_;
+    std::unique_ptr<GpuBuffer> parameters_;
 };
 
 }  // namespace ernie
