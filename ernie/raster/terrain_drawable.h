@@ -82,6 +82,10 @@ struct TerrainParams {
     /// A planet's body-fixed axes in the world's, columns x, y and z:
     /// a rotation.
     glm::dmat3 planetRotation{1.0};
+    /// A planet's world in a batch (`tokens::kWorld`): the views of
+    /// other worlds neither draw it nor refine its LOD; -1 for every
+    /// world's.
+    std::int32_t world = -1;
     /// A planet's finest LOD quad, world units: the LOD refines below
     /// the data's quads, heights bilinear between them, down to about
     /// this. 0 stops at the data's.

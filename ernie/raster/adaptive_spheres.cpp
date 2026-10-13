@@ -78,6 +78,7 @@ void AdaptiveSpheres::SetSpheres(
         params.temperature = sphere.temperature;
         params.planetCentre = sphere.centre;
         params.planetRotation = sphere.rotation;
+        params.world = sphere.world;
         params.finestCell =
             lod.enabled ? kFinestCell * std::max({sphere.radii.x,
                                                   sphere.radii.y,
@@ -139,6 +140,22 @@ std::optional<Bounds3> AdaptiveSpheres::Bounds() const {
     std::optional<Bounds3> bounds;
     for (std::size_t i = 0; i < count_; ++i) {
         Grow(bounds, bodies_[i]->Bounds());
+    }
+    return bounds;
+}
+
+std::map<std::int32_t, Bounds3>
+AdaptiveSpheres::WorldsBounds() const {
+    std::map<std::int32_t, Bounds3> bounds;
+    for (std::size_t i = 0; i < count_; ++i) {
+        for (const auto& [world, box] : bodies_[i]->WorldsBounds()) {
+            const auto [it, added] = bounds.try_emplace(world, box);
+            if (!added) {
+                it->second =
+                    Bounds3{glm::min(it->second.first, box.first),
+                            glm::max(it->second.second, box.second)};
+            }
+        }
     }
     return bounds;
 }

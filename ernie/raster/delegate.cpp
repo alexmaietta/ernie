@@ -3171,6 +3171,28 @@ RasterDelegate::GpuAnchorOf(const Scene& scene,
     return std::nullopt;
 }
 
+glm::dmat4 RasterDelegate::HostPoseOf(const Scene& scene,
+                                      const Path& path) {
+    const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path);
+    if (!anchor) {
+        return scene.WorldTransform(path);
+    }
+    // The anchor's own ops, its GPU rows copied to the host, under
+    // its parent's pose (itself perhaps under GPU-posed prims).
+    const Path& at = anchor->at;
+    ComputeInterop& compute = RequireCompute();
+    const GpuOpReader read = [&](std::string_view attribute,
+                                 const Tensor& device) {
+        return compute.Download(device,
+                                scene.WriteStream(at, attribute));
+    };
+    const glm::dmat4 parent =
+        ResetsXformStack(scene, at) || at.Parent().IsRoot()
+            ? glm::dmat4(1.0)
+            : HostPoseOf(scene, at.Parent());
+    return parent * ComposeXformOps(scene, at, &read) * anchor->below;
+}
+
 OverlayAnchorPose
 RasterDelegate::OverlayAnchorOf(const Scene& scene,
                                 const Path& path) const {
@@ -4072,6 +4094,10 @@ RasterDelegate::Items(const Scene& scene,
             !scene.IsVisible(path)) {
             return std::nullopt;
         }
+        // Drawn by `spheres_` (`UpdatePrims`).
+        if (IsAdaptiveSphere(scene, path)) {
+            return std::nullopt;
+        }
         MeshItem item;
         item.mesh = synced.handle;
         if (const std::optional<GpuAnchor> anchor =
@@ -4084,9 +4110,6 @@ RasterDelegate::Items(const Scene& scene,
             item.prototype = glm::mat4(anchor->below);
             item.instancer = anchor->instancer;
             item.instances = {anchor->row};
-        } else if (IsAdaptiveSphere(scene, path)) {
-            // Drawn by `spheres_` (`UpdatePrims`).
-            return std::nullopt;
         } else {
             item.transform = scene.WorldTransform(path);
         }
@@ -4555,23 +4578,23 @@ void RasterDelegate::UpdatePrims(
                                      .GetThermalTemperature());
     terrain_.SetParams(terrain);
     planet_.SetParams(terrain);
-    // Adaptive spheres, but those under prims posed on the GPU, which
-    // draw their meshes. Invalid radii are the meshes' errors.
+    // Adaptive spheres, those under prims posed on the GPU at their
+    // poses copied back (the LOD is chosen on the CPU). Invalid radii
+    // are their meshes' errors.
     {
         std::vector<AdaptiveSphere> spheres;
         for (const Path& path : scene.Prims(tokens::kSphere)) {
             if (inPrototypes_.contains(path) ||
                 !scene.IsVisible(path) ||
-                !IsAdaptiveSphere(scene, path) ||
-                GpuAnchorOf(scene, path)) {
+                !IsAdaptiveSphere(scene, path)) {
                 continue;
             }
             const double radius = Sphere(scene, path).GetRadius();
             if (!(radius > 0.0) || !std::isfinite(radius)) {
                 continue;
             }
-            AdaptiveSphere sphere = AdaptiveSphere::Of(
-                scene.WorldTransform(path), radius);
+            AdaptiveSphere sphere =
+                AdaptiveSphere::Of(HostPoseOf(scene, path), radius);
             if (!(glm::all(glm::greaterThan(sphere.radii,
                                             glm::dvec3(0.0))) &&
                   std::isfinite(glm::length(sphere.radii)))) {
@@ -4582,6 +4605,7 @@ void RasterDelegate::UpdatePrims(
             sphere.linkGroup = links_.GroupOf(path);
             sphere.temperature = CheckedTemperature(
                 path, Gprim(scene, path).GetThermalTemperature());
+            sphere.world = WorldOf(scene, path);
             spheres.push_back(sphere);
         }
         spheres_.SetSpheres(spheres, terrain.lod);

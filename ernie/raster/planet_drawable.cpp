@@ -485,7 +485,11 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
     // The origin follows the camera within `kRebaseReach`.
     constexpr double kRebaseReach = 1024.0;
     std::vector<glm::dvec3> eyes{BodyOffset()};
-    eyes.insert(eyes.end(), lodEyes_.begin(), lodEyes_.end());
+    for (std::size_t v = 0; v < lodEyes_.size(); ++v) {
+        if (v >= lodSees_.size() || lodSees_[v]) {
+            eyes.push_back(lodEyes_[v]);
+        }
+    }
     glm::dvec3 lowest(std::numeric_limits<double>::max());
     glm::dvec3 highest(std::numeric_limits<double>::lowest());
     for (const glm::dvec3& eye : eyes) {
@@ -508,6 +512,16 @@ std::optional<Bounds3> PlanetDrawable::Bounds() const {
     const glm::dvec3 half = extent * (0.5 * (highest - lowest));
     return Bounds3{glm::vec3(centre - half),
                    glm::vec3(centre + half)};
+}
+
+std::map<std::int32_t, Bounds3> PlanetDrawable::WorldsBounds() const {
+    std::map<std::int32_t, Bounds3> bounds;
+    if (params_.world != -1) {
+        if (const std::optional<Bounds3> box = Bounds()) {
+            bounds.emplace(params_.world, *box);
+        }
+    }
+    return bounds;
 }
 
 void PlanetDrawable::Select(const glm::dvec3& eye,
@@ -612,6 +626,18 @@ void PlanetDrawable::Prepare(
         }
     }
     frozen_ = lod.freeze;
+    // The views of its world (or of every world): only they draw it
+    // and refine its LOD, and the first of them its shadows'.
+    lodSees_.assign(views, true);
+    std::optional<std::size_t> firstSeeing;
+    for (std::size_t v = 0; v < views; ++v) {
+        const std::int32_t world = frame.ViewWorld(v);
+        lodSees_[v] = params_.world == -1 || world == -1 ||
+                      world == params_.world;
+        if (lodSees_[v] && !firstSeeing) {
+            firstSeeing = v;
+        }
+    }
     std::vector<LodRange> ranges;
     firstRange_ = 0.0;
     if (lod.enabled) {
@@ -685,7 +711,13 @@ void PlanetDrawable::Prepare(
                 }
             }
             mainRanges_.push_back(
-                {0, static_cast<std::uint32_t>(patches_.size())});
+                {0, lodSees_[v]
+                        ? static_cast<std::uint32_t>(patches_.size())
+                        : 0u});
+            continue;
+        }
+        if (!lodSees_[v]) {
+            mainRanges_.push_back({first, 0});
             continue;
         }
         Select(lodEyes_[v], ranges,
@@ -701,23 +733,31 @@ void PlanetDrawable::Prepare(
     }
     cascadeRanges_.assign(cascades.size(), DrawRange{});
     for (std::size_t c = 0; c < cascades.size(); ++c) {
+        const ShadowCascade& cascade = cascades[c];
+        // Maps of other worlds, or none of its world's views, cast
+        // nothing of it.
+        if (!firstSeeing || (cascade.world && params_.world != -1 &&
+                             *cascade.world != params_.world)) {
+            continue;
+        }
         if (ranges.empty()) {
-            cascadeRanges_[c] = mainRanges_.front();
+            cascadeRanges_[c] = {
+                0, static_cast<std::uint32_t>(patches_.size())};
             continue;
         }
         const auto first =
             static_cast<std::uint32_t>(patches_.size());
-        const glm::vec3 eye(WorldOf(lodEyes_.front()));
+        const glm::dvec3& lodEye = lodEyes_[*firstSeeing];
+        const glm::vec3 eye(WorldOf(lodEye));
         // A view the GPU poses, or moving across the shutter, draws
         // every patch: its matrix here is only an estimate, or one of
         // its sub-frames'.
-        const ShadowCascade& cascade = cascades[c];
         const Frustum light = Rotated(
             Shifted(Frustum::FromMatrix(cascade.lightViewProjection),
                     -eye),
             toBody);
         const bool culls = !cascade.moving && !cascade.gpuFitted;
-        Select(lodEyes_.front(), ShadowRanges(ranges, cascade),
+        Select(lodEye, ShadowRanges(ranges, cascade),
                culls ? &light : nullptr);
         cascadeRanges_[c] = {
             first,
@@ -796,7 +836,8 @@ void PlanetDrawable::RecordShadow(
     std::size_t cascade, const glm::mat4& lightViewProjection,
     const ShadowCasters& casters) const {
     if (!prepared_ || cascade >= cascadeRanges_.size() ||
-        !casters.shared || !casters.Casts(params_.linkGroup)) {
+        !casters.Draws(params_.world) ||
+        !casters.Casts(params_.linkGroup)) {
         return;
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,

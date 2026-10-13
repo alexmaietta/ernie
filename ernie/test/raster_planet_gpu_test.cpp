@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "ernie/device/compute_interop.h"
 #include "ernie/geometry/cube_sphere_lod.h"
 #include "ernie/geometry/planet_heights.h"
 #include "ernie/raster/delegate.h"
@@ -680,4 +681,145 @@ TEST_F(RasterDelegateTest, AnAdaptiveSpheresTextureTurnsWithIt) {
     const auto* texel = image.As<std::uint8_t>() +
                         (kSize / 2 * kSize + kSize / 2) * 4;
     EXPECT_GT(texel[0], 2 * std::max(texel[1], texel[2]) + 10);
+}
+
+// Two worlds' Earth-sized adaptive spheres in one place, red and
+// green, seen by a batch's two views from 100 m and 100 km up: each
+// view draws only its own world's, its horizon the true sphere's, and
+// each sphere refines only towards its world's view, so fewer
+// triangles are drawn than when both spheres are every world's.
+TEST_F(RasterDelegateTest,
+       AnAdaptiveSphereRefinesOnlyTowardsItsWorld) {
+    constexpr std::uint32_t kSide = 128;
+    constexpr double kFocal = 24.0;
+    const std::array<double, 2> altitudes{100.0, 100000.0};
+    const auto sceneOf = [&](bool worlds) {
+        Scene scene;
+        ernie::Material::Define(scene, "/Looks/Red")
+            .SetAlbedo(glm::dvec3(1.0, 0.0, 0.0));
+        ernie::Material::Define(scene, "/Looks/Green")
+            .SetAlbedo(glm::dvec3(0.0, 1.0, 0.0));
+        const std::array<const char*, 2> looks{"/Looks/Red",
+                                               "/Looks/Green"};
+        std::vector<double> poses;
+        for (int w = 0; w < 2; ++w) {
+            const std::string env = "/Envs/Env" + std::to_string(w);
+            ernie::Xform xform = ernie::Xform::Define(scene, env);
+            if (worlds) {
+                xform.SetWorld(w);
+            }
+            ernie::Sphere::Define(scene, env + "/Planet")
+                .SetRadius(kEarth)
+                .SetTessellation(std::string(tokens::kAdaptiveSphere))
+                .SetMaterialBinding(
+                    looks[static_cast<std::size_t>(w)]);
+            const glm::dvec3 eye(
+                0.0, 0.0,
+                kEarth + altitudes[static_cast<std::size_t>(w)]);
+            const glm::dmat4 pose = ernie::LookAtTransform(
+                eye, eye + glm::dvec3(1.0, 0.0, 0.0),
+                {0.0, 0.0, 1.0});
+            for (int row = 0; row < 4; ++row) {
+                for (int col = 0; col < 4; ++col) {
+                    poses.push_back(pose[col][row]);
+                }
+            }
+        }
+        scene.Define("/World/Sun", tokens::kDistantLight)
+            .Set(tokens::kTransform,
+                 ernie::DistantLightTransform({0.2, 0.1, 1.0}));
+        ernie::Camera::Define(scene, "/World/Camera")
+            .SetSensorNoise(false)
+            .SetFocalLength(kFocal)
+            .SetClippingRange(glm::dvec2(1.0, 1e9))
+            .SetPoses(Tensor::Copy<double>(poses, {2, 4, 4}))
+            .SetWorlds(Tensor::Copy<std::int32_t>(
+                std::vector<std::int32_t>{0, 1}, {2}));
+        ernie::RenderProduct::Define(scene, "/Render/Batch")
+            .SetCamera("/World/Camera")
+            .SetResolution(glm::dvec2(kSide, kSide));
+        ernie::RenderSettings::Define(scene, "/Render/Settings")
+            .SetClearColor(glm::dvec3(0.0, 0.0, 1.0));
+        return scene;
+    };
+    const ernie::Path batchOnly[] = {"/Render/Batch"};
+
+    Scene scene = sceneOf(true);
+    RasterDelegate delegate(*context_);
+    const Tensor images = delegate.Step(scene, batchOnly)
+                              .at("/Render/Batch")
+                              .vars.at("LdrColor")
+                              .Map(ernie::MapDevice::Cpu)
+                              .tensor;
+    ASSERT_EQ(images.Shape(),
+              (std::vector<std::int64_t>{2, kSide, kSide, 4}));
+    const auto texel = [&](std::size_t view, std::size_t row,
+                           std::size_t col) {
+        return images.As<std::uint8_t>() +
+               ((view * kSide + row) * kSide + col) * 4;
+    };
+    const double halfHeight = 0.5 * 15.2908 / kFocal;
+    for (std::size_t view = 0; view < 2; ++view) {
+        const double dip =
+            std::acos(kEarth / (kEarth + altitudes[view]));
+        const double expected =
+            0.5 * kSide * (1.0 + std::tan(dip) / halfHeight);
+        std::size_t row = 0;
+        while (row < kSide && IsClear(texel(view, row, kSide / 2))) {
+            ++row;
+        }
+        EXPECT_NEAR(static_cast<double>(row), expected, 1.5)
+            << "view " << view;
+        const std::uint8_t* ground =
+            texel(view, kSide - 4, kSide / 2);
+        const int own = ground[view == 0 ? 0 : 1];
+        const int other = ground[view == 0 ? 1 : 0];
+        EXPECT_GT(own, 2 * other + 10) << "view " << view;
+    }
+    const std::uint64_t own = delegate.Spheres().TriangleCount();
+
+    Scene shared = sceneOf(false);
+    RasterDelegate both(*context_);
+    both.Step(shared, batchOnly);
+    EXPECT_LT(own, both.Spheres().TriangleCount())
+        << "refined only towards their own world's views";
+}
+
+// An adaptive sphere under a prim posed on the GPU (a translate row
+// of a CUDA array) draws where the row puts it, and follows it.
+TEST_F(RasterDelegateTest,
+       AnAdaptiveSphereFollowsAPrimPosedOnTheGpu) {
+    RasterDelegate delegate(*context_);
+    std::string why;
+    ernie::ComputeInterop* cuda = delegate.Compute(&why);
+    if (cuda == nullptr) {
+        GTEST_SKIP() << "No CUDA interop: " << why;
+    }
+    Scene scene = AdaptiveSphereScene(1.0, glm::dmat4(1.0),
+                                      {0.3, -0.5, 1.0}, kSize);
+    scene.Remove("/World/Body");
+    ernie::Xform::Define(scene, "/World/Rig");
+    scene.Set(
+        "/World/Rig", tokens::kXformOpOrder,
+        std::vector<std::string>{std::string(tokens::kTranslate)});
+    ernie::Sphere::Define(scene, "/World/Rig/Ball")
+        .SetRadius(1.0)
+        .SetTessellation(std::string(tokens::kAdaptiveSphere))
+        .SetMaterialBinding("/Looks/Grey");
+    PlaceCamera(scene, {10.0, -12.0, 0.0}, {10.0, 0.0, 0.0},
+                {0.0, 0.0, 1.0}, {0.1, 1e4});
+    const std::vector<ernie::Path> rig{"/World/Rig"};
+    const auto place = [&](float x) {
+        const std::array<float, 3> at{x, 0.0f, 0.0f};
+        scene.Write(rig, tokens::kTranslate,
+                    cuda->Upload(Tensor::Copy<float>(at, {1, 3})));
+        const Tensor image = delegate.Render(scene);
+        return !IsClear(image.As<std::uint8_t>() +
+                        (kSize / 2 * kSize + kSize / 2) * 4);
+    };
+    EXPECT_TRUE(place(10.0f)) << "drawn at the row's translate";
+    EXPECT_EQ(delegate.Spheres().Count(), 1u);
+    EXPECT_EQ(delegate.Meshes().DrawCount(0), 0u)
+        << "not drawn as its mesh too";
+    EXPECT_FALSE(place(-10.0f)) << "gone with the rig";
 }

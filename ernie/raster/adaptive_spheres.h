@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -32,6 +33,9 @@ struct AdaptiveSphere {
     std::uint32_t linkGroup = 0;
     /// Its own temperature in kelvin; 0 for its material's.
     float temperature = 0.0f;
+    /// Its world in a batch (`tokens::kWorld`): only that world's
+    /// views draw it and refine it; -1 for every world's.
+    std::int32_t world = -1;
 
     /// `radius` posed by `transform`, which must not shear: the
     /// centre its translation, the axes its columns' directions, the
@@ -48,7 +52,8 @@ struct AdaptiveSphere {
 /// place. They shade as planets: normals the ellipsoid's, their
 /// materials' albedo textures in latitude and longitude
 /// (equirectangular, as a uv Sphere's coordinates), detail textures
-/// triplanar. Batched worlds see every sphere.
+/// triplanar. In a batch, a sphere of one world refines only towards
+/// that world's views.
 class AdaptiveSpheres : public RasterDrawable {
   public:
     /// The finest LOD quad, relative to the largest radius: about a
@@ -96,6 +101,9 @@ class AdaptiveSpheres : public RasterDrawable {
     /// What of the spheres can cast the shadows a view sees
     /// (`PlanetDrawable::Bounds`).
     std::optional<Bounds3> Bounds() const override;
+
+    /// Each world's spheres' `Bounds`.
+    std::map<std::int32_t, Bounds3> WorldsBounds() const override;
 
     void Prepare(const FrameParams& params,
                  std::span<const ShadowCascade> cascades) override;

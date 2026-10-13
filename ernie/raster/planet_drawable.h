@@ -18,6 +18,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -184,6 +185,10 @@ class PlanetDrawable : public RasterDrawable {
     /// the planet; none without heights.
     std::optional<Bounds3> Bounds() const override;
 
+    /// `Bounds` under its world (`TerrainParams::world`), for a
+    /// batch's maps fitted to worlds; none for every world's.
+    std::map<std::int32_t, Bounds3> WorldsBounds() const override;
+
     /// Writes the planet uniforms of every view and selects the LOD
     /// patches for every view (each from its own eye and frustum) and
     /// every cascade (from view 0's eye).
@@ -270,6 +275,8 @@ class PlanetDrawable : public RasterDrawable {
     std::vector<glm::dvec3> lodEyes_;
     std::vector<Frustum> lodFrusta_;  ///< Relative to each eye, body
                                       ///< axes.
+    /// Per view, whether it sees the planet's world.
+    std::vector<bool> lodSees_;
     glm::dvec3 origin_{0.0};
     bool prepared_ = false;
     float minHeight_ = 0.0f;

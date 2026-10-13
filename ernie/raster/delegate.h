@@ -453,6 +453,12 @@ class RasterDelegate : public RenderDelegate {
     std::optional<GpuAnchor> GpuAnchorOf(const Scene& scene,
                                          const Path& path) const;
 
+    /// The world transform of `path` on the host, under prims posed
+    /// on the GPU too: their rows copied back (waiting for their
+    /// streams) and composed with the CPU transforms between, for the
+    /// few prims the CPU must place, such as adaptive spheres' LODs.
+    glm::dmat4 HostPoseOf(const Scene& scene, const Path& path);
+
     /// Where an overlay anchor is this frame (`OverlayAnchorPose`):
     /// under its GPU anchor, else at its world transform (the world's
     /// origin for a prim that does not exist), resolved once per
