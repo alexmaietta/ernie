@@ -34,6 +34,7 @@ extern const char kCubeFacesSlang[];
 extern const char kPyramidSlang[];
 
 /// The standard sensor filters (`StandardSensorFilters`).
+extern const char kFilterAgxSlang[];
 extern const char kFilterBayerSlang[];
 extern const char kFilterBloomingSlang[];
 extern const char kFilterColorMatrixSlang[];

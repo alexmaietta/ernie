@@ -291,16 +291,20 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
          shaders::kFilterMeasuredQeSlang},
         {"bolometer",
          "Microbolometer",
-         "An uncooled microbolometer: counts from the in-band radiance "
+         "An uncooled microbolometer: counts from the in-band "
+         "radiance "
          "between cut-on and cut-off, followed with its thermal time "
          "constant, with NETD noise, a residual fixed pattern and "
          "drift; and its brightness temperature for an object's "
-         "emissivity and reflected temperature (BrightnessTemperature, "
+         "emissivity and reflected temperature "
+         "(BrightnessTemperature, "
          "thermalDisplay). An integrator into electrons, in place of "
          "qe.",
-         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal Imaging\", "
+         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal "
+          "Imaging\", "
           "2nd ed., Wiley-VCH, 2018",
-          "P. W. Kruse, \"Uncooled Thermal Imaging: Arrays, Systems, and "
+          "P. W. Kruse, \"Uncooled Thermal Imaging: Arrays, Systems, "
+          "and "
           "Applications\", SPIE Press, 2001"},
          Kind::Integrator,
          Domain::Electrons,
@@ -312,7 +316,8 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
           {"fpn", 0.03f, "Fixed pattern after correction, K rms"},
           {"drift", 0.0f, "Offset of every pixel, K"},
           {"timeConstant", 0.01f, "Thermal time constant, s"},
-          {"emissivity", 1.0f, "The object's, for brightness temperature"},
+          {"emissivity", 1.0f,
+           "The object's, for brightness temperature"},
           {"reflected", 293.15f, "What the object reflects, K"}},
          "Bolometer",
          shaders::kFilterBolometerSlang,
@@ -321,14 +326,17 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
         {"thermalDisplay",
          "Thermal display",
          "A thermal camera's picture of the brightness temperature "
-         "(after bolometer): over a fixed kelvin range or its automatic "
+         "(after bolometer): over a fixed kelvin range or its "
+         "automatic "
          "gain control's from the last frame, in a palette. An "
          "integrator into colour, in place of cie.",
-         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal Imaging\", "
+         {"M. Vollmer and K.-P. Moellmann, \"Infrared Thermal "
+          "Imaging\", "
           "2nd ed., Wiley-VCH, 2018"},
          Kind::Integrator,
          Domain::Rgb,
-         {{"automatic", 1.0f, "1: the last frame's range; 0: low to high"},
+         {{"automatic", 1.0f,
+           "1: the last frame's range; 0: low to high"},
           {"low", 270.0f, "Shown at the palette's start, K"},
           {"high", 330.0f, "Shown at its end, K"},
           {"span", 2.0f, "The automatic range's least, K"},
@@ -494,6 +502,19 @@ std::vector<SensorFilterModel> StandardSensorFilters() {
            {0.0f, 1.0f}}},
          "ToneCurve",
          shaders::kFilterToneCurveSlang},
+        {"agx",
+         "AgX",
+         "A filmic display transform in place of the exposure's "
+         "clip: highlights roll off, bright colours desaturate "
+         "towards white.",
+         {"T. Sobotka, AgX, 2022 (Blender 4.0's view transform)",
+          "Google, Filament's AgX, 2023; three.js's AgXToneMapping"},
+         Kind::Pixel,
+         Domain::Display,
+         {{"exposure", 0.0f,
+           "Stops more than the camera's exposure"}},
+         "AgX",
+         shaders::kFilterAgxSlang},
         {"spectralTransmission",
          "Spectral transmission",
          "Each band times a transmission curve of 48 samples, 360 to "

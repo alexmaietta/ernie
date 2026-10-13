@@ -354,6 +354,9 @@ class SensorFilterRegistry {
 ///   `inputBits` to `outputBits`; after `adc`.
 /// - `toneCurve` (pixel, display): each channel through `curve` (33
 ///   samples over 0 to 1); after `exposure`.
+/// - `agx` (pixel, display): the AgX filmic display transform of the
+///   exposed linear colour, `exposure` stops more, in place of the
+///   exposure's clip; after `exposure`.
 /// - `spectralTransmission` (band): each band times `curve` (48
 ///   samples, 360 to 830 nm), a measured filter's transmission;
 ///   before `qe` and `cie`.

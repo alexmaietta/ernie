@@ -11,6 +11,7 @@ set(ernie_shaders
     closure/oren_nayar.slang=kBrdfOrenNayarSlang
     closure/preview_surface.slang=kBrdfPreviewSurfaceSlang
     film/cube_faces.slang=kCubeFacesSlang
+    film/filter_agx.slang=kFilterAgxSlang
     film/filter_bayer.slang=kFilterBayerSlang
     film/filter_blooming.slang=kFilterBloomingSlang
     film/filter_color_matrix.slang=kFilterColorMatrixSlang

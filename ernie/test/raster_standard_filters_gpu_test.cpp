@@ -653,6 +653,53 @@ TEST_F(RasterDelegateTest, CurveParametersTakeArraysOfAnyLength) {
     }
 }
 
+TEST_F(RasterDelegateTest, AgxRollsOffWhatTheExposureClips) {
+    // MeshScene's red quad made 50 times brighter: the exposure clips
+    // its red, AgX lets green and blue in there as bright colours
+    // desaturate towards white; fewer stops, darker.
+    RasterDelegate delegate(*context_);
+    Scene scene = MeshScene();
+    const std::map<std::string, float> brighter{
+        {"red", 50.0f}, {"green", 50.0f}, {"blue", 50.0f}};
+    const auto clipped = VarsThrough(delegate, scene, {"LdrColor"},
+                                     {{"cie", kNone},
+                                      {"whiteBalance", brighter},
+                                      {"exposure", kNone}})
+                             .at("LdrColor");
+    const auto filmic = VarsThrough(delegate, scene, {"LdrColor"},
+                                    {{"cie", kNone},
+                                     {"whiteBalance", brighter},
+                                     {"exposure", kNone},
+                                     {"agx", kNone}})
+                            .at("LdrColor");
+    const auto darker = VarsThrough(delegate, scene, {"LdrColor"},
+                                    {{"cie", kNone},
+                                     {"whiteBalance", brighter},
+                                     {"exposure", kNone},
+                                     {"agx", {{"exposure", -12.0f}}}})
+                            .at("LdrColor");
+    std::size_t saturated = 0;
+    double sum = 0.0;
+    double darkerSum = 0.0;
+    double clippedOthers = 0.0;
+    double filmicOthers = 0.0;
+    for (std::size_t i = 0; i < clipped.size(); i += 4) {
+        sum += double(filmic[i]);
+        darkerSum += double(darker[i]);
+        if (clipped[i] < 255.0f) {
+            continue;
+        }
+        ++saturated;
+        clippedOthers +=
+            double(clipped[i + 1]) + double(clipped[i + 2]);
+        filmicOthers += double(filmic[i + 1]) + double(filmic[i + 2]);
+    }
+    EXPECT_GT(saturated, 0u) << "the exposure clips the quad's red";
+    EXPECT_GT(filmicOthers, clippedOthers + 255.0)
+        << "green and blue come in where red clips";
+    EXPECT_LT(darkerSum, 0.5 * sum) << "fewer stops, darker";
+}
+
 TEST_F(RasterDelegateTest,
        BloomingSpillsSaturatedChargeAlongColumns) {
     // MeshScene's red quad at the default 1 s exposure holds far more
