@@ -912,7 +912,9 @@ void BindRender(nb::module_& m) {
             "memory, holding the rows, which the scene now holds as "
             "the attribute. Write into it "
             "on `stream`, then `scene.unmap(prims, attribute, "
-            "stream)`; map again every step.")
+            "stream)`; map again every step. Deprecated: "
+            "`with scene.column(prims, attribute).map(\"cuda\") as "
+            "rows:` maps the same rows.")
         .def(
             "map",
             [](nb::pointer_and_handle<Renderer> self, Scene& scene,

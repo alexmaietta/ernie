@@ -164,6 +164,8 @@ class RasterDelegate : public RenderDelegate {
     /// group, rows of one array written to exactly `prims` in row
     /// order. Orientations map as x, y, z, w unless composed on the
     /// GPU (then as written).
+    /// @deprecated As `RenderDelegate::MapArray` of a PrimSet: map
+    /// the column (`Column::Map`), which this backs.
     Tensor MapArray(Scene& scene, const PrimSet& prims,
                     std::string_view attribute,
                     std::uintptr_t stream = 1) override;

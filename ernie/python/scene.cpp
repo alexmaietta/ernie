@@ -1518,6 +1518,23 @@ void BindScene(nb::module_& m) {
         .def(nb::init<>())
         .def_rw("version", &ChangeCursor::version);
 
+    nb::class_<ColumnChange>(m, "ColumnChange",
+                             "One attribute of many prims written whole "
+                             "as a column's rows; see "
+                             "Scene.column_changes.")
+        .def_prop_ro("paths",
+                     [](const ColumnChange& change) {
+                         return change.paths != nullptr
+                                    ? *change.paths
+                                    : std::vector<Path>();
+                     },
+                     "The prims, in row order.")
+        .def_ro("attribute", &ColumnChange::attribute)
+        .def_ro("bits", &ColumnChange::bits)
+        .def("__len__", [](const ColumnChange& change) {
+            return change.paths != nullptr ? change.paths->size() : 0;
+        });
+
     nb::class_<glm::dquat>(
         m, "Quat",
         "A rotation as a quaternion, Quat(w, x, y, z) with the real "
@@ -2122,7 +2139,43 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("cursor"),
             "(path, Dirty) for every prim changed since `cursor`, "
-            "which advances.");
+            "which advances.")
+        .def(
+            "column_changes",
+            [](const Scene& scene, ChangeCursor& cursor) {
+                std::vector<ColumnChange> columns;
+                std::vector<std::pair<Path, Dirty>> changes;
+                for (const Change& change :
+                     scene.Changes(cursor, columns)) {
+                    changes.emplace_back(change.path, change.bits);
+                }
+                return std::pair(std::move(changes),
+                                 std::move(columns));
+            },
+            nb::arg("cursor"),
+            "As `changes`, but an attribute written whole as a "
+            "column's rows since `cursor` comes as one ColumnChange, "
+            "not as its prims' changes: (changes, columns). "
+            "`expand_columns` gives the rest.")
+        .def(
+            "expand_columns",
+            [](const Scene& scene,
+               const std::vector<std::pair<Path, Dirty>>& changes,
+               const std::vector<ColumnChange>& columns) {
+                std::vector<Change> given;
+                for (const auto& [path, bits] : changes) {
+                    given.push_back({path, bits});
+                }
+                std::vector<std::pair<Path, Dirty>> result;
+                for (const Change& change :
+                     scene.ExpandColumns(given, columns)) {
+                    result.emplace_back(change.path, change.bits);
+                }
+                return result;
+            },
+            nb::arg("changes"), nb::arg("columns"),
+            "`changes` with `columns`' prims, their descendants and "
+            "their dependents merged in, as `changes` reports them.");
 
     const auto triple = [](const glm::dvec3& v) {
         return nb::make_tuple(v.x, v.y, v.z);

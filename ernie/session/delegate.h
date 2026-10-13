@@ -223,6 +223,10 @@ class RenderDelegate {
     /// `MapArray`: writes the tensor as those rows, prim i's row i,
     /// and returns it. Unmap every prim (`Scene::Unmap` of the
     /// PrimSet) after writing.
+    /// @deprecated Map a column instead, `Scene::GetColumn(prims,
+    /// attribute).Map(device, stream)` then `Column::Unmap`: it maps
+    /// these same rows where the delegate offers them
+    /// (`ColumnStorage`), and others on any device besides.
     /// @throws std::invalid_argument as the single prim's.
     virtual Tensor MapArray(Scene& scene, const PrimSet& prims,
                             std::string_view attribute,

@@ -12,9 +12,15 @@ Prims, paths and attributes, transforms, and change tracking.
 
 ::: ernie.AttributeMapping
 
+::: ernie.Column
+
+::: ernie.ColumnMapping
+
 ::: ernie.Quat
 
 ::: ernie.ChangeCursor
+
+::: ernie.ColumnChange
 
 ::: ernie.Dirty
 
