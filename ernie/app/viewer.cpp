@@ -2832,18 +2832,29 @@ struct Viewer::State {
     /// session's prims for the viewer's own.
     void PropertiesButton(const Path& camera, const char* shortcut) {
         const ImGuiStyle& style = ImGui::GetStyle();
-        const ImVec2 min = ImGui::GetItemRectMin();
-        const ImVec2 max = ImGui::GetItemRectMax();
-        const float shortcutWidth =
-            shortcut != nullptr && *shortcut != '\0'
-                ? ImGui::CalcTextSize(shortcut).x +
-                      2.0f * style.ItemSpacing.x
-                : 0.0f;
+        const ImGuiWindow* menuWindow = ImGui::GetCurrentWindow();
         const float width = ImGui::CalcTextSize(icons::kSettings).x +
                             2.0f * style.FramePadding.x;
-        const ImVec2 after = ImGui::GetCursorScreenPos();
-        ImGui::SetCursorScreenPos(
-            ImVec2(max.x - shortcutWidth - width, min.y));
+        // Where the row's shortcut column starts (the menu's), else
+        // its right edge; on the row's line, so the menu's layout
+        // carries on below it.
+        // ImGui draws the shortcut at its column's offset plus what
+        // the row has to spare beyond the columns' width.
+        const ImGuiMenuColumns& columns = menuWindow->DC.MenuColumns;
+        const float rowStart = ImGui::GetItemRectMin().x;
+        const float rowEnd = ImGui::GetItemRectMax().x;
+        const float spare =
+            std::max(rowEnd - rowStart -
+                         static_cast<float>(columns.TotalWidth),
+                     0.0f);
+        const float right =
+            shortcut != nullptr && *shortcut != '\0'
+                ? rowStart +
+                      static_cast<float>(columns.OffsetShortcut) +
+                      spare - style.ItemSpacing.x
+                : rowEnd;
+        ImGui::SameLine(right - width - menuWindow->Pos.x +
+                        menuWindow->Scroll.x);
         ImGui::PushID(camera.String().c_str());
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
         if (ImGui::SmallButton(icons::kSettings)) {
@@ -2880,8 +2891,11 @@ struct Viewer::State {
                         ? Label(camera.Parent()) + "/" + Label(camera)
                         : Label(camera);
                 ImGui::PushID(camera.String().c_str());
-                const bool chosen = menu::Option(
-                    label.c_str(), camera == activeCamera);
+                ImGui::SetNextItemAllowOverlap();
+                // Room on the right for its settings button.
+                const bool chosen =
+                    menu::Option((label + "        ").c_str(),
+                                 camera == activeCamera);
                 ImGui::PopID();
                 if (chosen) {
                     SetActive(camera);
