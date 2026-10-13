@@ -159,9 +159,7 @@ class PropertiesPanel final : public Panel {
         ImGui::SameLine();
         ImGui::TextDisabled(
             "%s%s", type.empty() ? "untyped" : type.c_str(),
-            !selected              ? "  (the viewport's camera)"
-            : selection.size() > 1 ? "  (first of the selection)"
-                                   : "");
+            selection.size() > 1 ? "  (first of the selection)" : "");
         if (!error_.empty()) {
             ImGui::TextColored(ImVec4(0.89f, 0.34f, 0.32f, 1.0f),
                                "%s", error_.c_str());

@@ -42,9 +42,8 @@ TEST(RenderSchemas, FallbacksAreTheRenderDefaults) {
         frame.domeDirections);
     EXPECT_EQ(settings.GetDomeLightMode(), "approximate");
     EXPECT_EQ(frame.domeMode, ernie::DomeLightMode::Approximate);
-    EXPECT_FLOAT_EQ(static_cast<float>(std::exp2(
-                        settings.GetExposureCompensation())),
-                    frame.exposure);
+    // Exposure is the camera's; only a viewer's viewport adds to it.
+    EXPECT_FLOAT_EQ(frame.exposure, 1.0f);
     EXPECT_EQ(settings.GetMeter(), frame.meter);
     EXPECT_FLOAT_EQ(static_cast<float>(settings.GetLodMeshError()),
                     frame.meshLodError);
