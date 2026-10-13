@@ -648,13 +648,13 @@ GBuffer meshGBuffer(VertexOutput in) {
     let unlit = hiddenLine();
     GBuffer out;
     // Its temperature: its points' or their nodes' (a solver's), else its own, else its material's
-    // texture's, else 0 for the material's.
+    // thermal texture's (`thermalTextureSlot`: a thermal inertia below 0), else 0 for the
+    // material's.
     let thermal = (d.offsets.w & kThermal) != 0;
     let solved = (d.offsets.w & (kHasTemperatures | kHasNodes)) != 0;
     var kelvin = thermal && solved && in.kelvin > 0.0 ? in.kelvin : d.tint.a;
-    if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs) &&
-        surface.temperature.x > 0.0) {
-        kelvin = max(temperatureTexture(imageUv(in.uv)), 0.0);
+    if (kelvin == 0.0 && (d.offsets.w & (kThermal | kHasUvs)) == (kThermal | kHasUvs)) {
+        kelvin = thermalTextureSlot(imageUv(in.uv));
     }
     out.normal = packNormal(shadingNormal, kelvin);
     out.albedo = float4(unlit ? 1.0 : surfaceAlbedoScale(in.world),

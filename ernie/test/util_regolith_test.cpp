@@ -76,6 +76,14 @@ TEST(Regolith, TablesSpanThermalInertiaAndAlbedo) {
     EXPECT_GT(at(12, 0, 0), at(12, 0, 1) + 5.0f)
         << "darker ground hotter at noon";
     EXPECT_LT(at(12, 1, 0), at(12, 0, 0)) << "rocks cooler at noon";
+    // A bright regolith, its albedo past 1 at grazing sun but for the
+    // clamp, stays physical.
+    const ernie::DiurnalTable bright =
+        ernie::DiurnalTemperatureTable({}, 2, 24, {50.0f}, {0.6f});
+    const auto [low, high] = std::minmax_element(
+        bright.kelvin.begin(), bright.kelvin.end());
+    EXPECT_GT(*low, 20.0f) << "the pole's";
+    EXPECT_LT(*high, 400.0f);
     // The regolith's own inertia and albedo without axes.
     const ernie::DiurnalTable own =
         ernie::DiurnalTemperatureTable({}, 2, 4);

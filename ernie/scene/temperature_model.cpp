@@ -31,10 +31,11 @@ constexpr const char* kTemperatureModelSlang = R"(
 // Where a model is evaluated: the point and its outward surface normal (world, relative to the
 // frame's origin); the brightest distant light's direction towards it (0 for none), its
 // irradiance over all wavelengths facing it (W/m^2) and the share of it reaching the point past
-// shadows; the sunlight on the surface from every distant light (W/m^2, shadowed); the material's
-// solar absorptivity and hemispherical thermal emissivity; its own temperature (K, 0 for none);
-// the frame's time (s); the world +z axis of a prim bound to the material (0 for none); and its
-// thermal inertia (J m^-2 K^-1 s^-1/2, 0 for none).
+// shadows; the sunlight on the surface from every distant light (W/m^2, shadowed); the pixel's
+// solar absorptivity (the material's scaled as its albedo textures scale its reflectance) and the
+// material's hemispherical thermal emissivity; its own temperature (K, 0 for none); the frame's
+// time (s); the world +z axis of a prim bound to the material (0 for none); and the pixel's
+// thermal inertia (J m^-2 K^-1 s^-1/2, its texture's else the material's, 0 for none).
 public struct TemperatureInput {
     public float3 position;
     public float3 normal;

@@ -64,16 +64,16 @@ public struct Surface {
     public uint4 virtualAlbedo;
     public uint2 virtualTile;
     public uint* virtualRequests;
-    // x: 1 with a temperature texture, kelvin in red (heap slot 15, `temperatureTexture`); yzw
-    // unused.
+    // A thermal texture (heap slot 15, `thermalTexture`): x 1 with kelvin in its red; y 1 with
+    // thermal inertia in its green for the material's temperature model; zw unused.
     public float4 temperature;
 }
 
 [[vk::binding(5, 0)]] public ConstantBuffer<Surface> surface;
 
-// The temperature texture at image coordinates `uv` (origin top left), bilinear from four loads
-// since float formats need not filter, clamped at its edges.
-public float temperatureTexture(float2 uv) {
+// The thermal texture at image coordinates `uv` (origin top left): kelvin and thermal inertia,
+// bilinear from four loads since float formats need not filter, clamped at its edges.
+public float2 thermalTexture(float2 uv) {
     let image = heapTextures[surfaceSlot(15)];
     uint width;
     uint height;
@@ -83,9 +83,21 @@ public float temperatureTexture(float2 uv) {
     let last = int2(width, height) - 1;
     let a = clamp(int2(floor(p)), int2(0), last);
     let b = clamp(int2(floor(p)) + 1, int2(0), last);
-    let top = lerp(image.Load(int3(a.x, a.y, 0)).r, image.Load(int3(b.x, a.y, 0)).r, f.x);
-    let bottom = lerp(image.Load(int3(a.x, b.y, 0)).r, image.Load(int3(b.x, b.y, 0)).r, f.x);
+    let top = lerp(image.Load(int3(a.x, a.y, 0)).rg, image.Load(int3(b.x, a.y, 0)).rg, f.x);
+    let bottom = lerp(image.Load(int3(a.x, b.y, 0)).rg, image.Load(int3(b.x, b.y, 0)).rg, f.x);
     return lerp(top, bottom, f.y);
+}
+
+// The G-buffer's temperature slot at `uv` with no temperature of its own: the thermal texture's
+// kelvin, else where the material has a temperature model its thermal inertia negated, which the
+// model reads (`temperatureMain`) and everything else takes as no temperature; 0 for neither.
+public float thermalTextureSlot(float2 uv) {
+    if (surface.temperature.x == 0.0 && surface.temperature.y == 0.0) {
+        return 0.0;
+    }
+    let texel = thermalTexture(uv);
+    let kelvin = surface.temperature.x > 0.0 ? max(texel.x, 0.0) : 0.0;
+    return kelvin > 0.0 ? kelvin : surface.temperature.y > 0.0 ? -max(texel.y, 0.0) : 0.0;
 }
 
 // The material's heap slot `i` (`Surface::heap`).

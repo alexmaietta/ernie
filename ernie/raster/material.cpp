@@ -898,36 +898,49 @@ void RasterMaterial::SetDetailAlbedo(const Image* albedo) {
     WriteUniform();
 }
 
-void RasterMaterial::SetTemperatureTexture(
-    std::span<const float> kelvin, std::uint32_t width,
-    std::uint32_t height) {
+void RasterMaterial::SetThermalTexture(std::span<const float> kelvin,
+                                       std::span<const float> inertia,
+                                       std::uint32_t width,
+                                       std::uint32_t height) {
     std::unique_ptr<GpuImage> image;
-    if (!kelvin.empty()) {
-        if (kelvin.size() !=
-            static_cast<std::size_t>(width) * height) {
-            throw std::invalid_argument(
-                "Temperature texture holds " +
-                std::to_string(kelvin.size()) + " values, not " +
-                std::to_string(width) + " x " +
-                std::to_string(height));
+    if (!kelvin.empty() || !inertia.empty()) {
+        const std::size_t texels =
+            static_cast<std::size_t>(width) * height;
+        for (const std::span<const float> values :
+             {kelvin, inertia}) {
+            if (!values.empty() && values.size() != texels) {
+                throw std::invalid_argument(
+                    "Thermal texture holds " +
+                    std::to_string(values.size()) + " values, not " +
+                    std::to_string(width) + " x " +
+                    std::to_string(height));
+            }
         }
         const std::uint32_t maxSize =
             context_.Limits().maxImageDimension2D;
-        if (width > maxSize || height > maxSize) {
+        if (width == 0 || height == 0 || width > maxSize ||
+            height > maxSize) {
             throw std::invalid_argument(
-                "Temperature texture exceeds the device's maximum "
-                "texture size");
+                "Thermal texture is empty or exceeds the device's "
+                "maximum texture size");
+        }
+        std::vector<float> pairs(2 * texels, 0.0f);
+        for (std::size_t i = 0; i < texels; ++i) {
+            pairs[2 * i] = kelvin.empty() ? 0.0f : kelvin[i];
+            pairs[2 * i + 1] = inertia.empty() ? 0.0f : inertia[i];
         }
         image = std::make_unique<GpuImage>(
             context_,
-            ImageDesc{width, height, 1, 1, VK_FORMAT_R32_SFLOAT,
+            ImageDesc{width, height, 1, 1, VK_FORMAT_R32G32_SFLOAT,
                       VK_IMAGE_USAGE_SAMPLED_BIT});
         const std::span<const std::byte> mips[] = {
-            std::as_bytes(kelvin)};
+            std::as_bytes(std::span(pairs))};
         image->Upload(mips);
     }
     vkDeviceWaitIdle(context_.Device());
-    temperatureTexture_ = std::move(image);
+    thermalTexture_ = std::move(image);
+    thermalKelvin_ = !kelvin.empty();
+    thermalInertia_ = !inertia.empty();
     WriteUniform();
 }
 
@@ -1110,8 +1123,9 @@ void RasterMaterial::WriteUniform() {
     u.heap[1] = image(detailAlbedo_.get());
     u.heap[2] = image(detailNormal_.get());
     u.heap[3] = sampler(&sampler_);
-    u.heap[15] = image(temperatureTexture_.get());
-    u.temperature[0] = temperatureTexture_ != nullptr ? 1.0f : 0.0f;
+    u.heap[15] = image(thermalTexture_.get());
+    u.temperature[0] = thermalKelvin_ ? 1.0f : 0.0f;
+    u.temperature[1] = thermalInertia_ ? 1.0f : 0.0f;
     for (std::size_t slot = 0; slot < kMaterialTextureSlots; ++slot) {
         u.heap[4 + slot] = image(textures_[slot] != nullptr
                                      ? textures_[slot]->image.get()
@@ -1183,8 +1197,8 @@ std::uint64_t RasterMaterial::GpuBytes() const {
     for (const auto& fallback : fallbacks_) {
         bytes += fallback->Bytes();
     }
-    if (temperatureTexture_ != nullptr) {
-        bytes += temperatureTexture_->Bytes();
+    if (thermalTexture_ != nullptr) {
+        bytes += thermalTexture_->Bytes();
     }
     return bytes;
 }

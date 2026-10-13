@@ -138,6 +138,11 @@ struct MaterialSettings {
     /// (`tokens::kThermalInertia`), for its temperature model; 0 for
     /// none.
     float thermalInertia = 0.0f;
+    /// Its thermal terminal's thermal inertia texture
+    /// (`tokens::kThermalInertiaInput` connected): one channel after
+    /// the reader's scale and bias, in place of the Material's
+    /// thermal inertia texture.
+    std::optional<TextureReader> inertiaTexture;
     /// Its thermal terminal's temperature texture (`tokens::
     /// kThermalOutput`): one channel, kelvin after the reader's scale
     /// and bias, in place of the Material's temperature texture.

@@ -142,7 +142,10 @@ DiurnalSurfaceTemperatures(const RegolithProperties& regolith,
         if (cosIncidence <= 0.0) {
             return 0.0;
         }
-        return (1.0 - Albedo(regolith, std::acos(cosIncidence))) *
+        // A bright regolith's albedo would pass 1 at grazing sun.
+        return (1.0 -
+                std::min(Albedo(regolith, std::acos(cosIncidence)),
+                         1.0)) *
                regolith.solarIrradiance * cosIncidence;
     };
     // From about the deep regolith's temperature, a hundred days in

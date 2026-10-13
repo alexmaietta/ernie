@@ -1621,6 +1621,101 @@ TEST_F(RasterDelegateTest,
                  std::invalid_argument);
 }
 
+// Each pixel reads the diurnal table at its own thermal inertia and
+// albedo: before dawn on the equator a thermal inertia texture's rock
+// (1500) on the quad's right is far warmer than its fines (50) on the
+// left, as the table holds; at noon an albedo texture's darker right
+// half is hotter.
+TEST_F(RasterDelegateTest,
+       DiurnalTablesReadEachPixelsInertiaAndAlbedo) {
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    const ernie::DiurnalTable table = ernie::DiurnalTemperatureTable(
+        {}, 2, 24, {50.0f, 1500.0f}, {0.1f, 0.5f});
+    const std::array<float, 2> inertia{50.0f, 1500.0f};
+    ernie::Material(scene, "/Looks/M")
+        .SetThermalModel("diurnal")
+        .SetThermalModelParams({0.0f, 1.0f, 0.0f})
+        .SetThermalModelData(table.ModelData())
+        .SetThermalInertiaTexture(
+            Tensor::Copy<float>(inertia, {1, 2}));
+    RasterDelegate delegate(*context_);
+    const auto at = [&](float x) {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        const glm::vec4 clip =
+            ernie::CameraParamsOf(scene, "/World/Camera", kSize,
+                                  kSize)
+                .RasterView()
+                .ViewProjection() *
+            glm::vec4(x, 0.0f, 0.0f, 1.0f);
+        const auto col = static_cast<std::size_t>(
+            (clip.x / clip.w * 0.5f + 0.5f) * kSize);
+        return kelvin.As<float>()[(kSize / 2) * kSize + col];
+    };
+    const auto sun = [&](double hour) {
+        // East is +x with the pole along y; the sun's hour angle
+        // west.
+        const double angle = (hour / 24.0 - 0.5) * 2.0 * M_PI;
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(
+                      {-std::sin(angle), 0.0, std::cos(angle)}));
+    };
+    // 11 pm: the grey (0.5) material at the albedo axis's top.
+    sun(23.0);
+    EXPECT_NEAR(at(-6.0f), table.kelvin[table.At(0, 23, 0, 1)], 1.0f);
+    EXPECT_NEAR(at(6.0f), table.kelvin[table.At(0, 23, 1, 1)], 1.0f);
+    EXPECT_GT(at(6.0f), at(-6.0f) + 60.0f) << "rock holds the heat";
+
+    // Noon, its diffuse colour a raw texture of 0.5 then 0.1 (four
+    // texels, so each side reads one through the wrapping sampler).
+    sun(12.0);
+    const Path albedo("/Looks/M/Tex");
+    const std::array<float, 12> texels{0.5f, 0.5f, 0.5f, 0.5f,
+                                       0.5f, 0.5f, 0.1f, 0.1f,
+                                       0.1f, 0.1f, 0.1f, 0.1f};
+    scene.Write(albedo, tokens::kShaderTexture,
+                Tensor::Copy<float>(texels, {1, 4, 3}));
+    ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
+                   albedo, "outputs:rgb");
+    // Within the sunlight-weighted reflectance's few percent of the
+    // texels' luminance.
+    EXPECT_NEAR(at(-6.0f), table.kelvin[table.At(0, 12, 0, 1)], 4.0f);
+    EXPECT_NEAR(at(6.0f), table.kelvin[table.At(0, 12, 1, 0)], 4.0f);
+    EXPECT_GT(at(6.0f), table.kelvin[table.At(0, 12, 1, 1)] + 5.0f)
+        << "darker rock is hotter";
+
+    // The inertia from a thermal terminal's texture instead, scaled
+    // from 0.05 and 1.5 by 1000, the model on the node.
+    sun(23.0);
+    scene.Clear("/Looks/M", tokens::kThermalInertiaTexture);
+    const Path node("/Looks/M/Thermal");
+    ernie::Shader::Define(scene, node)
+        .SetInfoId(std::string(tokens::kErnieThermal))
+        .SetThermalModel("diurnal")
+        .SetThermalModelParams({0.0f, 1.0f, 0.0f})
+        .SetThermalModelData(table.ModelData());
+    ernie::Connect(scene, "/Looks/M", tokens::kThermalOutput, node,
+                   "outputs:out");
+    const Path rocks("/Looks/M/Rocks");
+    ernie::Shader::Define(scene, rocks)
+        .SetInfoId(std::string(tokens::kUsdUVTexture));
+    scene.Set(rocks, tokens::kShaderScale, glm::dvec4(1000.0));
+    const std::array<float, 4> abundance{0.05f, 0.05f, 1.5f, 1.5f};
+    scene.Write(rocks, tokens::kShaderTexture,
+                Tensor::Copy<float>(abundance, {1, 4, 1}));
+    ernie::Connect(scene, rocks, tokens::kSt, "/Looks/M/St",
+                   "outputs:result");
+    ernie::Connect(scene, node, tokens::kThermalInertiaInput, rocks,
+                   "outputs:r");
+    EXPECT_NEAR(at(-6.0f), table.kelvin[table.At(0, 23, 0, 1)], 4.0f);
+    EXPECT_NEAR(at(6.0f), table.kelvin[table.At(0, 23, 1, 0)], 4.0f);
+}
+
 // A surface whose emissiveColor reads a texture glows as its texels
 // go, unlit: red where they are red, blue where blue; the texture's
 // scale is how bright, twice the scale twice the light.

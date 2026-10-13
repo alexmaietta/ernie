@@ -276,18 +276,21 @@ class RasterMaterial {
     /// @throws std::invalid_argument as `SetDetailTextures`.
     void SetDetailNormal(const Image* normal);
 
-    /// Replaces the temperature texture: `kelvin`, `width` x `height`
-    /// row by row from the top, read through mesh texture coordinates
-    /// with thermal emission on (bilinear, clamped at its edges);
-    /// empty removes it.
-    /// @throws std::invalid_argument if the size does not match or
+    /// Replaces the thermal texture, `width` x `height` row by row
+    /// from the top, read through mesh texture coordinates with
+    /// thermal emission on (bilinear, clamped at its edges): `kelvin`
+    /// (0 or below there for the material's temperature) and
+    /// `inertia`, thermal inertia for its temperature model (0 or
+    /// below for the material's), each empty for none; both empty
+    /// remove it.
+    /// @throws std::invalid_argument if a size does not match or
     /// exceeds the device's maximum texture size.
-    void SetTemperatureTexture(std::span<const float> kelvin,
-                               std::uint32_t width,
-                               std::uint32_t height);
+    void SetThermalTexture(std::span<const float> kelvin,
+                           std::span<const float> inertia,
+                           std::uint32_t width, std::uint32_t height);
 
-    bool HasTemperatureTexture() const {
-        return temperatureTexture_ != nullptr;
+    bool HasThermalTexture() const {
+        return thermalTexture_ != nullptr;
     }
 
     /// Reads `texture` (from `UploadMaterialTexture`, and shareable
@@ -393,7 +396,10 @@ class RasterMaterial {
     std::shared_ptr<const GpuImage> albedoMap_;
     std::shared_ptr<const GpuImage> detailAlbedo_;
     std::shared_ptr<const GpuImage> detailNormal_;
-    std::unique_ptr<GpuImage> temperatureTexture_;  ///< R32F kelvin.
+    /// RG32F kelvin and thermal inertia (`SetThermalTexture`).
+    std::unique_ptr<GpuImage> thermalTexture_;
+    bool thermalKelvin_ = false;   ///< Whether it holds kelvin.
+    bool thermalInertia_ = false;  ///< Whether it holds inertia.
     /// By `MaterialTextureSlot`: the texture of `SetTexture`, null
     /// for none; the 1 x 1 one bound in its place (white albedo, a
     /// flat normal, zero); and the sampler.

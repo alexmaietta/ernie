@@ -919,21 +919,41 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
                         "needs float32 (rows, cols) or (rows, cols, "
                         "1)");
                 }
-                const auto rows =
-                    static_cast<std::uint32_t>(shape[0]);
-                const auto cols =
-                    static_cast<std::uint32_t>(shape[1]);
-                gpu.SetTemperatureTexture(
-                    std::span(kelvin.As<float>(),
-                              static_cast<std::size_t>(rows) * cols),
-                    cols, rows);
-            } else if (gpu.HasTemperatureTexture()) {
-                gpu.SetTemperatureTexture({}, 0, 0);
+                channel.height = static_cast<std::uint32_t>(shape[0]);
+                channel.width = static_cast<std::uint32_t>(shape[1]);
+                channel.values.assign(
+                    values.As<float>(),
+                    values.As<float>() +
+                        static_cast<std::size_t>(channel.width) *
+                            channel.height);
             }
         } catch (const std::invalid_argument& error) {
-            throw UploadError(path, kThermalTemperatureTexture,
-                              error.what());
+            throw UploadError(path, attribute, error.what());
         }
+        return channel;
+    };
+    const Channel kelvin =
+        load(settings.temperatureTexture,
+             prim.GetThermalTemperatureTexture(),
+             kThermalTemperatureTexture);
+    const Channel inertia =
+        load(settings.inertiaTexture, prim.GetThermalInertiaTexture(),
+             kThermalInertiaTexture);
+    try {
+        if (!kelvin.values.empty() && !inertia.values.empty() &&
+            (kelvin.width != inertia.width ||
+             kelvin.height != inertia.height)) {
+            throw std::invalid_argument(
+                "its temperature and thermal inertia textures differ "
+                "in size");
+        }
+        const Channel& size = kelvin.values.empty() ? inertia : kelvin;
+        if (!size.values.empty() || gpu.HasThermalTexture()) {
+            gpu.SetThermalTexture(kelvin.values, inertia.values,
+                                  size.width, size.height);
+        }
+    } catch (const std::invalid_argument& error) {
+        throw UploadError(path, kThermalInertiaTexture, error.what());
     }
 }
 

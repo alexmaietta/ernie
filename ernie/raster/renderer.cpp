@@ -669,7 +669,8 @@ constexpr DescriptorBinding kTemperatureBindings[] = {
 /// model (its index plus 1, 0 for none), its data's count and
 /// address, its solar absorptivity and thermal emissivity, the +z
 /// axis of a prim bound to it (`SetTemperatureAxis`), its thermal
-/// inertia, and its parameters.
+/// inertia, the luminance its albedo is relative to, and its
+/// parameters.
 struct TemperatureMaterialGpu {
     std::uint32_t model;
     std::uint32_t dataCount;
@@ -678,7 +679,8 @@ struct TemperatureMaterialGpu {
     VkDeviceAddress data;
     float axis[3];
     float inertia;
-    std::uint32_t padding[2];
+    float luminance;
+    std::uint32_t padding;
     float params[TemperatureModelRegistry::kMaxParams];
 };
 static_assert(sizeof(TemperatureMaterialGpu) == 112,
@@ -4589,6 +4591,7 @@ void RasterRenderer::WriteMaterialTable() {
                     std::copy_n(&axis->second.x, 3, record.axis);
                 }
                 record.inertia = settings.thermalInertia;
+                record.luminance = material->Luminance();
                 record.absorptivity = static_cast<float>(
                     SolarAbsorptivity(reflectance));
                 record.emissivity = static_cast<float>(

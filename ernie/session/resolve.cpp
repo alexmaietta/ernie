@@ -3742,8 +3742,14 @@ MaterialSettings MaterialSettingsOf(const Scene& scene,
         settings.temperatureModelParams =
             shader.GetThermalModelParams();
         settings.temperatureModelData = shader.GetThermalModelData();
-        settings.thermalInertia =
-            inertia(node, shader.GetThermalInertia());
+        if (const std::optional<Connection> texture =
+                GetConnection(scene, node, kThermalInertiaInput)) {
+            settings.inertiaTexture = TextureReaderOf(
+                scene, *texture, kThermalInertiaInput, node, true);
+        } else {
+            settings.thermalInertia =
+                inertia(node, shader.GetThermalInertia());
+        }
     }
     settings.polarizationRetention = static_cast<float>(
         std::clamp(view.GetPolarizationRetention(), 0.0, 1.0));

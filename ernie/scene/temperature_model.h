@@ -40,10 +40,13 @@ struct TemperatureModelParam {
 /// the brightest distant light's direction, its irradiance over all
 /// wavelengths facing it (W/m^2) and how much of it reaches the point
 /// past shadows; the sunlight on the surface from every distant light
-/// (W/m^2, shadowed); the material's solar absorptivity and thermal
-/// emissivity; its own temperature (0 for none); the frame's time
-/// (s); the world +z axis of a prim bound to the material (0 for
-/// none); and its thermal inertia (0 for none). Parameter `i` is
+/// (W/m^2, shadowed); the pixel's solar absorptivity (the material's,
+/// scaled as its albedo textures scale its reflectance) and the
+/// material's thermal emissivity; its own temperature (0 for none);
+/// the frame's time (s); the world +z axis of a prim bound to the
+/// material (0 for none); and the pixel's thermal inertia (its
+/// thermal inertia texture's, else the material's; 0 for none).
+/// Parameter `i` is
 /// `p.get(i)`, the material's
 /// `ernie:thermal:model:data` `p.data(i)` (`p.dataCount()` of them).
 ///
