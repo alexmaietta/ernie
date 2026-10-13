@@ -173,13 +173,13 @@ class CustomPanelDemo : public app::Demo {
     }
 
     void Paint(const std::array<double, 3>& rgb) {
-        colours_[selected_] = rgb;
+        colours_[static_cast<std::size_t>(selected_)] = rgb;
         Cube(GetScene(), BoxPath(selected_))
             .SetDisplayColor({rgb[0], rgb[1], rgb[2]});
     }
 
     void Show(bool shown) {
-        shown_[selected_] = shown;
+        shown_[static_cast<std::size_t>(selected_)] = shown;
         Cube(GetScene(), BoxPath(selected_))
             .SetVisibility(std::string(shown ? tokens::kInherited
                                              : tokens::kInvisible));

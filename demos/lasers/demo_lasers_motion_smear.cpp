@@ -321,7 +321,8 @@ class MotionSmearDemo : public app::Demo {
         const auto* values = bands.As<float>();
         for (std::size_t b = 0; b < count; ++b) {
             for (std::size_t i = 0; i < pixels; ++i) {
-                image.values[i] += values[b * pixels + i];
+                image.values[i] +=
+                    static_cast<double>(values[b * pixels + i]);
             }
         }
         return frames_.emplace(e, std::move(image)).first->second;

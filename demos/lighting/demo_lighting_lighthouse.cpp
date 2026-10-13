@@ -266,7 +266,7 @@ class LighthouseDemo : public app::Demo {
         for (std::size_t i = 0; i < sky; ++i) {
             sideSum += side[i];
             moved += std::abs(turned[i] - side[i]);
-            lit += side[i] > 0.02 * brightest ? 1 : 0;
+            lit += side[i] > 0.02 * brightest ? 1u : 0u;
             turnedSky += turned[i];
             hazierSky += hazier[i];
         }

@@ -53,7 +53,7 @@ std::vector<std::uint8_t> MakeClouds(double coverage) {
     const glm::dvec3 low(-10000.0, -10000.0, kBase);
     const GradientNoise noise(21);
     std::vector<float> density(
-        static_cast<std::size_t>(shape.x) * shape.y * shape.z, 0.0f);
+        static_cast<std::size_t>(shape.x * shape.y * shape.z), 0.0f);
     for (int i = 0; i < shape.x; ++i) {
         for (int j = 0; j < shape.y; ++j) {
             const glm::dvec2 xy =
@@ -95,9 +95,8 @@ std::vector<std::uint8_t> MakeClouds(double coverage) {
                     0.5 + 0.5 * noise.Fbm(p / 180.0 + 31.0, 3);
                 const double value =
                     base - (1.0 - base) * detail * (0.6 - 0.3 * h);
-                density[(static_cast<std::size_t>(i) * shape.y + j) *
-                            shape.z +
-                        k] =
+                density[static_cast<std::size_t>(
+                    (i * shape.y + j) * shape.z + k)] =
                     value > 1e-3 ? static_cast<float>(value) : 0.0f;
             }
         }

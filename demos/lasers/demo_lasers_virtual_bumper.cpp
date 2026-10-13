@@ -318,8 +318,8 @@ class VirtualBumperDemo : public app::Demo {
     std::pair<Tensor, std::vector<float>> Expose() {
         Camera camera(GetScene(), "/World/Camera");
         for (int i = 0; i < 8; ++i) {
-            std::pair<Tensor, std::vector<float>> frame = Capture();
-            const Tensor& image = frame.first;
+            std::pair<Tensor, std::vector<float>> shot = Capture();
+            const Tensor& image = shot.first;
             double peak = 0.0;
             const auto rows =
                 static_cast<std::size_t>(image.Shape()[0]);
@@ -331,7 +331,7 @@ class VirtualBumperDemo : public app::Demo {
                 }
             }
             if (std::abs(peak - 230.0) <= 4.0) {
-                return frame;
+                return shot;
             }
             // LdrColor is gamma encoded: about the 2.2th root of
             // light.

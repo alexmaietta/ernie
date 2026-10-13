@@ -70,7 +70,7 @@ std::vector<std::uint8_t> MakeHaze() {
     const glm::dvec3 low(-6.0, -1.0, 0.0);
     const GradientNoise noise(11);
     std::vector<float> density(
-        static_cast<std::size_t>(shape.x) * shape.y * shape.z, 0.0f);
+        static_cast<std::size_t>(shape.x * shape.y * shape.z), 0.0f);
     for (int i = 0; i < shape.x; ++i) {
         for (int j = 0; j < shape.y; ++j) {
             for (int k = 0; k < shape.z; ++k) {
@@ -81,9 +81,9 @@ std::vector<std::uint8_t> MakeHaze() {
                                    0.4 * noise.Fbm(0.3 * p + 7.0, 3),
                                0.0, 1.0) *
                     std::exp(-p.z / 8.0);
-                density[(static_cast<std::size_t>(i) * shape.y + j) *
-                            shape.z +
-                        k] = static_cast<float>(value);
+                density[static_cast<std::size_t>(
+                    (i * shape.y + j) * shape.z + k)] =
+                    static_cast<float>(value);
             }
         }
     }
@@ -205,8 +205,8 @@ class LightShowDemo : public app::Demo {
         std::size_t swept = 0;
         std::size_t drawn = 0;
         for (std::size_t i = 0; i < lit.size(); ++i) {
-            swept += cones[i] > coneThreshold ? 1 : 0;
-            drawn += clear[i] > wallThreshold ? 1 : 0;
+            swept += cones[i] > coneThreshold ? 1u : 0u;
+            drawn += clear[i] > wallThreshold ? 1u : 0u;
         }
         const double pixels = static_cast<double>(lit.size());
         const double darkest =
@@ -216,10 +216,13 @@ class LightShowDemo : public app::Demo {
                     "their figures %.1f%% on the wall; with the "
                     "projectors off, "
                     "the brightest pixel is %.3g\n",
-                    100.0 * swept / pixels, 100.0 * drawn / pixels,
+                    100.0 * static_cast<double>(swept) / pixels,
+                    100.0 * static_cast<double>(drawn) / pixels,
                     darkest);
-        Check(swept > 0.05 * pixels, "the cones show in the haze");
-        Check(drawn > 0.001 * pixels && drawn < 0.2 * pixels,
+        Check(static_cast<double>(swept) > 0.05 * pixels,
+              "the cones show in the haze");
+        Check(static_cast<double>(drawn) > 0.001 * pixels &&
+                  static_cast<double>(drawn) < 0.2 * pixels,
               "the figures draw lines on the wall");
         Check(darkest == 0.0, "nothing else lights the hall");
     }

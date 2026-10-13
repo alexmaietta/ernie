@@ -68,8 +68,9 @@ Tensor Fringes(int periods) {
     auto* data = static_cast<float*>(image.Data());
     for (std::int64_t row = 0; row < kRows; ++row) {
         for (std::int64_t col = 0; col < kCols; ++col) {
-            const double phase =
-                2.0 * M_PI * periods * (col + 0.5) / kCols;
+            const double phase = 2.0 * M_PI * periods *
+                                 (static_cast<double>(col) + 0.5) /
+                                 kCols;
             data[row * kCols + col] =
                 static_cast<float>(0.5 + 0.5 * std::cos(phase));
         }

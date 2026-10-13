@@ -115,9 +115,10 @@ class PhysicsDemo : public app::Demo {
             Sphere::Define(scene, path)
                 .SetRadius(kRadius)
                 .SetDisplayColor({0.9, 0.35 + 0.2 * k, 0.2});
-            projectiles_[k].wait = 0.6 * k;
+            const auto slot = static_cast<std::size_t>(k);
+            projectiles_[slot].wait = 0.6 * k;
             Launch(k);
-            projectiles_[k].wait = 0.6 * k;
+            projectiles_[slot].wait = 0.6 * k;
             label.anchor = path;
             labels.Label({0.0, 0.0, kRadius}, "p" + std::to_string(k),
                          label);
@@ -143,7 +144,7 @@ class PhysicsDemo : public app::Demo {
             Sphere::Define(scene, path)
                 .SetRadius(0.2)
                 .SetDisplayColor({0.85, 0.85, 0.9});
-            masses_[m] =
+            masses_[static_cast<std::size_t>(m)] =
                 kPivot + glm::dvec3(kRest * (m + 1), 0.0, 0.0);
         }
         label.anchor =
@@ -158,7 +159,7 @@ class PhysicsDemo : public app::Demo {
     void Step() override {
         const double dt = frameDt;
         for (int k = 0; k < kProjectiles; ++k) {
-            Projectile& p = projectiles_[k];
+            Projectile& p = projectiles_[static_cast<std::size_t>(k)];
             if (p.wait > 0.0) {
                 p.wait -= dt;
                 continue;
@@ -201,7 +202,7 @@ class PhysicsDemo : public app::Demo {
         for (int s = 0; s < kSubsteps; ++s) {
             std::array<glm::dvec3, kMasses> forces;
             forces.fill(glm::dvec3(0.0, 0.0, -kGravity));
-            for (int m = 0; m < kMasses; ++m) {
+            for (std::size_t m = 0; m < kMasses; ++m) {
                 const glm::dvec3 from =
                     m == 0 ? kPivot : masses_[m - 1];
                 const glm::dvec3 fromVelocity =
@@ -219,7 +220,7 @@ class PhysicsDemo : public app::Demo {
                     forces[m - 1] -= f;
                 }
             }
-            for (int m = 0; m < kMasses; ++m) {
+            for (std::size_t m = 0; m < kMasses; ++m) {
                 massVelocities_[m] += forces[m] * h;
                 masses_[m] += massVelocities_[m] * h;
             }
@@ -249,7 +250,7 @@ class PhysicsDemo : public app::Demo {
 
   private:
     void Launch(int k) {
-        Projectile& p = projectiles_[k];
+        Projectile& p = projectiles_[static_cast<std::size_t>(k)];
         const int n = p.launches + k;
         const double speed = 11.0 + 1.5 * k;
         const double elevation = glm::radians(50.0 + 8.0 * (n % 3));
@@ -277,14 +278,14 @@ class PhysicsDemo : public app::Demo {
         Scene& scene = GetScene();
         auto* speeds = static_cast<float*>(
             scene.GetOverlay("labels").Batches()[0].values.Data());
-        for (int k = 0; k < kProjectiles; ++k) {
+        for (std::size_t k = 0; k < kProjectiles; ++k) {
             SetXform(scene, "/World/Projectile" + std::to_string(k),
                      {.translate = projectiles_[k].position});
             speeds[k] = static_cast<float>(
                 glm::length(projectiles_[k].velocity));
         }
         scene.GetOverlay("labels").Touch();
-        for (int m = 0; m < kMasses; ++m) {
+        for (std::size_t m = 0; m < kMasses; ++m) {
             SetXform(scene, "/World/Mass" + std::to_string(m),
                      {.translate = masses_[m]});
         }
@@ -368,7 +369,7 @@ class PhysicsDemo : public app::Demo {
                           arrow);
         }
         arrow.color = kVelocity;
-        for (int m = 0; m < kMasses; ++m) {
+        for (std::size_t m = 0; m < kMasses; ++m) {
             vectors.Arrow(masses_[m],
                           masses_[m] + 0.15 * massVelocities_[m],
                           arrow);
@@ -409,7 +410,7 @@ class PhysicsDemo : public app::Demo {
         // Springs: blue squeezed, white at rest, red stretched, wider
         // the more strained; and a rope curved through the chain.
         Overlay& springs = scene.GetOverlay("springs").Clear();
-        for (int m = 0; m < kMasses; ++m) {
+        for (std::size_t m = 0; m < kMasses; ++m) {
             const glm::dvec3 from = m == 0 ? kPivot : masses_[m - 1];
             const double strain =
                 (glm::distance(from, masses_[m]) - kRest) / kRest;

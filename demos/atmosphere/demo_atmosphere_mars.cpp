@@ -82,10 +82,12 @@ glm::dvec3 MeanLinearRgbIn(const Tensor& image, double top,
         static_cast<const std::uint8_t*>(image.Data());
     glm::dvec3 sum(0.0);
     std::int64_t count = 0;
-    for (auto y = static_cast<std::int64_t>(top * rows);
-         y < static_cast<std::int64_t>(bottom * rows); ++y) {
-        for (auto x = static_cast<std::int64_t>(left * cols);
-             x < static_cast<std::int64_t>(right * cols); ++x) {
+    const auto height = static_cast<double>(rows);
+    const auto width = static_cast<double>(cols);
+    for (auto y = static_cast<std::int64_t>(top * height);
+         y < static_cast<std::int64_t>(bottom * height); ++y) {
+        for (auto x = static_cast<std::int64_t>(left * width);
+             x < static_cast<std::int64_t>(right * width); ++x) {
             const std::int64_t i = (y * cols + x) * channels;
             sum +=
                 glm::dvec3(texels[i], texels[i + 1], texels[i + 2]);

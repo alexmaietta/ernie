@@ -62,7 +62,7 @@ class HudDemo : public app::Demo {
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetDisplayColor({0.9, 0.3 + 0.12 * i, 0.2});
-            heights_[i] = 1.0 + 0.8 * i;
+            heights_[static_cast<std::size_t>(i)] = 1.0 + 0.8 * i;
             OverlayStyle style;
             style.anchor = ball;
             style.depth = OverlayDepth::Always;
@@ -93,7 +93,7 @@ class HudDemo : public app::Demo {
     }
 
     void Step() override {
-        for (int i = 0; i < kBalls; ++i) {
+        for (std::size_t i = 0; i < kBalls; ++i) {
             velocities_[i] -= kGravity * frameDt;
             heights_[i] += velocities_[i] * frameDt;
             if (heights_[i] < 0.0) {
@@ -136,13 +136,14 @@ class HudDemo : public app::Demo {
             static_cast<float*>(tracked.Batches()[0].values.Data());
         double energy = 0.0;
         for (int i = 0; i < kBalls; ++i) {
+            const auto b = static_cast<std::size_t>(i);
             SetXform(
-                scene, anchors_[i],
+                scene, anchors_[b],
                 {.translate = glm::dvec3(-4.0 + 2.0 * i, 0.0,
-                                         heights_[i] + kRadius)});
-            values[i] = static_cast<float>(heights_[i]);
-            energy += kGravity * heights_[i] +
-                      0.5 * velocities_[i] * velocities_[i];
+                                         heights_[b] + kRadius)});
+            values[i] = static_cast<float>(heights_[b]);
+            energy += kGravity * heights_[b] +
+                      0.5 * velocities_[b] * velocities_[b];
         }
         // Host arrays written in place: read again once touched.
         tracked.Touch();

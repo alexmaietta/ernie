@@ -52,7 +52,7 @@ MakeDust(glm::dvec3 drift = glm::dvec3(0.0)) {
     const glm::dvec3 low(-6.0, -2.0, 0.0);
     const GradientNoise noise(5);
     std::vector<float> density(
-        static_cast<std::size_t>(shape.x) * shape.y * shape.z, 0.0f);
+        static_cast<std::size_t>(shape.x * shape.y * shape.z), 0.0f);
     for (int i = 0; i < shape.x; ++i) {
         for (int j = 0; j < shape.y; ++j) {
             for (int k = 0; k < shape.z; ++k) {
@@ -64,9 +64,8 @@ MakeDust(glm::dvec3 drift = glm::dvec3(0.0)) {
                                          0.4 * (p - drift) + 3.0, 4),
                         0.0, 1.0) *
                     std::exp(-p.z / 2.0);
-                density[(static_cast<std::size_t>(i) * shape.y + j) *
-                            shape.z +
-                        k] =
+                density[static_cast<std::size_t>(
+                    (i * shape.y + j) * shape.z + k)] =
                     value > 1e-3 ? static_cast<float>(value) : 0.0f;
             }
         }
@@ -207,7 +206,7 @@ class VisibleBeamsDemo : public app::Demo {
         }
         std::size_t visible = 0;
         for (std::size_t i = 0; i < lit.size(); ++i) {
-            visible += lit[i] - clear[i] > 0.05 * brightest ? 1 : 0;
+            visible += lit[i] - clear[i] > 0.05 * brightest ? 1u : 0u;
         }
         const double share = static_cast<double>(visible) /
                              static_cast<double>(lit.size());

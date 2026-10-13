@@ -186,7 +186,7 @@ class RefractionDemo : public app::Demo {
                 static_cast<double>(disc.bottom - disc.top + 1);
             const double centre =
                 kViews[i].elevation +
-                (images[i].Shape()[0] / 2.0 -
+                (static_cast<double>(images[i].Shape()[0]) / 2.0 -
                  0.5 * static_cast<double>(disc.top + disc.bottom)) /
                     pixelsPerDegree;
             std::printf("%s: %.0f x %.0f pixels, centre %.2f degrees "

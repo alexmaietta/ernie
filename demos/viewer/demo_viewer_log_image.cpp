@@ -121,8 +121,9 @@ class LogImageDemo : public app::Demo {
         std::vector<float> grey(static_cast<std::size_t>(kRows) *
                                 kCols);
         for (std::size_t i = 0; i < grey.size(); ++i) {
-            const double d =
-                std::isfinite(distance[i]) ? distance[i] : kFar;
+            const double d = std::isfinite(distance[i])
+                                 ? static_cast<double>(distance[i])
+                                 : kFar;
             grey[i] = static_cast<float>(
                 1.0 -
                 std::clamp((d - kNear) / (kFar - kNear), 0.0, 1.0));

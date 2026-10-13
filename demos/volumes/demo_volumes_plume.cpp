@@ -168,7 +168,7 @@ class PlumeShader {
         pipeline_ = std::make_unique<ComputePipeline>(
             context, layout_,
             compiler.CompileSpirv(modules, "plume"));
-        const auto& table = GradientNoise(5).Permutation();
+        const auto table = GradientNoise(5).Permutation();
         const std::vector<std::uint32_t> words(table.begin(),
                                                table.end());
         permutation_.Write(std::as_bytes(std::span(words)));

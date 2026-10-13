@@ -162,11 +162,11 @@ class PulsedDemo : public app::Demo {
         return Path("/World/Camera" + std::to_string(c));
     }
 
-    /// Every camera's LdrColor for the frame from `time - kFrame` to
-    /// `time` on the sensor clock, uint8 (rows, cols, 4).
-    std::vector<Tensor> RenderAt(double time) {
+    /// Every camera's LdrColor for the frame from `end - kFrame` to
+    /// `end` on the sensor clock, uint8 (rows, cols, 4).
+    std::vector<Tensor> RenderAt(double end) {
         RenderDelegate& delegate = GetRenderer().Delegate();
-        delegate.ResetTime(time - kFrame);
+        delegate.ResetTime(end - kFrame);
         std::vector<Path> products;
         for (const View& view : kViews) {
             products.emplace_back(view.product);

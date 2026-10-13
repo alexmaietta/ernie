@@ -373,8 +373,9 @@ class FireSolver {
     /// The field's values, for tests.
     std::vector<float> Read(int field) const {
         std::vector<float> values(kCells);
-        grids_[slots_[field == 0 ? kSmoke : kHeat]]->Read(
-            std::as_writable_bytes(std::span(values)));
+        grids_[static_cast<std::size_t>(
+                   slots_[field == 0 ? kSmoke : kHeat])]
+            ->Read(std::as_writable_bytes(std::span(values)));
         return values;
     }
 
@@ -416,7 +417,8 @@ class FireSolver {
     };
 
     VkDeviceAddress Address(Grid grid) const {
-        return grids_[slots_[grid]]->Address();
+        return grids_[static_cast<std::size_t>(slots_[grid])]
+            ->Address();
     }
 
     void Swap(Grid a, Grid b) {
@@ -541,7 +543,7 @@ class FireSolver {
     std::array<int, kGrids> slots_ = [] {
         std::array<int, kGrids> slots{};
         for (int i = 0; i < kGrids; ++i) {
-            slots[i] = i;
+            slots[static_cast<std::size_t>(i)] = i;
         }
         return slots;
     }();
@@ -594,14 +596,16 @@ class FireDemo : public app::Demo {
         double sum = 0.0;
         double moment = 0.0;
         for (std::uint32_t n = 0; n < kCells; ++n) {
-            sum += smoke[n];
-            moment += smoke[n] * (n % kNz) * kVoxel;
+            sum += static_cast<double>(smoke[n]);
+            moment += static_cast<double>(
+                          smoke[n] * static_cast<float>(n % kNz)) *
+                      kVoxel;
         }
         const double rise = moment / sum;
         const float hottest =
             *std::max_element(heat.begin(), heat.end());
         std::printf("soot's mean height %.2f m, hottest %.2f\n", rise,
-                    hottest);
+                    static_cast<double>(hottest));
         Check(rise > 0.3, "the soot should rise");
         Check(hottest > 0.5f, "the fire should be hot");
         const auto* texels = image.As<std::uint8_t>();

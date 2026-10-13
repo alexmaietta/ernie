@@ -122,9 +122,9 @@ class IlluminantsDemo : public app::Demo {
         for (int k = 0; k < static_cast<int>(kChart.size()); ++k) {
             const int col = k % 6;
             const int row = k / 6;
-            const glm::dvec3 srgb(kChart[k][0] / 255.0,
-                                  kChart[k][1] / 255.0,
-                                  kChart[k][2] / 255.0);
+            const auto& patch = kChart[static_cast<std::size_t>(k)];
+            const glm::dvec3 srgb(patch[0] / 255.0, patch[1] / 255.0,
+                                  patch[2] / 255.0);
             Box(scene, "/World/Chart/P" + std::to_string(k),
                 {-0.525 + 0.11 * col, 0.98, 1.465 - 0.11 * row},
                 {0.1, 0.02, 0.1}, demos::SrgbToLinear(srgb));
@@ -223,10 +223,11 @@ class IlluminantsDemo : public app::Demo {
   private:
     void LightWith(int index) {
         illuminant_ = index;
+        const Illuminant& light =
+            kIlluminants[static_cast<std::size_t>(index)];
         SphereLight(GetScene(), "/World/Spot")
-            .SetPhysicalIlluminant(
-                std::string(kIlluminants[index].token))
-            .SetColorTemperature(kIlluminants[index].kelvin);
+            .SetPhysicalIlluminant(std::string(light.token))
+            .SetColorTemperature(light.kelvin);
     }
 
     /// The scene under each illuminant in turn, RGBA uint8; leaves

@@ -248,7 +248,7 @@ class ZeroCopyDemo : public app::Demo {
                         ((r * kSize + y) * 4 * kSize + c * kSize) * 4,
                     texels + ((static_cast<std::size_t>(i * stride) *
                                    kSize +
-                               y) *
+                               static_cast<std::size_t>(y)) *
                               kSize) *
                                  4,
                     kSize * 4);

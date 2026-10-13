@@ -73,9 +73,11 @@ std::filesystem::path StandInEarth() {
             1.0 -
             0.5 * std::abs(static_cast<double>(row) / kRows - 0.5);
         for (std::int64_t col = 0; col < kCols; ++col) {
-            const auto& colour = kQuarters[col * 4 / kCols];
-            std::uint8_t* texel = &texels[(row * kCols + col) * 4];
-            for (int c = 0; c < 3; ++c) {
+            const auto& colour =
+                kQuarters[static_cast<std::size_t>(col * 4 / kCols)];
+            std::uint8_t* texel = &texels[static_cast<std::size_t>(
+                (row * kCols + col) * 4)];
+            for (std::size_t c = 0; c < 3; ++c) {
                 texel[c] =
                     static_cast<std::uint8_t>(colour[c] * shade);
             }

@@ -176,7 +176,7 @@ constexpr glm::dvec2 kLightSize(130.0, 105.0);
 constexpr double kLumens = 300.0;
 
 /// (nm, value) pairs of kReflectance's column `column`, flat.
-std::vector<float> Pairs(int column) {
+std::vector<float> Pairs(std::size_t column) {
     std::vector<float> pairs;
     for (const auto& row : kReflectance) {
         pairs.push_back(row[0]);
@@ -216,7 +216,7 @@ void DefineQuads(Scene& scene, const Path& path,
 glm::dvec3 MeanRgb(const Tensor& image, std::size_t row0,
                    std::size_t row1, std::size_t col0,
                    std::size_t col1) {
-    const std::size_t cols = image.Shape()[1];
+    const auto cols = static_cast<std::size_t>(image.Shape()[1]);
     const auto* data = static_cast<const std::uint8_t*>(image.Data());
     glm::dvec3 sum(0.0);
     for (std::size_t r = row0; r < row1; ++r) {
@@ -240,13 +240,15 @@ class CornellBoxDemo : public app::Demo {
         const std::array<Path, 4> looks{Path(), Path("/Looks/White"),
                                         Path("/Looks/Green"),
                                         Path("/Looks/Red")};
-        for (int column = 1; column <= 3; ++column) {
+        for (std::size_t column = 1; column <= 3; ++column) {
             Material::Define(scene, looks[column])
                 .SetReflectance(Pairs(column));
         }
         for (const Surface& surface : kSurfaces) {
-            DefineQuads(scene, Path("/World").Child(surface.name),
-                        surface.quads, looks[surface.column]);
+            DefineQuads(
+                scene, Path("/World").Child(surface.name),
+                surface.quads,
+                looks[static_cast<std::size_t>(surface.column)]);
         }
         // The opening as the camera sees it: a panel just above the
         // light, glowing at the luminance of a Lambertian emitter of
@@ -300,8 +302,8 @@ class CornellBoxDemo : public app::Demo {
 
     void TestFinal() override {
         const Tensor image = RenderImage();
-        const std::size_t rows = image.Shape()[0];
-        const std::size_t cols = image.Shape()[1];
+        const auto rows = static_cast<std::size_t>(image.Shape()[0]);
+        const auto cols = static_cast<std::size_t>(image.Shape()[1]);
         // The red wall fills the image's left edge, the green its
         // right.
         const glm::dvec3 left = MeanRgb(image, rows / 3, 2 * rows / 3,

@@ -115,7 +115,7 @@ class CameraBillboardDemo : public app::Demo {
         OverlayStyle edge;
         edge.color = {1.0f, 0.85f, 0.3f, 1.0f};
         edge.width = 2.0f;
-        for (int k = 0; k < 4; ++k) {
+        for (std::size_t k = 0; k < 4; ++k) {
             drone.Line(eye, corners[k], edge);
             drone.Line(corners[k], corners[(k + 1) % 4], edge);
         }

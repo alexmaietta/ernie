@@ -291,7 +291,7 @@ class BatchCameraDemo : public app::Demo {
                         ((r * kSize + y) * 4 * kSize + c * kSize) * 4,
                     texels + ((static_cast<std::size_t>(i * stride) *
                                    kSize +
-                               y) *
+                               static_cast<std::size_t>(y)) *
                               kSize) *
                                  4,
                     kSize * 4);
@@ -332,14 +332,16 @@ class BatchCameraDemo : public app::Demo {
             for (std::size_t i = 0; i < pixels; ++i) {
                 const double tenths =
                     std::isfinite(metres[i])
-                        ? std::min(10.0 * metres[i], 255.0)
+                        ? std::min(10.0 *
+                                       static_cast<double>(metres[i]),
+                                   255.0)
                         : 0.0;
                 values[i * 3] = values[i * 3 + 1] =
                     values[i * 3 + 2] = tenths;
             }
         } else {
             for (std::size_t i = 0; i < pixels; ++i) {
-                for (int c = 0; c < 3; ++c) {
+                for (std::size_t c = 0; c < 3; ++c) {
                     values[i * 3 + c] = texels[i * 4 + c];
                 }
             }
