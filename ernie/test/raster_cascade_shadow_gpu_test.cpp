@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -507,11 +508,16 @@ std::size_t WallColumn(double x) {
 
 /// `WallScene` with lights of irradiance 4: the linear green (from
 /// sRGB) along the image's middle rows at each world x in `xs`.
-std::vector<double> WallShadows(const ernie::VulkanContext& context,
-                                const std::vector<double>& azimuths,
-                                const std::vector<double>& xs) {
+std::vector<double>
+WallShadows(const ernie::VulkanContext& context,
+            const std::vector<double>& azimuths,
+            const std::vector<double>& xs,
+            const std::function<void(ernie::Scene&)>& change = {}) {
     ernie::RasterDelegate delegate(context);
-    const ernie::Scene scene = WallScene(azimuths, 4.0);
+    ernie::Scene scene = WallScene(azimuths, 4.0);
+    if (change) {
+        change(scene);
+    }
     ernie::Tensor image;
     for (int frame = 0; frame < 3; ++frame) {
         image = delegate.Render(scene);
@@ -563,14 +569,35 @@ TEST_F(CascadeShadowTest, EveryDistantLightHasItsOwnHorizon) {
     EXPECT_NEAR(green[2] / green[3], 0.5, 0.12) << "east of the wall";
 }
 
-// Temperature models see the horizon too: under the Sun's 1361 W/m^2
-// 20 degrees up, black ground in zero-capacitance balance is at
-// (E sin 20 / sigma)^(1/4), about 300 K, and in the wall's shadow
-// past the cascades near the sink's 3 K.
-TEST_F(CascadeShadowTest, TheTerrainsHorizonCoolsItsShadow) {
+// Excluding the terrain from a light's shadow link leaves its horizon
+// out: the ground west of the wall lit.
+TEST_F(CascadeShadowTest, ShadowLinksLeaveTheHorizonOut) {
+    const std::vector<double> green = WallShadows(
+        *context_, {0.0}, {-250.0, -1200.0}, [](ernie::Scene& scene) {
+            scene.Set("/World/Sun0",
+                      ernie::tokens::kShadowLinkExcludes,
+                      std::vector<ernie::Path>{"/World/Ground"});
+        });
+    ASSERT_GT(green[1], 0.05);
+    EXPECT_NEAR(green[0], green[1], 0.1 * green[1]);
+}
+
+namespace {
+
+/// `WallScene` under the Sun's 1361 W/m^2, its ground black in
+/// zero-capacitance balance, after `change`: the temperature along
+/// the image's middle row at each world x in `xs`.
+std::vector<float>
+WallKelvin(const ernie::VulkanContext& context,
+           const std::vector<double>& azimuths,
+           const std::vector<double>& xs,
+           const std::function<void(ernie::Scene&)>& change = {}) {
     using namespace ernie;
     namespace tokens = ernie::tokens;
-    Scene scene = WallScene({0.0}, 1361.0);
+    Scene scene = WallScene(azimuths, 1361.0);
+    if (change) {
+        change(scene);
+    }
     RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
     Material(scene, "/Looks/Grey")
         .SetThermalModel("balance")
@@ -582,7 +609,7 @@ TEST_F(CascadeShadowTest, TheTerrainsHorizonCoolsItsShadow) {
         .SetResolution(glm::dvec2(kWallWidth, kWallHeight));
     scene.Set("/Render/Out", tokens::kOrderedVars,
               std::vector<Path>{var});
-    RasterDelegate delegate(*context_);
+    RasterDelegate delegate(context);
     const Path product[] = {"/Render/Out"};
     Tensor kelvin;
     for (int frame = 0; frame < 3; ++frame) {
@@ -592,13 +619,42 @@ TEST_F(CascadeShadowTest, TheTerrainsHorizonCoolsItsShadow) {
                      .Map(MapDevice::Cpu)
                      .tensor.Contiguous();
     }
-    const auto at = [&](double x) {
-        return kelvin.As<float>()[(kWallHeight / 2) * kWallWidth +
-                                  WallColumn(x)];
-    };
-    EXPECT_NEAR(at(-1200.0), 300.0f, 8.0f) << "lit, 1100 m west";
-    EXPECT_LT(at(-250.0), 50.0f) << "150 m into the shadow";
-    EXPECT_LT(at(-800.0), 50.0f) << "100 m short of its end";
+    std::vector<float> out;
+    for (const double x : xs) {
+        out.push_back(
+            kelvin.As<float>()[(kWallHeight / 2) * kWallWidth +
+                               WallColumn(x)]);
+    }
+    return out;
+}
+
+}  // namespace
+
+// Temperature models see the horizon too: under the Sun's 1361 W/m^2
+// 20 degrees up, black ground in zero-capacitance balance is at
+// (E sin 20 / sigma)^(1/4), about 300 K, and in the wall's shadow
+// past the cascades near the sink's 3 K.
+TEST_F(CascadeShadowTest, TheTerrainsHorizonCoolsItsShadow) {
+    const std::vector<float> kelvin =
+        WallKelvin(*context_, {0.0}, {-1200.0, -250.0, -800.0});
+    EXPECT_NEAR(kelvin[0], 300.0f, 8.0f) << "lit, 1100 m west";
+    EXPECT_LT(kelvin[1], 50.0f) << "150 m into the shadow";
+    EXPECT_LT(kelvin[2], 50.0f) << "100 m short of its end";
+}
+
+// Light linking filters what temperature models see: a second sun
+// from the west, both lighting the open ground, warms it to 2^(1/4)
+// of one sun's; linked away from the ground it adds nothing.
+TEST_F(CascadeShadowTest, LightLinksFilterWhatTemperatureModelsSee) {
+    const float both =
+        WallKelvin(*context_, {0.0, 180.0}, {-1200.0})[0];
+    EXPECT_NEAR(both, 300.0f * std::pow(2.0f, 0.25f), 10.0f);
+    const float linked = WallKelvin(
+        *context_, {0.0, 180.0}, {-1200.0}, [](ernie::Scene& scene) {
+            ernie::DistantLight(scene, "/World/Sun1")
+                .SetLightLinkExcludes({ernie::Path("/World/Ground")});
+        })[0];
+    EXPECT_NEAR(linked, 300.0f, 8.0f);
 }
 
 // A moon far towards the sun, beyond the cascades' casters

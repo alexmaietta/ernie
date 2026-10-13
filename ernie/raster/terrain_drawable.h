@@ -455,8 +455,10 @@ class TerrainDrawable : public RasterDrawable {
     std::unique_ptr<GpuImage> sunHorizon_;
     std::uint32_t sunHorizonScale_ = 1;
     /// Each light's direction across the grid (columns east, rows
-    /// south) this frame, and each layer's at its last computation.
-    std::vector<glm::vec2> sunAzimuths_;
+    /// south) this frame, none for a light the terrain needs no
+    /// horizon towards (light linking), and each layer's at its last
+    /// computation.
+    std::vector<std::optional<glm::vec2>> sunAzimuths_;
     mutable std::vector<std::optional<glm::vec2>> sunHorizonAzimuths_;
     mutable bool heightMaximaDirty_ = true;
     /// Makes the sun horizon maps, with a layer for each of `lights`

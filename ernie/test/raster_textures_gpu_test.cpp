@@ -1527,6 +1527,42 @@ TEST_F(RasterDelegateTest, TemperatureModelsFollowTheSunlight) {
                  std::invalid_argument);
 }
 
+// No distant light is special to the diurnal table: a second sun
+// beside the first, as bright, warms the quad at noon to 2^(1/4) of
+// the table's (their T^4 summed); at half the table's irradiance, to
+// 1.5^(1/4) of it.
+TEST_F(RasterDelegateTest, DiurnalTablesSumEveryDistantLight) {
+    Scene scene = TexturedScene();
+    const Path var("/Render/Vars/Temperature");
+    ernie::RenderVar::Define(scene, var).SetSourceName("Temperature");
+    scene.Set("/Render/Out", tokens::kOrderedVars,
+              std::vector<Path>{var});
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    const auto noon = ernie::DistantLightTransform(
+        glm::normalize(glm::dvec3(0.0, 0.05, 1.0)));
+    for (const char* path : {"/World/Sun", "/World/Sun2"}) {
+        ernie::DistantLight::Define(scene, path)
+            .SetIrradiance(1361.0)
+            .SetPhysicalIlluminant(std::string(tokens::kSun));
+        scene.Set(path, tokens::kTransform, noon);
+    }
+    ernie::Material(scene, "/Looks/M")
+        .SetThermalModel("diurnal")
+        .SetThermalModelParams({0.0f, 1.0f, 0.0f});
+    RasterDelegate delegate(*context_);
+    const auto centre = [&] {
+        const Tensor kelvin = Render(delegate, scene, "Temperature");
+        return kelvin.As<float>()[(kSize / 2) * kSize + kSize / 2];
+    };
+    const ernie::DiurnalTable& moon = ernie::LunarDiurnalTable();
+    EXPECT_NEAR(centre(), moon.kelvin[48] * std::pow(2.0f, 0.25f),
+                2.0f);
+    ernie::DistantLight(scene, "/World/Sun2").SetIrradiance(680.5);
+    EXPECT_NEAR(centre(), moon.kelvin[48] * std::pow(1.5f, 0.25f),
+                2.0f);
+}
+
 TEST_F(RasterDelegateTest, CustomTemperatureModelsRegisterAndRun) {
     Scene scene = TexturedScene();
     const Path var("/Render/Vars/Temperature");
@@ -1646,6 +1682,10 @@ TEST_F(RasterDelegateTest,
               std::vector<Path>{var});
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetThermalEnable(true);
+    // The sunlight the table was made for.
+    ernie::DistantLight(scene, "/World/Sun")
+        .SetIrradiance(1361.0)
+        .SetPhysicalIlluminant(std::string(tokens::kSun));
     const ernie::DiurnalTable table = ernie::DiurnalTemperatureTable(
         {}, 2, 24, {50.0f, 1500.0f}, {0.1f, 0.5f});
     const std::array<float, 2> inertia{50.0f, 1500.0f};

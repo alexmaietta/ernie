@@ -649,15 +649,23 @@ void TerrainDrawable::EnsureSunHorizon(std::uint32_t lights) {
 
 void TerrainDrawable::RecordSunHorizon(
     VkCommandBuffer commands) const {
-    // The layers whose lights turned, or all with new heights.
+    // The layers whose lights turned, or all with new heights; none
+    // for lights the terrain needs no horizon towards, whose layers
+    // are left to compute once it does.
     std::vector<std::uint32_t> layers;
     for (std::uint32_t layer = 0; layer < sunAzimuths_.size();
          ++layer) {
-        const std::optional<glm::vec2>& was =
-            sunHorizonAzimuths_[layer];
+        std::optional<glm::vec2>& was = sunHorizonAzimuths_[layer];
+        const std::optional<glm::vec2>& now = sunAzimuths_[layer];
+        if (!now) {
+            if (heightMaximaDirty_) {
+                was.reset();
+            }
+            continue;
+        }
         if (heightMaximaDirty_ || !was ||
-            std::acos(std::clamp(glm::dot(*was, sunAzimuths_[layer]),
-                                 -1.0f, 1.0f)) > kSunHorizonTurn) {
+            std::acos(std::clamp(glm::dot(*was, *now), -1.0f, 1.0f)) >
+                kSunHorizonTurn) {
             layers.push_back(layer);
         }
     }
@@ -741,8 +749,8 @@ void TerrainDrawable::RecordSunHorizon(
     constants.values[1] = static_cast<float>(pixelSize_);
     constants.sun[2] = static_cast<float>(heightMaxima_->Desc().mips);
     for (const std::uint32_t layer : layers) {
-        constants.sun[0] = sunAzimuths_[layer].x;
-        constants.sun[1] = sunAzimuths_[layer].y;
+        constants.sun[0] = sunAzimuths_[layer]->x;
+        constants.sun[1] = sunAzimuths_[layer]->y;
         dispatch(*sunHorizonPipeline_, heightMaxima_->MipView(0),
                  VK_IMAGE_LAYOUT_GENERAL, heightMaxima_->MipView(0),
                  layer, constants);
@@ -1075,13 +1083,22 @@ void TerrainDrawable::Prepare(
     // The sun horizon maps for the shadows of the distant lights that
     // cast them, a layer each.
     sunAzimuths_.clear();
-    const std::vector<glm::vec3>& lights = renderer_.HorizonLights();
+    const std::vector<RasterRenderer::HorizonLight>& lights =
+        renderer_.HorizonLights();
     if (HasHeightfield() && !lights.empty()) {
         EnsureSunHorizon(static_cast<std::uint32_t>(lights.size()));
-        for (const glm::vec3& toLight : lights) {
+        const std::uint32_t group = params_.linkGroup & 31u;
+        for (const RasterRenderer::HorizonLight& light : lights) {
+            // None for a light that does not light the terrain, or
+            // whose shadows it does not cast (light linking).
+            if (((light.lightMask >> group) & 1u) == 0 ||
+                ((light.shadowMask >> group) & 1u) == 0) {
+                sunAzimuths_.emplace_back();
+                continue;
+            }
             // Across the grid: columns east, rows south. A light
             // overhead has no azimuth, nor a horizon that hides it.
-            const glm::vec2 across(toLight.x, -toLight.y);
+            const glm::vec2 across(light.towards.x, -light.towards.y);
             sunAzimuths_.push_back(glm::length(across) > 1e-6f
                                        ? glm::normalize(across)
                                        : glm::vec2(1.0f, 0.0f));
@@ -1095,7 +1112,8 @@ void TerrainDrawable::Prepare(
         sun.info = {sunHorizon_->Desc().width,
                     sunHorizon_->Desc().height, params_.primId, 1};
         sun.heights = {static_cast<float>(origin_.z),
-                       static_cast<float>(pixelSize_), 0.0f, 0.0f};
+                       static_cast<float>(pixelSize_),
+                       static_cast<float>(group), 0.0f};
         renderer_.SetSunHorizon(sun);
     }
     if (!HasHeightfield()) {

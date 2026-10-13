@@ -21,7 +21,7 @@ TEST(TemperatureModel, BuiltinsRegisterAndDispatch) {
     EXPECT_EQ(data[2], 96.0f);
     EXPECT_EQ(data[6], 0.12f);
     EXPECT_EQ(registry.Find("diurnal")->Defaults(),
-              (std::vector<float>{0.0f, 0.0f, 0.0f}));
+              (std::vector<float>{0.0f, 0.0f, 0.0f, 1361.0f}));
     const auto modules = ernie::TemperatureModelModules(registry);
     ASSERT_EQ(modules.size(), 4u);
     EXPECT_EQ(modules.back().name, "temperature_models");

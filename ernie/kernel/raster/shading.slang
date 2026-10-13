@@ -333,7 +333,9 @@ struct ShadingResources {
     // horizon towards the light's azimuth (`sunHorizonVisibility`). Their grid: the north-west
     // corner's x and y relative to the frame's origin, the texel size and the terrain's vertical
     // exaggeration; their width, height, the terrain's prim id, and 1 with them; the frame
-    // origin's height (subtracted from the terrain's) and the heights' cell size.
+    // origin's height (subtracted from the terrain's), the heights' cell size and the terrain's
+    // light link group (lights that do not light it or take no shadows from it have their layers
+    // unmade).
     uint sunHorizonMap;
     float4 sunHorizonGrid;
     uint4 sunHorizonInfo;
@@ -888,12 +890,14 @@ float sunHorizonWeight(LightGpu light, float3 world) {
 
 // `visibility`, the share of `light` its shadow maps leave `world` (read at `shadowPoint`), with
 // the terrain's horizon towards it (`sunHorizonVisibility`) where the surface is the terrain's
-// (prim `primId`) and the light a distant one casting shadows, wherever its maps' texels are
-// coarser than the horizon map's, as far as the view sees.
+// (prim `primId`), the light a distant one casting shadows and the terrain among its casters
+// (shadow linking), wherever its maps' texels are coarser than the horizon map's, as far as the
+// view sees.
 float withTerrainHorizon(LightGpu light, float3 world, float3 shadowPoint, float3 toLight,
                          uint primId, float visibility) {
     if (uint(light.position.w) != 0 || light.patternLayout.x == 0 ||
-        resources.sunHorizonInfo.w == 0 || primId != resources.sunHorizonInfo.z) {
+        resources.sunHorizonInfo.w == 0 || primId != resources.sunHorizonInfo.z ||
+        ((light.links.y >> uint(resources.sunHorizonHeights.z)) & 1u) == 0) {
         return visibility;
     }
     let horizon = sunHorizonVisibility(light, world, toLight);
@@ -2798,9 +2802,7 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
     TemperatureInput input;
     input.position = world;
     input.normal = n;
-    input.sunDirection = float3(0.0);
-    input.sunIrradiance = 0.0;
-    input.sunVisibility = 0.0;
+    input.lightCount = 0;
     input.irradiance = 0.0;
     // The pixel's own albedo: the material's sunlight-weighted reflectance scaled as its albedo
     // map and texture scale its luminance in the G-buffer.
@@ -2815,11 +2817,14 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
     input.time = asfloat(pass.model.w);
     input.axis = float3(record.axisX, record.axisY, record.axisZ);
     input.inertia = slot < 0.0 ? -slot : record.inertia;
+    // Every distant light the view sees and light linking links to the surface, alike.
+    let linkGroup = (ids.w >> 1) & 31u;
     let lightCount = min(sh.size.w, kShadeLights);
-    for (uint k = 0; k < lightCount; ++k) {
+    for (uint k = 0; k < lightCount && input.lightCount < kTemperatureLights; ++k) {
         let light = lights[shv.view.z + k];
         let irradiance = light.patternExtent.w;
-        if (((shv.view.x >> k) & 1u) == 0 || uint(light.position.w) != 0 || irradiance <= 0.0) {
+        if (((shv.view.x >> k) & 1u) == 0 || ((light.links.x >> linkGroup) & 1u) == 0 ||
+            uint(light.position.w) != 0 || irradiance <= 0.0) {
             continue;
         }
         let toLight = light.position.xyz;
@@ -2831,11 +2836,10 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
                                                             float2(id.xy)));
             input.irradiance += irradiance * nDotL * visibility;
         }
-        if (irradiance > input.sunIrradiance) {
-            input.sunDirection = toLight;
-            input.sunIrradiance = irradiance;
-            input.sunVisibility = visibility;
-        }
+        input.lightDirection[input.lightCount] = toLight;
+        input.lightIrradiance[input.lightCount] = irradiance;
+        input.lightVisibility[input.lightCount] = visibility;
+        input.lightCount += 1;
     }
     TemperatureParams p;
     for (uint i = 0; i < 16; ++i) {

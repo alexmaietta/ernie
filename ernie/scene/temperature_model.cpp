@@ -28,20 +28,25 @@ constexpr const char* kTemperatureModelSlang = R"(
 // A surface's temperature computed as it renders (ernie/scene/temperature_model.h): what a model
 // is evaluated at, its parameters with the material's data, and the interface it implements.
 
+// The most distant lights a model sees (the renderer's lights a frame).
+public static const uint kTemperatureLights = 16;
+
 // Where a model is evaluated: the point and its outward surface normal (world, relative to the
-// frame's origin); the brightest distant light's direction towards it (0 for none), its
-// irradiance over all wavelengths facing it (W/m^2) and the share of it reaching the point past
-// shadows; the sunlight on the surface from every distant light (W/m^2, shadowed); the pixel's
-// solar absorptivity (the material's scaled as its albedo textures scale its reflectance) and the
-// material's hemispherical thermal emissivity; its own temperature (K, 0 for none); the frame's
-// time (s); the world +z axis of a prim bound to the material (0 for none); and the pixel's
-// thermal inertia (J m^-2 K^-1 s^-1/2, its texture's else the material's, 0 for none).
+// frame's origin); every distant light that lights it (none singled out; light linking leaves
+// out those not linked to it), `lightCount` of them: its direction towards it, its irradiance
+// over all wavelengths facing it (W/m^2) and the share of it reaching the point past shadows;
+// the sunlight on the surface from them all (W/m^2, shadowed); the pixel's solar absorptivity
+// (the material's scaled as its albedo textures scale its reflectance) and the material's
+// hemispherical thermal emissivity; its own temperature (K, 0 for none); the frame's time (s);
+// the world +z axis of a prim bound to the material (0 for none); and the pixel's thermal inertia
+// (J m^-2 K^-1 s^-1/2, its texture's else the material's, 0 for none).
 public struct TemperatureInput {
     public float3 position;
     public float3 normal;
-    public float3 sunDirection;
-    public float sunIrradiance;
-    public float sunVisibility;
+    public uint lightCount;
+    public float3 lightDirection[kTemperatureLights];
+    public float lightIrradiance[kTemperatureLights];
+    public float lightVisibility[kTemperatureLights];
     public float irradiance;
     public float absorptivity;
     public float emissivity;
@@ -145,22 +150,42 @@ public struct DiurnalTemperature : ITemperatureModel {
         pole = dot(pole, pole) > 0.0 ? normalize(pole) : float3(0.0, 0.0, 1.0);
         let n = input.normal;
         let latitude = asin(saturate(abs(dot(n, pole))));
-        // The sun's hour angle, westward from the meridian: the body turns towards its east,
-        // pole x n, so the sun moves west and the afternoon has it there.
+        let row = latitude / (0.5 * 3.14159265) * float(rows - 1);
+        let inertia = axisWeight(p, 5, inertias,
+                                 input.inertia > 0.0 ? input.inertia : p.data(5), true);
+        let albedo = axisWeight(p, 5 + inertias, albedos, 1.0 - input.absorptivity, false);
+        // Each light's day, its table temperature at its own hour angle, weighted by its
+        // irradiance over the table's: T^4 summed, as radiated power adds (exact for a surface
+        // that keeps no heat; the table's stored heat counted once per light).
         let up = n - dot(n, pole) * pole;
         let east = cross(pole, n);
-        let sun = input.sunDirection - dot(input.sunDirection, pole) * pole;
-        let hour = atan2(-dot(sun, east), dot(sun, up));
-        let phase = frac(hour / (2.0 * 3.14159265) + 0.5);
-        let row = latitude / (0.5 * 3.14159265) * float(rows - 1);
-        let column = phase * float(columns);
+        let reference = p.get(3) > 0.0 ? p.get(3) : 1361.0;
+        var power = 0.0;
+        for (uint k = 0; k < min(input.lightCount, kTemperatureLights); ++k) {
+            if (input.lightIrradiance[k] <= 0.0) {
+                continue;
+            }
+            // Its hour angle, westward from the meridian: the body turns towards its east,
+            // pole x n, so a light moves west and the afternoon has it there.
+            let towards = input.lightDirection[k];
+            let along = towards - dot(towards, pole) * pole;
+            let hour = atan2(-dot(along, east), dot(along, up));
+            let phase = frac(hour / (2.0 * 3.14159265) + 0.5);
+            let kelvin = tableKelvin(p, first, rows, columns, inertias, albedos, row,
+                                     phase * float(columns), inertia, albedo);
+            power += input.lightIrradiance[k] / reference * kelvin * kelvin * kelvin * kelvin;
+        }
+        return power > 0.0 ? sqrt(sqrt(power)) : input.kelvin;
+    }
+
+    // The table at fractional row `row` and column `column` (wrapping over the day), inertia and
+    // albedo `inertia` and `albedo` (`axisWeight`'s), quadrilinear.
+    float tableKelvin(TemperatureParams p, uint first, uint rows, uint columns, uint inertias,
+                      uint albedos, float row, float column, float2 inertia, float2 albedo) {
         let r0 = min(uint(row), rows - 2);
         let c0 = uint(column) % columns;
         let fr = saturate(row - float(r0));
         let fc = frac(column);
-        let inertia = axisWeight(p, 5, inertias,
-                                 input.inertia > 0.0 ? input.inertia : p.data(5), true);
-        let albedo = axisWeight(p, 5 + inertias, albedos, 1.0 - input.absorptivity, false);
         var sum = 0.0;
         for (uint corner = 0; corner < 16; ++corner) {
             let r = corner & 1u;
@@ -248,7 +273,11 @@ TemperatureModelRegistry TemperatureModelRegistry::WithBuiltins() {
     diurnal.params = {
         {"poleX", 0.0f, "The body's pole, world x" + pole},
         {"poleY", 0.0f, "The body's pole, world y" + pole},
-        {"poleZ", 0.0f, "The body's pole, world z" + pole}};
+        {"poleZ", 0.0f, "The body's pole, world z" + pole},
+        {"irradiance", 1361.0f,
+         "The sunlight the table was made for, W/m^2: each distant "
+         "light counts as its irradiance over this, their T^4 "
+         "summed."}};
     diurnal.typeName = "DiurnalTemperature";
     diurnal.slang = kDiurnalSlang;
     diurnal.defaultData = [] {

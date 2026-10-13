@@ -3234,7 +3234,9 @@ void RasterRenderer::WriteLights(
         if (light.type == LightType::Distant && light.shadows &&
             !light.domeDiffuse && params.shadows.enabled &&
             glm::length(light.direction) > 0.0f) {
-            horizonLights_.push_back(glm::normalize(light.direction));
+            horizonLights_.push_back({glm::normalize(light.direction),
+                                      light.lightMask,
+                                      light.shadowMask});
             table[i].patternLayout[0] =
                 static_cast<std::uint32_t>(horizonLights_.size());
         }

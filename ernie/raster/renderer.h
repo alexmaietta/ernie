@@ -394,16 +394,26 @@ class RasterRenderer {
         std::array<float, 4> grid{};
         /// Its width and height, the terrain's prim id, and 1.
         std::array<std::uint32_t, 4> info{};
-        /// The frame origin's height (subtracted from the terrain's)
-        /// and the heights' cell size.
+        /// The frame origin's height (subtracted from the terrain's),
+        /// the heights' cell size and the terrain's light link group.
         std::array<float, 4> heights{};
     };
 
-    /// Towards each distant light casting shadows this frame (a
-    /// dome's directions aside), in the order of their layers of a
-    /// terrain's sun horizon maps. Known before drawables prepare
-    /// (`RasterDrawable::Prepare`).
-    const std::vector<glm::vec3>& HorizonLights() const {
+    /// A distant light casting shadows this frame (a dome's
+    /// directions aside), in the order of their layers of a terrain's
+    /// sun horizon maps: towards it, and its light linking
+    /// (`LightParams::lightMask` and `shadowMask`), which a terrain
+    /// whose link group it neither lights nor takes shadows from
+    /// leaves its layer unmade for.
+    struct HorizonLight {
+        glm::vec3 towards{0.0f};
+        std::uint32_t lightMask = ~0u;
+        std::uint32_t shadowMask = ~0u;
+    };
+
+    /// The distant lights casting shadows this frame. Known before
+    /// drawables prepare (`RasterDrawable::Prepare`).
+    const std::vector<HorizonLight>& HorizonLights() const {
         return horizonLights_;
     }
 
@@ -1472,7 +1482,7 @@ class RasterRenderer {
     /// their place otherwise.
     bool domeShadowed_ = false;
     TerrainHorizon terrainHorizon_;
-    std::vector<glm::vec3> horizonLights_;
+    std::vector<HorizonLight> horizonLights_;
     SunHorizon sunHorizon_;
     std::unique_ptr<GpuImage>
         noHorizon_;  ///< Binds in place of a terrain's horizon map.
