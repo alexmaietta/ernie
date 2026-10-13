@@ -82,6 +82,13 @@ TEST(Tiff, DeflateInTiles) {
     ExpectRgb(TiffImage(Fixture("rgb_tiled_deflate.tif")));
 }
 
+TEST(Tiff, PlanesStoredApart) {
+    // USGS's Viking colour mosaic of Mars keeps each channel's strips
+    // apart.
+    ExpectRgb(TiffImage(Fixture("rgb_planar_raw.tif")));
+    ExpectRgb(TiffImage(Fixture("rgb_planar_lzw.tif")));
+}
+
 TEST(Tiff, UncompressedFloats) {
     // LOLA's elevation models' encoding.
     ExpectFloat(TiffImage(Fixture("float_raw.tif")));

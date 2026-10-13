@@ -79,9 +79,16 @@ class TiffImage : public RasterSource {
 
   private:
     /// Strip or tile `chunk` decoded (predictor undone, host byte
-    /// order): `chunkWidth_` by its rows; the last one decoded is
-    /// kept for the next `Read`.
+    /// order): `chunkWidth_` by its rows of `ChunkChannels()`
+    /// samples; the last one decoded of each plane is kept for the
+    /// next `Read`.
     const std::vector<std::byte>& Chunk(std::size_t chunk) const;
+
+    /// Samples a pixel in a chunk: every channel's, or one with the
+    /// planes stored apart.
+    std::uint32_t ChunkChannels() const {
+        return planes_ > 1 ? 1u : channels_;
+    }
 
     std::shared_ptr<const MappedFile> file_;
     bool bigEndian_ = false;
@@ -98,13 +105,17 @@ class TiffImage : public RasterSource {
     std::uint32_t chunkWidth_ = 0;
     std::uint32_t chunkHeight_ = 0;
     std::uint32_t chunksAcross_ = 1;
+    /// Chunks of one plane; with the planes stored apart
+    /// (PlanarConfiguration 2), `planes_` of them one after another.
+    std::size_t chunksPerPlane_ = 0;
+    std::uint32_t planes_ = 1;
     std::vector<std::uint64_t> offsets_;
     std::vector<std::uint64_t> byteCounts_;
     std::optional<std::array<double, 3>> pixelScale_;
     std::optional<std::array<double, 6>> tiepoint_;
     std::optional<double> noData_;
-    mutable std::size_t cachedChunk_ = ~std::size_t{0};
-    mutable std::vector<std::byte> cached_;
+    mutable std::vector<std::size_t> cachedChunks_;
+    mutable std::vector<std::vector<std::byte>> cached_;
 };
 
 }  // namespace ernie

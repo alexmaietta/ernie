@@ -295,10 +295,8 @@ TiffImage::TiffImage(const std::filesystem::path& path)
         throw std::runtime_error(name +
                                  ": TIFF samples of mixed sizes");
     }
-    if (one(kPlanarConfiguration, 1) != 1) {
-        throw std::runtime_error(
-            name + ": TIFF planes stored apart are not read");
-    }
+    // Planes stored apart: each channel's strips or tiles in turn.
+    planes_ = one(kPlanarConfiguration, 1) == 2 ? channels_ : 1u;
     const std::uint64_t format = one(kSampleFormat, 1);
     if (format == 3 && bits_ == 32) {
         type_ = SampleType::Float32;
@@ -352,9 +350,11 @@ TiffImage::TiffImage(const std::filesystem::path& path)
                                  ": TIFF strips or tiles of no size");
     }
     chunksAcross_ = (width_ + chunkWidth_ - 1) / chunkWidth_;
-    const std::size_t chunks =
-        std::size_t{chunksAcross_} *
-        ((height_ + chunkHeight_ - 1) / chunkHeight_);
+    chunksPerPlane_ = std::size_t{chunksAcross_} *
+                      ((height_ + chunkHeight_ - 1) / chunkHeight_);
+    const std::size_t chunks = chunksPerPlane_ * planes_;
+    cachedChunks_.assign(planes_, ~std::size_t{0});
+    cached_.resize(planes_);
     if (offsets_.size() < chunks || byteCounts_.size() < chunks) {
         throw std::runtime_error(name +
                                  ": TIFF strips or tiles missing");
@@ -395,12 +395,15 @@ TiffImage::TiffImage(const std::filesystem::path& path)
 
 const std::vector<std::byte>&
 TiffImage::Chunk(std::size_t chunk) const {
-    if (chunk == cachedChunk_) {
-        return cached_;
+    const std::size_t plane = chunk / chunksPerPlane_;
+    if (chunk == cachedChunks_[plane]) {
+        return cached_[plane];
     }
     ERNIE_ZONE("TIFF chunk");
+    const std::uint32_t channels = ChunkChannels();
     const std::uint32_t row0 =
-        static_cast<std::uint32_t>(chunk / chunksAcross_) *
+        static_cast<std::uint32_t>(chunk % chunksPerPlane_ /
+                                   chunksAcross_) *
         chunkHeight_;
     // A strip at the image's foot holds only the rows left; tiles are
     // always whole.
@@ -408,7 +411,7 @@ TiffImage::Chunk(std::size_t chunk) const {
         tiled_ ? chunkHeight_
                : std::min(chunkHeight_, height_ - row0);
     const std::size_t pixelBytes =
-        std::size_t{channels_} * SampleBytes();
+        std::size_t{channels} * SampleBytes();
     const std::size_t rowBytes =
         std::size_t{chunkWidth_} * pixelBytes;
     const std::size_t expected = rowBytes * rows;
@@ -443,21 +446,21 @@ TiffImage::Chunk(std::size_t chunk) const {
     // first, across the row; undone before the byte order is.
     if (predictor_ == 3) {
         std::vector<std::byte> row(rowBytes);
-        const std::size_t count =
-            std::size_t{chunkWidth_} * channels_;
+        const std::size_t samples =
+            std::size_t{chunkWidth_} * channels;
         for (std::uint32_t y = 0; y < rows; ++y) {
             std::byte* line = data.data() + y * rowBytes;
-            for (std::size_t i = channels_; i < rowBytes; ++i) {
+            for (std::size_t i = channels; i < rowBytes; ++i) {
                 line[i] = static_cast<std::byte>(
                     std::to_integer<unsigned>(line[i]) +
-                    std::to_integer<unsigned>(line[i - channels_]));
+                    std::to_integer<unsigned>(line[i - channels]));
             }
-            for (std::size_t i = 0; i < count; ++i) {
+            for (std::size_t i = 0; i < samples; ++i) {
                 for (std::uint32_t b = 0; b < bytes; ++b) {
                     // Most significant first in the file; the host is
                     // little-endian (std::endian checked below).
                     row[i * bytes + b] =
-                        line[(bytes - 1 - b) * count + i];
+                        line[(bytes - 1 - b) * samples + i];
                 }
             }
             std::memcpy(line, row.data(), rowBytes);
@@ -466,28 +469,30 @@ TiffImage::Chunk(std::size_t chunk) const {
                    (std::endian::native == std::endian::big) &&
                bytes > 1) {
         for (std::size_t i = 0; i < data.size(); i += bytes) {
-            std::reverse(data.begin() + i, data.begin() + i + bytes);
+            const auto first =
+                data.begin() + static_cast<std::ptrdiff_t>(i);
+            std::reverse(first, first + bytes);
         }
     }
     // Predictor 2: each sample the difference from its left
     // neighbour's.
     if (predictor_ == 2) {
         const std::size_t samples =
-            std::size_t{chunkWidth_} * channels_;
+            std::size_t{chunkWidth_} * channels;
         for (std::uint32_t y = 0; y < rows; ++y) {
             std::byte* line = data.data() + y * rowBytes;
-            for (std::size_t i = channels_; i < samples; ++i) {
+            for (std::size_t i = channels; i < samples; ++i) {
                 switch (bytes) {
                 case 1:
                     line[i] = static_cast<std::byte>(
                         std::to_integer<unsigned>(line[i]) +
                         std::to_integer<unsigned>(
-                            line[i - channels_]));
+                            line[i - channels]));
                     break;
                 case 2: {
                     std::uint16_t a, b;
                     std::memcpy(&a, line + 2 * i, 2);
-                    std::memcpy(&b, line + 2 * (i - channels_), 2);
+                    std::memcpy(&b, line + 2 * (i - channels), 2);
                     a = static_cast<std::uint16_t>(a + b);
                     std::memcpy(line + 2 * i, &a, 2);
                     break;
@@ -495,7 +500,7 @@ TiffImage::Chunk(std::size_t chunk) const {
                 default: {
                     std::uint32_t a, b;
                     std::memcpy(&a, line + 4 * i, 4);
-                    std::memcpy(&b, line + 4 * (i - channels_), 4);
+                    std::memcpy(&b, line + 4 * (i - channels), 4);
                     a += b;
                     std::memcpy(line + 4 * i, &a, 4);
                     break;
@@ -507,9 +512,9 @@ TiffImage::Chunk(std::size_t chunk) const {
     static_assert(
         std::endian::native == std::endian::little,
         "TIFF floats are reordered for a little-endian host");
-    cached_ = std::move(data);
-    cachedChunk_ = chunk;
-    return cached_;
+    cached_[plane] = std::move(data);
+    cachedChunks_[plane] = chunk;
+    return cached_[plane];
 }
 
 void TiffImage::Read(std::uint32_t x, std::uint32_t y,
@@ -525,26 +530,43 @@ void TiffImage::Read(std::uint32_t x, std::uint32_t y,
         throw std::out_of_range(
             "TIFF: too little room for the rectangle");
     }
-    for (std::uint32_t row = y; row < y + h; ++row) {
-        const std::uint32_t chunkRow = row / chunkHeight_;
-        for (std::uint32_t column = x; column < x + w;) {
-            const std::uint32_t chunkColumn = column / chunkWidth_;
-            const std::vector<std::byte>& chunk = Chunk(
-                std::size_t{chunkRow} * chunksAcross_ + chunkColumn);
-            const std::uint32_t left = chunkColumn * chunkWidth_;
-            const std::uint32_t span =
-                std::min(x + w, left + chunkWidth_) - column;
-            std::memcpy(
-                out.data() +
+    // Each plane's samples go to their channel of the pixels.
+    const std::size_t sampleBytes = SampleBytes();
+    const std::size_t chunkPixel = ChunkChannels() * sampleBytes;
+    for (std::uint32_t plane = 0; plane < planes_; ++plane) {
+        for (std::uint32_t row = y; row < y + h; ++row) {
+            const std::uint32_t chunkRow = row / chunkHeight_;
+            for (std::uint32_t column = x; column < x + w;) {
+                const std::uint32_t chunkColumn =
+                    column / chunkWidth_;
+                const std::vector<std::byte>& chunk =
+                    Chunk(plane * chunksPerPlane_ +
+                          std::size_t{chunkRow} * chunksAcross_ +
+                          chunkColumn);
+                const std::uint32_t left = chunkColumn * chunkWidth_;
+                const std::uint32_t span =
+                    std::min(x + w, left + chunkWidth_) - column;
+                std::byte* to =
+                    out.data() +
                     (std::size_t{row - y} * w + (column - x)) *
-                        pixelBytes,
-                chunk.data() +
+                        pixelBytes;
+                const std::byte* from =
+                    chunk.data() +
                     (std::size_t{row - chunkRow * chunkHeight_} *
                          chunkWidth_ +
                      (column - left)) *
-                        pixelBytes,
-                span * pixelBytes);
-            column += span;
+                        chunkPixel;
+                if (planes_ == 1) {
+                    std::memcpy(to, from, span * pixelBytes);
+                } else {
+                    for (std::uint32_t i = 0; i < span; ++i) {
+                        std::memcpy(
+                            to + i * pixelBytes + plane * sampleBytes,
+                            from + i * sampleBytes, sampleBytes);
+                    }
+                }
+                column += span;
+            }
         }
     }
 }
