@@ -20,12 +20,14 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <numbers>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 using ernie::CubeSphereLod;
@@ -505,13 +507,23 @@ TEST_F(RasterDelegateTest, APlanetFromAHeightsFilePagesInItsDetail) {
 
     Scene streamed = scene(true, tokens::kAsync);
     RasterDelegate async(*context_);
+    // The file is read off the frame: frames before it is in draw no
+    // planet, then the first after it draws its faces as pages come.
     async.Render(streamed);
+    EXPECT_FALSE(async.Planet().HasHeights())
+        << "the first frame does not wait for the file";
+    for (int frame = 0; frame < 1000 && !async.Planet().HasHeights();
+         ++frame) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        async.Render(streamed);
+    }
+    ASSERT_TRUE(async.Planet().HasHeights());
+    ASSERT_NE(async.Planet().Pages(), nullptr);
     EXPECT_GT(async.Planet().Pages()->Pending(), 0u)
-        << "the first frame draws the faces";
+        << "its first frame draws the faces";
     Tensor last;
     for (int frame = 0;
-         frame < 200 &&
-         (frame == 0 || async.Planet().Pages()->Pending() > 0);
+         frame < 200 && async.Planet().Pages()->Pending() > 0;
          ++frame) {
         last = async.Render(streamed);
     }

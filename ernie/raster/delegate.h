@@ -530,12 +530,34 @@ class RasterDelegate : public RenderDelegate {
     std::shared_ptr<const MaterialTexture>
     UploadBaked(const std::filesystem::path& output,
                 const std::string& key, const TextureReader& reader);
-    /// Draws the planet of semi-axes `radii` from the latitude-
-    /// longitude heights in `file`: faces of up to 1024 quads read
-    /// now, finer ones paged (`PlanetPages`).
-    void SetPlanetFromFile(const std::filesystem::path& file,
-                           const glm::dvec3& radii,
-                           const PlanetHeightsOptions& options);
+    /// A planet's heights read from a latitude-longitude file: its
+    /// faces of up to 1024 quads, and the depth finer ones are paged
+    /// to (`PlanetPages`).
+    struct PlanetLoad {
+        std::shared_ptr<const RasterSource> source;
+        PlanetTile faces;
+        std::uint32_t base = 0;
+        std::uint32_t depth = 0;
+    };
+    /// A heights file being read off the frame, for Terrain
+    /// `terrain`.
+    struct PendingPlanet {
+        Path terrain;
+        std::filesystem::path file;
+        glm::dvec3 radii{0.0};
+        PlanetHeightsOptions options;
+        std::future<PlanetLoad> load;
+    };
+    /// Reads the planet of semi-axes `radii` from `file`, on any
+    /// thread.
+    static PlanetLoad
+    LoadPlanetFile(const std::filesystem::path& file,
+                   const glm::dvec3& radii,
+                   const PlanetHeightsOptions& options);
+    /// Draws the pending planet once read, the old one until then;
+    /// with `wait`, waiting for it, and throwing what reading it
+    /// threw.
+    void FinishPlanetLoad(bool wait);
     void SyncHeightfield(const Scene& scene, const Path& terrain);
     /// Uploads the map of the frame's dome and the stars of its
     /// StarField when they change.
@@ -625,10 +647,11 @@ class RasterDelegate : public RenderDelegate {
                              const Path& prim) const;
     /// The draws of the synced meshes and instancers. With `touched`,
     /// only those meshes' draws (and those `SyncMeshes` re-added or
-    /// dropped) are built again, the rest kept from the last; without,
-    /// all are.
-    std::vector<MeshItem> Items(const Scene& scene,
-                                const std::set<Path>* touched = nullptr);
+    /// dropped) are built again, the rest kept from the last;
+    /// without, all are.
+    std::vector<MeshItem>
+    Items(const Scene& scene,
+          const std::set<Path>* touched = nullptr);
     /// The meshes whose draws a sync's `changes` may change, or null
     /// when they may change draws beyond their own prims' meshes (a
     /// material, a light linking, an ancestor's world...), so that
@@ -797,6 +820,7 @@ class RasterDelegate : public RenderDelegate {
     std::uint64_t posedTimeCode_ = 0;
     RenderPrims prims_;
     std::optional<Key> heightfield_;
+    std::optional<PendingPlanet> pendingPlanet_;
     std::optional<Key>
         domeMap_;  ///< The dome map last uploaded, and its dome.
     /// Whether the last upload looked for a sun in the map (the full

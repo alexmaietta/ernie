@@ -1172,8 +1172,19 @@ TextureWait RasterDelegate::WaitForTextures(const Scene& scene,
         result.failed.insert(result.failed.end(), failed.begin(),
                              failed.end());
     }
-    result.loading =
-        loadingTextures_.size() + compressingTextures_.size();
+    // A planet's heights file, until the deadline.
+    if (pendingPlanet_ &&
+        (forever || pendingPlanet_->load.wait_until(deadline) ==
+                        std::future_status::ready)) {
+        try {
+            FinishPlanetLoad(true);
+        } catch (const std::exception& error) {
+            result.failed.emplace_back(error.what());
+        }
+    }
+    result.loading = loadingTextures_.size() +
+                     compressingTextures_.size() +
+                     (pendingPlanet_ ? 1u : 0u);
     return result;
 }
 
@@ -1276,9 +1287,10 @@ RasterDelegate::UploadBaked(const std::filesystem::path& output,
         CachedReader(reader));
 }
 
-void RasterDelegate::SetPlanetFromFile(
-    const std::filesystem::path& file, const glm::dvec3& radii,
-    const PlanetHeightsOptions& options) {
+RasterDelegate::PlanetLoad
+RasterDelegate::LoadPlanetFile(const std::filesystem::path& file,
+                               const glm::dvec3& radii,
+                               const PlanetHeightsOptions& options) {
     ERNIE_ZONE("Planet heights file");
     std::shared_ptr<const RasterSource> source = OpenRaster(file);
     const LatLongGrid grid =
@@ -1299,20 +1311,53 @@ void RasterDelegate::SetPlanetFromFile(
     while ((std::uint64_t{base} << depth) < wanted) {
         ++depth;
     }
-    const PlanetTile faces =
-        PlanetFacesOf(*source, options, radii, base);
-    const auto side = static_cast<std::size_t>(base) + 1;
-    std::array<RasterView, CubeSphereLod::kFaces> views;
-    for (std::size_t face = 0; face < views.size(); ++face) {
-        views[face].data = faces.heights.data() + face * side * side;
-        views[face].width = side;
-        views[face].height = side;
+    PlanetLoad load;
+    load.faces = PlanetFacesOf(*source, options, radii, base);
+    load.source = std::move(source);
+    load.base = base;
+    load.depth = depth;
+    return load;
+}
+
+void RasterDelegate::FinishPlanetLoad(bool wait) {
+    if (!pendingPlanet_ ||
+        (!wait && pendingPlanet_->load.wait_for(std::chrono::seconds(
+                      0)) != std::future_status::ready)) {
+        return;
     }
-    planet_.SetHeights(radii, views, faces.slopes, faces.ranges);
-    if (depth > 0) {
-        planet_.SetPages(std::make_unique<PlanetPages>(
-            context_, std::move(source), options, radii, base,
-            depth));
+    PendingPlanet pending = std::move(*pendingPlanet_);
+    pendingPlanet_.reset();
+    try {
+        PlanetLoad load = pending.load.get();
+        const auto side = static_cast<std::size_t>(load.base) + 1;
+        std::array<RasterView, CubeSphereLod::kFaces> views;
+        for (std::size_t face = 0; face < views.size(); ++face) {
+            views[face].data =
+                load.faces.heights.data() + face * side * side;
+            views[face].width = side;
+            views[face].height = side;
+        }
+        planet_.SetHeights(pending.radii, views, load.faces.slopes,
+                           load.faces.ranges);
+        if (load.depth > 0) {
+            planet_.SetPages(std::make_unique<PlanetPages>(
+                context_, std::move(load.source), pending.options,
+                pending.radii, load.base, load.depth));
+        }
+        log::Info("Planet heights from " + pending.file.string() +
+                  " active: faces of " + std::to_string(load.base) +
+                  " quads" +
+                  (load.depth > 0
+                       ? ", paged to " +
+                             std::to_string(load.base << load.depth)
+                       : std::string()));
+    } catch (const std::exception& error) {
+        const std::invalid_argument failure = UploadError(
+            pending.terrain, tokens::kHeightsFile, error.what());
+        if (wait) {
+            throw failure;
+        }
+        log::Info(failure.what());
     }
 }
 
@@ -1327,7 +1372,8 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
             ? std::nullopt
             : std::optional<TerrainView>(TerrainView(scene, terrain));
     // A planet's heights from a file: faces of up to 1024 quads read
-    // at once, finer ones paged in as views need them.
+    // off the frame (the planet drawn as it was meanwhile), finer
+    // ones paged in as views need them.
     if (prim && !prim->GetHeightsFile().empty() &&
         (prim->HasPlanetRadius() || prim->HasPlanetRadii())) {
         const Key key =
@@ -1338,23 +1384,29 @@ void RasterDelegate::SyncHeightfield(const Scene& scene,
             return;
         }
         heightfield_ = key;
-        try {
-            if (terrain_.HasHeightfield()) {
-                terrain_.ClearHeightfield();
-            }
-            SetPlanetFromFile(
-                prim->GetHeightsFile(),
-                prim->HasPlanetRadii()
-                    ? prim->GetPlanetRadii()
-                    : glm::dvec3(prim->GetPlanetRadius()),
-                PlanetHeightsOptions{prim->GetHeightsUnit(),
-                                     prim->GetHeightsReference(),
-                                     std::nullopt});
-        } catch (const std::exception& error) {
-            throw UploadError(terrain, kHeightsFile, error.what());
+        if (terrain_.HasHeightfield()) {
+            terrain_.ClearHeightfield();
         }
+        PendingPlanet pending;
+        pending.terrain = terrain;
+        pending.file = prim->GetHeightsFile();
+        pending.radii = prim->HasPlanetRadii()
+                            ? prim->GetPlanetRadii()
+                            : glm::dvec3(prim->GetPlanetRadius());
+        pending.options = PlanetHeightsOptions{
+            prim->GetHeightsUnit(), prim->GetHeightsReference(),
+            std::nullopt};
+        log::Info("Loading planet heights from " +
+                  pending.file.string());
+        pending.load = textureLoaders_.Submit(
+            [file = pending.file, radii = pending.radii,
+             options = pending.options] {
+                return LoadPlanetFile(file, radii, options);
+            });
+        pendingPlanet_ = std::move(pending);
         return;
     }
+    pendingPlanet_.reset();
     const Tensor* written = prim ? prim->GetHeights() : nullptr;
     if (written == nullptr) {
         if (heightfield_) {
@@ -1938,8 +1990,9 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         const bool gpuColors = onGpu(kDisplayColor);
         key.second[3] = gpuNormals ? 1 : key.second[3];
         key.second[4] = gpuColors ? 1 : key.second[4];
-        // A constant colour only tints the draws (`SyncedMesh::tint`):
-        // the mesh stays, as colours per vertex do not.
+        // A constant colour only tints the draws
+        // (`SyncedMesh::tint`): the mesh stays, as colours per vertex
+        // do not.
         if (scene.Read(path, kDisplayColor) == nullptr) {
             key.second[4] = 0;
         }
@@ -3239,17 +3292,19 @@ bool RasterDelegate::RefreshGpuXforms(
         const std::vector<Path>& paths = *column.paths;
         const auto first = gpuPosed_.find(paths.front());
         const auto last = gpuPosed_.find(paths.back());
-        if (column.bits != Dirty::Transform || first == gpuPosed_.end() ||
-            last == gpuPosed_.end() ||
+        if (column.bits != Dirty::Transform ||
+            first == gpuPosed_.end() || last == gpuPosed_.end() ||
             first->second.group != last->second.group) {
             return false;
         }
         GpuXformGroup& group = *first->second.group;
-        const auto op = std::ranges::find(group.ops, column.attribute);
+        const auto op =
+            std::ranges::find(group.ops, column.attribute);
         if (op == group.ops.end() || group.members != paths.size() ||
             first->second.row != 0 ||
             std::size_t{last->second.row} + 1 != paths.size() ||
-            scene.AttributeVersion(paths.front(), tokens::kXformOpOrder) >
+            scene.AttributeVersion(paths.front(),
+                                   tokens::kXformOpOrder) >
                 syncedVersion_) {
             return false;
         }
@@ -3721,8 +3776,9 @@ void RasterDelegate::Sync(const Scene& scene) {
         sceneId_ = scene.Id();
         cursor_.version = scene.Version();
     } else {
-        // Columns written whole (a simulation's bodies every step) come
-        // whole, expanded only when a full sync needs their prims.
+        // Columns written whole (a simulation's bodies every step)
+        // come whole, expanded only when a full sync needs their
+        // prims.
         std::vector<ColumnChange> columns;
         const std::vector<Change>& changes =
             changed.emplace(scene.Changes(cursor_, columns));
@@ -3738,12 +3794,13 @@ void RasterDelegate::Sync(const Scene& scene) {
             return IsViewChange(scene, change);
         };
         if (!posing && std::ranges::all_of(changes, view) &&
-            std::ranges::all_of(columns, [&](const ColumnChange& column) {
-                return std::ranges::all_of(*column.paths,
-                                           [&](const Path& path) {
-                                               return view({path, column.bits});
-                                           });
-            })) {
+            std::ranges::all_of(
+                columns, [&](const ColumnChange& column) {
+                    return std::ranges::all_of(
+                        *column.paths, [&](const Path& path) {
+                            return view({path, column.bits});
+                        });
+                })) {
             return;
         }
         // So does a simulation step that only rewrites the arrays of
@@ -3836,7 +3893,8 @@ void RasterDelegate::Sync(const Scene& scene) {
     }
     if (changed && !linked && links_.groups.empty()) {
         touched = TouchedMeshes(scene, *changed);
-        // Most of them, as a simulation writes every body: all at once.
+        // Most of them, as a simulation writes every body: all at
+        // once.
         if (touched && 2 * (touched->size() + remeshed_.size()) >
                            syncedMeshes_.size()) {
             touched.reset();
@@ -3893,7 +3951,8 @@ RasterDelegate::TouchedMeshes(const Scene& scene,
 }
 
 std::vector<MeshItem>
-RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
+RasterDelegate::Items(const Scene& scene,
+                      const std::set<Path>* touched) {
     ERNIE_ZONE("Sync items");
     // Instancers' prototypes, and the meshes of each, which may be a
     // mesh or a subtree of them (as USD's are), by their nearest
@@ -3934,7 +3993,8 @@ RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
                 const Path prototype = syncedMeshes_.contains(path)
                                            ? prototypeOf(path)
                                            : Path();
-                if (prototype.IsEmpty() == !inPrototypes_.contains(path)) {
+                if (prototype.IsEmpty() ==
+                    !inPrototypes_.contains(path)) {
                     continue;
                 }
                 if (prototype.IsEmpty()) {
@@ -3944,9 +4004,11 @@ RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
                     }
                 } else {
                     inPrototypes_.insert(path);
-                    std::vector<Path>& meshes = prototypeMeshes_[prototype];
+                    std::vector<Path>& meshes =
+                        prototypeMeshes_[prototype];
                     meshes.insert(std::lower_bound(meshes.begin(),
-                                                   meshes.end(), path),
+                                                   meshes.end(),
+                                                   path),
                                   path);
                 }
             }
@@ -3965,8 +4027,9 @@ RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
     };
 
     // Each mesh's own draw, none when hidden or in a prototype.
-    const auto build = [&](const Path& path, const SyncedMesh& synced)
-        -> std::optional<MeshItem> {
+    const auto build =
+        [&](const Path& path,
+            const SyncedMesh& synced) -> std::optional<MeshItem> {
         if (synced.handle == 0 || inPrototypes_.contains(path) ||
             !scene.IsVisible(path)) {
             return std::nullopt;
@@ -4041,7 +4104,8 @@ RasterDelegate::Items(const Scene& scene, const std::set<Path>* touched) {
                 : scene.WorldTransform(path);
         for (std::size_t k = 0; k < targets.size(); ++k) {
             const auto meshes = prototypeMeshes_.find(targets[k]);
-            if (meshes == prototypeMeshes_.end() || lists[k].empty()) {
+            if (meshes == prototypeMeshes_.end() ||
+                lists[k].empty()) {
                 continue;
             }
             // From the prototype's parent's frame, which instances
@@ -4287,11 +4351,13 @@ void RasterDelegate::UpdatePrims(
     std::optional<glm::vec3> minimalColor) {
     ERNIE_ZONE("UpdatePrims");
     Sync(scene);
-    // Textures that finished loading take their placeholders' places;
-    // a frame that waits for all of them waits here, and for a
-    // planet's height pages as it prepares.
+    // Textures that finished loading take their placeholders' places,
+    // and a planet's heights file once read its old heights'; a frame
+    // that waits for all of them waits here, and for a planet's
+    // height pages as it prepares.
     const bool waits = WaitsForTextures(scene, prims.settings);
     FinishTextureLoads(waits);
+    FinishPlanetLoad(waits);
     planet_.SetWaitForPages(waits);
     prims_ = prims;
     // Lights under prims posed on the GPU (a lamp on a robot's link):
