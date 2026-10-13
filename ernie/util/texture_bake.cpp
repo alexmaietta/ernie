@@ -259,6 +259,20 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
         }
         return table;
     }();
+    // Linear back to sRGB bytes by table rather than a power a texel,
+    // the most of the halving's time: 2^14 steps of linear, finer
+    // than half a byte of sRGB even near black, where its slope
+    // is 12.92.
+    constexpr std::size_t kSteps = 1u << 14;
+    static const std::array<std::uint8_t, kSteps + 1> kSrgb = [] {
+        std::array<std::uint8_t, kSteps + 1> table{};
+        for (std::size_t i = 0; i < table.size(); ++i) {
+            table[i] = static_cast<std::uint8_t>(std::lround(
+                LinearToSrgb(static_cast<float>(i) / kSteps) *
+                255.0f));
+        }
+        return table;
+    }();
     const std::uint32_t w = std::max(1u, width / 2);
     const std::uint32_t h = std::max(1u, height / 2);
     std::vector<std::uint8_t> half(std::size_t{w} * h * 4);
@@ -281,13 +295,12 @@ HalveRgba8(std::span<const std::uint8_t> rgba, std::uint32_t width,
                                 : static_cast<float>(value) / 255.0f;
                     }
                 }
-                float mean = sum / 4.0f;
-                if (srgb && c < 3) {
-                    mean = LinearToSrgb(mean);
-                }
+                const float mean = std::clamp(sum / 4.0f, 0.0f, 1.0f);
                 half[(std::size_t{y} * w + x) * 4 + c] =
-                    static_cast<std::uint8_t>(std::lround(
-                        std::clamp(mean, 0.0f, 1.0f) * 255.0f));
+                    srgb && c < 3 ? kSrgb[static_cast<std::size_t>(
+                                        std::lround(mean * kSteps))]
+                                  : static_cast<std::uint8_t>(
+                                        std::lround(mean * 255.0f));
             }
         }
     });
