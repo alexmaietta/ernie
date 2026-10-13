@@ -267,6 +267,13 @@ class RenderDelegate {
                                 std::array<std::uint32_t, 3> shape,
                                 FieldWriter writer);
 
+    /// Whether any mesh or field writer is set, so that every frame
+    /// may change outside the scene (the viewer's eco mode keeps
+    /// rendering). None by default.
+    virtual bool HasWriters() const {
+        return false;
+    }
+
     /// The render vars `Record` can draw of the frame the last
     /// `Update` prepared: `Info().viewVars` and what that frame adds,
     /// such as the AOVs its sensor filters write ("aov:<name>").

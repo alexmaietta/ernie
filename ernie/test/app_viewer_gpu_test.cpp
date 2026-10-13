@@ -1142,6 +1142,14 @@ TEST_F(ViewerTest, EcoModePausesRenderingUntilSomethingChanges) {
     viewer_->SetSelection({Path("/World/Cube")});
     EXPECT_FALSE(pausedAfter(1));
     EXPECT_TRUE(pausedAfter(4)) << "still with something selected";
+    // Writers change what the scene does not say every frame.
+    viewer_->Delegate().SetFieldWriter(
+        "/World/Field", {1, 1, 1},
+        [](VkCommandBuffer, const FieldWriteTarget&) {});
+    EXPECT_FALSE(pausedAfter(8)) << "never paused while writing";
+    viewer_->Delegate().SetFieldWriter("/World/Field", {1, 1, 1},
+                                       nullptr);
+    EXPECT_TRUE(pausedAfter(8));
     // A screenshot still renders the frame it writes.
     viewer_->GetCaptureOptions().folder = TempFile("eco");
     viewer_->Screenshot();

@@ -151,6 +151,11 @@ class RasterDelegate : public RenderDelegate {
                         std::array<std::uint32_t, 3> shape,
                         FieldWriter writer) override;
 
+    /// As `RenderDelegate::HasWriters`.
+    bool HasWriters() const override {
+        return !meshWriters_.empty() || !fieldWriters_.empty();
+    }
+
     /// As `RenderDelegate::MapArray` of a PrimSet: transform op
     /// `attribute` (`xformOp:*`) of prims posed on the GPU as one
     /// group, rows of one array written to exactly `prims` in row
@@ -633,6 +638,8 @@ class RasterDelegate : public RenderDelegate {
     std::unique_ptr<ComputeInterop> compute_;
     /// Meshes written on the GPU, by path (`SetMeshWriter`).
     std::map<Path, WrittenMesh> meshWriters_;
+    /// DenseFields written on the GPU (`SetFieldWriter`).
+    std::set<Path> fieldWriters_;
     bool computeTried_ = false;
     std::string computeWhy_;
     bool meshesOnGpu_ = false;

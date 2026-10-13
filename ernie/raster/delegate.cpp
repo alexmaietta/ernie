@@ -2528,6 +2528,11 @@ void RasterDelegate::SetMeshWriter(const Path& path,
 void RasterDelegate::SetFieldWriter(
     const Path& path, std::array<std::uint32_t, 3> shape,
     FieldWriter writer) {
+    if (writer) {
+        fieldWriters_.insert(path);
+    } else {
+        fieldWriters_.erase(path);
+    }
     renderer_.SetVolumeFieldWriter(path.String(), shape,
                                    std::move(writer));
 }

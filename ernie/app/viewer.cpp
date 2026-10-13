@@ -533,7 +533,9 @@ struct Viewer::State {
         std::uint32_t height = 0;
         std::string var;
         int band = 0;
-        bool busy = false;  ///< A capture or recording waits on it.
+        /// A capture or recording waits on it, textures are loading
+        /// or writers write every frame: never paused.
+        bool busy = false;
         std::uint64_t redraws = 0;  ///< See `Viewer::Redraw`.
         /// The renderer's own progress: what it holds and counts
         /// (`RenderStats`) changes as it streams or loads.
@@ -3443,16 +3445,18 @@ struct Viewer::State {
         RenderStats stats = delegate->Stats();
         view.gpuBytes = stats.gpuBytes;
         view.counters = std::move(stats.counters);
-        // Textures still loading show placeholders: keep rendering
-        // until they are in.
+        // Textures still loading show placeholders, and writers
+        // change meshes and fields every frame: keep rendering.
         const bool loading = std::ranges::any_of(
             view.counters, [](const auto& counter) {
                 return counter.first == raster_stats::kTexturesLoading &&
                        counter.second > 0;
             });
         view.busy = capture.has_value() || recording.has_value() ||
-                    loading;
-        unchangedFrames = view == lastView ? unchangedFrames + 1 : 0;
+                    loading || delegate->HasWriters();
+        unchangedFrames = view == lastView && !view.busy
+                              ? unchangedFrames + 1
+                              : 0;
         lastView = std::move(view);
         const RenderSettings settings =
             RenderSettings::OrFallbacks(scene, settingsSource);
