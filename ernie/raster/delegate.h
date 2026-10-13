@@ -225,6 +225,10 @@ class RasterDelegate : public RenderDelegate {
         highlightColour_ = colour;
     }
 
+    void SetViewStage(const Path& filter) override {
+        viewStage_ = filter;
+    }
+
     std::optional<double> MeteredLuminance() const override {
         return renderer_.MeteredLuminance();
     }
@@ -655,6 +659,9 @@ class RasterDelegate : public RenderDelegate {
     /// The AOVs the view's chain writes, in slot order, as of the
     /// last `Update`.
     std::vector<std::string> viewAovs_;
+    /// The filter the view's chain ends after (`SetViewStage`), or
+    /// empty.
+    Path viewStage_;
     // The opt-in var the view shows (MotionVector or a polarization
     // var), which it holds only while shown, or empty; and the one
     // its targets hold.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/app.h"
+#include "ernie/app/sensor_chain.h"
 #include "ernie/device/memory_stats.h"
 #include "ernie/device/vulkan_context.h"
 #include "ernie/raster/delegate.h"
@@ -1393,4 +1394,57 @@ TEST(ViewerOptionsTest, RejectsAnEmptyWindowAndUnknownSettings) {
     options.width = 64;
     options.settings = Path("/World/Cube");
     EXPECT_THROW(Viewer(scene, options), std::invalid_argument);
+}
+
+TEST_F(ViewerTest, ViewStagesShowTheImageAfterAFilter) {
+    // The viewer's own camera customized, a Bayer mosaic after the
+    // noise: the whole chain's electrons hold one channel a pixel;
+    // the stage after the noise, before the mosaic, all three alike
+    // on the white cube.
+    ViewportDisplay display;
+    display.grid = display.lights = display.cameras = false;
+    viewer_->SetViewportDisplay(display);
+    Scene& scene = viewer_->GetScene();
+    const Path product =
+        CustomizeChain(scene, viewer_->ActiveCamera());
+    EXPECT_TRUE(product.HasPrefix(Path(tokens::kSessionRoot)));
+    AddChainFilter(scene, product, "bayer",
+                   viewer_->Delegate().SensorFilters());
+    // The Electrons var at the centre pixel, as the viewport shows
+    // it.
+    const auto centre = [&] {
+        EXPECT_TRUE(viewer_->Step());
+        const std::filesystem::path path = TempFile("stage.png");
+        viewer_->Capture(path, "Electrons");
+        EXPECT_TRUE(viewer_->Step());
+        int width = 0;
+        int height = 0;
+        int channels = 0;
+        unsigned char* texels = stbi_load(
+            path.string().c_str(), &width, &height, &channels, 4);
+        std::array<int, 3> rgb{};
+        EXPECT_NE(texels, nullptr);
+        if (texels != nullptr) {
+            const std::size_t row = static_cast<std::size_t>(width);
+            const unsigned char* pixel =
+                texels +
+                4 * (static_cast<std::size_t>(height / 2) * row +
+                     row / 2);
+            rgb = {pixel[0], pixel[1], pixel[2]};
+            stbi_image_free(texels);
+        }
+        std::filesystem::remove(path);
+        return rgb;
+    };
+    const std::array<int, 3> whole = centre();
+    const auto [low, high] =
+        std::minmax({whole[0], whole[1], whole[2]});
+    EXPECT_LT(low + 40, high) << "the mosaic's single channel";
+    viewer_->Delegate().SetViewStage(
+        Path(product.String() + "Chain/noise"));
+    const std::array<int, 3> stage = centre();
+    const auto [stageLow, stageHigh] =
+        std::minmax({stage[0], stage[1], stage[2]});
+    EXPECT_GT(stageLow, 40);
+    EXPECT_LT(stageHigh - stageLow, 20) << "every channel, before it";
 }

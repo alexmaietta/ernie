@@ -3126,12 +3126,23 @@ void RasterDelegate::Update(const Scene& scene, const Path& settings,
     const Path chain =
         ViewChainProduct(scene, settings, prims.camera);
     const Path chosen[] = {chain};
-    const std::vector<SensorFilterStep> filters =
+    std::vector<SensorFilterStep> filters =
         ResolveRenderProducts(
             scene, chain.IsEmpty() ? std::span<const Path>() : chosen,
             settings)
             .front()
             .filters;
+    // A stage (`SetViewStage`): the chain up to that filter, its last
+    // domain what the vars show.
+    if (!chain.IsEmpty() && !viewStage_.IsEmpty()) {
+        std::vector<Path> staged =
+            RenderProduct(scene, chain).GetFilters();
+        if (const auto stage = std::ranges::find(staged, viewStage_);
+            stage != staged.end()) {
+            staged.erase(stage + 1, staged.end());
+            filters = SensorFilterStepsOf(scene, staged);
+        }
+    }
     viewAovs_ =
         filters.empty()
             ? std::vector<std::string>{}

@@ -378,6 +378,15 @@ class RenderDelegate {
         static_cast<void>(var);
     }
 
+    /// Ends the view's sensor chain after the SensorFilter prim
+    /// `filter` of the product it runs (`ViewChainProduct`), so its
+    /// vars show the image there, the last domain it writes; empty,
+    /// or a filter not in that chain, runs it whole. Call before
+    /// `Update`. Backends without sensor chains ignore it.
+    virtual void SetViewStage(const Path& filter) {
+        static_cast<void>(filter);
+    }
+
     /// Outlines the prims at `paths` and their descendants in
     /// `Record`'s image, as Omniverse Kit outlines its selection, in
     /// display colour `colour` (sRGB-encoded rgb, alpha its opacity);

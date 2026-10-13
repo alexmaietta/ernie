@@ -212,7 +212,8 @@ ResolveRenderProducts(const Scene& scene,
 /// The RenderProduct whose sensor chain a view through `camera` runs,
 /// as that camera's own sensor (a thermal camera's bolometer, say):
 /// the first of `settings`' products looking through it, else the
-/// first such product of the scene outside the session root; empty
+/// first such product of the scene, those under the session root only
+/// for a camera there (the viewer's own); empty
 /// for none, when the view runs its settings' first product's chain
 /// (`DefaultFilterChain` without products).
 Path ViewChainProduct(const Scene& scene, const Path& settings,

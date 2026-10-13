@@ -4245,7 +4245,6 @@ Viewer::Viewer(Scene& scene, const ViewerOptions& options)
     s.panels.push_back(MakeStagePanel());
     s.panels.push_back(MakePropertiesPanel());
     s.panels.push_back(MakeSettingsPanel());
-    s.panels.push_back(MakeCameraPanel());
     s.panels.push_back(MakeLogPanel());
     s.panels.push_back(std::make_unique<InfoPanel>());
     s.panels.push_back(std::make_unique<OverlaysPanel>());

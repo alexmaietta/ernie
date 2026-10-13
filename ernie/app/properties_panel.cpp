@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/app/builtin_panels.h"
+#include "ernie/app/camera_sections.h"
 #include "ernie/app/icons.h"
 #include "ernie/app/prim_icons.h"
 #include "ernie/app/prim_schemas.h"
@@ -138,12 +139,17 @@ class PropertiesPanel final : public Panel {
     void Draw(Viewer& viewer) override {
         const std::vector<Path>& selection = viewer.Selection();
         Scene& scene = viewer.GetScene();
-        if (selection.empty() || !scene.Has(selection.front())) {
+        // Without a selection, the camera the viewport looks through
+        // (the viewer's own, say), its sensor to edit.
+        const bool selected =
+            !selection.empty() && scene.Has(selection.front());
+        if (!selected && !scene.Has(viewer.ActiveCamera())) {
             ImGui::TextDisabled(
                 "Select a prim in the Stage or the viewport.");
             return;
         }
-        const Path& path = selection.front();
+        const Path& path =
+            selected ? selection.front() : viewer.ActiveCamera();
         // As Kit's property window: a search field, then the prim's
         // path and type.
         ImGui::SetNextItemWidth(-1.0f);
@@ -158,7 +164,9 @@ class PropertiesPanel final : public Panel {
         ImGui::SameLine();
         ImGui::TextDisabled(
             "%s%s", type.empty() ? "untyped" : type.c_str(),
-            selection.size() > 1 ? "  (first of the selection)" : "");
+            !selected              ? "  (the viewport's camera)"
+            : selection.size() > 1 ? "  (first of the selection)"
+                                   : "");
         if (!error_.empty()) {
             ImGui::TextColored(ImVec4(0.89f, 0.34f, 0.32f, 1.0f),
                                "%s", error_.c_str());
@@ -179,6 +187,9 @@ class PropertiesPanel final : public Panel {
             viewer, path, sections, labelWidth_, filter);
         if (!failure.empty()) {
             error_ = failure;
+        }
+        if (type == tokens::kCamera) {
+            DrawCameraSections(viewer, path, labelWidth_, filter);
         }
         std::set<std::string, std::less<>> known{
             std::string(tokens::kTransform)};

@@ -1213,9 +1213,11 @@ Path ViewChainProduct(const Scene& scene, const Path& settings,
             }
         }
     }
+    // The session's own products are its camera's alone.
     const Path session(kSessionRoot);
     for (const Path& product : scene.Prims(kRenderProduct)) {
-        if (!product.HasPrefix(session) && looksThrough(product)) {
+        if ((!product.HasPrefix(session) || camera.HasPrefix(session)) &&
+            looksThrough(product)) {
             return product;
         }
     }

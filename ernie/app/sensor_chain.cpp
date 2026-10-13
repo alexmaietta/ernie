@@ -92,8 +92,13 @@ bool Valid(const Scene& scene, const std::vector<Path>& filters,
 }  // namespace
 
 Path CustomizeChain(Scene& scene, const Path& camera) {
-    const Path product = FreePath(
-        scene, "/Render/" + std::string(camera.Name()) + "Sensor");
+    // The viewer's own camera's under the session root, as it is.
+    const Path session(tokens::kSessionRoot);
+    const std::string root = camera.HasPrefix(session)
+                                 ? session.String() + "/Render/"
+                                 : std::string("/Render/");
+    const Path product =
+        FreePath(scene, root + std::string(camera.Name()) + "Sensor");
     const Path folder(product.String() + "Chain");
     std::vector<Path> filters;
     for (const SensorFilter filter : DefaultFilterChain()) {
@@ -112,6 +117,72 @@ Path CustomizeChain(Scene& scene, const Path& camera) {
         .SetOrderedVars({var})
         .SetFilters(filters);
     return product;
+}
+
+std::vector<Path> ProductsOf(const Scene& scene, const Path& camera) {
+    std::vector<Path> products;
+    const Path session(tokens::kSessionRoot);
+    for (const Path& product : scene.Prims(tokens::kRenderProduct)) {
+        // The session's own products are its camera's alone.
+        if (product.HasPrefix(session) &&
+            !camera.HasPrefix(session)) {
+            continue;
+        }
+        const std::vector<Path> cameras =
+            RenderProduct(scene, product).GetCamera();
+        if (!cameras.empty() && cameras.front() == camera) {
+            products.push_back(product);
+        }
+    }
+    return products;
+}
+
+bool HoldsVar(const Scene& scene, const Path& product,
+              std::string_view name) {
+    for (const Path& var :
+         RenderProduct(scene, product).GetOrderedVars()) {
+        if (scene.Has(var) &&
+            scene.TypeOf(var) == tokens::kRenderVar &&
+            RenderVar(scene, var).GetSourceName() == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void SetProductVar(Scene& scene, const Path& product,
+                   std::string_view name, bool held) {
+    RenderProduct view(scene, product);
+    std::vector<Path> vars = view.GetOrderedVars();
+    if (held) {
+        if (HoldsVar(scene, product, name)) {
+            return;
+        }
+        // Children of the product named as their source, the colon of
+        // an AOV's ("aov:mosaic") left out.
+        std::string child(name);
+        std::erase(child, ':');
+        const Path var =
+            FreePath(scene, product.Child(child).String());
+        RenderVar::Define(scene, var)
+            .SetSourceName(std::string(name));
+        vars.push_back(var);
+        view.SetOrderedVars(vars);
+        return;
+    }
+    std::vector<Path> kept;
+    std::vector<Path> removed;
+    for (const Path& var : vars) {
+        const bool named =
+            scene.Has(var) &&
+            scene.TypeOf(var) == tokens::kRenderVar &&
+            RenderVar(scene, var).GetSourceName() == name;
+        (named ? removed : kept).push_back(var);
+    }
+    view.SetOrderedVars(kept);
+    for (const Path& var : removed) {
+        scene.Remove(var);
+    }
 }
 
 Path AddChainFilter(Scene& scene, const Path& product,
@@ -186,6 +257,27 @@ void RemoveChainFilter(Scene& scene, const Path& product,
     if (scene.Has(removed) && !Referenced(scene, removed)) {
         scene.Remove(removed);
     }
+}
+
+std::string_view StageVarOf(std::string_view type,
+                            const SensorFilterRegistry& registry) {
+    const auto domains = DomainsOf(type, registry);
+    if (!domains) {
+        return render_vars::kLdrColor;
+    }
+    switch (domains->second) {
+    case FilterDomain::Spectrum:
+        return render_vars::kSpectralRadiance;
+    case FilterDomain::Electrons:
+        return render_vars::kElectrons;
+    case FilterDomain::Digital:
+        return render_vars::kRawDn;
+    case FilterDomain::Rgb:
+        return render_vars::kHdrColor;
+    case FilterDomain::Display:
+        break;
+    }
+    return render_vars::kLdrColor;
 }
 
 std::string ChainFlowOf(std::string_view type,

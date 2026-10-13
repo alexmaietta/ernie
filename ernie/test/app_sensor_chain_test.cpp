@@ -111,3 +111,45 @@ TEST(SensorChain, FiltersBypassMoveAddAndRemove) {
               "display");
     EXPECT_EQ(ernie::app::ChainFlowOf("nope", registry), "unknown");
 }
+
+TEST(SensorChain, ProductsHoldVarsAndTheViewersCameraItsOwn) {
+    Scene scene = CameraScene();
+    const SensorFilterRegistry registry =
+        SensorFilterRegistry::WithStandard();
+    const Path camera("/World/Thermal");
+    EXPECT_TRUE(ernie::app::ProductsOf(scene, camera).empty());
+    const Path product = ernie::app::CustomizeChain(scene, camera);
+    EXPECT_EQ(ernie::app::ProductsOf(scene, camera),
+              std::vector<Path>{product});
+    EXPECT_TRUE(ernie::app::HoldsVar(scene, product, "LdrColor"));
+    EXPECT_FALSE(ernie::app::HoldsVar(scene, product, "Temperature"));
+    ernie::app::SetProductVar(scene, product, "Temperature", true);
+    EXPECT_TRUE(ernie::app::HoldsVar(scene, product, "Temperature"));
+    EXPECT_TRUE(scene.Has(product.Child("Temperature")));
+    ernie::app::SetProductVar(scene, product, "LdrColor", false);
+    EXPECT_FALSE(ernie::app::HoldsVar(scene, product, "LdrColor"));
+    EXPECT_FALSE(scene.Has(product.Child("LdrColor")));
+
+    // The viewer's own camera's product under the session root, which
+    // only it sees.
+    const Path session(
+        Path(ernie::tokens::kSessionRoot).Child("View"));
+    ernie::Camera::Define(scene, session);
+    const Path own = ernie::app::CustomizeChain(scene, session);
+    EXPECT_TRUE(own.HasPrefix(Path(ernie::tokens::kSessionRoot)));
+    EXPECT_EQ(
+        ernie::ViewChainProduct(scene, "/Render/Settings", session),
+        own);
+    EXPECT_EQ(ernie::app::ProductsOf(scene, session),
+              std::vector<Path>{own});
+    EXPECT_EQ(ernie::app::ProductsOf(scene, camera),
+              std::vector<Path>{product});
+
+    EXPECT_EQ(ernie::app::StageVarOf("noise", registry), "Electrons");
+    EXPECT_EQ(ernie::app::StageVarOf("adc", registry), "RawDN");
+    EXPECT_EQ(ernie::app::StageVarOf("cie", registry), "HdrColor");
+    EXPECT_EQ(ernie::app::StageVarOf("psf", registry),
+              "SpectralRadiance");
+    EXPECT_EQ(ernie::app::StageVarOf("exposure", registry),
+              "LdrColor");
+}

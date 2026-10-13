@@ -2,7 +2,7 @@
 ernie_add_library(
     ernie_app
     SOURCES
-    camera_panel.cpp
+    camera_sections.cpp
     capture.cpp
     capture_panel.cpp
     cli.cpp
