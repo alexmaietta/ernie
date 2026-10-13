@@ -3404,6 +3404,12 @@ void RasterDelegate::UpdatePrims(
         return FrameParamsOf(scene, prims_, extent.width,
                              extent.height);
     }();
+    // The viewport's own exposure stops, and its meter.
+    if (viewportFrame_) {
+        frame.exposure =
+            static_cast<float>(std::exp2(viewportStops_));
+        frame.meter = true;
+    }
     for (std::size_t i = 0;
          i < frame.lights.size() && i < anchoredLights.size(); ++i) {
         frame.lights[i].posedOnGpu = anchoredLights[i];

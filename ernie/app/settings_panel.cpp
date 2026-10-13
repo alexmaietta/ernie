@@ -137,24 +137,6 @@ class SettingsPanel final : public Panel {
         if (ImGui::Checkbox("##vsync", &vsync)) {
             viewer.SetVsync(vsync);
         }
-        row("Auto exposure");
-        bool automatic = viewer.AutoExposing();
-        if (ImGui::Checkbox("##autoExposure", &automatic)) {
-            viewer.SetExposure(automatic ? Viewer::Exposure::Auto
-                                         : Viewer::Exposure::Camera);
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Key the scene's metered luminance to "
-                              "middle grey; off, the camera's "
-                              "own exposure applies");
-        }
-        row("Exposure comp.");
-        float stops =
-            static_cast<float>(viewer.ExposureCompensation());
-        if (ImGui::SliderFloat("##compensation", &stops, -6.0f, 6.0f,
-                               "%+.1f EV")) {
-            viewer.SetExposureCompensation(stops);
-        }
         row("Gizmo");
         const char* gizmoNames[] = {"None", "Translate", "Rotate",
                                     "Scale"};

@@ -2881,16 +2881,13 @@ FrameParams FrameParamsOf(const Scene& scene,
     params.minimalColor =
         glm::vec3(options.GetMinimalConstantColor());
     const std::string precision = options.GetSpectralPrecision();
-    if (precision != tokens::kFloat32 &&
-        precision != tokens::kFloat16) {
+    if (precision != tokens::kFloat32 && precision != tokens::kFloat16) {
         throw std::invalid_argument(
             "'" + std::string(tokens::kSpectralPrecision) + "' of '" +
             settings.String() + "' is '" + precision +
             "', not float32 or float16");
     }
     params.halfRadiance = precision == tokens::kFloat16;
-    params.exposure = static_cast<float>(
-        std::exp2(options.GetExposureCompensation()));
     params.meter = options.GetMeter();
     params.culling = CullingOf(scene, settings);
     params.occlusion = OcclusionOf(scene, settings);

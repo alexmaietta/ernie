@@ -52,10 +52,7 @@ def test_render_settings_read_fallbacks_and_define_with_keywords():
         settings.dome_light_mode == "approximate"
         and settings.dome_directions == 16
     )
-    assert (
-        settings.exposure_compensation == 0.0
-        and settings.meter is False
-    )
+    assert settings.meter is False
     assert (
         settings.lod_mesh_error == 1.0 and settings.lod_enable is True
     )

@@ -2577,10 +2577,10 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
             image.As<std::uint8_t>()[4 * (kVarSize / 2 * kVarSize +
                                           kVarSize / 2)]);
     };
-    ernie::Camera(scene, "/World/Camera")
-        .SetExposureTime(1.0 / 20000.0);
+    ernie::Camera camera(scene, "/World/Camera");
+    camera.SetExposureTime(1.0 / 20000.0);
     const int base = centre();
-    settings.SetExposureCompensation(2.0);
+    camera.SetExposure(2.0);
     EXPECT_GT(centre(), base + 40);
 }
 

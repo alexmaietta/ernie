@@ -362,6 +362,14 @@ class RenderDelegate {
         static_cast<void>(blend);
     }
 
+    /// Stops on the viewport's photographic outputs (`Record`) on top
+    /// of its camera's exposure, as a viewer's compensation asks; the
+    /// viewport's frames meter their luminance too. The scene and its
+    /// products' outputs are untouched.
+    virtual void SetViewportExposure(double stops) {
+        static_cast<void>(stops);
+    }
+
     /// Which spectral band `Record` shows when it presents
     /// SpectralRadiance: 0 to the camera's band count - 1, or -1 for
     /// the mean over the bands; backends that cannot choose ignore

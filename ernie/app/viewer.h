@@ -598,8 +598,9 @@ class Viewer {
     Exposure GetExposure() const;
     void SetExposure(Exposure exposure);
 
-    /// Stops of exposure compensation on top of either mode
-    /// (`tokens::kExposureCompensation`).
+    /// Stops of exposure compensation on top of either mode, in the
+    /// viewport only (`RenderDelegate::SetViewportExposure`): the
+    /// camera's exposure and the products' outputs are untouched.
     double ExposureCompensation() const;
     void SetExposureCompensation(double stops);
 

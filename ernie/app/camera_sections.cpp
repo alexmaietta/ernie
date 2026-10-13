@@ -31,6 +31,30 @@ namespace {
 
 constexpr ImVec4 kError{0.89f, 0.34f, 0.32f, 1.0f};
 
+/// `text` as the last item's tooltip while it is hovered (disabled
+/// too), wrapped at about 28 characters' widths; none when empty.
+void Tooltip(const std::string& text) {
+    if (text.empty() ||
+        !ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip |
+                              ImGuiHoveredFlags_AllowWhenDisabled)) {
+        return;
+    }
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+    ImGui::TextUnformatted(text.c_str());
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+/// A filter's tooltip: what it does, then what it works on.
+std::string FilterTooltip(std::string_view type,
+                          const SensorFilterRegistry& registry) {
+    const std::string description =
+        ChainDescriptionOf(type, registry);
+    const std::string flow = ChainFlowOf(type, registry);
+    return description.empty() ? flow : description + "\n\n" + flow;
+}
+
 /// What the viewport shows of a chain's stage, per viewer: the filter
 /// its chain ends after (`RenderDelegate::SetViewStage`) and the var
 /// it showed before.
@@ -204,11 +228,8 @@ void DrawProducts(Viewer& viewer, Scene& scene, const Path& camera,
             ChosenProducts()[camera] = CustomizeChain(scene, camera);
         };
     }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("A render product looking through this "
-                          "camera, with LdrColor and a copy of the "
-                          "default chain");
-    }
+    Tooltip("A render product looking through this camera, with "
+            "LdrColor and a copy of the default chain");
     if (edit) {
         edit();
     }
@@ -227,6 +248,7 @@ AddMenu(const SensorFilterRegistry& registry) {
         if (ImGui::Selectable(std::string(NameOf(filter)).c_str())) {
             chosen = std::string(NameOf(filter));
         }
+        Tooltip(FilterTooltip(NameOf(filter), registry));
     }
     const std::pair<FilterKind, const char*> kinds[] = {
         {FilterKind::Spatial, "Spatial"},
@@ -247,10 +269,7 @@ AddMenu(const SensorFilterRegistry& registry) {
             if (ImGui::Selectable(model.id.c_str())) {
                 chosen = model.id;
             }
-            if (ImGui::IsItemHovered() &&
-                !model.description.empty()) {
-                ImGui::SetTooltip("%s", model.description.c_str());
-            }
+            Tooltip(FilterTooltip(model.id, registry));
         }
     }
     return chosen;
@@ -280,11 +299,9 @@ void DrawChain(Viewer& viewer, Scene& scene, const Path& camera,
         ImGui::TextWrapped("%s", chain.c_str());
         if (ImGui::Button("Customize")) {
             ChosenProducts()[camera] = CustomizeChain(scene, camera);
-        } else if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("A render product looking through this "
-                              "camera with a copy of the default "
-                              "chain, to edit");
         }
+        Tooltip("A render product looking through this camera with a "
+                "copy of the default chain, to edit");
         return;
     }
     Path& chosen = ChosenProducts()[camera];
@@ -342,15 +359,15 @@ void DrawChain(Viewer& viewer, Scene& scene, const Path& camera,
         if (ImGui::Checkbox("##enabled", &enabled)) {
             prim.SetFilterEnabled(enabled);
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Unchecked, the chain runs without it");
-        }
+        Tooltip("Unchecked, the chain runs without it");
         ImGui::SameLine();
         const std::string type = prim.GetFilterType();
         const std::string label =
             type + "##" + std::string(filter.Name());
         const bool open = ImGui::TreeNodeEx(
             label.c_str(), ImGuiTreeNodeFlags_AllowOverlap);
+        Tooltip(FilterTooltip(type, registry) + "\n\n" +
+                filter.String());
         ImGui::SameLine();
         ImGui::TextDisabled("%s",
                             ChainFlowOf(type, registry).c_str());
@@ -388,28 +405,33 @@ void DrawChain(Viewer& viewer, Scene& scene, const Path& camera,
             ImGui::PopStyleColor();
         }
         ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(
-                ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip(
-                viewport
-                    ? (shown ? "Showing the image after it; click "
-                               "for the whole chain's"
-                             : "Show the image right after it in "
-                               "the viewport")
-                    : "The viewport runs another product's chain");
-        }
+        Tooltip(
+            viewport
+                ? (shown
+                       ? "Showing the image right after it "
+                         "(" +
+                             std::string(StageVarOf(type, registry)) +
+                             "); click for the whole "
+                             "chain's"
+                       : "Show the image right after it in "
+                         "the viewport, as " +
+                             std::string(StageVarOf(type, registry)))
+                : "The viewport runs another product's "
+                  "chain");
         ImGui::SameLine();
         if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
             edit = [&scene, product, i] {
                 MoveChainFilter(scene, product, i, -1);
             };
         }
+        Tooltip("Earlier in the chain");
         ImGui::SameLine();
         if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
             edit = [&scene, product, i] {
                 MoveChainFilter(scene, product, i, 1);
             };
         }
+        Tooltip("Later in the chain");
         ImGui::SameLine();
         if (ImGui::Button("x",
                           ImVec2(ImGui::GetFrameHeight(), 0.0f))) {
@@ -417,6 +439,7 @@ void DrawChain(Viewer& viewer, Scene& scene, const Path& camera,
                 RemoveChainFilter(scene, product, i);
             };
         }
+        Tooltip("Remove it from the chain");
         if (open) {
             std::vector<PropertySection> sections =
                 SchemaOf(scene, filter, viewer.Brdfs(), registry);
@@ -460,13 +483,25 @@ void DrawChain(Viewer& viewer, Scene& scene, const Path& camera,
 }  // namespace
 
 void DrawCameraSections(Viewer& viewer, const Path& camera,
+                        std::span<const PropertySection> sections,
                         float labelWidth, std::string_view filter) {
     Scene& scene = viewer.GetScene();
     const auto shows = [&](const char* title) {
         return MatchesFilter(title, title, filter) &&
                SectionHeader(viewer, title);
     };
+    // Its exposure attributes, which change its products' outputs,
+    // and the meter.
+    const auto exposure = std::ranges::find(sections, "Exposure",
+                                            &PropertySection::title);
     if (shows("Exposure")) {
+        if (exposure != sections.end()) {
+            const std::string error = DrawPropertyFields(
+                viewer, camera, exposure->fields, labelWidth);
+            if (!error.empty()) {
+                ImGui::TextColored(kError, "%s", error.c_str());
+            }
+        }
         DrawExposure(viewer, scene, camera);
     }
     if (shows("Quantum Efficiency")) {

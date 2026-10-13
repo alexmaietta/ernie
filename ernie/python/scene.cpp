@@ -3122,7 +3122,6 @@ void BindScene(nb::module_& m) {
         {"SCENE", tokens::kScene},
         {"WORLD_FIT", tokens::kWorldFit},
         {"SHADOW_WORLD_MARGIN", tokens::kShadowWorldMargin},
-        {"EXPOSURE_COMPENSATION", tokens::kExposureCompensation},
         {"METER", tokens::kMeter},
         {"PHYSICAL_ILLUMINANT", tokens::kPhysicalIlluminant},
         {"PHYSICAL_CUSTOM_ILLUMINANT",

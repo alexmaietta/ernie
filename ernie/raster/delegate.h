@@ -236,6 +236,9 @@ class RasterDelegate : public RenderDelegate {
     SetViewportAutoExposure(std::optional<float> blend) override {
         viewportAutoExposure_ = blend;
     }
+    void SetViewportExposure(double stops) override {
+        viewportStops_ = stops;
+    }
 
     /// GPU memory of the renderer, drawables and the view's targets;
     /// triangles drawn by the terrain and meshes; and the
@@ -681,6 +684,9 @@ class RasterDelegate : public RenderDelegate {
     /// The viewer's automatic exposure for the viewport, and whether
     /// the frame being prepared is the viewport's.
     std::optional<float> viewportAutoExposure_;
+    /// Stops the viewer adds to the viewport's exposure
+    /// (`SetViewportExposure`).
+    double viewportStops_ = 0.0;
     bool viewportFrame_ = false;
     /// Inside the frame `StepAsync` meters before exposing.
     bool metering_ = false;

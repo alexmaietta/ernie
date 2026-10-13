@@ -140,10 +140,6 @@
       (::ernie::AttributeMeta{.doc = "The frame noise derives from; counts up by itself unless "   \
                                      "set.",                                                       \
                               .group = "Image"}))                                                  \
-    X(double, ExposureCompensation, ::ernie::tokens::kExposureCompensation, 0.0,                   \
-      (::ernie::AttributeMeta{.label = "Exposure", .doc = "Stops on the photographic outputs, on " \
-                                                          "top of the camera's exposure.",         \
-                              .group = "Image", .min = -16.0, .max = 16.0}))                       \
     X(bool, Meter, ::ernie::tokens::kMeter, false,                                                 \
       (::ernie::AttributeMeta{.doc = "Measure each frame's luminance, for automatic exposure and " \
                                      "meters.",                                                    \

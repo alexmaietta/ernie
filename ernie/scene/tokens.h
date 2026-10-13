@@ -1414,11 +1414,6 @@ inline constexpr std::string_view kScene = "scene";
 inline constexpr std::string_view kWorldFit = "world";
 inline constexpr std::string_view kShadowWorldMargin =
     "ernie:shadows:worldMargin";
-/// float, stops: exposure compensation on the photographic outputs
-/// (HdrColor's display, LdrColor), on top of the camera's own
-/// exposure; default 0.
-inline constexpr std::string_view kExposureCompensation =
-    "ernie:exposure";
 /// bool: measure each frame's scene luminance (its histogram) for
 /// automatic exposure and exposure meters, read back from a later
 /// frame (`RenderDelegate::MeteredLuminance`); default off.

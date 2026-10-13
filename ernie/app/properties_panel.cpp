@@ -183,13 +183,22 @@ class PropertiesPanel final : public Panel {
         const std::vector<PropertySection> sections =
             SchemaOf(scene, path, viewer.Brdfs(),
                      viewer.Delegate().SensorFilters());
+        // A camera's exposure joins its meter in its own sections.
+        const bool camera = type == tokens::kCamera;
+        std::vector<PropertySection> drawn = sections;
+        if (camera) {
+            std::erase_if(drawn, [](const PropertySection& section) {
+                return section.title == "Exposure";
+            });
+        }
         const std::string failure = DrawPropertySections(
-            viewer, path, sections, labelWidth_, filter);
+            viewer, path, drawn, labelWidth_, filter);
         if (!failure.empty()) {
             error_ = failure;
         }
-        if (type == tokens::kCamera) {
-            DrawCameraSections(viewer, path, labelWidth_, filter);
+        if (camera) {
+            DrawCameraSections(viewer, path, sections, labelWidth_,
+                               filter);
         }
         std::set<std::string, std::less<>> known{
             std::string(tokens::kTransform)};

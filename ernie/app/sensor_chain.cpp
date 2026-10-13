@@ -280,6 +280,40 @@ std::string_view StageVarOf(std::string_view type,
     return render_vars::kLdrColor;
 }
 
+std::string ChainDescriptionOf(std::string_view type,
+                               const SensorFilterRegistry& registry) {
+    if (const std::optional<SensorFilter> builtin =
+            SensorFilterNamed(type)) {
+        switch (*builtin) {
+        case SensorFilter::Lens:
+            return "Resamples the radiance into sensor pixels "
+                   "through "
+                   "the lens's distortion, with vignetting. Always "
+                   "first.";
+        case SensorFilter::Qe:
+            return "Mean electrons per channel: the camera equation, "
+                   "each channel's quantum efficiency over the "
+                   "bands, "
+                   "and dark current.";
+        case SensorFilter::Noise:
+            return "Shot, read, PRNU and DSNU noise on the "
+                   "electrons.";
+        case SensorFilter::Adc:
+            return "Digital numbers from the electrons: gain, "
+                   "offset, "
+                   "bit depth and the full well.";
+        case SensorFilter::Cie:
+            return "Linear sRGB in cd/m^2 from the bands through the "
+                   "CIE observer, the photographic branch.";
+        case SensorFilter::Exposure:
+            return "The photographic output: the colour times the "
+                   "exposure, sRGB-encoded (LdrColor).";
+        }
+    }
+    const SensorFilterModel* model = registry.Find(type);
+    return model != nullptr ? model->description : std::string();
+}
+
 std::string ChainFlowOf(std::string_view type,
                         const SensorFilterRegistry& registry) {
     if (const std::optional<SensorFilter> builtin =

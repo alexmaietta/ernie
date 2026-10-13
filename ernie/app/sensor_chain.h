@@ -64,6 +64,12 @@ void RemoveChainFilter(Scene& scene, const Path& product,
 std::string_view StageVarOf(std::string_view type,
                             const SensorFilterRegistry& registry);
 
+/// What filter `type` does, in a sentence or two: a registered
+/// filter's description, or the built-in's; empty for a type neither
+/// built in nor in `registry`.
+std::string ChainDescriptionOf(std::string_view type,
+                               const SensorFilterRegistry& registry);
+
 /// What filter `type` works on, and what it makes: "spectrum >
 /// electrons" for `qe`, "electrons" for `noise`; "unknown" for a type
 /// neither built in nor in `registry`.

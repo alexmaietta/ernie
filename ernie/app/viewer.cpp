@@ -501,7 +501,7 @@ struct Viewer::State {
     }
 
     /// The stops of exposure the viewport adds to the camera's: the
-    /// compensation and the scene settings' own. Exposing
+    /// viewer's compensation, the viewport's alone. Exposing
     /// automatically, the renderer adds the stops that bring the
     /// metered luminance to middle grey on the GPU, approached
     /// smoothly (`RenderDelegate::SetViewportAutoExposure`);
@@ -516,10 +516,7 @@ struct Viewer::State {
         constexpr double kAdaptation = 0.25;
         const double blend =
             1.0 - std::exp(-frameInfo.delta / kAdaptation);
-        const double stops =
-            compensation +
-            RenderSettings::OrFallbacks(scene, settingsSource)
-                .GetExposureCompensation();
+        const double stops = compensation;
         if (!AutoExposing()) {
             delegate->SetViewportAutoExposure(std::nullopt);
             autoStops.reset();
@@ -2572,6 +2569,8 @@ struct Viewer::State {
             ImGui::EndMenu();
         }
         if (menu::BeginSubmenu("Exposure")) {
+            ImGui::TextDisabled("The viewport's alone: cameras keep "
+                                "their own");
             const std::pair<Viewer::Exposure, const char*>
                 exposures[] = {
                     {Viewer::Exposure::Default, "Default"},
@@ -3520,11 +3519,10 @@ struct Viewer::State {
                        scene.Get(settingsSource, attribute) !=
                            nullptr;
             };
-            // Exposure: metered every frame, for automatic exposure
-            // and the meter.
-            overrides.emplace(tokens::kExposureCompensation,
-                              ExposureStops());
-            overrides.emplace(tokens::kMeter, true);
+            // The viewport's own exposure, metered every frame for
+            // automatic exposure and the meter; the scene's products
+            // keep their cameras'.
+            delegate->SetViewportExposure(ExposureStops());
             // The eye menu's overlays and the selection's outline
             // always show, besides the overlays the settings choose.
             UpdateSelectionOverlay();

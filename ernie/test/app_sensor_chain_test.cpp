@@ -153,3 +153,15 @@ TEST(SensorChain, ProductsHoldVarsAndTheViewersCameraItsOwn) {
     EXPECT_EQ(ernie::app::StageVarOf("exposure", registry),
               "LdrColor");
 }
+
+TEST(SensorChain, FiltersDescribeThemselves) {
+    const SensorFilterRegistry registry =
+        SensorFilterRegistry::WithStandard();
+    EXPECT_NE(ernie::app::ChainDescriptionOf("noise", registry)
+                  .find("Shot"),
+              std::string::npos);
+    EXPECT_EQ(ernie::app::ChainDescriptionOf("bolometer", registry),
+              registry.Find("bolometer")->description);
+    EXPECT_TRUE(
+        ernie::app::ChainDescriptionOf("nope", registry).empty());
+}
