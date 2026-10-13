@@ -10,16 +10,22 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
 #include <MaterialXFormat/XmlIo.h>
+#include <MaterialXGenHw/HwConstants.h>
+#include <MaterialXGenHw/Nodes/HwSurfaceNode.h>
 #include <MaterialXGenShader/DefaultColorManagementSystem.h>
 #include <MaterialXGenShader/GenContext.h>
 #include <MaterialXGenShader/Shader.h>
+#include <MaterialXGenShader/ShaderStage.h>
+#include <MaterialXGenShader/Syntax.h>
 #include <MaterialXGenShader/UnitSystem.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXGenSlang/SlangShaderGenerator.h>
 
+#include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <mutex>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -222,7 +228,520 @@ void Validate(const mx::DocumentPtr& document,
     }
 }
 
+// ---------------------------------------------------------------------
+// Generation for Ernie's shading pass
+
+/// MaterialX's `surface` node with its light loop over Ernie's
+/// lights: the closure's response to a unit of each light goes to
+/// Ernie (ernieMxLightResponse), which scales it by the light's
+/// spectrum, distance and shadow; its environment and emission stay
+/// MaterialX's.
+///
+/// Reference: MaterialX 1.39.5,
+/// MaterialXGenHw/Nodes/HwSurfaceNode.cpp (the loop this replaces).
+class ErnieSurfaceNode : public mx::HwSurfaceNode {
+  public:
+    static mx::ShaderNodeImplPtr create() {
+        return std::make_shared<ErnieSurfaceNode>();
+    }
+
+    void emitLightLoop(const mx::ShaderNode& node,
+                       mx::GenContext& context,
+                       mx::ShaderStage& stage,
+                       const std::string&) const override {
+        const auto& generator =
+            static_cast<const mx::HwShaderGenerator&>(
+                context.getShaderGenerator());
+        const mx::ShaderInput* bsdfInput =
+            node.getInput(getBsdfInputName());
+        const mx::ShaderNode* bsdf =
+            bsdfInput != nullptr ? bsdfInput->getConnectedSibling()
+                                 : nullptr;
+        if (bsdf == nullptr) {
+            return;
+        }
+        generator.emitComment(
+            "Ernie's lights: the response to a unit of each, which "
+            "Ernie scales by the light",
+            stage);
+        generator.emitLine("for (int ernieLight = 0; ernieLight < "
+                           "ernieMxLightCount(); ++ernieLight)",
+                           stage, false);
+        generator.emitScopeBegin(stage);
+        generator.emitLine("L = ernieMxLightDirection(ernieLight)",
+                           stage);
+        generator.emitLine("occlusion = 1.0", stage);
+        if (bsdf->hasClassification(
+                mx::ShaderNode::Classification::BSDF_R)) {
+            generator.emitLine(
+                "ClosureData closureData = makeClosureData("
+                "CLOSURE_TYPE_REFLECTION, L, V, N, P, occlusion)",
+                stage);
+            generator.emitFunctionCall(*bsdf, context, stage);
+        } else {
+            generator.emitLineBegin(stage);
+            generator.emitOutput(bsdf->getOutput(), true, true,
+                                 context, stage);
+            generator.emitLineEnd(stage);
+        }
+        generator.emitLine("ernieMxLightResponse(ernieLight, " +
+                               bsdf->getOutput()->getVariable() +
+                               ".response)",
+                           stage);
+        generator.emitScopeEnd(stage);
+        generator.emitLineBreak(stage);
+    }
+};
+
+/// The bytes a uniform of MaterialX type `type` takes in the uniform
+/// buffer (scalar layout), or 0 for a type it does not hold.
+std::uint32_t UniformBytes(const std::string& type) {
+    static const std::unordered_map<std::string, std::uint32_t>
+        kBytes{{"float", 4},    {"integer", 4},  {"boolean", 4},
+               {"vector2", 8},  {"vector3", 12}, {"color3", 12},
+               {"vector4", 16}, {"color4", 16},  {"matrix33", 36},
+               {"matrix44", 64}};
+    const auto it = kBytes.find(type);
+    return it != kBytes.end() ? it->second : 0;
+}
+
+/// The bridge call reading a uniform of MaterialX type `type` at byte
+/// `offset`.
+std::string UniformLoad(const std::string& type,
+                        std::uint32_t offset) {
+    static const std::unordered_map<std::string, std::string> kLoads{
+        {"float", "ernieMxLoadFloat"},
+        {"integer", "ernieMxLoadInt"},
+        {"vector2", "ernieMxLoadFloat2"},
+        {"vector3", "ernieMxLoadFloat3"},
+        {"color3", "ernieMxLoadFloat3"},
+        {"vector4", "ernieMxLoadFloat4"},
+        {"color4", "ernieMxLoadFloat4"},
+        {"matrix33", "ernieMxLoadFloat3x3"},
+        {"matrix44", "ernieMxLoadFloat4x4"}};
+    const std::string at = std::to_string(offset) + "u";
+    if (type == "boolean") {
+        return "(ernieMxLoadInt(" + at + ") != 0)";
+    }
+    return kLoads.at(type) + "(" + at + ")";
+}
+
+/// What Ernie gives for MaterialX's private uniforms it knows (the
+/// view's position, the time, the transforms), by variable; empty for
+/// one left at MaterialX's default.
+std::string PrivateUniform(const std::string& variable) {
+    static const std::unordered_map<std::string, std::string> kBridge{
+        {"u_viewPosition", "ernieMxViewPosition()"},
+        {"u_time", "ernieMxTime()"},
+        {"u_frame", "ernieMxFrame()"},
+        {"u_worldMatrix", "ernieMxWorldMatrix()"},
+        {"u_worldInverseMatrix", "ernieMxWorldInverseMatrix()"},
+        {"u_worldTransposeMatrix", "transpose(ernieMxWorldMatrix())"},
+        {"u_worldInverseTransposeMatrix",
+         "transpose(ernieMxWorldInverseMatrix())"},
+        {"u_viewMatrix", "ernieMxViewMatrix()"},
+        {"u_viewInverseMatrix", "ernieMxViewInverseMatrix()"},
+        {"u_projectionMatrix", "ernieMxProjectionMatrix()"}};
+    const auto it = kBridge.find(variable);
+    return it != kBridge.end() ? it->second : std::string();
+}
+
+/// What fills a vertex data field (`VertexData`'s, as MaterialX's
+/// pixel stages read them) of variable `variable` and Slang type
+/// `type`, from Ernie; its primvar's name to `geomProps` when it is
+/// one.
+std::string VertexDataFill(const std::string& variable,
+                           const std::string& type,
+                           std::vector<std::string>& geomProps) {
+    static const std::unordered_map<std::string, std::string> kFields{
+        {"positionWorld", "ernieMxPositionWorld()"},
+        {"normalWorld", "ernieMxNormalWorld()"},
+        {"tangentWorld", "ernieMxTangentWorld()"},
+        {"bitangentWorld", "ernieMxBitangentWorld()"},
+        {"positionObject", "ernieMxPositionObject()"},
+        {"normalObject", "ernieMxNormalObject()"},
+        {"tangentObject", "ernieMxTangentObject()"},
+        {"bitangentObject", "ernieMxBitangentObject()"}};
+    if (const auto it = kFields.find(variable); it != kFields.end()) {
+        return it->second;
+    }
+    const auto set = [&](std::string_view prefix) {
+        return std::stoi(variable.substr(prefix.size()));
+    };
+    if (variable.starts_with("texcoord_")) {
+        const std::string uv = "ernieMxTexcoord(" +
+                               std::to_string(set("texcoord_")) + ")";
+        return type == "float3" ? "float3(" + uv + ", 0.0)" : uv;
+    }
+    if (variable.starts_with("color_")) {
+        const std::string colour =
+            "ernieMxColor(" + std::to_string(set("color_")) + ")";
+        return type == "float3" ? colour + ".rgb" : colour;
+    }
+    if (variable.starts_with("geomprop_")) {
+        const auto id = static_cast<int>(geomProps.size());
+        geomProps.push_back(
+            variable.substr(std::string("geomprop_").size()));
+        static const std::unordered_map<std::string, std::string>
+            kTypes{{"float", "Float"},
+                   {"float2", "Float2"},
+                   {"float3", "Float3"},
+                   {"float4", "Float4"},
+                   {"int", "Int"}};
+        const auto it = kTypes.find(type);
+        if (it != kTypes.end()) {
+            return "ernieMxGeomProp" + it->second + "(" +
+                   std::to_string(id) + ")";
+        }
+    }
+    return {};
+}
+
+/// Corrects what MaterialX 1.39.5's Slang generation leaves invalid
+/// in `code`, where it turns its shared GLSL into Slang token by
+/// token (SlangShaderGenerator::SlangSyntaxFromGlsl):
+/// - GLSL's `mix`, renamed `lerp` where it stands alone but not where
+///   punctuation follows it, as a parameter of that name is used
+///   (LamaMix's "mix" input);
+/// - a global `const` without `static`, which Slang requires, where
+/// its
+///   own fix runs before `mat3` becomes `float3x3`
+///   (mx_blackbody.glsl);
+/// - GLSL's matrix times vector, which Slang spells `mul`
+///   (mx_flake.glsl).
+void FixMaterialXSlang(std::string& code) {
+    // A use of `mix` that is not a call: the variable it named.
+    static const std::regex kMix(R"(\bmix\b(\s*[^\s(a-zA-Z0-9_]))");
+    code = std::regex_replace(code, kMix, "lerp$1");
+    static const std::regex kGlobalConst(
+        R"((^|\n)const (float3x3|mat3) XYZ_to_RGB)");
+    code = std::regex_replace(code, kGlobalConst,
+                              "$1static const float3x3 XYZ_to_RGB");
+    const std::string flake = "return m * p;";
+    for (std::size_t at = code.find(flake); at != std::string::npos;
+         at = code.find(flake, at)) {
+        code.replace(at, flake.size(), "return mx_matrix_mul(m, p);");
+    }
+}
+
+/// MaterialX's Slang generator, writing a function Ernie's shading
+/// pass calls (`MaterialXShader`) in place of a fragment shader: its
+/// textures, uniforms, vertex data, lights and environment through
+/// Ernie's bridge functions.
+///
+/// References:
+/// - MaterialX 1.39.5, MaterialXGenSlang/SlangShaderGenerator.cpp
+/// (the
+///   pixel stage this adapts).
+/// - Pixar, OpenUSD hdSt/materialXShaderGen.cpp (a renderer's
+/// subclass
+///   of MaterialX's generator onto its own lights and data).
+class ErnieSlangShaderGenerator : public mx::SlangShaderGenerator {
+  public:
+    explicit ErnieSlangShaderGenerator(MaterialXShader& out)
+        : SlangShaderGenerator(mx::TypeSystem::create()), out_(out) {
+        registerImplementation("IM_surface_" + TARGET,
+                               ErnieSurfaceNode::create);
+    }
+
+  protected:
+    void emitPixelStage(const mx::ShaderGraph& graph,
+                        mx::GenContext& context,
+                        mx::ShaderStage& stage) const override {
+        emitDirectives(context, stage);
+        emitTextures(stage);
+        emitTypeDefinitions(context, stage);
+        emitConstants(context, stage);
+        const bool lighting = requiresLighting(graph);
+        emitUniforms(context, stage, false);
+        emitInputs(context, stage);
+        emitSetup(context, stage);
+        emitLibraryInclude("stdlib/genslang/lib/mx_math.slang",
+                           context, stage);
+        emitLineBreak(stage);
+        emitLine(
+            "#define DIRECTIONAL_ALBEDO_METHOD " +
+                std::to_string(int(
+                    context.getOptions().hwDirectionalAlbedoMethod)),
+            stage, false);
+        emitLine(
+            "#define AIRY_FRESNEL_ITERATIONS " +
+                std::to_string(
+                    context.getOptions().hwAiryFresnelIterations),
+            stage, false);
+        emitLineBreak(stage);
+        if (lighting) {
+            emitSpecularEnvironment(context, stage);
+            emitTransmissionRender(context, stage);
+        }
+        _tokenSubstitutions
+            [mx::ShaderGenerator::T_FILE_TRANSFORM_UV] =
+                context.getOptions().fileTextureVerticalFlip
+                    ? "mx_transform_uv_vflip.glsl"
+                    : "mx_transform_uv.glsl";
+        _tokenSubstitutions[mx::HW::T_TEX_SAMPLER_SIGNATURE] =
+            "SamplerTexture2D tex_sampler";
+        emitFunctionDefinitions(graph, context, stage);
+
+        const mx::ShaderGraphOutputSocket* socket =
+            graph.getOutputSocket();
+        setFunctionName("ernieMaterialX", stage);
+        emitLine(
+            "void ernieMaterialX(out float3 ernieColor, out float3 "
+            "ernieTransparency)",
+            stage, false);
+        emitFunctionBodyBegin(graph, context, stage);
+        emitLine("ernieMxSetup()", stage);
+        emitLine("ernieColor = float3(0.0)", stage);
+        emitLine("ernieTransparency = float3(0.0)", stage);
+        const bool surface = graph.hasClassification(
+            mx::ShaderNode::Classification::SHADER |
+            mx::ShaderNode::Classification::SURFACE);
+        out_.surface = graph.hasClassification(
+            mx::ShaderNode::Classification::SURFACE);
+        if (graph.hasClassification(
+                mx::ShaderNode::Classification::CLOSURE) &&
+            !graph.hasClassification(
+                mx::ShaderNode::Classification::SHADER)) {
+            // A bare closure, unattached to a surface: black, as
+            // MaterialX's own renderers show it.
+        } else if (surface) {
+            emitFunctionCalls(
+                graph, context, stage,
+                mx::ShaderNode::Classification::TEXTURE);
+            for (mx::ShaderGraphOutputSocket* output :
+                 graph.getOutputSockets()) {
+                if (output->getConnection() == nullptr) {
+                    continue;
+                }
+                const mx::ShaderNode* upstream =
+                    output->getConnection()->getNode();
+                if (upstream->getParent() == &graph &&
+                    (upstream->hasClassification(
+                         mx::ShaderNode::Classification::CLOSURE) ||
+                     upstream->hasClassification(
+                         mx::ShaderNode::Classification::SHADER))) {
+                    emitFunctionCall(*upstream, context, stage);
+                }
+            }
+        } else {
+            emitFunctionCalls(graph, context, stage);
+        }
+        if (const mx::ShaderOutput* connection =
+                socket->getConnection()) {
+            const std::string variable = connection->getVariable();
+            const std::string type = connection->getType().getName();
+            if (out_.surface) {
+                emitLine("ernieColor = " + variable + ".color",
+                         stage);
+                emitLine("ernieTransparency = " + variable +
+                             ".transparency",
+                         stage);
+            } else if (type == "float" || type == "integer" ||
+                       type == "boolean") {
+                emitLine("ernieColor = float3(float(" + variable +
+                             "))",
+                         stage);
+            } else if (type == "vector2") {
+                emitLine("ernieColor = float3(" + variable + ", 0.0)",
+                         stage);
+            } else if (type == "vector3" || type == "color3") {
+                emitLine("ernieColor = " + variable, stage);
+            } else if (type == "vector4" || type == "color4") {
+                emitLine("ernieColor = " + variable + ".rgb", stage);
+            }
+        }
+        emitFunctionBodyEnd(graph, context, stage);
+    }
+
+    /// Uniforms as static variables `ernieMxSetup` fills: textures as
+    /// slots of the texture table, the values Ernie knows (the view's
+    /// position, the time) from Ernie, the rest from the material's
+    /// uniform buffer.
+    void emitUniforms(mx::GenContext& context, mx::ShaderStage& stage,
+                      bool) const override {
+        loads_.clear();
+        std::uint32_t offset = 0;
+        for (const auto& [name, block] : stage.getUniformBlocks()) {
+            if (block->getName() == mx::HW::LIGHT_DATA ||
+                block->empty()) {
+                continue;
+            }
+            emitComment("Uniform block: " + block->getName(), stage);
+            for (std::size_t i = 0; i < block->size(); ++i) {
+                const mx::ShaderPort* port = (*block)[i];
+                const std::string& variable = port->getVariable();
+                const std::string type = port->getType().getName();
+                const std::string value =
+                    port->getValue()
+                        ? port->getValue()->getValueString()
+                        : std::string();
+                if (type == "filename" &&
+                    block->getName() == mx::HW::PRIVATE_UNIFORMS) {
+                    // MaterialX's environment maps and albedo table,
+                    // which Ernie's environment replaces.
+                    emitLine("static const SamplerTexture2D " +
+                                 variable + " = { 0xFFFFFFFFu }",
+                             stage);
+                    continue;
+                }
+                if (type == "filename") {
+                    MaterialXTexture texture;
+                    texture.variable = variable;
+                    texture.slot = static_cast<std::uint32_t>(
+                        out_.textures.size());
+                    texture.file = value;
+                    texture.path = port->getPath();
+                    out_.textures.push_back(texture);
+                    emitLine("static const SamplerTexture2D " +
+                                 variable + " = { " +
+                                 std::to_string(texture.slot) + "u }",
+                             stage);
+                    continue;
+                }
+                const std::string bridge = PrivateUniform(variable);
+                const std::uint32_t bytes = UniformBytes(type);
+                if (bridge.empty() &&
+                    (bytes == 0 ||
+                     block->getName() == mx::HW::PRIVATE_UNIFORMS)) {
+                    // Strings and MaterialX's own renderer's
+                    // settings: their values as they are.
+                    emitLineBegin(stage);
+                    emitVariableDeclaration(port, "static", context,
+                                            stage, true);
+                    emitString(mx::Syntax::SEMICOLON, stage);
+                    emitLineEnd(stage, false);
+                    continue;
+                }
+                emitLineBegin(stage);
+                emitVariableDeclaration(port, "static", context,
+                                        stage, false);
+                emitString(mx::Syntax::SEMICOLON, stage);
+                emitLineEnd(stage, false);
+                if (!bridge.empty()) {
+                    loads_.push_back(variable + " = " + bridge);
+                    continue;
+                }
+                loads_.push_back(variable + " = " +
+                                 UniformLoad(type, offset));
+                out_.uniforms.push_back(
+                    {variable, type, offset, port->getPath(), value});
+                offset += bytes;
+            }
+            emitLineBreak(stage);
+        }
+        out_.uniformBytes = offset;
+    }
+
+    /// The light from all around as Ernie gives it, in place of
+    /// MaterialX's environment maps: the same lobes (GGX about the
+    /// mirror or refracted direction, with its directional albedo)
+    /// and irradiance.
+    ///
+    /// Reference: MaterialX 1.39.5,
+    /// pbrlib/genglsl/lib/mx_environment_prefilter.glsl (the
+    /// functions these replace).
+    void
+    emitSpecularEnvironment(mx::GenContext& context,
+                            mx::ShaderStage& stage) const override {
+        emitLibraryInclude(
+            "pbrlib/genglsl/lib/mx_microfacet_specular.glsl", context,
+            stage);
+        emitString(R"(
+float3 mx_environment_radiance(float3 N, float3 V, float3 X, float2 alpha, int distribution, FresnelData fd)
+{
+    N = mx_forward_facing_normal(N, V);
+    float3 L = fd.refraction ? mx_refraction_solid_sphere(-V, N, fd.ior.x) : -reflect(V, N);
+    float NdotV = clamp(dot(N, V), M_FLOAT_EPS, 1.0);
+    float avgAlpha = mx_average_alpha(alpha);
+    float3 FG = mx_ggx_dir_albedo(NdotV, avgAlpha, fd);
+    FG = fd.refraction ? float3(1.0) - FG : FG;
+    return ernieMxEnvironmentRadiance(L, avgAlpha) * FG;
+}
+
+float3 mx_environment_irradiance(float3 N)
+{
+    return ernieMxEnvironmentIrradiance(N);
+}
+
+)",
+                   stage);
+    }
+
+    /// No MaterialX light functions: the light loop is Ernie's.
+    void
+    emitLightFunctionDefinitions(const mx::ShaderGraph&,
+                                 mx::GenContext&,
+                                 mx::ShaderStage&) const override {}
+
+  private:
+    /// Textures as slots of the material's texture table, sampled
+    /// through Ernie, in place of MaterialX's mx_texture.slang.
+    void emitTextures(mx::ShaderStage& stage) const {
+        emitString(R"(struct SamplerTexture2D
+{
+    uint slot;
+    int get_width(int mipLevel = 0) { return ernieMxTextureSize(slot, mipLevel).x; }
+    int get_height(int mipLevel = 0) { return ernieMxTextureSize(slot, mipLevel).y; }
+    int get_num_mip_levels() { return ernieMxTextureLevels(slot); }
+}
+
+float4 textureLod(SamplerTexture2D tex, float2 uv, float lod) { return ernieMxSampleLevel(tex.slot, uv, lod); }
+float4 texture(SamplerTexture2D tex, float2 uv) { return ernieMxSample(tex.slot, uv); }
+float4 textureGrad(SamplerTexture2D tex, float2 uv, float2 ddx_, float2 ddy_) { return ernieMxSampleGrad(tex.slot, uv, ddx_, ddy_); }
+int2 textureSize(SamplerTexture2D tex, int mipLevel) { return ernieMxTextureSize(tex.slot, mipLevel); }
+
+)",
+                   stage);
+    }
+
+    /// `ernieMxSetup`: the uniforms' values and the vertex data's.
+    void emitSetup(mx::GenContext&, mx::ShaderStage& stage) const {
+        emitLine("void ernieMxSetup()", stage, false);
+        emitScopeBegin(stage);
+        for (const std::string& load : loads_) {
+            emitLine(load, stage);
+        }
+        const mx::VariableBlock& vertexData =
+            stage.getInputBlock(mx::HW::VERTEX_DATA);
+        for (std::size_t i = 0; i < vertexData.size(); ++i) {
+            const mx::ShaderPort* port = vertexData[i];
+            const std::string fill =
+                VertexDataFill(port->getVariable(),
+                               _syntax->getTypeName(port->getType()),
+                               out_.geomProps);
+            if (!fill.empty()) {
+                emitLine("vd." + port->getVariable() + " = " + fill,
+                         stage);
+            }
+        }
+        emitScopeEnd(stage);
+        emitLineBreak(stage);
+    }
+
+    MaterialXShader& out_;
+    mutable std::vector<std::string> loads_;
+};
+
 }  // namespace
+
+std::vector<std::string>
+MaterialXElements(const std::filesystem::path& file) {
+    const mx::DocumentPtr document = mx::createDocument();
+    try {
+        mx::readFromXmlFile(document, file.string());
+    } catch (const std::exception& e) {
+        throw std::invalid_argument("Cannot read " + file.string() +
+                                    ": " + e.what());
+    }
+    document->setDataLibrary(Libraries());
+    std::vector<std::string> elements;
+    for (const mx::TypedElementPtr& element :
+         mx::findRenderableElements(document)) {
+        elements.push_back(element->getNamePath());
+    }
+    return elements;
+}
 
 std::filesystem::path MaterialXLibraries() {
     if (const char* folder = std::getenv("ERNIE_MATERIALX_LIBRARIES");
@@ -291,7 +810,8 @@ std::optional<MaterialXSource> MaterialXOf(const Scene& scene,
                            path.parent_path()};
 }
 
-MaterialXSlang GenerateMaterialXSlang(const MaterialXSource& source) {
+MaterialXShader
+GenerateMaterialXShader(const MaterialXSource& source) {
     const mx::DocumentPtr document = mx::createDocument();
     mx::FileSearchPath search;
     if (!source.base.empty()) {
@@ -300,19 +820,19 @@ MaterialXSlang GenerateMaterialXSlang(const MaterialXSource& source) {
     mx::readFromXmlString(document, source.document, search);
     const mx::ConstDocumentPtr libraries = Libraries();
     document->setDataLibrary(libraries);
+    const mx::ElementPtr found =
+        document->getDescendant(source.element);
     const mx::TypedElementPtr element =
-        document->getDescendant(source.element)
-            ? document->getDescendant(source.element)
-                  ->asA<mx::TypedElement>()
-            : nullptr;
+        found ? found->asA<mx::TypedElement>() : nullptr;
     if (!element) {
         throw std::invalid_argument("The MaterialX document has no "
                                     "element '" +
                                     source.element + "' to render");
     }
 
-    const mx::ShaderGeneratorPtr generator =
-        mx::SlangShaderGenerator::create();
+    MaterialXShader out;
+    const auto generator =
+        std::make_shared<ErnieSlangShaderGenerator>(out);
     // Colour spaces (textures' sRGB and the like) and units (lengths,
     // angles) as the standard libraries define them.
     const mx::DefaultColorManagementSystemPtr colours =
@@ -343,19 +863,55 @@ MaterialXSlang GenerateMaterialXSlang(const MaterialXSource& source) {
         mx::FilePath(folder.parent_path().string()));
     context.registerSourceCodeSearchPath(
         mx::FilePath(folder.string()));
-    context.getOptions().targetColorSpaceOverride = "lin_rec709";
-    context.getOptions().targetDistanceUnit = "meter";
-    mx::ShaderPtr shader;
+    mx::GenOptions& options = context.getOptions();
+    options.targetColorSpaceOverride = "lin_rec709";
+    options.targetDistanceUnit = "meter";
+    // Ernie's images keep their top row first, where texture
+    // coordinates have their origin at the bottom, as USD's do.
+    options.fileTextureVerticalFlip = true;
+    options.hwTransparency = true;
+    options.hwShadowMap = false;
+    options.hwAmbientOcclusion = false;
     try {
-        shader = generator->generate(
-            mx::createValidName(source.element), element, context);
+        out.code = generator
+                       ->generate(mx::createValidName(source.element),
+                                  element, context)
+                       ->getSourceCode(mx::Stage::PIXEL);
+        FixMaterialXSlang(out.code);
     } catch (const std::exception& e) {
         throw std::invalid_argument("MaterialX cannot generate '" +
                                     source.element +
                                     "': " + e.what());
     }
-    return MaterialXSlang{shader->getSourceCode(mx::Stage::VERTEX),
-                          shader->getSourceCode(mx::Stage::PIXEL)};
+    out.transparent =
+        mx::isTransparentSurface(element, generator->getTarget());
+    // Each texture's file relative to its document, and its image
+    // node's addressing and filtering, from its uniforms beside it
+    // ("<node>_file", "<node>_uaddressmode" and so on).
+    for (MaterialXTexture& texture : out.textures) {
+        if (!texture.file.empty() && !source.base.empty() &&
+            std::filesystem::path(texture.file).is_relative()) {
+            texture.file = (source.base / texture.file).string();
+        }
+        const std::size_t at = texture.variable.rfind("file");
+        const std::string node = texture.variable.substr(0, at);
+        for (const MaterialXUniform& uniform : out.uniforms) {
+            if (uniform.value.empty() ||
+                !uniform.variable.starts_with(node)) {
+                continue;
+            }
+            const std::string name =
+                uniform.variable.substr(node.size());
+            if (name == "uaddressmode") {
+                texture.uAddress = std::stoi(uniform.value);
+            } else if (name == "vaddressmode") {
+                texture.vAddress = std::stoi(uniform.value);
+            } else if (name == "filtertype") {
+                texture.filter = std::stoi(uniform.value);
+            }
+        }
+    }
+    return out;
 }
 
 }  // namespace ernie
