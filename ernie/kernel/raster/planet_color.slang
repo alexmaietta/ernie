@@ -71,8 +71,31 @@ float3 triplanarDetail(float3 world, inout float3 normal, out float slopeVarianc
     return w.x * x.albedo + w.y * y.albedo + w.z * z.albedo;
 }
 
+static const float kPi = 3.14159265358979;
+
+// The material's albedo texture over the whole body in simple cylindrical projection, at the
+// point of face `face` and data grid coordinate `grid`: s the longitude east from -180 degrees, t
+// the latitude from the south pole, through the reader's coordinate transform (UsdTransform2d, so
+// a grid that starts at 0 degrees east shifts by half a turn), t up the image as USD's.
+// Longitude's derivatives across the screen drop the turn it jumps at its seam, so filtering and
+// virtual textures' requests see the footprint as it is.
+float3 latLongAlbedo(uint face, float2 grid) {
+    let d = faceDirection(face, faceCoords(grid));
+    let st = float2(atan2(d.y, d.x) / (2.0 * kPi) + 0.5, asin(clamp(d.z, -1.0, 1.0)) / kPi + 0.5);
+    var dx = ddx(st);
+    var dy = ddy(st);
+    dx.x -= round(dx.x);
+    dy.x -= round(dy.x);
+    let rows = surface.albedoUv;
+    let uv = float2(dot(rows[0].xy, st) + rows[0].z, 1.0 - (dot(rows[1].xy, st) + rows[1].z));
+    let uvDx = float2(dot(rows[0].xy, dx), -dot(rows[1].xy, dx));
+    let uvDy = float2(dot(rows[0].xy, dy), -dot(rows[1].xy, dy));
+    let c = materialTextureGrad(0, uv, uvDx, uvDy);
+    return max(c.rgb * surface.albedoTextureScale.rgb + surface.albedoTextureBias.rgb, float3(0.0));
+}
+
 // The material's albedo map is not applied: it is a planar raster, which has no place on a
-// sphere.
+// sphere. Its albedo texture is, in latitude and longitude (`latLongAlbedo`).
 [shader("fragment")]
 GBuffer fragmentMain(VertexOutput in) {
     float3 up;
@@ -80,6 +103,9 @@ GBuffer fragmentMain(VertexOutput in) {
     var shadingNormal = normal;
     float slopeVariance;
     var modulation = triplanarDetail(in.world, shadingNormal, slopeVariance);
+    if (surface.textures.x > 0.0) {
+        modulation = modulation * latLongAlbedo(in.face, in.grid);
+    }
     let range = max(p.body.w - p.body.z, 1e-6);
     let fraction = (in.height - p.body.z) / range;
 

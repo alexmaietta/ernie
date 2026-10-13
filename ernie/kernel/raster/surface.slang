@@ -159,9 +159,24 @@ public float virtualAlbedoCoarseness() {
 // footprint's tile, then samples no finer than the min-LOD map says is resident around it, so
 // filtering spans tiles in hardware and never reads an unbound one.
 float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv) {
+    return virtualTextureAt(texture, filter, uv,
+                            texture.CalculateLevelOfDetailUnclamped(filter, uv), ddx(uv), ddy(uv));
+}
+
+// As `virtualTexture`, with the footprint's gradients given (`materialTextureGrad`), its level of
+// detail their longer one's.
+float4 virtualTextureGrad(Texture2D<float4> texture, SamplerState filter, float2 uv, float2 dx,
+                          float2 dy) {
+    let size = float2(surface.virtualAlbedo.zw);
+    let lod = 0.5 * log2(max(max(dot(dx * size, dx * size), dot(dy * size, dy * size)), 1e-12));
+    return virtualTextureAt(texture, filter, uv, lod, dx, dy);
+}
+
+// `virtualTexture`'s work at level of detail `lod`, of the footprint with gradients `dx` and `dy`.
+float4 virtualTextureAt(Texture2D<float4> texture, SamplerState filter, float2 uv, float lod,
+                        float2 dx, float2 dy) {
     let size = surface.virtualAlbedo.zw;
     let wrapped = uv - floor(uv);
-    let lod = texture.CalculateLevelOfDetailUnclamped(filter, uv);
     virtualRequest(size, lod, wrapped);
     float2 texel;
     let tile0 = virtualTileAt(size, 0, wrapped, texel);
@@ -170,7 +185,7 @@ float4 virtualTexture(Texture2D<float4> texture, SamplerState filter, float2 uv)
     // keeping anisotropic filtering, without the MinLod capability devices may lack.
     virtualCoarseness = max(minLod - max(lod, 0.0), 0.0);
     let scale = exp2(max(minLod - lod, 0.0));
-    return texture.SampleGrad(filter, uv, ddx(uv) * scale, ddy(uv) * scale);
+    return texture.SampleGrad(filter, uv, dx * scale, dy * scale);
 }
 
 // Pages are this many texels square: a tile and a border of `kPageBorder` on each side
@@ -204,10 +219,15 @@ float4 virtualPageSample(uint2 size, uint mip, float2 wrapped, SamplerState filt
 // then blends the two mips around the footprint's level of detail (trilinear, isotropic), each
 // from the finest resident page.
 float4 virtualPagedTexture(SamplerState filter, float2 uv) {
+    return virtualPagedTextureGrad(filter, uv, ddx(uv), ddy(uv));
+}
+
+// As `virtualPagedTexture`, with the footprint's gradients `uvDx` and `uvDy` given.
+float4 virtualPagedTextureGrad(SamplerState filter, float2 uv, float2 uvDx, float2 uvDy) {
     let size = surface.virtualAlbedo.zw;
     let wrapped = uv - floor(uv);
-    let dx = ddx(uv) * float2(size);
-    let dy = ddy(uv) * float2(size);
+    let dx = uvDx * float2(size);
+    let dy = uvDy * float2(size);
     let lod = max(0.5 * log2(max(max(dot(dx, dx), dot(dy, dy)), 1e-12)), 0.0);
     virtualRequest(size, lod, wrapped);
     virtualCoarseness = 0.0;
@@ -229,6 +249,21 @@ public float4 materialTexture(uint slot, float2 uv) {
         return virtualTexture(texture, filter, uv);
     }
     return texture.Sample(filter, uv);
+}
+
+// As `materialTexture`, with the footprint's gradients `dx` and `dy` given rather than taken from
+// the quad's: for coordinates that jump where the screen's do not, such as longitude across its
+// seam on a planet (`planet_color.slang`).
+public float4 materialTextureGrad(uint slot, float2 uv, float2 dx, float2 dy) {
+    let texture = heapTextures[surfaceSlot(4 + slot)];
+    let filter = heapSamplers[surfaceSlot(9 + slot)];
+    if (slot == 0 && surface.textures.x > 2.5) {
+        return virtualPagedTextureGrad(filter, uv, dx, dy);
+    }
+    if (slot == 0 && surface.textures.x > 1.5) {
+        return virtualTextureGrad(texture, filter, uv, dx, dy);
+    }
+    return texture.SampleGrad(filter, uv, dx, dy);
 }
 
 // Luminance albedo at a world position, which scales the material's reflectance spectrum

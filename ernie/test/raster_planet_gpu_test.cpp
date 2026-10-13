@@ -321,3 +321,56 @@ TEST_F(RasterDelegateTest,
     RasterDelegate delegate(*context_);
     EXPECT_THROW(delegate.Sync(scene), std::exception);
 }
+
+// A planet's albedo texture wraps the body in latitude and longitude:
+// a map coloured by quarter of longitude (blue, red, green, white
+// from 180 degrees west) shows red over 45 degrees west and green
+// over 45 degrees east.
+TEST_F(RasterDelegateTest, APlanetsAlbedoTextureWrapsItByLatLong) {
+    constexpr std::int64_t kWidth = 64;
+    constexpr std::int64_t kHeight = 32;
+    const std::array<std::array<std::uint8_t, 3>, 4> quarters{
+        {{0, 0, 255}, {255, 0, 0}, {0, 255, 0}, {255, 255, 255}}};
+    std::vector<std::uint8_t> texels;
+    for (std::int64_t row = 0; row < kHeight; ++row) {
+        for (std::int64_t col = 0; col < kWidth; ++col) {
+            const auto& c =
+                quarters[static_cast<std::size_t>(col * 4 / kWidth)];
+            texels.insert(texels.end(), {c[0], c[1], c[2], 255});
+        }
+    }
+    Scene scene = PlanetScene(64);
+    ernie::Shader::Define(scene, "/Looks/Regolith/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface)
+        .SetDiffuseColor(glm::dvec3(0.5));
+    ernie::Shader::Define(scene, "/Looks/Regolith/Tex")
+        .SetInfoId(tokens::kUsdUVTexture)
+        .SetSourceColorSpace("raw")
+        .SetTexture(
+            Tensor::Copy<std::uint8_t>(texels, {kHeight, kWidth, 4}));
+    ernie::Connect(scene, "/Looks/Regolith", tokens::kSurfaceOutput,
+                   "/Looks/Regolith/Surface", tokens::kSurfaceOutput);
+    ernie::Connect(scene, "/Looks/Regolith/Surface",
+                   tokens::kDiffuseColor, "/Looks/Regolith/Tex",
+                   "outputs:rgb");
+
+    RasterDelegate delegate(*context_);
+    const auto centre = [&](double longitude) {
+        const glm::dvec3 towards(std::cos(longitude),
+                                 std::sin(longitude), 0.0);
+        scene.Define("/World/Sun", tokens::kDistantLight)
+            .Set(tokens::kTransform,
+                 ernie::DistantLightTransform(towards));
+        PlaceCamera(scene, 4.0 * kMoon * towards, {0.0, 0.0, 0.0},
+                    {0.0, 0.0, 1.0}, {1e4, 1e8});
+        const Tensor image = delegate.Render(scene);
+        const auto* texel = image.As<std::uint8_t>() +
+                            (kSize / 2 * kSize + kSize / 2) * 4;
+        return std::array<int, 3>{texel[0], texel[1], texel[2]};
+    };
+    const double quarter = std::numbers::pi / 4.0;
+    const auto west = centre(-quarter);
+    EXPECT_GT(west[0], 2 * std::max(west[1], west[2]) + 10);
+    const auto east = centre(quarter);
+    EXPECT_GT(east[1], 2 * std::max(east[0], east[2]) + 10);
+}
