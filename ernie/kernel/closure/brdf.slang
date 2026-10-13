@@ -41,7 +41,7 @@ public struct BrdfInput {
 }
 
 // The most colour parameters a host uplifts into `BrdfInput::colours`.
-public static const uint kBrdfColours = 4;
+public static const uint kBrdfColours = 6;
 // Parameters packed with the material (`BrdfParams::values`); the rest, up to 48, behind
 // `BrdfParams::extended`.
 public static const uint kBrdfCoreParams = 16;
@@ -88,6 +88,8 @@ public struct EnvironmentResponse {
     // (`BrdfInput::light` and `view`'s): bent for an anisotropic lobe, whose reflections stretch
     // across its tangent; the normal, (0, 0, 1), otherwise.
     public float3 normal0;
+    // The part of `diffuse` that enters the surface to leave it elsewhere (`IBrdf::subsurface`).
+    public float3 subsurface;
 }
 
 // A purely diffuse response of weight `albedo`.
@@ -99,6 +101,7 @@ public EnvironmentResponse diffuseEnvironment(float3 albedo) {
     r.specular1 = float3(0.0);
     r.roughness1 = 1.0;
     r.normal0 = float3(0.0, 0.0, 1.0);
+    r.subsurface = float3(0.0);
     return r;
 }
 
@@ -122,6 +125,13 @@ public struct Transmission {
 
 public interface IBrdf {
     float3 radianceFactor(BrdfInput s, BrdfParams p);
+
+    // The part of `radianceFactor` that enters the surface to leave it around where it entered,
+    // per band: light scattered beneath it, which the host spreads by the model's subsurface
+    // radius (`BrdfModel::subsurfaceRadius`). Models that do not override it scatter none so.
+    float3 subsurface(BrdfInput s, BrdfParams p) {
+        return float3(0.0);
+    }
 
     // The light from behind the surface it lets through towards the viewer at cos(e) `s.mu`.
     // Models that do not override it are opaque.

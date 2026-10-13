@@ -217,6 +217,9 @@ struct MaterialGpu {
     // x: its opacity, below 1 a transparent surface's share of what reaches the eye
     // (`transmitMain`); yzw unused.
     float4 transparency;
+    // How far the light it scatters beneath its surface spreads, per linear RGB channel in
+    // scene units (`BrdfModel::subsurfaceRadius`), and 1 when it scatters so.
+    float4 subsurface;
 }
 
 struct ShadingConstants {
@@ -242,12 +245,16 @@ struct ShadingConstants {
     // was found for); z and w: `transmitMain`'s heap slots of the raster radiance and the opaque
     // depth, or `transmitCopyMain`'s of the transparent radiance.
     uint4 gbuffer;
+    // Light scattered beneath surfaces, a float per pixel of every layer of `spectral`: what
+    // shading stores, and `subsurfaceMain`'s first pass spreads along rows into the second.
+    float* subsurface;
+    float* subsurfaceSpread;
 }
 
 // A material's temperature model (the renderer's `TemperatureMaterialGpu`): its index in the
 // registry plus 1 (0 for none), its data's count and address, its solar absorptivity and thermal
-// emissivity, the world +z axis of a prim bound to it (0 for none), its thermal inertia, and its
-// parameters.
+// emissivity, the world +z axis of a prim bound to it (0 for none), its thermal inertia, the
+// luminance its albedo is relative to (`RasterMaterial::Luminance`), and its parameters.
 struct TemperatureMaterial {
     uint model;
     uint dataCount;
@@ -258,7 +265,8 @@ struct TemperatureMaterial {
     float axisY;
     float axisZ;
     float inertia;
-    uint2 padding;
+    float luminance;
+    uint padding;
     float params[16];
 }
 
@@ -1189,6 +1197,18 @@ float3 radianceFactors(float3 n, float3 l, float3 v, float3 albedo, float slopeV
     }
     ActiveBrdf model;
     return max(model.radianceFactor(input, params), float3(0.0));
+}
+
+// The active model's part of `radianceFactors` scattered beneath the surface
+// (`IBrdf::subsurface`).
+float3 subsurfaceOf(float3 n, float3 l, float3 v, float3 albedo, float slopeVariance,
+                    BrdfParams params, Bands bands) {
+    let input = bandInputOf(n, l, v, albedo, slopeVariance, bands);
+    if (input.mu0 <= 0.0) {
+        return float3(0.0);
+    }
+    ActiveBrdf model;
+    return max(model.subsurface(input, params), float3(0.0));
 }
 
 // The active model's specular part of `radianceFactors` (`IBrdf::specularReflection`).
@@ -2687,7 +2707,9 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
     }
     let record = resources.temperatureMaterials[ids.x];
     let packed = gNormalWrite[id];
-    if (record.model == 0 || unpackTemperature(packed) > 0.0) {
+    // Below 0, the pixel's thermal inertia (`thermalTextureSlot`).
+    let slot = unpackTemperature(packed);
+    if (record.model == 0 || slot > 0.0) {
         return;
     }
     let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
@@ -2701,12 +2723,19 @@ void temperatureMain(uint3 id : SV_DispatchThreadID) {
     input.sunIrradiance = 0.0;
     input.sunVisibility = 0.0;
     input.irradiance = 0.0;
-    input.absorptivity = record.absorptivity;
+    // The pixel's own albedo: the material's sunlight-weighted reflectance scaled as its albedo
+    // map and texture scale its luminance in the G-buffer.
+    let albedo = gAlbedo.Load(pixel);
+    let relative = record.luminance > 0.0
+                       ? albedo.x / record.luminance *
+                             dot(max(albedo.yzw, float3(0.0)), float3(0.2126, 0.7152, 0.0722))
+                       : 1.0;
+    input.absorptivity = saturate(1.0 - (1.0 - record.absorptivity) * relative);
     input.emissivity = record.emissivity;
     input.kelvin = materials[ids.x].surface.y;
     input.time = asfloat(pass.model.w);
     input.axis = float3(record.axisX, record.axisY, record.axisZ);
-    input.inertia = record.inertia;
+    input.inertia = slot < 0.0 ? -slot : record.inertia;
     let lightCount = min(sh.size.w, kShadeLights);
     for (uint k = 0; k < lightCount; ++k) {
         let light = lights[shv.view.z + k];
@@ -3100,9 +3129,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                                 ? apparentDirection(world, lights[shv.view.z + k].position.xyz)
                                 : float3(0.0);
     }
+    // Light scattered beneath the surface goes to `pass.subsurface`, for `subsurfaceMain` to
+    // spread, rather than into the radiance: where a material of the scene does so
+    // (`kBrdfSubsurface`), for the opaque surfaces, the pixel's material scattering.
+    let spreads = kBrdfSubsurface && pass.gbuffer.y == 0 && material.subsurface.w > 0.0 && !unlit;
     for (uint first = 0; first < bands; first += 3) {
         float3 bandAlbedo = float3(0.0);
         float3 unlitIrradiance = float3(0.0);
+        var spread = float3(0.0);
         var context = neutralBands(tangent);
         for (uint k = 0; k < 3; ++k) {
             let band = min(first + k, bands - 1);
@@ -3131,8 +3165,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             for (uint j = 0; j < 3; ++j) {
                 let wavelength =
                     sh.range.x + (float(min(first + j, bands - 1)) + 0.5) * sh.range.y;
-                radiance[j] += ambient * occlusion * uniform[j] *
-                               modulationAt(ambientCoefficients, ambientScale, wavelength);
+                let light =
+                    ambient * occlusion * modulationAt(ambientCoefficients, ambientScale, wavelength);
+                radiance[j] += uniform[j] * light;
+                if (spreads) {
+                    spread[j] += environment.subsurface[j] * light;
+                }
             }
         }
         for (uint j = 0; j < 3; ++j) {
@@ -3147,11 +3185,14 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             if (kelvin > 0.0 && !unlit) {
                 radiance[j] += thermalBand(ids.x, band, kelvin);
             }
-            // The atmosphere's sky and ground around it, diffusely.
-            radiance[j] += environment.diffuse[j] * (kShadeAir ? surround[band] : 0.0);
-            if (domeScale > 0.0) {
-                radiance[j] += environment.diffuse[j] * dome *
-                               modulationAt(domeCoefficients, domeScale, wavelength);
+            // The atmosphere's sky and ground around it, diffusely; the dome's.
+            let around = (kShadeAir ? surround[band] : 0.0) +
+                         (domeScale > 0.0
+                              ? dome * modulationAt(domeCoefficients, domeScale, wavelength)
+                              : 0.0);
+            radiance[j] += environment.diffuse[j] * around;
+            if (spreads) {
+                spread[j] += environment.subsurface[j] * around;
             }
             // The dome's light mirrored in the specular lobes, polarized by Fresnel's laws.
             var mirrored = 0.0;
@@ -3189,6 +3230,13 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
                                       context);
             let reflected = lightScales[k] * lightSpectrum / PI * factors;
             radiance += reflected;
+            if (spreads) {
+                spread += lightScales[k] * lightSpectrum / PI *
+                          (lights[k].shadow.y > 0.5
+                               ? environment.subsurface * max(dot(n, lightDirections[k]), 0.0)
+                               : subsurfaceOf(n, lightDirections[k], v, bandAlbedo, slopeVariance,
+                                              params, context));
+            }
             if (stokes != 0) {
                 // Its specular part, polarized by Fresnel's laws; the rest diffuse, keeping the
                 // light's polarization as far as the material does.
@@ -3218,7 +3266,12 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
             let transmittance = kShadeAir ? aerialTransmittance[band] : 1.0;
             let scattered = kShadeAir ? aerialScattered[band] : 0.0;
             let scale = radianceScale();
-            spectral[int3(id.xy, layer)] = (radiance[k] * transmittance + scattered) * scale;
+            spectral[int3(id.xy, layer)] =
+                ((radiance[k] - spread[k]) * transmittance + scattered) * scale;
+            if (spreads) {
+                pass.subsurface[(layer * sh.size.y + id.y) * sh.size.x + id.x] =
+                    spread[k] * transmittance * scale;
+            }
             if (stokes != 0) {
                 if (band / 4 != airGroup) {
                     airGroup = band / 4;
@@ -3341,6 +3394,119 @@ void transmitMain(uint3 id: SV_DispatchThreadID) {
             let back = radiance.Load(int4(behind.xy, layer, 0)).x;
             spectral[int3(id.xy, layer)] =
                 alpha * surface + (1.0 - alpha + alpha * max(through.factor[k], 0.0)) * back;
+        }
+    }
+}
+
+// Light scattered beneath surfaces (`pass.subsurface`, as shading stored it) spread across the
+// image and added to the raster radiance: per band, by Burley's normalized diffusion profile of
+// the material's radius at that band's wavelength (its RGB radius, `MaterialGpu::subsurface`, as
+// a sigmoid spectrum), approximated as two Gaussians of deviation d and 3d, a quarter and three
+// quarters of it, and applied separably: along rows into `pass.subsurfaceSpread`
+// (`pass.gbuffer.z` 0), then down columns into `spectral` (1). Taps on other materials, or
+// farther from the pixel in depth than the profile reaches, are left out, the rest renormalized.
+//
+// References:
+// - P. H. Christensen and B. Burley, "Approximate Reflectance Profiles for Efficient Subsurface
+//   Scattering", Pixar Technical Memo 15-04, 2015.
+// - J. Jimenez, K. Zsolnai, A. Jarabo, C. Freude, T. Auzinger, X.-C. Wu, J. von der Pahlen,
+//   M. Wimmer and D. Gutierrez, "Separable Subsurface Scattering", Computer Graphics Forum
+//   34(6), 2015.
+static const int kSubsurfaceTaps = 32;  // each side of the pixel, at the most
+
+// One Gaussian of the profile at distance `x`, deviation `sigma`, up to a constant factor.
+float subsurfaceGaussian(float x, float sigma) {
+    return exp(-0.5 * x * x / (sigma * sigma)) / sigma;
+}
+
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void subsurfaceMain(uint3 id: SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    let pixel = int4(id.xyz, 0);
+    let ids = gIds.Load(pixel);
+    if (ids.x == kBackground) {
+        return;
+    }
+    let material = materials[ids.x];
+    if (material.subsurface.w <= 0.0) {
+        return;
+    }
+    let vertical = pass.gbuffer.z != 0;
+    let from = vertical ? pass.subsurfaceSpread : pass.subsurface;
+    let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
+                     1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
+    let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
+    // A pixel's width along the pass's axis there, and the taps' spacing, a pixel at the least.
+    let step = 2.0 / float2(sh.size.xy);
+    let along = cameraPoint(shv.invViewProj, shv.strip,
+                            ndc.xy + (vertical ? float2(0.0, step.y) : float2(step.x, 0.0)),
+                            ndc.z) -
+                world;
+    let pixelSize = max(length(along), 1e-12);
+    let rgb = max(material.subsurface.rgb, float3(0.0));
+    let widest = max(rgb.x, max(rgb.y, rgb.z));
+    let coefficients = widest > 0.0 ? sigmoidCoefficients(rgb / widest) : float3(0.0);
+    // Out to the wider Gaussian's three deviations, 3 x 3d, the taps spaced quadratically, dense
+    // where the profile is steep near the pixel (as Jimenez et al.'s are by its distribution),
+    // each weighted by the share of the axis it stands for, half the way to its neighbours.
+    let reach = 9.0 * max(widest, 1e-9);
+    // A tap per few pixels the profile reaches across, a few at the least.
+    let count = clamp(int(ceil(reach / pixelSize / 4.0)), 6, kSubsurfaceTaps);
+    float offsets[2 * kSubsurfaceTaps + 1];
+    float spans[2 * kSubsurfaceTaps + 1];
+    int2 taps[2 * kSubsurfaceTaps + 1];
+    bool kept[2 * kSubsurfaceTaps + 1];
+    for (int k = 0; k < 2 * kSubsurfaceTaps + 1; ++k) {
+        kept[k] = false;
+    }
+    for (int i = -count; i <= count; ++i) {
+        let k = i + kSubsurfaceTaps;
+        let f = float(i) / float(count);
+        let shift = int(round(sign(f) * f * f * reach / pixelSize));
+        let at = int2(id.xy) + (vertical ? int2(0, shift) : int2(shift, 0));
+        offsets[k] = float(shift) * pixelSize;
+        let inner = abs(f) - 1.0 / float(count);
+        let outer = abs(f) + 1.0 / float(count);
+        spans[k] = 0.5 * reach * (outer * outer - sign(inner) * inner * inner);
+        taps[k] = at;
+        kept[k] = false;
+        if (all(at >= 0) && all(at < int2(sh.size.xy))) {
+            let tap = int4(at, id.z, 0);
+            if (gIds.Load(tap).x == ids.x) {
+                let tapNdc = float2((float(at.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
+                                    1.0 - (float(at.y) + 0.5) / float(sh.size.y) * 2.0);
+                let tapWorld =
+                    cameraPoint(shv.invViewProj, shv.strip, tapNdc, gDepth.Load(tap));
+                kept[k] = abs(dot(tapWorld - world, shv.forward.xyz)) < reach;
+            }
+        }
+    }
+    let bands = uint(sh.range.z);
+    for (uint band = 0; band < bands; ++band) {
+        let layer = id.z * bands + band;
+        let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+        let d = max(widest > 0.0 ? modulationAt(coefficients, widest, wavelength) : 0.0, 1e-9);
+        var sum = 0.0;
+        var weights = 0.0;
+        for (int k = 0; k < 2 * kSubsurfaceTaps + 1; ++k) {
+            if (!kept[k]) {
+                continue;
+            }
+            let w = spans[k] * (0.25 * subsurfaceGaussian(offsets[k], d) +
+                                0.75 * subsurfaceGaussian(offsets[k], 3.0 * d));
+            sum += w * from[(layer * sh.size.y + uint(taps[k].y)) * sh.size.x + uint(taps[k].x)];
+            weights += w;
+        }
+        let at = (layer * sh.size.y + id.y) * sh.size.x + id.x;
+        let spread = weights > 0.0 ? sum / weights : from[at];
+        if (vertical) {
+            spectral[int3(id.xy, layer)] = spectral[int3(id.xy, layer)] + spread;
+        } else {
+            pass.subsurfaceSpread[at] = spread;
         }
     }
 }

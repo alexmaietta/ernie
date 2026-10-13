@@ -2134,6 +2134,58 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       SubsurfaceScatteringSpreadsLightPastTheTerminator) {
+    // A ball 30 m across filling most of FlatScene's view from above,
+    // lit from the side by a low sun from +x: its terminator runs
+    // down the middle of the image. A ball scattering all its diffuse
+    // light beneath its surface, 1 m far, carries light a few pixels
+    // past it into the shade, as an opaque one does not, but not far
+    // past it; nor does it make the lit side brighter than it was.
+    Scene scene = FlatScene();
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 0.05}));
+    ernie::Sphere::Define(scene, "/World/Ball")
+        .SetRadius(15.0)
+        .SetMaterialBinding("/Looks/Ball");
+    ernie::Material::Define(scene, "/Looks/Ball")
+        .SetAlbedo(glm::dvec3(0.5))
+        .SetBrdf("open_pbr");
+    scene.Set("/Looks/Ball", "inputs:specular_weight", 0.0);
+    RasterDelegate delegate(*context_);
+    // The centre row's pixels at columns `cols`, one band's radiance.
+    const auto row = [&](std::initializer_list<std::size_t> cols) {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const Tensor spectral = outputs.at("/Render/Product")
+                                    .vars.at("SpectralRadiance")
+                                    .Map(ernie::MapDevice::Cpu)
+                                    .tensor;
+        const auto* values =
+            static_cast<const float*>(spectral.Data());
+        std::vector<float> out;
+        for (const std::size_t col : cols) {
+            out.push_back(values[8 * kVarSize * kVarSize +
+                                 (kVarSize / 2) * kVarSize + col]);
+        }
+        return out;
+    };
+    // Past the terminator, far past it, and lit.
+    const std::vector<float> opaque = row({13, 8, 20});
+    ASSERT_GT(opaque[2], 10.0f * opaque[0]) << "past the terminator";
+    scene.Set("/Looks/Ball", "inputs:subsurface_weight", 1.0);
+    scene.Set("/Looks/Ball", "inputs:subsurface_color",
+              glm::dvec3(0.5));
+    scene.Set("/Looks/Ball", "inputs:subsurface_radius", 1.0);
+    scene.Set("/Looks/Ball", "inputs:subsurface_radius_scale_g", 1.0);
+    scene.Set("/Looks/Ball", "inputs:subsurface_radius_scale_b", 1.0);
+    const std::vector<float> spread = row({13, 8, 20});
+    EXPECT_GT(spread[0], opaque[0] + 0.03f * opaque[2])
+        << "light spread past the terminator";
+    EXPECT_NEAR(spread[1], opaque[1], 0.02f * opaque[2])
+        << "not far past it";
+    EXPECT_LT(spread[2], 1.05f * opaque[2]) << "no light made";
+}
+
+TEST_F(RasterDelegateTest,
        TransparentSurfacesShowWhatLiesBehindThem) {
     // A pane over FlatScene's lit floor, seen from straight above: a
     // clear thin-walled one lets the floor through but the little it

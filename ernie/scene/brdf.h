@@ -3,6 +3,8 @@
 
 #include "ernie/util/shader_source.h"
 
+#include <glm/glm.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -70,6 +72,12 @@ struct BrdfModel {
     /// a bit none has falls away), and gives each material's own to
     /// `BrdfParams::features`. Empty for models without layers.
     std::function<std::uint32_t(std::span<const float>)> features;
+    /// For models that scatter light beneath their surfaces
+    /// (`BrdfRegistry::kSubsurfaceFeature`): how far, per linear RGB
+    /// channel in scene units, for a material of these parameters;
+    /// the renderer spreads its subsurface light over this radius,
+    /// per band.
+    std::function<glm::vec3(std::span<const float>)> subsurfaceRadius;
 
     /// Default value of every parameter, in order.
     std::vector<float> Defaults() const;
@@ -89,7 +97,7 @@ class BrdfRegistry {
     static constexpr std::size_t kCoreParams = 16;
     /// Most colour parameters (`BrdfParam::colour`) a model may
     /// declare.
-    static constexpr std::size_t kMaxColours = 4;
+    static constexpr std::size_t kMaxColours = 6;
     /// The feature bit (`BrdfModel::features`) of a material that
     /// reads the surface's tangent (`BrdfInput`'s frame), such as an
     /// anisotropic one: the renderer keeps the G-buffer's tangents
@@ -99,6 +107,10 @@ class BrdfRegistry {
     /// through (`IBrdf::transmission`): drawn after the opaque
     /// surfaces, in front of what it shows through.
     static constexpr std::uint32_t kTransmissionFeature = 1u << 30;
+    /// The feature bit of a material that scatters light beneath its
+    /// surface (`IBrdf::subsurface`): its subsurface light is spread
+    /// across the image by `BrdfModel::subsurfaceRadius`.
+    static constexpr std::uint32_t kSubsurfaceFeature = 1u << 29;
 
     /// An empty registry.
     BrdfRegistry() = default;

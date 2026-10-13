@@ -16,7 +16,11 @@ import brdf;
 // the material has: 16-18 coat_color, 19-21 fuzz_color, 22 thin_film_thickness (um),
 // 23 thin_film_ior, 24 specular_roughness_anisotropy (along the surface's tangent,
 // `BrdfInput::light` and `view`'s frame), 25 transmission_weight, 26-28 transmission_color,
-// 29 geometry_thin_walled (0 or 1). A transmitting material's dielectric base lets through, in
+// 29 geometry_thin_walled (0 or 1), 30 subsurface_weight, 31-33 subsurface_color,
+// 34 subsurface_radius (scene units), 35-37 subsurface_radius_scale. Subsurface scattering
+// replaces that share of the dielectric base's diffuse with a Lambertian lobe of
+// subsurface_color, which `subsurface` reports for the host to spread over the radius, per band
+// (`BrdfModel::subsurfaceRadius`). A transmitting material's dielectric base lets through, in
 // place of its diffuse, what its specular lobe, coat and fuzz leave (`transmission`), unblurred
 // by its roughness. Colours arrive uplifted at the bands (`BrdfInput::colours`: specular_color,
 // coat_color, fuzz_color), and the film's interference is at the bands' wavelengths.
@@ -55,6 +59,7 @@ public static const uint kOpenPbrCoat = 1u;
 public static const uint kOpenPbrFuzz = 2u;
 public static const uint kOpenPbrThinFilm = 4u;
 public static const uint kOpenPbrTransmission = 8u;
+public static const uint kOpenPbrSubsurface = 16u;
 // Anisotropy reads the surface's tangent: `BrdfRegistry::kTangentsFeature`.
 public static const uint kOpenPbrAnisotropy = 0x80000000u;
 
@@ -206,6 +211,8 @@ public struct OpenPbr : IBrdf {
         float transmission;
         float3 transmissionColour;
         bool thinWalled;
+        float subsurface;
+        float3 subsurfaceColour;
     }
 
     static Material materialOf(BrdfInput s, BrdfParams p) {
@@ -256,6 +263,12 @@ public struct OpenPbr : IBrdf {
             m.filmWeight = saturate(p.get(11));
             m.filmNm = max(p.get(22), 0.0) * 1000.0;
             m.filmIor = max(p.get(23), 1.0);
+        }
+        m.subsurface = 0.0;
+        m.subsurfaceColour = float3(1.0);
+        if (hasLayer(p, kOpenPbrSubsurface)) {
+            m.subsurface = saturate(p.get(30));
+            m.subsurfaceColour = saturate(s.colours[4]);
         }
         m.transmission = 0.0;
         m.transmissionColour = float3(1.0);
@@ -317,6 +330,7 @@ public struct OpenPbr : IBrdf {
         float3 diffuse;
         float3 specular;
         float ior;
+        float3 subsurface;  // the part of `diffuse` scattered beneath the surface
     }
 
     // f_r's diffuse part (the base's diffuse and the fuzz, unpolarized) and specular part (the
@@ -361,8 +375,11 @@ public struct OpenPbr : IBrdf {
                                  (1.0 - dielectricAlbedo(m, roughness, mu)),
                              float3(0.0)));
         Lobes lobes;
-        lobes.diffuse = (1.0 - m.metalness) * (1.0 - m.transmission) * under *
-                        eon(saturate(m.base), m.diffuseRoughness, mu0, mu, s.cosG);
+        let base = (1.0 - m.metalness) * (1.0 - m.transmission) * under;
+        lobes.subsurface = base * m.subsurface * m.subsurfaceColour / PI;
+        lobes.diffuse = base * (1.0 - m.subsurface) *
+                            eon(saturate(m.base), m.diffuseRoughness, mu0, mu, s.cosG) +
+                        lobes.subsurface;
         lobes.specular = specular;
         let meanBase = (m.base.x + m.base.y + m.base.z) / 3.0;
         lobes.ior = lerp(m.specularIor, iorOf(meanBase), m.metalness);
@@ -380,6 +397,7 @@ public struct OpenPbr : IBrdf {
                                        (1.0 - coatAlbedo(m, coatRoughness, mu)),
                                    0.0));
             lobes.diffuse *= through;
+            lobes.subsurface *= through;
             lobes.specular = lobes.specular * through + coat;
             lobes.ior = lerp(lobes.ior, m.coatIor, m.coatWeight);
         }
@@ -390,6 +408,7 @@ public struct OpenPbr : IBrdf {
             // Its f_r cos(i) is its albedo towards the viewer times its distribution.
             let fuzz = m.fuzzColour * albedo * sheenLtc(s, m.fuzzRoughness) / max(mu0, 1e-4);
             lobes.diffuse = lobes.diffuse * below + fuzz;
+            lobes.subsurface *= below;
             lobes.specular *= below;
         }
         return lobes;
@@ -399,6 +418,14 @@ public struct OpenPbr : IBrdf {
         let lobes = lobesOf(s, p);
         // The radiance factor is pi times f_r times cos(i).
         return PI * s.mu0 * (lobes.diffuse + lobes.specular);
+    }
+
+    public override float3 subsurface(BrdfInput s, BrdfParams p) {
+        // None where no material of the scene scatters beneath its surface.
+        if ((BRDF_FEATURES & kOpenPbrSubsurface) == 0u) {
+            return float3(0.0);
+        }
+        return PI * s.mu0 * lobesOf(s, p).subsurface;
     }
 
     public override SpecularReflection specularReflection(BrdfInput s, BrdfParams p) {
@@ -470,14 +497,18 @@ public struct OpenPbr : IBrdf {
             }
         }
         r.specular0 = lerp(dielectric, metal, m.metalness);
-        r.diffuse = (1.0 - m.metalness) * (1.0 - m.transmission) *
-                    max(1.0 - dielectric, float3(0.0)) *
-                    eonAlbedo(saturate(m.base), m.diffuseRoughness, mu);
+        let base = (1.0 - m.metalness) * (1.0 - m.transmission) *
+                   max(1.0 - dielectric, float3(0.0));
+        r.subsurface = base * m.subsurface * m.subsurfaceColour;
+        r.diffuse = base * (1.0 - m.subsurface) *
+                        eonAlbedo(saturate(m.base), m.diffuseRoughness, mu) +
+                    r.subsurface;
         if (m.coatWeight > 0.0) {
             let coatRoughness = widenedRoughness(m.coatRoughness, s.slopeVariance);
             let coat = coatAlbedo(m, coatRoughness, mu);
             let through = m.coatTransmission * (1.0 - coat);
             r.diffuse *= through;
+            r.subsurface *= through;
             r.specular0 *= through;
             r.specular1 = float3(coat);
             r.roughness1 = coatRoughness;
@@ -485,6 +516,7 @@ public struct OpenPbr : IBrdf {
         if (m.fuzzWeight > 0.0) {
             let albedo = m.fuzzWeight * sheenAlbedo(mu, m.fuzzRoughness);
             r.diffuse = r.diffuse * (1.0 - albedo) + m.fuzzColour * albedo;
+            r.subsurface *= 1.0 - albedo;
             r.specular0 *= 1.0 - albedo;
             r.specular1 *= 1.0 - albedo;
         }

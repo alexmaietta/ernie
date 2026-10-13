@@ -193,6 +193,7 @@ constexpr std::uint32_t kOpenPbrCoat = 1;
 constexpr std::uint32_t kOpenPbrFuzz = 2;
 constexpr std::uint32_t kOpenPbrThinFilm = 4;
 constexpr std::uint32_t kOpenPbrTransmission = 8;
+constexpr std::uint32_t kOpenPbrSubsurface = 16;
 
 BrdfModel OpenPbr() {
     BrdfModel model{
@@ -225,7 +226,16 @@ BrdfModel OpenPbr() {
          "Shading at Imageworks\", SIGGRAPH 2017 course.",
          "W. Jakob and J. Hanika, \"A Low-Dimensional Function "
          "Space for Efficient Spectral Upsampling\", Computer "
-         "Graphics Forum 38(2), 2019 (its colours' spectra)."},
+         "Graphics Forum 38(2), 2019 (its colours' spectra).",
+         "B. Burley, \"Extending the Disney BRDF to a BSDF with "
+         "Integrated Subsurface Scattering\", SIGGRAPH 2015 course, "
+         "and P. H. Christensen and B. Burley, \"Approximate "
+         "Reflectance Profiles for Efficient Subsurface "
+         "Scattering\", Pixar, 2015 (the profile its subsurface "
+         "light spreads by).",
+         "J. Jimenez et al., \"Separable Subsurface Scattering\", "
+         "Computer Graphics Forum 34(6), 2015 (spread in screen "
+         "space)."},
         {{"base_weight", "Base weight", "", 1.0f, 0.0f, 1.0f, false,
           "Scales the base colour."},
          {"base_metalness", "Metalness", "", 0.0f, 0.0f, 1.0f, false,
@@ -300,7 +310,33 @@ BrdfModel OpenPbr() {
          {"geometry_thin_walled", "Thin walled", "", 0.0f, 0.0f, 1.0f,
           false,
           "1 for a thin shell (a pane, a bubble), which lets light "
-          "through unbent; 0 for a solid body, which refracts it."}},
+          "through unbent; 0 for a solid body, which refracts it."},
+         {"subsurface_weight", "Subsurface", "", 0.0f, 0.0f, 1.0f,
+          false,
+          "How much of the dielectric base's diffuse light scatters "
+          "beneath it, to leave it further on."},
+         {"subsurface_color", "Subsurface colour", "", 0.8f, 0.0f,
+          1.0f, false,
+          "The albedo of the light scattered beneath it.", true,
+          kOpenPbrSubsurface},
+         {"subsurface_color_g", "Subsurface colour G", "", 0.8f, 0.0f,
+          1.0f, false, "subsurface_color's green."},
+         {"subsurface_color_b", "Subsurface colour B", "", 0.8f, 0.0f,
+          1.0f, false, "subsurface_color's blue."},
+         {"subsurface_radius", "Subsurface radius", "", 0.01f, 1e-5f,
+          1000.0f, true,
+          "How far light travels beneath it, in scene units (a "
+          "centimetre in metres)."},
+         {"subsurface_radius_scale_r", "Subsurface radius scale R",
+          "", 1.0f, 0.0f, 1.0f, false,
+          "The radius's share for red light: how much further red "
+          "travels than blue in skin."},
+         {"subsurface_radius_scale_g", "Subsurface radius scale G",
+          "", 0.5f, 0.0f, 1.0f, false,
+          "The radius's share for green."},
+         {"subsurface_radius_scale_b", "Subsurface radius scale B",
+          "", 0.25f, 0.0f, 1.0f, false,
+          "The radius's share for blue."}},
         "OpenPbr",
         shaders::kBrdfOpenPbrSlang};
     // A layer where its weight is above 0.
@@ -314,11 +350,21 @@ BrdfModel OpenPbr() {
                     ? kOpenPbrTransmission |
                           BrdfRegistry::kTransmissionFeature
                     : 0u;
+        // Subsurface light is spread across the image.
+        bits |= p.size() > 30 && p[30] > 0.0f
+                    ? kOpenPbrSubsurface |
+                          BrdfRegistry::kSubsurfaceFeature
+                    : 0u;
         // Anisotropy reads the surface's tangents.
         bits |= p.size() > 24 && p[24] > 0.0f
                     ? BrdfRegistry::kTangentsFeature
                     : 0u;
         return bits;
+    };
+    // subsurface_radius times its scale per channel.
+    model.subsurfaceRadius = [](std::span<const float> p) {
+        return p.size() > 37 ? p[34] * glm::vec3(p[35], p[36], p[37])
+                             : glm::vec3(0.0f);
     };
     return model;
 }

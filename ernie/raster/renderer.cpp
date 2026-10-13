@@ -471,8 +471,12 @@ struct MaterialGpu {
     /// Its opacity, a transparent surface's share of what reaches
     /// the eye (`transmitMain`), 1 for opaque ones; three unused.
     float transparency[4];
+    /// How far the light it scatters beneath its surface spreads,
+    /// per linear RGB channel in scene units, and 1 when it does
+    /// (`BrdfModel::subsurfaceRadius`).
+    float subsurface[4];
 };
-static_assert(sizeof(MaterialGpu) == 880,
+static_assert(sizeof(MaterialGpu) == 896,
               "MaterialGpu must match shading.slang");
 
 /// Reflectance luminance below which a material counts as black; its
@@ -746,8 +750,12 @@ struct ShadingConstants {
     float horizonLevels[4];
     /// x: the G-buffer's tangents' bindless slot, 0 without them.
     std::uint32_t gbuffer[4];
+    /// Light scattered beneath surfaces, and spread along rows
+    /// (shading.slang's `subsurfaceMain`), 0 without such surfaces.
+    VkDeviceAddress subsurface;
+    VkDeviceAddress subsurfaceSpread;
 };
-static_assert(sizeof(ShadingConstants) == 112,
+static_assert(sizeof(ShadingConstants) == 128,
               "ShadingConstants must match shading.slang");
 
 /// sensor.slang's SensorConstants, which the sensor kernels and the
@@ -998,7 +1006,9 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
 /// parameters, which of them a material with those features reads,
 /// and the feature each needs (0 for none), so shading uplifts at
 /// each band only those the pixel's material reads; and whether it
-/// reads the G-buffer's tangents (`BrdfRegistry::kTangentsFeature`).
+/// reads the G-buffer's tangents (`BrdfRegistry::kTangentsFeature`)
+/// or scatters light beneath its surfaces
+/// (`BrdfRegistry::kSubsurfaceFeature`).
 std::string BrdfModuleSource(const BrdfModel& brdf,
                              std::uint32_t features) {
     if (!brdf.features) {
@@ -1026,17 +1036,22 @@ std::string BrdfColourSource(const BrdfModel& brdf,
                     : "0";
         bits += comma + std::to_string(feature);
     }
+    const auto flag = [&](std::uint32_t bit) {
+        return std::string((features & bit) != 0 ? "true" : "false");
+    };
+    const std::string size =
+        std::to_string(BrdfRegistry::kMaxColours);
     return "static const uint kBrdfColourCount = " +
            std::to_string(colours.size()) +
-           ";\nstatic const uint4 kBrdfColourParams = uint4(" +
-           params +
-           ");\nstatic const uint4 kBrdfColourUsed = uint4(" + used +
-           ");\nstatic const uint4 kBrdfColourFeatures = uint4(" +
-           bits + ");\nstatic const bool kBrdfTangents = " +
-           ((features & BrdfRegistry::kTangentsFeature) != 0
-                ? "true"
-                : "false") +
-           ";\n";
+           ";\nstatic const uint kBrdfColourParams[" + size +
+           "] = {" + params +
+           "};\nstatic const uint kBrdfColourUsed[" + size + "] = {" +
+           used + "};\nstatic const uint kBrdfColourFeatures[" +
+           size + "] = {" + bits +
+           "};\nstatic const bool kBrdfTangents = " +
+           flag(BrdfRegistry::kTangentsFeature) +
+           ";\nstatic const bool kBrdfSubsurface = " +
+           flag(BrdfRegistry::kSubsurfaceFeature) + ";\n";
 }
 
 /// The modules of the shading and sky passes with `brdf` as the
@@ -2776,29 +2791,6 @@ void RasterRenderer::WriteLights(
                 }
                 lightViews_.insert(lightViews_.end(), views.begin(),
                                    views.end());
-                // Its casters far towards it, such as moons: its
-                // long-range view after the cascades, its index plus
-                // 1 in `map[2]` (shading.slang's `longRangeView`).
-                if (cascaded &&
-                    lightViews_.size() < kMaxLightShadowViews) {
-                    atmospherePlanet_.reset();
-                    if (params.atmosphere) {
-                        atmospherePlanet_ =
-                            params.atmosphere->planetCentre;
-                    }
-                    const Bounds3 receivers =
-                        LongRangeReceivers(params);
-                    if (std::optional<ShadowCascade> far =
-                            FitLongRangeView(
-                                receivers.first, receivers.second,
-                                axis, bounds->first, bounds->second,
-                                entry.extentY[3], own)) {
-                        far->shadowMask = light.shadowMask;
-                        entry.map[2] = static_cast<float>(
-                            lightViews_.size() + 1);
-                        lightViews_.push_back(*far);
-                    }
-                }
             }
         }
         // A focused light's emission is spectrum x (1 - tint) x
@@ -4040,6 +4032,19 @@ void RasterRenderer::Update(
             TransmitPipelines(model, pushbroom_);
         }
     }
+    if (subsurface_) {
+        std::unique_ptr<ComputePipeline>& spread =
+            subsurfacePipelines_[{pushbroom_, shadingVariant_}];
+        if (spread == nullptr) {
+            spread = std::make_unique<ComputePipeline>(
+                context_, shadingLayout_,
+                compiler_.CompileSpirv(
+                    ShadingModules(brdfs_.Models().front(),
+                                   lightPatterns_, temperatureModels_,
+                                   pushbroom_, shadingVariant_),
+                    "subsurfaceMain"));
+        }
+    }
     if (temperatureModelsInUse_) {
         TemperaturePipeline(pushbroom_);
     }
@@ -4424,6 +4429,14 @@ void RasterRenderer::WriteMaterialTable() {
         transparentMaterials_[id] = transparent;
         tangentMaterials_[id] =
             (features & BrdfRegistry::kTangentsFeature) != 0;
+        if ((features & BrdfRegistry::kSubsurfaceFeature) != 0 &&
+            model->subsurfaceRadius) {
+            const glm::vec3 radius = model->subsurfaceRadius(params);
+            entry.subsurface[0] = radius.x;
+            entry.subsurface[1] = radius.y;
+            entry.subsurface[2] = radius.z;
+            entry.subsurface[3] = 1.0f;
+        }
         entry.transparency[0] =
             transparent ? std::clamp(settings.opacity, 0.0f, 1.0f)
                         : 1.0f;
@@ -4591,6 +4604,10 @@ void RasterRenderer::WriteMaterialTable() {
     anyTransparent_ =
         std::ranges::find(transparentMaterials_, true) !=
         transparentMaterials_.end();
+    subsurface_ = std::ranges::any_of(
+        modelFeatures_, [](std::uint32_t features) {
+            return (features & BrdfRegistry::kSubsurfaceFeature) != 0;
+        });
     // The temperature models' table and data, when any material has
     // one, the records' data offsets made addresses.
     temperatureModelsInUse_ =
@@ -5602,9 +5619,6 @@ void RasterRenderer::RecordShadowMaps(
             // Only the geometry its light's shadow link holds.
             ShadowCasters casters = lightCasters_;
             casters.linkGroups = lightViews_[v].shadowMask;
-            if (lightViews_[v].longRange) {
-                casters.skipPlanet = atmospherePlanet_;
-            }
             for (const RasterDrawable* drawable : drawables) {
                 ERNIE_GPU_ZONE_NAMED(context_, commands,
                                      drawable->ProfileName());
@@ -6230,67 +6244,14 @@ float RasterRenderer::FitCascadeDistance(
         farthest = std::min(farthest, 1.1f * seenFar);
     }
     // No farther than a set distance, as Unreal's
-    // DynamicShadowDistance, beyond which nothing is shadowed; nor
-    // than the casters the cascades hold reach, a moon in view
-    // aside, which the long-range view shadows by
-    // (`kLongRangeStart`).
+    // DynamicShadowDistance, beyond which nothing is shadowed.
     if (params.shadows.distance > 0.0f) {
         farthest = std::min(farthest, params.shadows.distance);
     }
-    farthest = std::min(farthest, kLongRangeStart);
     // A margin keeps surfaces at exactly the farthest depth, such as
     // flat ground under a nadir camera, inside the last cascade.
     return std::clamp(1.01f * farthest, view.nearPlane * 1.01f,
                       view.farPlane);
-}
-
-Bounds3
-RasterRenderer::LongRangeReceivers(const FrameParams& params) const {
-    const CascadeFit& fit = *cascadeFit_;
-    const CameraView& view = fit.view;
-    // Both atmospheres' presets reach 100 km up (ernie/util/
-    // atmosphere.cpp), as far as the sky marches.
-    constexpr double kAtmosphereTop = 100e3;
-    std::optional<Bounds3> shell;
-    float reach = std::max(fit.distance, kLongRangeStart);
-    if (params.atmosphere) {
-        const glm::vec3 centre(params.atmosphere->planetCentre -
-                               params.origin);
-        const auto top = static_cast<float>(
-            params.atmosphere->planetRadius + kAtmosphereTop);
-        shell =
-            Bounds3{centre - glm::vec3(top), centre + glm::vec3(top)};
-        reach = glm::length(view.eye - centre) + top;
-    }
-    Bounds3 box{view.eye, view.eye};
-    const auto add = [&](const glm::vec3& p) {
-        box.first = glm::min(box.first, p);
-        box.second = glm::max(box.second, p);
-    };
-    if (fit.around > 0.0f || view.IsOrthographic()) {
-        // A cube camera looks every way; an orthographic one's box is
-        // as wide as it is deep, near enough for this.
-        add(view.eye - glm::vec3(reach));
-        add(view.eye + glm::vec3(reach));
-    } else {
-        const glm::mat4 cameraToWorld = glm::inverse(view.view);
-        const float tanY = std::tan(0.5f * view.verticalFov);
-        const float tanX = tanY * view.aspect;
-        for (int i = 0; i < 4; ++i) {
-            add(glm::vec3(
-                cameraToWorld *
-                glm::vec4((i & 1 ? 1.0f : -1.0f) * tanX * reach,
-                          (i & 2 ? 1.0f : -1.0f) * tanY * reach,
-                          -reach, 1.0f)));
-        }
-    }
-    if (shell) {
-        box.first =
-            glm::clamp(box.first, shell->first, shell->second);
-        box.second =
-            glm::clamp(box.second, shell->first, shell->second);
-    }
-    return box;
 }
 
 void RasterRenderer::ReadDepthRange(std::uint32_t slot) {
@@ -6919,6 +6880,24 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             }
         }
         WriteShadingResources(commands);
+        // Light scattered beneath surfaces, a float per pixel of each
+        // raster layer, then spread along rows.
+        if (subsurface_) {
+            const VkDeviceSize bytes =
+                VkDeviceSize{extent_.width} * extent_.height *
+                targets.RasterRadiance().Desc().layers *
+                sizeof(float);
+            for (std::unique_ptr<GpuBuffer>* buffer :
+                 {&subsurfaceLight_, &subsurfaceSpread_}) {
+                if (*buffer == nullptr || (*buffer)->Size() < bytes) {
+                    vkDeviceWaitIdle(context_.Device());
+                    *buffer = std::make_unique<GpuBuffer>(
+                        context_, bytes,
+                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        BufferMemory::Device);
+                }
+            }
+        }
         // The surfaces' tangents, where a material reads them.
         std::uint32_t tangentSlot = 0;
         if (targets.Tangents()) {
@@ -6949,6 +6928,11 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             constants.model[2] =
                 targets.Stokes() ? targets.StokesOffset() : 0u;
             constants.gbuffer[0] = tangentSlot;
+            if (subsurface_) {
+                constants.subsurface = subsurfaceLight_->Address();
+                constants.subsurfaceSpread =
+                    subsurfaceSpread_->Address();
+            }
             if (terrainHorizon_.image != nullptr) {
                 std::copy(terrainHorizon_.grid.begin(),
                           terrainHorizon_.grid.end(),
@@ -7034,6 +7018,28 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             shadingLayout_.PushConstants(commands, &constants,
                                          sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
+        }
+        // Light scattered beneath surfaces spread, along rows then
+        // down columns into the raster radiance.
+        if (subsurface_) {
+            ERNIE_GPU_ZONE(context_, commands,
+                           "Subsurface scattering");
+            ShaderBarrier(commands);
+            vkCmdBindPipeline(commands,
+                              VK_PIPELINE_BIND_POINT_COMPUTE,
+                              subsurfacePipelines_
+                                  .at({pushbroom_, shadingVariant_})
+                                  ->Handle());
+            shadingLayout_.Push(
+                commands, VK_PIPELINE_BIND_POINT_COMPUTE, shading);
+            for (std::uint32_t pass = 0; pass < 2; ++pass) {
+                ShadingConstants constants = constantsFor(0);
+                constants.gbuffer[2] = pass;
+                shadingLayout_.PushConstants(commands, &constants,
+                                             sizeof(constants));
+                vkCmdDispatch(commands, groupsX, groupsY, views);
+                ShaderBarrier(commands);
+            }
         }
         // The transparent surfaces' own radiance, from their G-buffer
         // into theirs, without the dome occlusion found for the

@@ -169,6 +169,7 @@ class BrdfVulkanTest : public ernie::testing::VulkanTest {
         const std::string evaluation =
             mode == "specular"
                 ? "model.specularReflection(s, params[0]).factor"
+            : mode == "subsurface" ? "model.subsurface(s, params[0])"
             : mode == "environment"
                 ? "environmentSum(model.environment(s, params[0]))"
                 : "model.radianceFactor(s, params[0])";
@@ -932,4 +933,33 @@ TEST_F(BrdfVulkanTest,
                 0.02 * environment(plain, 1.0));
     EXPECT_LT(environment(tinted, 0.1),
               0.95 * environment(plain, 0.1));
+}
+
+TEST_F(BrdfVulkanTest,
+       OpenPbrSubsurfaceIsTheShareOfItsDiffuseItSpreads) {
+    // Without specular, all the light of a base scattering wholly
+    // beneath its surface is subsurface light, and half of it of one
+    // scattering half; none without subsurface.
+    const BrdfModel& model = *registry_.Find("open_pbr");
+    const std::vector<Geometry> cases = GeometryGrid(glm::dvec3(0.5));
+    const auto with = [&](float weight, const std::string& mode) {
+        return Evaluate("open_pbr",
+                        OpenPbrParams(model, {{3, 0.0f},
+                                              {30, weight},
+                                              {31, 0.5f},
+                                              {32, 0.5f},
+                                              {33, 0.5f}}),
+                        cases, 0.0, mode);
+    };
+    const std::vector<glm::dvec3> whole = with(1.0f, "radiance");
+    const std::vector<glm::dvec3> spread = with(1.0f, "subsurface");
+    const std::vector<glm::dvec3> half = with(0.5f, "subsurface");
+    const std::vector<glm::dvec3> none = with(0.0f, "subsurface");
+    for (std::size_t c = 0; c < cases.size(); ++c) {
+        EXPECT_NEAR(spread[c].g, whole[c].g,
+                    1e-5 + 1e-4 * whole[c].g);
+        EXPECT_NEAR(half[c].g, 0.5 * spread[c].g,
+                    1e-5 + 1e-4 * spread[c].g);
+        EXPECT_EQ(none[c].g, 0.0);
+    }
 }

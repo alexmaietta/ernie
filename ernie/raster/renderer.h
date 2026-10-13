@@ -1037,16 +1037,6 @@ class RasterRenderer {
     /// recent frame of the same stream saw from about the same pose
     /// (`seen_`), and the volumes' bounds, which write no depth.
     float FitCascadeDistance(const FrameParams& params) const;
-    /// The box of what `cascadeFit_`'s view may see shadowed by the
-    /// long-range views (`FitLongRangeView`): with an atmosphere, the
-    /// view's frustum through its shell, whose sky and aerial
-    /// perspective march the air; without, out to the cascades'
-    /// casters' reach (`kLongRangeStart`).
-    Bounds3 LongRangeReceivers(const FrameParams& params) const;
-    /// The world centre of the planet whose atmosphere shadows its
-    /// own light (`ShadowCasters::skipPlanet`), out of the long-range
-    /// views; none without an atmosphere.
-    std::optional<glm::dvec3> atmospherePlanet_;
     std::optional<CascadeFit> cascadeFit_;
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;
@@ -1464,6 +1454,18 @@ class RasterRenderer {
     /// Whether some material is transparent, for `Update` to make
     /// those pipelines.
     bool anyTransparent_ = false;
+    /// Whether some material scatters light beneath its surface
+    /// (`BrdfRegistry::kSubsurfaceFeature`): its light, per pixel of
+    /// every raster layer, and that spread along rows, made the first
+    /// time it is shaded (`Shade`); and the spreading pass, per
+    /// pushbroom and shading variant (shading.slang's
+    /// `subsurfaceMain`).
+    bool subsurface_ = false;
+    mutable std::unique_ptr<GpuBuffer> subsurfaceLight_;
+    mutable std::unique_ptr<GpuBuffer> subsurfaceSpread_;
+    std::map<std::pair<bool, std::uint32_t>,
+             std::unique_ptr<ComputePipeline>>
+        subsurfacePipelines_;
     /// Models' parameters past `BrdfRegistry::kCoreParams`, each
     /// material's after its features (`BrdfParams::extended`).
     std::unique_ptr<GpuBuffer> brdfExtended_;
