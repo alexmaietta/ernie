@@ -16,6 +16,8 @@ scene.define("/Looks/Exhaust", ernie.Material, density=20.0)
 
 Ernie reads OpenVDB files (`.vdb`) and uncompressed NanoVDB files (`.nvdb`). The GPU walks each grid's tree in place, NanoVDB's layout, so sparse grids stay sparse in memory: an OpenVDB file's grids are read with OpenVDB (Blosc and zip compression included) and converted to NanoVDB as they load, with their statistics. OpenVDB is built into Ernie statically, with oneTBB, Blosc and zlib, and none of their symbols are exported, so an application that loads its own copies (Houdini, Isaac Sim) is unaffected. A build configured with `-DERNIE_OPENVDB=OFF` reads NanoVDB alone; convert OpenVDB files for it with OpenVDB's `nanovdb_convert` (without `-z` or `-b`).
 
+`demo_volumes_openvdb` stands OpenVDB's sample volumes on a ground, read from their `.vdb` files as they are: two smoke columns lit by the sun, fire glowing at its temperature grid, and on request the explosion (fetched once from openvdb.org, 60 MB, the explosion 76 MB more).
+
 `fieldName` picks a grid of the file by name, and `fieldIndex` picks among grids of the same name. Without a name, `fieldIndex` counts every grid in the file. Every grid type NanoVDB stores as floats is read: float, half, Fp4, Fp8, Fp16 and FpN. A vec3f grid is read as the lengths of its vectors.
 
 A field prim's transform places its grid in the Volume, and the Volume's transform places the Volume in the world. Values sit at the grid's integer index coordinates, and Ernie interpolates trilinearly between them.

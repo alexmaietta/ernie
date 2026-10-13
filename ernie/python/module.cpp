@@ -2,6 +2,7 @@
 #include "bindings.h"
 
 #include "ernie/util/log.h"
+#include "ernie/util/nanovdb.h"
 
 NB_MODULE(_ernie, m) {
     m.doc() =
@@ -14,6 +15,10 @@ NB_MODULE(_ernie, m) {
         ernie::log::SetVerbosity(
             static_cast<ernie::log::Verbosity>(verbosity));
     });
+    m.def("openvdb_available", &ernie::OpenVdbAvailable,
+          "Whether this Ernie reads OpenVDB files (.vdb): built with "
+          "OpenVDB (ERNIE_OPENVDB, on by default). NanoVDB files (.nvdb) "
+          "read either way.");
     ernie::python::BindTensor(m);
     ernie::python::BindScene(m);
     ernie::python::BindSceneJson(m);
