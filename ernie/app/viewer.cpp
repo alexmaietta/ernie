@@ -554,6 +554,17 @@ struct Viewer::State {
         bool operator==(const ViewportOverlayKey&) const = default;
     };
     ViewportOverlayKey viewportOverlayKey;
+    /// What the selection overlay was last drawn from
+    /// (`UpdateSelectionOverlay`), its version then included.
+    struct SelectionOverlayKey {
+        std::uint64_t scene = 0;
+        std::uint64_t overlay = 0;
+        std::vector<Path> selected;
+        float scale = 0.0f;
+        glm::vec4 color{0.0f};
+        bool operator==(const SelectionOverlayKey&) const = default;
+    };
+    SelectionOverlayKey selectionOverlayKey;
     std::uint64_t unchangedFrames = 0;
     std::uint64_t redraws = 0;
     bool ecoPaused = false;
@@ -1913,6 +1924,14 @@ struct Viewer::State {
         if (selection.empty() && overlay.Empty()) {
             return;
         }
+        // Drawn again only when what it shows may have changed, so a
+        // still view changes nothing (eco mode, `EcoPause`).
+        SelectionOverlayKey key{scene.Version(), overlay.Version(),
+                                selection, contentScale,
+                                theme.accent};
+        if (key == selectionOverlayKey) {
+            return;
+        }
         overlay.Clear();
         OverlayStyle style;
         style.color = theme.accent;
@@ -1933,6 +1952,8 @@ struct Viewer::State {
                 overlay.Axes(world, 1.0, style);
             }
         }
+        key.overlay = overlay.Version();
+        selectionOverlayKey = std::move(key);
     }
 
     /// Draws what the eye menu shows over the scene into the

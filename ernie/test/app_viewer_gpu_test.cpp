@@ -1137,6 +1137,10 @@ TEST_F(ViewerTest, EcoModePausesRenderingUntilSomethingChanges) {
     // As does a redraw asked for.
     viewer_->Redraw();
     EXPECT_FALSE(pausedAfter(1));
+    // A selection changes the view once, its overlay not every frame.
+    viewer_->SetSelection({Path("/World/Cube")});
+    EXPECT_FALSE(pausedAfter(1));
+    EXPECT_TRUE(pausedAfter(4)) << "still with something selected";
     // A screenshot still renders the frame it writes.
     viewer_->GetCaptureOptions().folder = TempFile("eco");
     viewer_->Screenshot();
