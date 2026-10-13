@@ -188,7 +188,9 @@ struct MeshItem {
 /// raw position, orientation and scale arrays, so updating thousands
 /// of instances from a simulation costs a copy of those arrays and
 /// nothing per instance on the CPU. Meshes are two-sided; without
-/// normals each triangle is lit flat.
+/// normals they shade smooth, each point's normal the area-weighted
+/// sum of its triangles' computed on the GPU, again as its points
+/// move.
 ///
 /// Culling (`FrameParams::culling`) follows each view's frustum and,
 /// for shadow views, the light's:
@@ -320,8 +322,9 @@ class MeshDrawable : public RasterDrawable {
     /// triangle, as many as the mesh was added with (zeros holding
     /// their place), copied as `SetNormals`. Indices are not checked:
     /// each must be below the number of points. Such a mesh has no
-    /// coarser levels of detail, and host normals it has are not
-    /// recomputed as its points move (shaded flat without normals).
+    /// coarser levels of detail, and normals are not computed from
+    /// its triangles: its host normals stay as they are, and without
+    /// them each triangle shades flat.
     /// @throws std::invalid_argument for an unknown mesh, another
     /// number of indices, a tensor of another type or device, or
     /// without `SetComputeInterop`.
@@ -836,10 +839,14 @@ class MeshDrawable : public RasterDrawable {
         std::array<std::uint32_t, 3>
             skinSamples{};  ///< Lower, upper, alpha's bits.
         bool skinPosed = false;
-        /// Whether its normals follow its device points, recomputed
-        /// on the GPU when they move: a mesh with normals whose
-        /// points, but not normals, come from the device.
+        /// Whether its normals are computed from its triangles on the
+        /// GPU, and again when its points move: a mesh without
+        /// normals, or with normals whose points, but not normals,
+        /// come from the device.
         bool recomputeNormals = false;
+        /// Whether its normals are ours, made for a mesh added
+        /// without any (`DropGeneratedNormals`).
+        bool generatedNormals = false;
         /// Whether an anisotropic material shades it
         /// (`RasterRenderer::MaterialReadsTangents`), and whether it
         /// holds smooth tangents for it (`tangents_`, from its rest
@@ -996,6 +1003,11 @@ class MeshDrawable : public RasterDrawable {
     /// Simplifies a mesh's coarser levels of detail from its host
     /// data.
     void BuildLevels(Mesh& mesh) const;
+    /// Forgets normals made for a mesh added without any, once its
+    /// triangles come from the GPU (a writer, device indices), where
+    /// none around its points are known: it shades each triangle's
+    /// own again and a writer sees no normals.
+    static void DropGeneratedNormals(Mesh& mesh);
     void RebuildInstances();
     /// Lays out the composed instancers: their raw arrays' and
     /// parents' offsets, their ops, and each instance's level, in

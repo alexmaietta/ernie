@@ -77,20 +77,11 @@ def maps():
 
 
 def terrain():
-    """The patch's points, smooth normals, face counts, indices and
-    texture coordinates."""
+    """The patch's points, face counts, indices and texture coordinates
+    (its smooth normals the renderer's)."""
     s = np.linspace(-HALF, HALF, GRID + 1)
     x, y = np.meshgrid(s, s)
     points = np.stack([x, y, height(x, y)], -1).reshape(-1, 3)
-    # The heights' gradient by central differences, so slopes shade and
-    # take their temperatures smoothly rather than face by face.
-    e = 0.05
-    dx = (height(x + e, y) - height(x - e, y)) / (2.0 * e)
-    dy = (height(x, y + e) - height(x, y - e)) / (2.0 * e)
-    normals = np.stack([-dx, -dy, np.ones_like(dx)], -1).reshape(
-        -1, 3
-    )
-    normals /= np.linalg.norm(normals, axis=1, keepdims=True)
     st = np.stack(
         [(x + HALF) / (2.0 * HALF), (y + HALF) / (2.0 * HALF)], -1
     )
@@ -103,7 +94,6 @@ def terrain():
     ).ravel()
     return (
         points,
-        normals.astype(np.float32),
         np.full(GRID * GRID, 4),
         indices,
         st.reshape(-1, 2).astype(np.float32),
@@ -177,12 +167,11 @@ class Demo(ernie.demo.Demo):
         )
         scene.connect(surface.path, tokens.DIFFUSE_COLOR, albedo_map.path,
                       "outputs:rgb")  # fmt: skip
-        points, normals, counts, indices, st = terrain()
+        points, counts, indices, st = terrain()
         world.define(
             "Terrain",
             ernie.Mesh,
             points=points,
-            normals=normals,
             face_vertex_counts=counts,
             face_vertex_indices=indices,
             material_binding=look.path,

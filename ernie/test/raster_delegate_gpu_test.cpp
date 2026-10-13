@@ -821,6 +821,36 @@ TEST_F(RasterDelegateTest, MeshWritersDrawWhatTheyWrite) {
     EXPECT_EQ(red({-11, -1, 0}), 0);
 }
 
+// A ridge of two slopes without normals, lit from the right: smooth
+// normals, computed on the GPU from the triangles around each point,
+// shade it alike just either side of the ridge, where flat ones would
+// jump from the sunlit slope's to the other's; its feet still differ.
+TEST_F(RasterDelegateTest, MeshesWithoutNormalsShadeSmooth) {
+    Scene scene = MeshScene();
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({1.0, 0.0, 1.0}));
+    const std::array<float, 18> points{-4, -4, 0,    0,  -4, 1.5f,
+                                       0,  4,  1.5f, -4, 4,  0,
+                                       4,  -4, 0,    4,  4,  0};
+    const std::array<std::int32_t, 2> counts{4, 4};
+    const std::array<std::int32_t, 8> indices{0, 1, 2, 3, 1, 4, 5, 2};
+    ernie::Mesh::Define(scene, "/World/Ridge")
+        .SetPoints(Tensor::Copy<float>(points, {6, 3}))
+        .SetFaceVertexCounts(Tensor::Copy<std::int32_t>(counts, {2}))
+        .SetFaceVertexIndices(
+            Tensor::Copy<std::int32_t>(indices, {8}))
+        .SetMaterialBinding("/Looks/Red");
+    RasterDelegate delegate(*context_);
+    const Tensor image = delegate.Render(scene);
+    const auto red = [&](float x) {
+        const float z = 1.5f * (1.0f - std::abs(x) / 4.0f);
+        return static_cast<int>(TexelAt(scene, image, {x, 0, z})[0]);
+    };
+    EXPECT_NEAR(red(-0.3f), red(0.3f), 12) << "no edge at the ridge";
+    EXPECT_GT(red(3.5f), red(-3.5f) + 30)
+        << "the slopes still differ";
+}
+
 TEST_F(RasterDelegateTest,
        CudaPointsOfDetailedPrototypesDrawAsHostOnes) {
     RasterDelegate delegate(*context_);

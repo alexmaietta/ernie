@@ -941,6 +941,17 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     Mesh mesh;
     std::tie(mesh.low, mesh.high) = PointBounds(data.points);
     mesh.data = std::move(data);
+    // Without normals, smooth ones as Hydra gives: each point's the
+    // area-weighted sum of its triangles', on the GPU
+    // (`mesh_normals.slang`) once and again whenever its points move.
+    // Device triangles (`SetIndices`) leave them 0, which draws each
+    // triangle's own.
+    if (mesh.data.normals.empty() && !mesh.data.indices.empty()) {
+        mesh.data.normals.assign(mesh.data.points.size(), 0.0f);
+        mesh.recomputeNormals = true;
+        mesh.generatedNormals = true;
+        mesh.adjacency = TrianglesAround(mesh.data.indices, count);
+    }
     // Points all zero hold the place of device ones (`MeshDataOf`):
     // levels simplified from them would be degenerate, so they wait
     // for the first device points (`SetPoints`).
@@ -959,6 +970,13 @@ std::uint32_t MeshDrawable::AddMesh(MeshData data) {
     meshes_.emplace(handle, std::move(mesh));
     geometryDirty_ = true;
     return handle;
+}
+
+void MeshDrawable::DropGeneratedNormals(Mesh& mesh) {
+    if (mesh.generatedNormals) {
+        mesh.data.normals.clear();
+        mesh.generatedNormals = false;
+    }
 }
 
 void MeshDrawable::BuildLevels(Mesh& mesh) const {
@@ -1140,6 +1158,7 @@ void MeshDrawable::SetNormals(std::uint32_t mesh,
         target.adjacency.clear();
         geometryDirty_ = true;
     }
+    target.generatedNormals = false;
     target.deviceNormals = normals;
     target.normalsStream = stream;
     target.normalsDirty = true;
@@ -1323,6 +1342,7 @@ void MeshDrawable::SetIndices(std::uint32_t mesh,
         target.lodUvs.clear();
         target.recomputeNormals = false;
         target.adjacency.clear();
+        DropGeneratedNormals(target);
         geometryDirty_ = true;
     }
     // The view `MapIndices` gave out, handed back: the triangles are
@@ -1447,6 +1467,7 @@ void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
             target.lodUvs.clear();
             target.recomputeNormals = false;
             target.adjacency.clear();
+            DropGeneratedNormals(target);
             geometryDirty_ = true;
         }
     } else {

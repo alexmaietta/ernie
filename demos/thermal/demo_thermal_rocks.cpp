@@ -304,31 +304,16 @@ class RocksThermalDemo : public app::Demo {
 
     double hour_ = kStartHour;
 
-    /// The patch: a grid of quads over the heights, with smooth
-    /// normals and texture coordinates across it.
+    /// The patch: a grid of quads over the heights, with texture
+    /// coordinates across it (its smooth normals the renderer's).
     void DefineTerrain(const Path& look) {
         std::vector<double> points;
-        std::vector<float> normals;
         std::vector<float> st;
         for (int i = 0; i <= kGrid; ++i) {
             const double y = -kHalf + 2.0 * kHalf * i / kGrid;
             for (int j = 0; j <= kGrid; ++j) {
                 const double x = -kHalf + 2.0 * kHalf * j / kGrid;
                 points.insert(points.end(), {x, y, Height(x, y)});
-                // The heights' gradient by central differences, so
-                // slopes shade and take their temperatures smoothly
-                // rather than face by face.
-                constexpr double e = 0.05;
-                const glm::dvec3 n = glm::normalize(glm::dvec3(
-                    -(Height(x + e, y) - Height(x - e, y)) /
-                        (2.0 * e),
-                    -(Height(x, y + e) - Height(x, y - e)) /
-                        (2.0 * e),
-                    1.0));
-                normals.insert(normals.end(),
-                               {static_cast<float>(n.x),
-                                static_cast<float>(n.y),
-                                static_cast<float>(n.z)});
                 st.insert(
                     st.end(),
                     {static_cast<float>((x + kHalf) / (2.0 * kHalf)),
@@ -349,7 +334,6 @@ class RocksThermalDemo : public app::Demo {
         Scene& scene = GetScene();
         Mesh::Define(scene, "/World/Terrain")
             .SetPoints(Tensor::Copy<double>(points, {count, 3}))
-            .SetNormals(Tensor::Copy<float>(normals, {count, 3}))
             .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
                 std::vector<std::int64_t>(kGrid * kGrid, 4),
                 {kGrid * kGrid}))
