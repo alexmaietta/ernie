@@ -72,6 +72,11 @@ struct ShadowCasters {
     /// The light link groups whose geometry casts these shadows
     /// (`LightParams::shadowMask`), a bit each.
     std::uint32_t linkGroups = ~0u;
+    /// For a light's long-range view (`ShadowCascade::longRange`),
+    /// the world centre of the planet whose atmosphere shadows the
+    /// light behind it itself (its planet-shadow table, which bends
+    /// red light into the umbra): that planet casts none there.
+    std::optional<glm::dvec3> skipPlanet;
 
     /// Whether casters (or a view's draws) in world `of` (-1: shared)
     /// are drawn.

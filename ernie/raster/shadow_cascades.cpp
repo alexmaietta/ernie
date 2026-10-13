@@ -191,14 +191,21 @@ FitCascades(const CameraView& camera, float shadowDistance,
         const float x = std::floor(centerInLight.x / snap) * snap;
         const float y = std::floor(centerInLight.y / snap) * snap;
         // The sphere's depth, at least kCascadeMinDepthHalf either
-        // way. Casters nearer the light clamp onto the near plane, or
-        // without clamping the range reaches back to hold them.
+        // way, and towards the light as far as kLongRangeStart, where
+        // the long-range map takes the casters over: those culled
+        // wholly nearer the light, those partly nearer clamped onto
+        // the near plane, or without clamping held while the scene
+        // reaches no farther (Unreal's caster frustum, which reaches
+        // the light).
         const float depthHalf =
             std::max(radius, kCascadeMinDepthHalf);
-        float zNear = -centerInLight.z - depthHalf;
+        float zNear =
+            -centerInLight.z - std::max(depthHalf, kLongRangeStart);
         const float zFar = -centerInLight.z + depthHalf;
         if (!clampCasters) {
-            zNear = std::min(zNear, sceneNear - depthPadding);
+            zNear =
+                std::max(zNear, std::min(-centerInLight.z - depthHalf,
+                                         sceneNear - depthPadding));
         }
         const glm::mat4 projection = glm::orthoRH_ZO(
             x - half, x + half, y - half, y + half, zNear, zFar);
@@ -207,6 +214,76 @@ FitCascades(const CameraView& camera, float shadowDistance,
         cascades.push_back(cascade);
     }
     return cascades;
+}
+
+std::optional<ShadowCascade>
+FitLongRangeView(const glm::vec3& receiverLow,
+                 const glm::vec3& receiverHigh,
+                 const glm::vec3& toSun, const glm::vec3& sceneMin,
+                 const glm::vec3& sceneMax, float tanRadius,
+                 std::uint32_t resolution) {
+    // As the cascades look along the light.
+    const glm::vec3 up = std::fabs(toSun.z) > 0.99f
+                             ? glm::vec3(0.0f, 1.0f, 0.0f)
+                             : glm::vec3(0.0f, 0.0f, 1.0f);
+    const glm::mat4 lightView =
+        glm::lookAtRH(toSun, glm::vec3(0.0f), up);
+    const auto corner = [](const glm::vec3& low,
+                           const glm::vec3& high, int i) {
+        return glm::vec3((i & 1) ? high.x : low.x,
+                         (i & 2) ? high.y : low.y,
+                         (i & 4) ? high.z : low.z);
+    };
+    // The receivers across the light and their depths along it, and
+    // the depth of the scene's nearest point to the light.
+    glm::vec2 low(std::numeric_limits<float>::max());
+    glm::vec2 high(std::numeric_limits<float>::lowest());
+    float receiverNear = std::numeric_limits<float>::max();
+    float receiverFar = std::numeric_limits<float>::lowest();
+    float sceneNear = std::numeric_limits<float>::max();
+    for (int i = 0; i < 8; ++i) {
+        const glm::vec3 p = glm::vec3(
+            lightView *
+            glm::vec4(corner(receiverLow, receiverHigh, i), 1.0f));
+        low = glm::min(low, glm::vec2(p));
+        high = glm::max(high, glm::vec2(p));
+        receiverNear = std::min(receiverNear, -p.z);
+        receiverFar = std::max(receiverFar, -p.z);
+        sceneNear =
+            std::min(sceneNear,
+                     -(lightView *
+                       glm::vec4(corner(sceneMin, sceneMax, i), 1.0f))
+                          .z);
+    }
+    // Where the cascades' casters end.
+    const float castersEnd = receiverNear - kLongRangeStart;
+    if (!(sceneNear < castersEnd)) {
+        return std::nullopt;
+    }
+    // Widened by the penumbra of the farthest caster on the farthest
+    // receiver: the light's disc as that caster sees it.
+    const float margin =
+        (receiverFar - sceneNear) * std::max(tanRadius, 0.0f);
+    const float res = static_cast<float>(std::max(resolution, 1u));
+    float half =
+        0.5f * std::max(high.x - low.x, high.y - low.y) + margin;
+    // Up to a quarter stop, so a drifting fit keeps its texels.
+    half = std::exp2(
+        std::ceil(4.0f * std::log2(std::max(half, 1e-3f))) / 4.0f);
+    const float texel = 2.0f * half / res;
+    const glm::vec2 centre = 0.5f * (low + high);
+    const float x = std::floor(centre.x / texel) * texel;
+    const float y = std::floor(centre.y / texel) * texel;
+    const float padding = 0.01f * (castersEnd - sceneNear) + 1e-3f;
+    ShadowCascade view;
+    view.lightViewProjection =
+        glm::orthoRH_ZO(x - half, x + half, y - half, y + half,
+                        sceneNear - padding, castersEnd) *
+        lightView;
+    view.texelWorldSize = texel;
+    view.resolution = resolution;
+    view.longRange = true;
+    return view;
 }
 
 }  // namespace ernie

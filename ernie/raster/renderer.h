@@ -1037,6 +1037,16 @@ class RasterRenderer {
     /// recent frame of the same stream saw from about the same pose
     /// (`seen_`), and the volumes' bounds, which write no depth.
     float FitCascadeDistance(const FrameParams& params) const;
+    /// The box of what `cascadeFit_`'s view may see shadowed by the
+    /// long-range views (`FitLongRangeView`): with an atmosphere, the
+    /// view's frustum through its shell, whose sky and aerial
+    /// perspective march the air; without, out to the cascades'
+    /// casters' reach (`kLongRangeStart`).
+    Bounds3 LongRangeReceivers(const FrameParams& params) const;
+    /// The world centre of the planet whose atmosphere shadows its
+    /// own light (`ShadowCasters::skipPlanet`), out of the long-range
+    /// views; none without an atmosphere.
+    std::optional<glm::dvec3> atmospherePlanet_;
     std::optional<CascadeFit> cascadeFit_;
     std::vector<ShadowCascade> lightViews_;
     std::vector<ShadowCascade> shadowViews_;

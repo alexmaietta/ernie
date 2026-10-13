@@ -44,6 +44,10 @@ struct ShadowCascade {
     /// `lightViewProjection` is only the frame's pose, so passes cull
     /// nothing by it.
     bool moving = false;
+    /// A distant light's long-range view (`FitLongRangeView`):
+    /// casters far towards the light, which shading reads for the
+    /// share of the light's disc they leave, not by depth comparison.
+    bool longRange = false;
 };
 
 /// The share of each cascade's depth span that it reaches past its
@@ -62,6 +66,11 @@ inline constexpr float kCascadeSnapTexels = 4.0f;
 /// Metres of depth a cascade spans at least on either side of its
 /// sphere's centre (Unreal's `DepthRangeClamp`, 5000 cm).
 inline constexpr float kCascadeMinDepthHalf = 50.0f;
+/// Metres towards the light from a receiver within which casters
+/// shadow it through the cascades; farther ones, such as moons, cast
+/// through the long-range map (`FitLongRangeView`). As far as
+/// cascades reach along the view, too.
+inline constexpr float kLongRangeStart = 10e3f;
 
 /// Unreal Engine's cascaded shadow map biases and filtering, its
 /// defaults: `r.Shadow.CSMDepthBias`,
@@ -128,10 +137,11 @@ std::pair<glm::vec3, glm::vec3> WithShadows(const glm::vec3& low,
 /// round it, and its centre snaps to multiples of
 /// `kCascadeSnapTexels` texels, so shadow edges do not shimmer as the
 /// camera moves. Light-space depth spans the sphere, at least
-/// `kCascadeMinDepthHalf` either way; with `clampCasters`, for maps
-/// whose pipelines clamp depth, casters nearer the light land on its
-/// near plane ("pancaking"), else the depth reaches back to hold the
-/// whole scene box. `shadowDistance` is rounded up to a quarter stop,
+/// `kCascadeMinDepthHalf` either way, and towards the light to
+/// `kLongRangeStart`; with `clampCasters`, for maps whose pipelines
+/// clamp depth, casters partly nearer the light land on its near
+/// plane ("pancaking"), else the depth reaches back no farther than
+/// the scene box. `shadowDistance` is rounded up to a quarter stop,
 /// so a distance fitted to what the view sees keeps its cascades as
 /// it drifts.
 ///
@@ -160,5 +170,29 @@ FitCascades(const CameraView& camera, float shadowDistance,
             const glm::vec3& sceneMax, int count, float exponent,
             std::uint32_t resolution, float around = 0.0f,
             bool clampCasters = false);
+
+/// The long-range shadow view of a distant light towards `toSun`
+/// (unit): an orthographic map of the casters more than
+/// `kLongRangeStart` towards the light from the receivers in the box
+/// `receiverLow` to `receiverHigh`, such as moons eclipsing the
+/// ground and the air, for shading to integrate the light's
+/// limb-darkened disc over (its angular radius's tangent
+/// `tanRadius`).
+///
+/// The map holds the receivers' box as the light sees it, widened by
+/// the widest penumbra a caster in the scene box `sceneMin` to
+/// `sceneMax` throws on them, so casters off it still shade them; its
+/// centre snaps to whole texels. Its depth reaches from the scene's
+/// nearest point to the light to `kLongRangeStart` short of the
+/// receivers: nearer casters, the cascades', land on its far plane
+/// with depth clamping and read as none.
+///
+/// @return None without a caster that far towards the light.
+std::optional<ShadowCascade>
+FitLongRangeView(const glm::vec3& receiverLow,
+                 const glm::vec3& receiverHigh,
+                 const glm::vec3& toSun, const glm::vec3& sceneMin,
+                 const glm::vec3& sceneMax, float tanRadius,
+                 std::uint32_t resolution);
 
 }  // namespace ernie

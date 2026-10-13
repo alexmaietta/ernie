@@ -296,9 +296,10 @@ TEST(FitLightShadowViews, LasersLookAlongTheirBeam) {
     EXPECT_LT(depth(halfway), depth(end));
 }
 
-// Maps that clamp depth span only each cascade's slice in depth, so a
+// Maps that clamp depth span only each cascade's slice in depth and
+// the casters up to kLongRangeStart towards the light, so a
 // planet-sized scene keeps depth precision: every slice corner lies
-// within the depth range, which is about the slice's size.
+// within the depth range, which is about the slice's size and that.
 TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
     const CameraView camera = TestCamera();
     const glm::vec3 toSun =
@@ -318,8 +319,10 @@ TEST(FitCascades, ClampedCasterDepthsSpanOnlyTheSlice) {
             Project(cascade.lightViewProjection, toSun);
         const float range = 1.0f / std::fabs(b.z - a.z);
         EXPECT_LT(range, 4.0f * cascade.splitFar +
-                             2.0f * ernie::kCascadeMinDepthHalf)
+                             2.0f * ernie::kCascadeMinDepthHalf +
+                             ernie::kLongRangeStart)
             << "cascade " << c;
+        EXPECT_GT(range, ernie::kLongRangeStart) << "cascade " << c;
         for (const float depth :
              {cascade.splitNear, cascade.splitFar}) {
             for (int i = 0; i < 4; ++i) {
@@ -349,4 +352,56 @@ TEST(FitCascades, DriftingDistancesKeepTheCascades) {
         EXPECT_EQ(a[c].lightViewProjection, b[c].lightViewProjection)
             << "cascade " << c;
     }
+}
+
+// Without a caster more than kLongRangeStart towards the light, a
+// light has no long-range view: the cascades hold every caster.
+TEST(FitLongRangeView, NoneWithoutFarCasters) {
+    const glm::vec3 toSun =
+        glm::normalize(glm::vec3(0.3f, 0.2f, 0.9f));
+    EXPECT_FALSE(ernie::FitLongRangeView(
+        {-10, -10, 0}, {10, 10, 5}, toSun, {-100, -100, 0},
+        {100, 100, 50}, 0.005f, 1024));
+}
+
+// A moon far towards the sun: the long-range view holds it in depth,
+// the receivers off its far plane (theirs the cascades' casters), and
+// as much around them as the moon's penumbra reaches.
+TEST(FitLongRangeView, HoldsAMoonAndTheReceiversPenumbra) {
+    const glm::vec3 toSun =
+        glm::normalize(glm::vec3(0.3f, 0.2f, 0.9f));
+    const float distance = 384.4e6f;
+    const float moonRadius = 1737.4e3f;
+    const glm::vec3 moon = toSun * distance;
+    const glm::vec3 receiverLow(-1000.0f, -1000.0f, 0.0f);
+    const glm::vec3 receiverHigh(1000.0f, 1000.0f, 100.0f);
+    const float tanRadius = std::tan(glm::radians(0.2665f));
+    const auto view = ernie::FitLongRangeView(
+        receiverLow, receiverHigh, toSun,
+        glm::min(receiverLow, moon - glm::vec3(moonRadius)),
+        glm::max(receiverHigh, moon + glm::vec3(moonRadius)),
+        tanRadius, 1024);
+    ASSERT_TRUE(view);
+    EXPECT_TRUE(view->longRange);
+    const glm::mat4& m = view->lightViewProjection;
+    const glm::vec3 centre = Project(m, moon);
+    EXPECT_LE(std::fabs(centre.x), 1.0f);
+    EXPECT_LE(std::fabs(centre.y), 1.0f);
+    EXPECT_GE(centre.z, 0.0f);
+    EXPECT_LT(centre.z, 1.0f);
+    // The receivers lie past the far plane, where clamping lands
+    // them.
+    EXPECT_GT(Project(m, glm::vec3(0.0f)).z, 1.0f);
+    // A point across the light from the receivers by most of the
+    // moon's penumbra is still on the map.
+    const glm::vec3 across = glm::normalize(
+        glm::cross(toSun, glm::vec3(1.0f, 0.0f, 0.0f)));
+    const glm::vec3 edge =
+        Project(m, across * 0.9f * distance * tanRadius);
+    EXPECT_LE(std::fabs(edge.x), 1.0f);
+    EXPECT_LE(std::fabs(edge.y), 1.0f);
+    EXPECT_NEAR(view->texelWorldSize,
+                2.0f / (1024.0f * glm::length(glm::vec3(
+                                      m[0][0], m[1][0], m[2][0]))),
+                1.0f);
 }

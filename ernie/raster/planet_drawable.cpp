@@ -840,6 +840,13 @@ void PlanetDrawable::RecordShadow(
         !casters.Casts(params_.linkGroup)) {
         return;
     }
+    // A planet whose atmosphere shadows it casts no long-range
+    // shadow.
+    if (casters.skipPlanet &&
+        glm::length(*casters.skipPlanet - params_.planetCentre) <
+            1.0) {
+        return;
+    }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipelines_->shadow->Handle());
     pipelines_->layout.Push(commands, VK_PIPELINE_BIND_POINT_GRAPHICS,

@@ -119,7 +119,8 @@ ShadowCheck CheckShadows(const ernie::VulkanContext& context,
                                  reference.balls[i].centre));
     }
     const glm::dvec3 toSun = glm::normalize(reference.toSun);
-    DistantLight::Define(scene, "/World/Sun");
+    // A point: the exact answers' sun.
+    DistantLight::Define(scene, "/World/Sun").SetAngle(0.0);
     scene.Set("/World/Sun", tokens::kTransform,
               DistantLightTransform(toSun));
     const double aspect = static_cast<double>(reference.height) /
@@ -373,9 +374,63 @@ TEST_F(CascadeShadowTest, ReferenceAHighBall) {
     reference.toSun = {0.2, 0.3, 0.9};
     reference.eye = {-10.0, -25.0, 15.0};
     reference.target = {-4.0, -6.0, 0.0};
-    // Its shadow 25 m off, where the 5x5 filter's two and a half
-    // texels either way span a pixel or more.
-    ExpectExact(*context_, reference, 300, 0.18);
+    ExpectExact(*context_, reference);
+}
+
+// A ball 150 m towards the sun over a floor seen close up: the
+// cascade of the floor it shadows draws it though it lies far
+// towards the light from the cascade's own slice, flattened onto its
+// near plane, as Unreal culls casters by a frustum reaching the
+// light.
+TEST_F(CascadeShadowTest, ReferenceABallFarTowardsTheSun) {
+    Reference reference;
+    const glm::dvec3 toSun =
+        glm::normalize(glm::dvec3(0.3, -0.4, 0.85));
+    reference.balls = {
+        {toSun * 150.0 + glm::dvec3(0.0, 0.0, 0.0), 6.0}};
+    reference.toSun = toSun;
+    reference.eye = {-6.0, -14.0, 9.0};
+    reference.target = {0.0, 0.0, 0.0};
+    ExpectExact(*context_, reference);
+}
+
+// A moon far towards the sun, beyond the cascades' casters
+// (`kLongRangeStart`), casts through the sun's long-range view, after
+// its cascades.
+TEST_F(CascadeShadowTest, AMoonCastsThroughTheLongRangeView) {
+    using namespace ernie;
+    namespace tokens = ernie::tokens;
+    Scene scene = FlatScene();
+    const glm::dvec3 toSun =
+        glm::normalize(glm::dvec3(0.3, -0.4, 0.85));
+    DistantLight(scene, "/World/Sun").SetShadowEnable(true);
+    scene.Set("/World/Sun", tokens::kTransform,
+              DistantLightTransform(toSun));
+    Sphere::Define(scene, "/World/Moon").SetRadius(1737.4e3);
+    scene.Set("/World/Moon", tokens::kTransform,
+              glm::translate(glm::dmat4(1.0), toSun * 384.4e6));
+    RasterDelegate delegate(*context_);
+    delegate.Render(scene);
+    const auto views = delegate.Renderer().LightShadowViews();
+    const auto far = std::find_if(
+        views.begin(), views.end(),
+        [](const ShadowCascade& view) { return view.longRange; });
+    ASSERT_NE(far, views.end());
+    EXPECT_EQ(std::count_if(views.begin(), views.end(),
+                            [](const ShadowCascade& view) {
+                                return view.splitFar > 0.0f;
+                            }),
+              ernie::RenderSettings(scene, "/Render/Settings")
+                  .GetShadowCascades());
+    EXPECT_GT(far->texelWorldSize, 1e3f)
+        << "a map as wide as the moon's penumbra, thousands of km";
+    // Without it, none.
+    scene.Remove("/World/Moon");
+    delegate.Render(scene);
+    const auto without = delegate.Renderer().LightShadowViews();
+    EXPECT_TRUE(std::none_of(
+        without.begin(), without.end(),
+        [](const ShadowCascade& view) { return view.longRange; }));
 }
 
 namespace {
