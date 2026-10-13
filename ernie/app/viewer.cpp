@@ -2823,6 +2823,39 @@ struct Viewer::State {
     /// Kit's camera menu: the viewer's perspective camera, its
     /// orthographic views from the top, front and right, the scene's
     /// cameras, and a new camera where the view is.
+    /// A settings button at the right of the menu's last row (left of
+    /// its `shortcut`), as Kit's camera list has: selects `camera`
+    /// and shows its properties, the Stage panel showing the
+    /// session's prims for the viewer's own.
+    void PropertiesButton(const Path& camera, const char* shortcut) {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 min = ImGui::GetItemRectMin();
+        const ImVec2 max = ImGui::GetItemRectMax();
+        const float shortcutWidth =
+            shortcut != nullptr && *shortcut != '\0'
+                ? ImGui::CalcTextSize(shortcut).x +
+                      2.0f * style.ItemSpacing.x
+                : 0.0f;
+        const float width = ImGui::CalcTextSize(icons::kSettings).x +
+                            2.0f * style.FramePadding.x;
+        const ImVec2 after = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(
+            ImVec2(max.x - shortcutWidth - width, min.y));
+        ImGui::PushID(camera.String().c_str());
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        if (ImGui::SmallButton(icons::kSettings)) {
+            SetSelection({camera});
+            self.FocusPanel("Properties");
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Select it and show its properties");
+        }
+        ImGui::PopID();
+        ImGui::SetCursorScreenPos(after);
+    }
+
     void DrawCameraMenu() {
         const bool viewer = activeCamera == PerspectiveCamera();
         const std::vector<Path> cameras = ViewableCameras(scene);
@@ -2853,14 +2886,23 @@ struct Viewer::State {
                 if (ImGui::IsItemHovered()) {
                     ImGui::SetTooltip("%s", camera.String().c_str());
                 }
+                PropertiesButton(camera, nullptr);
             }
             ImGui::EndMenu();
         }
         for (int v = -1; v < 3; ++v) {
+            if (v == -1) {
+                ImGui::SetNextItemAllowOverlap();
+            }
             if (menu::Option(kViews[v + 1].name,
                              viewer && orthographicView == v,
                              kViews[v + 1].shortcut)) {
                 ChooseView(v);
+            }
+            // The viewer's own camera, which every view moves.
+            if (v == -1) {
+                PropertiesButton(PerspectiveCamera(),
+                                 kViews[0].shortcut);
             }
         }
         ImGui::Separator();

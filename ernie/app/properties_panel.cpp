@@ -139,17 +139,12 @@ class PropertiesPanel final : public Panel {
     void Draw(Viewer& viewer) override {
         const std::vector<Path>& selection = viewer.Selection();
         Scene& scene = viewer.GetScene();
-        // Without a selection, the camera the viewport looks through
-        // (the viewer's own, say), its sensor to edit.
-        const bool selected =
-            !selection.empty() && scene.Has(selection.front());
-        if (!selected && !scene.Has(viewer.ActiveCamera())) {
+        if (selection.empty() || !scene.Has(selection.front())) {
             ImGui::TextDisabled(
                 "Select a prim in the Stage or the viewport.");
             return;
         }
-        const Path& path =
-            selected ? selection.front() : viewer.ActiveCamera();
+        const Path& path = selection.front();
         // As Kit's property window: a search field, then the prim's
         // path and type.
         ImGui::SetNextItemWidth(-1.0f);

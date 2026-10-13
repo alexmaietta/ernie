@@ -177,6 +177,11 @@ class StagePanel final : public Panel {
             StartRename(selection.front());
         }
         if (reveal_) {
+            // A session prim selected (the viewer's camera, from the
+            // camera menu) shows the session's prims.
+            if (std::ranges::any_of(selection, IsSessionPath)) {
+                showSession_ = true;
+            }
             for (const Path& selected : selection) {
                 for (Path at = selected.Parent();
                      !at.IsEmpty() && !at.IsRoot();

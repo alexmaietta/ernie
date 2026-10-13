@@ -16,8 +16,7 @@ std::unique_ptr<Panel> MakeStagePanel();
 /// value type, editing through the viewer's undo history, with a
 /// reset back to each attribute's fallback; bulk data shows its
 /// shape. A camera adds its exposure, quantum efficiency, render
-/// products and sensor chain (`DrawCameraSections`); without a
-/// selection it shows the camera the viewport looks through.
+/// products and sensor chain (`DrawCameraSections`).
 std::unique_ptr<Panel> MakePropertiesPanel();
 
 /// The Settings panel. Render: the viewport's RenderSettings prim and
