@@ -27,6 +27,7 @@
 #include <pxr/base/gf/quath.h>
 #include <pxr/base/gf/rotation.h>
 #include <pxr/base/gf/vec2f.h>
+#include <pxr/base/gf/vec2i.h>
 #include <pxr/base/gf/vec3d.h>
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/tf/errorMark.h>
@@ -66,16 +67,26 @@
 #include <pxr/imaging/hd/visibilitySchema.h>
 #include <pxr/imaging/hd/xformSchema.h>
 #include <pxr/pxr.h>
+#include <pxr/usd/ar/asset.h>
+#include <pxr/usd/ar/packageUtils.h>
+#include <pxr/usd/ar/resolvedPath.h>
+#include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/sdf/assetPath.h>
+#include <pxr/usd/usd/collectionAPI.h>
 #include <pxr/usd/usd/editContext.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/variantSets.h>
+#include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/imageable.h>
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/pointBased.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
+#include <pxr/usd/usdLux/lightAPI.h>
+#include <pxr/usd/usdRender/product.h>
+#include <pxr/usd/usdRender/settings.h>
+#include <pxr/usd/usdRender/var.h>
 #include <pxr/usd/usdSkel/animQuery.h>
 #include <pxr/usd/usdSkel/animation.h>
 #include <pxr/usd/usdSkel/binding.h>
@@ -87,6 +98,9 @@
 #include <pxr/usd/usdSkel/skeletonQuery.h>
 #include <pxr/usd/usdSkel/skinningQuery.h>
 #include <pxr/usd/usdSkel/utils.h>
+#include <pxr/usd/usdVol/fieldAsset.h>
+#include <pxr/usd/usdVol/openVDBAsset.h>
+#include <pxr/usd/usdVol/volume.h>
 #include <pxr/usdImaging/usdImaging/flattenedDataSourceProviders.h>
 #include <pxr/usdImaging/usdImaging/sceneIndices.h>
 #include <pxr/usdImaging/usdImaging/stageSceneIndex.h>
@@ -97,6 +111,8 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
 #include <optional>
@@ -138,6 +154,9 @@ std::optional<std::vector<double>> NumbersOf(const VtValue& value) {
     } else if (value.IsHolding<GfVec2d>()) {
         const GfVec2d v = value.UncheckedGet<GfVec2d>();
         out = {v[0], v[1]};
+    } else if (value.IsHolding<GfVec2i>()) {
+        const GfVec2i v = value.UncheckedGet<GfVec2i>();
+        out = {static_cast<double>(v[0]), static_cast<double>(v[1])};
     } else if (value.IsHolding<GfVec3f>()) {
         const GfVec3f v = value.UncheckedGet<GfVec3f>();
         out = {v[0], v[1], v[2]};
@@ -554,6 +573,10 @@ class Importer {
                 TranslateTree(child.GetPath());
             }
         }
+        if (request_.renderSettings) {
+            RenderPrims();
+        }
+        LightLinks();
         SampledAttributes();
         if (!mark.IsClean()) {
             for (const TfError& error : mark) {
@@ -659,6 +682,103 @@ class Importer {
                          matrix.data(), 16);
     }
 
+    /// The file the asset value `asset` of the prim `path` names, for
+    /// Ernie to read: its resolved path, unpacked first into the
+    /// package cache when it is inside a package (a .usdz's texture),
+    /// and a NanoVDB file beside an OpenVDB one in its place.
+    std::string Asset(const std::string& path,
+                      const SdfAssetPath& asset) {
+        std::string text = AssetText(asset);
+        if (ArIsPackageRelativePath(text)) {
+            text = Unpacked(path, text);
+        }
+        if (TfStringEndsWith(text, ".vdb")) {
+            const std::filesystem::path nanovdb =
+                std::filesystem::path(text).replace_extension(
+                    ".nvdb");
+            std::error_code error;
+            if (std::filesystem::exists(nanovdb, error)) {
+                return nanovdb.string();
+            }
+            Warn(
+                path + ": " + text +
+                " is OpenVDB, which Ernie does not read; convert it "
+                "to " +
+                nanovdb.filename().string() +
+                " beside it with nanovdb_convert (without -z or -b)");
+        }
+        return text;
+    }
+
+    /// The file inside a package at the package-relative path
+    /// `packaged`, unpacked into the package cache once per version
+    /// of the package, or `packaged` itself when it cannot be.
+    std::string Unpacked(const std::string& path,
+                         const std::string& packaged) {
+        if (const auto it = unpacked_.find(packaged);
+            it != unpacked_.end()) {
+            return it->second;
+        }
+        const auto fail = [&](const std::string& why) {
+            Warn(path + ": " + packaged + " is inside a package; " +
+                 why);
+            unpacked_.emplace(packaged, packaged);
+            return packaged;
+        };
+        if (request_.packageCache == nullptr) {
+            return fail(
+                "Ernie has no cache folder to unpack it into");
+        }
+        const std::shared_ptr<ArAsset> asset =
+            ArGetResolver().OpenAsset(ArResolvedPath(packaged));
+        const std::shared_ptr<const char> bytes =
+            asset ? asset->GetBuffer() : nullptr;
+        if (!bytes) {
+            return fail("it cannot be read");
+        }
+        // A folder per package version: its path, size and time.
+        const std::string package =
+            ArSplitPackageRelativePathOuter(packaged).first;
+        std::error_code error;
+        const auto size = std::filesystem::file_size(package, error);
+        const auto time =
+            std::filesystem::last_write_time(package, error);
+        const std::size_t key = std::hash<std::string>{}(
+            packaged + "|" + std::to_string(size) + "|" +
+            std::to_string(time.time_since_epoch().count()));
+        const std::filesystem::path folder =
+            std::filesystem::path(request_.packageCache) /
+            TfStringPrintf("%016zx", key);
+        const std::filesystem::path file =
+            folder /
+            std::filesystem::path(
+                ArSplitPackageRelativePathInner(packaged).second)
+                .filename();
+        if (std::filesystem::file_size(file, error) !=
+            asset->GetSize()) {
+            std::filesystem::create_directories(folder, error);
+            // Written aside and renamed, so a reader never sees half.
+            const std::filesystem::path partial =
+                file.string() + ".partial";
+            {
+                std::ofstream out(partial, std::ios::binary);
+                out.write(bytes.get(), static_cast<std::streamsize>(
+                                           asset->GetSize()));
+                if (!out) {
+                    return fail("it cannot be written to " +
+                                folder.string());
+                }
+            }
+            std::filesystem::rename(partial, file, error);
+            if (error) {
+                return fail("it cannot be written to " +
+                            folder.string());
+            }
+        }
+        unpacked_.emplace(packaged, file.string());
+        return file.string();
+    }
+
     /// Sets the attribute `name` on `path` to `value` if it is of a
     /// kind Ernie holds as a single value.
     void SetValue(const std::string& path, const std::string& name,
@@ -677,13 +797,7 @@ class Importer {
                            value.UncheckedGet<std::string>().c_str());
         } else if (value.IsHolding<SdfAssetPath>()) {
             const std::string text =
-                AssetText(value.UncheckedGet<SdfAssetPath>());
-            if (text.find('[') != std::string::npos) {
-                Warn(path + ": " + name + " is inside a package (" +
-                     text +
-                     "); Ernie cannot read files from .usdz archives "
-                     "yet");
-            }
+                Asset(path, value.UncheckedGet<SdfAssetPath>());
             sink_.SetToken(path.c_str(), name.c_str(), text.c_str());
         } else if (const auto numbers = NumbersOf(value)) {
             sink_.SetNumbers(path.c_str(), name.c_str(),
@@ -794,6 +908,13 @@ class Importer {
             TranslateCamera(ds, path);
         } else if (HdPrimTypeIsLight(type)) {
             TranslateLight(ds, path);
+            if (usd && usd.HasAPI<UsdLuxLightAPI>()) {
+                lights_.emplace_back(source, path);
+            }
+        } else if (ernieType == "Volume") {
+            TranslateVolume(UsdVolVolume(usd), ds, path);
+        } else if (ernieType == "OpenVDBAsset") {
+            TranslateField(UsdVolOpenVDBAsset(usd), path);
         } else if (type == HdPrimTypeTokens->cube ||
                    type == HdPrimTypeTokens->sphere ||
                    type == HdPrimTypeTokens->cylinder ||
@@ -815,6 +936,12 @@ class Importer {
             }
             if (usd.IsA<UsdSkelRoot>()) {
                 return "SkelRoot";
+            }
+            if (usd.IsA<UsdVolVolume>()) {
+                return "Volume";
+            }
+            if (usd.IsA<UsdVolOpenVDBAsset>()) {
+                return "OpenVDBAsset";
             }
         }
         static const std::unordered_map<TfToken, std::string,
@@ -899,6 +1026,12 @@ class Importer {
             sink_.SetTokenAt(
                 p, n, time,
                 value.UncheckedGet<std::string>().c_str());
+        } else if (value.IsHolding<SdfAssetPath>()) {
+            // A file per frame, such as a volume's grids.
+            sink_.SetTokenAt(
+                p, n, time,
+                Asset(path, value.UncheckedGet<SdfAssetPath>())
+                    .c_str());
         } else if (const auto numbers = NumbersOf(value)) {
             sink_.SetNumbersAt(p, n, time, numbers->data(),
                                numbers->size());
@@ -1247,6 +1380,232 @@ class Importer {
                 Call(path, [&] { SetValue(path, name, value); });
             }
         }
+    }
+
+    /// A UsdVol Volume: its `field:<name>` relationships to its
+    /// field prims (translated wherever they are) and its material.
+    void TranslateVolume(const UsdVolVolume& volume,
+                         const HdContainerDataSourceHandle& ds,
+                         const std::string& path) {
+        for (const auto& [name, field] : volume.GetFieldPaths()) {
+            TranslateTree(field);
+            const std::string target = Map(field);
+            const char* targets[] = {target.c_str()};
+            Call(path, [&] {
+                sink_.SetTargets(
+                    path.c_str(),
+                    ("field:" + name.GetString()).c_str(), targets, 1,
+                    false);
+            });
+        }
+        Bind(ds, path);
+    }
+
+    /// An OpenVDBAsset field: which grid of which file.
+    void TranslateField(const UsdVolOpenVDBAsset& field,
+                        const std::string& path) {
+        for (const UsdAttribute& attribute :
+             {field.GetFilePathAttr(), field.GetFieldNameAttr(),
+              field.GetFieldIndexAttr(), field.GetFieldDataTypeAttr(),
+              field.GetVectorDataRoleHintAttr(),
+              field.GetFieldClassAttr()}) {
+            VtValue value;
+            if (attribute.HasAuthoredValue() &&
+                attribute.Get(&value, time_)) {
+                Call(path, [&] {
+                    SetValue(path, attribute.GetName().GetString(),
+                             value);
+                });
+            }
+        }
+    }
+
+    /// Each light's light and shadow link collections, once every
+    /// prim they may name is translated: their includes and excludes
+    /// as Ernie paths, those outside the import dropped.
+    void LightLinks() {
+        std::unordered_map<SdfPath, std::string, SdfPath::Hash> ernie;
+        for (const auto& [source, path] : mapped_) {
+            ernie.emplace(source, path);
+        }
+        const auto targetOf =
+            [&](const SdfPath& target) -> std::optional<std::string> {
+            if (const auto it = ernie.find(target);
+                it != ernie.end()) {
+                return it->second;
+            }
+            if (default_.IsEmpty() || target.HasPrefix(default_)) {
+                return Map(target);
+            }
+            return std::nullopt;
+        };
+        for (const auto& [source, path] : lights_) {
+            const UsdLuxLightAPI light(stage_->GetPrimAtPath(source));
+            for (const auto& [collection, link] :
+                 {std::pair(light.GetLightLinkCollectionAPI(),
+                            "collection:lightLink:"),
+                  std::pair(light.GetShadowLinkCollectionAPI(),
+                            "collection:shadowLink:")}) {
+                if (!collection) {
+                    continue;
+                }
+                const std::string prefix = link;
+                if (const UsdAttribute expression =
+                        collection.GetMembershipExpressionAttr();
+                    expression && expression.HasAuthoredValue()) {
+                    Warn(path + ": its " + prefix +
+                         " membership expression is not supported; "
+                         "only its includes and excludes link");
+                }
+                bool includeRoot = true;
+                if (const UsdAttribute attribute =
+                        collection.GetIncludeRootAttr();
+                    attribute.HasAuthoredValue() &&
+                    attribute.Get(&includeRoot)) {
+                    Call(path, [&] {
+                        sink_.SetBool(
+                            path.c_str(),
+                            (prefix + "includeRoot").c_str(),
+                            includeRoot);
+                    });
+                }
+                for (const auto& [relationship, name] :
+                     {std::pair(collection.GetIncludesRel(),
+                                "includes"),
+                      std::pair(collection.GetExcludesRel(),
+                                "excludes")}) {
+                    SdfPathVector targets;
+                    if (!relationship ||
+                        !relationship.GetTargets(&targets) ||
+                        targets.empty()) {
+                        continue;
+                    }
+                    std::vector<std::string> paths;
+                    for (const SdfPath& target : targets) {
+                        if (const auto mapped = targetOf(target)) {
+                            paths.push_back(*mapped);
+                        } else {
+                            Warn(path + ": its " + prefix + name +
+                                 " target " + target.GetString() +
+                                 " is outside the import; it is "
+                                 "dropped");
+                        }
+                    }
+                    std::vector<const char*> texts;
+                    for (const std::string& p : paths) {
+                        texts.push_back(p.c_str());
+                    }
+                    Call(path, [&] {
+                        sink_.SetTargets(
+                            path.c_str(), (prefix + name).c_str(),
+                            texts.data(), texts.size(), true);
+                    });
+                }
+            }
+        }
+    }
+
+    /// The stage's RenderSettings, RenderProducts and RenderVars,
+    /// wherever they are (usually /Render, outside the default prim),
+    /// with the attributes and relationships Ernie's declare; the
+    /// cameras they name are translated too.
+    void RenderPrims() {
+        for (const UsdPrim& prim : stage_->Traverse()) {
+            const char* type =
+                prim.IsA<UsdRenderSettings>()  ? "RenderSettings"
+                : prim.IsA<UsdRenderProduct>() ? "RenderProduct"
+                : prim.IsA<UsdRenderVar>()     ? "RenderVar"
+                                               : nullptr;
+            if (type == nullptr) {
+                continue;
+            }
+            const std::string path = Map(prim.GetPath());
+            if (!Call(path,
+                      [&] { DefinePrim(path.c_str(), type); })) {
+                continue;
+            }
+            Mapped(prim.GetPath(), path);
+            for (const UsdAttribute& attribute :
+                 prim.GetAuthoredAttributes()) {
+                std::string name = attribute.GetName().GetString();
+                VtValue value;
+                if (!sink_.Declares(path.c_str(), name.c_str()) ||
+                    !attribute.Get(&value, time_)) {
+                    continue;
+                }
+                if (name == "sourceName") {
+                    value = RenderVarName(path, value);
+                }
+                Call(path, [&] { SetValue(path, name, value); });
+            }
+            for (const UsdRelationship& relationship :
+                 prim.GetAuthoredRelationships()) {
+                const std::string name =
+                    relationship.GetName().GetString();
+                SdfPathVector targets;
+                if (!sink_.Declares(path.c_str(), name.c_str()) ||
+                    !relationship.GetForwardedTargets(&targets)) {
+                    continue;
+                }
+                std::vector<std::string> paths;
+                for (const SdfPath& target : targets) {
+                    // Cameras outside the default prim come in too.
+                    if (const UsdPrim t =
+                            stage_->GetPrimAtPath(target);
+                        t && t.IsA<UsdGeomCamera>()) {
+                        TranslateTree(target);
+                    }
+                    paths.push_back(Map(target));
+                }
+                std::vector<const char*> texts;
+                for (const std::string& p : paths) {
+                    texts.push_back(p.c_str());
+                }
+                Call(path, [&] {
+                    sink_.SetTargets(path.c_str(), name.c_str(),
+                                     texts.data(), texts.size(),
+                                     true);
+                });
+            }
+        }
+    }
+
+    /// A RenderVar's source as Ernie names its render vars: USD's
+    /// usual names (Hydra's AOVs and RenderMan's) for the ones Ernie
+    /// has, others as they are.
+    VtValue RenderVarName(const std::string& path,
+                          const VtValue& value) {
+        std::string name;
+        if (value.IsHolding<std::string>()) {
+            name = value.UncheckedGet<std::string>();
+        } else if (value.IsHolding<TfToken>()) {
+            name = value.UncheckedGet<TfToken>().GetString();
+        } else {
+            return value;
+        }
+        static const std::unordered_map<std::string, std::string>
+            kNames{{"color", "HdrColor"},
+                   {"Ci", "HdrColor"},
+                   {"rgba", "HdrColor"},
+                   {"depth", "DistanceToImagePlane"},
+                   {"z", "DistanceToImagePlane"},
+                   {"normal", "Normal"},
+                   {"Neye", "Normal"},
+                   {"N", "Normal"},
+                   {"primId", "PrimId"},
+                   {"instanceId", "InstanceId"},
+                   {"motion", "MotionVector"},
+                   {"dPdtime", "MotionVector"}};
+        if (const auto it = kNames.find(name); it != kNames.end()) {
+            return VtValue(it->second);
+        }
+        if (name.find_first_of("<>'.") != std::string::npos) {
+            Warn(path + ": its source " + name +
+                 " is a light path expression; Ernie renders its "
+                 "colour (HdrColor)");
+            return VtValue(std::string("HdrColor"));
+        }
+        return value;
     }
 
     void TranslatePoints(const HdContainerDataSourceHandle& ds,
@@ -2461,7 +2820,7 @@ class Importer {
                     .empty()) {
                 return std::nullopt;
             }
-            return AssetText(v.UncheckedGet<SdfAssetPath>());
+            return Asset(material, v.UncheckedGet<SdfAssetPath>());
         };
 
         const std::string surface = material + "/ErniePreviewSurface";
@@ -2621,6 +2980,11 @@ class Importer {
     std::unordered_map<SdfPath, std::string, SdfPath::Hash>
         materials_;
     std::unordered_map<SdfPath, std::string, SdfPath::Hash> shaders_;
+    /// Lights whose link collections wait for every prim to be
+    /// translated (`LightLinks`).
+    std::vector<std::pair<SdfPath, std::string>> lights_;
+    /// Files unpacked from packages by their package-relative paths.
+    std::unordered_map<std::string, std::string> unpacked_;
     std::unordered_set<std::string> warned_;
 };
 

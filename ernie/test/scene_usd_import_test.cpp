@@ -10,11 +10,15 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 using ernie::Path;
@@ -488,6 +492,333 @@ def Xform "Shot"
     ernie::Stage(scene_, Path::Root()).SetTimeCode(12.5);
     EXPECT_NEAR(scene_.WorldTransform(Path("/World/Shot/Box"))[3].y,
                 11.5, 1e-6);
+}
+
+TEST_F(UsdImportTest, VolumesNameTheirFieldsAndNanoVdbFiles) {
+    // An OpenVDB file with a NanoVDB conversion beside it, and one
+    // without.
+    std::ofstream(dir_ / "smoke.vdb") << "vdb";
+    std::ofstream(dir_ / "smoke.nvdb") << "nvdb";
+    std::ofstream(dir_ / "fire.vdb") << "vdb";
+    const std::filesystem::path file = dir_ / "volume.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Fx"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Fx"
+{
+    def Volume "Smoke"
+    {
+        rel field:density = </Fx/Smoke/Density>
+        rel field:temperature = </Fx/Smoke/Heat>
+
+        def OpenVDBAsset "Density"
+        {
+            asset filePath = @smoke.vdb@
+            token fieldName = "density"
+        }
+        def OpenVDBAsset "Heat"
+        {
+            asset filePath = @fire.vdb@
+            token fieldName = "temperature"
+            int fieldIndex = 1
+        }
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Fx"), file);
+    EXPECT_EQ(scene_.TypeOf(Path("/World/Fx/Smoke")), "Volume");
+    EXPECT_EQ(scene_.TypeOf(Path("/World/Fx/Smoke/Density")),
+              "OpenVDBAsset");
+    EXPECT_EQ(scene_.Get<Path>(Path("/World/Fx/Smoke"),
+                               "field:density", Path()),
+              Path("/World/Fx/Smoke/Density"));
+    EXPECT_EQ(scene_.Get<Path>(Path("/World/Fx/Smoke"),
+                               "field:temperature", Path()),
+              Path("/World/Fx/Smoke/Heat"));
+    EXPECT_TRUE(Token("/World/Fx/Smoke/Density", tokens::kFilePath)
+                    .ends_with("smoke.nvdb"))
+        << "the NanoVDB file beside it";
+    EXPECT_EQ(Token("/World/Fx/Smoke/Density", tokens::kFieldName),
+              "density");
+    EXPECT_EQ(scene_.Get<int>(Path("/World/Fx/Smoke/Heat"),
+                              tokens::kFieldIndex, 0),
+              1);
+    EXPECT_TRUE(Token("/World/Fx/Smoke/Heat", tokens::kFilePath)
+                    .ends_with("fire.vdb"));
+    ASSERT_EQ(result.warnings.size(), 1u);
+    EXPECT_NE(result.warnings.front().find("nanovdb_convert"),
+              std::string::npos)
+        << result.warnings.front();
+}
+
+TEST_F(UsdImportTest, LightsKeepTheirLinks) {
+    const std::filesystem::path file = dir_ / "linked.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Set"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Set"
+{
+    def Cube "Hero" {}
+    def Cube "Extra" {}
+    def SphereLight "Key" (
+        prepend apiSchemas = ["CollectionAPI:lightLink", "CollectionAPI:shadowLink"]
+    )
+    {
+        uniform bool collection:lightLink:includeRoot = 0
+        rel collection:lightLink:includes = </Set/Hero>
+        rel collection:shadowLink:excludes = </Set/Extra>
+    }
+    def DistantLight "Fill" (
+        prepend apiSchemas = ["CollectionAPI:lightLink"]
+    )
+    {
+        rel collection:lightLink:includes = </Set>
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Set"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    const Path key("/World/Set/Key");
+    EXPECT_FALSE(
+        scene_.Get<bool>(key, tokens::kLightLinkIncludeRoot, true));
+    EXPECT_EQ(scene_.Get<std::vector<Path>>(
+                  key, tokens::kLightLinkIncludes, {}),
+              std::vector<Path>{Path("/World/Set/Hero")});
+    EXPECT_EQ(scene_.Get<std::vector<Path>>(
+                  key, tokens::kShadowLinkExcludes, {}),
+              std::vector<Path>{Path("/World/Set/Extra")});
+    EXPECT_TRUE(
+        scene_.Get<bool>(key, tokens::kShadowLinkIncludeRoot, true))
+        << "unauthored, the default";
+    EXPECT_EQ(
+        scene_.Get<std::vector<Path>>(Path("/World/Set/Fill"),
+                                      tokens::kLightLinkIncludes, {}),
+        std::vector<Path>{Path("/World/Set")})
+        << "the default prim is the import's root";
+}
+
+TEST_F(UsdImportTest, RenderSettingsComeWithTheirCamerasAndVars) {
+    const std::filesystem::path file = dir_ / "shot.usda";
+    std::ofstream(file) << R"(#usda 1.0
+(
+    defaultPrim = "Set"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+def Xform "Set"
+{
+    def Cube "Box" {}
+}
+def Camera "ShotCam"
+{
+    float focalLength = 35
+}
+def Scope "Render"
+{
+    def RenderSettings "Settings"
+    {
+        rel camera = </ShotCam>
+        uniform int2 resolution = (640, 360)
+        rel products = </Render/Beauty>
+    }
+    def RenderProduct "Beauty"
+    {
+        rel orderedVars = [</Render/Color>, </Render/Depth>]
+    }
+    def RenderVar "Color"
+    {
+        uniform string sourceName = "Ci"
+    }
+    def RenderVar "Depth"
+    {
+        uniform string sourceName = "depth"
+    }
+}
+)";
+    const ernie::UsdImportResult result =
+        ernie::ImportUsd(scene_, Path("/World/Set"), file);
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    const Path settings("/World/Set/_external/Render/Settings");
+    ASSERT_EQ(scene_.TypeOf(settings), "RenderSettings");
+    const glm::dvec2 resolution = scene_.Get<glm::dvec2>(
+        settings, tokens::kResolution, glm::dvec2(0.0));
+    EXPECT_EQ(resolution, glm::dvec2(640.0, 360.0));
+    const std::vector<Path> cameras = scene_.Get<std::vector<Path>>(
+        settings, tokens::kCameraRel, {});
+    ASSERT_EQ(cameras.size(), 1u);
+    EXPECT_EQ(scene_.TypeOf(cameras.front()), "Camera")
+        << "the camera outside the default prim comes in too";
+    EXPECT_EQ(scene_
+                  .Get<std::vector<Path>>(
+                      Path("/World/Set/_external/Render/Beauty"),
+                      tokens::kOrderedVars, {})
+                  .size(),
+              2u);
+    EXPECT_EQ(Token("/World/Set/_external/Render/Color",
+                    tokens::kSourceName),
+              "HdrColor");
+    EXPECT_EQ(Token("/World/Set/_external/Render/Depth",
+                    tokens::kSourceName),
+              "DistanceToImagePlane");
+
+    Scene without;
+    without.Define(Path("/World"), "Xform");
+    ernie::UsdImportOptions options;
+    options.renderSettings = false;
+    ernie::ImportUsd(without, Path("/World/Set"), file, options);
+    EXPECT_TRUE(without.Prims(tokens::kRenderSettings).empty());
+}
+
+/// The CRC-32 a zip entry records.
+std::uint32_t Crc32(std::string_view bytes) {
+    std::uint32_t crc = 0xffffffffu;
+    for (const char c : bytes) {
+        crc ^= static_cast<std::uint8_t>(c);
+        for (int bit = 0; bit < 8; ++bit) {
+            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+        }
+    }
+    return ~crc;
+}
+
+/// Writes `files` (name, bytes; the layer first) as a .usdz: an
+/// uncompressed zip whose data starts on 64-byte boundaries.
+void WriteUsdz(
+    const std::filesystem::path& path,
+    const std::vector<std::pair<std::string, std::string>>& files) {
+    std::string zip;
+    std::string directory;
+    const auto u16 = [](std::string& out, std::uint32_t v) {
+        out.push_back(static_cast<char>(v & 0xff));
+        out.push_back(static_cast<char>((v >> 8) & 0xff));
+    };
+    const auto u32 = [&](std::string& out, std::uint32_t v) {
+        u16(out, v & 0xffff);
+        u16(out, v >> 16);
+    };
+    for (const auto& [name, bytes] : files) {
+        const auto offset = static_cast<std::uint32_t>(zip.size());
+        const auto size = static_cast<std::uint32_t>(bytes.size());
+        const std::uint32_t crc = Crc32(bytes);
+        // Padding in an extra field (4 bytes of header) aligns data.
+        const std::size_t start = zip.size() + 30 + name.size() + 4;
+        const std::size_t pad = (64 - start % 64) % 64;
+        u32(zip, 0x04034b50u);
+        u16(zip, 20);
+        u16(zip, 0);
+        u16(zip, 0);
+        u32(zip, 0);
+        u32(zip, crc);
+        u32(zip, size);
+        u32(zip, size);
+        u16(zip, static_cast<std::uint32_t>(name.size()));
+        u16(zip, static_cast<std::uint32_t>(4 + pad));
+        zip += name;
+        u16(zip, 0x1986);
+        u16(zip, static_cast<std::uint32_t>(pad));
+        zip.append(pad, '\0');
+        zip += bytes;
+        u32(directory, 0x02014b50u);
+        u16(directory, 20);
+        u16(directory, 20);
+        u16(directory, 0);
+        u16(directory, 0);
+        u32(directory, 0);
+        u32(directory, crc);
+        u32(directory, size);
+        u32(directory, size);
+        u16(directory, static_cast<std::uint32_t>(name.size()));
+        u16(directory, 0);
+        u16(directory, 0);
+        u16(directory, 0);
+        u16(directory, 0);
+        u32(directory, 0);
+        u32(directory, offset);
+        directory += name;
+    }
+    const auto at = static_cast<std::uint32_t>(zip.size());
+    zip += directory;
+    u32(zip, 0x06054b50u);
+    u16(zip, 0);
+    u16(zip, 0);
+    u16(zip, static_cast<std::uint32_t>(files.size()));
+    u16(zip, static_cast<std::uint32_t>(files.size()));
+    u32(zip, static_cast<std::uint32_t>(directory.size()));
+    u32(zip, at);
+    u16(zip, 0);
+    std::ofstream(path, std::ios::binary) << zip;
+}
+
+void SetEnvironment(const char* name, const std::string& value) {
+#if defined(_WIN32)
+    _putenv_s(name, value.c_str());
+#else
+    setenv(name, value.c_str(), 1);
+#endif
+}
+
+TEST_F(UsdImportTest, TexturesInsidePackagesAreUnpacked) {
+    const std::filesystem::path cache = dir_ / "packages";
+    SetEnvironment("ERNIE_USD_PACKAGE_CACHE", cache.string());
+    const std::string texture = "not really a png";
+    WriteUsdz(dir_ / "asset.usdz", {{"asset.usda", R"(#usda 1.0
+(
+    defaultPrim = "Asset"
+)
+def Xform "Asset"
+{
+    def Cube "Box" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        rel material:binding = </Asset/Looks/Paint>
+    }
+    def Scope "Looks"
+    {
+        def Material "Paint"
+        {
+            token outputs:surface.connect = </Asset/Looks/Paint/Surface.outputs:surface>
+            def Shader "Surface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.connect = </Asset/Looks/Paint/Tex.outputs:rgb>
+                token outputs:surface
+            }
+            def Shader "Tex"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @textures/paint.png@
+                float3 outputs:rgb
+            }
+        }
+    }
+}
+)"},
+                                    {"textures/paint.png", texture}});
+    const ernie::UsdImportResult result = ernie::ImportUsd(
+        scene_, Path("/World/Asset"), dir_ / "asset.usdz");
+    SetEnvironment("ERNIE_USD_PACKAGE_CACHE", "");
+    EXPECT_TRUE(result.warnings.empty())
+        << (result.warnings.empty() ? "" : result.warnings.front());
+    const std::filesystem::path unpacked =
+        Token("/World/Asset/Looks/Paint/Tex", "inputs:file");
+    EXPECT_EQ(unpacked.filename(), "paint.png");
+    EXPECT_TRUE(unpacked.string().starts_with(cache.string()))
+        << unpacked;
+    std::ifstream in(unpacked, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)),
+                            std::istreambuf_iterator<char>());
+    EXPECT_EQ(bytes, texture);
 }
 
 TEST_F(UsdImportTest, MissingFilesThrow) {

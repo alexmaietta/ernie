@@ -80,7 +80,8 @@ void BindUsd(nb::module_& m) {
                std::string,
                std::unordered_map<std::string, std::string>>>&
                variants,
-           std::optional<double> time, bool proxy, bool guide) {
+           std::optional<double> time, bool proxy, bool guide,
+           bool renderSettings) {
             UsdImportOptions options;
             if (variants) {
                 for (const auto& [prim, sets] : *variants) {
@@ -93,6 +94,7 @@ void BindUsd(nb::module_& m) {
             options.time = time;
             options.proxy = proxy;
             options.guide = guide;
+            options.renderSettings = renderSettings;
             const Path path = PathFromPython(root);
             UsdImportResult result;
             {
@@ -113,7 +115,7 @@ void BindUsd(nb::module_& m) {
         nb::is_method(), nb::arg("root"), nb::arg("file"),
         nb::arg("variants") = nb::none(),
         nb::arg("time") = nb::none(), nb::arg("proxy") = false,
-        nb::arg("guide") = false,
+        nb::arg("guide") = false, nb::arg("render_settings") = true,
         "Imports a USD file (.usd, .usda, .usdc, .usdz) at root, a "
         "prim "
         "path, through OpenUSD: composed (sublayers, references, "
@@ -124,7 +126,9 @@ void BindUsd(nb::module_& m) {
         "the scene's. variants selects before composing, as "
         "{usd_prim_path: {variant_set: selection}}; time is the time "
         "code read (the earliest otherwise); proxy and guide also "
-        "translate prims of those purposes. Returns a UsdImport. "
+        "translate prims of those purposes; render_settings False "
+        "leaves out its RenderSettings, products and vars. Returns a "
+        "UsdImport. "
         "Raises "
         "RuntimeError when the plugin (libernie_usd, built with "
         "-DERNIE_USD=ON) is missing or the file cannot be opened.");

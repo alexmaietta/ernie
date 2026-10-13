@@ -6,6 +6,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/value.h"
 #include "ernie/usd/plugin_api.h"
+#include "ernie/util/disk_cache.h"
 #include "ernie/util/profile.h"
 #include "ernie/util/tensor.h"
 
@@ -423,6 +424,14 @@ UsdImportResult ImportUsd(Scene& scene, const Path& root,
     request.variantCount = variants.size();
     request.proxy = options.proxy;
     request.guide = options.guide;
+    request.renderSettings = options.renderSettings;
+    // Textures inside .usdz packages are unpacked for the renderer.
+    const std::optional<std::filesystem::path> packages =
+        CacheDirectory("ERNIE_USD_PACKAGE_CACHE", "usd_packages");
+    const std::string packageText =
+        packages ? packages->string() : std::string();
+    request.packageCache =
+        packageText.empty() ? nullptr : packageText.c_str();
     request.upAxis = UpAxisOf(scene);
     request.metersPerUnit = MetersPerUnitOf(scene);
 

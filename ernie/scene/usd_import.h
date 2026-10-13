@@ -27,6 +27,10 @@ struct UsdImportOptions {
     /// Translate prims of purpose "proxy" and "guide" too.
     bool proxy = false;
     bool guide = false;
+    /// Translate the file's RenderSettings, RenderProducts and
+    /// RenderVars. The scene renders with its first RenderSettings in
+    /// path order, so an asset's may take the place of none.
+    bool renderSettings = true;
 };
 
 struct UsdImportResult {

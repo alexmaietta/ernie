@@ -50,6 +50,7 @@ The root's transform also converts the file's units into the scene's. A file's `
 | `variants={prim: {set: selection}}` | `options.variants` | Variant selections made on the session layer before composing, in the given order, so a selection may pick a nested variant set that an earlier one brought in. |
 | `time=t` | `options.time` | The time code to read. Without one, each attribute's earliest value is read, which is its default value when it has no time samples. |
 | `proxy=True`, `guide=True` | `options.proxy`, `options.guide` | Also translate prims of purpose `proxy` and `guide`. Prims of purpose `default` and `render` are always translated. |
+| `render_settings=False` | `options.renderSettings` | Leave out the file's `RenderSettings`, `RenderProduct`s and `RenderVar`s, which are translated by default. |
 
 To pick other variants, remove the subtree and import again. Prim paths stay the same, so the renderer keeps the textures that did not change.
 
@@ -75,11 +76,14 @@ scene.get_prim(rover.prims[steer]).set_xform(rotate=(0.0, 0.0, 15.0))
 - **Shapes.** `Cube`, `Sphere`, `Cylinder`, `Cone`, `Capsule` and `Plane`, with their sizes and axes and a constant `displayColor`.
 - **Points and instancers.** `Points` with their widths. `PointInstancer` with positions, orientations, scales, prototype indices and its prototypes, which Ernie draws only through the instancer.
 - **Instancing.** Native instances (instanceable prims) and point instancers become `PointInstancer`s of shared prototypes, which Ernie draws as instances. The prototypes are translated once, under the root's `_external`. The instanced Kitchen Set imports far fewer meshes than its plain version.
-- **Cameras and lights.** `Camera` with its projection, focal length, apertures, clipping range, f-stop and focus distance. The UsdLux lights `DistantLight`, `DomeLight`, `SphereLight`, `RectLight`, `DiskLight` and `CylinderLight` with their `inputs:*`.
+- **Cameras and lights.** `Camera` with its projection, focal length, apertures, clipping range, f-stop and focus distance. The UsdLux lights `DistantLight`, `DomeLight`, `SphereLight`, `RectLight`, `DiskLight` and `CylinderLight` with their `inputs:*`, and their light and shadow link collections (`collection:lightLink` and `collection:shadowLink`: `includeRoot`, `includes` and `excludes`; membership expressions are not read, with a warning).
+- **Volumes.** UsdVol `Volume`s with their `field:<name>` relationships and bound material, and `OpenVDBAsset` fields with their file, grid name and index, data type, role hint and class, sampled when they change over time (a file per frame). Ernie reads NanoVDB, so a field naming an OpenVDB file (`smoke.vdb`) reads the NanoVDB file beside it (`smoke.nvdb`) when there is one; without it, a warning says how to convert it (see [Volumes](../concepts/volumes.md)).
+- **Render settings.** `RenderSettings`, `RenderProduct`s and `RenderVar`s, wherever the file keeps them (usually `/Render`, which comes in under `_external`), with the attributes and relationships Ernie's prims declare, such as the camera, resolution, products and ordered vars; a camera outside the default prim that they name comes in too. A RenderVar's `sourceName` takes Ernie's name for USD's usual ones (`color` and `Ci` are `HdrColor`, `depth` is `DistanceToImagePlane`, `normal` is `Normal`, `primId`, `instanceId`); a light path expression renders `HdrColor`, with a warning. The scene renders with its first RenderSettings in path order, so an asset's apply only when the scene has none before it; `render_settings=False` leaves them out.
+- **Packages.** Textures and other files inside a `.usdz` are unpacked into Ernie's cache (`$ERNIE_USD_PACKAGE_CACHE`, else `usd_packages` in the cache folder) once per version of the package, and the prims name the unpacked files.
 - **Materials.** The material each gprim resolves to (direct and collection bindings, inherited from ancestors, the full purpose first) is bound as `material:binding`. A UsdPreviewSurface network in the universal render context is copied from Hydra's material network as it is, with its `UsdUVTexture`, `UsdPrimvarReader` and `UsdTransform2d` shaders, their inputs and their connections. Texture paths are resolved.
 - **MDL, approximated.** Ernie does not compile MDL yet. A material with only an MDL surface becomes a UsdPreviewSurface from the MDL shader's main inputs: OmniPBR's base colour and texture, roughness, metallic, normal map, emission and opacity, and OmniSurface's base colour, roughness, metalness and emission. Other MDL materials keep their base colour, with a warning.
 
-Prims of other types become `Xform`s, with one warning per type, so what is below them still comes in. Physics prims, render settings and other prims without a transform are skipped.
+Prims of other types become `Xform`s, with one warning per type, so what is below them still comes in. Physics prims and other prims without a transform are skipped.
 
 ## Subdivision surfaces
 
@@ -126,8 +130,7 @@ Between samples, numbers, vectors and matrices interpolate linearly (matrices by
 - Time samples of arrays per element other than points (normals, texture coordinates, per-vertex colours) are read at one time.
 - Blend shapes' normal offsets: a skinned mesh's normals are recomputed from its posed triangles.
 - Subdivision surfaces refine to one level everywhere: no refinement by distance or screen size yet. Their points written on the GPU draw the control mesh.
-- `BasisCurves`, `NurbsPatch` and volumes.
-- Textures inside `.usdz` archives: the stage loads, but Ernie cannot read the images yet (a warning says so).
+- `BasisCurves` and `NurbsPatch`; volumes' `Field3DAsset` fields.
 - `invisibleIds` on point instancers.
 - Windows: the plugin builds on Linux for now.
 

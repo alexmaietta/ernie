@@ -19,7 +19,7 @@
 namespace ernie::usd_plugin {
 
 /// Bumped whenever `Sink` or `Request` change.
-inline constexpr std::uint32_t kAbiVersion = 4;
+inline constexpr std::uint32_t kAbiVersion = 5;
 
 /// Where the plugin authors what it translates; Ernie implements it
 /// over a Scene, coercing values to each attribute's declared type.
@@ -123,6 +123,12 @@ struct Request {
     /// and "render" always are).
     bool proxy = false;
     bool guide = false;
+    /// Translate the stage's RenderSettings, RenderProducts and
+    /// RenderVars.
+    bool renderSettings = true;
+    /// A folder to unpack files inside packages (.usdz) into, such
+    /// as textures, for Ernie to read; none leaves them packed.
+    const char* packageCache = nullptr;
     /// The Ernie stage's units, which the root's transform converts
     /// the file's into.
     char upAxis = 'Z';
