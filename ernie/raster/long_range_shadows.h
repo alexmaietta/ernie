@@ -33,15 +33,18 @@ class LongRangeShadows {
     /// One long-range view to integrate: its layer of the light
     /// shadow maps and texels across there (in the layer's corner),
     /// the tangent of its light's angular radius in map widths per
-    /// unit of map depth, and its receivers' depth in the map (above
-    /// 1, past its far plane). The square of its map the visibility
+    /// unit of map depth, and its receivers' nearest and farthest
+    /// depth in the map (above 1, past its far plane), for each of
+    /// which the visibility is written. The square of its map the
+    /// visibility
     /// map spans: the receivers' box, `region` xy its corner nearest
     /// the origin and z its side, in map coordinates (0 to 1).
     struct View {
         std::uint32_t layer = 0;
         std::uint32_t texels = 0;
         float tanUv = 0.0f;
-        float receivers = 1.0f;
+        float receiversNear = 1.0f;
+        float receiversFar = 1.0f;
         glm::vec3 region{0.0f, 0.0f, 1.0f};
     };
 
@@ -63,9 +66,10 @@ class LongRangeShadows {
     void Record(VkCommandBuffer commands, const GpuImage& shadowMaps,
                 std::span<const View> views) const;
 
-    /// The visibility maps (an array, a layer per view of the last
-    /// `Record`, RGBA16F at `kWavelengths`), for shading; a single
-    /// layer of 1 before any view.
+    /// The visibility maps (an array, two layers per view of the last
+    /// `Record`, at its receivers' nearest and farthest depths,
+    /// RGBA16F at `kWavelengths`), for shading; two layers of 1
+    /// before any view.
     const GpuImage& Visibility() const {
         return *visibility_;
     }

@@ -2827,8 +2827,10 @@ void RasterRenderer::WriteLights(
                         // integrating the disc over it takes: the
                         // light's angular radius in map widths (2 /
                         // |row 0|) per unit of depth (1 / |row 2|),
-                        // and the receivers' middle's depth, past the
-                        // far plane.
+                        // and the receivers' nearest and farthest
+                        // depths, past the far plane (`patternExtent`
+                        // xy for shading, a distant light having no
+                        // pattern).
                         entry.map[3] = static_cast<float>(
                             longRangeViews_.size());
                         const glm::mat4& m = far->lightViewProjection;
@@ -2836,14 +2838,13 @@ void RasterRenderer::WriteLights(
                             glm::vec3(m[0][2], m[1][2], m[2][2]));
                         const float acrossWorld = glm::length(
                             glm::vec3(m[0][0], m[1][0], m[2][0]));
-                        const glm::vec3 middle =
-                            0.5f *
-                            (receivers.first + receivers.second);
                         // The receivers' square of the map, a texel
                         // of the visibility map more each way, which
                         // it spans (`beamExtra` yzw for shading).
                         glm::vec2 low(1.0f);
                         glm::vec2 high(0.0f);
+                        float nearest = std::numeric_limits<float>::max();
+                        float farthest = 0.0f;
                         for (int c = 0; c < 8; ++c) {
                             const glm::vec4 clip =
                                 m *
@@ -2858,7 +2859,11 @@ void RasterRenderer::WriteLights(
                                                0.5f - 0.5f * clip.y);
                             low = glm::min(low, uv);
                             high = glm::max(high, uv);
+                            nearest = std::min(nearest, clip.z);
+                            farthest = std::max(farthest, clip.z);
                         }
+                        entry.patternExtent[0] = nearest;
+                        entry.patternExtent[1] = farthest;
                         const float side =
                             std::max(high.x - low.x, high.y - low.y) *
                             (1.0f +
@@ -2878,7 +2883,7 @@ void RasterRenderer::WriteLights(
                                 entry.extentY[3] * acrossWorld /
                                     (2.0f *
                                      std::max(perWorld, 1e-30f)),
-                                (m * glm::vec4(middle, 1.0f)).z,
+                                nearest, farthest,
                                 glm::vec3(corner, side)});
                         lightViews_.push_back(*far);
                     }
@@ -6386,7 +6391,17 @@ RasterRenderer::LongRangeReceivers(const FrameParams& params) const {
             params.atmosphere->planetRadius + kAtmosphereTop);
         shell =
             Bounds3{centre - glm::vec3(top), centre + glm::vec3(top)};
-        reach = glm::length(view.eye - centre) + top;
+        // From within the shell, as far as a ray can run in it before
+        // the ground or space: to the ground's horizon and on to the
+        // top; from outside, through it all.
+        const float height = glm::length(view.eye - centre);
+        const auto bottom =
+            static_cast<float>(params.atmosphere->planetRadius);
+        reach = height < top
+                    ? std::sqrt(std::max(
+                          height * height - bottom * bottom, 0.0f)) +
+                          std::sqrt(top * top - bottom * bottom)
+                    : height + top;
     }
     Bounds3 box{view.eye, view.eye};
     const auto add = [&](const glm::vec3& p) {

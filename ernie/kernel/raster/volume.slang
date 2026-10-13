@@ -1000,8 +1000,12 @@ float4 longRangeGroup(LightGpu light, float3 world, float4 wavelengths) {
     if (clip.z < 1.0 || any(uv < float2(0.0)) || any(uv > float2(1.0))) {
         return float4(1.0);
     }
-    let held = heapTextureArrays[shading.longRangeVisibility].SampleLevel(
-        tableSampler, float3(uv, light.map.w), 0.0);
+    let maps = heapTextureArrays[shading.longRangeVisibility];
+    let first = 2.0 * light.map.w;
+    let t = saturate((clip.z - light.patternExtent.x) /
+                     max(light.patternExtent.y - light.patternExtent.x, 1e-30));
+    let held = lerp(maps.SampleLevel(tableSampler, float3(uv, first), 0.0),
+                    maps.SampleLevel(tableSampler, float3(uv, first + 1.0), 0.0), t);
     float4 alphas;
     for (uint i = 0; i < 4; ++i) {
         alphas[i] = limbDarkening(kLongRangeWavelengths[i]);

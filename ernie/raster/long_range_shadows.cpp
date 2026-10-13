@@ -89,7 +89,7 @@ LongRangeShadows::LongRangeShadows(const VulkanContext& context,
     integrate_ = std::make_unique<ComputePipeline>(
         context, visibilityLayout_,
         compiler.CompileSpirv(modules, "visibilityMain"));
-    visibility_ = VisibilityImage(context, 1, 1);
+    visibility_ = VisibilityImage(context, 2, 1);
 }
 
 void LongRangeShadows::Resize(std::uint32_t layers,
@@ -121,7 +121,7 @@ void LongRangeShadows::Prepare(std::span<const View> views) {
     for (const View& view : views) {
         texels = std::max(texels, view.texels);
     }
-    Resize(static_cast<std::uint32_t>(views.size()), texels);
+    Resize(2 * static_cast<std::uint32_t>(views.size()), texels);
 }
 
 void LongRangeShadows::Record(VkCommandBuffer commands,
@@ -141,7 +141,8 @@ void LongRangeShadows::Record(VkCommandBuffer commands,
         constants.size[2] = half;
         constants.size[3] = mips;
         constants.params[0] = view.tanUv;
-        constants.params[1] = view.receivers;
+        constants.params[1] = view.receiversNear;
+        constants.params[3] = view.receiversFar;
         constants.params[2] = static_cast<float>(v);
         std::memcpy(constants.wavelengths, kWavelengths.data(),
                     sizeof(constants.wavelengths));
@@ -199,7 +200,8 @@ void LongRangeShadows::Record(VkCommandBuffer commands,
             vkCmdBindPipeline(commands,
                               VK_PIPELINE_BIND_POINT_COMPUTE,
                               integrate_->Handle());
-            vkCmdDispatch(commands, Groups(half), Groups(half), 1);
+            // At the receivers' nearest and farthest depths.
+            vkCmdDispatch(commands, Groups(half), Groups(half), 2);
             ComputeBarrier(commands);
         }
     }

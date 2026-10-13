@@ -763,8 +763,13 @@ float4 longRangeLight(LightGpu light, float3 world) {
     if (clip.z < 1.0 || any(uv < float2(0.0)) || any(uv > float2(1.0))) {
         return float4(1.0);
     }
-    return heapTextureArrays[resources.longRangeVisibility].SampleLevel(
-        tableSampler, float3(uv, light.map.w), 0.0);
+    // Between its layers at the receivers' nearest and farthest depths (`patternExtent` xy).
+    let maps = heapTextureArrays[resources.longRangeVisibility];
+    let first = 2.0 * light.map.w;
+    let t = saturate((clip.z - light.patternExtent.x) /
+                     max(light.patternExtent.y - light.patternExtent.x, 1e-30));
+    return lerp(maps.SampleLevel(tableSampler, float3(uv, first), 0.0),
+                maps.SampleLevel(tableSampler, float3(uv, first + 1.0), 0.0), t);
 }
 
 // `longRangeLight` at a band group's `wavelengths` (nm).

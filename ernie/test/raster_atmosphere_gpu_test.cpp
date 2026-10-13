@@ -1038,6 +1038,159 @@ TEST_F(RasterDelegateTest, ASphereMoonEclipsesTheGround) {
     }
 }
 
+// A Sphere Moon at its farthest, centred on the sun, leaves its ring:
+// the ground keeps the limb-darkened annulus's share of the light.
+TEST_F(RasterDelegateTest, ASphereMoonsAnnularEclipseLeavesTheRing) {
+    constexpr double kFarthest = 405500e3;
+    const glm::dvec3 towards =
+        glm::normalize(glm::dvec3(0.5, 0.0, 0.866));
+    const double sunRadius = 0.5 * 0.53 * kPi / 180.0;
+    const auto centre = [&](bool moon) {
+        Scene scene = FlatScene();
+        ernie::DistantLight(scene, "/World/Sun")
+            .SetShadowEnable(true);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        if (moon) {
+            ernie::Sphere::Define(scene, "/World/Moon")
+                .SetRadius(kMoonRadius);
+            scene.Set(
+                "/World/Moon", tokens::kTransform,
+                glm::translate(glm::dmat4(1.0), kFarthest * towards));
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
+    };
+    const std::vector<double> clear = centre(false);
+    const std::vector<double> ring = centre(true);
+    const ernie::SpectralBands bands;
+    for (const int band : {1, 14}) {
+        const auto b = static_cast<std::size_t>(band);
+        EXPECT_NEAR(ring[b] / clear[b],
+                    EclipseReference(
+                        sunRadius, std::asin(kMoonRadius / kFarthest),
+                        0.0, bands.Centre(band)),
+                    0.01)
+            << "band " << band;
+    }
+}
+
+// Phobos, a body of any shape that casts no analytic eclipse, crosses
+// the smaller Martian sun: under it the ground keeps the share of the
+// limb-darkened disc it leaves, the Martian air and its planet aside
+// (the planet's shadow its atmosphere's own).
+TEST_F(RasterDelegateTest, PhobosTransitsTheSunOverMars) {
+    constexpr double kPhobosRadius = 11.27e3;
+    constexpr double kPhobosAltitude = 6000e3;
+    constexpr double kMarsSunAngle = 0.35;
+    const glm::dvec3 towards =
+        glm::normalize(glm::dvec3(0.5, 0.0, 0.866));
+    const auto centre = [&](bool phobos) {
+        Scene scene = FlatScene();
+        ernie::Atmosphere::Define(scene, "/World/Air")
+            .SetPreset(std::string(tokens::kMars));
+        ernie::DistantLight(scene, "/World/Sun")
+            .SetShadowEnable(true)
+            .SetAngle(kMarsSunAngle);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        if (phobos) {
+            ernie::Sphere::Define(scene, "/World/Phobos")
+                .SetRadius(kPhobosRadius);
+            scene.Set("/World/Phobos", tokens::kTransform,
+                      glm::translate(glm::dmat4(1.0),
+                                     kPhobosAltitude / towards.z *
+                                         towards));
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        return SpectrumAt(outputs, kVarSize / 2, kVarSize / 2);
+    };
+    const std::vector<double> clear = centre(false);
+    const std::vector<double> transit = centre(true);
+    const ernie::SpectralBands bands;
+    const double sunRadius = 0.5 * kMarsSunAngle * kPi / 180.0;
+    const double phobosRadius =
+        std::asin(kPhobosRadius * towards.z / kPhobosAltitude);
+    for (const int band : {1, 14}) {
+        const auto b = static_cast<std::size_t>(band);
+        EXPECT_NEAR(transit[b] / clear[b],
+                    EclipseReference(sunRadius, phobosRadius, 0.0,
+                                     bands.Centre(band)),
+                    0.02)
+            << "band " << band;
+    }
+}
+
+// The Moon's umbra seen from geostationary orbit on a planet with an
+// atmosphere: a Sphere Moon's through the long-range view as dark as
+// the analytic eclipse's CelestialBody in it, and as bright in its
+// penumbra.
+TEST_F(RasterDelegateTest,
+       TheUmbraFromOrbitMatchesTheAnalyticEclipse) {
+    constexpr double kEarth = 6371008.8;
+    const glm::dvec3 towards =
+        glm::normalize(glm::dvec3(0.5, 0.0, 0.866));
+    const double radius = 1.1 * kMoonRadius;
+    enum class Moon { None, Body, Sphere };
+    const auto view = [&](Moon moon) {
+        Scene scene = FlatScene();
+        scene.Remove("/World/Terrain");
+        ernie::Terrain::Define(scene, "/World/Earth")
+            .SetHeights(Tensor::Copy<float>(
+                std::vector<float>(6 * 65 * 65, 0.0f), {6, 65, 65}))
+            .SetPlanetRadius(kEarth)
+            .SetMaterialBinding("/Looks/Grey");
+        scene.Set("/World/Earth", tokens::kTransform,
+                  glm::translate(glm::dmat4(1.0),
+                                 glm::dvec3(0.0, 0.0, -kEarth)));
+        ernie::Atmosphere::Define(scene, "/World/Air");
+        ernie::DistantLight(scene, "/World/Sun")
+            .SetShadowEnable(true);
+        scene.Set("/World/Sun", tokens::kTransform,
+                  ernie::DistantLightTransform(towards));
+        ernie::Camera(scene, "/World/Camera")
+            .SetClippingRange(glm::dvec2(1e3, 1e9));
+        scene.Set("/World/Camera", tokens::kTransform,
+                  ernie::LookAtTransform({0.0, 0.0, 35786e3},
+                                         {0.0, 0.0, 0.0},
+                                         {0.0, 1.0, 0.0}));
+        const glm::dmat4 at =
+            glm::translate(glm::dmat4(1.0), 360000e3 * towards);
+        if (moon == Moon::Body) {
+            ernie::CelestialBody::Define(scene, "/World/Moon");
+            scene.Set("/World/Moon", tokens::kBodyRadius, radius);
+            scene.Set("/World/Moon", tokens::kTransform, at);
+        } else if (moon == Moon::Sphere) {
+            ernie::Sphere::Define(scene, "/World/Moon")
+                .SetRadius(radius);
+            scene.Set("/World/Moon", tokens::kTransform, at);
+        }
+        RasterDelegate delegate(*context_);
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const std::size_t c = kVarSize / 2;
+        return std::pair{SpectrumAt(outputs, c, c),
+                         SpectrumAt(outputs, c, c + kVarSize / 16)};
+    };
+    const auto [clearUmbra, clearPenumbra] = view(Moon::None);
+    const auto [bodyUmbra, bodyPenumbra] = view(Moon::Body);
+    const auto [sphereUmbra, spherePenumbra] = view(Moon::Sphere);
+    for (const std::size_t band : {1u, 8u, 14u}) {
+        EXPECT_LT(bodyUmbra[band], 0.1 * clearUmbra[band])
+            << "band " << band;
+        EXPECT_LT(sphereUmbra[band], 0.1 * clearUmbra[band])
+            << "band " << band;
+        EXPECT_LT(bodyPenumbra[band], 0.95 * clearPenumbra[band])
+            << "band " << band;
+        EXPECT_NEAR(spherePenumbra[band] / bodyPenumbra[band], 1.0,
+                    0.05)
+            << "band " << band << ": clear " << clearPenumbra[band]
+            << ", analytic " << bodyPenumbra[band] << ", geometric "
+            << spherePenumbra[band];
+    }
+}
+
 // Under a Sphere Moon the sky darkens as under the analytic eclipse's
 // CelestialBody: the air the sky's light comes from lies in the
 // long-range view's penumbra too, out to where the sun shines on it

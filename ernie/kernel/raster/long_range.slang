@@ -14,11 +14,11 @@
 // on the map of radius their distance from the receivers times its angular radius's tangent,
 // about the receivers' point; across rings of it, the fraction the casters cover, read at the mip
 // as fine as the ring's width, weighted by the brightness the power law of limb darkening gives
-// each ring, as atmosphere.slang's `eclipseVisibility` weights a body's. The receivers lie at one
-// depth, their box's middle (`LongRangeConstants::params.y`): for casters far beyond them, such as
-// a moon thousands of times farther than their box is deep, every receiver sees the same penumbra.
-// It is written at four wavelengths (`params.w` the visibility's layer, `wavelengths`), between
-// which shading interpolates by the limb darkening exponent.
+// each ring, as atmosphere.slang's `eclipseVisibility` weights a body's. It is written for
+// receivers at two depths, their box's nearest and farthest (`params` y and w), a layer each,
+// between which shading interpolates by a receiver's own: a caster nearer than the box is deep,
+// such as Phobos over Mars, throws a penumbra that widens across it. And at four wavelengths
+// (`wavelengths`), between which shading interpolates by the limb darkening exponent.
 //
 // References:
 // - S. Schneegans, J. Gilg, V. Ahlers and A. Gerndt, "Real-Time Rendering of Eclipses without
@@ -31,8 +31,9 @@ struct LongRangeConstants {
     // x: texels across the view's map (in its layer's corner of the shadow maps), y: its layer,
     // z: texels across the visibility map, w: the coverage's mips.
     uint4 size;
-    // x: the tangent of the light's angular radius in map widths per unit of map depth, y: the
-    // receivers' depth (past the far plane, so above 1), z: the visibility's layer.
+    // x: the tangent of the light's angular radius in map widths per unit of map depth, y and w:
+    // the receivers' nearest and farthest depth (past the far plane, so above 1), z: the view's
+    // pair of visibility layers, the first at the nearest depth.
     float4 params;
     // The wavelengths (nm) the visibility is written at.
     float4 wavelengths;
@@ -121,11 +122,12 @@ void visibilityMain(uint3 id : SV_DispatchThreadID) {
     if (any(id.xy >= uint2(texels))) {
         return;
     }
-    let layer = uint(constants.params.z);
+    // Dispatch z: the receivers' nearest depth (0) or farthest (1).
+    let layer = 2 * uint(constants.params.z) + id.z;
     let uv = constants.region.xy + (float2(id.xy) + 0.5) / float(texels) * constants.region.z;
     let mapTexels = float(constants.size.x);
     let tanUv = constants.params.x;
-    let receivers = constants.params.y;
+    let receivers = id.z == 0 ? constants.params.y : constants.params.w;
     // The casters near enough to shade the receivers here: those within the widest penumbra, a
     // caster's at the near plane, read at the mip that wide.
     let widest = receivers * tanUv;
