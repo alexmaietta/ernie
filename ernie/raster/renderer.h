@@ -1448,7 +1448,7 @@ class RasterRenderer {
     std::size_t starCount_ = 0;
     std::uint32_t sky_ = 0;
     /// For frame cameras and, once one is seen, pushbrooms: every
-    /// part's, made once a frame shows stars, bodies or air, and the
+    /// part's, made once a frame shows stars or air, and the
     /// dome's alone (`kSkyDomeOnly`), a third of the registers.
     std::array<std::array<std::unique_ptr<ComputePipeline>, 2>, 2>
         skyPipelines_;

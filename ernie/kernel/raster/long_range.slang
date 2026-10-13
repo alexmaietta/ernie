@@ -12,8 +12,8 @@
 // which spans the receivers' part of the view's (`region`), not the margin round it that holds the
 // casters off it: the casters there, at their mean depth, see the light's disc as a circle
 // on the map of radius their distance from the receivers times its angular radius's tangent,
-// about the receivers' point; across rings of it, the fraction the casters cover, read at the mip
-// as fine as the ring's width, weighted by the brightness the power law of limb darkening gives
+// about the receivers' point; across rings of it, the fraction the casters cover, read across
+// each ring's two halves at the mip half its width, weighted by the brightness the power law of limb darkening gives
 // each ring, as atmosphere.slang's `eclipseVisibility` weights a body's. It is written for
 // receivers at two depths, their box's nearest and farthest (`params` y and w), a layer each,
 // between which shading interpolates by a receiver's own: a caster nearer than the box is deep,
@@ -148,21 +148,25 @@ void visibilityMain(uint3 id : SV_DispatchThreadID) {
     for (uint k = 0; k < 4; ++k) {
         exponent[k] = 0.5 * limbDarkening(constants.wavelengths[k]) + 1.0;
     }
-    // Each ring read at the mip as fine as its width, at points about as far apart.
+    // Each ring read at its inner and outer halves' middles, at the mip half its width, so that
+    // a caster's edge just past the disc's (a moon only just covering the sun) stays out of the
+    // outer ring, at points about a width apart.
     let width = radius / float(kRings);
-    let mip = log2(max(width * mapTexels, 1.0));
+    let mip = log2(max(0.5 * width * mapTexels, 1.0));
     var covered = float4(0.0);
     var inside = float4(0.0);
     for (uint ring = 0; ring < kRings; ++ring) {
         let outer = float(ring + 1) / float(kRings);
-        let rho = (float(ring) + 0.5) * width;
-        let points = clamp(uint(ceil(2.0 * kPi * rho / width)), 4u, 32u);
+        let points = clamp(uint(ceil(2.0 * kPi * (float(ring) + 0.5))), 4u, 32u);
         var fraction = 0.0;
-        for (uint j = 0; j < points; ++j) {
-            let a = 2.0 * kPi * (float(j) + 0.5 * float(ring & 1)) / float(points);
-            fraction += coverageAt(uv + rho * float2(cos(a), sin(a)), mip).x;
+        for (uint half = 0; half < 2; ++half) {
+            let rho = (float(ring) + 0.25 + 0.5 * float(half)) * width;
+            for (uint j = 0; j < points; ++j) {
+                let a = 2.0 * kPi * (float(j) + 0.5 * float((ring + half) & 1)) / float(points);
+                fraction += coverageAt(uv + rho * float2(cos(a), sin(a)), mip).x;
+            }
         }
-        fraction /= float(points);
+        fraction /= float(2 * points);
         let within = 1.0 - pow(float4(max(1.0 - outer * outer, 0.0)), exponent);
         covered += fraction * (within - inside);
         inside = within;

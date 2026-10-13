@@ -2283,9 +2283,8 @@ void volumeMain(uint3 thread : SV_DispatchThreadID) {
                     if (lit <= 0.0) {
                         continue;
                     }
-                    // A distant light through the air (not refracted, nor eclipsed by the
-                    // celestial bodies), and past the casters far towards it, such as moons
-                    // (`longRangeGroup`).
+                    // A distant light through the air (not refracted), and past the casters far
+                    // towards it, such as moons (`longRangeGroup`).
                     let throughAir =
                         uint(light.position.w) == kDistantLight && air[1].y != 0.0;
                     let tangent = light.extentY.w;

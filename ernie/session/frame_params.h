@@ -699,16 +699,6 @@ struct VolumeParams {
     bool operator==(const VolumeParams&) const = default;
 };
 
-/// A CelestialBody far beyond the scene (`BodyParamsOf`): drawn in
-/// the sky and eclipsing the sun.
-struct BodyParams {
-    glm::dvec3 centre{0.0};   ///< World, metres.
-    double radius = 0.0;      ///< Metres.
-    glm::vec3 albedo{0.12f};  ///< Normal albedo, linear RGB.
-
-    bool operator==(const BodyParams&) const = default;
-};
-
 /// A distant light towards unit vector `towards` in relative units: a
 /// flat spectrum over `bands` under which a white Lambertian surface
 /// facing it has a luminance of 1 cd/m^2, the sun's angular diameter,
@@ -757,9 +747,6 @@ struct FrameParams {
         stars;  ///< Stars behind everything, as last uploaded.
     std::optional<AtmosphereParams>
         atmosphere;  ///< The planet's atmosphere.
-    /// Bodies such as moons, at most `kMaxBodies`.
-    std::vector<BodyParams> bodies;
-    static constexpr std::size_t kMaxBodies = 4;
     /// The visible Volumes (`VolumesOf`).
     std::vector<VolumeParams> volumes;
     float exposure =

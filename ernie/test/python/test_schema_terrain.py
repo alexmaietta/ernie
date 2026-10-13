@@ -84,15 +84,3 @@ def test_atmosphere_class():
     assert air.sodium_column == 4e13
     assert air.cloud_top == 0.0 and air.cloud_cover == 0.5
     assert scene.get("/World/Air", tokens.ATMOSPHERE_PRESET) == "mars"
-
-
-def test_celestial_body_class():
-    scene = ernie.Scene()
-    moon = scene.define(
-        "/World/Moon", ernie.CelestialBody, albedo=(0.13, 0.12, 0.11)
-    )
-    assert isinstance(moon, ernie.Imageable)
-    assert moon.radius == pytest.approx(1737.4e3)
-    assert tuple(moon.albedo) == pytest.approx((0.13, 0.12, 0.11))
-    moon.radius = 3474.8e3
-    assert scene.get("/World/Moon", tokens.BODY_RADIUS) == 3474.8e3

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Solar eclipses by a CelestialBody Moon: partial and annular through
-// a solar filter, totality from the ground, and its shadow from
-// orbit.
+// Solar eclipses by a Moon of real geometry, a sphere whose shadow
+// comes through the sun's long-range shadow view: partial and annular
+// through a solar filter, totality from the ground, and its shadow
+// from orbit.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
@@ -18,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -146,13 +150,20 @@ class EclipseDemo : public app::Demo {
         DistantLight(scene, "/World/Sun")
             .SetTransform(DistantLightTransform(
                 {std::cos(e), 0.0, std::sin(e)}));
-        // The Moon: its mean radius and normal albedo.
-        CelestialBody::Define(scene, "/World/Moon")
+        // The Moon: its mean radius, and regolith of normal albedo
+        // 0.12 (Lommel-Seeliger's single-scattering albedo 8 times
+        // it).
+        Material::Define(scene, "/World/Looks/Regolith")
+            .SetBrdf("lommel_seeliger")
+            .SetAlbedo(glm::dvec3(8.0 * 0.12));
+        Sphere::Define(scene, "/World/Moon")
             .SetRadius(1737.4e3)
-            .SetAlbedo(glm::dvec3(0.12));
+            .SetMaterialBinding("/World/Looks/Regolith");
         Camera::Define(scene, "/World/Camera")
             .SetSensorNoise(false)
-            .SetExposureIso(100.0);
+            .SetExposureIso(100.0)
+            .SetClippingRange(
+                {1.0, std::numeric_limits<double>::infinity()});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(Path("/World/Camera"))
             .SetResolution({480, 320})
@@ -209,12 +220,14 @@ class EclipseDemo : public app::Demo {
                                         cols / 2 + 2)) < 0.01,
               "the Moon should be dark against the sun");
         // Totality: a dark sky, brightest along the horizon.
-        const Tensor day = RenderWithoutMoon(2);
+        // Daylight, 14 stops darker, does not saturate.
+        const Tensor day = RenderWithoutMoon(2, 14.0);
         const double total =
             Luminance(demos::MeanLinearRgb(images[2]));
-        const double daylight = Luminance(demos::MeanLinearRgb(day));
-        std::printf("totality %.5f of daylight\n", total / daylight);
-        Check(total < 0.05 * daylight,
+        const double daylight =
+            std::exp2(14.0) * Luminance(demos::MeanLinearRgb(day));
+        std::printf("totality %.6f of daylight\n", total / daylight);
+        Check(total < 1e-3 * daylight,
               "totality should darken the sky");
         const double horizon = Luminance(RegionLinearRgb(
             images[2], rows - rows / 5, rows, 0, cols));
@@ -262,13 +275,15 @@ class EclipseDemo : public app::Demo {
                                                      std::sin(e))});
     }
 
-    /// View `index` with the Moon far from the sun; leaves the view
-    /// as it was.
-    Tensor RenderWithoutMoon(int index) {
+    /// View `index` with the Moon far from the sun, `stops` darker;
+    /// leaves the view as it was.
+    Tensor RenderWithoutMoon(int index, double stops = 0.0) {
         const int current = view_;
         Show(index);
-        MoonAt(kViews[static_cast<std::size_t>(index)].moonDistance,
-               -30.0);
+        const View& view = kViews[static_cast<std::size_t>(index)];
+        MoonAt(view.moonDistance, -30.0);
+        Camera(GetScene(), "/World/Camera")
+            .SetExposure(view.filter - stops);
         Tensor image = GetRenderer().Render(GetScene());
         Show(current);
         return image;

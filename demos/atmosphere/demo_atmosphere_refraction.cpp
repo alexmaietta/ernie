@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Refraction lifts and flattens the low sun and Moon: a telephoto
-// sunset, the sun seen after it sets, moonrise, and sunset from the
-// ISS.
+// Refraction lifts and flattens the low sun: a telephoto sunset, the
+// sun seen after it sets, a reddened moonrise, and sunset from the
+// ISS. The Moon is geometry, which the air reddens but does not bend.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
@@ -17,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -131,15 +134,21 @@ class RefractionDemo : public app::Demo {
             .SetPhysicalIlluminant(std::string(tokens::kSun))
             .SetAngle(0.53);
         // The full Moon opposite the sun, aside from the Earth's
-        // shadow.
-        CelestialBody::Define(scene, "/World/Moon")
+        // shadow: regolith of normal albedo 0.12 (Lommel-Seeliger's
+        // single-scattering albedo 8 times it).
+        Material::Define(scene, "/World/Looks/Regolith")
+            .SetBrdf("lommel_seeliger")
+            .SetAlbedo(glm::dvec3(8.0 * 0.12));
+        Sphere::Define(scene, "/World/Moon")
             .SetRadius(1737.4e3)
-            .SetAlbedo(glm::dvec3(0.12));
+            .SetMaterialBinding("/World/Looks/Regolith");
         SetXform(scene, "/World/Moon",
-                 {.translate = kMoonDistance * Towards(183.0, 1.5)});
+                 {.translate = kMoonDistance * Towards(183.0, 1.9)});
         Camera::Define(scene, "/World/Camera")
             .SetSensorNoise(false)
-            .SetExposureIso(100.0);
+            .SetExposureIso(100.0)
+            .SetClippingRange(
+                {1.0, std::numeric_limits<double>::infinity()});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(Path("/World/Camera"))
             .SetResolution({480, 320})
@@ -265,5 +274,5 @@ class RefractionDemo : public app::Demo {
 ERNIE_REGISTER_DEMO(
     RefractionDemo, "atmosphere", "refraction",
     "Refraction at the horizon: the flattened setting "
-    "sun, seen after it sets, a rising full Moon, "
+    "sun, seen after it sets, a reddened rising full Moon, "
     "and the sun squashed from orbit.");

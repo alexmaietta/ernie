@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// A lunar eclipse from the ground: the Moon in the Earth's shadow,
-// lit red by sunlight the atmosphere refracts into it, darker with
-// clouds.
+// A lunar eclipse from the ground: the Moon, a sphere of
+// Lommel-Seeliger regolith, in the Earth's shadow, lit red by
+// sunlight the atmosphere refracts into it, darker with clouds.
 
 #include "ernie/app/demo.h"
 #include "ernie/scene/base_schemas.h"
 #include "ernie/scene/camera_schemas.h"
+#include "ernie/scene/geometry_schemas.h"
 #include "ernie/scene/light_schemas.h"
+#include "ernie/scene/material_schemas.h"
 #include "ernie/scene/render_schemas.h"
 #include "ernie/scene/terrain_schemas.h"
 #include "ernie/scene/tokens.h"
@@ -17,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <numbers>
 #include <string>
 #include <vector>
@@ -84,14 +87,21 @@ class LunarEclipseDemo : public app::Demo {
             .SetIrradiance(1361.0)
             .SetPhysicalIlluminant(std::string(tokens::kSun))
             .SetAngle(0.53);
-        CelestialBody::Define(scene, "/World/Moon")
+        // Normal albedo 0.12: Lommel-Seeliger's single-scattering
+        // albedo 8 times it.
+        Material::Define(scene, "/World/Looks/Regolith")
+            .SetBrdf("lommel_seeliger")
+            .SetAlbedo(glm::dvec3(8.0 * 0.12));
+        Sphere::Define(scene, "/World/Moon")
             .SetRadius(1737.4e3)
-            .SetAlbedo(glm::dvec3(0.12));
+            .SetMaterialBinding("/World/Looks/Regolith");
         // 1200 mm: the Moon fills half the frame's height.
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(1200.0)
             .SetSensorNoise(false)
-            .SetExposureIso(100.0);
+            .SetExposureIso(100.0)
+            .SetClippingRange(
+                {1.0, std::numeric_limits<double>::infinity()});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(Path("/World/Camera"))
             .SetResolution({480, 320})

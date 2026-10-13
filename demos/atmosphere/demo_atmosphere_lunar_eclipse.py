@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""A lunar eclipse from the ground: the Moon in the Earth's shadow, lit
-red by sunlight the atmosphere refracts into it, darker with clouds."""
+"""A lunar eclipse from the ground: the Moon, a sphere of Lommel-Seeliger
+regolith, in the Earth's shadow, lit red by sunlight the atmosphere
+refracts into it, darker with clouds."""
 
 import math
 
@@ -55,11 +56,19 @@ class Demo(ernie.demo.Demo):
             physical_illuminant=tokens.SUN,
             angle=0.53,
         )
+        # Normal albedo 0.12: Lommel-Seeliger's single-scattering
+        # albedo 8 times it.
+        self.scene.define(
+            "/World/Looks/Regolith",
+            ernie.Material,
+            brdf="lommel_seeliger",
+            albedo=(8.0 * 0.12,) * 3,
+        )
         self.moon = world.define(
             "Moon",
-            ernie.CelestialBody,
+            ernie.Sphere,
             radius=1737.4e3,
-            albedo=(0.12, 0.12, 0.12),
+            material_binding="/World/Looks/Regolith",
         )
         # 1200 mm: the Moon fills half the frame's height.
         self.camera = world.define(
@@ -68,6 +77,7 @@ class Demo(ernie.demo.Demo):
             focal_length=1200.0,
             sensor_noise=False,
             exposure_iso=100.0,
+            clipping_range=(1.0, math.inf),
         )
         self.scene.define(
             "/Render/Settings",

@@ -118,14 +118,8 @@ struct ShadingUniforms {
     /// luminance (its luminance is `sun[3]`'s); w the scale the
     /// raster radiance is stored at (`radianceScale_`).
     float ambient[4];
-    /// Celestial bodies (km): each centre relative to the frame's
-    /// origin and radius, 0 for none; and its normal albedo, linear
-    /// RGB. They fill the views' stride, so shading reads them as one
-    /// array.
-    float bodies[4][4];
-    float bodyAlbedo[4][4];
 };
-static_assert(sizeof(ShadingUniforms) == 1280,
+static_assert(sizeof(ShadingUniforms) == 1152,
               "ShadingUniforms must match shading.slang");
 
 /// A view's own shading uniforms (shading.slang's ShadingView), after
@@ -152,7 +146,6 @@ constexpr std::uint32_t kSkyMap = 2;
 constexpr std::uint32_t kSkyStars = 4;
 constexpr std::uint32_t kSkyLighting = 8;
 constexpr std::uint32_t kSkyAtmosphere = 16;
-constexpr std::uint32_t kSkyBodies = 32;
 
 struct LightGpu {
     float position[4];
@@ -905,7 +898,7 @@ SensorPlan ProbePlan(const SensorFilterModel& model,
 }
 
 /// What `shadeMain` is compiled with, as bits of a key: the air's
-/// light (an atmosphere or celestial bodies), polarization and
+/// light (an atmosphere), polarization and
 /// lasers, and in bits 8 up the most lights it shades. A frame shades
 /// with the leanest it needs (`ShadingVariantOf`): the full kernel
 /// holds every band's air and every light's state at once, 255
@@ -991,7 +984,7 @@ std::uint32_t ShadingVariantOf(const FrameParams& params, bool stokes,
         (half ? kShadeHalfRadiance : 0u) |
         (params.camera.bands.rgb ? kShadeRgb : 0u) |
         BandCapacityBits(params.camera.bands.count);
-    if (params.atmosphere || !params.bodies.empty()) {
+    if (params.atmosphere) {
         variant |= kShadeAir;
     }
     if (stokes) {
@@ -4161,11 +4154,8 @@ void RasterRenderer::Update(
     if (params.stars && starCount_ > 0) {
         sky_ |= kSkyStars;
     }
-    if (!params.bodies.empty()) {
-        sky_ |= kSkyBodies;
-    }
     SkyPipeline(pushbroom_, true);
-    if ((sky_ & (kSkyStars | kSkyBodies | kSkyAtmosphere)) != 0) {
+    if ((sky_ & (kSkyStars | kSkyAtmosphere)) != 0) {
         SkyPipeline(pushbroom_, false);
     }
     // The planet's shadow table takes the size of the brightest
@@ -4937,21 +4927,6 @@ void RasterRenderer::WriteShading(const FrameParams& params) {
                 : 0.0f;
         shading.atmosphere[1][3] =
             static_cast<float>(atmosphere_->Params().polarization);
-    }
-    // Bodies in kilometres likewise, the Moon's 384,000 km away.
-    for (std::size_t i = 0;
-         i < std::min(params.bodies.size(), FrameParams::kMaxBodies);
-         ++i) {
-        const BodyParams& body = params.bodies[i];
-        const glm::dvec3 centre =
-            (body.centre - params.origin) * 1e-3;
-        shading.bodies[i][0] = static_cast<float>(centre.x);
-        shading.bodies[i][1] = static_cast<float>(centre.y);
-        shading.bodies[i][2] = static_cast<float>(centre.z);
-        shading.bodies[i][3] = static_cast<float>(body.radius * 1e-3);
-        shading.bodyAlbedo[i][0] = body.albedo.x;
-        shading.bodyAlbedo[i][1] = body.albedo.y;
-        shading.bodyAlbedo[i][2] = body.albedo.z;
     }
     shading.sky[1] = map.width;
     shading.sky[2] = map.height;
@@ -7319,11 +7294,6 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             if ((sky_ & kSkyStars) != 0) {
                 ERNIE_GPU_ZONE(context_, commands, "Stars");
                 part(1);
-            }
-            if ((sky_ & kSkyBodies) != 0) {
-                ERNIE_GPU_ZONE(context_, commands,
-                               "Celestial bodies");
-                part(2);
             }
             if ((sky_ & kSkyAtmosphere) != 0) {
                 ERNIE_GPU_ZONE(context_, commands, "Atmosphere");

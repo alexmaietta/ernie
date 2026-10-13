@@ -64,9 +64,6 @@ struct RenderPrims {
     Path ground;
     Path stars;       ///< The first visible StarField.
     Path atmosphere;  ///< The first visible Atmosphere.
-    /// The first visible CelestialBodies, at most
-    /// `FrameParams::kMaxBodies`.
-    std::vector<Path> bodies;
     /// A stand-in for the camera's world transform, for a camera
     /// posed on the GPU (`CameraParamsOf`).
     std::optional<glm::dmat4> cameraTransform;
@@ -486,11 +483,6 @@ std::optional<PlanetSphere> PlanetOf(const Scene& scene);
 /// first): the one a frame renders, as a camera flies between
 /// planets. Empty without one.
 Path NearestAtmosphere(const Scene& scene, const glm::dvec3& point);
-
-/// A CelestialBody's centre (its transform's origin), radius and
-/// albedo.
-/// @throws std::invalid_argument for another prim type.
-BodyParams BodyParamsOf(const Scene& scene, const Path& path);
 
 /// How much wider than the sensor's the raster image's field of view
 /// must be for every sensor pixel's undistorted ray to land in it: 1

@@ -147,17 +147,10 @@ TEST(TerrainSchemas, RegistryDescribesTheTypes) {
     EXPECT_EQ(atmosphere.FindByPyName("dust_optical_depth")->name,
               tokens::kAtmosphereDustOpticalDepth);
 
-    const PrimTypeDef& body = ernie::GetPrimType("CelestialBody");
-    EXPECT_EQ(body.base, &ernie::GetPrimType("Imageable"));
-    EXPECT_EQ(body.Find(tokens::kBodyRadius)->fallback,
-              Value(1737.4e3));
-    EXPECT_EQ(body.FindByPyName("albedo")->name, tokens::kBodyAlbedo);
-
     const std::vector<const PrimTypeDef*> types =
         ernie::TerrainSchemaTypes();
-    ASSERT_EQ(types.size(), 4u);
+    ASSERT_EQ(types.size(), 3u);
     EXPECT_EQ(types[0], &terrain);
     EXPECT_EQ(types[1], &stars);
     EXPECT_EQ(types[2], &atmosphere);
-    EXPECT_EQ(types[3], &body);
 }

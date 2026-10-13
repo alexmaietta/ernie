@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Solar eclipses by a CelestialBody Moon: partial and annular through
-a solar filter, totality from the ground, and its shadow from orbit."""
+"""Solar eclipses by a Moon of real geometry, a sphere whose shadow
+comes through the sun's long-range shadow view: partial and annular
+through a solar filter, totality from the ground, and its shadow from
+orbit."""
 
 import math
 
@@ -114,18 +116,26 @@ class Demo(ernie.demo.Demo):
                 (math.cos(e), 0.0, math.sin(e))
             ),
         )
-        # The Moon: its mean radius and normal albedo.
+        # The Moon: its mean radius, and regolith of normal albedo
+        # 0.12 (Lommel-Seeliger's single-scattering albedo 8 times it).
+        self.scene.define(
+            "/World/Looks/Regolith",
+            ernie.Material,
+            brdf="lommel_seeliger",
+            albedo=(8.0 * 0.12,) * 3,
+        )
         self.moon = world.define(
             "Moon",
-            ernie.CelestialBody,
+            ernie.Sphere,
             radius=1737.4e3,
-            albedo=(0.12, 0.12, 0.12),
+            material_binding="/World/Looks/Regolith",
         )
         self.camera = world.define(
             "Camera",
             ernie.Camera,
             sensor_noise=False,
             exposure_iso=100.0,
+            clipping_range=(1.0, math.inf),
         )
         self.scene.define(
             "/Render/Settings",
@@ -192,12 +202,13 @@ class Demo(ernie.demo.Demo):
             )
         )
 
-    def render_without_moon(self, index):
-        """View `index` with the Moon far from the sun; leaves the
-        view as it was."""
+    def render_without_moon(self, index, stops=0.0):
+        """View `index` with the Moon far from the sun, `stops` darker;
+        leaves the view as it was."""
         current = self.view
         self.show(index)
         self.moon_at(VIEWS[index][5], -30.0)
+        self.camera.exposure = VIEWS[index][9] - stops
         image = np.array(self.renderer.render(self.scene))
         self.show(current)
         return image
@@ -245,14 +256,15 @@ class Demo(ernie.demo.Demo):
         assert region_luminance(images[1], *middle) < 0.01, (
             "the Moon should be dark against the sun"
         )
-        # Totality: a dark sky, brightest along the horizon.
+        # Totality: a dark sky, brightest along the horizon. Daylight,
+        # 14 stops darker, does not saturate.
         everything = (slice(None), slice(None))
         total = region_luminance(images[2], *everything)
-        daylight = region_luminance(
-            self.render_without_moon(2), *everything
+        daylight = 2.0**14 * region_luminance(
+            self.render_without_moon(2, 14.0), *everything
         )
-        print(f"totality {total / daylight:.5f} of daylight")
-        assert total < 0.05 * daylight, (
+        print(f"totality {total / daylight:.6f} of daylight")
+        assert total < 1e-3 * daylight, (
             "totality should darken the sky"
         )
         horizon = region_luminance(

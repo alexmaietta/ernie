@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Refraction lifts and flattens the low sun and Moon: a telephoto
-sunset, the sun seen after it sets, moonrise, and sunset from the ISS."""
+"""Refraction lifts and flattens the low sun: a telephoto sunset, the sun
+seen after it sets, a reddened moonrise, and sunset from the ISS. The
+Moon is geometry, which the air reddens but does not bend."""
 
 import math
 
@@ -116,14 +117,22 @@ class Demo(ernie.demo.Demo):
             physical_illuminant=tokens.SUN,
             angle=0.53,
         )
-        # The full Moon opposite the sun, aside from the Earth's shadow.
+        # The full Moon opposite the sun, aside from the Earth's shadow:
+        # regolith of normal albedo 0.12 (Lommel-Seeliger's
+        # single-scattering albedo 8 times it).
+        self.scene.define(
+            "/World/Looks/Regolith",
+            ernie.Material,
+            brdf="lommel_seeliger",
+            albedo=(8.0 * 0.12,) * 3,
+        )
         world.define(
             "Moon",
-            ernie.CelestialBody,
+            ernie.Sphere,
             radius=1737.4e3,
-            albedo=(0.12, 0.12, 0.12),
+            material_binding="/World/Looks/Regolith",
             translate=tuple(
-                MOON_DISTANCE * c for c in towards(183.0, 1.5)
+                MOON_DISTANCE * c for c in towards(183.0, 1.9)
             ),
         )
         self.camera = world.define(
@@ -131,6 +140,7 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             sensor_noise=False,
             exposure_iso=100.0,
+            clipping_range=(1.0, math.inf),
         )
         self.scene.define(
             "/Render/Settings",
