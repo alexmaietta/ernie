@@ -1876,11 +1876,12 @@ void aerialPerspective(float3 world, float2 ndc, out float transmittance[kMaxBan
     for (uint group = 0; group * 4 < bands; ++group) {
         float4 light;
         float4 through;
-        scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                           atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
-                           max(start, 0.0), end, skyLights(group),
-                           bodiesEclipse(group, sh.atmosphere[0].xyz), group, kAerialSteps, light,
-                           through);
+        // Light shafts: the scene's shadows in the air between the eye and the surface.
+        scatterAlongLightsShadowed(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                   atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
+                                   max(start, 0.0), end, skyLights(group),
+                                   bodiesEclipse(group, sh.atmosphere[0].xyz), group, kAerialSteps,
+                                   sunShafts(), light, through);
         for (uint k = 0; k < 4 && group * 4 + k < bands; ++k) {
             transmittance[group * 4 + k] = through[k];
             scattered[group * 4 + k] = light[k];
@@ -1922,6 +1923,64 @@ float airShadow(LightGpu light, float3 point) {
     }
     return lightShadowMaps.SampleCmpLevelZero(lightShadowSampler, float3(tap.uv, float(tap.view)),
                                               tap.depth);
+}
+
+// The fraction of distant `light` reaching `world` in the air (light shafts): one comparison in its
+// cascade (the march's steps average them, unfiltered), else its shadow map's, times what the
+// volumes let through (their shadow maps', clouds' shafts).
+float airSunVisibility(LightGpu light, float3 world) {
+    if (light.cone.w <= 0.0) {
+        return 1.0;
+    }
+    float visibility = 1.0;
+    if (hasCascades(light)) {
+        let at = cascadeAt(light, world);
+        if (at.cascade < uint(light.cone.w)) {
+            let view = uint(light.cone.z) + at.cascade;
+            let m = lightViews[view];
+            let clip = mul(m, float4(world, 1.0));
+            let uv = float2(0.5 * clip.x + 0.5, 0.5 - 0.5 * clip.y);
+            if (all(uv >= float2(0.0)) && all(uv <= float2(1.0))) {
+                let texels = light.map.x;
+                let scale = 1.0 / max(0.5 * kCsmBiasHalfTexels * lightTexelWorld(light, view) *
+                                          length(m[2].xyz),
+                                      1e-5);
+                // Shadowed a whole fade beyond the casters' bias, so the air just above
+                // what casts (as wide as a cascade's texels, kilometres from orbit) stays lit.
+                visibility = lerp(softCompare(cascadeDepth(view, int2(uv * texels), texels),
+                                              min(clip.z, 0.99999) - 1.0 / scale, scale),
+                                  1.0, at.out);
+            }
+        }
+    } else {
+        visibility = airShadow(light, world);
+    }
+    return visibility * volumeTransmittance(light, world);
+}
+
+// The scene's shadows in the air for the view's sky lights (`skyLights`'s order): their shadow
+// maps' and the volumes', at points km from the planet's centre (`scatterAlongLightsShadowed`).
+struct SunShafts : IAirShadow {
+    uint slots[kSkyLights];
+
+    float atPoint(uint light, float3 point) {
+        let world = (point + sh.atmosphere[0].xyz) * 1e3;
+        return airSunVisibility(lights[slots[light]], world);
+    }
+}
+
+SunShafts sunShafts() {
+    SunShafts shafts;
+    uint count = 0;
+    let lightCount = min(sh.size.w, kMaxLights);
+    for (uint k = 0; k < lightCount && count < kSkyLights; ++k) {
+        if (!isSkyLight(k)) {
+            continue;
+        }
+        shafts.slots[count] = shv.view.z + k;
+        ++count;
+    }
+    return shafts;
 }
 
 // The unit direction of the ray through `ndc`, and its `origin`. A perspective camera's is found
@@ -2263,10 +2322,11 @@ void atmosphereSky(inout float radiance[kMaxBands], float3 origin, float3 d,
         let eclipse = bodiesEclipse(group, sh.atmosphere[0].xyz);
         let sources = skyLights(group);
         if (inside) {
-            scatterAlongLights(atmosphereMedium, atmosphereDensities, atmospherePhases,
-                               atmosphereTransmittance, atmosphereMultiple, tableSampler, p, d,
-                               start, end, sources, eclipse, group, kSkySteps, scattered,
-                               transmittance);
+            // With light shafts: the scene's shadows in the air along the view.
+            scatterAlongLightsShadowed(atmosphereMedium, atmosphereDensities, atmospherePhases,
+                                       atmosphereTransmittance, atmosphereMultiple, tableSampler,
+                                       p, d, start, end, sources, eclipse, group, kSkySteps,
+                                       sunShafts(), scattered, transmittance);
             let first = p + start * d;
             let r = length(first);
             vertical = first / r;

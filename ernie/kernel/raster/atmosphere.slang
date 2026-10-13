@@ -510,6 +510,19 @@ public struct SkyLights {
     public uint count;
 }
 
+// What the scene lets of a sky light through to a point of the air (km from the planet's centre),
+// its shadows' (`scatterAlongLightsShadowed`): light shafts.
+public interface IAirShadow {
+    public float atPoint(uint light, float3 point);
+}
+
+// The air in no shadow.
+public struct NoAirShadow : IAirShadow {
+    public float atPoint(uint light, float3 point) {
+        return 1.0;
+    }
+}
+
 // `scatterAlong` for `lights`, the light scattered being theirs (W m^-2 sr^-1 nm^-1) rather than
 // per unit irradiance; the air's coefficients are found once per step for them all.
 public void scatterAlongLights(float4* medium, float* densities,
@@ -519,6 +532,22 @@ public void scatterAlongLights(float4* medium, float* densities,
                                float3 d, float start, float end, SkyLights lights, Eclipse eclipse,
                                uint group, uint steps, out float4 radiance,
                                out float4 transmittance) {
+    scatterAlongLightsShadowed(medium, densities, phases, transmittanceTable, multipleTable, linear,
+                               p, d, start, end, lights, eclipse, group, steps, NoAirShadow(),
+                               radiance, transmittance);
+}
+
+// `scatterAlongLights` with the scene's shadows in the air, `shadow`'s: they dim each light's
+// single scattering at each step, its multiple scattering coming from the air all around (as
+// three-geospatial's atmosphere does with its shadow length, Bruneton's).
+//
+// Reference: E. Bruneton, "Precomputed Atmospheric Scattering: a New Implementation", 2017
+//   (light shafts, single scattering left out over the shadowed part of the ray).
+public void scatterAlongLightsShadowed<S : IAirShadow>(
+    float4* medium, float* densities, float* phases, Texture2DArray<float4> transmittanceTable,
+    Texture2DArray<float4> multipleTable, SamplerState linear, float3 p, float3 d, float start,
+    float end, SkyLights lights, Eclipse eclipse, uint group, uint steps, S shadow,
+    out float4 radiance, out float4 transmittance) {
     let bottom = atmosphereBottom(medium);
     let top = atmosphereTop(medium);
     let constituents = uint(medium[0].z);
@@ -565,7 +594,8 @@ public void scatterAlongLights(float4* medium, float* densities,
                                          bottom, top);
             let multiple =
                 multipleScattering(multipleTable, linear, r, dot(up, sun), group, bottom, top);
-            source += lights.irradiance[i] * (phased * toSun + scattering * multiple) *
+            source += lights.irradiance[i] *
+                      (phased * toSun * shadow.atPoint(i, point) + scattering * multiple) *
                       eclipseVisibility(eclipse, point, sun, sunSine);
         }
         let sample = exp(-extinction * step);
