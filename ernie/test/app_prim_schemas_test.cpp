@@ -122,7 +122,7 @@ TEST(PrimSchemasTest, MaterialPanelsComeFromTheRegistryAndTheBrdf) {
         Titles(SchemaOf(scene, "/Looks/Rock/Node", brdfs, filters)),
         (std::vector<std::string>{"Shader", "Preview surface",
                                   "Texture", "Transform 2D",
-                                  "Primvar reader", "Prim"}));
+                                  "Primvar reader", "Thermal", "Prim"}));
 }
 
 TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
@@ -137,8 +137,9 @@ TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
     // Radius, height, then the axis its base declares.
     const std::vector<PropertySection> capsule =
         SchemaOf(scene, "/Capsule", brdfs, filters);
-    EXPECT_EQ(Titles(capsule), (std::vector<std::string>{
-                                   "Shape", "Geometry", "Prim"}));
+    EXPECT_EQ(Titles(capsule),
+              (std::vector<std::string>{"Shape", "Geometry", "Thermal",
+                                        "Prim"}));
     ASSERT_EQ(capsule[0].fields.size(), 3u);
     EXPECT_EQ(capsule[0].fields[0].fallback, Value(0.5));
     EXPECT_EQ(capsule[0].fields[1].label, "Height");
@@ -150,12 +151,12 @@ TEST(PrimSchemasTest, GeometryPanelsComeFromTheRegistry) {
 
     // A mesh's arrays are not edited.
     EXPECT_EQ(Titles(SchemaOf(scene, "/Mesh", brdfs, filters)),
-              (std::vector<std::string>{"Geometry", "Prim"}));
+              (std::vector<std::string>{"Geometry", "Thermal", "Prim"}));
 
     const std::vector<PropertySection> ground =
         SchemaOf(scene, "/Ground", brdfs, filters);
     EXPECT_EQ(Titles(ground),
-              (std::vector<std::string>{"Ground", "Prim"}));
+              (std::vector<std::string>{"Ground", "Thermal", "Prim"}));
     EXPECT_EQ(FieldOf(ground, tokens::kChecker)->label,
               "Checkerboard");
     EXPECT_EQ(FieldOf(ground, tokens::kCheckerSize)->min, 0.001);

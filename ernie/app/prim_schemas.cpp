@@ -187,11 +187,12 @@ void ShaderSections(const ernie::Shader& shader,
                     std::vector<PropertySection>& sections) {
     using Entry = std::pair<std::string_view,
                             std::string_view>;  // (info:id, section)
-    static constexpr std::array<Entry, 4> kSectionOf{{
+    static constexpr std::array<Entry, 5> kSectionOf{{
         {kUsdPreviewSurface, "Preview surface"},
         {kUsdUVTexture, "Texture"},
         {kUsdTransform2d, "Transform 2D"},
         {kUsdPrimvarReaderFloat2, "Primvar reader"},
+        {kErnieThermal, "Thermal"},
     }};
     const std::string id = shader.GetInfoId();
     const auto own = std::ranges::find(
