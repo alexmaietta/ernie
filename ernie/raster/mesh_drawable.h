@@ -1090,8 +1090,9 @@ class MeshDrawable : public RasterDrawable {
     void Cull(const FrameParams& params,
               std::span<const ShadowCascade> cascades);
     /// Uploads the frame's culling jobs, their frusta and the draws'
-    /// culling data, and sizes the outputs for `visible` instances.
-    void WriteCullJobs(const std::vector<GpuCullJob>& jobs,
+    /// culling data, and sizes the outputs for `visible` instances;
+    /// with no `jobs`, last frame's stay, on the GPU too.
+    void WriteCullJobs(const std::vector<GpuCullJob>* jobs,
                        const std::vector<glm::vec4>& views,
                        std::uint32_t visible, std::uint32_t draws);
     /// Uploads the draws' culling data (`cullItemsDirty_`): each
@@ -1397,6 +1398,7 @@ class MeshDrawable : public RasterDrawable {
     std::uint64_t scannedMaterials_ = ~0ull;
     bool anyCutout_ = false;
     bool anyTransparent_ = false;
+    std::vector<bool> itemCutouts_;  ///< Each item's `Cutout`.
     /// Items moved, retinted or reheated with the layout kept
     /// (`SetItems`), or settled (`SettleMotion`): patched at the next
     /// `Prepare`.
@@ -1410,6 +1412,9 @@ class MeshDrawable : public RasterDrawable {
     /// Meshes with work for the next frame or to settle after it:
     /// points, normals or colours written or mapped.
     std::set<std::uint32_t> activeMeshes_;
+    /// Meshes whose points have come from the GPU (device points or a
+    /// writer), the only ones `ReadBounds` may measure.
+    std::set<std::uint32_t> gpuPointMeshes_;
     /// Whether `SetItems` may have moved items `SettleMotion` has yet
     /// to settle.
     bool itemsMoving_ = false;

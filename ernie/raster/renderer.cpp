@@ -5545,6 +5545,7 @@ void RasterRenderer::RecordShadows(
         ERNIE_GPU_ZONE(context_, commands, "Setup");
         {
             ERNIE_GPU_ZONE(context_, commands, "Uploads");
+            ERNIE_ZONE("Record uploads");
             // The frame's host data first, after every earlier
             // frame's use of the buffers it fills.
             uploads_.Record(commands);
@@ -5587,6 +5588,7 @@ void RasterRenderer::RecordShadows(
         }
         {
             ERNIE_GPU_ZONE(context_, commands, "Prepass");
+            ERNIE_ZONE("Record prepass");
             // Poses composed on the GPU, and views posed under them,
             // before anything reads them.
             for (const RasterDrawable* drawable : drawables) {
@@ -5611,6 +5613,7 @@ void RasterRenderer::RecordShadows(
         RecordExposure(commands);
         {
             ERNIE_GPU_ZONE(context_, commands, "Cull");
+            ERNIE_ZONE("Record cull");
             // Culling and other compute the draws read, once for
             // every view and shadow view.
             for (const RasterDrawable* drawable : drawables) {
@@ -5648,6 +5651,7 @@ void RasterRenderer::RecordShadowMaps(
     VkCommandBuffer commands,
     std::span<const RasterDrawable* const> drawables,
     const RasterFrame& given, std::uint32_t subframe) const {
+    ERNIE_ZONE("Record shadow maps");
     // Drawing into the light shadow maps, the passes bind a texel in
     // their place.
     RasterFrame frame = given;

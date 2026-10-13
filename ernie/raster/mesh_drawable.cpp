@@ -1118,6 +1118,7 @@ void MeshDrawable::SetPoints(
     target.deviceStream = stream;
     target.pointsDirty = true;
     activeMeshes_.insert(mesh);
+    gpuPointMeshes_.insert(mesh);
     // Normals it has follow the points on the GPU, unless they come
     // from the device too.
     // Not with device triangles: the host's are placeholders.
@@ -1451,6 +1452,9 @@ void MeshDrawable::SetWriter(std::uint32_t mesh, MeshWriter writer,
     // Gaining or losing one takes or frees a slot of counts.
     geometryDirty_ = geometryDirty_ || !writer != !target.writer;
     target.writer = std::move(writer);
+    if (target.writer) {
+        gpuPointMeshes_.insert(mesh);
+    }
     target.gpuPoints.reset();
     target.lastGpuPoints.reset();
     target.pointsBounded = target.writer && bounds.has_value();
@@ -2111,6 +2115,7 @@ void MeshDrawable::RemoveMeshes(std::span<const std::uint32_t> meshes) {
     for (const std::uint32_t mesh : removed) {
         meshes_.erase(mesh);
         activeMeshes_.erase(mesh);
+        gpuPointMeshes_.erase(mesh);
         writers_.erase(mesh);
     }
     std::erase_if(items_, [&removed](const MeshItem& item) {
@@ -3022,6 +3027,7 @@ void MeshDrawable::RebuildCompose() {
 }
 
 void MeshDrawable::PrepareCompose(bool all) {
+    ERNIE_ZONE("Mesh prepare compose");
     pendingCompose_.clear();
     if (composeJobs_.empty()) {
         return;
@@ -3297,8 +3303,10 @@ void MeshDrawable::Prepare(const FrameParams& params,
         scannedMaterials_ = materials;
         anyCutout_ = false;
         anyTransparent_ = false;
+        itemCutouts_.assign(items_.size(), false);
         for (std::size_t i = 0; i < items_.size(); ++i) {
-            anyCutout_ = anyCutout_ || Cutout(i);
+            itemCutouts_[i] = Cutout(i);
+            anyCutout_ = anyCutout_ || itemCutouts_[i];
             anyTransparent_ = anyTransparent_ || Transparent(i);
         }
     }
@@ -3356,6 +3364,9 @@ void MeshDrawable::Prepare(const FrameParams& params,
         RebuildGeometry();
     } else {
         // Only meshes whose points move recompute their normals.
+        ERNIE_ZONE("Mesh active uploads");
+        ERNIE_PLOT("Active meshes",
+                   static_cast<std::int64_t>(activeMeshes_.size()));
         pendingNormals_.clear();
         pendingSkins_.clear();
         for (const std::uint32_t handle : activeMeshes_) {
@@ -3649,6 +3660,7 @@ MeshDrawable::MeasuredPositions(const Instancer& instancer) {
 }
 
 void MeshDrawable::ReadBounds(std::uint32_t slot) {
+    ERNIE_ZONE("Mesh read bounds");
     boundsSlot_ = slot;
     std::vector<std::pair<std::uint32_t, std::size_t>>& jobs =
         boundsJobs_[slot];
@@ -3715,7 +3727,8 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
             jobs.emplace_back(handle, instancer.count);
         }
     }
-    for (const auto& [handle, mesh] : meshes_) {
+    for (const std::uint32_t handle : gpuPointMeshes_) {
+        const Mesh& mesh = meshes_.at(handle);
         if (MeasuresPoints(mesh)) {
             jobs.emplace_back(handle, mesh.data.points.size() / 3);
         }
@@ -3732,6 +3745,7 @@ void MeshDrawable::ReadBounds(std::uint32_t slot) {
 }
 
 void MeshDrawable::WriteBoundsJobs() {
+    ERNIE_ZONE("Mesh write bounds jobs");
     const auto& jobs = boundsJobs_[boundsSlot_];
     if (jobs.empty()) {
         return;
@@ -3935,6 +3949,7 @@ MeshDrawable::Resources(const RasterFrame& frame, std::size_t item,
 }
 
 void MeshDrawable::WriteResources() {
+    ERNIE_ZONE("Mesh write resources");
     const auto address = [](const auto& buffer) {
         return buffer != nullptr ? buffer->Address()
                                  : VkDeviceAddress{0};
@@ -4091,8 +4106,6 @@ void MeshDrawable::Cull(const FrameParams& params,
     std::uint32_t draws = 0;
     std::vector<glm::uvec4> records;  // per indirect draw: draw,
                                       // instance offset, index offset
-    cullDrawCounts_.clear();
-    viewJobStarts_.clear();
     // Each level's draw of a run of ids starting at `ids`: the draw,
     // its ids' offset past the draw's own and its indices.
     const auto addRecords = [&](std::uint32_t item, std::uint32_t ids,
@@ -4274,13 +4287,36 @@ void MeshDrawable::Cull(const FrameParams& params,
                        viewLayout_.worlds == viewWorlds &&
                        viewLayout_.culling == culling_ &&
                        viewLayout_.occlusion == occlusion_;
+    // The shadow views' lists, kept as the views' are while no cascade
+    // tests bounds here (the GPU culls, fits it, or it culls nothing)
+    // and their worlds, masks and culling stay: only their cull blocks
+    // are written again.
+    std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
+                           bool>>
+        cascadeKeys;
+    bool shadowsCacheable = cacheable;
+    for (const ShadowCascade& cascade : cascades) {
+        cascadeKeys.emplace_back(cascade.world, cascade.shadowMask,
+                                 cascade.moving);
+        shadowsCacheable = shadowsCacheable &&
+                           (culling_ == Culling::Gpu ||
+                            cascade.gpuFitted || cascade.moving);
+    }
+    const bool reuseShadows = shadowsCacheable && reuse &&
+                              viewLayout_.shadows &&
+                              viewLayout_.cascades == cascadeKeys;
+    // Both kept: the jobs, records and lists are last frame's, as are
+    // the GPU's copies of them, so only the cull blocks go out.
+    const bool steady = reuseShadows;
     if (reuse) {
-        jobs = viewLayout_.jobs;
-        records = viewLayout_.records;
-        cullDrawCounts_ = viewLayout_.drawCounts;
+        if (!steady) {
+            jobs = viewLayout_.jobs;
+            records = viewLayout_.records;
+            cullDrawCounts_ = viewLayout_.drawCounts;
+            viewJobStarts_ = viewLayout_.jobStarts;
+        }
         visible = viewLayout_.visible;
         draws = viewLayout_.draws;
-        viewJobStarts_ = viewLayout_.jobStarts;
         // With poses on the GPU, it writes each view's planes and
         // matrix (`RecordViewPoses`); the rest of a block is the
         // camera's, the same for every view: the first view's,
@@ -4307,6 +4343,8 @@ void MeshDrawable::Cull(const FrameParams& params,
         }
     }
     if (!reuse) {
+        cullDrawCounts_.clear();
+        viewJobStarts_.clear();
         viewDraws_.clear();
         for (std::size_t v = 0; v < params.Views(); ++v) {
             viewJobStarts_.push_back(
@@ -4392,40 +4430,16 @@ void MeshDrawable::Cull(const FrameParams& params,
             viewLayout_.jobStarts = viewJobStarts_;
         }
     }
-    shadowDraws_.clear();
-    gpuShadowSlots_.clear();
-    // The shadow views' lists, kept as the views' are while no cascade
-    // tests bounds here (the GPU culls, fits it, or it culls nothing)
-    // and their worlds, masks and culling stay: only their cull blocks
-    // are written again.
-    std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
-                           bool>>
-        cascadeKeys;
-    bool shadowsCacheable = cacheable;
-    for (const ShadowCascade& cascade : cascades) {
-        cascadeKeys.emplace_back(cascade.world, cascade.shadowMask,
-                                 cascade.moving);
-        shadowsCacheable = shadowsCacheable &&
-                           (culling_ == Culling::Gpu ||
-                            cascade.gpuFitted || cascade.moving);
+    if (!steady) {
+        shadowDraws_.clear();
     }
-    const bool reuseShadows = shadowsCacheable && reuse &&
-                              viewLayout_.shadows &&
-                              viewLayout_.cascades == cascadeKeys;
+    gpuShadowSlots_.clear();
     const std::size_t jobsBefore = jobs.size();
     const std::size_t recordsBefore = records.size();
     const std::size_t countsBefore = cullDrawCounts_.size();
     if (reuseShadows) {
-        jobs.insert(jobs.end(), viewLayout_.shadowJobs.begin(),
-                    viewLayout_.shadowJobs.end());
-        records.insert(records.end(), viewLayout_.shadowRecords.begin(),
-                       viewLayout_.shadowRecords.end());
-        cullDrawCounts_.insert(cullDrawCounts_.end(),
-                               viewLayout_.shadowDrawCounts.begin(),
-                               viewLayout_.shadowDrawCounts.end());
         visible = viewLayout_.shadowVisible;
         draws = viewLayout_.shadowDrawTotal;
-        shadowDraws_ = viewLayout_.shadowLists;
     }
     for (const ShadowCascade& cascade : cascades) {
         if (reuseShadows) {
@@ -4500,16 +4514,18 @@ void MeshDrawable::Cull(const FrameParams& params,
     }
     // A world's shadow pass draws its world's casters and the shared
     // ones, not every world's.
-    shadowWorldDraws_.assign(shadowDraws_.size(), {});
-    for (std::size_t c = 0; c < shadowDraws_.size(); ++c) {
-        for (const VisibleRange& caster : shadowDraws_[c]) {
-            shadowWorldDraws_
-                [c][itemRanges_[caster.item][caster.range].world]
-                    .push_back(caster);
+    if (!steady) {
+        shadowWorldDraws_.assign(shadowDraws_.size(), {});
+        for (std::size_t c = 0; c < shadowDraws_.size(); ++c) {
+            for (const VisibleRange& caster : shadowDraws_[c]) {
+                shadowWorldDraws_
+                    [c][itemRanges_[caster.item][caster.range].world]
+                        .push_back(caster);
+            }
         }
     }
-    WriteCullJobs(jobs, views, visible, draws);
-    if (!records.empty()) {
+    WriteCullJobs(steady ? nullptr : &jobs, views, visible, draws);
+    if (!steady && !records.empty()) {
         Reserve(context_, drawRecords_,
                 records.size() * sizeof(glm::uvec4),
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -4699,20 +4715,24 @@ void MeshDrawable::UploadCull(std::unique_ptr<GpuBuffer>& buffer,
     renderer_.Uploads().Write(*buffer, bytes);
 }
 
-void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>& jobs,
+void MeshDrawable::WriteCullJobs(const std::vector<GpuCullJob>* jobs,
                                  const std::vector<glm::vec4>& views,
                                  std::uint32_t visible,
                                  std::uint32_t draws) {
     ERNIE_ZONE("Mesh write cull jobs");
-    cullJobs_.assign(jobs.begin(), jobs.end());
-    if (jobs.empty()) {
+    if (jobs != nullptr) {
+        cullJobs_.assign(jobs->begin(), jobs->end());
+    }
+    if (cullJobs_.empty()) {
         return;
     }
     // The items change only with the draws.
     if (cullItemsDirty_) {
         WriteCullItems();
     }
-    UploadCull(cullJobBuffer_, std::as_bytes(std::span(jobs)));
+    if (jobs != nullptr) {
+        UploadCull(cullJobBuffer_, std::as_bytes(std::span(*jobs)));
+    }
     UploadCull(cullViewBuffer_, std::as_bytes(std::span(views)));
     Reserve(context_, visibleIds_,
             VkDeviceSize{visible} * sizeof(std::uint32_t),
@@ -5252,7 +5272,10 @@ std::size_t MeshDrawable::Record(
     // Cutout materials draw with the cutout variants, made by
     // `Prepare` when one appears.
     const auto cutout = [&](std::uint32_t item) {
-        return Cutout(item) && shadowCutoutPipeline_ != nullptr &&
+        return anyCutout_ &&
+               (item < itemCutouts_.size() ? itemCutouts_[item]
+                                           : Cutout(item)) &&
+               shadowCutoutPipeline_ != nullptr &&
                cutoutPipelines_[pushbroom_ ? 1 : 0] != nullptr;
     };
     const auto bind = [&](std::uint32_t item, bool culled) {
