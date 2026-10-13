@@ -1873,9 +1873,6 @@ RasterDelegate::ChangedMeshes(const Scene& scene,
         }
         const std::string_view type =
             scene.Has(path) ? scene.TypeOf(path) : std::string_view();
-        if (type == kSkeleton || type == kSkelAnimation) {
-            return std::nullopt;
-        }
         if (IsMeshType(type) || syncedMeshes_.contains(path)) {
             meshes.push_back(path);
         }
@@ -1929,6 +1926,11 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         const bool gpuColors = onGpu(kDisplayColor);
         key.second[3] = gpuNormals ? 1 : key.second[3];
         key.second[4] = gpuColors ? 1 : key.second[4];
+        // A constant colour only tints the draws (`SyncedMesh::tint`):
+        // the mesh stays, as colours per vertex do not.
+        if (scene.Read(path, kDisplayColor) == nullptr) {
+            key.second[4] = 0;
+        }
         // A subdivision surface's level (its own or the stage's) and
         // tags (key slot 11). Its points refine again when they
         // change.
@@ -2010,6 +2012,7 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
         const auto it = syncedMeshes_.find(path);
         if (it != syncedMeshes_.end() && it->second.key == key) {
             SyncedMesh& synced = it->second;
+            synced.tint = ConstantDisplayColor(Gprim(scene, path));
             if (synced.versions == versions) {
                 continue;
             }
@@ -3523,8 +3526,26 @@ void RasterDelegate::Sync(const Scene& scene) {
         SyncMeshes(scene, changedMeshes ? &*changedMeshes : nullptr);
     });
     // GPU-posed prims first: instancers under them compose under
-    // their instances.
-    attempt([&] { SyncGpuXforms(scene); });
+    // their instances. With none, only a changed prim's own transform
+    // written as GPU arrays makes some, so the scene is not searched.
+    const bool gpuXforms =
+        !changed || !gpuPosed_.empty() ||
+        std::ranges::any_of(*changed, [&scene](const Change& change) {
+            if (!Any(change.bits, Dirty::Transform | Dirty::Added) ||
+                !scene.Has(change.path)) {
+                return false;
+            }
+            try {
+                const std::optional<GpuXform> pose =
+                    GpuXformOf(scene, change.path);
+                return pose && !pose->ops.empty();
+            } catch (const std::invalid_argument&) {
+                return true;
+            }
+        });
+    if (gpuXforms) {
+        attempt([&] { SyncGpuXforms(scene); });
+    }
     attempt([&] { SyncInstancers(scene); });
     attempt([&] { SyncPoints(scene); });
     // Light linking's groups of what is drawn, before the draws that
@@ -3569,10 +3590,6 @@ RasterDelegate::TouchedMeshes(const Scene& scene,
     if (!gpuPosed_.empty()) {
         return std::nullopt;
     }
-    const auto only = [](Dirty bits, Dirty allowed) {
-        return (static_cast<std::uint32_t>(bits) &
-                ~static_cast<std::uint32_t>(allowed)) == 0;
-    };
     std::set<Path> touched;
     for (const Change& change : changes) {
         if (IsViewChange(scene, change)) {
@@ -3587,22 +3604,16 @@ RasterDelegate::TouchedMeshes(const Scene& scene,
             touched.insert(path);
             continue;
         }
-        // Moving or hiding a prim stamps the meshes beneath it, which
-        // come as changes of their own; a new grouping holds none
-        // yet; points and an instancer's own draws are built again
-        // anyway, but not its prototypes.
-        if (only(change.bits, Dirty::Transform | Dirty::Visibility) ||
-            ((type == kXform || type == kScope) &&
-             only(change.bits, Dirty::Added | Dirty::Transform |
-                                   Dirty::Visibility)) ||
-            type == kPoints ||
-            (type == kPointInstancer &&
-             !Any(change.bits,
-                  Dirty::Topology | Dirty::Added | Dirty::Removed))) {
-            continue;
+        // Other prims change no mesh's draw but through the meshes'
+        // own changes: what an ancestor's transform, visibility or
+        // world (`AttributeMeta::inherited`), or a material's edits
+        // (`AttributeMeta::targetDirty`), reach comes stamped. Only
+        // an instancer's prototypes decide which meshes draw alone.
+        if (type == kPointInstancer &&
+            Any(change.bits,
+                Dirty::Topology | Dirty::Added | Dirty::Removed)) {
+            return std::nullopt;
         }
-        // A material, a light, an ancestor's world or binding...
-        return std::nullopt;
     }
     return touched;
 }

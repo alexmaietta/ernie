@@ -1406,4 +1406,15 @@ TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
     scene.Remove("/World/Group/B");
     ernie::Cube::Define(scene, "/World/Group/C").SetSize(3.0);
     expectFresh("a mesh removed and another added");
+    // What reaches meshes from other prims: a material they are bound
+    // to, gone and back, and their group's world.
+    ernie::Cube(scene, "/World/Group/A").SetMaterialBinding("/Looks/Red");
+    expectFresh("a mesh bound to a material");
+    scene.Remove("/Looks/Red");
+    expectFresh("the material removed");
+    ernie::Material::Define(scene, "/Looks/Red")
+        .SetAlbedo(glm::dvec3(0.0, 0.0, 1.0));
+    expectFresh("the material back");
+    ernie::Xform(scene, "/World/Group").SetWorld(1);
+    expectFresh("its group's world");
 }
