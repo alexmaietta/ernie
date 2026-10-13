@@ -3,6 +3,7 @@
 
 #include "ernie/scene/path.h"
 #include "ernie/scene/value.h"
+#include "ernie/util/numbers.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -49,17 +50,78 @@ glm::dmat3 EulerRotation(glm::dvec3 degrees, RotationOrder order);
 glm::dvec3 EulerAngles(const glm::dmat3& rotation,
                        RotationOrder order);
 
+/// A part of `XformOps`, set or not, read as `std::optional<T>` is
+/// (`if (part)`, `*part`).
+template <typename T> class XformPart {
+  public:
+    XformPart() = default;
+    XformPart(std::nullopt_t) {}
+    XformPart(const T& value) : value_(value) {}
+
+    explicit operator bool() const {
+        return value_.has_value();
+    }
+    bool has_value() const {
+        return value_.has_value();
+    }
+    const T& operator*() const {
+        return *value_;
+    }
+    const T* operator->() const {
+        return &*value_;
+    }
+    void reset() {
+        value_.reset();
+    }
+
+  private:
+    std::optional<T> value_;
+};
+
+/// A vector part of `XformOps`: a `glm::dvec3`, three numbers
+/// (`{1, 2, 3}`), or any contiguous range of three (`std::array`,
+/// `std::vector`, `std::span`), so that no glm type is needed.
+class XformVector : public XformPart<glm::dvec3> {
+  public:
+    using XformPart::XformPart;
+    XformVector() = default;
+    XformVector(double x, double y, double z)
+        : XformPart(glm::dvec3(x, y, z)) {}
+    /// @throws std::invalid_argument unless `numbers` holds three.
+    template <NumberRange R>
+    XformVector(const R& numbers) : XformPart(VectorOf<3>(numbers)) {}
+};
+
+/// The rotation part of `XformOps` as a quaternion: a `glm::dquat`,
+/// or its real part then its imaginary one, as OpenUSD's
+/// `GfQuatd(real, imaginary)` (`{1, {0, 0, 0}}` turns nothing), never
+/// four numbers alone (w may be first or last).
+class XformRotation : public XformPart<glm::dquat> {
+  public:
+    using XformPart::XformPart;
+    XformRotation() = default;
+    XformRotation(double real, const glm::dvec3& imaginary)
+        : XformPart(glm::dquat(real, imaginary.x, imaginary.y,
+                               imaginary.z)) {}
+    /// @throws std::invalid_argument unless `imaginary` holds three
+    /// numbers.
+    template <NumberRange R>
+    XformRotation(double real, const R& imaginary)
+        : XformRotation(real, VectorOf<3>(imaginary)) {}
+};
+
 /// A prim's local transform as translate, rotate (Euler angles or a
 /// quaternion) and scale, the ops of USD's UsdGeomXformCommonAPI.
-/// Unset parts are left out.
+/// Unset parts are left out. Each part takes glm types or plain
+/// numbers: `{.translate = {1, 2, 3}, .orient = {1, {0, 0, 0}}}`.
 struct XformOps {
-    std::optional<glm::dvec3> translate;
-    std::optional<glm::dvec3>
+    XformVector translate;
+    XformVector
         rotate;  ///< Euler angles in degrees, in `rotationOrder`.
     RotationOrder rotationOrder = RotationOrder::XYZ;
-    std::optional<glm::dquat>
+    XformRotation
         orient;  ///< A unit quaternion, in place of `rotate`.
-    std::optional<glm::dvec3> scale;
+    XformVector scale;
 };
 
 /// Sets the prim at `path` to `xform`: its set parts as

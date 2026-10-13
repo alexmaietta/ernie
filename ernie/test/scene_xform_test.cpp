@@ -10,7 +10,9 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cmath>
 #include <random>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -1099,4 +1101,32 @@ TEST(Xform, ADragDoesNotMergeIntoOtherAttributes) {
     EXPECT_EQ(scene.LocalTransform(rock), glm::dmat4(1.0));
     EXPECT_NE(scene.Get(rock, tokens::kVisibility), nullptr)
         << "the visibility edit stays";
+}
+
+TEST(Xform, OpsTakePlainNumbers) {
+    Scene scene;
+    scene.Define("/World/Box", "Xform");
+    // Three numbers, any range of three, a real part and an imaginary
+    // one: no glm types.
+    const std::vector<float> scale = {2.0f, 2.0f, 2.0f};
+    const double half = std::sqrt(0.5);  // a quarter turn about z
+    SetXform(scene, "/World/Box",
+             {.translate = {1, 2, 3},
+              .orient = {half, std::array{0.0, 0.0, half}},
+              .scale = scale});
+    const glm::dmat4 expected =
+        glm::translate(glm::dmat4(1.0), glm::dvec3(1.0, 2.0, 3.0)) *
+        glm::rotate(glm::dmat4(1.0), glm::radians(90.0),
+                    glm::dvec3(0.0, 0.0, 1.0)) *
+        glm::scale(glm::dmat4(1.0), glm::dvec3(2.0));
+    EXPECT_MAT_NEAR(scene.LocalTransform("/World/Box"), expected, 1e-12);
+
+    XformOps ops{.orient = {1, {0, 0, 0}}};
+    ASSERT_TRUE(ops.orient);
+    EXPECT_EQ(*ops.orient, glm::dquat(1.0, 0.0, 0.0, 0.0));
+    EXPECT_FALSE(ops.translate);
+    ops.translate = std::array<int, 3>{4, 5, 6};
+    EXPECT_EQ(*ops.translate, glm::dvec3(4.0, 5.0, 6.0));
+    EXPECT_THROW(ops.scale = std::vector<double>({1.0, 2.0}),
+                 std::invalid_argument);
 }

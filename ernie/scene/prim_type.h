@@ -6,6 +6,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/value.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/numbers.h"
 #include "ernie/util/tensor.h"
 
 #include <glm/glm.hpp>
@@ -567,7 +568,7 @@ class SchemaView {
      * the host; GPU arrays are written as tensors (DLPack). */      \
     template <typename R, typename T = Type>                         \
         requires(std::is_same_v<T, ::ernie::Tensor> &&               \
-                 ::ernie::detail::NumberRange<R>)                    \
+                 ::ernie::NumberRange<R>)                            \
     Self& Set##Name(const R& values,                                 \
                     std::vector<std::int64_t> shape = {}) {          \
         return Set##Name(::ernie::detail::TensorFromNumbers(         \
@@ -598,7 +599,7 @@ class SchemaView {
      * not fill whole rows. */                                       \
     template <typename R, typename T = Type>                         \
         requires(::ernie::kIsOrArray<T> &&                           \
-                 ::ernie::detail::NumberRange<R>)                    \
+                 ::ernie::NumberRange<R>)                            \
     Self& Write##Name(const R& values) {                             \
         return Write##Name(                                          \
             ::ernie::detail::ArrayFromNumbers<T>(values));           \
@@ -720,14 +721,6 @@ void WriteAttribute(Scene& scene, const Path& path,
     }
 }
 
-/// A contiguous range of numbers on the host: a `std::array`,
-/// `std::vector`, `std::span` or C array of them.
-template <typename R>
-concept NumberRange =
-    std::ranges::contiguous_range<R> && std::ranges::sized_range<R> &&
-    std::is_arithmetic_v<std::ranges::range_value_t<R>> &&
-    !std::is_same_v<std::ranges::range_value_t<R>, bool>;
-
 /// The numbers in a vector attribute of type `T`; 0 for other types.
 /// Quaternions and matrices take none: four numbers may put w first
 /// or last, sixteen may be rows or columns.
@@ -762,21 +755,11 @@ concept SetsFromNumbers =
 template <typename T, NumberRange R>
 ValueType<T> FromNumbers(const R& values) {
     using V = ValueType<T>;
-    const std::span numbers(values);
     if constexpr (kVectorSize<V> > 0) {
-        constexpr std::size_t n = kVectorSize<V>;
-        if (numbers.size() != n) {
-            throw std::invalid_argument(
-                "Expected " + std::to_string(n) + " numbers, not " +
-                std::to_string(numbers.size()));
-        }
-        V vector(0.0);
-        for (std::size_t i = 0; i < n; ++i) {
-            vector[static_cast<glm::length_t>(i)] =
-                static_cast<double>(numbers[i]);
-        }
-        return vector;
+        return VectorOf<static_cast<glm::length_t>(kVectorSize<V>)>(
+            values);
     } else {
+        const std::span numbers(values);
         return V(numbers.begin(), numbers.end());
     }
 }
