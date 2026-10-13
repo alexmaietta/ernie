@@ -775,6 +775,10 @@ std::uint32_t MeshDrawable::CullLevels(std::size_t item) const {
         meshes_.at(items_[item].mesh).levels.size());
 }
 
+bool MeshDrawable::Transparent(std::size_t item) const {
+    return renderer_.TransparentMaterial(items_[item].material);
+}
+
 bool MeshDrawable::Cutout(std::size_t item) const {
     return renderer_.MaterialOrDefault(items_[item].material)
         .Settings()
@@ -3029,6 +3033,14 @@ void MeshDrawable::Prepare(const FrameParams& params,
     if (cutout) {
         CreateCutoutPipelines(pushbroom);
     }
+    // Transparent materials draw in their own phase, when shaded.
+    drawsTransparent_ = false;
+    for (std::size_t i = 0;
+         i < items_.size() && minimal_ == MinimalMode::Off &&
+         !drawsTransparent_;
+         ++i) {
+        drawsTransparent_ = Transparent(i);
+    }
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
@@ -4766,7 +4778,7 @@ std::size_t MeshDrawable::Record(
     std::span<const VisibleRange> ranges, const glm::mat4& light,
     const ShadowCasters* casters, bool shadow, bool direct,
     int culledSet, const DescriptorResource* motion,
-    RecordState* state) const {
+    RecordState* state, std::optional<bool> transparent) const {
     std::size_t calls = 0;
     RecordState own;
     RecordState& kept = state != nullptr ? *state : own;
@@ -4775,6 +4787,10 @@ std::size_t MeshDrawable::Record(
     bool& pushedCulled = kept.pushedCulled;
     const PipelineLayout& layout =
         motion != nullptr ? motionLayout_ : layout_;
+    // A colour pass's items, transparent or opaque.
+    const auto drawn = [&](std::uint32_t item) {
+        return !transparent || Transparent(item) == *transparent;
+    };
     // Cutout materials draw with the cutout variants, made by
     // `Prepare` when one appears.
     const auto cutout = [&](std::uint32_t item) {
@@ -4883,7 +4899,7 @@ std::size_t MeshDrawable::Record(
             continue;
         }
         const std::uint32_t vertices = itemIndices_[visible.item];
-        if (vertices == 0) {
+        if (vertices == 0 || !drawn(visible.item)) {
             continue;
         }
         if (visible.job >= 0) {
@@ -5009,9 +5025,14 @@ void MeshDrawable::RecordShadow(VkCommandBuffer commands,
     if (cascade >= shadowDraws_.size()) {
         return;
     }
+    // Transparent surfaces let the light through, so cast none: a
+    // depth map has no partial shadow to give them.
+    const std::optional<bool> opaque =
+        drawsTransparent_ ? std::optional<bool>(false) : std::nullopt;
     if (casters.world == ShadowCasters::kAllWorlds) {
         Record(commands, frame, shadowDraws_[cascade],
-               lightViewProjection, &casters, true, true, 0);
+               lightViewProjection, &casters, true, true, 0, nullptr,
+               nullptr, opaque);
         return;
     }
     const auto& byWorld = shadowWorldDraws_[cascade];
@@ -5020,7 +5041,8 @@ void MeshDrawable::RecordShadow(VkCommandBuffer commands,
         const auto draws = byWorld.find(world);
         if (draws != byWorld.end() && casters.Draws(world)) {
             Record(commands, frame, draws->second,
-                   lightViewProjection, &casters, true, true, 0);
+                   lightViewProjection, &casters, true, true, 0,
+                   nullptr, nullptr, opaque);
         }
         if (casters.world < 0) {
             break;  // the shared casters only
@@ -5066,9 +5088,31 @@ void MeshDrawable::RecordColorState(VkCommandBuffer commands,
         direct = false;
         culledSet = occlusion_ == Occlusion::TwoPass ? 1 : 0;
     }
-    const std::size_t calls =
+    // Transparent items in their own phase alone, every set of them
+    // at once: what the opaque phases would draw in turn.
+    const std::optional<bool> transparent =
+        drawsTransparent_
+            ? std::optional<bool>(phase == DrawPhase::Transparent)
+            : std::nullopt;
+    if (phase == DrawPhase::Transparent) {
+        if (!drawsTransparent_) {
+            return;
+        }
+        const bool twoPass = occlusion_ == Occlusion::TwoPass;
         Record(commands, frame, viewDraws_[view], glm::mat4(1.0f),
-               nullptr, false, direct, culledSet, nullptr, state);
+               nullptr, false, true,
+               occlusion_ == Occlusion::Off || twoPass ? 0 : -1,
+               nullptr, state, transparent);
+        if (occlusion_ != Occlusion::Off) {
+            Record(commands, frame, viewDraws_[view], glm::mat4(1.0f),
+                   nullptr, false, false, twoPass ? 1 : 0, nullptr,
+                   state, transparent);
+        }
+        return;
+    }
+    const std::size_t calls = Record(
+        commands, frame, viewDraws_[view], glm::mat4(1.0f), nullptr,
+        false, direct, culledSet, nullptr, state, transparent);
     viewCalls_.resize(viewDraws_.size());
     viewCalls_[view] =
         (phase == DrawPhase::Occludees ? viewCalls_[view] : 0) +

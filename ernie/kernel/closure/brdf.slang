@@ -105,8 +105,28 @@ public struct SpecularReflection {
     public float ior;
 }
 
+// How much of the light from behind a surface comes through it towards the viewer, per band
+// (`factor`; what it reflects is its radiance factor's): through a solid body of index of
+// refraction `ior`, bent at its surface, or a thin-walled one (`thinWalled`, such as a pane),
+// which lets it through unbent.
+public struct Transmission {
+    public float3 factor;
+    public float ior;
+    public bool thinWalled;
+}
+
 public interface IBrdf {
     float3 radianceFactor(BrdfInput s, BrdfParams p);
+
+    // The light from behind the surface it lets through towards the viewer at cos(e) `s.mu`.
+    // Models that do not override it are opaque.
+    Transmission transmission(BrdfInput s, BrdfParams p) {
+        Transmission t;
+        t.factor = float3(0.0);
+        t.ior = 1.0;
+        t.thinWalled = true;
+        return t;
+    }
 
     // The specular part of `radianceFactor` for polarization. Models that do not override it
     // reflect nothing specularly: all their light diffuse.

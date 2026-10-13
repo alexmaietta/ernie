@@ -457,8 +457,11 @@ struct MaterialGpu {
     /// The address of its features and parameters past the core ones
     /// (`BrdfParams::extended`), 0 for none.
     std::uint64_t extended;
+    /// Its opacity, a transparent surface's share of what reaches
+    /// the eye (`transmitMain`), 1 for opaque ones; three unused.
+    float transparency[4];
 };
-static_assert(sizeof(MaterialGpu) == 864,
+static_assert(sizeof(MaterialGpu) == 880,
               "MaterialGpu must match shading.slang");
 
 /// Reflectance luminance below which a material counts as black; its
@@ -3990,6 +3993,9 @@ void RasterRenderer::Update(
         ShadingVariantOf(params, stokes_, halfRadiance_);
     for (const std::size_t model : modelsInUse_) {
         ShadingPipeline(model, pushbroom_);
+        if (anyTransparent_) {
+            TransmitPipelines(model, pushbroom_);
+        }
     }
     if (temperatureModelsInUse_) {
         TemperaturePipeline(pushbroom_);
@@ -4149,6 +4155,123 @@ RasterRenderer::ShadingPipeline(std::size_t model, bool pushbroom) {
                 .first->second;
 }
 
+void RasterRenderer::TransmitPipelines(std::size_t model,
+                                       bool pushbroom) {
+    const std::uint32_t features =
+        model < modelFeatures_.size() ? modelFeatures_[model] : 0u;
+    const BrdfModel& brdf = brdfs_.Models()[model];
+    std::unique_ptr<ComputePipeline>& transmit = transmitPipelines_[{
+        model, pushbroom, shadingVariant_, features}];
+    if (transmit == nullptr) {
+        transmit = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_,
+            compiler_.CompileSpirv(
+                ShadingModules(brdf, lightPatterns_,
+                               temperatureModels_, pushbroom,
+                               shadingVariant_, features),
+                "transmitMain"));
+    }
+    std::unique_ptr<ComputePipeline>& copy =
+        transmitCopyPipelines_[{pushbroom, shadingVariant_}];
+    if (copy == nullptr) {
+        copy = std::make_unique<ComputePipeline>(
+            context_, shadingLayout_,
+            compiler_.CompileSpirv(
+                ShadingModules(brdfs_.Models().front(),
+                               lightPatterns_, temperatureModels_,
+                               pushbroom, shadingVariant_),
+                "transmitCopyMain"));
+    }
+}
+
+void RasterRenderer::Transmit(VkCommandBuffer commands,
+                              RenderTargets& targets,
+                              std::uint32_t firstView) const {
+    ERNIE_GPU_ZONE(context_, commands, "Transparency");
+    const auto sampled = [](const GpuImage& image) {
+        return DescriptorResource::Of(
+            image.View(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    };
+    const auto general = [](const GpuImage& image) {
+        return DescriptorResource::Of(image.View(),
+                                      VK_IMAGE_LAYOUT_GENERAL);
+    };
+    BindlessHeap& heap = context_.Bindless();
+    const auto slot = [&](const GpuImage& image,
+                          VkImageLayout layout) {
+        shadingSlots_.push_back(
+            heap.AddImage(BindlessHeap::Kind::Texture2DArray,
+                          image.View(), layout));
+        return shadingSlots_.back().Index();
+    };
+    const std::uint32_t tangents =
+        targets.Tangents()
+            ? slot(targets.TransparentGBuffer(3),
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            : 0u;
+    const std::uint32_t behind =
+        slot(targets.RasterRadiance(), VK_IMAGE_LAYOUT_GENERAL);
+    const std::uint32_t depth = slot(
+        targets.Depth(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const std::uint32_t composited =
+        slot(targets.TransparentRadiance(), VK_IMAGE_LAYOUT_GENERAL);
+    const DescriptorResource& patterns =
+        DescriptorResource::Of(*patternData_);
+    const auto bound = [&](GpuImage& output) {
+        return std::array<DescriptorResource, 9>{
+            DescriptorResource::Of(*shadingResources_),
+            sampled(targets.TransparentGBuffer(0)),
+            sampled(targets.TransparentGBuffer(1)),
+            sampled(targets.TransparentGBuffer(2)),
+            sampled(targets.TransparentDepth()),
+            general(output),
+            general(*noOcclusion_),
+            general(*noOcclusion_),
+            patterns};
+    };
+    const std::uint32_t groupsX = Groups(extent_.width);
+    const std::uint32_t groupsY = Groups(extent_.height);
+    const std::uint32_t views = targets.RasterLayers();
+    ShadingConstants constants{};
+    constants.model[1] = firstView;
+    constants.model[2] =
+        targets.Stokes() ? targets.StokesOffset() : 0u;
+    // Each model's surfaces over what is behind them, into their own
+    // radiance; once every pixel has read its surroundings, into the
+    // raster radiance.
+    ShaderBarrier(commands);
+    const auto surfaces = bound(targets.TransparentRadiance());
+    for (const std::size_t model : modelsInUse_) {
+        vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          transmitPipelines_
+                              .at({model, pushbroom_, shadingVariant_,
+                                   modelFeatures_[model]})
+                              ->Handle());
+        shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            surfaces);
+        constants.model[0] = static_cast<std::uint32_t>(model);
+        constants.gbuffer[0] = tangents;
+        constants.gbuffer[1] = 1;
+        constants.gbuffer[2] = behind;
+        constants.gbuffer[3] = depth;
+        shadingLayout_.PushConstants(commands, &constants,
+                                     sizeof(constants));
+        vkCmdDispatch(commands, groupsX, groupsY, views);
+    }
+    ShaderBarrier(commands);
+    vkCmdBindPipeline(
+        commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+        transmitCopyPipelines_.at({pushbroom_, shadingVariant_})
+            ->Handle());
+    shadingLayout_.Push(commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                        bound(targets.RasterRadiance()));
+    constants.gbuffer[2] = composited;
+    shadingLayout_.PushConstants(commands, &constants,
+                                 sizeof(constants));
+    vkCmdDispatch(commands, groupsX, groupsY, views);
+    ShaderBarrier(commands);
+}
+
 void RasterRenderer::SkyPipeline(bool pushbroom, bool domeOnly) {
     std::unique_ptr<ComputePipeline>& sky =
         skyPipelines_[pushbroom ? 1 : 0][domeOnly ? 1 : 0];
@@ -4212,6 +4335,7 @@ void RasterRenderer::WriteMaterialTable() {
     // none) until the buffer is made.
     std::vector<float> extended;
     modelFeatures_.assign(registered.size(), 0u);
+    transparentMaterials_.assign(count, false);
     for (const auto& [id, material] : materials_) {
         MaterialGpu& entry = table[id];
         const auto model =
@@ -4245,6 +4369,16 @@ void RasterRenderer::WriteMaterialTable() {
         const std::uint32_t features =
             model->features ? model->features(params) : 0u;
         modelFeatures_[index] |= features;
+        // Transparent: partly opaque without cutting out, or letting
+        // light through (`TransparentMaterial`).
+        const bool transparent =
+            !settings.Cutout() &&
+            ((settings.opacity < 1.0f && !settings.opacityTexture) ||
+             (features & BrdfRegistry::kTransmissionFeature) != 0);
+        transparentMaterials_[id] = transparent;
+        entry.transparency[0] =
+            transparent ? std::clamp(settings.opacity, 0.0f, 1.0f)
+                        : 1.0f;
         if (params.size() > BrdfRegistry::kCoreParams) {
             entry.extended = extended.size() + 1;
             extended.push_back(std::bit_cast<float>(features));
@@ -4384,6 +4518,9 @@ void RasterRenderer::WriteMaterialTable() {
         modelFeatures_, [](std::uint32_t features) {
             return (features & BrdfRegistry::kTangentsFeature) != 0;
         });
+    anyTransparent_ =
+        std::ranges::find(transparentMaterials_, true) !=
+        transparentMaterials_.end();
     // The temperature models' table and data, when any material has
     // one, the records' data offsets made addresses.
     temperatureModelsInUse_ =
@@ -5618,7 +5755,32 @@ void RasterRenderer::RecordViews(
             ERNIE_GPU_ZONE(context_, commands, "G-buffer occludees");
             draw(DrawPhase::Occludees, true);
         }
-        Shade(commands, targets, first);
+        // The transparent surfaces, the nearest in front of the
+        // opaque ones, into their own G-buffer.
+        const bool transparent = std::ranges::any_of(
+            drawables, [](const RasterDrawable* drawable) {
+                return drawable->DrawsTransparent();
+            });
+        if (transparent) {
+            ERNIE_GPU_ZONE(context_, commands,
+                           "G-buffer transparent");
+            targets.PrepareTransparency(commands);
+            BeginRendering(commands, targets.TransparentTarget());
+            std::vector<RasterFrame> frames;
+            frames.reserve(layers);
+            for (std::uint32_t v = 0; v < layers; ++v) {
+                frames.push_back(Frame(first + v));
+            }
+            for (const RasterDrawable* drawable : drawables) {
+                if (drawable->DrawsTransparent()) {
+                    drawable->RecordColorViews(
+                        commands, frames, first,
+                        DrawPhase::Transparent);
+                }
+            }
+            vkCmdEndRendering(commands);
+        }
+        Shade(commands, targets, first, transparent);
         if (volumes_->Active()) {
             // Shading's resources as Shade wrote them just before.
             VolumePass::Shading shading;
@@ -5629,6 +5791,10 @@ void RasterRenderer::RecordViews(
                              VolumeLayout(), first, extent_.width,
                              extent_.height, pushbroom_, sky_ != 0);
             ShaderBarrier(commands);
+        }
+        // Over the volumes behind them, which then show through.
+        if (transparent) {
+            Transmit(commands, targets, first);
         }
         if (subframes_ > 1) {
             Accumulate(commands, targets, subframe);
@@ -6583,7 +6749,8 @@ void RasterRenderer::WriteShadingResources(
 
 void RasterRenderer::Shade(VkCommandBuffer commands,
                            RenderTargets& targets,
-                           std::uint32_t firstView) const {
+                           std::uint32_t firstView,
+                           bool transparent) const {
     ERNIE_ZONE("Shade");
     // Shading writes the pixels it shades; the lens reads background
     // ones as no radiance, so the raster radiance needs no clearing.
@@ -6741,6 +6908,49 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
             shadingLayout_.PushConstants(commands, &constants,
                                          sizeof(constants));
             vkCmdDispatch(commands, groupsX, groupsY, views);
+        }
+        // The transparent surfaces' own radiance, from their G-buffer
+        // into theirs, without the dome occlusion found for the
+        // opaque ones'.
+        if (transparent) {
+            ERNIE_GPU_ZONE(context_, commands, "Transparent shading");
+            targets.PrepareTransparentCompute(commands);
+            std::uint32_t surfaceTangents = 0;
+            if (targets.Tangents()) {
+                shadingSlots_.push_back(context_.Bindless().AddImage(
+                    BindlessHeap::Kind::Texture2DArray,
+                    targets.TransparentGBuffer(3).View(),
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+                surfaceTangents = shadingSlots_.back().Index();
+            }
+            const DescriptorResource surfaces[] = {
+                shading[0],
+                sampled(targets.TransparentGBuffer(0)),
+                sampled(targets.TransparentGBuffer(1)),
+                sampled(targets.TransparentGBuffer(2)),
+                sampled(targets.TransparentDepth()),
+                general(targets.TransparentRadiance()),
+                shading[6],
+                shading[7],
+                shading[8]};
+            for (const std::size_t model : modelsInUse_) {
+                vkCmdBindPipeline(
+                    commands, VK_PIPELINE_BIND_POINT_COMPUTE,
+                    shadingPipelines_
+                        .at({model, pushbroom_, shadingVariant_,
+                             modelFeatures_[model]})
+                        ->Handle());
+                shadingLayout_.Push(commands,
+                                    VK_PIPELINE_BIND_POINT_COMPUTE,
+                                    surfaces);
+                ShadingConstants constants =
+                    constantsFor(static_cast<std::uint32_t>(model));
+                constants.gbuffer[0] = surfaceTangents;
+                constants.gbuffer[1] = 1;
+                shadingLayout_.PushConstants(commands, &constants,
+                                             sizeof(constants));
+                vkCmdDispatch(commands, groupsX, groupsY, views);
+            }
         }
         // The pixels no geometry covers, when the dome, stars or the
         // atmosphere show there; else the lens reads them as no

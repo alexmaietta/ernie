@@ -95,6 +95,10 @@ class BrdfRegistry {
     /// anisotropic one: the renderer keeps the G-buffer's tangents
     /// only while a material has it.
     static constexpr std::uint32_t kTangentsFeature = 1u << 31;
+    /// The feature bit of a material that lets light from behind it
+    /// through (`IBrdf::transmission`): drawn after the opaque
+    /// surfaces, in front of what it shows through.
+    static constexpr std::uint32_t kTransmissionFeature = 1u << 30;
 
     /// An empty registry.
     BrdfRegistry() = default;

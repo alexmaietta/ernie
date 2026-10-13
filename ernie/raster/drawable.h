@@ -95,6 +95,10 @@ enum class DrawPhase {
                 ///< occlusion-culled instances.
     Occludees,  ///< The occlusion-culled instances, after the depth
                 ///< pyramid.
+    Transparent,  ///< The transparent surfaces, after the opaque
+                  ///< ones, into their own G-buffer
+                  ///< (`RenderTargets::PrepareTransparency`); only
+                  ///< drawables that `DrawsTransparent`.
 };
 
 /// Something a `RasterRenderer` draws: terrain, meshes, and in future
@@ -215,6 +219,14 @@ class RasterDrawable {
     RecordColor(VkCommandBuffer commands, const RasterFrame& frame,
                 std::size_t view,
                 DrawPhase phase = DrawPhase::All) const = 0;
+
+    /// Whether the last `Prepare` left transparent surfaces to draw
+    /// (`RasterRenderer::TransparentMaterial`): drawn in their own
+    /// phase, `DrawPhase::Transparent`, and in no other. None by
+    /// default.
+    virtual bool DrawsTransparent() const {
+        return false;
+    }
 
     /// `RecordColor` of views `first` to `first + frames.size()`,
     /// `frames` theirs, one after another into the open rendering

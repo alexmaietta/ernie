@@ -91,7 +91,9 @@ RenderTargets::RenderTargets(const VulkanContext& context,
         ImageDesc{extent.width, extent.height, layers, 1,
                   kDepthFormat,
                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                      VK_IMAGE_USAGE_SAMPLED_BIT,
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                      // Copied for the transparent pass.
+                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                   false, true});
     const auto bandLayers = static_cast<std::uint32_t>(bands);
     rasterRadiance_ = std::make_unique<GpuImage>(
@@ -316,6 +318,87 @@ void RenderTargets::SetTangents(bool tangents) {
         desc.height = extent_.height;
         gbuffer_[3] = std::make_unique<GpuImage>(context_, desc);
     }
+}
+
+void RenderTargets::PrepareTransparency(VkCommandBuffer commands) {
+    const ImageDesc& radiance = rasterRadiance_->Desc();
+    if (transparentDepth_ == nullptr) {
+        for (std::size_t i = 0; i < transparentGBuffer_.size(); ++i) {
+            ImageDesc desc = gbuffer_[i]->Desc();
+            desc.width = extent_.width;
+            desc.height = extent_.height;
+            transparentGBuffer_[i] =
+                std::make_unique<GpuImage>(context_, desc);
+        }
+        ImageDesc depth = depth_->Desc();
+        depth.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        transparentDepth_ =
+            std::make_unique<GpuImage>(context_, depth);
+    }
+    // As the raster radiance, whose layers and format follow the
+    // frame's polarizer and precision.
+    if (transparentRadiance_ == nullptr ||
+        transparentRadiance_->Desc().layers != radiance.layers ||
+        transparentRadiance_->Desc().format != radiance.format) {
+        if (transparentRadiance_ != nullptr) {
+            vkDeviceWaitIdle(context_.Device());
+        }
+        transparentRadiance_ =
+            std::make_unique<GpuImage>(context_, radiance);
+    }
+    // The opaque depth, which the transparent surfaces test against.
+    depth_->Transition(commands,
+                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transparentDepth_->Transition(
+        commands, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkImageCopy copy{};
+    copy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0,
+                           depth_->Desc().layers};
+    copy.dstSubresource = copy.srcSubresource;
+    copy.extent = {extent_.width, extent_.height, 1};
+    vkCmdCopyImage(commands, depth_->Handle(),
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   transparentDepth_->Handle(),
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    for (const std::unique_ptr<GpuImage>& image :
+         transparentGBuffer_) {
+        image->Transition(commands,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    }
+    transparentDepth_->Transition(
+        commands, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+}
+
+RenderingTarget RenderTargets::TransparentTarget() const {
+    RenderingTarget target;
+    for (const std::unique_ptr<GpuImage>& image :
+         transparentGBuffer_) {
+        target.colors.push_back(image->View());
+    }
+    VkClearColorValue background{};
+    background.uint32[0] = 0xFFFFFFFFu;
+    target.clearColors = {VkClearColorValue{}, VkClearColorValue{},
+                          background, VkClearColorValue{}};
+    target.depth = transparentDepth_->View();
+    target.loadDepth = true;
+    target.extent = extent_;
+    target.layers = RasterLayers();
+    return target;
+}
+
+void RenderTargets::PrepareTransparentCompute(
+    VkCommandBuffer commands) {
+    for (const std::unique_ptr<GpuImage>& image :
+         transparentGBuffer_) {
+        image->Transition(commands,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+    transparentDepth_->Transition(
+        commands, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transparentRadiance_->Transition(commands,
+                                     VK_IMAGE_LAYOUT_GENERAL);
 }
 
 void RenderTargets::PrepareCompute(VkCommandBuffer commands) {

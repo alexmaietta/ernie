@@ -15,7 +15,10 @@ import brdf;
 // 13 coat_ior, 14 coat_darkening, 15 fuzz_roughness; past the first 16, read only for a layer
 // the material has: 16-18 coat_color, 19-21 fuzz_color, 22 thin_film_thickness (um),
 // 23 thin_film_ior, 24 specular_roughness_anisotropy (along the surface's tangent,
-// `BrdfInput::light` and `view`'s frame). Colours arrive uplifted at the bands (`BrdfInput::colours`: specular_color,
+// `BrdfInput::light` and `view`'s frame), 25 transmission_weight, 26-28 transmission_color,
+// 29 geometry_thin_walled (0 or 1). A transmitting material's dielectric base lets through, in
+// place of its diffuse, what its specular lobe, coat and fuzz leave (`transmission`), unblurred
+// by its roughness. Colours arrive uplifted at the bands (`BrdfInput::colours`: specular_color,
 // coat_color, fuzz_color), and the film's interference is at the bands' wavelengths.
 //
 // Layers cost nothing where no material has them: the renderer defines BRDF_FEATURES as the
@@ -48,6 +51,7 @@ import brdf;
 public static const uint kOpenPbrCoat = 1u;
 public static const uint kOpenPbrFuzz = 2u;
 public static const uint kOpenPbrThinFilm = 4u;
+public static const uint kOpenPbrTransmission = 8u;
 // Anisotropy reads the surface's tangent: `BrdfRegistry::kTangentsFeature`.
 public static const uint kOpenPbrAnisotropy = 0x80000000u;
 
@@ -196,6 +200,9 @@ public struct OpenPbr : IBrdf {
         float filmWeight;
         float filmNm;
         float filmIor;
+        float transmission;
+        float3 transmissionColour;
+        bool thinWalled;
     }
 
     static Material materialOf(BrdfInput s, BrdfParams p) {
@@ -246,6 +253,14 @@ public struct OpenPbr : IBrdf {
             m.filmWeight = saturate(p.get(11));
             m.filmNm = max(p.get(22), 0.0) * 1000.0;
             m.filmIor = max(p.get(23), 1.0);
+        }
+        m.transmission = 0.0;
+        m.transmissionColour = float3(1.0);
+        m.thinWalled = false;
+        if (hasLayer(p, kOpenPbrTransmission)) {
+            m.transmission = saturate(p.get(25));
+            m.transmissionColour = saturate(s.colours[3]);
+            m.thinWalled = p.get(29) > 0.5;
         }
         return m;
     }
@@ -343,7 +358,7 @@ public struct OpenPbr : IBrdf {
                                  (1.0 - dielectricAlbedo(m, roughness, mu)),
                              float3(0.0)));
         Lobes lobes;
-        lobes.diffuse = (1.0 - m.metalness) * under *
+        lobes.diffuse = (1.0 - m.metalness) * (1.0 - m.transmission) * under *
                         eon(saturate(m.base), m.diffuseRoughness, mu0, mu, s.cosG);
         lobes.specular = specular;
         let meanBase = (m.base.x + m.base.y + m.base.z) / 3.0;
@@ -391,6 +406,32 @@ public struct OpenPbr : IBrdf {
         return r;
     }
 
+    // The dielectric base's transmission where it does not reflect: what its specular lobe at the
+    // viewer's angle leaves, tinted, then what the coat and the fuzz let through; refracted at
+    // the base's index unless thin-walled.
+    public override Transmission transmission(BrdfInput s, BrdfParams p) {
+        let m = materialOf(s, p);
+        Transmission t;
+        t.ior = m.specularIor;
+        t.thinWalled = m.thinWalled;
+        t.factor = float3(0.0);
+        if (m.transmission <= 0.0) {
+            return t;
+        }
+        let mu = saturate(s.mu);
+        let roughness = widenedRoughness(m.specularRoughness, s.slopeVariance);
+        t.factor = (1.0 - m.metalness) * m.transmission * m.transmissionColour *
+                   max(1.0 - dielectricAlbedo(m, roughness, mu), float3(0.0));
+        if (m.coatWeight > 0.0) {
+            let coatRoughness = widenedRoughness(m.coatRoughness, s.slopeVariance);
+            t.factor *= m.coatTransmission * (1.0 - coatAlbedo(m, coatRoughness, mu));
+        }
+        if (m.fuzzWeight > 0.0) {
+            t.factor *= 1.0 - m.fuzzWeight * sheenAlbedo(mu, m.fuzzRoughness);
+        }
+        return t;
+    }
+
     // The split-sum approximation: the base's specular lobe (the metal's F82 tint on the
     // environment BRDF's grazing bias) and the coat's, the diffuse what they leave; the fuzz,
     // broad, with the diffuse.
@@ -421,7 +462,8 @@ public struct OpenPbr : IBrdf {
         var r = diffuseEnvironment(float3(0.0));
         r.roughness0 = roughness;
         r.specular0 = lerp(dielectric, metal, m.metalness);
-        r.diffuse = (1.0 - m.metalness) * max(1.0 - dielectric, float3(0.0)) *
+        r.diffuse = (1.0 - m.metalness) * (1.0 - m.transmission) *
+                    max(1.0 - dielectric, float3(0.0)) *
                     eonAlbedo(saturate(m.base), m.diffuseRoughness, mu);
         if (m.coatWeight > 0.0) {
             let coatRoughness = widenedRoughness(m.coatRoughness, s.slopeVariance);

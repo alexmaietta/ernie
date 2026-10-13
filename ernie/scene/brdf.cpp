@@ -192,6 +192,7 @@ BrdfModel PreviewSurface() {
 constexpr std::uint32_t kOpenPbrCoat = 1;
 constexpr std::uint32_t kOpenPbrFuzz = 2;
 constexpr std::uint32_t kOpenPbrThinFilm = 4;
+constexpr std::uint32_t kOpenPbrTransmission = 8;
 
 BrdfModel OpenPbr() {
     BrdfModel model{
@@ -284,7 +285,22 @@ BrdfModel OpenPbr() {
          {"specular_roughness_anisotropy", "Specular anisotropy", "",
           0.0f, 0.0f, 1.0f, false,
           "Stretches the specular lobe along the surface's tangent, "
-          "along which its texture coordinates' u grows."}},
+          "along which its texture coordinates' u grows."},
+         {"transmission_weight", "Transmission", "", 0.0f, 0.0f, 1.0f,
+          false,
+          "How much of the dielectric base lets light through in "
+          "place of its diffuse."},
+         {"transmission_color", "Transmission colour", "", 1.0f, 0.0f,
+          1.0f, false, "Tints the light let through.", true,
+          kOpenPbrTransmission},
+         {"transmission_color_g", "Transmission colour G", "", 1.0f,
+          0.0f, 1.0f, false, "transmission_color's green."},
+         {"transmission_color_b", "Transmission colour B", "", 1.0f,
+          0.0f, 1.0f, false, "transmission_color's blue."},
+         {"geometry_thin_walled", "Thin walled", "", 0.0f, 0.0f, 1.0f,
+          false,
+          "1 for a thin shell (a pane, a bubble), which lets light "
+          "through unbent; 0 for a solid body, which refracts it."}},
         "OpenPbr",
         shaders::kBrdfOpenPbrSlang};
     // A layer where its weight is above 0.
@@ -293,6 +309,11 @@ BrdfModel OpenPbr() {
         bits |= p.size() > 9 && p[9] > 0.0f ? kOpenPbrCoat : 0u;
         bits |= p.size() > 10 && p[10] > 0.0f ? kOpenPbrFuzz : 0u;
         bits |= p.size() > 11 && p[11] > 0.0f ? kOpenPbrThinFilm : 0u;
+        // Transmission draws it in front of what it shows through.
+        bits |= p.size() > 25 && p[25] > 0.0f
+                    ? kOpenPbrTransmission |
+                          BrdfRegistry::kTransmissionFeature
+                    : 0u;
         // Anisotropy reads the surface's tangents.
         bits |= p.size() > 24 && p[24] > 0.0f
                     ? BrdfRegistry::kTangentsFeature

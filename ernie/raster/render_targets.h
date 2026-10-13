@@ -149,6 +149,36 @@ class RenderTargets : public FrameImages {
     /// the render vars.
     void PrepareCompute(VkCommandBuffer commands);
 
+    /// Records what the transparent surfaces' pass draws into: their
+    /// G-buffer (the opaque one's formats) cleared, and their depth,
+    /// the opaque depth copied, so the nearest transparent surface in
+    /// front of the opaque ones stays. Made the first time a frame
+    /// draws transparent surfaces; their radiance (as the raster
+    /// radiance) too.
+    void PrepareTransparency(VkCommandBuffer commands);
+
+    /// The transparent pass's attachments, after
+    /// `PrepareTransparency`.
+    RenderingTarget TransparentTarget() const;
+
+    /// Records the transitions that let compute passes read the
+    /// transparent G-buffer and depth and write their radiance.
+    void PrepareTransparentCompute(VkCommandBuffer commands);
+
+    GpuImage& TransparentGBuffer(std::size_t index) {
+        return *transparentGBuffer_.at(index);
+    }
+
+    GpuImage& TransparentDepth() {
+        return *transparentDepth_;
+    }
+
+    /// The transparent surfaces' own radiance, then, composited over
+    /// what lies behind them, what the raster radiance takes there.
+    GpuImage& TransparentRadiance() {
+        return *transparentRadiance_;
+    }
+
     GpuImage& GBuffer(std::size_t index) {
         return *gbuffer_.at(index);
     }
@@ -305,6 +335,11 @@ class RenderTargets : public FrameImages {
     bool shared_;
     std::array<std::unique_ptr<GpuImage>, 4> gbuffer_;
     bool tangents_ = false;  ///< See `SetTangents`.
+    /// See `PrepareTransparency`; null until a frame draws
+    /// transparent surfaces.
+    std::array<std::unique_ptr<GpuImage>, 4> transparentGBuffer_;
+    std::unique_ptr<GpuImage> transparentDepth_;
+    std::unique_ptr<GpuImage> transparentRadiance_;
     std::unique_ptr<GpuImage> depth_;
     std::unique_ptr<GpuImage> rasterRadiance_;
     std::unique_ptr<GpuImage> mediaTemperature_;

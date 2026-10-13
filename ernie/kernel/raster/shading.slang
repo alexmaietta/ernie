@@ -214,6 +214,9 @@ struct MaterialGpu {
     float2 surface;
     // Its features and parameters past the core ones (`BrdfParams::extended`), null for none.
     float* extended;
+    // x: its opacity, below 1 a transparent surface's share of what reaches the eye
+    // (`transmitMain`); yzw unused.
+    float4 transparency;
 }
 
 struct ShadingConstants {
@@ -235,7 +238,9 @@ struct ShadingConstants {
     // The heights above the ground the horizon map's levels see from, in height units.
     float4 horizonLevels;
     // x: the G-buffer's tangents' heap slot (`heapTextureArrays`, gbuffer.slang's `packTangent`),
-    // 0 without them.
+    // 0 without them; y: 1 when the G-buffer is the transparent surfaces' (which no dome occlusion
+    // was found for); z and w: `transmitMain`'s heap slots of the raster radiance and the opaque
+    // depth, or `transmitCopyMain`'s of the transparent radiance.
     uint4 gbuffer;
 }
 
@@ -2890,7 +2895,7 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
     // the diffuse dome is looked up towards the bent normal, as far as the sky is hidden
     // (Unreal's sky lighting with distance field AO).
     let domeLit = !unlit && (sh.sky.x & kSkyLighting) != 0;
-    let shadowed = domeLit && sh.domeLighting.x > 0.0;
+    let shadowed = domeLit && sh.domeLighting.x > 0.0 && pass.gbuffer.y == 0;
     let occlusionState = shadowed ? occlusionFiltered[id] : float4(n, 1.0);
     let occlusion = occlusionState.w;
     let lookup = normalize(lerp(occlusionState.xyz, n, occlusion) + 1e-6 * n);
@@ -3202,6 +3207,138 @@ void shadeMain(uint3 id : SV_DispatchThreadID) {
         }
     }
     addAirLight(id, ndc.xy, world, true);
+}
+
+// Transparent surfaces over what lies behind them, for the dispatch's model: run over the
+// transparent G-buffer (`RenderTargets::PrepareTransparency`) after shading stored the surfaces'
+// own radiance in `spectral`, it stores there, per band, the surface's share by its opacity
+// alpha and what comes through it from the raster radiance (heap slot `pass.gbuffer.z`):
+//
+//   L = alpha L_surface + (1 - alpha + alpha T) L_behind,
+//
+// T the model's transmission (`IBrdf::transmission`). Through a solid body L_behind is read where
+// the view ray, bent at its surface by Snell's law, reaches the depth of the opaque surface
+// behind it (the opaque depth, heap slot `pass.gbuffer.w`): a screen-space refraction of the
+// one surface the G-buffer holds, which the body's far side does not bend back; through a
+// thin-walled one, or past the image's edge or something nearer than the surface, straight
+// behind. Polarization's Stokes Q and U keep what is behind.
+//
+// References:
+// - S. Sousa, "Generic Refraction Simulation", GPU Gems 2, ch. 19, 2005 (screen-space
+//   refraction by offsetting the lookup of the scene behind).
+// - C. Wyman, "An Approximate Image-Space Approach for Interactive Refraction", SIGGRAPH 2005.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void transmitMain(uint3 id: SV_DispatchThreadID) {
+    shadedView = pass.model.y + id.z;
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    let pixel = int4(id.xyz, 0);
+    let ids = gIds.Load(pixel);
+    if (ids.x == kBackground) {
+        return;
+    }
+    let material = materials[ids.x];
+    if (material.info.x != pass.model.x) {
+        return;
+    }
+    let ndc = float3((float(id.x) + 0.5) / float(sh.size.x) * 2.0 - 1.0,
+                     1.0 - (float(id.y) + 0.5) / float(sh.size.y) * 2.0, gDepth.Load(pixel));
+    let world = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, ndc.z);
+    let v = viewVector(ndc.xy, world);
+    let n = facingNormal(unpackNormal(gNormal.Load(pixel)), v);
+    let encodedSigma = float(ids.w >> 16) / 65535.0;
+    let sigma = encodedSigma / (1.0 - encodedSigma);
+    BrdfParams params;
+    params.values = material.params;
+    params.extended = material.extended;
+    if (material.info.y != 0) {
+        let index = material.info.y - 1;
+        params.values[index / 4][index % 4] = float((ids.w >> 8) & 0xFFu) / 255.0;
+    }
+    float4 spectra[kBrdfColours];
+    colourSpectra(params, spectra);
+    let tangent = pixelTangent(pixel);
+    ActiveBrdf model;
+    let alpha = saturate(material.transparency.x);
+    let probe = model.transmission(
+        bandInputOf(n, v, v, float3(1.0), sigma * sigma, neutralBands(tangent)), params);
+
+    // Where what shows through lies: the opaque surface behind, reached along the bent ray.
+    let radiance = heapTextureArrays[pass.gbuffer.z];
+    let opaqueDepth = heapTextureArrays[pass.gbuffer.w];
+    var behind = pixel;
+    let depthBehind = opaqueDepth.Load(pixel).x;
+    // (Not onto the sky, cleared to depth 0, which has no depth to reach.)
+    if (!probe.thinWalled && probe.ior != 1.0 && depthBehind > 0.0 && depthBehind < ndc.z) {
+        let straight = cameraPoint(shv.invViewProj, shv.strip, ndc.xy, depthBehind);
+        let reach = length(straight - world);
+        let bent = refract(-v, n, 1.0 / max(probe.ior, 1e-3));
+        if (dot(bent, bent) > 0.0 && reach > 0.0) {
+            let lands = world + bent * reach;
+            // The screen's axes at that depth, a pixel's step along each.
+            let step = 2.0 / float2(sh.size.xy);
+            let across = cameraPoint(shv.invViewProj, shv.strip, ndc.xy + float2(step.x, 0.0),
+                                     depthBehind) - straight;
+            let down = cameraPoint(shv.invViewProj, shv.strip, ndc.xy + float2(0.0, step.y),
+                                   depthBehind) - straight;
+            let offset = lands - straight;
+            let pixels = float2(dot(offset, across) / max(dot(across, across), 1e-20),
+                                -dot(offset, down) / max(dot(down, down), 1e-20));
+            let at = int2(round(float2(id.xy) + pixels));
+            // Not past the image, nor onto something in front of the surface.
+            if (all(at >= 0) && all(at < int2(sh.size.xy)) &&
+                opaqueDepth.Load(int4(at, id.z, 0)).x < ndc.z) {
+                behind = int4(at, id.z, 0);
+            }
+        }
+    }
+
+    let bands = uint(sh.range.z);
+    for (uint first = 0; first < bands; first += 3) {
+        var context = neutralBands(tangent);
+        for (uint k = 0; k < 3; ++k) {
+            let band = min(first + k, bands - 1);
+            let wavelength = sh.range.x + (float(band) + 0.5) * sh.range.y;
+            context.wavelengths[k] = wavelength;
+            for (uint c = 0; c < kBrdfColourCount && c < kBrdfColours; ++c) {
+                if (spectra[c].w >= 0.0) {
+                    context.colours[c][k] = modulationAt(spectra[c].xyz, spectra[c].w, wavelength);
+                }
+            }
+        }
+        let through =
+            model.transmission(bandInputOf(n, v, v, float3(1.0), sigma * sigma, context), params);
+        for (uint k = 0; k < 3 && first + k < bands; ++k) {
+            let layer = id.z * bands + first + k;
+            let surface = spectral[int3(id.xy, layer)];
+            let back = radiance.Load(int4(behind.xy, layer, 0)).x;
+            spectral[int3(id.xy, layer)] =
+                alpha * surface + (1.0 - alpha + alpha * max(through.factor[k], 0.0)) * back;
+        }
+    }
+}
+
+// The transparent surfaces' composited radiance (heap slot `pass.gbuffer.z`) into `spectral`,
+// the raster radiance, where the transparent G-buffer holds one: after `transmitMain` has read
+// every pixel's surroundings.
+[shader("compute")]
+[numthreads(8, 8, 1)]
+void transmitCopyMain(uint3 id: SV_DispatchThreadID) {
+    if (id.x >= sh.size.x || id.y >= sh.size.y) {
+        return;
+    }
+    let pixel = int4(id.xyz, 0);
+    if (gIds.Load(pixel).x == kBackground) {
+        return;
+    }
+    let composited = heapTextureArrays[pass.gbuffer.z];
+    let bands = uint(sh.range.z);
+    for (uint band = 0; band < bands; ++band) {
+        let layer = id.z * bands + band;
+        spectral[int3(id.xy, layer)] = composited.Load(int4(id.xy, layer, 0)).x;
+    }
 }
 
 // The bands per-band arrays hold: the frame's band count rounded up to a power of two

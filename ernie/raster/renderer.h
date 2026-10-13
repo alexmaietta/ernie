@@ -175,6 +175,16 @@ class RasterRenderer {
         return tangents_;
     }
 
+    /// Whether material `id` is transparent: partly opaque (a
+    /// constant opacity below 1, without a cutout threshold) or
+    /// letting light through (`BrdfRegistry::kTransmissionFeature`).
+    /// Drawables draw such surfaces in `DrawPhase::Transparent`, over
+    /// the opaque ones.
+    bool TransparentMaterial(std::uint32_t id) const {
+        return id < transparentMaterials_.size() &&
+               transparentMaterials_[id];
+    }
+
     const BrdfRegistry& Brdfs() const {
         return brdfs_;
     }
@@ -797,6 +807,9 @@ class RasterRenderer {
     const ComputePipeline& TemperaturePipeline(bool pushbroom);
     const ComputePipeline& ShadingPipeline(std::size_t model,
                                            bool pushbroom = false);
+    /// `transmitMain` for `model`, and `transmitCopyMain`, as
+    /// `ShadingPipeline` compiles shading.
+    void TransmitPipelines(std::size_t model, bool pushbroom);
     /// Sensor.slang's entry point `entry`, which reads only its lens,
     /// for lens kernel source `lens` (`SensorPlan::LensSource`) in
     /// `layout`, compiled when first wanted.
@@ -866,9 +879,16 @@ class RasterRenderer {
                      std::uint32_t subframe) const;
     /// Spectral shading and the sky of `targets`' views into their
     /// raster radiance, with the uniforms of view `firstView` on (a
-    /// sub-frame's).
+    /// sub-frame's); with `transparent`, the transparent surfaces'
+    /// G-buffer into their own radiance too.
     void Shade(VkCommandBuffer commands, RenderTargets& targets,
-               std::uint32_t firstView) const;
+               std::uint32_t firstView,
+               bool transparent = false) const;
+    /// The transparent surfaces over what lies behind them in the
+    /// raster radiance (shading.slang's `transmitMain`), after
+    /// `Shade` and the volumes.
+    void Transmit(VkCommandBuffer commands, RenderTargets& targets,
+                  std::uint32_t firstView) const;
     /// Records shading's resources (shading.slang's ShadingResources)
     /// into `shadingResources_`: its buffers' addresses and its
     /// textures in fresh slots of the bindless heap.
@@ -1402,6 +1422,22 @@ class RasterRenderer {
     /// (`BrdfRegistry::kTangentsFeature`), for the G-buffer to hold
     /// them.
     bool tangents_ = false;
+    /// Per material id, `TransparentMaterial`.
+    std::vector<bool> transparentMaterials_;
+    /// Per model, shading variant and features, the transparent
+    /// surfaces' compositing (shading.slang's `transmitMain`); and
+    /// the copy of their result into the raster radiance
+    /// (`transmitCopyMain`).
+    std::map<
+        std::tuple<std::size_t, bool, std::uint32_t, std::uint32_t>,
+        std::unique_ptr<ComputePipeline>>
+        transmitPipelines_;
+    std::map<std::pair<bool, std::uint32_t>,
+             std::unique_ptr<ComputePipeline>>
+        transmitCopyPipelines_;
+    /// Whether some material is transparent, for `Update` to make
+    /// those pipelines.
+    bool anyTransparent_ = false;
     /// Models' parameters past `BrdfRegistry::kCoreParams`, each
     /// material's after its features (`BrdfParams::extended`).
     std::unique_ptr<GpuBuffer> brdfExtended_;

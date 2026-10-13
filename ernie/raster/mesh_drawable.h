@@ -729,6 +729,9 @@ class MeshDrawable : public RasterDrawable {
                      std::span<const RasterFrame> frames,
                      std::size_t first,
                      DrawPhase phase = DrawPhase::All) const override;
+    bool DrawsTransparent() const override {
+        return drawsTransparent_;
+    }
 
     /// Draws again what view `view` drew of the draws that moved
     /// since the last frame (their transforms, instance arrays or
@@ -1065,14 +1068,14 @@ class MeshDrawable : public RasterDrawable {
     };
     /// With `state`, starts from what it says is bound and leaves it
     /// as bound after.
-    std::size_t Record(VkCommandBuffer commands,
-                       const RasterFrame& frame,
-                       std::span<const VisibleRange> ranges,
-                       const glm::mat4& light,
-                       const ShadowCasters* casters, bool shadow,
-                       bool direct, int culledSet,
-                       const DescriptorResource* motion = nullptr,
-                       RecordState* state = nullptr) const;
+    std::size_t
+    Record(VkCommandBuffer commands, const RasterFrame& frame,
+           std::span<const VisibleRange> ranges,
+           const glm::mat4& light, const ShadowCasters* casters,
+           bool shadow, bool direct, int culledSet,
+           const DescriptorResource* motion = nullptr,
+           RecordState* state = nullptr,
+           std::optional<bool> transparent = std::nullopt) const;
     /// `RecordColor`, from and into `state`.
     void RecordColorState(VkCommandBuffer commands,
                           const RasterFrame& frame, std::size_t view,
@@ -1116,6 +1119,12 @@ class MeshDrawable : public RasterDrawable {
 
     /// Whether item `item`'s material cuts out part of it.
     bool Cutout(std::size_t item) const;
+    /// Whether item `item`'s material is transparent
+    /// (`RasterRenderer::TransparentMaterial`).
+    bool Transparent(std::size_t item) const;
+    /// Whether the last `Prepare` found transparent items to draw in
+    /// their own phase: shaded, not minimal.
+    bool drawsTransparent_ = false;
     /// The levels of detail GPU culling picks among for item `item`:
     /// its mesh's for an instancer's draws, the full mesh alone for a
     /// draw of its own.

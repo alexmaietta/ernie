@@ -2134,6 +2134,78 @@ TEST_F(RasterDelegateTest,
 }
 
 TEST_F(RasterDelegateTest,
+       TransparentSurfacesShowWhatLiesBehindThem) {
+    // A pane over FlatScene's lit floor, seen from straight above: a
+    // clear thin-walled one lets the floor through but the little it
+    // reflects at normal incidence; a red one, the floor's red; a
+    // half-opaque white plate, half its own light and half the
+    // floor's. The sun is off the mirror direction, which a smooth
+    // pane would reflect into the camera.
+    Scene scene = FlatScene();
+    scene.Set("/World/Sun", tokens::kTransform,
+              ernie::DistantLightTransform({0.5, 0.0, 0.866}));
+    DefineQuad(scene, "/World/Pane", 30.0f);
+    scene.Set(
+        "/World/Pane", tokens::kTransform,
+        glm::translate(glm::dmat4(1.0), glm::dvec3(0.0, 0.0, 5.0)));
+    ernie::Mesh(scene, "/World/Pane")
+        .SetMaterialBinding("/Looks/Pane");
+    ernie::Material pane =
+        ernie::Material::Define(scene, "/Looks/Pane");
+    pane.SetAlbedo(glm::dvec3(0.8));
+    RasterDelegate delegate(*context_);
+    const std::size_t c = kVarSize / 2;
+    const auto centre = [&] {
+        ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
+        const auto vars = MapVars(outputs);
+        return glm::vec3(At<float>(vars.at("HdrColor"), c, c, 0),
+                         At<float>(vars.at("HdrColor"), c, c, 1),
+                         At<float>(vars.at("HdrColor"), c, c, 2));
+    };
+    const glm::vec3 plate = centre();
+    scene.Set("/World/Pane", tokens::kVisibility,
+              std::string(tokens::kInvisible));
+    const glm::vec3 floor = centre();
+    scene.Set("/World/Pane", tokens::kVisibility,
+              std::string(tokens::kInherited));
+    ASSERT_GT(floor.g, 0.05f);
+    ASSERT_GT(plate.g, floor.g)
+        << "the plate is lighter than the floor";
+
+    pane.SetBrdf("open_pbr");
+    scene.Set("/Looks/Pane", "inputs:transmission_weight", 1.0);
+    scene.Set("/Looks/Pane", "inputs:geometry_thin_walled", 1.0);
+    scene.Set("/Looks/Pane", "inputs:specular_roughness", 0.0);
+    const glm::vec3 clear = centre();
+    EXPECT_NEAR(clear.g / floor.g, 1.0f, 0.1f) << "clear glass";
+    scene.Set("/Looks/Pane", "inputs:transmission_color",
+              glm::dvec3(1.0, 0.05, 0.05));
+    const glm::vec3 red = centre();
+    EXPECT_LT(red.g, 0.3f * floor.g);
+    EXPECT_GT(red.r, 0.5f * floor.r) << "red glass";
+
+    // A UsdPreviewSurface of the plate's colour, half opaque.
+    scene.Remove("/Looks/Pane");
+    ernie::Material::Define(scene, "/Looks/Pane");
+    ernie::Shader::Define(scene, "/Looks/Pane/Surface")
+        .SetInfoId(tokens::kUsdPreviewSurface)
+        .SetDiffuseColor(glm::dvec3(0.8))
+        .SetOpacity(0.5);
+    ernie::Connect(scene, "/Looks/Pane", tokens::kSurfaceOutput,
+                   "/Looks/Pane/Surface", tokens::kSurfaceOutput);
+    const glm::vec3 opaque = [&] {
+        ernie::Shader(scene, "/Looks/Pane/Surface").SetOpacity(1.0);
+        const glm::vec3 lit = centre();
+        ernie::Shader(scene, "/Looks/Pane/Surface").SetOpacity(0.5);
+        return lit;
+    }();
+    const glm::vec3 half = centre();
+    EXPECT_NEAR(half.g, 0.5f * (opaque.g + floor.g),
+                0.1f * (opaque.g + floor.g))
+        << "half opaque";
+}
+
+TEST_F(RasterDelegateTest,
        TheDirectionsModeShadowsTheDomeFromTheWholeScene) {
     // FlatScene's floor and a 6 m cube under a uniform dome. In the
     // directions mode the dome's diffuse light comes from 16 shadowed
