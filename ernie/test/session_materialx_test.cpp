@@ -65,14 +65,18 @@ std::string Fixture(const char* name) {
             std::istreambuf_iterator<char>()};
 }
 
-/// Compiles `shader`'s code under the stub bridge
-/// (fixtures/materialx), as the shading pass will its own.
+/// Compiles `shader`'s module and, importing it, the stub bridge
+/// (fixtures/materialx) with an entry point calling it, as the
+/// shading pass will its own.
 /// @throws std::invalid_argument with Slang's diagnostics.
 void Compile(const ShaderCompiler& compiler,
              const MaterialXShader& shader, const std::string& name) {
+    const std::string module = "mx_" + name;
     const std::vector<ShaderModuleSource> modules{
-        {name, Fixture("stub_bridge.slang") + shader.code +
-                   Fixture("stub_main.slang")}};
+        {module, shader.code},
+        {"stub_" + name, "import " + module + ";\n" +
+                             Fixture("stub_bridge.slang") +
+                             Fixture("stub_main.slang")}};
     compiler.CompileSpirv(modules, "stubMain");
 }
 
