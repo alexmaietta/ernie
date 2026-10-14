@@ -206,6 +206,11 @@
                               .doc = "Farthest the cascades reach (m); 0 for as far as the view "  \
                                      "sees.",                                                      \
                               .group = "Shadows", .max = 1e7}))                                    \
+    X(bool, ShadowHorizons, ::ernie::tokens::kShadowHorizons, true,                                \
+      (::ernie::AttributeMeta{.label = "Terrain horizons",                                         \
+                              .doc = "Terrains' horizon maps shadow them towards each distant "    \
+                                     "light where its cascades grow coarse, at any distance.",     \
+                              .group = "Shadows"}))                                                \
     X(bool, ShadowShowCascades, ::ernie::tokens::kShadowShowCascades, false,                       \
       (::ernie::AttributeMeta{.label = "Show cascades", .group = "Shadows"}))                      \
     X(std::string, ShadowWorlds, ::ernie::tokens::kShadowWorlds, ::ernie::tokens::kSeparate,       \

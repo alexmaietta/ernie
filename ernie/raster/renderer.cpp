@@ -3246,6 +3246,7 @@ void RasterRenderer::WriteLights(
         const LightParams& light = params.lights[i];
         if (light.type == LightType::Distant && light.shadows &&
             !light.domeDiffuse && params.shadows.enabled &&
+            params.shadows.horizons &&
             glm::length(light.direction) > 0.0f) {
             horizonLights_.push_back({glm::normalize(light.direction),
                                       light.lightMask,

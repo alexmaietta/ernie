@@ -1570,6 +1570,11 @@ inline constexpr std::string_view kShadowSplitExponent =
 /// shadowed; 0, the default, for as far as the view sees.
 inline constexpr std::string_view kShadowDistance =
     "ernie:shadows:distance";
+/// bool: whether Terrains' horizon maps shadow them towards each
+/// distant light where its cascades grow coarse, at any distance;
+/// default true.
+inline constexpr std::string_view kShadowHorizons =
+    "ernie:shadows:horizons";
 inline constexpr std::string_view kShadowShowCascades =
     "ernie:shadows:showCascades";
 inline constexpr std::string_view kLodEnable = "ernie:lod:enable";

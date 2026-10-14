@@ -101,6 +101,9 @@ struct ShadowSettings {
     /// The farthest a single view's cascades reach (m), nothing past
     /// it shadowed; 0 for as far as the view sees.
     float distance = 0.0f;
+    /// Whether Terrains' horizon maps shadow them towards each
+    /// distant light where its cascades grow coarse.
+    bool horizons = true;
     bool showCascades =
         false;  ///< Tint fragments by cascade, for tuning.
     std::uint32_t lightResolution =
