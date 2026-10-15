@@ -463,21 +463,10 @@ VolumeMaterialGpu MaterialOf(const VolumeMaterialParams& params,
     return material;
 }
 
-std::unique_ptr<GpuBuffer> Grow(const VulkanContext& context,
-                                std::unique_ptr<GpuBuffer> buffer,
-                                VkDeviceSize bytes) {
-    if (buffer == nullptr || buffer->Size() < bytes) {
-        if (buffer != nullptr) {
-            vkDeviceWaitIdle(context.Device());
-        }
-        buffer = std::make_unique<GpuBuffer>(
-            context, std::max<VkDeviceSize>(bytes, 16),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            BufferMemory::Device);
-    }
-    return buffer;
-}
+/// Usage of buffers that shaders read and copies fill.
+constexpr VkBufferUsageFlags kStorageCopyUsage =
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 // volume.slang's modules, with the light patterns as shading takes
 // them (`lightPattern`), for lasers' beams in the medium, for a
@@ -528,7 +517,7 @@ VolumePass::VolumePass(const VulkanContext& context,
       cacheLayout_(context, kCacheBindings),
       changeLayout_(context, kChangeBindings,
                     sizeof(VolumeConstants)) {
-    pool_ = Grow(context_, nullptr, kGridAlignment);
+    Reserve(context_, pool_, kGridAlignment, kStorageCopyUsage);
     resources_ = std::make_unique<GpuBuffer>(
         context_, sizeof(VolumeResources),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, BufferMemory::Device);
@@ -941,15 +930,8 @@ void VolumePass::PrepareDropletTables(
     if (!added) {
         return;
     }
-    const VkDeviceSize bytes = dropletValues_.size() * sizeof(float);
-    if (dropletTables_ == nullptr || dropletTables_->Size() < bytes) {
-        if (dropletTables_ != nullptr) {
-            vkDeviceWaitIdle(context_.Device());
-        }
-        dropletTables_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    Reserve(context_, dropletTables_,
+            dropletValues_.size() * sizeof(float));
     uploads.Write(*dropletTables_,
                   std::as_bytes(std::span(dropletValues_)));
     hostChanged_ |= 3 | kHostDiscrete;
@@ -1019,14 +1001,8 @@ void VolumePass::PlanDistanceGrids() {
         loaded.distanceStale = false;
     }
     // Two passes' words, each read by the next.
-    if (scratch > 0 && (distanceScratch_ == nullptr ||
-                        distanceScratch_->Size() < 8 * scratch)) {
-        if (distanceScratch_ != nullptr) {
-            vkDeviceWaitIdle(context_.Device());
-        }
-        distanceScratch_ = std::make_unique<GpuBuffer>(
-            context_, 8 * scratch, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
+    if (scratch > 0) {
+        Reserve(context_, distanceScratch_, 8 * scratch);
     }
 }
 
@@ -1432,7 +1408,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     const auto upload = [&](std::unique_ptr<GpuBuffer>& buffer,
                             std::span<const std::byte> bytes) {
         ERNIE_ZONE("Volume upload");
-        buffer = Grow(context_, std::move(buffer), bytes.size());
+        Reserve(context_, buffer, bytes.size(), kStorageCopyUsage);
         uploads.Write(*buffer, bytes);
     };
     upload(volumes_, std::as_bytes(std::span(instances)));
@@ -1474,15 +1450,8 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
             uploads.Write(*cloudNoise_,
                           std::as_bytes(std::span(all)));
         }
-        const VkDeviceSize bytes =
-            cloudBlocks.size() * sizeof(cloudBlocks[0]);
-        if (cloudLayers_ == nullptr || cloudLayers_->Size() < bytes) {
-            if (cloudLayers_ != nullptr) {
-                vkDeviceWaitIdle(context_.Device());
-            }
-            cloudLayers_ = std::make_unique<GpuBuffer>(
-                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
+        if (Reserve(context_, cloudLayers_,
+                    cloudBlocks.size() * sizeof(cloudBlocks[0]))) {
             cloudBlocks_.clear();
         }
         // Built again only when they change.
@@ -1649,14 +1618,7 @@ void VolumePass::Prepare(
     const std::uint32_t slots =
         lightCount + (settings_.skyLightSteps > 0 ? 2 : 0);
     if (cacheCells_ > 0) {
-        const VkDeviceSize bytes = 4 * cacheCells_ * slots;
-        if (cache_ == nullptr || cache_->Size() < bytes) {
-            if (cache_ != nullptr) {
-                vkDeviceWaitIdle(context_.Device());
-            }
-            cache_ = std::make_unique<GpuBuffer>(
-                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
+        if (Reserve(context_, cache_, 4 * cacheCells_ * slots)) {
             hostChanged_ |= 1;
         }
         resources.lightCache = cache_->Address();
@@ -1695,13 +1657,7 @@ void VolumePass::Prepare(
         lightCount * VkDeviceSize{LightParams::kProfileRows} *
             LightParams::kProfileColumns * sizeof(float) +
         timing.Size();
-    if (previous_ == nullptr || previous_->Size() < compared) {
-        if (previous_ != nullptr) {
-            vkDeviceWaitIdle(context_.Device());
-        }
-        previous_ = std::make_unique<GpuBuffer>(
-            context_, std::max<VkDeviceSize>(compared, 16),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
+    if (Reserve(context_, previous_, compared)) {
         hostChanged_ |= 3 | kHostDiscrete;
     }
     resources.previous = previous_->Address();
@@ -1726,15 +1682,8 @@ void VolumePass::Prepare(
     resources.cloudLayers =
         cloudLayers_ != nullptr ? cloudLayers_->Address() : 0;
     if (cloudShadowTexels_ > 0) {
-        const VkDeviceSize bytes = 16 * cloudShadowTexels_;
-        if (cloudShadows_ == nullptr ||
-            cloudShadows_->Size() < bytes) {
-            if (cloudShadows_ != nullptr) {
-                vkDeviceWaitIdle(context_.Device());
-            }
-            cloudShadows_ = std::make_unique<GpuBuffer>(
-                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
+        if (Reserve(context_, cloudShadows_,
+                    16 * cloudShadowTexels_)) {
             hostChanged_ |= 1;
         }
         resources.cloudShadows = cloudShadows_->Address();
@@ -1742,14 +1691,7 @@ void VolumePass::Prepare(
     // Cloud droplets' collectors: their light maps, built again with
     // the caches, and the transport table once ready.
     if (lightMapTexels_ > 0) {
-        const VkDeviceSize bytes = 16 * lightMapTexels_;
-        if (lightMaps_ == nullptr || lightMaps_->Size() < bytes) {
-            if (lightMaps_ != nullptr) {
-                vkDeviceWaitIdle(context_.Device());
-            }
-            lightMaps_ = std::make_unique<GpuBuffer>(
-                context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
+        if (Reserve(context_, lightMaps_, 16 * lightMapTexels_)) {
             hostChanged_ |= 1;
         }
         resources.lightMaps = lightMaps_->Address();

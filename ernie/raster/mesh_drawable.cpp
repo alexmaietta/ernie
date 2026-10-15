@@ -377,22 +377,6 @@ constexpr std::uint32_t kCullNoInstances = 8;
 /// kept.
 constexpr std::uint32_t kCullVisibility = 16;
 
-/// Grows `buffer` to hold `bytes`, waiting for the device first if it
-/// replaces one in use.
-void Reserve(const VulkanContext& context,
-             std::unique_ptr<GpuBuffer>& buffer, VkDeviceSize bytes,
-             VkBufferUsageFlags usage, BufferMemory memory) {
-    bytes = std::max<VkDeviceSize>(bytes, 16);
-    if (buffer != nullptr && buffer->Size() >= bytes) {
-        return;
-    }
-    if (buffer != nullptr) {
-        vkDeviceWaitIdle(context.Device());
-    }
-    buffer =
-        std::make_unique<GpuBuffer>(context, bytes, usage, memory);
-}
-
 /// Frame (0 and 1), material (5) and mesh (10, its buffers'
 /// addresses; 22 to 26, its material's textures) bindings; see
 /// mesh.slang.

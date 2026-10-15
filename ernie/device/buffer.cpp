@@ -3,6 +3,7 @@
 
 #include "ernie/device/memory_stats.h"
 
+#include <algorithm>
 #include <bit>
 #include <cstring>
 #include <stdexcept>
@@ -266,6 +267,21 @@ void GpuBuffer::Read(std::span<std::byte> bytes,
                         &region);
     });
     staging.Read(bytes);
+}
+
+bool Reserve(const VulkanContext& context,
+             std::unique_ptr<GpuBuffer>& buffer, VkDeviceSize bytes,
+             VkBufferUsageFlags usage, BufferMemory memory) {
+    bytes = std::max<VkDeviceSize>(bytes, 16);
+    if (buffer != nullptr && buffer->Size() >= bytes) {
+        return false;
+    }
+    if (buffer != nullptr) {
+        context.WaitIdle();
+    }
+    buffer =
+        std::make_unique<GpuBuffer>(context, bytes, usage, memory);
+    return true;
 }
 
 }  // namespace ernie

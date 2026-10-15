@@ -117,4 +117,20 @@ class GpuBuffer {
     BufferMemory memory_ = BufferMemory::Device;
 };
 
+/// @brief Grows `buffer` so it holds at least `bytes`.
+/// @param context The device the buffer lives on.
+/// @param buffer  The buffer to keep or replace; may be null.
+/// @param bytes   The size needed (at least 16 bytes are allocated).
+/// @param usage   Usage flags for a new buffer.
+/// @param memory  Memory kind for a new buffer.
+/// @return True when a new buffer replaced the old one, so its
+///         address changed and its contents are undefined.
+/// @note Waits for the device before replacing a buffer, since
+///       submitted work may still read the old one.
+bool Reserve(
+    const VulkanContext& context, std::unique_ptr<GpuBuffer>& buffer,
+    VkDeviceSize bytes,
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    BufferMemory memory = BufferMemory::Device);
+
 }  // namespace ernie

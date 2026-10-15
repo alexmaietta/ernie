@@ -732,30 +732,15 @@ void PointsDrawable::Prepare(
         draw.thermal[0] =
             params.thermal.enable ? item.temperature : 0.0f;
     }
-    const VkDeviceSize bytes = std::max<VkDeviceSize>(
-        draws.size() * sizeof(GpuPointsDraw), 16);
-    if (draws_->Size() < bytes) {
-        vkDeviceWaitIdle(context_.Device());
-        draws_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    Reserve(context_, draws_, draws.size() * sizeof(GpuPointsDraw));
     if (!draws.empty()) {
         renderer_.Uploads().Write(*draws_,
                                   std::as_bytes(std::span(draws)));
     }
     anchored_ = static_cast<std::uint32_t>(records.size() / 9);
     if (anchored_ > 0) {
-        const VkDeviceSize recordBytes =
-            records.size() * sizeof(glm::vec4);
-        if (anchorRecords_ == nullptr ||
-            anchorRecords_->Size() < recordBytes) {
-            vkDeviceWaitIdle(context_.Device());
-            anchorRecords_ = std::make_unique<GpuBuffer>(
-                context_, recordBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
+        Reserve(context_, anchorRecords_,
+                records.size() * sizeof(glm::vec4));
         renderer_.Uploads().Write(*anchorRecords_,
                                   std::as_bytes(std::span(records)));
     }
@@ -842,27 +827,13 @@ void PointsDrawable::Prepare(
     // counted up by the culling.
     std::vector<VkDrawIndirectCommand> commands(jobs_.size(),
                                                 {6, 0, 0, 0});
-    const auto reserve = [&](std::unique_ptr<GpuBuffer>& buffer,
-                             VkDeviceSize wanted,
-                             VkBufferUsageFlags usage) {
-        wanted = std::max<VkDeviceSize>(wanted, 16);
-        if (buffer == nullptr || buffer->Size() < wanted) {
-            if (buffer != nullptr) {
-                vkDeviceWaitIdle(context_.Device());
-            }
-            buffer = std::make_unique<GpuBuffer>(
-                context_, wanted, usage, BufferMemory::Device);
-        }
-    };
-    reserve(cullJobs_, jobs_.size() * sizeof(glm::uvec4),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    reserve(cullCommands_,
+    Reserve(context_, cullJobs_, jobs_.size() * sizeof(glm::uvec4));
+    Reserve(context_, cullCommands_,
             commands.size() * sizeof(VkDrawIndirectCommand),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
-    reserve(visibleChunks_,
-            VkDeviceSize{visible} * sizeof(std::uint32_t),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    Reserve(context_, visibleChunks_,
+            VkDeviceSize{visible} * sizeof(std::uint32_t));
     renderer_.Uploads().Write(*cullJobs_,
                               std::as_bytes(std::span(jobs_)));
     renderer_.Uploads().Write(*cullCommands_,

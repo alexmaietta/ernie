@@ -2278,13 +2278,8 @@ void RasterRenderer::WriteLightTiming(const FrameParams& frame,
     if (!timed) {
         return;
     }
-    const VkDeviceSize bytes = timing.size() * sizeof(glm::vec2);
-    if (lightTiming_->Size() < bytes) {
-        vkDeviceWaitIdle(context_.Device());
-        lightTiming_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    Reserve(context_, lightTiming_,
+            timing.size() * sizeof(glm::vec2));
     uploads_.Write(*lightTiming_, std::as_bytes(std::span(timing)));
 }
 
@@ -3320,16 +3315,8 @@ void RasterRenderer::WriteLights(
         }
     }
     if (!matrices.empty()) {
-        const VkDeviceSize matrixBytes =
-            matrices.size() * sizeof(glm::mat4);
-        if (lightViewMatrices_->Size() < matrixBytes) {
-            // Grown only once no frame still reads it.
-            vkDeviceWaitIdle(context_.Device());
-            lightViewMatrices_ = std::make_unique<GpuBuffer>(
-                context_, matrixBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
+        Reserve(context_, lightViewMatrices_,
+                matrices.size() * sizeof(glm::mat4));
         uploads_.Write(*lightViewMatrices_,
                        std::as_bytes(std::span(matrices)));
         if (!blocks.empty()) {
@@ -4774,16 +4761,8 @@ void RasterRenderer::WriteMaterialTable() {
                     });
     if (temperatureModelsInUse_) {
         temperatureData.push_back(0.0f);  // never empty
-        const VkDeviceSize dataBytes =
-            temperatureData.size() * sizeof(float);
-        if (temperatureData_ == nullptr ||
-            temperatureData_->Size() < dataBytes) {
-            vkDeviceWaitIdle(context_.Device());
-            temperatureData_ = std::make_unique<GpuBuffer>(
-                context_, dataBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
+        Reserve(context_, temperatureData_,
+                temperatureData.size() * sizeof(float));
         uploads_.Write(*temperatureData_,
                        std::as_bytes(std::span(temperatureData)));
         for (TemperatureMaterialGpu& record : temperatureTable) {
@@ -4791,28 +4770,13 @@ void RasterRenderer::WriteMaterialTable() {
                           record.data * sizeof(float);
         }
     }
-    const VkDeviceSize modelBytes =
-        temperatureTable.size() * sizeof(TemperatureMaterialGpu);
-    if (temperatureMaterials_ == nullptr ||
-        temperatureMaterials_->Size() < modelBytes) {
-        vkDeviceWaitIdle(context_.Device());
-        temperatureMaterials_ = std::make_unique<GpuBuffer>(
-            context_, modelBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    Reserve(context_, temperatureMaterials_,
+            temperatureTable.size() * sizeof(TemperatureMaterialGpu));
     uploads_.Write(*temperatureMaterials_,
                    std::as_bytes(std::span(temperatureTable)));
     if (!extended.empty()) {
-        const VkDeviceSize extendedBytes =
-            extended.size() * sizeof(float);
-        if (brdfExtended_ == nullptr ||
-            brdfExtended_->Size() < extendedBytes) {
-            vkDeviceWaitIdle(context_.Device());
-            brdfExtended_ = std::make_unique<GpuBuffer>(
-                context_, extendedBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                BufferMemory::Device);
-        }
+        Reserve(context_, brdfExtended_,
+                extended.size() * sizeof(float));
         uploads_.Write(*brdfExtended_,
                        std::as_bytes(std::span(extended)));
         for (MaterialGpu& entry : table) {
@@ -4826,23 +4790,11 @@ void RasterRenderer::WriteMaterialTable() {
         tangentMaterials_ != wasTangents) {
         ++materialsVersion_;
     }
-    const VkDeviceSize bytes = table.size() * sizeof(MaterialGpu);
-    if (materialTable_ == nullptr || materialTable_->Size() < bytes) {
-        vkDeviceWaitIdle(context_.Device());
-        materialTable_ = std::make_unique<GpuBuffer>(
-            context_, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            BufferMemory::Device);
-    }
+    Reserve(context_, materialTable_,
+            table.size() * sizeof(MaterialGpu));
     uploads_.Write(*materialTable_, std::as_bytes(std::span(table)));
-    const VkDeviceSize temperatureBytes =
-        temperatures.size() * sizeof(float);
-    if (materialTemperatures_ == nullptr ||
-        materialTemperatures_->Size() < temperatureBytes) {
-        vkDeviceWaitIdle(context_.Device());
-        materialTemperatures_ = std::make_unique<GpuBuffer>(
-            context_, temperatureBytes,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-    }
+    Reserve(context_, materialTemperatures_,
+            temperatures.size() * sizeof(float));
     uploads_.Write(*materialTemperatures_,
                    std::as_bytes(std::span(temperatures)));
     // Their display range, at least 10 K wide.
@@ -5382,14 +5334,9 @@ void RasterRenderer::WriteSensor(const FrameParams& params,
 void RasterRenderer::WriteMotion(const FrameParams& params,
                                  const FrameParams& frame) {
     ERNIE_ZONE("Motion uniforms");
-    const VkDeviceSize bytes =
-        VkDeviceSize{views_} * sizeof(MotionUniforms);
-    if (motionUniforms_ == nullptr ||
-        motionUniforms_->Size() < bytes) {
-        vkDeviceWaitIdle(context_.Device());
-        motionUniforms_ = std::make_unique<GpuBuffer>(
-            context_, bytes, kViewUniformUsage, BufferMemory::Device);
-    }
+    Reserve(context_, motionUniforms_,
+            VkDeviceSize{views_} * sizeof(MotionUniforms),
+            kViewUniformUsage);
     if (cameraMotionPipeline_ == nullptr) {
         cameraMotionLayout_ = std::make_unique<PipelineLayout>(
             context_, kCameraMotionBindings, 16);
@@ -7178,16 +7125,8 @@ void RasterRenderer::Shade(VkCommandBuffer commands,
                 VkDeviceSize{extent_.width} * extent_.height *
                 targets.RasterRadiance().Desc().layers *
                 sizeof(float);
-            for (std::unique_ptr<GpuBuffer>* buffer :
-                 {&subsurfaceLight_, &subsurfaceSpread_}) {
-                if (*buffer == nullptr || (*buffer)->Size() < bytes) {
-                    vkDeviceWaitIdle(context_.Device());
-                    *buffer = std::make_unique<GpuBuffer>(
-                        context_, bytes,
-                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                        BufferMemory::Device);
-                }
-            }
+            Reserve(context_, subsurfaceLight_, bytes);
+            Reserve(context_, subsurfaceSpread_, bytes);
         }
         // The surfaces' tangents, where a material reads them.
         std::uint32_t tangentSlot = 0;
@@ -7813,13 +7752,9 @@ void RasterRenderer::SetHighlight(
     if (words.empty()) {
         return;
     }
-    const VkDeviceSize bytes = words.size() * sizeof(std::uint32_t);
-    if (highlight_->Size() < bytes) {
-        vkDeviceWaitIdle(context_.Device());
-        highlight_ = std::make_unique<GpuBuffer>(
-            context_, std::max<VkDeviceSize>(bytes, 256),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, BufferMemory::Device);
-    }
+    Reserve(context_, highlight_,
+            std::max<VkDeviceSize>(
+                words.size() * sizeof(std::uint32_t), 256));
     // Through the frame's uploads, ordered with the frames still
     // reading the buffer.
     uploads_.Write(*highlight_,
