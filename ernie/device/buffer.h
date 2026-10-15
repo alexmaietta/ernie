@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
+/// @file buffer.h
+/// @brief GPU buffers, their memory kinds, and growing them.
 #pragma once
 
 #include "ernie/device/vulkan_context.h"
@@ -10,25 +12,28 @@
 
 namespace ernie {
 
-/// Where a buffer lives and how the host reaches it.
+/// @brief Where a buffer lives and how the host reaches it.
 enum class BufferMemory {
-    Device,  ///< Device-local; `Write` and `Read` go through a
-             ///< staging copy.
-    Upload,  ///< Host-visible, written sequentially by the host each
-             ///< frame.
-    Readback,  ///< Host-visible and cached, for results the host
-               ///< reads.
-    /// Device-local in a dedicated allocation exportable as a POSIX
-    /// file descriptor, for sharing with CUDA
-    /// (`VulkanContext::SupportsExternalMemory`); `Write` and `Read`
-    /// stage.
+    /// Device-local; `Write` and `Read` go through a staging copy.
+    Device,
+    /// Host-visible, written by the host each frame.
+    Upload,
+    /// Host-visible and cached, for results the host reads.
+    Readback,
+    /// Device-local and exportable, for sharing with CUDA.
+    /// @see VulkanContext::SupportsExternalMemory
     Shared,
 };
 
-/// A Vulkan buffer with its memory, allocated through VMA.
+/// @brief A Vulkan buffer with its memory, allocated through VMA.
 class GpuBuffer {
   public:
-    /// @throws std::runtime_error if allocation fails.
+    /// @brief Allocates a buffer.
+    /// @param context The device to allocate on.
+    /// @param size    The size in bytes.
+    /// @param usage   Vulkan usage flags.
+    /// @param memory  Where the memory lives.
+    /// @throws std::runtime_error If allocation fails.
     GpuBuffer(const VulkanContext& context, VkDeviceSize size,
               VkBufferUsageFlags usage, BufferMemory memory);
     ~GpuBuffer();
@@ -37,62 +42,70 @@ class GpuBuffer {
     GpuBuffer(const GpuBuffer&) = delete;
     GpuBuffer& operator=(const GpuBuffer&) = delete;
 
+    /// @return The Vulkan handle.
     VkBuffer Handle() const {
         return buffer_;
     }
 
+    /// @return The size in bytes.
     VkDeviceSize Size() const {
         return size_;
     }
 
-    /// Copies `bytes` to the buffer at `offset`, waiting for the copy
-    /// when staging is needed.
-    /// @throws std::out_of_range if the range does not fit.
+    /// @brief Copies `bytes` into the buffer, waiting for the copy.
+    /// @param bytes  The data to copy.
+    /// @param offset Where in the buffer to start, in bytes.
+    /// @throws std::out_of_range If the range does not fit.
     void Write(std::span<const std::byte> bytes,
                VkDeviceSize offset = 0);
 
-    /// Copies the buffer's contents at `offset` into `bytes`, after
-    /// all submitted work that `VulkanContext::Submit` has waited
-    /// for.
-    /// @throws std::out_of_range if the range does not fit.
+    /// @brief Copies the buffer's contents into `bytes`.
+    /// @param bytes  Where to copy to; its size sets how much.
+    /// @param offset Where in the buffer to start, in bytes.
+    /// @note Sees all work that `VulkanContext::Submit` waited for.
+    /// @throws std::out_of_range If the range does not fit.
     void Read(std::span<std::byte> bytes,
               VkDeviceSize offset = 0) const;
 
+    /// @return Where the memory lives.
     BufferMemory Memory() const {
         return memory_;
     }
 
-    /// The buffer's address on the GPU, which shaders read it through
-    /// as a pointer (Slang's `T*`, in natural layout: the plain
-    /// `float[4]` structs Ernie writes) in place of a binding.
+    /// @brief The buffer's GPU address, which shaders read as a
+    /// pointer in place of a binding.
+    /// @return The device address.
     VkDeviceAddress Address() const;
 
-    /// For `Shared` buffers, a new handle to the buffer's memory (a
-    /// file descriptor, or a Win32 handle on Windows), owned by the
-    /// caller until it imports it elsewhere (`CloseExternalHandle`).
-    /// @throws std::logic_error for other buffers, or
-    /// std::runtime_error if export fails.
+    /// @brief Exports a new handle to a `Shared` buffer's memory.
+    /// @return A file descriptor (a Win32 handle on Windows), owned
+    /// by
+    ///         the caller until imported (`CloseExternalHandle`).
+    /// @throws std::logic_error If the buffer is not `Shared`.
+    /// @throws std::runtime_error If the export fails.
     ExternalHandle ExportHandle() const;
 
-    /// For `Shared` buffers, the size of the buffer's dedicated
-    /// memory allocation.
+    /// @return The size of a `Shared` buffer's dedicated allocation.
     VkDeviceSize AllocationSize() const {
         return allocationSize_;
     }
 
-    /// Keeps `object`, such as a CUDA import of the buffer's memory,
-    /// until the buffer is destroyed, releasing it before the memory
-    /// is freed.
+    /// @brief Keeps `object` alive until the buffer's memory is
+    /// freed.
+    /// @param object Something that uses the memory, such as a CUDA
+    ///               import of it; released first.
     void Attach(std::shared_ptr<void> object) {
         attached_ = std::move(object);
     }
 
+    /// @return The object passed to `Attach`, or null.
     const std::shared_ptr<void>& Attached() const {
         return attached_;
     }
 
-    /// Expires when the buffer is destroyed or replaced by
-    /// assignment, for work queued for it later (`FrameUploads`).
+    /// @return A token that expires when the buffer is destroyed or
+    ///         replaced, for work queued for it later
+    ///         (`FrameUploads`).
     std::weak_ptr<const void> Lifetime() const {
         return lifetime_;
     }
@@ -101,13 +114,13 @@ class GpuBuffer {
     void Release();
 
     const VulkanContext* context_ = nullptr;
-    std::weak_ptr<const void>
-        contextAlive_;  ///< `VulkanContext::Alive`.
+    /// Expires with the context (`VulkanContext::Alive`).
+    std::weak_ptr<const void> contextAlive_;
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;
-    /// For `Shared` buffers, `buffer_` and `sharedMemory_` as the
-    /// context also holds them (`VulkanContext::TrackExported`).
+    /// A `Shared` buffer's handles as the context tracks them
+    /// (`VulkanContext::TrackExported`).
     std::shared_ptr<VulkanContext::ExportedBuffer> exported_;
     VkDeviceSize allocationSize_ = 0;
     std::shared_ptr<void> attached_;

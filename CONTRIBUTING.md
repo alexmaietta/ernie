@@ -79,8 +79,33 @@ Packages: `cmake --preset package-deb` (or `package-rpm`), then `cmake --build -
 - Formatting is enforced by [pre-commit](https://pre-commit.com): clang-format, cmake-format, cppcheck, ruff, mypy and whitespace fixes. Run `pre-commit install` once, or `pre-commit run --all-files` before pushing.
 - Python is typed: annotate public functions, and keep `mypy` clean. The package ships `py.typed` and stubs generated from the bindings (nanobind's stubgen for `ernie._ernie`, `ernie/python/stub_schema.py` for the typed prim classes); give a binding an `nb::sig` where its generated signature is too loose. Follow ruff's import order and modern syntax (`X | None`, built-in generics).
 - Each module in `ernie/` is a library that depends only on the modules before it (see `ernie/CMakeLists.txt`). Headers sit next to their sources and are included as `"ernie/<module>/<file>.h"`.
-- Document public API with `///` comments. When code implements a published technique, cite it in a `References:` list in the doc comment.
 - Scene attributes use physical units (meters, kelvin, lux and so on). Say which unit in the doc comment.
+
+### Doc comments
+
+Doc comments are `///` lines structured with Doxygen tags, one short sentence per tag. The same style applies in C++ and Slang.
+
+```cpp
+/// @file buffer.h
+/// @brief GPU buffers and their memory.
+
+/// @brief Grows `buffer` so it holds at least `bytes`.
+/// @param context The device the buffer lives on.
+/// @param buffer  The buffer to keep or replace; may be null.
+/// @param bytes   The size needed.
+/// @return True when a new buffer replaced the old one.
+/// @throws std::runtime_error If allocation fails.
+bool Reserve(const VulkanContext& context,
+             std::unique_ptr<GpuBuffer>& buffer, VkDeviceSize bytes);
+```
+
+- Every header starts with `@file` and `@brief`.
+- Functions get `@brief`, `@param` for each parameter, `@return` when they return something, and `@throws` for each exception a caller should handle. Add `@note` or `@details` only for what a caller must know.
+- Classes and structs get a `@brief` and at most a few lines. Comment each field on its own line above it, not in the class comment and not as a trailing `///<`.
+- Say what and why, not how: the code shows how. Avoid long chained sentences; split them or cut them.
+- Architecture and background go in `docs/`, not in headers.
+- When code implements a published technique, cite it in a `References:` list at the end of the doc comment.
+- Inside function bodies, use plain `//` comments, and only where the reason for the code isn't obvious.
 - Demos go in `demos/<category>/` as a pair, `demo_<category>_<name>.cpp` and `demo_<category>_<name>.py`, the same demo in each language (registered with `ERNIE_REGISTER_DEMO(Class, "<category>", "<name>", ...)` in C++); only `demos/interop/` is Python alone. The file stem is the demo's name everywhere: `ernie --demo demo_<category>_<name>`, `python -m ernie.demos demo_<category>_<name>` and its own program. `ernie/test/python/test_demos.py` checks every pair renders the same image.
 - Tests are named `<module>_<topic>_test.cpp`. GPU tests use the `_gpu_test.cpp` suffix.
 
