@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792036567335,
+  "lastUpdate": 1792081824119,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -13731,6 +13731,318 @@ window.BENCHMARK_DATA = {
             "name": "sanitize-4: ccache miss rate",
             "value": 7.42,
             "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "566258f605591f521dd716dfa022139986e20cc6",
+          "message": "CI's OpenVDB cache keyed by OS and compiler, without commas; stats and shader-type tests updated",
+          "timestamp": "2026-10-15T16:11:58Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/566258f605591f521dd716dfa022139986e20cc6"
+        },
+        "date": 1792081821872,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 18.02,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.63,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.25,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.45,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-clang): job",
+            "value": 0.17,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 14.2,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 12.57,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.28,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.07,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 13.35,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 13.17,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 11.87,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 11.7,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 10.35,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 10.05,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 0.88,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 1.03,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.2,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 1.03,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.58,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.03,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 21.65,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 14.67,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 11.7,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 14.67,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 15.91,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 14.67,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 18.96,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 14.17,
+            "unit": "%"
+          },
+          {
+            "name": "test-clang: compile time",
+            "value": 55.34,
+            "unit": "min"
+          },
+          {
+            "name": "test-clang: compiles",
+            "value": 819,
+            "unit": "files"
+          },
+          {
+            "name": "test-clang: ccache miss rate",
+            "value": 100,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 53.9,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 850,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 100,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 53.09,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 850,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 100,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-3: compile time",
+            "value": 54.43,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-3: compiles",
+            "value": 850,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-3: ccache miss rate",
+            "value": 100,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-4: compile time",
+            "value": 52.7,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-4: compiles",
+            "value": 850,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-4: ccache miss rate",
+            "value": 100,
+            "unit": "%"
+          },
+          {
+            "name": "test-macos: compile time",
+            "value": 27.96,
+            "unit": "min"
+          },
+          {
+            "name": "test-macos: compiles",
+            "value": 654,
+            "unit": "files"
+          },
+          {
+            "name": "test-windows-1: compile time",
+            "value": 48.94,
+            "unit": "min"
+          },
+          {
+            "name": "test-windows-1: compiles",
+            "value": 659,
+            "unit": "files"
+          },
+          {
+            "name": "test-windows-2: compile time",
+            "value": 52.06,
+            "unit": "min"
+          },
+          {
+            "name": "test-windows-2: compiles",
+            "value": 937,
+            "unit": "files"
           }
         ]
       }
