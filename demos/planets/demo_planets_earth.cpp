@@ -119,7 +119,8 @@ glm::dvec3 Direction(double latitude, double longitude) {
 /// Where file `name` (a URL's last part) is cached: Blue Marble's
 /// beside the earlier demo's.
 std::filesystem::path CachedPath(const std::string& name) {
-    const std::string file = std::filesystem::path(name).filename();
+    const std::string file =
+        std::filesystem::path(name).filename().string();
     return demos::CacheDir() /
            (file.starts_with("world.topo") ? "blue_marble"
                                            : "earth") /
