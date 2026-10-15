@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792031204588,
+  "lastUpdate": 1792032551710,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -13189,6 +13189,158 @@ window.BENCHMARK_DATA = {
           {
             "name": "sanitize-4: compile time",
             "value": 35.82,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "2adacc187cfa311b2eabc351418f896a647f863e",
+          "message": "Wheels build on macOS and Windows, CI validates SPIR-V with the 1.4.341 layer, emissive texture test updated",
+          "timestamp": "2026-10-15T02:21:03Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/2adacc187cfa311b2eabc351418f896a647f863e"
+        },
+        "date": 1792032550262,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 27.42,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.08,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.88,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.37,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.17,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.25,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 9.75,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 9.53,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 10.8,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 10.67,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 11.17,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 11.05,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 32.49,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 35.46,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 35.55,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 36.6,
             "unit": "min"
           },
           {
