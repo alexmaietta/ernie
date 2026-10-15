@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792033020923,
+  "lastUpdate": 1792036567335,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -13474,6 +13474,263 @@ window.BENCHMARK_DATA = {
             "name": "package-test (debian:12): Build and run an application against them",
             "value": 0.05,
             "unit": "min"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "1e3729e440bb78007a070b8ff80d8b74f9e05818",
+          "message": "Dockerfile at the repo root; CI retries LunarG's validation layer download",
+          "timestamp": "2026-10-15T02:55:21Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/1e3729e440bb78007a070b8ff80d8b74f9e05818"
+        },
+        "date": 1792036565757,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 60.12,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.28,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.52,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.63,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-clang): job",
+            "value": 57.97,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-clang): Build OpenUSD",
+            "value": 57.55,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 16.82,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 16.68,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 11.55,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 11.42,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 6.28,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 4.88,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): job",
+            "value": 24.02,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (windows-amd64): wheel build",
+            "value": 23.62,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): job",
+            "value": 11.1,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (macos-arm64): wheel build",
+            "value": 10.83,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 0.88,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.23,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): job",
+            "value": 1.23,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): Build and run an application against them",
+            "value": 0.23,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 0.73,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.25,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.72,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.07,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 0.88,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "docker: job",
+            "value": 1.38,
+            "unit": "min"
+          },
+          {
+            "name": "docker: Build",
+            "value": 0.58,
+            "unit": "min"
+          },
+          {
+            "name": "docs: job",
+            "value": 1.15,
+            "unit": "min"
+          },
+          {
+            "name": "docs: Build",
+            "value": 0.33,
+            "unit": "min"
+          },
+          {
+            "name": "wheel-test (linux-x86_64): job",
+            "value": 2.45,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 8.99,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 7.42,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 12.91,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 7.59,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 15.4,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 7.59,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 9.16,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 7.42,
+            "unit": "%"
           }
         ]
       }
