@@ -84,7 +84,8 @@ def test_columns_write_and_map_rows_of_many_prims():
     with poses.map("cpu") as rows:
         rows[:, 0] += 10.0
     np.testing.assert_array_equal(
-        np.asarray(scene.read("/B", tokens.TRANSLATE)), [14.0, 0.0, 0.0]
+        np.asarray(scene.read("/B", tokens.TRANSLATE)),
+        [14.0, 0.0, 0.0],
     )
     poses.write(np.zeros((2, 3), np.float32))
     np.testing.assert_array_equal(poses.read(), np.zeros((2, 3)))
@@ -95,8 +96,12 @@ def test_columns_write_and_map_rows_of_many_prims():
 def test_column_writes_come_as_one_column_change():
     scene = ernie.Scene()
     for path in ("/A", "/B"):
-        scene.define(path, "Xform").set_xform(translate=(0.0, 0.0, 0.0))
-    poses = scene.column(ernie.PrimSet(["/A", "/B"]), tokens.TRANSLATE)
+        scene.define(path, "Xform").set_xform(
+            translate=(0.0, 0.0, 0.0)
+        )
+    poses = scene.column(
+        ernie.PrimSet(["/A", "/B"]), tokens.TRANSLATE
+    )
     poses.write(np.zeros((2, 3), np.float32))
     cursor = ernie.ChangeCursor()
     scene.changes(cursor)
@@ -115,8 +120,12 @@ def test_column_writes_come_as_one_column_change():
 def test_columns_read_without_a_change_and_hold_arrays_of_any_length():
     scene = ernie.Scene()
     for path in ("/A", "/B"):
-        scene.define(path, "Xform").set_xform(translate=(0.0, 0.0, 0.0))
-    poses = scene.column(ernie.PrimSet(["/A", "/B"]), tokens.TRANSLATE)
+        scene.define(path, "Xform").set_xform(
+            translate=(0.0, 0.0, 0.0)
+        )
+    poses = scene.column(
+        ernie.PrimSet(["/A", "/B"]), tokens.TRANSLATE
+    )
     poses.write(np.ones((2, 3), np.float32))
     cursor = ernie.ChangeCursor()
     scene.changes(cursor)
@@ -147,4 +156,9 @@ def test_selections_map_every_attribute_of_a_kind_at_once():
     (poses,) = cubes.read([tokens.TRANSLATE])
     np.testing.assert_array_equal(poses[:, 2], [5.0, 5.0, 5.0])
     scene.define("/D", ernie.Cube, translate=(3.0, 0.0, 0.0))
-    assert [str(p) for p in cubes.prims.paths] == ["/A", "/B", "/C", "/D"]
+    assert [str(p) for p in cubes.prims.paths] == [
+        "/A",
+        "/B",
+        "/C",
+        "/D",
+    ]

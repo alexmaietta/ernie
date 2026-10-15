@@ -296,7 +296,8 @@ TEST(Scene, DeclaredInheritanceAndRelationshipsReachDependents) {
     scene.Define("/World/Rock", tokens::kMesh);
     scene.Define("/Looks/Grey", tokens::kMaterial);
     scene.Define("/Looks/Grey/Shader", tokens::kShader);
-    scene.Set("/World/Rock", tokens::kMaterialBinding, Path("/Looks/Grey"));
+    scene.Set("/World/Rock", tokens::kMaterialBinding,
+              Path("/Looks/Grey"));
     scene.Define("/World/Skin", tokens::kMesh)
         .Set(tokens::kSkelSkeleton, Path("/World/Skel"));
     scene.Define("/World/Skel", tokens::kSkeleton)
@@ -325,10 +326,12 @@ TEST(Scene, DeclaredInheritanceAndRelationshipsReachDependents) {
 
     // Rebinding moves what reaches it; removing the target reaches
     // those still bound.
-    scene.Set("/World/Rock", tokens::kMaterialBinding, Path("/Looks/Red"));
+    scene.Set("/World/Rock", tokens::kMaterialBinding,
+              Path("/Looks/Red"));
     scene.Changes(cursor);
     scene.Set("/Looks/Grey", "user:note", 1.0);
-    EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rock"), Dirty::None);
+    EXPECT_EQ(BitsOf(scene.Changes(cursor), "/World/Rock"),
+              Dirty::None);
     scene.Set("/World/Rover/Wheel", tokens::kMaterialBinding,
               Path("/Looks/Grey"));
     scene.Changes(cursor);
@@ -360,8 +363,8 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
     scene.Define("/A/Mesh", tokens::kMesh);
     const ernie::PrimSet bodies({"/A", "/B", "/C"});
     const auto rows = [](float x) {
-        const std::array<float, 9> values{x, 0, 0, x + 1, 0, 0,
-                                          x + 2, 0, 0};
+        const std::array<float, 9> values{x, 0,     0, x + 1, 0,
+                                          0, x + 2, 0, 0};
         return Tensor::Copy<float>(values, {3, 3});
     };
     ChangeCursor cursor;
@@ -370,8 +373,8 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
 
     // Written again: whole, its rows read as they are now.
     scene.Write(bodies, tokens::kTranslate, rows(10));
-    EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kTranslate)->As<float>()[0],
-                    11.0f);
+    EXPECT_FLOAT_EQ(
+        scene.Read("/B", tokens::kTranslate)->As<float>()[0], 11.0f);
     EXPECT_DOUBLE_EQ(scene.WorldTransform("/A/Mesh")[3][0], 10.0);
     EXPECT_EQ(scene.AttributeVersion("/C", tokens::kTranslate),
               scene.Version());
@@ -397,39 +400,42 @@ TEST(Scene, ColumnsWriteManyPrimsWhole) {
     // A copy keeps its own rows.
     const Scene copy = scene;
     scene.Write(bodies, tokens::kTranslate, rows(30));
-    EXPECT_FLOAT_EQ(copy.Read("/A", tokens::kTranslate)->As<float>()[0],
-                    20.0f);
+    EXPECT_FLOAT_EQ(
+        copy.Read("/A", tokens::kTranslate)->As<float>()[0], 20.0f);
 
     // One prim written alone ends the column, its rows kept and none
     // of its changes lost; the next write binds anew.
     scene.Set("/B", tokens::kTranslate, glm::dvec3(5.0, 0.0, 0.0));
-    EXPECT_FLOAT_EQ(scene.Read("/A", tokens::kTranslate)->As<float>()[0],
-                    30.0f);
+    EXPECT_FLOAT_EQ(
+        scene.Read("/A", tokens::kTranslate)->As<float>()[0], 30.0f);
     columns.clear();
     const std::vector<Change> broken = scene.Changes(cursor, columns);
     EXPECT_TRUE(columns.empty());
     EXPECT_EQ(BitsOf(broken, "/C"), Dirty::Transform);
     scene.Write(bodies, tokens::kTranslate, rows(40));
     scene.Write(bodies, tokens::kTranslate, rows(50));
-    EXPECT_FLOAT_EQ(scene.Read("/B", tokens::kTranslate)->As<float>()[0],
-                    51.0f);
+    EXPECT_FLOAT_EQ(
+        scene.Read("/B", tokens::kTranslate)->As<float>()[0], 51.0f);
 }
 
 TEST(Scene, SelectionsFindPrimsOfATypeAndMapTheirColumns) {
     Scene scene;
     for (const char* path : {"/A", "/B", "/C"}) {
-        ernie::Cube::Define(scene, path).SetXform({.translate = {1, 2, 3}});
+        ernie::Cube::Define(scene, path)
+            .SetXform({.translate = {1, 2, 3}});
     }
     ernie::Cube(scene, "/A").SetDisplayColor({1.0, 0.0, 0.0});
     ernie::Cube(scene, "/C").SetDisplayColor({0.0, 0.0, 1.0});
-    ernie::Sphere::Define(scene, "/S").SetXform({.translate = {0, 0, 0}});
+    ernie::Sphere::Define(scene, "/S")
+        .SetXform({.translate = {0, 0, 0}});
 
     ernie::Selection cubes = scene.Select(tokens::kCube);
     EXPECT_EQ(cubes.Prims().Paths(),
               (std::vector<Path>{"/A", "/B", "/C"}));
-    ernie::Selection coloured =
-        scene.Select(tokens::kCube, {std::string(tokens::kDisplayColor)});
-    EXPECT_EQ(coloured.Prims().Paths(), (std::vector<Path>{"/A", "/C"}));
+    ernie::Selection coloured = scene.Select(
+        tokens::kCube, {std::string(tokens::kDisplayColor)});
+    EXPECT_EQ(coloured.Prims().Paths(),
+              (std::vector<Path>{"/A", "/C"}));
 
     // Every attribute stepped as columns, mapped at once; the same
     // prims keep their set, so their columns stay.
@@ -444,7 +450,8 @@ TEST(Scene, SelectionsFindPrimsOfATypeAndMapTheirColumns) {
     coloured.Unmap();
     std::vector<ernie::ColumnChange> columns;
     scene.Changes(cursor, columns);
-    EXPECT_EQ(scene.Read("/C", tokens::kTranslate)->As<float>()[0], 7.0f);
+    EXPECT_EQ(scene.Read("/C", tokens::kTranslate)->As<float>()[0],
+              7.0f);
     rows = coloured.Map(ernie::Device{}, stepped);
     coloured.Unmap();
     columns.clear();
@@ -455,19 +462,21 @@ TEST(Scene, SelectionsFindPrimsOfATypeAndMapTheirColumns) {
     ernie::Cube::Define(scene, "/D").SetDisplayColor({0.0, 1.0, 0.0});
     EXPECT_EQ(coloured.Prims().Size(), 3u);
     scene.Clear("/A", tokens::kDisplayColor);
-    EXPECT_EQ(coloured.Prims().Paths(), (std::vector<Path>{"/C", "/D"}));
+    EXPECT_EQ(coloured.Prims().Paths(),
+              (std::vector<Path>{"/C", "/D"}));
     ernie::Cube(scene, "/A").SetDisplayColor({1.0, 0.0, 0.0});
     EXPECT_EQ(coloured.Prims().Size(), 3u);
     scene.Remove("/C");
-    EXPECT_EQ(cubes.Prims().Paths(), (std::vector<Path>{"/A", "/B", "/D"}));
+    EXPECT_EQ(cubes.Prims().Paths(),
+              (std::vector<Path>{"/A", "/B", "/D"}));
 }
 
 TEST(Scene, ColumnsOfArraysGiveEachPrimItsOwnLength) {
     Scene scene;
     scene.Define("/A", tokens::kMesh);
     scene.Define("/B", tokens::kMesh);
-    ernie::Column points =
-        scene.GetColumn(ernie::PrimSet({"/A", "/B"}), tokens::kPoints);
+    ernie::Column points = scene.GetColumn(
+        ernie::PrimSet({"/A", "/B"}), tokens::kPoints);
     // Three points for A, four for B, one after another.
     std::vector<float> values(7 * 3);
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -498,9 +507,9 @@ TEST(Scene, ColumnsOfArraysGiveEachPrimItsOwnLength) {
     EXPECT_EQ(scene.Read("/A", tokens::kPoints)->Shape()[0], 5);
     EXPECT_EQ(scene.Read("/B", tokens::kPoints)->Shape()[0], 2);
     const std::vector<std::int64_t> wrong{5, 5};
-    EXPECT_THROW(
-        points.WriteArrays(Tensor::Copy<float>(values, {7, 3}), wrong),
-        std::invalid_argument);
+    EXPECT_THROW(points.WriteArrays(
+                     Tensor::Copy<float>(values, {7, 3}), wrong),
+                 std::invalid_argument);
 }
 
 TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
@@ -510,8 +519,8 @@ TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
     }
     ernie::SetXform(scene, "/A", {.translate = {1, 2, 3}});
     ernie::SetXform(scene, "/B", {.translate = {4, 5, 6}});
-    ernie::Column poses =
-        scene.GetColumn(ernie::PrimSet({"/A", "/B"}), tokens::kTranslate);
+    ernie::Column poses = scene.GetColumn(
+        ernie::PrimSet({"/A", "/B"}), tokens::kTranslate);
     // Read before written: the prims' values, gathered.
     const Tensor before = poses.Read();
     ASSERT_EQ(before.Shape(), (std::vector<std::int64_t>{2, 3}));
@@ -527,8 +536,8 @@ TEST(Scene, ColumnHandlesWriteAndMapOnAnyDevice) {
     std::vector<ernie::ColumnChange> columns;
     EXPECT_TRUE(scene.Changes(cursor, columns).empty());
     EXPECT_EQ(columns.size(), 1u);
-    EXPECT_FLOAT_EQ(scene.Read("/A", tokens::kTranslate)->As<float>()[0],
-                    10.0f);
+    EXPECT_FLOAT_EQ(
+        scene.Read("/A", tokens::kTranslate)->As<float>()[0], 10.0f);
     EXPECT_EQ(poses.Map(cpu).Data(), rows.Data()) << "mapped again";
     poses.Unmap();
     scene.Changes(cursor);
@@ -588,13 +597,15 @@ TEST(Scene, ColumnsOfAnyNumberReadAsTheirPrimsValues) {
     scene.GetColumn(cubes, tokens::kVisibility)
         .Write(Tensor::Copy<float>(shown, {2}));
     EXPECT_DOUBLE_EQ(ernie::GetNumber(scene, "/B",
-                                      tokens::kThermalTemperature, 0.0),
+                                      tokens::kThermalTemperature,
+                                      0.0),
                      450.0);
     EXPECT_EQ(ernie::GetVec3(scene, "/B", tokens::kDisplayColor,
                              glm::dvec3(0.5)),
               glm::dvec3(0.0, 0.0, 1.0));
     EXPECT_FALSE(scene.IsVisible("/A"));
-    EXPECT_FALSE(scene.IsVisible("/A/Child")) << "hiding its descendants";
+    EXPECT_FALSE(scene.IsVisible("/A/Child"))
+        << "hiding its descendants";
     EXPECT_TRUE(scene.IsVisible("/B"));
     // Written again whole, read anew.
     const std::array<float, 2> swapped{1.0f, 0.0f};

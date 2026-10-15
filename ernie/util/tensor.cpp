@@ -268,7 +268,8 @@ Tensor Tensor::Reshaped(std::vector<std::int64_t> shape) const {
             "Tensor::Reshaped needs a contiguous tensor of as many "
             "elements");
     }
-    return Tensor(data_, type_, std::move(shape), {}, device_, owner_);
+    return Tensor(data_, type_, std::move(shape), {}, device_,
+                  owner_);
 }
 
 bool Tensor::IsContiguous() const {

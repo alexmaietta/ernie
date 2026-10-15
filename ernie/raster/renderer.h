@@ -1079,7 +1079,7 @@ class RasterRenderer {
     std::uint32_t nextMaterial_ = 1;
     std::uint64_t materialSetVersion_ = 0;
     std::uint64_t materialsVersion_ = 0;  ///< `MaterialsVersion`.
-    std::uint64_t frames_ = 0;         ///< `BeginFrame`s so far.
+    std::uint64_t frames_ = 0;            ///< `BeginFrame`s so far.
     glm::dvec3 materialsOrigin_{0.0};  ///< The origin the materials'
                                        ///< uniforms are relative to.
 

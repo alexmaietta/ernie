@@ -81,34 +81,37 @@ namespace {
 /// The declared attributes that apply to descendants too
 /// (`AttributeMeta::inherited`).
 bool IsInherited(std::string_view attribute) {
-    static const std::set<std::string_view, std::less<>> inherited = [] {
-        std::set<std::string_view, std::less<>> names;
-        for (const PrimTypeDef* type : PrimTypes()) {
-            for (const AttributeDef& def : type->attributes) {
-                if (def.meta.inherited) {
-                    names.insert(def.name);
+    static const std::set<std::string_view, std::less<>> inherited =
+        [] {
+            std::set<std::string_view, std::less<>> names;
+            for (const PrimTypeDef* type : PrimTypes()) {
+                for (const AttributeDef& def : type->attributes) {
+                    if (def.meta.inherited) {
+                        names.insert(def.name);
+                    }
                 }
             }
-        }
-        return names;
-    }();
+            return names;
+        }();
     return inherited.contains(attribute);
 }
 
 /// The declared relationships whose targets' changes reach the prims
 /// holding them, with what they stamp (`AttributeMeta::targetDirty`).
-const std::map<std::string_view, Dirty, std::less<>>& TargetDirties() {
-    static const std::map<std::string_view, Dirty, std::less<>> bits = [] {
-        std::map<std::string_view, Dirty, std::less<>> declared;
-        for (const PrimTypeDef* type : PrimTypes()) {
-            for (const AttributeDef& def : type->attributes) {
-                if (def.meta.targetDirty) {
-                    declared[def.name] |= *def.meta.targetDirty;
+const std::map<std::string_view, Dirty, std::less<>>&
+TargetDirties() {
+    static const std::map<std::string_view, Dirty, std::less<>> bits =
+        [] {
+            std::map<std::string_view, Dirty, std::less<>> declared;
+            for (const PrimTypeDef* type : PrimTypes()) {
+                for (const AttributeDef& def : type->attributes) {
+                    if (def.meta.targetDirty) {
+                        declared[def.name] |= *def.meta.targetDirty;
+                    }
                 }
             }
-        }
-        return declared;
-    }();
+            return declared;
+        }();
     return bits;
 }
 
@@ -700,7 +703,8 @@ void Scene::Unmap(const Path& path, std::string_view attribute,
 }
 
 const Scene::ColumnData*
-Scene::ColumnOf(const PrimSet& prims, std::string_view attribute) const {
+Scene::ColumnOf(const PrimSet& prims,
+                std::string_view attribute) const {
     if (prims.id_ == 0) {
         return nullptr;
     }
@@ -811,14 +815,15 @@ void Scene::Write(const PrimSet& prims, std::string_view attribute,
         offsets.push_back(offsets.back() + count);
     }
     if (values.Rank() == 0 || values.Shape()[0] != offsets.back()) {
-        throw std::invalid_argument(
-            "Scene::Write of arrays needs the counts to add up to the "
-            "values' entries");
+        throw std::invalid_argument("Scene::Write of arrays needs "
+                                    "the counts to add up to the "
+                                    "values' entries");
     }
     WriteColumn(prims, attribute, values, std::move(offsets), stream);
 }
 
-void Scene::WriteColumn(const PrimSet& prims, std::string_view attribute,
+void Scene::WriteColumn(const PrimSet& prims,
+                        std::string_view attribute,
                         const Tensor& rows,
                         std::vector<std::int64_t> offsets,
                         std::uintptr_t stream) {
@@ -874,11 +879,11 @@ void Scene::WriteColumn(const PrimSet& prims, std::string_view attribute,
                         attribute, rows.Row(row), stream,
                         std::pair(rows, row), true);
         } else {
-            WriteTensor(prims.Paths()[i],
-                        *static_cast<PrimData*>(prims.prims_[i]),
-                        attribute,
-                        rows.Slice(offsets[i], offsets[i + 1] - offsets[i]),
-                        stream, std::nullopt, true);
+            WriteTensor(
+                prims.Paths()[i],
+                *static_cast<PrimData*>(prims.prims_[i]), attribute,
+                rows.Slice(offsets[i], offsets[i + 1] - offsets[i]),
+                stream, std::nullopt, true);
         }
     }
     // From now one column, which the next write of the same prims
@@ -886,7 +891,8 @@ void Scene::WriteColumn(const PrimSet& prims, std::string_view attribute,
     IdentifyPrimSet(prims);
     const std::uint64_t id = nextColumn_++;
     ColumnData column;
-    column.paths = std::make_shared<const std::vector<Path>>(prims.Paths());
+    column.paths =
+        std::make_shared<const std::vector<Path>>(prims.Paths());
     column.sorted = prims.Paths();
     std::ranges::sort(column.sorted);
     column.attribute = std::string(attribute);
@@ -909,9 +915,9 @@ void Scene::WriteColumn(const PrimSet& prims, std::string_view attribute,
 
 namespace {
 
-/// A value's numbers as a column's row holds them: vectors' components,
-/// quaternions x, y, z, w (as arrays of them are), float arrays as
-/// they are; none for matrices, text and paths.
+/// A value's numbers as a column's row holds them: vectors'
+/// components, quaternions x, y, z, w (as arrays of them are), float
+/// arrays as they are; none for matrices, text and paths.
 std::optional<std::vector<float>> RowNumbers(const Value& value) {
     return std::visit(
         [](const auto& v) -> std::optional<std::vector<float>> {
@@ -937,7 +943,8 @@ std::optional<std::vector<float>> RowNumbers(const Value& value) {
                     numbers.push_back(static_cast<float>(v[i]));
                 }
                 return numbers;
-            } else if constexpr (std::is_same_v<T, std::vector<float>>) {
+            } else if constexpr (std::is_same_v<T,
+                                                std::vector<float>>) {
                 return v;
             } else {
                 return std::nullopt;
@@ -961,11 +968,14 @@ Tensor Scene::GatherRows(const PrimSet& prims,
                     "' is on a GPU: write the column's rows there");
             }
             const Tensor host = tensor->Contiguous();
-            const auto count = static_cast<std::size_t>(host.Elements());
+            const auto count =
+                static_cast<std::size_t>(host.Elements());
             if (host.Type() == DType::Float32) {
-                row.emplace(host.As<float>(), host.As<float>() + count);
+                row.emplace(host.As<float>(),
+                            host.As<float>() + count);
             } else if (host.Type() == DType::Float64) {
-                row.emplace(host.As<double>(), host.As<double>() + count);
+                row.emplace(host.As<double>(),
+                            host.As<double>() + count);
             }
         } else if (const Value* value = Get(path, attribute)) {
             row = RowNumbers(*value);
@@ -985,16 +995,19 @@ Tensor Scene::GatherRows(const PrimSet& prims,
         numbers.insert(numbers.end(), row->begin(), row->end());
     }
     const auto rows = static_cast<std::int64_t>(prims.Size());
-    return Tensor::Copy<float>(numbers, {rows, std::max<std::int64_t>(width, 0)});
+    return Tensor::Copy<float>(
+        numbers, {rows, std::max<std::int64_t>(width, 0)});
 }
 
-Column Scene::GetColumn(const PrimSet& prims, std::string_view attribute) {
+Column Scene::GetColumn(const PrimSet& prims,
+                        std::string_view attribute) {
     // Its copies share its columns.
     IdentifyPrimSet(prims);
     return Column(*this, prims, std::string(attribute));
 }
 
-void Scene::SetColumnStorage(std::weak_ptr<ColumnStorage> storage) const {
+void Scene::SetColumnStorage(
+    std::weak_ptr<ColumnStorage> storage) const {
     columnStorage_.storage = std::move(storage);
 }
 
@@ -1011,14 +1024,16 @@ void Column::WriteArrays(const Tensor& values,
 Tensor Column::Map(Device device, std::uintptr_t stream) {
     Scene& scene = *scene_;
     const auto held = [&]() -> const Tensor* {
-        const Scene::ColumnData* data = scene.ColumnOf(prims_, attribute_);
+        const Scene::ColumnData* data =
+            scene.ColumnOf(prims_, attribute_);
         return data != nullptr && data->rows.Location() == device &&
                        data->rows.IsContiguous()
                    ? &data->rows
                    : nullptr;
     };
     // The consumer's own storage already: written where it reads.
-    if (const Scene::ColumnData* data = scene.ColumnOf(prims_, attribute_);
+    if (const Scene::ColumnData* data =
+            scene.ColumnOf(prims_, attribute_);
         data != nullptr && data->provided && held() != nullptr) {
         return data->rows;
     }
@@ -1026,12 +1041,16 @@ Tensor Column::Map(Device device, std::uintptr_t stream) {
     if (const std::shared_ptr<ColumnStorage> storage =
             scene.columnStorage_.storage.lock()) {
         if (std::optional<ColumnStorage::Rows> offered =
-                storage->Allocate(scene, prims_, attribute_, device, stream)) {
+                storage->Allocate(scene, prims_, attribute_, device,
+                                  stream)) {
             if (const Tensor* now = held();
-                now == nullptr || now->Data() != offered->rows.Data()) {
-                scene.Write(prims_, attribute_, offered->rows, stream);
+                now == nullptr ||
+                now->Data() != offered->rows.Data()) {
+                scene.Write(prims_, attribute_, offered->rows,
+                            stream);
             }
-            scene.ColumnOf(prims_, attribute_)->provided = offered->kept;
+            scene.ColumnOf(prims_, attribute_)->provided =
+                offered->kept;
             return offered->rows;
         }
     }
@@ -1135,7 +1154,8 @@ Column Selection::GetColumn(std::string_view attribute) {
 }
 
 std::vector<Tensor>
-Selection::Map(Device device, const std::vector<std::string>& attributes,
+Selection::Map(Device device,
+               const std::vector<std::string>& attributes,
                std::uintptr_t stream) {
     std::vector<Tensor> rows;
     for (const std::string& attribute : attributes) {
@@ -1153,7 +1173,8 @@ void Selection::Unmap(std::uintptr_t stream) {
 }
 
 std::vector<Tensor>
-Selection::Read(Device device, const std::vector<std::string>& attributes) {
+Selection::Read(Device device,
+                const std::vector<std::string>& attributes) {
     std::vector<Tensor> rows;
     for (const std::string& attribute : attributes) {
         rows.push_back(GetColumn(attribute).Read(device));
@@ -1269,7 +1290,8 @@ Scene::AttributeVersion(const Path& path,
     if (!prim->second.bound.empty()) {
         if (const auto bound = prim->second.bound.find(attribute);
             bound != prim->second.bound.end()) {
-            if (const auto column = columns_.find(bound->second.column);
+            if (const auto column =
+                    columns_.find(bound->second.column);
                 column != columns_.end()) {
                 return std::max(own, column->second.version);
             }
@@ -1526,20 +1548,23 @@ bool Scene::IsVisible(const Path& path) const {
     // Kept as `WorldTransform` keeps its matrix.
     const PrimData& prim = Find(path);
     if (prim.visibleAt != 0 &&
-        prim.visibleAt >= prim.stamps[StampIndex(Dirty::Visibility)] &&
-        prim.visibleAt >= columnStamps_[StampIndex(Dirty::Visibility)]) {
+        prim.visibleAt >=
+            prim.stamps[StampIndex(Dirty::Visibility)] &&
+        prim.visibleAt >=
+            columnStamps_[StampIndex(Dirty::Visibility)]) {
         return prim.visible;
     }
     const Value* visibility = Get(path, tokens::kVisibility);
-    const std::string* token =
-        visibility != nullptr ? visibility->Get<std::string>() : nullptr;
+    const std::string* token = visibility != nullptr
+                                   ? visibility->Get<std::string>()
+                                   : nullptr;
     // As a column's row, 0 hides it.
     double row = 1.0;
-    const bool hidden = token != nullptr
-                            ? *token == tokens::kInvisible
-                            : GetRow(*this, path, tokens::kVisibility,
-                                     {&row, 1}) &&
-                                  row == 0.0;
+    const bool hidden =
+        token != nullptr
+            ? *token == tokens::kInvisible
+            : GetRow(*this, path, tokens::kVisibility, {&row, 1}) &&
+                  row == 0.0;
     const Path parent = path.Parent();
     prim.visible = !hidden && (parent.IsEmpty() || IsVisible(parent));
     prim.visibleAt = version_;
@@ -1634,7 +1659,8 @@ void Scene::AddColumn(std::map<Path, Dirty>& changed,
         add(path);
         if (descends) {
             for (auto below = std::next(it);
-                 below != prims_.end() && below->first.HasPrefix(path);
+                 below != prims_.end() &&
+                 below->first.HasPrefix(path);
                  ++below) {
                 add(below->first);
             }
@@ -1645,7 +1671,8 @@ void Scene::AddColumn(std::map<Path, Dirty>& changed,
 void Scene::Forward(std::map<Path, Dirty>& changed) const {
     // Changes at or under a relationship's targets reach the prims
     // holding it, as a material's reach the prims bound to it, and on
-    // through theirs (an animation, its skeleton, the skinned meshes).
+    // through theirs (an animation, its skeleton, the skinned
+    // meshes).
     const auto& dependents = Dependents();
     for (bool more = !dependents.empty() && !changed.empty(); more;) {
         more = false;
@@ -1725,13 +1752,15 @@ Scene::Collect(ChangeCursor& cursor,
     const auto reaches = [&dependents](const ColumnData& column) {
         for (const auto& [target, sources] : dependents) {
             // A row's prim at or under the target...
-            const auto under = std::ranges::lower_bound(column.sorted, target);
-            if (under != column.sorted.end() && under->HasPrefix(target)) {
+            const auto under =
+                std::ranges::lower_bound(column.sorted, target);
+            if (under != column.sorted.end() &&
+                under->HasPrefix(target)) {
                 return true;
             }
             // ...or the target under one.
-            for (Path at = target.Parent(); !at.IsEmpty() && !at.IsRoot();
-                 at = at.Parent()) {
+            for (Path at = target.Parent();
+                 !at.IsEmpty() && !at.IsRoot(); at = at.Parent()) {
                 if (std::ranges::binary_search(column.sorted, at)) {
                     return true;
                 }

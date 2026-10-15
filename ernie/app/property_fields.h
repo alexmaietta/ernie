@@ -96,8 +96,8 @@ bool ResetSquare(const Viewer& viewer, bool authored);
 /// Draws the icon glyph `icon` (one UTF-8 character) centred on
 /// `centre` by its ink, not its advance, which icon fonts leave
 /// uneven.
-void DrawIconCentred(ImDrawList* draw, const char* icon, ImVec2 centre,
-                     ImU32 colour);
+void DrawIconCentred(ImDrawList* draw, const char* icon,
+                     ImVec2 centre, ImU32 colour);
 
 /// A square button `size` pixels across showing `icon` centred by its
 /// ink (`DrawIconCentred`); `id` its ImGui id. Returns whether it was

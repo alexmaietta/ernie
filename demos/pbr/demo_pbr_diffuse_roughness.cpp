@@ -51,8 +51,8 @@ constexpr std::array<glm::dvec3, 2> kCentres = {
 /// depth.
 glm::dvec3 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -66,7 +66,8 @@ glm::dvec3 Project(const glm::dvec3& point) {
 glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
                     double inner, double outer) {
     const glm::dvec3 at = Project(point);
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t rows = image.Shape()[0];
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
@@ -74,9 +75,9 @@ glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
     double count = 0.0;
     for (std::int64_t row = 0; row < rows; ++row) {
         for (std::int64_t col = 0; col < cols; ++col) {
-            const double r = std::hypot(col + 0.5 - at.x,
-                                        row + 0.5 - at.y) /
-                             (at.z * kRadius);
+            const double r =
+                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) /
+                (at.z * kRadius);
             if (r < inner || r >= outer) {
                 continue;
             }
@@ -114,7 +115,8 @@ class DiffuseRoughnessDemo : public app::Demo {
             scene.Set(look, "inputs:specular_weight", 0.0);
             scene.Set(look, "inputs:base_diffuse_roughness",
                       i == 0 ? 0.0 : kRoughness);
-            const std::string ball = "/World/" + std::string(names[i]);
+            const std::string ball =
+                "/World/" + std::string(names[i]);
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetMaterialBinding(look);
@@ -132,11 +134,12 @@ class DiffuseRoughnessDemo : public app::Demo {
             .SetResolution({kWidth, kHeight})
             .SetAmbient(0.0);
 
-        Widgets().Slider("Diffuse roughness (right)", 0.0, 1.0,
-                         kRoughness,
-                         [this](double roughness) { Roughen(roughness); });
-        Widgets().Slider("Sun phase angle", 0.0, 150.0, kPhase,
-                         [this](double degrees) { LightAt(degrees); });
+        Widgets().Slider(
+            "Diffuse roughness (right)", 0.0, 1.0, kRoughness,
+            [this](double roughness) { Roughen(roughness); });
+        Widgets().Slider(
+            "Sun phase angle", 0.0, 150.0, kPhase,
+            [this](double degrees) { LightAt(degrees); });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->LookAt(kEye, kTarget);
@@ -152,13 +155,14 @@ class DiffuseRoughnessDemo : public app::Demo {
         const Tensor smooth = GetRenderer().Render(GetScene());
         Roughen(kRoughness);
         LightAt(kPhase);
-        std::printf(
-            "Limb over middle with the sun behind the camera: Lambert "
-            "%.3f, rough %.3f\n",
-            lambert, rough);
+        std::printf("Limb over middle with the sun behind the "
+                    "camera: Lambert "
+                    "%.3f, rough %.3f\n",
+                    lambert, rough);
         Check(0.35 < lambert && lambert < 0.75,
               "Lambert's limb darkens as cos");
-        Check(rough > lambert + 0.1, "the rough ball's limb is flatter");
+        Check(rough > lambert + 0.1,
+              "the rough ball's limb is flatter");
         Check(std::abs(LimbDarkening(smooth, 1) - lambert) < 0.02,
               "roughness 0 is Lambert");
     }
@@ -183,8 +187,8 @@ class DiffuseRoughnessDemo : public app::Demo {
         const glm::dvec3 weights(0.2126, 0.7152, 0.0722);
         const double middle =
             glm::dot(DiscMean(image, kCentres[i], 0.0, 0.3), weights);
-        const double limb =
-            glm::dot(DiscMean(image, kCentres[i], 0.8, 0.95), weights);
+        const double limb = glm::dot(
+            DiscMean(image, kCentres[i], 0.8, 0.95), weights);
         return limb / middle;
     }
 };

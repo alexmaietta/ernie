@@ -443,8 +443,10 @@ bool IsViewChange(const Scene& scene, const Change& change);
 /// `attribute` (`GpuXformGroup::Channels`): contiguous float32, a row
 /// of 3 per instance for colours, of 1 for temperatures and
 /// visibility.
-bool IsInstanceChannel(const Tensor& rows, std::string_view attribute) {
-    const std::int64_t width = attribute == tokens::kDisplayColor ? 3 : 1;
+bool IsInstanceChannel(const Tensor& rows,
+                       std::string_view attribute) {
+    const std::int64_t width =
+        attribute == tokens::kDisplayColor ? 3 : 1;
     return rows.Type() == DType::Float32 && rows.IsContiguous() &&
            rows.Rank() >= 1 && rows.Rank() <= 2 &&
            (rows.Rank() == 2 ? rows.Shape()[1] == width : width == 1);
@@ -670,21 +672,23 @@ class DelegateColumns final : public ColumnStorage {
         : delegate_(delegate) {}
 
     std::optional<Rows> Allocate(Scene& scene, const PrimSet& prims,
-                                 std::string_view attribute, Device device,
+                                 std::string_view attribute,
+                                 Device device,
                                  std::uintptr_t stream) override {
         ComputeInterop* compute = delegate_.Compute();
         if (compute == nullptr || device != compute->Location()) {
             return std::nullopt;
         }
         try {
-            return Rows{delegate_.MapArray(scene, prims, attribute, stream),
-                        true};
+            return Rows{
+                delegate_.MapArray(scene, prims, attribute, stream),
+                true};
         } catch (const std::invalid_argument&) {
         }
-        // One prim's array (a mesh's points, an instancer's positions,
-        // a terrain's heights) as the column's one row: the arrays it
-        // draws from, which alternate between frames, so asked for
-        // each time.
+        // One prim's array (a mesh's points, an instancer's
+        // positions, a terrain's heights) as the column's one row:
+        // the arrays it draws from, which alternate between frames,
+        // so asked for each time.
         if (prims.Size() == 1) {
             try {
                 const Tensor array = delegate_.MapArray(
@@ -696,7 +700,8 @@ class DelegateColumns final : public ColumnStorage {
             }
         }
         try {
-            const Tensor host = scene.GetColumn(prims, attribute).Read();
+            const Tensor host =
+                scene.GetColumn(prims, attribute).Read();
             if (host.Location().kind != DeviceKind::Cpu) {
                 return std::nullopt;
             }
@@ -958,39 +963,53 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
             throw UploadError(path, attribute, error.what());
         }
     }
-    // Its temperature texture: its thermal terminal's, one channel in
-    // kelvin after the reader's scale and bias, else its own tensor.
+    // Its thermal texture: kelvin and thermal inertia, each its
+    // thermal terminal's texture (one channel after the reader's
+    // scale and bias), else its own tensor.
     const Key temperatureKey =
-        KeyOf(scene, path, {kThermalTemperatureTexture});
+        KeyOf(scene, path,
+              {kThermalTemperatureTexture, kThermalInertiaTexture});
+    const auto readerKey =
+        [&](const std::optional<TextureReader>& r) {
+            return r ? TextureKey(scene, *r) : std::string();
+        };
     const std::string temperatureReader =
-        settings.temperatureTexture
-            ? TextureKey(scene, *settings.temperatureTexture)
-            : std::string();
-    if (material.temperatureTexture != temperatureKey ||
-        material.temperatureReader != temperatureReader) {
-        material.temperatureTexture = temperatureKey;
-        material.temperatureReader = temperatureReader;
+        readerKey(settings.temperatureTexture) + "|" +
+        readerKey(settings.inertiaTexture);
+    if (material.temperatureTexture == temperatureKey &&
+        material.temperatureReader == temperatureReader) {
+        return;
+    }
+    material.temperatureTexture = temperatureKey;
+    material.temperatureReader = temperatureReader;
+    struct Channel {
+        std::vector<float> values;
+        std::uint32_t width = 0;
+        std::uint32_t height = 0;
+    };
+    const auto load = [&](const std::optional<TextureReader>& source,
+                          const Tensor* tensor,
+                          std::string_view attribute) {
+        Channel channel;
         try {
-            if (settings.temperatureTexture) {
-                TextureReader reader = *settings.temperatureTexture;
+            if (source) {
+                TextureReader reader = *source;
                 reader.colorSpace = TextureColorSpace::Raw;
                 const Image image = TextureImageOf(scene, reader);
                 const auto c =
                     static_cast<glm::length_t>(reader.channel);
-                std::vector<float> kelvin;
-                kelvin.reserve(image.pixels.size());
+                channel.values.reserve(image.pixels.size());
                 for (const glm::vec4& texel : image.pixels) {
-                    kelvin.push_back(texel[c] * reader.scale[c] +
-                                     reader.bias[c]);
+                    channel.values.push_back(
+                        texel[c] * reader.scale[c] + reader.bias[c]);
                 }
-                gpu.SetTemperatureTexture(kelvin, image.width,
-                                          image.height);
-            } else if (const Tensor* tensor =
-                           prim.GetThermalTemperatureTexture()) {
-                const Tensor kelvin = tensor->Contiguous();
+                channel.width = image.width;
+                channel.height = image.height;
+            } else if (tensor != nullptr) {
+                const Tensor values = tensor->Contiguous();
                 const std::vector<std::int64_t> shape =
-                    kelvin.Shape();
-                if (kelvin.Type() != DType::Float32 ||
+                    values.Shape();
+                if (values.Type() != DType::Float32 ||
                     (shape.size() != 2 &&
                      !(shape.size() == 3 && shape[2] == 1)) ||
                     shape[0] < 1 || shape[1] < 1) {
@@ -1011,10 +1030,9 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
         }
         return channel;
     };
-    const Channel kelvin =
-        load(settings.temperatureTexture,
-             prim.GetThermalTemperatureTexture(),
-             kThermalTemperatureTexture);
+    const Channel kelvin = load(settings.temperatureTexture,
+                                prim.GetThermalTemperatureTexture(),
+                                kThermalTemperatureTexture);
     const Channel inertia =
         load(settings.inertiaTexture, prim.GetThermalInertiaTexture(),
              kThermalInertiaTexture);
@@ -1026,7 +1044,8 @@ void RasterDelegate::SyncMaterial(const Scene& scene,
                 "its temperature and thermal inertia textures differ "
                 "in size");
         }
-        const Channel& size = kelvin.values.empty() ? inertia : kelvin;
+        const Channel& size =
+            kelvin.values.empty() ? inertia : kelvin;
         if (!size.values.empty() || gpu.HasThermalTexture()) {
             gpu.SetThermalTexture(kelvin.values, inertia.values,
                                   size.width, size.height);
@@ -2142,7 +2161,8 @@ std::uint64_t GeometryHash(const MeshData& data) {
 
 bool SameGeometry(const MeshData& a, const MeshData& b) {
     return a.points == b.points && a.indices == b.indices &&
-           a.normals == b.normals && a.cornerNormals == b.cornerNormals &&
+           a.normals == b.normals &&
+           a.cornerNormals == b.cornerNormals &&
            a.colors == b.colors && a.uvs == b.uvs &&
            a.lodIndices == b.lodIndices && a.lodUvs == b.lodUvs &&
            a.lodCornerNormals == b.lodCornerNormals &&
@@ -2161,7 +2181,8 @@ std::uint32_t RasterDelegate::ShareMesh(MeshData data) {
         }
     }
     const std::uint32_t handle = meshes_.AddMesh(data);
-    sharedMeshes_.emplace(hash, SharedMesh{handle, 1, std::move(data)});
+    sharedMeshes_.emplace(hash,
+                          SharedMesh{handle, 1, std::move(data)});
     sharedHashes_[handle] = hash;
     return handle;
 }
@@ -2405,7 +2426,8 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
             if (synced.versions == versions) {
                 continue;
             }
-            // A shared mesh is never written for one prim: added again.
+            // A shared mesh is never written for one prim: added
+            // again.
             if (synced.handle != 0 && !synced.shared &&
                 !(subdivision && synced.versions[0] != versions[0])) {
                 try {
@@ -2461,12 +2483,13 @@ void RasterDelegate::SyncMeshes(const Scene& scene,
                                 : MeshDataOf(scene, path);
             synced.hasColors = !data.colors.empty();
             synced.tint = ConstantDisplayColor(Gprim(scene, path));
-            // An implicit shape nothing writes for it alone shares the
-            // mesh of its geometry: a field of like cubes adds one.
+            // An implicit shape nothing writes for it alone shares
+            // the mesh of its geometry: a field of like cubes adds
+            // one.
             synced.shared =
-                scene.TypeOf(path) != kMesh && !deformed && !gpuIndices &&
-                !gpuNormals && !gpuColors && !onGpu(kPoints) &&
-                !meshWriters_.contains(path) &&
+                scene.TypeOf(path) != kMesh && !deformed &&
+                !gpuIndices && !gpuNormals && !gpuColors &&
+                !onGpu(kPoints) && !meshWriters_.contains(path) &&
                 scene.Read(path, kActiveCounts) == nullptr &&
                 scene.Read(path, kThermalTemperatures) == nullptr &&
                 scene.Read(path, kThermalNodeIds) == nullptr;
@@ -3180,19 +3203,22 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
     };
     // The members' `attribute` as rows of one array (a column), each
     // at its pose's row: one of the group's instance channels.
-    const auto columnChannel = [&scene](const std::vector<Member>& members,
-                                        std::string_view attribute) {
+    const auto columnChannel = [&scene](
+                                   const std::vector<Member>& members,
+                                   std::string_view attribute) {
         const Tensor* whole = nullptr;
         for (const Member& member : members) {
             const std::pair<Tensor, std::int64_t>* row =
                 scene.RowOf(member.path, attribute);
             if (row == nullptr || row->second != member.pose.row ||
-                (whole != nullptr && row->first.Data() != whole->Data())) {
+                (whole != nullptr &&
+                 row->first.Data() != whole->Data())) {
                 return Tensor();
             }
             whole = &row->first;
         }
-        return whole != nullptr && IsInstanceChannel(*whole, attribute)
+        return whole != nullptr &&
+                       IsInstanceChannel(*whole, attribute)
                    ? *whole
                    : Tensor();
     };
@@ -3299,7 +3325,8 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
 
     // What posed what before, to tell whether the draws under them
     // need building again.
-    const std::unordered_map<Path, GpuPosed> before = std::move(gpuPosed_);
+    const std::unordered_map<Path, GpuPosed> before =
+        std::move(gpuPosed_);
     gpuPosed_.clear();
     for (const auto& [key, members] : groups) {
         try {
@@ -3337,7 +3364,8 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
                 }
                 for (const std::string_view attribute :
                      {kXformOpOrder, kXformExtent, kQuaternionOrder,
-                      kDisplayColor, kThermalTemperature, kVisibility}) {
+                      kDisplayColor, kThermalTemperature,
+                      kVisibility}) {
                     version += scene.AttributeVersion(member.path,
                                                       attribute);
                 }
@@ -3394,9 +3422,11 @@ void RasterDelegate::SyncGpuXforms(const Scene& scene) {
             for (const auto& [op, whole] : first.ops) {
                 group.ops.push_back(op);
             }
-            for (const auto& [attribute, channel] : group.Channels()) {
-                *channel =
-                    composed ? Tensor() : columnChannel(members, attribute);
+            for (const auto& [attribute, channel] :
+                 group.Channels()) {
+                *channel = composed
+                               ? Tensor()
+                               : columnChannel(members, attribute);
             }
             // Versions count within one scene: another scene's prims
             // at the same paths upload.
@@ -3488,7 +3518,8 @@ void RasterDelegate::UploadGpuXformGroup(GpuXformGroup& group,
     // Its prims' colours, temperatures and visibility, columns of
     // them, as instance channels.
     const auto onDevice = [&compute](const Tensor& channel) {
-        return channel.Empty() || channel.Location().kind != DeviceKind::Cpu
+        return channel.Empty() ||
+                       channel.Location().kind != DeviceKind::Cpu
                    ? channel
                    : compute.Upload(channel);
     };
@@ -3709,8 +3740,8 @@ bool RasterDelegate::RefreshGpuXforms(
         }
     }
     // Columns written whole: a group's transform op or constant
-    // colours, its rows in the group's order (its first and last prims
-    // checked), all of them.
+    // colours, its rows in the group's order (its first and last
+    // prims checked), all of them.
     for (const ColumnChange& column : columns) {
         const std::vector<Path>& paths = *column.paths;
         const auto first = gpuPosed_.find(paths.front());
@@ -3722,7 +3753,8 @@ bool RasterDelegate::RefreshGpuXforms(
         GpuXformGroup& group = *first->second.group;
         if (group.members != paths.size() || first->second.row != 0 ||
             std::size_t{last->second.row} + 1 != paths.size() ||
-            scene.AttributeVersion(paths.front(), tokens::kXformOpOrder) >
+            scene.AttributeVersion(paths.front(),
+                                   tokens::kXformOpOrder) >
                 syncedVersion_) {
             return false;
         }
@@ -3747,8 +3779,10 @@ bool RasterDelegate::RefreshGpuXforms(
             seen.rewritten = std::max(seen.rewritten, paths.size());
             continue;
         }
-        const auto op = std::ranges::find(group.ops, column.attribute);
-        if (column.bits != Dirty::Transform || op == group.ops.end()) {
+        const auto op =
+            std::ranges::find(group.ops, column.attribute);
+        if (column.bits != Dirty::Transform ||
+            op == group.ops.end()) {
             return false;
         }
         const auto index =
@@ -4313,8 +4347,8 @@ void RasterDelegate::Sync(const Scene& scene) {
     if (changed) {
         changedMeshes = ChangedMeshes(scene, *changed);
         if (changedMeshes) {
-            changedMeshes->insert(changedMeshes->end(), unshared_.begin(),
-                                  unshared_.end());
+            changedMeshes->insert(changedMeshes->end(),
+                                  unshared_.begin(), unshared_.end());
         }
         if (changedMeshes &&
             2 * changedMeshes->size() > syncedMeshes_.size()) {
@@ -4331,9 +4365,10 @@ void RasterDelegate::Sync(const Scene& scene) {
     // whose transform became GPU arrays.
     const bool gpuXforms =
         !changed ||
-        std::ranges::any_of(*changed, [this, &scene](const Change& change) {
-            if (!Any(change.bits,
-                     Dirty::Transform | Dirty::Added | Dirty::Removed)) {
+        std::ranges::any_of(*changed, [this,
+                                       &scene](const Change& change) {
+            if (!Any(change.bits, Dirty::Transform | Dirty::Added |
+                                      Dirty::Removed)) {
                 return false;
             }
             if (gpuPosed_.contains(change.path)) {
@@ -4387,7 +4422,8 @@ void RasterDelegate::Sync(const Scene& scene) {
         }
     }
     attempt([&] { SyncItems(scene, touched ? &*touched : nullptr); });
-    // The draws under GPU-posed prims are built as they are posed now.
+    // The draws under GPU-posed prims are built as they are posed
+    // now.
     gpuPosedChanged_ = false;
     syncedVersion_ = scene.Version();
     if (!errors.empty()) {
@@ -4440,7 +4476,8 @@ void RasterDelegate::ShadeItem(const Scene& scene, const Path& mesh,
                                const SyncedMesh& synced,
                                MeshItem& item) const {
     item.material = MaterialOf(scene, mesh);
-    const bool bound = item.material != RasterRenderer::kDefaultMaterial;
+    const bool bound =
+        item.material != RasterRenderer::kDefaultMaterial;
     item.tint = bound ? glm::vec3(1.0f) : synced.tint;
     item.vertexColors = !bound;
     if (bound) {
@@ -4558,15 +4595,18 @@ void RasterDelegate::SyncItems(const Scene& scene,
         }
     }
     // Each mesh's own draw, none when hidden or in a prototype.
-    const auto build = [&](const Path& path, const SyncedMesh& synced)
-        -> std::optional<MeshItem> {
+    const auto build =
+        [&](const Path& path,
+            const SyncedMesh& synced) -> std::optional<MeshItem> {
         if (synced.handle == 0 || inPrototypes_.contains(path)) {
             return std::nullopt;
         }
-        // Under a group whose visibility is a column, hidden on the GPU
-        // (`GpuXformGroup::visible`), so drawn while what is above its
-        // prim shows it.
-        const std::optional<GpuAnchor> anchor = GpuAnchorOf(scene, path);
+        // Under a group whose visibility is a column, hidden on the
+        // GPU
+        // (`GpuXformGroup::visible`), so drawn while what is above
+        // its prim shows it.
+        const std::optional<GpuAnchor> anchor =
+            GpuAnchorOf(scene, path);
         const auto posed =
             anchor ? gpuPosed_.find(anchor->at) : gpuPosed_.end();
         const bool channelled = posed != gpuPosed_.end() &&
@@ -4619,7 +4659,8 @@ void RasterDelegate::SyncItems(const Scene& scene,
     }
     std::vector<MeshItem> instanced = InstancerItems(scene);
     // The same draws, a few edited: patched where they are, by their
-    // index at the last full setting, with the instancers' after them.
+    // index at the last full setting, with the instancers' after
+    // them.
     if (touched != nullptr && meshItemCount_ &&
         *meshItemCount_ + instanced.size() == meshes_.ItemCount()) {
         std::vector<std::pair<std::size_t, MeshItem>> changed;

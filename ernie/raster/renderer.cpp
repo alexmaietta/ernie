@@ -4,6 +4,7 @@
 #include "ernie/device/gpu_profile.h"
 #include "ernie/kernel/embedded_shaders.h"
 #include "ernie/raster/poisson_disk.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/scene/wide_view.h"
 #include "ernie/session/sampling.h"
 
@@ -2869,7 +2870,8 @@ void RasterRenderer::WriteLights(
                         // it spans (`beamExtra` yzw for shading).
                         glm::vec2 low(1.0f);
                         glm::vec2 high(0.0f);
-                        float nearest = std::numeric_limits<float>::max();
+                        float nearest =
+                            std::numeric_limits<float>::max();
                         float farthest = 0.0f;
                         for (int c = 0; c < 8; ++c) {
                             const glm::vec4 clip =

@@ -47,13 +47,15 @@ constexpr std::array<double, 6> kRamp = {270.0, 290.0, 310.0,
                                          330.0, 350.0, 370.0};
 constexpr double kBlockTemperature = 330.0;
 constexpr double kGroundTemperature = 295.0;
-constexpr double kSkyTemperature = 230.0;  // a clear sky's, 8 to 14 um
+constexpr double kSkyTemperature =
+    230.0;  // a clear sky's, 8 to 14 um
 
 constexpr glm::dvec2 kResolution(400.0, 300.0);
 constexpr double kFocalLength = 24.0;  // mm
 constexpr double kAperture = 20.955;   // mm
 constexpr glm::dvec3 kEye(0.0, -5.5, 2.6);
-constexpr glm::dvec3 kTarget(0.0, 0.2, 1.2);  // the sky above the horizon
+constexpr glm::dvec3 kTarget(0.0, 0.2,
+                             1.2);  // the sky above the horizon
 
 glm::dvec3 FinishCentre(std::size_t i) {
     return {0.7 * (static_cast<double>(i) - 3.0), 0.8, 0.25};
@@ -81,23 +83,27 @@ class ThermalDemo : public app::Demo {
             .SetCheckerColor1(glm::dvec3(0.8))
             .SetMaterialBinding("/World/Looks/Concrete");
         for (std::size_t i = 0; i < kFinishes.size(); ++i) {
-            const Path look("/World/Looks/" + std::string(kFinishes[i]));
+            const Path look("/World/Looks/" +
+                            std::string(kFinishes[i]));
             Material::Define(scene, look)
                 .SetReflectanceLibrary(kFinishes[i])
                 .SetThermalTemperature(kBlockTemperature);
             const Path block("/World/Block" + std::to_string(i));
-            Cube::Define(scene, block).SetSize(0.5).SetMaterialBinding(
-                look);
+            Cube::Define(scene, block)
+                .SetSize(0.5)
+                .SetMaterialBinding(look);
             SetXform(scene, block, {.translate = FinishCentre(i)});
         }
         for (std::size_t i = 0; i < kRamp.size(); ++i) {
-            const Path look("/World/Looks/Sphere" + std::to_string(i));
+            const Path look("/World/Looks/Sphere" +
+                            std::to_string(i));
             Material::Define(scene, look)
                 .SetReflectanceLibrary("black_paint")
                 .SetThermalTemperature(kRamp[i]);
             const Path ball("/World/Sphere" + std::to_string(i));
-            Sphere::Define(scene, ball).SetRadius(0.25).SetMaterialBinding(
-                look);
+            Sphere::Define(scene, ball)
+                .SetRadius(0.25)
+                .SetMaterialBinding(look);
             SetXform(scene, ball, {.translate = RampCentre(i)});
         }
         // The Sun 40 degrees up behind the camera.
@@ -107,23 +113,23 @@ class ThermalDemo : public app::Demo {
             .SetAngle(0.53)
             .SetTransform(DistantLightTransform(
                 glm::normalize(glm::dvec3(-0.4, -0.8, 0.75))));
-        // A blue sky, scattered sunlight falling as 1/lambda^4 to none
-        // past 1.1 um; the thermal camera sees its background
+        // A blue sky, scattered sunlight falling as 1/lambda^4 to
+        // none past 1.1 um; the thermal camera sees its background
         // temperature.
         DomeLight::Define(scene, "/World/Sky")
             .SetSpectrum(std::vector<float>{
-                380.0f,  0.22f,  450.0f,  0.17f, 500.0f, 0.13f,
-                550.0f,  0.10f,  600.0f,  0.075f, 700.0f, 0.04f,
-                850.0f,  0.017f, 1100.0f, 0.0f,  20000.0f, 0.0f});
+                380.0f, 0.22f, 450.0f, 0.17f, 500.0f, 0.13f, 550.0f,
+                0.10f, 600.0f, 0.075f, 700.0f, 0.04f, 850.0f, 0.017f,
+                1100.0f, 0.0f, 20000.0f, 0.0f});
 
         // Visible light by the sunny 16 rule; the thermal camera a
-        // microbolometer over 8 to 14 um, its brightness temperature in
-        // the ironbow palette from 265 to 375 K.
+        // microbolometer over 8 to 14 um, its brightness temperature
+        // in the ironbow palette from 265 to 375 K.
         DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0},
                      17, {"LdrColor"});
-        DefineCamera(kThermalCamera, kThermalProduct,
-                     {8000.0, 14000.0}, 6,
-                     {"LdrColor", "Temperature", "BrightnessTemperature"});
+        DefineCamera(
+            kThermalCamera, kThermalProduct, {8000.0, 14000.0}, 6,
+            {"LdrColor", "Temperature", "BrightnessTemperature"});
         Camera(scene, kVisibleCamera)
             .SetExposureFStop(16.0)
             .SetExposureTime(0.01)
@@ -135,14 +141,16 @@ class ThermalDemo : public app::Demo {
             .SetFilterType("thermalDisplay");
         for (const auto& [name, value] :
              {std::pair{"automatic", 0.0f}, std::pair{"low", 265.0f},
-              std::pair{"high", 375.0f}, std::pair{"palette", 2.0f}}) {
-            scene.Set(chain.Child("Display"), "inputs:" + std::string(name),
-                      value);
+              std::pair{"high", 375.0f},
+              std::pair{"palette", 2.0f}}) {
+            scene.Set(chain.Child("Display"),
+                      "inputs:" + std::string(name), value);
         }
         SensorFilterPrim::Define(scene, chain.Child("Exposure"))
             .SetFilterType("exposure");
         RenderProduct(scene, kThermalProduct)
-            .SetFilters({chain.Child("Bolometer"), chain.Child("Display"),
+            .SetFilters({chain.Child("Bolometer"),
+                         chain.Child("Display"),
                          chain.Child("Exposure")});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(kVisibleCamera)
@@ -155,7 +163,8 @@ class ThermalDemo : public app::Demo {
         Widgets().Combo("View",
                         {"Visible", "Thermal camera", "Temperature",
                          "Brightness temperature"},
-                        1, [this](std::size_t index) { Show(index); });
+                        1,
+                        [this](std::size_t index) { Show(index); });
         Widgets().Slider("Blocks (K)", 250.0, 400.0,
                          kBlockTemperature, [this](double kelvin) {
                              for (const char* finish : kFinishes) {
@@ -195,8 +204,9 @@ class ThermalDemo : public app::Demo {
         std::array<Sampled, kFinishes.size()> finish{};
         for (std::size_t i = 0; i < kFinishes.size(); ++i) {
             finish[i] = at(FinishCentre(i), kBlockTemperature);
-            std::printf("%s: visible %.3f thermal %.3f\n", kFinishes[i],
-                        finish[i].visible, finish[i].thermal);
+            std::printf("%s: visible %.3f thermal %.3f\n",
+                        kFinishes[i], finish[i].visible,
+                        finish[i].thermal);
             Check(finish[i].count > 0,
                   std::string(kFinishes[i]) +
                       " should read its temperature in the "
@@ -208,9 +218,10 @@ class ThermalDemo : public app::Demo {
         const Sampled& aluminium = finish[6];
         Check(white.visible > 3.0 * black.visible,
               "white paint should be the brighter in the visible");
-        Check(std::abs(white.thermal - black.thermal) <
-                  0.1 * black.thermal,
-              "white and black paint should glow alike at 8 to 14 um");
+        Check(
+            std::abs(white.thermal - black.thermal) <
+                0.1 * black.thermal,
+            "white and black paint should glow alike at 8 to 14 um");
         Check(std::abs(copper.thermal - black.thermal) <
                   0.1 * black.thermal,
               "weathered copper's oxide should glow as paint does");
@@ -221,7 +232,8 @@ class ThermalDemo : public app::Demo {
         Check(ground.count > 0,
               "the ground should read the default temperature");
         Check(aluminium.thermal < ground.thermal,
-              "hot aluminium should look colder than the cooler ground");
+              "hot aluminium should look colder than the cooler "
+              "ground");
         double previous = 0.0;
         for (std::size_t i = 0; i < kRamp.size(); ++i) {
             const Sampled sphere = at(RampCentre(i), kRamp[i]);
@@ -246,9 +258,10 @@ class ThermalDemo : public app::Demo {
         };
         const double paintReads = brightnessAt(FinishCentre(0));
         const double aluminiumReads = brightnessAt(FinishCentre(6));
-        std::printf("brightness temperature: black paint %.1f K, bare "
-                    "aluminium %.1f K\n",
-                    paintReads, aluminiumReads);
+        std::printf(
+            "brightness temperature: black paint %.1f K, bare "
+            "aluminium %.1f K\n",
+            paintReads, aluminiumReads);
         Check(std::abs(paintReads - kBlockTemperature) < 6.0,
               "black paint should read near its temperature");
         Check(aluminiumReads < 300.0,
@@ -342,7 +355,8 @@ class ThermalDemo : public app::Demo {
         images.kelvin.assign(data, data + Rows() * Cols());
         const Tensor brightness =
             map(kThermalProduct, "BrightnessTemperature");
-        const auto* read = static_cast<const float*>(brightness.Data());
+        const auto* read =
+            static_cast<const float*>(brightness.Data());
         images.brightness.assign(read, read + Rows() * Cols());
         return images;
     }
@@ -351,7 +365,8 @@ class ThermalDemo : public app::Demo {
     /// heatmap.
     static Tensor Rgb(const Tensor& image) {
         Tensor rgb = Tensor::Zeros(DType::UInt8, {Rows(), Cols(), 3});
-        const auto* in = static_cast<const std::uint8_t*>(image.Data());
+        const auto* in =
+            static_cast<const std::uint8_t*>(image.Data());
         auto* out = static_cast<std::uint8_t*>(rgb.Data());
         const auto channels = image.Shape()[2];
         for (std::int64_t i = 0; i < Rows() * Cols(); ++i) {
@@ -367,15 +382,18 @@ class ThermalDemo : public app::Demo {
             glm::normalize(glm::cross(forward, {0.0, 0.0, 1.0}));
         const glm::dvec3 up = glm::cross(right, forward);
         const glm::dvec3 d = point - kEye;
-        const double pixels = kFocalLength / kAperture * kResolution.x;
+        const double pixels =
+            kFocalLength / kAperture * kResolution.x;
         const double depth = glm::dot(d, forward);
-        return {0.5 * kResolution.x + pixels * glm::dot(d, right) / depth,
-                0.5 * kResolution.y - pixels * glm::dot(d, up) / depth};
+        return {
+            0.5 * kResolution.x + pixels * glm::dot(d, right) / depth,
+            0.5 * kResolution.y - pixels * glm::dot(d, up) / depth};
     }
 
     /// The mean brightness (0 to 1) of an image's top row.
     static double Sky(const Tensor& image) {
-        const auto* data = static_cast<const std::uint8_t*>(image.Data());
+        const auto* data =
+            static_cast<const std::uint8_t*>(image.Data());
         double sum = 0.0;
         for (std::int64_t c = 0; c < Cols(); ++c) {
             for (std::int64_t k = 0; k < 3; ++k) {
@@ -395,8 +413,10 @@ class ThermalDemo : public app::Demo {
         Sampled sampled;
         for (int r = -4; r <= 4; ++r) {
             for (int c = -4; c <= 4; ++c) {
-                const auto row = static_cast<std::int64_t>(centre.y) + r;
-                const auto col = static_cast<std::int64_t>(centre.x) + c;
+                const auto row =
+                    static_cast<std::int64_t>(centre.y) + r;
+                const auto col =
+                    static_cast<std::int64_t>(centre.x) + c;
                 const auto pixel =
                     static_cast<std::size_t>(row * Cols() + col);
                 if (std::abs(images.kelvin[pixel] - kelvin) > 0.01) {

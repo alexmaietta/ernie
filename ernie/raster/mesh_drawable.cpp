@@ -373,7 +373,8 @@ constexpr std::uint32_t kCullMoved =
     4;  ///< The instancer's transform moved since the last frame.
 /// A draw without an instancer: its one instance is its transform's.
 constexpr std::uint32_t kCullNoInstances = 8;
-/// Its instancer hides some instances (`instanceVisible_`): never kept.
+/// Its instancer hides some instances (`instanceVisible_`): never
+/// kept.
 constexpr std::uint32_t kCullVisibility = 16;
 
 /// Grows `buffer` to hold `bytes`, waiting for the device first if it
@@ -508,7 +509,8 @@ void CheckInstances(const InstanceData& data) {
         throw std::invalid_argument(
             "Instance colours must have 3 values per instance");
     }
-    if (!data.temperatures.empty() && data.temperatures.size() != count) {
+    if (!data.temperatures.empty() &&
+        data.temperatures.size() != count) {
         throw std::invalid_argument(
             "Instance temperatures must have 1 value per instance");
     }
@@ -553,7 +555,8 @@ TransformBox(const glm::mat4& transform, const glm::vec3& low,
 void PoseDraw(GpuDraw& draw, const glm::mat4& model,
               const glm::mat4& previous, const glm::mat4& prototype,
               const glm::vec3& tint, float temperature) {
-    std::memcpy(draw.model, glm::value_ptr(model), sizeof(draw.model));
+    std::memcpy(draw.model, glm::value_ptr(model),
+                sizeof(draw.model));
     std::memcpy(draw.previous, glm::value_ptr(previous),
                 sizeof(draw.previous));
     std::memcpy(draw.prototype, glm::value_ptr(prototype),
@@ -568,11 +571,13 @@ void PoseDraw(GpuDraw& draw, const glm::mat4& model,
 /// [`low`, `high`] as a sphere, and whether it moved; its other flags
 /// (`info[1]`) kept.
 void PoseCullItem(GpuCullItem& entry, const glm::mat4& model,
-                  const glm::mat4& previous, const glm::mat4& prototype,
-                  const glm::vec3& low, const glm::vec3& high) {
+                  const glm::mat4& previous,
+                  const glm::mat4& prototype, const glm::vec3& low,
+                  const glm::vec3& high) {
     const auto [boxLow, boxHigh] = TransformBox(prototype, low, high);
     const glm::vec3 centre = 0.5f * (boxLow + boxHigh);
-    std::memcpy(entry.model, glm::value_ptr(model), sizeof(entry.model));
+    std::memcpy(entry.model, glm::value_ptr(model),
+                sizeof(entry.model));
     entry.sphere[0] = centre.x;
     entry.sphere[1] = centre.y;
     entry.sphere[2] = centre.z;
@@ -2308,7 +2313,8 @@ void MeshDrawable::RemoveMesh(std::uint32_t mesh) {
     RemoveMeshes(std::span(&mesh, 1));
 }
 
-void MeshDrawable::RemoveMeshes(std::span<const std::uint32_t> meshes) {
+void MeshDrawable::RemoveMeshes(
+    std::span<const std::uint32_t> meshes) {
     if (meshes.empty()) {
         return;
     }
@@ -2342,10 +2348,12 @@ bool MeshDrawable::HasInstanceColors(const Instancer& instancer) {
                               : !instancer.data.colors.empty();
 }
 
-bool MeshDrawable::HasInstanceTemperatures(const Instancer& instancer) {
+bool MeshDrawable::HasInstanceTemperatures(
+    const Instancer& instancer) {
     return !instancer.composed &&
-           (instancer.onDevice ? !instancer.device.temperatures.Empty()
-                               : !instancer.data.temperatures.empty());
+           (instancer.onDevice
+                ? !instancer.device.temperatures.Empty()
+                : !instancer.data.temperatures.empty());
 }
 
 bool MeshDrawable::HasInstanceVisibility(const Instancer& instancer) {
@@ -2461,9 +2469,11 @@ void MeshDrawable::SetInstances(std::uint32_t instancer,
           std::pair{&data.visible, "Instance visibility"}}) {
         if (!array->Empty()) {
             CheckDeviceTensor(*array, 1, what);
-            if (static_cast<std::size_t>(array->Elements()) != count) {
+            if (static_cast<std::size_t>(array->Elements()) !=
+                count) {
                 throw std::invalid_argument(
-                    std::string(what) + " must have 1 value per instance");
+                    std::string(what) +
+                    " must have 1 value per instance");
             }
         }
     }
@@ -3176,7 +3186,8 @@ void MeshDrawable::RebuildInstances() {
     orientations_ = Pool(std::as_bytes(std::span(orientations)));
     scales_ = Pool(std::as_bytes(std::span(scales)));
     instanceColors_ = Pool(std::as_bytes(std::span(colors)));
-    instanceTemperatures_ = Pool(std::as_bytes(std::span(temperatures)));
+    instanceTemperatures_ =
+        Pool(std::as_bytes(std::span(temperatures)));
     instanceVisible_ = Pool(std::as_bytes(std::span(visible)));
     for (auto& [handle, instancer] : instancers_) {
         instancer.set = 0;
@@ -3512,13 +3523,14 @@ void MeshDrawable::WriteInstancer(Instancer& instancer, bool flip) {
                                    device.stream);
         }
         if (!device.temperatures.Empty()) {
-            compute_->CopyToBuffer(device.temperatures,
-                                   *instanceTemperatures_,
-                                   first * sizeof(float), device.stream);
+            compute_->CopyToBuffer(
+                device.temperatures, *instanceTemperatures_,
+                first * sizeof(float), device.stream);
         }
         if (!device.visible.Empty()) {
             compute_->CopyToBuffer(device.visible, *instanceVisible_,
-                                   first * sizeof(float), device.stream);
+                                   first * sizeof(float),
+                                   device.stream);
         }
         instancer.inPlace = {};
         return;
@@ -3601,7 +3613,8 @@ void MeshDrawable::Prepare(const FrameParams& params,
         CreateCutoutPipelines(pushbroom);
     }
     // Transparent materials draw in their own phase, when shaded.
-    drawsTransparent_ = anyTransparent_ && minimal_ == MinimalMode::Off;
+    drawsTransparent_ =
+        anyTransparent_ && minimal_ == MinimalMode::Off;
     viewWorlds_.clear();
     for (std::size_t v = 0; v < params.Views(); ++v) {
         viewWorlds_.push_back(params.ViewWorld(v));
@@ -3891,8 +3904,9 @@ void MeshDrawable::WriteDraws() {
             flags |= HasInstanceTemperatures(instancer)
                          ? kHasInstanceTemperatures
                          : 0u;
-            flags |= HasInstanceVisibility(instancer) ? kHasInstanceVisibility
-                                                      : 0u;
+            flags |= HasInstanceVisibility(instancer)
+                         ? kHasInstanceVisibility
+                         : 0u;
             const std::uint32_t first = instancer.first;
             draw.points[3] = first;
             for (const std::uint32_t instance : item.instances) {
@@ -4296,7 +4310,8 @@ MeshDrawable::PlainBox(std::size_t item) const {
         plain.hostPoints = !mesh.data.points.empty();
         plain.anyPoints =
             plain.hostPoints || !mesh.devicePoints.Empty();
-        plain.box = TransformBox(transforms_[item], mesh.low, mesh.high);
+        plain.box =
+            TransformBox(transforms_[item], mesh.low, mesh.high);
         plain.known = true;
     }
     return plain;
@@ -4316,8 +4331,8 @@ MeshDrawable::RangeBounds(std::size_t item,
         Bounds3 box = plain.box;
         if (previousTransforms_[item] != transforms_[item]) {
             const Mesh& mesh = meshes_.at(draw.mesh);
-            const Bounds3 was = TransformBox(previousTransforms_[item],
-                                             mesh.low, mesh.high);
+            const Bounds3 was = TransformBox(
+                previousTransforms_[item], mesh.low, mesh.high);
             box = {glm::min(box.first, was.first),
                    glm::max(box.second, was.second)};
         }
@@ -4618,20 +4633,20 @@ void MeshDrawable::Cull(const FrameParams& params,
                        viewLayout_.worlds == viewWorlds &&
                        viewLayout_.culling == culling_ &&
                        viewLayout_.occlusion == occlusion_;
-    // The shadow views' lists, kept as the views' are while no cascade
-    // tests bounds here (the GPU culls, fits it, or it culls nothing)
-    // and their worlds, masks and culling stay: only their cull blocks
-    // are written again.
-    std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
-                           bool>>
+    // The shadow views' lists, kept as the views' are while no
+    // cascade tests bounds here (the GPU culls, fits it, or it culls
+    // nothing) and their worlds, masks and culling stay: only their
+    // cull blocks are written again.
+    std::vector<
+        std::tuple<std::optional<std::int32_t>, std::uint32_t, bool>>
         cascadeKeys;
     bool shadowsCacheable = cacheable;
     for (const ShadowCascade& cascade : cascades) {
         cascadeKeys.emplace_back(cascade.world, cascade.shadowMask,
                                  cascade.moving);
-        shadowsCacheable = shadowsCacheable &&
-                           (culling_ == Culling::Gpu ||
-                            cascade.gpuFitted || cascade.moving);
+        shadowsCacheable =
+            shadowsCacheable && (culling_ == Culling::Gpu ||
+                                 cascade.gpuFitted || cascade.moving);
     }
     const bool reuseShadows = shadowsCacheable && reuse &&
                               viewLayout_.shadows &&
@@ -4974,7 +4989,8 @@ std::uint64_t MeshDrawable::LayoutOf(const Instancer& instancer) {
 
 bool MeshDrawable::CullItemsKept() const {
     return !cullItemsDirty_ &&
-           cullItemBytes_.size() == items_.size() * sizeof(GpuCullItem);
+           cullItemBytes_.size() ==
+               items_.size() * sizeof(GpuCullItem);
 }
 
 void MeshDrawable::PatchItems() {
@@ -5001,8 +5017,9 @@ void MeshDrawable::PatchItems() {
             std::byte* entryAt =
                 cullItemBytes_.data() + i * sizeof(GpuCullItem);
             std::memcpy(&entry, entryAt, sizeof(entry));
-            PoseCullItem(entry, transforms_[i], previousTransforms_[i],
-                         item.prototype, mesh.low, mesh.high);
+            PoseCullItem(entry, transforms_[i],
+                         previousTransforms_[i], item.prototype,
+                         mesh.low, mesh.high);
             std::memcpy(entryAt, &entry, sizeof(entry));
         }
     }
@@ -5023,8 +5040,10 @@ void MeshDrawable::PatchInstanceBases(
     ERNIE_ZONE("Mesh patch instance bases");
     const bool items = CullItemsKept();
     for (std::size_t i = 0; i < items_.size(); ++i) {
-        const std::optional<std::uint32_t>& handle = items_[i].instancer;
-        if (!handle || std::ranges::find(flipped, *handle) == flipped.end()) {
+        const std::optional<std::uint32_t>& handle =
+            items_[i].instancer;
+        if (!handle ||
+            std::ranges::find(flipped, *handle) == flipped.end()) {
             continue;
         }
         const Instancer& instancer = instancers_.at(*handle);
@@ -5773,8 +5792,8 @@ std::size_t MeshDrawable::Record(
                 continue;
             }
             if (visible.job >= 0) {
-                // Occluders draw with the direct draws, their only set;
-                // other jobs in their culled set's phase.
+                // Occluders draw with the direct draws, their only
+                // set; other jobs in their culled set's phase.
                 if (visible.occluder ? !direct : culledSet < 0) {
                     continue;
                 }
@@ -5788,10 +5807,12 @@ std::size_t MeshDrawable::Record(
                     set == 0 ? job.output[1] : job.output[3];
                 // Shadow batches span materials, except cutout ones,
                 // which bind their own to test their opacity.
-                const std::uint32_t at = open ? open->item : visible.item;
+                const std::uint32_t at =
+                    open ? open->item : visible.item;
                 const bool sameMaterial =
                     materialOf(at) == materialOf(visible.item) &&
-                    itemPipelines_[at] == itemPipelines_[visible.item];
+                    itemPipelines_[at] ==
+                        itemPipelines_[visible.item];
                 const bool joins =
                     open && open->first + open->count == firstDraw &&
                     ((shadow && !cutout(open->item) &&
@@ -5833,9 +5854,10 @@ std::size_t MeshDrawable::Record(
             ranges.data(),
             ranges.size(),
             casters != nullptr ? casters->world : 0,
-            static_cast<std::int8_t>(
-                casters == nullptr ? 0 : casters->shared ? 1 : 2),
-            static_cast<std::int8_t>(!transparent ? 0
+            static_cast<std::int8_t>(casters == nullptr ? 0
+                                     : casters->shared  ? 1
+                                                        : 2),
+            static_cast<std::int8_t>(!transparent   ? 0
                                      : *transparent ? 2
                                                     : 1),
             shadow,

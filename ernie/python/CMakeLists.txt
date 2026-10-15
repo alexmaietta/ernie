@@ -22,9 +22,13 @@ target_compile_features(_ernie PRIVATE cxx_std_20)
 # Only the init function is exported; macOS's two-level namespace and Windows' explicit exports
 # keep the rest apart without a list.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(ernie_python_exports "${PROJECT_SOURCE_DIR}/cmake/ernie_python_exports.map")
-    target_link_options(_ernie PRIVATE "LINKER:--version-script=${ernie_python_exports}")
-    set_target_properties(_ernie PROPERTIES LINK_DEPENDS "${ernie_python_exports}")
+    set(ernie_python_exports
+        "${PROJECT_SOURCE_DIR}/cmake/ernie_python_exports.map")
+    target_link_options(
+        _ernie PRIVATE
+        "LINKER:--version-script=${ernie_python_exports}")
+    set_target_properties(_ernie PROPERTIES LINK_DEPENDS
+                                            "${ernie_python_exports}")
 endif()
 target_include_directories(
     _ernie SYSTEM PRIVATE "${NB_DIR}/include" ${Python_INCLUDE_DIRS})

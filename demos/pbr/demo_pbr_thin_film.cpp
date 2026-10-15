@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // OpenPBR's thin film: iridescence from a film a fraction of a micron
-// thick on the base's specular (thin_film_weight, thin_film_thickness,
-// thin_film_ior), like the colours of heat-tinted steel, anodized
-// titanium or oil on black glass. The balls' films thicken from left
-// to right through the interference colours, which shift with the
-// angle of view.
+// thick on the base's specular (thin_film_weight,
+// thin_film_thickness, thin_film_ior), like the colours of
+// heat-tinted steel, anodized titanium or oil on black glass. The
+// balls' films thicken from left to right through the interference
+// colours, which shift with the angle of view.
 //
 // References:
 // - J. Andersson, A. Portsmouth et al., "OpenPBR Surface
@@ -66,14 +66,15 @@ const std::array<Base, 3> kBases = {{
 /// A latitude-longitude studio: a sky brightening upwards, a dim
 /// floor and two soft boxes, linear RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         for (int j = 0; j < cols; ++j) {
             const double a = 360.0 * (j + 0.5) / cols;
             double sky =
                 e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi /
-                                                180.0)
+                                               180.0)
                         : 0.03;
             for (const double centre : {240.0, 330.0}) {
                 if (std::abs(e - 35.0) < 15.0 &&
@@ -95,8 +96,8 @@ Tensor Studio(int rows = 64, int cols = 128) {
 /// depth.
 glm::dvec3 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -109,16 +110,17 @@ glm::dvec3 Project(const glm::dvec3& point) {
 std::vector<glm::dvec3> DiscPixels(const Tensor& image,
                                    const glm::dvec3& point) {
     const glm::dvec3 at = Project(point);
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t rows = image.Shape()[0];
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
     std::vector<glm::dvec3> pixels;
     for (std::int64_t row = 0; row < rows; ++row) {
         for (std::int64_t col = 0; col < cols; ++col) {
-            const double r = std::hypot(col + 0.5 - at.x,
-                                        row + 0.5 - at.y) /
-                             (at.z * kRadius);
+            const double r =
+                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) /
+                (at.z * kRadius);
             if (r < 0.95) {
                 const std::uint8_t* texel =
                     texels + (row * cols + col) * channels;
@@ -178,7 +180,8 @@ class ThinFilmDemo : public app::Demo {
             Material::Define(scene, LookOf(i)).SetBrdf("open_pbr");
             scene.Set(LookOf(i), "inputs:thin_film_weight", 1.0);
             scene.Set(LookOf(i), "inputs:thin_film_ior", kFilmIor);
-            const std::string ball = "/World/Ball" + std::to_string(i);
+            const std::string ball =
+                "/World/Ball" + std::to_string(i);
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetMaterialBinding(LookOf(i));
@@ -203,14 +206,15 @@ class ThinFilmDemo : public app::Demo {
         for (const Base& base : kBases) {
             names.emplace_back(base.name);
         }
-        Widgets().Combo("Base", std::move(names), 0,
-                        [this](std::size_t index) { SetBase(index); });
-        Widgets().Slider("Middle ball's film (um)", 0.0, 1.0, kThickness,
-                         [this](double thickness) { Thicken(thickness); });
-        Widgets().Slider("Film IOR", 1.0, 2.5, kFilmIor,
-                         [this](double ior) {
-                             Film("thin_film_ior", ior);
-                         });
+        Widgets().Combo(
+            "Base", std::move(names), 0,
+            [this](std::size_t index) { SetBase(index); });
+        Widgets().Slider(
+            "Middle ball's film (um)", 0.0, 1.0, kThickness,
+            [this](double thickness) { Thicken(thickness); });
+        Widgets().Slider(
+            "Film IOR", 1.0, 2.5, kFilmIor,
+            [this](double ior) { Film("thin_film_ior", ior); });
         Widgets().Slider("Film weight", 0.0, 1.0, 1.0,
                          [this](double weight) {
                              Film("thin_film_weight", weight);
@@ -229,11 +233,11 @@ class ThinFilmDemo : public app::Demo {
         std::vector<glm::dvec3> hues;
         for (std::size_t i = 0; i < kScales.size(); ++i) {
             const glm::dvec3 mean = Mean(filmed[i]);
-            std::printf(
-                "Film %.2f um: chroma %.1f (bare %.1f), mean RGB %.1f "
-                "%.1f %.1f\n",
-                kScales[i] * kThickness, Chroma(filmed[i]),
-                Chroma(bare[i]), mean.r, mean.g, mean.b);
+            std::printf("Film %.2f um: chroma %.1f (bare %.1f), mean "
+                        "RGB %.1f "
+                        "%.1f %.1f\n",
+                        kScales[i] * kThickness, Chroma(filmed[i]),
+                        Chroma(bare[i]), mean.r, mean.g, mean.b);
             hues.push_back(mean / (mean.r + mean.g + mean.b));
         }
         for (std::size_t i = 0; i < kScales.size(); ++i) {
@@ -245,7 +249,8 @@ class ThinFilmDemo : public app::Demo {
             const glm::dvec3 d = glm::abs(hues[i] - hues[i - 1]);
             nearest = std::min(nearest, d.r + d.g + d.b);
         }
-        Check(nearest > 0.03, "each thickness has a colour of its own");
+        Check(nearest > 0.03,
+              "each thickness has a colour of its own");
     }
 
   private:

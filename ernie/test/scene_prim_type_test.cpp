@@ -14,9 +14,9 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -446,10 +446,12 @@ TEST(PrimType, SettersTakeRangesOfNumbers) {
     mesh.SetFaceVertexIndices(std::vector<std::int32_t>{0, 1, 2});
     EXPECT_EQ(mesh.GetFaceVertexIndices()->Shape(),
               (std::vector<std::int64_t>{3}));
-    EXPECT_THROW(mesh.SetPoints(points, {2, 3}), std::invalid_argument);
+    EXPECT_THROW(mesh.SetPoints(points, {2, 3}),
+                 std::invalid_argument);
 
     // OrArray arrays as float32 rows of a vector's numbers.
-    mesh.WriteDisplayColor(std::vector<double>{1, 0, 0, 0, 1, 0, 0, 0, 1});
+    mesh.WriteDisplayColor(
+        std::vector<double>{1, 0, 0, 0, 1, 0, 0, 0, 1});
     ASSERT_NE(mesh.ReadDisplayColor(), nullptr);
     EXPECT_EQ(mesh.ReadDisplayColor()->Shape(),
               (std::vector<std::int64_t>{3, 3}));

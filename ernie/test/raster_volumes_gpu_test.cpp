@@ -292,9 +292,9 @@ TEST_F(RasterDelegateTest,
                     for (std::size_t x = kCentre - kHalf;
                          x <= kCentre + kHalf; ++x) {
                         mean[b] +=
-                            double(values[(b * kVarSize + y) *
-                                              kVarSize +
-                                          x]) /
+                            double(
+                                values[(b * kVarSize + y) * kVarSize +
+                                       x]) /
                             (kFrames * (2 * kHalf + 1) *
                              (2 * kHalf + 1));
                     }
@@ -380,7 +380,8 @@ TEST_F(RasterDelegateTest, AVolumeEmitsAlongItsDepth) {
     }
 }
 
-TEST_F(RasterDelegateTest, HotGasReadsInTheTemperatureVarByItsOpacity) {
+TEST_F(RasterDelegateTest,
+       HotGasReadsInTheTemperatureVarByItsOpacity) {
     // A 1000 K gas over FlatScene's floor at 300 K: the Temperature
     // var is the gas's over its opacity and the floor's through the
     // rest, with temporal amortisation on (every pixel marches for
@@ -388,24 +389,27 @@ TEST_F(RasterDelegateTest, HotGasReadsInTheTemperatureVarByItsOpacity) {
     constexpr double kSigma = 1.2;
     RasterDelegate delegate(*context_);
     Scene scene = VolumeScene(kSigma, 0.0);
-    ernie::Material(scene, "/Looks/Grey").SetThermalTemperature(300.0);
+    ernie::Material(scene, "/Looks/Grey")
+        .SetThermalTemperature(300.0);
     ernie::RenderSettings(scene, "/Render/Settings")
         .SetThermalEnable(true)
         .SetVolumeTemporal(true);
     const auto centre = [&] {
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
-        return At<float>(MapVars(outputs).at("Temperature"), kVarSize / 2,
-                         kVarSize / 2, 0);
+        return At<float>(MapVars(outputs).at("Temperature"),
+                         kVarSize / 2, kVarSize / 2, 0);
     };
-    EXPECT_NEAR(centre(), 300.0f, 1e-3f) << "the gas has no temperature";
+    EXPECT_NEAR(centre(), 300.0f, 1e-3f)
+        << "the gas has no temperature";
     scene.Set("/Looks/Gas", tokens::kVolumeTemperature, 1000.0);
     const double opacity = 1.0 - std::exp(-kSigma * kDepth);
     for (int frame = 0; frame < 3; ++frame) {
-        EXPECT_NEAR(centre(), 1000.0 * opacity + 300.0 * (1.0 - opacity),
-                    5.0)
+        EXPECT_NEAR(centre(),
+                    1000.0 * opacity + 300.0 * (1.0 - opacity), 5.0)
             << "frame " << frame;
     }
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(false);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(false);
     EXPECT_EQ(centre(), 0.0f);
 }
 

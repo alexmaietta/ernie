@@ -62,14 +62,15 @@ const std::array<Cloth, 3> kCloths = {{
 /// A latitude-longitude studio: a sky brightening upwards, a dim
 /// floor and two soft boxes, linear RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         for (int j = 0; j < cols; ++j) {
             const double a = 360.0 * (j + 0.5) / cols;
             double sky =
                 e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi /
-                                                180.0)
+                                               180.0)
                         : 0.03;
             for (const double centre : {240.0, 330.0}) {
                 if (std::abs(e - 35.0) < 15.0 &&
@@ -91,8 +92,8 @@ Tensor Studio(int rows = 64, int cols = 128) {
 /// depth.
 glm::dvec3 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -106,7 +107,8 @@ glm::dvec3 Project(const glm::dvec3& point) {
 glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
                     double inner, double outer) {
     const glm::dvec3 at = Project(point);
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t rows = image.Shape()[0];
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
@@ -114,9 +116,9 @@ glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
     double count = 0.0;
     for (std::int64_t row = 0; row < rows; ++row) {
         for (std::int64_t col = 0; col < cols; ++col) {
-            const double r = std::hypot(col + 0.5 - at.x,
-                                        row + 0.5 - at.y) /
-                             (at.z * kRadius);
+            const double r =
+                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) /
+                (at.z * kRadius);
             if (r < inner || r >= outer) {
                 continue;
             }
@@ -166,7 +168,8 @@ class FuzzDemo : public app::Demo {
             scene.Set(look, "inputs:fuzz_weight", kFuzzWeight);
             scene.Set(look, "inputs:fuzz_roughness", kFuzzRoughness);
             scene.Set(look, "inputs:fuzz_color", cloth.fuzz);
-            const std::string ball = "/World/" + std::string(cloth.name);
+            const std::string ball =
+                "/World/" + std::string(cloth.name);
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetMaterialBinding(look);
@@ -184,17 +187,16 @@ class FuzzDemo : public app::Demo {
             .SetResolution({kWidth, kHeight})
             .SetAmbient(0.0);
 
-        Widgets().Slider("Fuzz weight", 0.0, 1.0, kFuzzWeight,
-                         [this](double value) {
-                             Fuzz("fuzz_weight", value);
+        Widgets().Slider(
+            "Fuzz weight", 0.0, 1.0, kFuzzWeight,
+            [this](double value) { Fuzz("fuzz_weight", value); });
+        Widgets().Slider(
+            "Fuzz roughness", 0.0, 1.0, kFuzzRoughness,
+            [this](double value) { Fuzz("fuzz_roughness", value); });
+        Widgets().Slider("Sun azimuth (0 behind the balls)", 0.0,
+                         180.0, kSunAzimuth, [this](double degrees) {
+                             LightFrom(degrees);
                          });
-        Widgets().Slider("Fuzz roughness", 0.0, 1.0, kFuzzRoughness,
-                         [this](double value) {
-                             Fuzz("fuzz_roughness", value);
-                         });
-        Widgets().Slider("Sun azimuth (0 behind the balls)", 0.0, 180.0,
-                         kSunAzimuth,
-                         [this](double degrees) { LightFrom(degrees); });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->LookAt(kEye, kTarget);
@@ -210,15 +212,17 @@ class FuzzDemo : public app::Demo {
         const std::vector<double> rough = Rims();
         Fuzz("fuzz_roughness", kFuzzRoughness);
         for (std::size_t i = 0; i < kCloths.size(); ++i) {
-            std::printf(
-                "%s's rim: fuzz %.4f, none %.4f, roughest fuzz %.4f\n",
-                kCloths[i].name, fuzzy[i], bare[i], rough[i]);
+            std::printf("%s's rim: fuzz %.4f, none %.4f, roughest "
+                        "fuzz %.4f\n",
+                        kCloths[i].name, fuzzy[i], bare[i], rough[i]);
         }
         for (std::size_t i = 0; i < kCloths.size(); ++i) {
-            Check(fuzzy[i] > 2.0 * bare[i], "the fuzz lights the rims");
+            Check(fuzzy[i] > 2.0 * bare[i],
+                  "the fuzz lights the rims");
         }
-        Check(rough[2] > 1.5 * fuzzy[2],
-              "rougher fibres spread the sheen further over the balls");
+        Check(
+            rough[2] > 1.5 * fuzzy[2],
+            "rougher fibres spread the sheen further over the balls");
     }
 
   private:

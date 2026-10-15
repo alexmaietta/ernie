@@ -606,8 +606,7 @@ class SchemaView {
      * vector's numbers. @throws std::invalid_argument if they do    \
      * not fill whole rows. */                                       \
     template <typename R, typename T = Type>                         \
-        requires(::ernie::kIsOrArray<T> &&                           \
-                 ::ernie::NumberRange<R>)                            \
+        requires(::ernie::kIsOrArray<T> && ::ernie::NumberRange<R>)  \
     Self& Write##Name(const R& values) {                             \
         return Write##Name(                                          \
             ::ernie::detail::ArrayFromNumbers<T>(values));           \
@@ -744,8 +743,7 @@ template <typename T> struct ValueTypeOf {
 template <typename T> struct ValueTypeOf<OrArray<T>> {
     using Type = T;
 };
-template <typename T>
-using ValueType = typename ValueTypeOf<T>::Type;
+template <typename T> using ValueType = typename ValueTypeOf<T>::Type;
 
 /// Whether the setter of an attribute declared as `T` takes `R` as
 /// numbers: a vector's, or a float array's, where `R` is not already
@@ -755,7 +753,8 @@ concept SetsFromNumbers =
     NumberRange<R> &&
     (kVectorSize<ValueType<T>> > 0 ||
      std::is_same_v<ValueType<T>, std::vector<float>>) &&
-    !std::is_convertible_v<const R&, typename AttributeTraits<T>::Arg>;
+    !std::is_convertible_v<const R&,
+                           typename AttributeTraits<T>::Arg>;
 
 /// `values` as the value of an attribute declared as `T`.
 /// @throws std::invalid_argument if a vector's numbers are not as
@@ -776,7 +775,8 @@ ValueType<T> FromNumbers(const R& values) {
 /// of a vector's numbers, else one dimension.
 /// @throws std::invalid_argument if the numbers do not fill whole
 /// rows.
-template <typename T, NumberRange R> Tensor ArrayFromNumbers(const R& values) {
+template <typename T, NumberRange R>
+Tensor ArrayFromNumbers(const R& values) {
     const std::span numbers(values);
     const std::vector<float> floats(numbers.begin(), numbers.end());
     const auto count = static_cast<std::int64_t>(floats.size());
@@ -786,7 +786,8 @@ template <typename T, NumberRange R> Tensor ArrayFromNumbers(const R& values) {
         if (count % n != 0) {
             throw std::invalid_argument(
                 "Expected rows of " + std::to_string(n) +
-                " numbers, not " + std::to_string(count) + " numbers");
+                " numbers, not " + std::to_string(count) +
+                " numbers");
         }
         return Tensor::Copy<float>(floats, {count / n, n});
     } else {
@@ -802,11 +803,13 @@ template <NumberRange R>
 Tensor TensorFromNumbers(const R& values,
                          std::vector<std::int64_t> shape) {
     const std::span numbers(values);
-    using E = std::remove_cv_t<typename decltype(numbers)::element_type>;
+    using E =
+        std::remove_cv_t<typename decltype(numbers)::element_type>;
     if (shape.empty()) {
         shape = {static_cast<std::int64_t>(numbers.size())};
     }
-    return Tensor::Copy<E>(std::span<const E>(numbers), std::move(shape));
+    return Tensor::Copy<E>(std::span<const E>(numbers),
+                           std::move(shape));
 }
 
 /// The `AttributeDef` of an attribute declared as `T` with `fallback`

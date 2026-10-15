@@ -126,7 +126,8 @@ glm::dvec4 AttributeTraits<glm::dvec4>::Read(const Scene& scene,
     const Value* value = scene.Get(path, name);
     if (value == nullptr) {
         glm::dvec4 row = fallback;
-        return GetRow(scene, path, name, {&row[0], 4}) ? row : fallback;
+        return GetRow(scene, path, name, {&row[0], 4}) ? row
+                                                       : fallback;
     }
     return From(*value).value_or(fallback);
 }
@@ -531,14 +532,13 @@ void CheckValue(const AttributeDef& def, const PrimTypeDef* type,
     if (value == nullptr) {
         // Numbers take an array of their own numbers too: a column's
         // row (`Column`), which their readers read (`GetRow`).
-        const bool numbers =
-            def.kind == AttributeKind::Bool ||
-            def.kind == AttributeKind::Int ||
-            def.kind == AttributeKind::Double ||
-            def.kind == AttributeKind::Vec2 ||
-            def.kind == AttributeKind::Vec3 ||
-            def.kind == AttributeKind::Vec4 ||
-            def.kind == AttributeKind::Quat;
+        const bool numbers = def.kind == AttributeKind::Bool ||
+                             def.kind == AttributeKind::Int ||
+                             def.kind == AttributeKind::Double ||
+                             def.kind == AttributeKind::Vec2 ||
+                             def.kind == AttributeKind::Vec3 ||
+                             def.kind == AttributeKind::Vec4 ||
+                             def.kind == AttributeKind::Quat;
         if (def.kind != AttributeKind::Tensor && !def.meta.array &&
             !numbers) {
             fail("'" + std::string(def.name) +

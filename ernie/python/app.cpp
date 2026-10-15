@@ -402,10 +402,11 @@ void BindApp(nb::module_& parent) {
             nb::arg("label"), nb::arg("source"),
             "A line plot of the floats `source()` returns, read "
             "each frame.")
-        .def("progress", &WidgetPanel::Progress, nb::arg("label"),
-             "Adds a progress bar, empty until `set` gives it a float "
-             "fraction done (0 to 1) and a str to show over it; "
-             "returns its id.")
+        .def(
+            "progress", &WidgetPanel::Progress, nb::arg("label"),
+            "Adds a progress bar, empty until `set` gives it a float "
+            "fraction done (0 to 1) and a str to show over it; "
+            "returns its id.")
         .def(
             "set",
             [](WidgetPanel& panel, WidgetPanel::Id widget,
@@ -704,7 +705,7 @@ void BindApp(nb::module_& parent) {
                     : level == "warning" ? LogLevel::Warning
                     : level == "info"    ? LogLevel::Info
                                          : throw nb::value_error(
-                                            "level must be \"info\", "
+                                               "level must be \"info\", "
                                                "\"warning\" or "
                                                "\"error\"");
                 viewer.Log(parsed, std::move(text));
@@ -921,11 +922,12 @@ void BindApp(nb::module_& parent) {
             "\"prores\" or \"none\") in the background.")
         .def_prop_ro("recording", &Viewer::Recording,
                      "Whether a sequence is recording.")
-        .def_prop_ro("eco_paused", &Viewer::EcoPaused,
-                     "Whether eco mode (RenderSettings "
-                     "ernie:ecoMode:enabled, as Omniverse's) has paused "
-                     "the viewport's rendering, nothing having changed "
-                     "for ernie:ecoMode:maxFramesWithoutChange frames.")
+        .def_prop_ro(
+            "eco_paused", &Viewer::EcoPaused,
+            "Whether eco mode (RenderSettings "
+            "ernie:ecoMode:enabled, as Omniverse's) has paused "
+            "the viewport's rendering, nothing having changed "
+            "for ernie:ecoMode:maxFramesWithoutChange frames.")
         .def("redraw", &Viewer::Redraw,
              "Counts as a change for eco mode: for what changes the "
              "image outside the scene, such as GPU arrays written in "

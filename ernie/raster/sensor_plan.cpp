@@ -461,8 +461,10 @@ std::string SensorPlan::Source(std::uint32_t segment) const {
         }
     };
     writes(render_vars::kElectrons, FilterDomain::Electrons);
-    // A radiometric integrator's into electrons (`bolometer`) sets it.
-    writes(render_vars::kBrightnessTemperature, FilterDomain::Electrons);
+    // A radiometric integrator's into electrons (`bolometer`) sets
+    // it.
+    writes(render_vars::kBrightnessTemperature,
+           FilterDomain::Electrons);
     writes(render_vars::kRawDn, FilterDomain::Digital);
     writes(render_vars::kHdrColor, FilterDomain::Rgb);
     writes(render_vars::kLdrColor, FilterDomain::Display);

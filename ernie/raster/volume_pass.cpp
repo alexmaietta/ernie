@@ -198,14 +198,17 @@ constexpr std::uint32_t kDropletAngles = 1024;
 // their block's float4s (`cloudLayersDensity`).
 constexpr std::uint32_t kCloudLayersGrid = 0xC10D5u;
 constexpr std::size_t kCloudLayerBlock = 16;
+// Its floats (named: cppcheck misreads `4 * kCloudLayerBlock` as a
+// template argument).
+constexpr std::size_t kCloudBlockFloats = 4 * kCloudLayerBlock;
 
 // A cloud layers field's block: its noise's tiles, then each of up to
 // four layers' bottom, top, density, shape and detail amounts,
 // weather exponent, shape bias, coverage filter width, profile and
 // channel.
-std::array<float, 4 * kCloudLayerBlock>
+std::array<float, kCloudBlockFloats>
 CloudBlockOf(const CloudLayersParams& layers) {
-    std::array<float, 4 * kCloudLayerBlock> block{};
+    std::array<float, kCloudBlockFloats> block{};
     block[0] =
         static_cast<float>(std::clamp(layers.coverage, 0.0, 1.0));
     block[1] = static_cast<float>(layers.turbulenceDisplacement);
@@ -1127,7 +1130,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
     std::vector<VolumeMaterialGpu> materials;
     std::vector<VolumeGpu> instances;
     // Cloud layers fields' blocks (`cloudLayersDensity`).
-    std::vector<std::array<float, 4 * kCloudLayerBlock>> cloudBlocks;
+    std::vector<std::array<float, kCloudBlockFloats>> cloudBlocks;
     // Each instance's world and its bounds relative to the origin.
     std::vector<std::int32_t> worlds;
     std::vector<std::pair<glm::dvec3, glm::dvec3>> boxes;
@@ -1261,7 +1264,7 @@ void VolumePass::Set(std::span<const VolumeParams> volumes,
                                            : all[1];
             // Cloud layers' steps, as a grid's voxels.
             const glm::dmat4 voxelToLocal =
-                stepGrid != nullptr
+                stepGrid != nullptr || held.layers == nullptr
                     ? stepField->toVolume * stepGrid->grid.indexToGrid
                     : held.layers->toVolume *
                           glm::scale(

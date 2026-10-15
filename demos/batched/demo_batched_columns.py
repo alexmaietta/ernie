@@ -34,7 +34,9 @@ def wave(t, xp, device=None):
     x = (i % SIDE) * SPACING - half
     y = (i // SIDE) * SPACING - half
     r = xp.sqrt(x * x + y * y)
-    z = AMPLITUDE * xp.sin(2.0 * math.pi * (r - SPEED * t) / WAVELENGTH)
+    z = AMPLITUDE * xp.sin(
+        2.0 * math.pi * (r - SPEED * t) / WAVELENGTH
+    )
     h = 0.5 + 0.5 * z / AMPLITUDE
     places = xp.stack([x, y, z], 1)
     colours = xp.stack(
@@ -67,7 +69,9 @@ class Demo(ernie.demo.Demo):
             except ImportError:
                 torch = None
             if torch is None or not torch.cuda.is_available():
-                raise RuntimeError("--rows cuda needs PyTorch with CUDA")
+                raise RuntimeError(
+                    "--rows cuda needs PyTorch with CUDA"
+                )
             self.torch = torch
         scene = self.scene
         world = scene.define("/World", ernie.Xform)
@@ -77,7 +81,9 @@ class Demo(ernie.demo.Demo):
         )
         world.define("Camera", ernie.Camera, focal_length=18.0).set(
             tokens.TRANSFORM,
-            ernie.look_at_transform((0.0, -70.0, 45.0), (0.0, 0.0, 0.0)),
+            ernie.look_at_transform(
+                (0.0, -70.0, 45.0), (0.0, 0.0, 0.0)
+            ),
         )
         places = wave(0.0, np)[0]
         paths = []
@@ -102,7 +108,9 @@ class Demo(ernie.demo.Demo):
         columns = (self.poses, self.colours, self.kelvin)
         if self.device == "cuda":
             torch = self.torch
-            for column, rows in zip(columns, wave(self.time, torch, "cuda")):
+            for column, rows in zip(
+                columns, wave(self.time, torch, "cuda")
+            ):
                 with column.map("cuda") as mapped:
                     torch.from_dlpack(mapped).copy_(rows)
         else:
@@ -124,9 +132,15 @@ class Demo(ernie.demo.Demo):
             ), "each cube is where its row puts it"
 
     def test_final(self):
-        rows = np.asarray(self.colours.read()) if self.device == "cpu" else None
+        rows = (
+            np.asarray(self.colours.read())
+            if self.device == "cpu"
+            else None
+        )
         if rows is not None:
-            assert rows.shape == (SIDE * SIDE, 3), "one colour per cube"
+            assert rows.shape == (SIDE * SIDE, 3), (
+                "one colour per cube"
+            )
 
 
 if __name__ == "__main__":

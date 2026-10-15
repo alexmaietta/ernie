@@ -270,9 +270,9 @@ class RenderTargets : public FrameImages {
     }
 
     /// Render vars a frame also holds as linear buffers over all its
-    /// views, which the sensor writes beside the images (sensor.slang's
-    /// `SensorLinear`), so mapping them to a compute API copies
-    /// nothing (`FrameImages::Linear`).
+    /// views, which the sensor writes beside the images
+    /// (sensor.slang's `SensorLinear`), so mapping them to a compute
+    /// API copies nothing (`FrameImages::Linear`).
     struct LinearVars {
         /// The vars the sensor can write so: `VarNames` up to
         /// BrightnessTemperature (sensor.slang's `kLinearVars`).

@@ -61,14 +61,15 @@ const std::array<Metal, 5> kMetals = {{
 /// A latitude-longitude studio: a sky brightening upwards, a dim
 /// floor and two soft boxes, linear RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         for (int j = 0; j < cols; ++j) {
             const double a = 360.0 * (j + 0.5) / cols;
             double sky =
                 e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi /
-                                                180.0)
+                                               180.0)
                         : 0.03;
             for (const double centre : {240.0, 330.0}) {
                 if (std::abs(e - 35.0) < 15.0 &&
@@ -90,8 +91,8 @@ Tensor Studio(int rows = 64, int cols = 128) {
 /// depth.
 glm::dvec3 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -107,7 +108,8 @@ glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
                     double inner, double outer, bool upper = false) {
     const glm::dvec3 at = Project(point);
     const double radius = at.z * kRadius;
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t rows = image.Shape()[0];
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
@@ -116,8 +118,10 @@ glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
     for (std::int64_t row = 0; row < rows; ++row) {
         for (std::int64_t col = 0; col < cols; ++col) {
             const double r =
-                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) / radius;
-            if (r < inner || r >= outer || (upper && row + 0.5 >= at.y)) {
+                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) /
+                radius;
+            if (r < inner || r >= outer ||
+                (upper && row + 0.5 >= at.y)) {
                 continue;
             }
             for (int c = 0; c < 3; ++c) {
@@ -162,7 +166,8 @@ class MetalsDemo : public app::Demo {
             scene.Set(look, "inputs:base_metalness", 1.0);
             scene.Set(look, "inputs:specular_roughness", kRoughness);
             scene.Set(look, "inputs:specular_color", metal.tint);
-            const std::string ball = "/World/" + std::string(metal.name);
+            const std::string ball =
+                "/World/" + std::string(metal.name);
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetMaterialBinding(look);
@@ -180,8 +185,9 @@ class MetalsDemo : public app::Demo {
             .SetResolution({kWidth, kHeight})
             .SetAmbient(0.0);
 
-        Widgets().Slider("Roughness", 0.0, 1.0, kRoughness,
-                         [this](double roughness) { Roughen(roughness); });
+        Widgets().Slider(
+            "Roughness", 0.0, 1.0, kRoughness,
+            [this](double roughness) { Roughen(roughness); });
         Widgets().Combo("Edge tint", {"F82 tint", "None (white)"}, 0,
                         [this](std::size_t index) { Tint(index); });
         if (viewer != nullptr) {
@@ -220,7 +226,8 @@ class MetalsDemo : public app::Demo {
         Check(gold.r > 1.5 * gold.b, "gold is yellow");
         Check(copper.r > 1.3 * copper.g, "copper is red");
         Check(std::max({aluminium.r, aluminium.g, aluminium.b}) <
-                  1.1 * std::min({aluminium.r, aluminium.g, aluminium.b}),
+                  1.1 * std::min(
+                            {aluminium.r, aluminium.g, aluminium.b}),
               "aluminium is neutral");
         Check(tinted.b / tinted.r < 0.96 * plain.b / plain.r,
               "the F82 tint colours gold's grazing reflection");

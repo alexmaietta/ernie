@@ -45,5 +45,8 @@ ernie_add_library(
 # The banner's version and the About window's build configuration
 # (log.h).
 set_source_files_properties(
-    log.cpp PROPERTIES COMPILE_DEFINITIONS
-    "ERNIE_VERSION=\"${ERNIE_VERSION}\";ERNIE_BUILD_TYPE=\"$<CONFIG>\"")
+    log.cpp
+    PROPERTIES
+        COMPILE_DEFINITIONS
+        "ERNIE_VERSION=\"${ERNIE_VERSION}\";ERNIE_BUILD_TYPE=\"$<CONFIG>\""
+)

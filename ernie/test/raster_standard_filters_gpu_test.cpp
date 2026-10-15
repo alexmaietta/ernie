@@ -1825,7 +1825,8 @@ TEST_F(RasterDelegateTest,
     EXPECT_GT(*seen.rbegin(), 2207.0f) << "into the last segment";
 }
 
-TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
+TEST_F(RasterDelegateTest,
+       BolometersReadBrightnessTemperatureAndShowIt) {
     // MeshScene's quad alone, a black body at 320 K, through an 8 to
     // 14 um bolometer, the ADC and a white-hot display from 300 to
     // 340 K: the BrightnessTemperature var reads it back, the picture
@@ -1842,7 +1843,8 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
         .SetThermalTemperature(320.0)
         .SetThermalEmissivity(
             std::vector<float>{7000.0f, 1.0f, 15000.0f, 1.0f});
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
     const auto chain = [](std::map<std::string, float> bolometer,
                           std::map<std::string, float> display) {
         bolometer.try_emplace("netd", 0.0f);
@@ -1861,25 +1863,28 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
                                            "LdrColor", "Electrons"};
     RasterDelegate delegate(*context_);
     auto values = VarsThrough(delegate, scene, vars, chain({}, {}));
-    const std::vector<float>& kelvin = values["BrightnessTemperature"];
+    const std::vector<float>& kelvin =
+        values["BrightnessTemperature"];
     const auto hottest = static_cast<std::size_t>(
-        std::max_element(kelvin.begin(), kelvin.end()) - kelvin.begin());
+        std::max_element(kelvin.begin(), kelvin.end()) -
+        kelvin.begin());
     EXPECT_NEAR(kelvin[hottest], 320.0f, 0.5f);
     EXPECT_NEAR(values["LdrColor"][4 * hottest], 128.0f, 4.0f)
         << "white-hot, half way from 300 to 340 K";
     EXPECT_GT(values["Electrons"][4 * hottest], 0.0f) << "its counts";
 
-    // Half the emissivity: half the signal of a 320 K black body, read
-    // as a colder one by a camera that assumes 1.
+    // Half the emissivity: half the signal of a 320 K black body,
+    // read as a colder one by a camera that assumes 1.
     ernie::Material(scene, "/Looks/Red")
         .SetThermalEmissivity(
             std::vector<float>{7000.0f, 0.5f, 15000.0f, 0.5f});
     values = VarsThrough(delegate, scene, vars, chain({}, {}));
     EXPECT_LT(values["BrightnessTemperature"][hottest], 290.0f);
-    values = VarsThrough(delegate, scene, vars,
-                         chain({{"emissivity", 0.5f}, {"reflected", 3.0f}},
-                               {}));
-    EXPECT_NEAR(values["BrightnessTemperature"][hottest], 320.0f, 0.5f)
+    values = VarsThrough(
+        delegate, scene, vars,
+        chain({{"emissivity", 0.5f}, {"reflected", 3.0f}}, {}));
+    EXPECT_NEAR(values["BrightnessTemperature"][hottest], 320.0f,
+                0.5f)
         << "the object's emissivity given, its true temperature";
     ernie::Material(scene, "/Looks/Red")
         .SetThermalEmissivity(
@@ -1890,8 +1895,8 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
     double squares = 0.0;
     int count = 0;
     for (int frame = 0; frame < 8; ++frame) {
-        values =
-            VarsThrough(delegate, scene, vars, chain({{"netd", 1.0f}}, {}));
+        values = VarsThrough(delegate, scene, vars,
+                             chain({{"netd", 1.0f}}, {}));
         for (const float k : values["BrightnessTemperature"]) {
             if (k > 300.0f && k < 340.0f) {
                 sum += static_cast<double>(k);
@@ -1913,10 +1918,12 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
         Scene step = scene;
         const Steps steps = chain({{"timeConstant", 0.01f}}, {});
         const auto frame = [&](double dt) {
-            ernie::Camera(step, "/World/Camera").SetSensorNoise(false);
+            ernie::Camera(step, "/World/Camera")
+                .SetSensorNoise(false);
             std::vector<Path> filters;
             for (std::size_t i = 0; i < steps.size(); ++i) {
-                const Path path("/Render/Filters/F" + std::to_string(i));
+                const Path path("/Render/Filters/F" +
+                                std::to_string(i));
                 step.Remove(path);
                 ernie::SensorFilterPrim::Define(step, path)
                     .SetFilterType(steps[i].first);
@@ -1926,8 +1933,8 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
                 filters.push_back(path);
             }
             const Path var("/Render/Vars/BrightnessTemperature");
-            ernie::RenderVar::Define(step, var)
-                .SetSourceName("BrightnessTemperature");
+            ernie::RenderVar::Define(step, var).SetSourceName(
+                "BrightnessTemperature");
             ernie::RenderProduct::Define(step, "/Render/Out")
                 .SetCamera("/World/Camera")
                 .SetResolution(glm::dvec2(kSize, kSize));
@@ -1944,7 +1951,8 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
             return tensor.As<float>()[hottest];
         };
         EXPECT_NEAR(frame(0.0), 320.0f, 0.5f) << "settled at first";
-        ernie::Material(step, "/Looks/Red").SetThermalTemperature(340.0);
+        ernie::Material(step, "/Looks/Red")
+            .SetThermalTemperature(340.0);
         const float lagged = frame(0.01);
         EXPECT_GT(lagged, 328.0f);
         EXPECT_LT(lagged, 336.0f) << "about 1 - 1/e of the way";
@@ -1952,18 +1960,21 @@ TEST_F(RasterDelegateTest, BolometersReadBrightnessTemperatureAndShowIt) {
     }
 
     // Automatic gain control: the first frame at the fixed range, the
-    // next over the last's, the quad alone at 320 K and the least span
-    // of 2 K about it: half way again, though the fixed range is far.
+    // next over the last's, the quad alone at 320 K and the least
+    // span of 2 K about it: half way again, though the fixed range is
+    // far.
     {
         RasterDelegate automatic(*context_);
         const auto shown = [&] {
-            return VarsThrough(automatic, scene, vars,
-                               chain({}, {{"automatic", 1.0f},
-                                          {"low", 330.0f},
-                                          {"high", 340.0f}}))["LdrColor"]
-                [4 * hottest];
+            return VarsThrough(
+                automatic, scene, vars,
+                chain({},
+                      {{"automatic", 1.0f},
+                       {"low", 330.0f},
+                       {"high", 340.0f}}))["LdrColor"][4 * hottest];
         };
         EXPECT_EQ(shown(), 0.0f) << "below the fixed range";
-        EXPECT_NEAR(shown(), 128.0f, 4.0f) << "the last frame's range";
+        EXPECT_NEAR(shown(), 128.0f, 4.0f)
+            << "the last frame's range";
     }
 }

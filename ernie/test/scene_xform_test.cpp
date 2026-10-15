@@ -1119,7 +1119,8 @@ TEST(Xform, OpsTakePlainNumbers) {
         glm::rotate(glm::dmat4(1.0), glm::radians(90.0),
                     glm::dvec3(0.0, 0.0, 1.0)) *
         glm::scale(glm::dmat4(1.0), glm::dvec3(2.0));
-    EXPECT_MAT_NEAR(scene.LocalTransform("/World/Box"), expected, 1e-12);
+    EXPECT_MAT_NEAR(scene.LocalTransform("/World/Box"), expected,
+                    1e-12);
 
     XformOps ops{.orient = {1, {0, 0, 0}}};
     ASSERT_TRUE(ops.orient);
@@ -1135,7 +1136,9 @@ TEST(Xform, WorldTransformsAndVisibilityFollowEveryChange) {
     Scene scene;
     scene.Define("/World/Arm/Hand", "Xform");
     SetXform(scene, "/World/Arm/Hand", {.translate = {1, 0, 0}});
-    const auto x = [&] { return scene.WorldTransform("/World/Arm/Hand")[3][0]; };
+    const auto x = [&] {
+        return scene.WorldTransform("/World/Arm/Hand")[3][0];
+    };
     EXPECT_DOUBLE_EQ(x(), 1.0);
     EXPECT_DOUBLE_EQ(x(), 1.0) << "kept";
     // An ancestor moved, then retyped (its ops gone), then sampled.
@@ -1143,11 +1146,13 @@ TEST(Xform, WorldTransformsAndVisibilityFollowEveryChange) {
     EXPECT_DOUBLE_EQ(x(), 11.0);
     scene.Define("/World", "Scope");
     EXPECT_DOUBLE_EQ(x(), 1.0);
-    scene.SetAt("/World/Arm", tokens::kTranslate, 0.0, glm::dvec3(0.0));
+    scene.SetAt("/World/Arm", tokens::kTranslate, 0.0,
+                glm::dvec3(0.0));
     scene.SetAt("/World/Arm", tokens::kTranslate, 10.0,
                 glm::dvec3(20.0, 0.0, 0.0));
-    scene.Set("/World/Arm", tokens::kXformOpOrder,
-              std::vector<std::string>{std::string(tokens::kTranslate)});
+    scene.Set(
+        "/World/Arm", tokens::kXformOpOrder,
+        std::vector<std::string>{std::string(tokens::kTranslate)});
     EXPECT_DOUBLE_EQ(x(), 1.0);
     scene.Set(Path::Root(), tokens::kTimeCode, 5.0);
     EXPECT_DOUBLE_EQ(x(), 11.0);

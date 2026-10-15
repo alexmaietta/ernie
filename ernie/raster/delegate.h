@@ -385,8 +385,8 @@ class RasterDelegate : public RenderDelegate {
     };
 
     /// A mesh drawn for every prim of the same geometry, an implicit
-    /// shape's (a cube of a size, say) that nothing writes on the GPU:
-    /// added once, its levels of detail simplified once.
+    /// shape's (a cube of a size, say) that nothing writes on the
+    /// GPU: added once, its levels of detail simplified once.
     struct SharedMesh {
         std::uint32_t handle = 0;
         std::size_t prims = 0;
@@ -447,16 +447,17 @@ class RasterDelegate : public RenderDelegate {
         /// under and the CPU transforms between.
         bool composed = false;
         std::vector<InstanceParent> parents;
-        /// Its prims' constant colours, temperatures and visibility as
-        /// rows of one array each (columns of `primvars:displayColor`,
-        /// `ernie:thermal:temperature`, `visibility`), if they are:
-        /// instance channels.
+        /// Its prims' constant colours, temperatures and visibility
+        /// as rows of one array each (columns of
+        /// `primvars:displayColor`, `ernie:thermal:temperature`,
+        /// `visibility`), if they are: instance channels.
         Tensor colors;
         Tensor temperatures;
         Tensor visible;
 
         /// Each channel by the attribute its column is of.
-        std::array<std::pair<std::string_view, Tensor*>, 3> Channels() {
+        std::array<std::pair<std::string_view, Tensor*>, 3>
+        Channels() {
             return {{{tokens::kDisplayColor, &colors},
                      {tokens::kThermalTemperature, &temperatures},
                      {tokens::kVisibility, &visible}}};
@@ -694,10 +695,11 @@ class RasterDelegate : public RenderDelegate {
     std::vector<AnchoredView>
     AnchoredViewsOf(const Scene& scene,
                     std::span<const Path> cameras) const;
-    /// The prim's pose from GPU arrays (`GpuXformOf`), or with compute
-    /// interop from rows of a host column, which groups upload whole;
-    /// none when its ops are not all such rows.
-    std::optional<GpuXform> PoseOf(const Scene& scene, const Path& path);
+    /// The prim's pose from GPU arrays (`GpuXformOf`), or with
+    /// compute interop from rows of a host column, which groups
+    /// upload whole; none when its ops are not all such rows.
+    std::optional<GpuXform> PoseOf(const Scene& scene,
+                                   const Path& path);
     /// Hands the drawable a group's arrays from one of its prims'
     /// pose.
     void UploadGpuXformGroup(GpuXformGroup& group,
@@ -1027,9 +1029,9 @@ class RasterDelegate : public RenderDelegate {
     /// writes relative to the frame's origin.
     bool anchoredViews_ = false;
     std::unordered_map<Path, GpuPosed> gpuPosed_;
-    /// Whether the last `SyncGpuXforms` posed other prims, or the same
-    /// ones otherwise (their groups, rows or frames): every draw under
-    /// them is built again (`Items`).
+    /// Whether the last `SyncGpuXforms` posed other prims, or the
+    /// same ones otherwise (their groups, rows or frames): every draw
+    /// under them is built again (`Items`).
     bool gpuPosedChanged_ = false;
     /// The scene's version at the last full `Sync`: prims below
     /// GPU-posed ones whose own transform ops are older changed only

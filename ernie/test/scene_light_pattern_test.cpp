@@ -59,7 +59,7 @@ TEST(LightPatternRegistry, RegistersPatternsByIdAndChecksThem) {
 TEST(LightPatternRegistry, BuiltinsComeFirst) {
     ernie::LightPatternRegistry registry =
         ernie::LightPatternRegistry::WithBuiltins();
-    const std::vector<std::string> ids = {"spot", "line", "grid",
+    const std::vector<std::string> ids = {"spot",  "line", "grid",
                                           "image", "dots", "scan"};
     ASSERT_EQ(registry.Models().size(), ids.size());
     for (std::size_t i = 0; i < ids.size(); ++i) {

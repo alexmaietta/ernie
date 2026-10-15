@@ -49,7 +49,8 @@ constexpr double kAnisotropy = 0.85;
 constexpr double kRoughness = 0.35;
 constexpr double kSky = 0.4;  // the studio's intensity
 constexpr double kSun = 0.6;
-constexpr double kTilt = 35.0;  // degrees the panels lean back from upright
+constexpr double kTilt =
+    35.0;  // degrees the panels lean back from upright
 constexpr double kRadius = 0.6;  // the ball's
 constexpr std::array<glm::dvec3, 3> kCentres = {
     glm::dvec3(-1.6, 0.0, 0.75), glm::dvec3(0.0, 0.0, 0.75),
@@ -60,12 +61,14 @@ constexpr glm::dvec3 kAluminium(0.92, 0.92, 0.93);
 /// light instead: a sky brightening upwards over a dim floor, linear
 /// RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         const double sky =
-            e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi / 180.0)
-                    : 0.03;
+            e > 0.0
+                ? 0.2 + 0.6 * std::sin(e * std::numbers::pi / 180.0)
+                : 0.03;
         for (int j = 0; j < cols * 3; ++j) {
             texels[static_cast<std::size_t>(i * cols * 3 + j)] =
                 static_cast<float>(sky);
@@ -92,8 +95,8 @@ struct MeshArrays {
 };
 
 /// Appends the point (x, y) in a panel's plane at `centre`.
-void AddPanelPoint(MeshArrays& mesh, const glm::dvec3& centre, double x,
-                   double y) {
+void AddPanelPoint(MeshArrays& mesh, const glm::dvec3& centre,
+                   double x, double y) {
     const auto [right, up, normal] = PanelAxes();
     const glm::dvec3 p = centre + x * right + y * up;
     mesh.points.insert(mesh.points.end(), {p.x, p.y, p.z});
@@ -103,8 +106,8 @@ void AddPanelPoint(MeshArrays& mesh, const glm::dvec3& centre, double x,
 MeshArrays Plate(const glm::dvec3& centre, double size = 1.0) {
     MeshArrays mesh;
     const std::array<glm::dvec2, 4> corners = {
-        glm::dvec2(0.0, 0.0), glm::dvec2(1.0, 0.0), glm::dvec2(1.0, 1.0),
-        glm::dvec2(0.0, 1.0)};
+        glm::dvec2(0.0, 0.0), glm::dvec2(1.0, 0.0),
+        glm::dvec2(1.0, 1.0), glm::dvec2(0.0, 1.0)};
     for (const glm::dvec2& corner : corners) {
         AddPanelPoint(mesh, centre, (corner.x - 0.5) * size,
                       (corner.y - 0.5) * size);
@@ -119,7 +122,8 @@ MeshArrays Plate(const glm::dvec3& centre, double size = 1.0) {
 /// An annulus of quads, u outwards and v round it (its seam's points
 /// doubled).
 MeshArrays Disc(const glm::dvec3& centre, double inner = 0.05,
-                double outer = 0.6, int rings = 16, int segments = 256) {
+                double outer = 0.6, int rings = 16,
+                int segments = 256) {
     MeshArrays mesh;
     for (int i = 0; i <= rings; ++i) {
         const double u = static_cast<double>(i) / rings;
@@ -179,8 +183,8 @@ std::array<glm::dvec3, 3> Lamps() {
 /// The pixel (col, row) of a world point.
 glm::dvec2 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -197,11 +201,13 @@ double Stretch(const Tensor& image, const glm::dvec3& point,
     const glm::dvec2 at = Project(point);
     const int col0 = static_cast<int>(at.x) - half;
     const int row0 = static_cast<int>(at.y) - half;
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
     const int size = 2 * half;
-    std::vector<double> brightness(static_cast<std::size_t>(size * size));
+    std::vector<double> brightness(
+        static_cast<std::size_t>(size * size));
     double mean = 0.0;
     for (int r = 0; r < size; ++r) {
         for (int c = 0; c < size; ++c) {
@@ -219,7 +225,8 @@ double Stretch(const Tensor& image, const glm::dvec3& point,
     for (int r = 0; r < size; ++r) {
         for (int c = 0; c < size; ++c) {
             const double w = std::max(
-                brightness[static_cast<std::size_t>(r * size + c)] - mean,
+                brightness[static_cast<std::size_t>(r * size + c)] -
+                    mean,
                 0.0);
             total += w;
             meanRow += w * r;
@@ -233,7 +240,8 @@ double Stretch(const Tensor& image, const glm::dvec3& point,
     for (int r = 0; r < size; ++r) {
         for (int c = 0; c < size; ++c) {
             const double w = std::max(
-                brightness[static_cast<std::size_t>(r * size + c)] - mean,
+                brightness[static_cast<std::size_t>(r * size + c)] -
+                    mean,
                 0.0);
             across += w * (c - meanCol) * (c - meanCol);
             down += w * (r - meanRow) * (r - meanRow);
@@ -242,13 +250,15 @@ double Stretch(const Tensor& image, const glm::dvec3& point,
     return std::sqrt(across / down);
 }
 
-void DefineMesh(Scene& scene, const Path& path, const MeshArrays& mesh,
-                const Path& material) {
-    const auto points = static_cast<std::int64_t>(mesh.points.size() / 3);
+void DefineMesh(Scene& scene, const Path& path,
+                const MeshArrays& mesh, const Path& material) {
+    const auto points =
+        static_cast<std::int64_t>(mesh.points.size() / 3);
     Mesh::Define(scene, path)
         .SetPoints(Tensor::Copy<double>(mesh.points, {points, 3}))
         .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
-            mesh.counts, {static_cast<std::int64_t>(mesh.counts.size())}))
+            mesh.counts,
+            {static_cast<std::int64_t>(mesh.counts.size())}))
         .SetFaceVertexIndices(Tensor::Copy<std::int64_t>(
             mesh.indices,
             {static_cast<std::int64_t>(mesh.indices.size())}))
@@ -259,7 +269,8 @@ void DefineMesh(Scene& scene, const Path& path, const MeshArrays& mesh,
 
 class AnisotropyDemo : public app::Demo {
   public:
-    AnisotropyDemo(app::Viewer* viewer, const app::DemoOptions& options)
+    AnisotropyDemo(app::Viewer* viewer,
+                   const app::DemoOptions& options)
         : Demo(viewer, options) {
         numFrames = 1;
         Scene& scene = GetScene();
@@ -278,7 +289,8 @@ class AnisotropyDemo : public app::Demo {
             .SetTransform(DistantLightTransform({0.5, -0.6, 0.62}));
         const std::array<glm::dvec3, 3> lamps = Lamps();
         for (std::size_t i = 0; i < lamps.size(); ++i) {
-            const std::string lamp = "/World/Lamp" + std::to_string(i);
+            const std::string lamp =
+                "/World/Lamp" + std::to_string(i);
             SphereLight::Define(scene, lamp)
                 .SetRadius(0.04)
                 .SetIntensity(150.0);
@@ -312,19 +324,18 @@ class AnisotropyDemo : public app::Demo {
             .SetResolution({kWidth, kHeight})
             .SetAmbient(0.0);
 
-        Widgets().Slider("Anisotropy", 0.0, 1.0, kAnisotropy,
-                         [this](double value) {
-                             GetScene().Set(
-                                 "/World/Looks/Brushed",
-                                 "inputs:specular_roughness_anisotropy",
-                                 value);
-                         });
-        Widgets().Slider("Roughness", 0.0, 1.0, kRoughness,
-                         [this](double value) {
-                             GetScene().Set("/World/Looks/Brushed",
-                                            "inputs:specular_roughness",
-                                            value);
-                         });
+        Widgets().Slider(
+            "Anisotropy", 0.0, 1.0, kAnisotropy,
+            [this](double value) {
+                GetScene().Set("/World/Looks/Brushed",
+                               "inputs:specular_roughness_anisotropy",
+                               value);
+            });
+        Widgets().Slider(
+            "Roughness", 0.0, 1.0, kRoughness, [this](double value) {
+                GetScene().Set("/World/Looks/Brushed",
+                               "inputs:specular_roughness", value);
+            });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->LookAt(kEye, kTarget);
@@ -341,13 +352,14 @@ class AnisotropyDemo : public app::Demo {
                   "inputs:specular_roughness_anisotropy", 0.0);
         const glm::dvec2 plain = Stretches();
         scene.Set("/World/Looks/Brushed",
-                  "inputs:specular_roughness_anisotropy", kAnisotropy);
+                  "inputs:specular_roughness_anisotropy",
+                  kAnisotropy);
         DomeLight(scene, "/World/Sky").SetIntensity(kSky);
         DistantLight(scene, "/World/Sun").SetIntensity(kSun);
-        std::printf(
-            "Highlights' spread across over down: plate %.2f (isotropic "
-            "%.2f), ball %.2f (isotropic %.2f)\n",
-            brushed.x, plain.x, brushed.y, plain.y);
+        std::printf("Highlights' spread across over down: plate %.2f "
+                    "(isotropic "
+                    "%.2f), ball %.2f (isotropic %.2f)\n",
+                    brushed.x, plain.x, brushed.y, plain.y);
         Check(brushed.x < 0.6 * plain.x,
               "the plate's highlight stretches up it, along u");
         Check(brushed.y > 1.5 * plain.y,
@@ -368,5 +380,6 @@ class AnisotropyDemo : public app::Demo {
 
 ERNIE_REGISTER_DEMO(
     AnisotropyDemo, "pbr", "anisotropy",
-    "OpenPBR's specular anisotropy: brushed aluminium plate, disc and "
+    "OpenPBR's specular anisotropy: brushed aluminium plate, disc "
+    "and "
     "ball, highlights stretched along their texture's u.");

@@ -24,7 +24,10 @@ from ernie.demo import heatmap, side_by_side, write_png
 
 RADIUS = 10.0  # m: the Moon, small enough to share the frame
 CRAFT = np.array([-5.0, -26.0, 4.0])  # the spacecraft's body centre
-PANELS = {"White": (-2.2, "white_coating"), "Aluminium": (2.2, "aluminium")}
+PANELS = {
+    "White": (-2.2, "white_coating"),
+    "Aluminium": (2.2, "aluminium"),
+}
 INTERNAL = 150.0  # W/m^2 the body's electronics give off
 SPACE = 3.0  # K
 SUN_ELEVATION = 0.15  # z of the Sun's direction, before normalizing
@@ -93,7 +96,10 @@ class Demo(ernie.demo.Demo):
             thermal_model="diurnal",
         )
         world.define(
-            "Moon", ernie.Sphere, radius=RADIUS, material_binding=regolith.path
+            "Moon",
+            ernie.Sphere,
+            radius=RADIUS,
+            material_binding=regolith.path,
         )
         # The body black and warmed by its electronics, through the
         # material's thermal terminal; the panels open behind, each with
@@ -109,7 +115,12 @@ class Demo(ernie.demo.Demo):
             thermal_model="balance",
             thermal_model_params=[-1.0, -1.0, SPACE, INTERNAL, 1.0],
         )
-        scene.connect(body.path, tokens.THERMAL_OUTPUT, thermal.path, "outputs:out")
+        scene.connect(
+            body.path,
+            tokens.THERMAL_OUTPUT,
+            thermal.path,
+            "outputs:out",
+        )
         world.define(
             "Body",
             ernie.Cube,
@@ -147,7 +158,11 @@ class Demo(ernie.demo.Demo):
         # microbolometer over 8 to 14 um, ironbow over the range the last
         # frame showed (80 to 400 K before one), so the night side reads.
         self.visible = self.define_camera(
-            "Visible", VISIBLE_PRODUCT, (380.0, 720.0), 17, ["LdrColor"]
+            "Visible",
+            VISIBLE_PRODUCT,
+            (380.0, 720.0),
+            17,
+            ["LdrColor"],
         )
         self.visible.exposure_f_stop = 16.0
         self.visible.exposure_time = 0.004
@@ -158,7 +173,12 @@ class Demo(ernie.demo.Demo):
             (
                 "Display",
                 "thermalDisplay",
-                {"automatic": 1.0, "low": 80.0, "high": 400.0, "palette": 2.0},
+                {
+                    "automatic": 1.0,
+                    "low": 80.0,
+                    "high": 400.0,
+                    "palette": 2.0,
+                },
             ),
             ("Exposure", "exposure", {}),
         ):
@@ -194,7 +214,11 @@ class Demo(ernie.demo.Demo):
             on_change=self.show,
         )
         self.widgets.slider(
-            "Sun azimuth (deg)", -80.0, 80.0, AZIMUTH, on_change=self.place_sun
+            "Sun azimuth (deg)",
+            -80.0,
+            80.0,
+            AZIMUTH,
+            on_change=self.place_sun,
         )
         self.show(1)
 
@@ -203,7 +227,8 @@ class Demo(ernie.demo.Demo):
         self.azimuth = azimuth
         direction = sun_direction(azimuth)
         self.sun.set(
-            tokens.TRANSFORM, ernie.distant_light_transform(tuple(direction))
+            tokens.TRANSFORM,
+            ernie.distant_light_transform(tuple(direction)),
         )
         for name, (offset, _) in PANELS.items():
             self.panels[name].points = panel_points(offset, direction)
@@ -216,7 +241,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL_LENGTH,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
             spectral_range=spectral,
             spectral_bands=bands,
@@ -249,18 +276,23 @@ class Demo(ernie.demo.Demo):
             return
         camera = self.visible if index == 0 else self.thermal
         self.viewer.active_camera = camera.path
-        self.viewer.view_var = "Temperature" if index == 2 else "LdrColor"
+        self.viewer.view_var = (
+            "Temperature" if index == 2 else "LdrColor"
+        )
 
     def render_all(self):
         """The visible and thermal LdrColor, uint8 (rows, cols, 4), and
         the Temperature var in kelvin (rows, cols)."""
         outputs = self.renderer.step(
-            self.scene, render_products=[VISIBLE_PRODUCT, THERMAL_PRODUCT]
+            self.scene,
+            render_products=[VISIBLE_PRODUCT, THERMAL_PRODUCT],
         )
 
         def var(product, name):
             frame = outputs[product].frames[0]
-            return np.array(frame.render_vars[f"{product}/{name}"].map())
+            return np.array(
+                frame.render_vars[f"{product}/{name}"].map()
+            )
 
         return (
             var(VISIBLE_PRODUCT, "LdrColor"),
@@ -277,7 +309,11 @@ class Demo(ernie.demo.Demo):
         write_png(
             path,
             side_by_side(
-                [visible[..., :3], thermal[..., :3], heatmap(kelvin, 80.0, 400.0)]
+                [
+                    visible[..., :3],
+                    thermal[..., :3],
+                    heatmap(kelvin, 80.0, 400.0),
+                ]
             ),
         )
 
@@ -288,7 +324,9 @@ class Demo(ernie.demo.Demo):
             """The Temperature var on the Moon's equator `longitude`
             degrees right of the sub-camera point."""
             a = np.radians(longitude)
-            col, row = project(RADIUS * np.array([np.sin(a), -np.cos(a), 0.0]))
+            col, row = project(
+                RADIUS * np.array([np.sin(a), -np.cos(a), 0.0])
+            )
             return float(kelvin[row, col])
 
         noon = surface(self.azimuth)
@@ -296,14 +334,18 @@ class Demo(ernie.demo.Demo):
         night = float(equator[equator > 0.0].min())
         print(f"sun at {self.azimuth:.0f} deg: noon {noon:.1f} K, "
               f"night side {night:.1f} K")  # fmt: skip
-        assert abs(noon - 390.0) < 10.0, "the subsolar point should be near 390 K"
+        assert abs(noon - 390.0) < 10.0, (
+            "the subsolar point should be near 390 K"
+        )
         assert night < 130.0, "the night side should be near 100 K"
         # The same sun 45 degrees either side of noon: afternoon (east of
         # the subsolar point, right) warmer than morning.
         afternoon = surface(self.azimuth + 45.0)
         morning = surface(self.azimuth - 45.0)
         print(f"morning {morning:.1f} K, afternoon {afternoon:.1f} K")
-        assert afternoon > morning + 0.5, "the afternoon should be warmer"
+        assert afternoon > morning + 0.5, (
+            "the afternoon should be warmer"
+        )
         # The panels: aluminium absorbs little but radiates less still,
         # hot; white paint radiates well, cold; yet the camera sees the
         # aluminium darker, its low emissivity mirroring space.

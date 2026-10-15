@@ -233,9 +233,11 @@ TemperatureModelRegistry TemperatureModelRegistry::WithBuiltins() {
         "absorbs and its internal heat equal what it radiates to its "
         "surroundings: a spacecraft's thin panels.";
     balance.references = {
-        "D. G. Gilmore (ed.), \"Spacecraft Thermal Control Handbook\", "
+        "D. G. Gilmore (ed.), \"Spacecraft Thermal Control "
+        "Handbook\", "
         "2nd ed., The Aerospace Press, 2002, chapter 2.",
-        "M. Dunstan et al., \"PANGU: Planet and Asteroid Natural Scene "
+        "M. Dunstan et al., \"PANGU: Planet and Asteroid Natural "
+        "Scene "
         "Generation Utility\", University of Dundee."};
     balance.params = {
         {"absorptivity", -1.0f,
@@ -290,11 +292,12 @@ TemperatureModelRegistry TemperatureModelRegistry::WithBuiltins() {
 void TemperatureModelRegistry::Add(TemperatureModel model) {
     if (!IsIdentifier(model.id)) {
         throw std::invalid_argument(
-            "Temperature model id must be an identifier: '" + model.id +
-            "'");
+            "Temperature model id must be an identifier: '" +
+            model.id + "'");
     }
     if (IsBuiltinId(model.id)) {
-        throw std::invalid_argument("Temperature model id '" + model.id +
+        throw std::invalid_argument("Temperature model id '" +
+                                    model.id +
                                     "' is a built-in model's");
     }
     if (Find(model.id) != nullptr) {
@@ -366,13 +369,15 @@ double SolarAbsorptivity(const Spectrum& reflectance) {
     for (double nm = 250.5; nm < 2500.0; nm += 1.0) {
         const double irradiance = sun(nm);
         total += irradiance;
-        reflected += irradiance * std::clamp(reflectance(nm), 0.0, 1.0);
+        reflected +=
+            irradiance * std::clamp(reflectance(nm), 0.0, 1.0);
     }
     return total > 0.0 ? 1.0 - reflected / total : 0.0;
 }
 
-double ThermalEmissivity(const std::function<double(double)>& emissivity,
-                         double kelvin) {
+double
+ThermalEmissivity(const std::function<double(double)>& emissivity,
+                  double kelvin) {
     // Planck's radiance up to its constants, per nm.
     constexpr double kC2 = 1.438776877e7;  // nm K
     double total = 0.0;

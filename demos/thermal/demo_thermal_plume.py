@@ -45,7 +45,12 @@ def exhaust(s, radial):
     width = 0.28 + 0.07 * s
     core = np.exp(-(radial * radial) / (width * width))
     fade = np.clip((11.5 - s) / 2.0, 0.0, 1.0)
-    soot = core * (0.25 + 0.6 * (1.0 - np.exp(-s / 3.0))) / (1.0 + 0.1 * s) * fade
+    soot = (
+        core
+        * (0.25 + 0.6 * (1.0 - np.exp(-s / 3.0)))
+        / (1.0 + 0.1 * s)
+        * fade
+    )
     diamonds = 1.0 + 0.35 * np.exp(-s / 2.5) * np.cos(7.0 * s)
     rise = PEAK_RISE * np.exp(-s / 4.0) * core * diamonds
     return soot, rise * fade
@@ -87,10 +92,14 @@ class Demo(ernie.demo.Demo):
             "Concrete", ernie.Material, reflectance_library="concrete"
         )
         steel = looks.define(
-            "Steel", ernie.Material, reflectance_library="galvanized_steel"
+            "Steel",
+            ernie.Material,
+            reflectance_library="galvanized_steel",
         )
         world.define(
-            "Ground", ernie.GroundPlane, material_binding=concrete.path
+            "Ground",
+            ernie.GroundPlane,
+            material_binding=concrete.path,
         )
         # The stand, and the engine on it: chamber and bell at their own
         # temperatures.
@@ -135,9 +144,14 @@ class Demo(ernie.demo.Demo):
         soot, rise = exhaust(x, np.hypot(y, z - AXIS_HEIGHT))
         held = soot > 1e-4
         plume = world.define(
-            "Plume", ernie.Volume, material_binding="/World/Looks/Exhaust"
+            "Plume",
+            ernie.Volume,
+            material_binding="/World/Looks/Exhaust",
         )
-        for name, values in (("Density", soot), ("Temperature", rise)):
+        for name, values in (
+            ("Density", soot),
+            ("Temperature", rise),
+        ):
             plume.define(
                 name,
                 ernie.DenseField,
@@ -146,7 +160,9 @@ class Demo(ernie.demo.Demo):
                 translate=tuple(GRID_ORIGIN),
             )
         plume.set_field("density", plume.path.child("Density"))
-        plume.set_field("temperature", plume.path.child("Temperature"))
+        plume.set_field(
+            "temperature", plume.path.child("Temperature")
+        )
         self.exhaust = looks.define(
             "Exhaust",
             ernie.Material,
@@ -183,7 +199,11 @@ class Demo(ernie.demo.Demo):
         # Visible light by the sunny 16 rule; a 3 to 5 um camera of flat
         # response exposed for the exhaust, the cool ground dark.
         self.visible = self.define_camera(
-            "Visible", VISIBLE_PRODUCT, (380.0, 720.0), 17, ["LdrColor"]
+            "Visible",
+            VISIBLE_PRODUCT,
+            (380.0, 720.0),
+            17,
+            ["LdrColor"],
         )
         self.visible.exposure_f_stop = 16.0
         self.visible.exposure_time = 0.01
@@ -221,17 +241,25 @@ class Demo(ernie.demo.Demo):
             on_change=self.show,
         )
         self.widgets.slider(
-            "Exhaust rise (K)", 200.0, 3000.0, PEAK_RISE, on_change=rise_to
+            "Exhaust rise (K)",
+            200.0,
+            3000.0,
+            PEAK_RISE,
+            on_change=rise_to,
         )
         self.show(1)
 
-    def define_camera(self, name, product, spectral, bands, variables):
+    def define_camera(
+        self, name, product, spectral, bands, variables
+    ):
         camera = self.scene.define(
             f"/World/{name}",
             ernie.Camera,
             focal_length=FOCAL_LENGTH,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
             spectral_range=spectral,
             spectral_bands=bands,
@@ -262,18 +290,23 @@ class Demo(ernie.demo.Demo):
             return
         camera = self.visible if index == 0 else self.infrared
         self.viewer.active_camera = camera.path
-        self.viewer.view_var = "Temperature" if index == 2 else "LdrColor"
+        self.viewer.view_var = (
+            "Temperature" if index == 2 else "LdrColor"
+        )
 
     def render_all(self):
         """The visible and 3 to 5 um LdrColor, uint8 (rows, cols, 4), and
         the Temperature var in kelvin (rows, cols)."""
         outputs = self.renderer.step(
-            self.scene, render_products=[VISIBLE_PRODUCT, INFRARED_PRODUCT]
+            self.scene,
+            render_products=[VISIBLE_PRODUCT, INFRARED_PRODUCT],
         )
 
         def var(product, name):
             frame = outputs[product].frames[0]
-            return np.array(frame.render_vars[f"{product}/{name}"].map())
+            return np.array(
+                frame.render_vars[f"{product}/{name}"].map()
+            )
 
         return (
             var(VISIBLE_PRODUCT, "LdrColor"),

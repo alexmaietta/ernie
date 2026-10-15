@@ -17,7 +17,8 @@ if(EXISTS "${INSTALL}/.built")
 endif()
 
 # Every library static, position independent and with hidden symbols, in Release, found in the
-# install directory alone.
+# install directory first (each its <Package>_ROOT). PATH stays searched: the tools live there
+# (ar in manylinux's gcc-toolset, rc and mt in an MSVC prompt).
 set(common
     -G "${GENERATOR}"
     "-DCMAKE_C_COMPILER=${C_COMPILER}"
@@ -27,7 +28,6 @@ set(common
     "-DCMAKE_INSTALL_PREFIX=${INSTALL}"
     -DCMAKE_INSTALL_LIBDIR=lib
     "-DCMAKE_PREFIX_PATH=${INSTALL}"
-    -DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     -DBUILD_SHARED_LIBS=OFF
     -DCMAKE_C_VISIBILITY_PRESET=hidden
@@ -81,6 +81,17 @@ set(options_openvdb
     -DBLOSC_USE_STATIC_LIBS=ON
     -DZLIB_USE_STATIC_LIBS=ON)
 
+# Stops with the end of `log`, so that CI shows why a step failed.
+function(fail_with_log what log)
+    file(READ "${log}" text)
+    string(LENGTH "${text}" length)
+    if(length GREATER 8000)
+        math(EXPR start "${length} - 8000")
+        string(SUBSTRING "${text}" ${start} -1 text)
+    endif()
+    message(FATAL_ERROR "${what} failed; the end of ${log}:\n${text}")
+endfunction()
+
 string(REPLACE "^" ";" sources "${SOURCES}")
 foreach(source IN LISTS sources)
     string(REPLACE "|" ";" fields "${source}")
@@ -106,7 +117,7 @@ foreach(source IN LISTS sources)
         ERROR_FILE "${WORK}/${name}-configure.log"
         RESULT_VARIABLE result)
     if(NOT result EQUAL 0)
-        message(FATAL_ERROR "Configuring ${name} failed; see ${WORK}/${name}-configure.log")
+        fail_with_log("Configuring ${name}" "${WORK}/${name}-configure.log")
     endif()
     execute_process(
         COMMAND "${CMAKE_COMMAND}" --build "${WORK}/build/${name}" --config Release --parallel
@@ -115,7 +126,7 @@ foreach(source IN LISTS sources)
         ERROR_FILE "${WORK}/${name}-build.log"
         RESULT_VARIABLE result)
     if(NOT result EQUAL 0)
-        message(FATAL_ERROR "Building ${name} failed; see ${WORK}/${name}-build.log")
+        fail_with_log("Building ${name}" "${WORK}/${name}-build.log")
     endif()
 endforeach()
 file(TOUCH "${INSTALL}/.built")

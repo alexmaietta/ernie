@@ -169,7 +169,11 @@ class Demo(ernie.demo.Demo):
         # microbolometer over 8 to 14 um, its brightness temperature in
         # the ironbow palette from 265 to 375 K.
         self.visible = self.define_camera(
-            "Visible", VISIBLE_PRODUCT, (380.0, 720.0), 17, ["LdrColor"]
+            "Visible",
+            VISIBLE_PRODUCT,
+            (380.0, 720.0),
+            17,
+            ["LdrColor"],
         )
         self.visible.exposure_f_stop = 16.0
         self.visible.exposure_time = 0.01
@@ -180,7 +184,12 @@ class Demo(ernie.demo.Demo):
             (
                 "Display",
                 "thermalDisplay",
-                {"automatic": 0.0, "low": 265.0, "high": 375.0, "palette": 2.0},
+                {
+                    "automatic": 0.0,
+                    "low": 265.0,
+                    "high": 375.0,
+                    "palette": 2.0,
+                },
             ),
             ("Exposure", "exposure", {}),
         ):
@@ -227,7 +236,11 @@ class Demo(ernie.demo.Demo):
             on_change=self.show,
         )
         self.widgets.slider(
-            "Blocks (K)", 250.0, 400.0, BLOCK_TEMPERATURE, on_change=heat
+            "Blocks (K)",
+            250.0,
+            400.0,
+            BLOCK_TEMPERATURE,
+            on_change=heat,
         )
         self.show(1)
         if viewer is not None:
@@ -243,7 +256,9 @@ class Demo(ernie.demo.Demo):
             ernie.Camera,
             focal_length=FOCAL_LENGTH,
             horizontal_aperture=APERTURE,
-            vertical_aperture=APERTURE * RESOLUTION[1] / RESOLUTION[0],
+            vertical_aperture=APERTURE
+            * RESOLUTION[1]
+            / RESOLUTION[0],
             sensor_noise=False,
             spectral_range=spectral,
             spectral_bands=bands,
@@ -286,12 +301,15 @@ class Demo(ernie.demo.Demo):
         the Temperature and BrightnessTemperature vars in kelvin (rows,
         cols)."""
         outputs = self.renderer.step(
-            self.scene, render_products=[VISIBLE_PRODUCT, THERMAL_PRODUCT]
+            self.scene,
+            render_products=[VISIBLE_PRODUCT, THERMAL_PRODUCT],
         )
 
         def var(product, name):
             frame = outputs[product].frames[0]
-            return np.array(frame.render_vars[f"{product}/{name}"].map())
+            return np.array(
+                frame.render_vars[f"{product}/{name}"].map()
+            )
 
         return (
             var(VISIBLE_PRODUCT, "LdrColor"),
@@ -324,7 +342,9 @@ class Demo(ernie.demo.Demo):
         images = self.render_all()
         finish = []
         for i, name in enumerate(FINISHES):
-            sampled = sample(images, finish_centre(i), BLOCK_TEMPERATURE)
+            sampled = sample(
+                images, finish_centre(i), BLOCK_TEMPERATURE
+            )
             print(
                 f"{name}: visible {sampled[0]:.3f} "
                 f"thermal {sampled[1]:.3f}"
@@ -350,7 +370,9 @@ class Demo(ernie.demo.Demo):
         assert aluminium[1] < 0.6 * black[1], (
             "bare aluminium should look cold: it mirrors the sky"
         )
-        ground = sample(images, np.array([1.0, -1.0, 0.0]), GROUND_TEMPERATURE)
+        ground = sample(
+            images, np.array([1.0, -1.0, 0.0]), GROUND_TEMPERATURE
+        )
         assert ground[2] > 0, (
             "the ground should read the default temperature"
         )
@@ -362,7 +384,9 @@ class Demo(ernie.demo.Demo):
             for i, kelvin in enumerate(RAMP)
         ]
         for kelvin, sphere in zip(RAMP, spheres):
-            print(f"sphere at {kelvin:.0f} K: thermal {sphere[1]:.3f}")
+            print(
+                f"sphere at {kelvin:.0f} K: thermal {sphere[1]:.3f}"
+            )
             assert sphere[2] > 0
         assert all(
             a[1] <= b[1] for a, b in zip(spheres, spheres[1:])
@@ -371,7 +395,10 @@ class Demo(ernie.demo.Demo):
             "370 K should far outshine 270 K"
         )
         visible, thermal, temperature, brightness = images
-        assert temperature[0, 0] == 0.0, "the sky should have no temperature"
+        assert temperature[0, 0] == 0.0, (
+            "the sky should have no temperature"
+        )
+
         # What the camera reads, for an emissivity of 1: black paint
         # near its 330 K, bare aluminium far colder.
         def reads(point):

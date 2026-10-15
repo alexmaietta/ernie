@@ -41,8 +41,10 @@ namespace {
 using namespace ernie;
 using demos::Check;
 
-constexpr double kRadius = 10.0;  // m: the Moon, small enough to share the frame
-constexpr glm::dvec3 kCraft(-5.0, -26.0, 4.0);  // the spacecraft's body centre
+constexpr double kRadius =
+    10.0;  // m: the Moon, small enough to share the frame
+constexpr glm::dvec3 kCraft(-5.0, -26.0,
+                            4.0);  // the spacecraft's body centre
 struct Panel {
     const char* name;
     double offset;
@@ -51,10 +53,13 @@ struct Panel {
 constexpr std::array<Panel, 2> kPanels = {
     Panel{"White", -2.2, "white_coating"},
     Panel{"Aluminium", 2.2, "aluminium"}};
-constexpr float kInternal = 150.0f;  // W/m^2 the body's electronics give off
-constexpr float kSpace = 3.0f;       // K
-constexpr double kSunElevation = 0.15;  // z of the Sun's direction, before normalizing
-constexpr double kAzimuth = 20.0;  // degrees: the Sun right of the camera, its start
+constexpr float kInternal =
+    150.0f;  // W/m^2 the body's electronics give off
+constexpr float kSpace = 3.0f;  // K
+constexpr double kSunElevation =
+    0.15;  // z of the Sun's direction, before normalizing
+constexpr double kAzimuth =
+    20.0;  // degrees: the Sun right of the camera, its start
 
 constexpr glm::dvec2 kResolution(400.0, 300.0);
 constexpr double kFocalLength = 24.0;  // mm
@@ -78,8 +83,9 @@ Tensor PanelPoints(double offset, glm::dvec3 facing) {
         glm::normalize(glm::cross(glm::dvec3(0.0, 0.0, 1.0), facing));
     const glm::dvec3 v = glm::cross(facing, u);
     std::vector<double> points;
-    for (const auto& [a, b] : {std::pair{-1.0, -1.0}, std::pair{1.0, -1.0},
-                               std::pair{1.0, 1.0}, std::pair{-1.0, 1.0}}) {
+    for (const auto& [a, b] :
+         {std::pair{-1.0, -1.0}, std::pair{1.0, -1.0},
+          std::pair{1.0, 1.0}, std::pair{-1.0, 1.0}}) {
         const glm::dvec3 p = centre + a * 0.75 * u + b * 0.5 * v;
         points.insert(points.end(), {p.x, p.y, p.z});
     }
@@ -103,7 +109,8 @@ glm::ivec2 Project(glm::dvec3 point) {
 
 class LunarThermalDemo : public app::Demo {
   public:
-    LunarThermalDemo(app::Viewer* viewer, const app::DemoOptions& options)
+    LunarThermalDemo(app::Viewer* viewer,
+                     const app::DemoOptions& options)
         : Demo(viewer, options) {
         numFrames = 1;
         Scene& scene = GetScene();
@@ -134,14 +141,18 @@ class LunarThermalDemo : public app::Demo {
             .SetMaterialBinding("/World/Looks/Body");
         SetXform(scene, "/World/Body", {.translate = kCraft});
         for (const Panel& panel : kPanels) {
-            const Path look("/World/Looks/" + std::string(panel.name));
+            const Path look("/World/Looks/" +
+                            std::string(panel.name));
             Material::Define(scene, look)
                 .SetReflectanceLibrary(panel.finish)
                 .SetThermalModel("balance")
-                .SetThermalModelParams({-1.0f, -1.0f, kSpace, 0.0f, 2.0f});
+                .SetThermalModelParams(
+                    {-1.0f, -1.0f, kSpace, 0.0f, 2.0f});
             const std::vector<std::int64_t> indices{0, 1, 2, 3};
-            Mesh::Define(scene, Path("/World/" + std::string(panel.name)))
-                .SetPoints(PanelPoints(panel.offset, SunDirection(0.0)))
+            Mesh::Define(scene,
+                         Path("/World/" + std::string(panel.name)))
+                .SetPoints(
+                    PanelPoints(panel.offset, SunDirection(0.0)))
                 .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
                     std::vector<std::int64_t>{4}, {1}))
                 .SetFaceVertexIndices(
@@ -155,12 +166,13 @@ class LunarThermalDemo : public app::Demo {
 
         // Visible light for sunlit regolith; the thermal camera a
         // microbolometer over 8 to 14 um, ironbow over the range the
-        // last frame showed (80 to 400 K before one), so the night side
-        // reads.
-        DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0}, 17,
-                     {"LdrColor"});
-        DefineCamera(kThermalCamera, kThermalProduct, {8000.0, 14000.0},
-                     6, {"LdrColor", "Temperature"});
+        // last frame showed (80 to 400 K before one), so the night
+        // side reads.
+        DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0},
+                     17, {"LdrColor"});
+        DefineCamera(kThermalCamera, kThermalProduct,
+                     {8000.0, 14000.0}, 6,
+                     {"LdrColor", "Temperature"});
         Camera(scene, kVisibleCamera)
             .SetExposureFStop(16.0)
             .SetExposureTime(0.004)
@@ -172,14 +184,16 @@ class LunarThermalDemo : public app::Demo {
             .SetFilterType("thermalDisplay");
         for (const auto& [name, value] :
              {std::pair{"automatic", 1.0f}, std::pair{"low", 80.0f},
-              std::pair{"high", 400.0f}, std::pair{"palette", 2.0f}}) {
-            scene.Set(chain.Child("Display"), "inputs:" + std::string(name),
-                      value);
+              std::pair{"high", 400.0f},
+              std::pair{"palette", 2.0f}}) {
+            scene.Set(chain.Child("Display"),
+                      "inputs:" + std::string(name), value);
         }
         SensorFilterPrim::Define(scene, chain.Child("Exposure"))
             .SetFilterType("exposure");
         RenderProduct(scene, kThermalProduct)
-            .SetFilters({chain.Child("Bolometer"), chain.Child("Display"),
+            .SetFilters({chain.Child("Bolometer"),
+                         chain.Child("Display"),
                          chain.Child("Exposure")});
         RenderSettings::Define(scene, "/Render/Settings")
             .SetCamera(kThermalCamera)
@@ -188,11 +202,12 @@ class LunarThermalDemo : public app::Demo {
             .SetThermalEnable(true)
             .SetThermalBackgroundTemperature(kSpace);
 
-        Widgets().Combo("View",
-                        {"Visible", "Thermal camera", "Temperature"}, 1,
-                        [this](std::size_t index) { Show(index); });
-        Widgets().Slider("Sun azimuth (deg)", -80.0, 80.0, kAzimuth,
-                         [this](double azimuth) { PlaceSun(azimuth); });
+        Widgets().Combo(
+            "View", {"Visible", "Thermal camera", "Temperature"}, 1,
+            [this](std::size_t index) { Show(index); });
+        Widgets().Slider(
+            "Sun azimuth (deg)", -80.0, 80.0, kAzimuth,
+            [this](double azimuth) { PlaceSun(azimuth); });
         Show(1);
     }
 
@@ -202,7 +217,8 @@ class LunarThermalDemo : public app::Demo {
         const Images images = RenderAll();
         const std::array<Tensor, 3> row = {
             Rgb(images.visible), Rgb(images.thermal),
-            demos::Heatmap(images.kelvin, Rows(), Cols(), 80.0, 400.0)};
+            demos::Heatmap(images.kelvin, Rows(), Cols(), 80.0,
+                           400.0)};
         app::WritePng(path, demos::SideBySide(row));
     }
 
@@ -212,54 +228,62 @@ class LunarThermalDemo : public app::Demo {
             return images.kelvin[static_cast<std::size_t>(
                 pixel.y * Cols() + pixel.x)];
         };
-        // The Temperature var on the Moon's equator `longitude` degrees
-        // right of the sub-camera point.
+        // The Temperature var on the Moon's equator `longitude`
+        // degrees right of the sub-camera point.
         const auto surface = [&](double longitude) {
             const double a = glm::radians(longitude);
-            return kelvinAt(Project(
-                kRadius * glm::dvec3(std::sin(a), -std::cos(a), 0.0)));
+            return kelvinAt(
+                Project(kRadius *
+                        glm::dvec3(std::sin(a), -std::cos(a), 0.0)));
         };
         const double noon = surface(azimuth_);
         const int equator = Project(glm::dvec3(0.0)).y;
         double night = std::numeric_limits<double>::max();
         for (std::int64_t c = 0; c < Cols(); ++c) {
-            const double kelvin = kelvinAt({static_cast<int>(c), equator});
+            const double kelvin =
+                kelvinAt({static_cast<int>(c), equator});
             if (kelvin > 0.0) {
                 night = std::min(night, kelvin);
             }
         }
-        std::printf("sun at %.0f deg: noon %.1f K, night side %.1f K\n",
-                    azimuth_, noon, night);
+        std::printf(
+            "sun at %.0f deg: noon %.1f K, night side %.1f K\n",
+            azimuth_, noon, night);
         Check(std::abs(noon - 390.0) < 10.0,
               "the subsolar point should be near 390 K");
         Check(night < 130.0, "the night side should be near 100 K");
-        // The same sun 45 degrees either side of noon: afternoon (east
-        // of the subsolar point, right) warmer than morning.
+        // The same sun 45 degrees either side of noon: afternoon
+        // (east of the subsolar point, right) warmer than morning.
         const double afternoon = surface(azimuth_ + 45.0);
         const double morning = surface(azimuth_ - 45.0);
         std::printf("morning %.1f K, afternoon %.1f K\n", morning,
                     afternoon);
-        Check(afternoon > morning + 0.5, "the afternoon should be warmer");
-        // The panels: aluminium absorbs little but radiates less still,
-        // hot; white paint radiates well, cold; yet the camera sees the
-        // aluminium darker, its low emissivity mirroring space.
+        Check(afternoon > morning + 0.5,
+              "the afternoon should be warmer");
+        // The panels: aluminium absorbs little but radiates less
+        // still, hot; white paint radiates well, cold; yet the camera
+        // sees the aluminium darker, its low emissivity mirroring
+        // space.
         std::array<std::pair<double, double>, kPanels.size()> reads{};
         const auto* thermal =
             static_cast<const std::uint8_t*>(images.thermal.Data());
         for (std::size_t i = 0; i < kPanels.size(); ++i) {
-            const glm::ivec2 pixel =
-                Project(kCraft + glm::dvec3(kPanels[i].offset, 0.0, 0.0));
-            const auto at = static_cast<std::size_t>(pixel.y * Cols() +
-                                                     pixel.x) *
-                            4;
-            reads[i] = {kelvinAt(pixel),
-                        (thermal[at] + thermal[at + 1] + thermal[at + 2]) /
-                            3.0};
+            const glm::ivec2 pixel = Project(
+                kCraft + glm::dvec3(kPanels[i].offset, 0.0, 0.0));
+            const auto at =
+                static_cast<std::size_t>(pixel.y * Cols() + pixel.x) *
+                4;
+            reads[i] = {
+                kelvinAt(pixel),
+                (thermal[at] + thermal[at + 1] + thermal[at + 2]) /
+                    3.0};
             std::printf("%s panel: %.1f K, thermal %.0f\n",
-                        kPanels[i].name, reads[i].first, reads[i].second);
+                        kPanels[i].name, reads[i].first,
+                        reads[i].second);
         }
-        Check(reads[1].first > reads[0].first + 100.0,
-              "bare aluminium should run far hotter than white paint");
+        Check(
+            reads[1].first > reads[0].first + 100.0,
+            "bare aluminium should run far hotter than white paint");
         Check(reads[1].second < reads[0].second,
               "yet it should look the colder at 8 to 14 um");
         const double body = kelvinAt(Project(kCraft));
@@ -327,7 +351,8 @@ class LunarThermalDemo : public app::Demo {
         }
         GetViewer()->SetActiveCamera(
             Path(index == 0 ? kVisibleCamera : kThermalCamera));
-        GetViewer()->SetViewVar(index == 2 ? "Temperature" : "LdrColor");
+        GetViewer()->SetViewVar(index == 2 ? "Temperature"
+                                           : "LdrColor");
     }
 
     static std::int64_t Rows() {
@@ -361,7 +386,8 @@ class LunarThermalDemo : public app::Demo {
     /// heatmap.
     static Tensor Rgb(const Tensor& image) {
         Tensor rgb = Tensor::Zeros(DType::UInt8, {Rows(), Cols(), 3});
-        const auto* in = static_cast<const std::uint8_t*>(image.Data());
+        const auto* in =
+            static_cast<const std::uint8_t*>(image.Data());
         auto* out = static_cast<std::uint8_t*>(rgb.Data());
         const auto channels = image.Shape()[2];
         for (std::int64_t i = 0; i < Rows() * Cols(); ++i) {

@@ -44,7 +44,7 @@ constexpr std::int64_t kNz = 32;
 constexpr double kVoxel = 0.125;
 constexpr glm::dvec3 kGridOrigin(0.0, -2.0, -0.5);
 constexpr double kAxisHeight = 1.5;
-constexpr double kAmbient = 295.0;  // the air, the ground's too
+constexpr double kAmbient = 295.0;    // the air, the ground's too
 constexpr double kPeakRise = 1700.0;  // above the air, at the nozzle
 constexpr double kChamberKelvin = 700.0;
 constexpr double kBellKelvin = 900.0;
@@ -60,19 +60,23 @@ constexpr glm::dvec3 kTarget(4.0, 0.0, 1.3);
 /// kelvin, which falls away downstream through bright shock diamonds.
 glm::dvec2 Exhaust(double s, double radial) {
     const double width = 0.28 + 0.07 * s;
-    const double core = std::exp(-(radial * radial) / (width * width));
+    const double core =
+        std::exp(-(radial * radial) / (width * width));
     const double fade = std::clamp((11.5 - s) / 2.0, 0.0, 1.0);
-    const double soot = core * (0.25 + 0.6 * (1.0 - std::exp(-s / 3.0))) /
+    const double soot = core *
+                        (0.25 + 0.6 * (1.0 - std::exp(-s / 3.0))) /
                         (1.0 + 0.1 * s) * fade;
     const double diamonds =
         1.0 + 0.35 * std::exp(-s / 2.5) * std::cos(7.0 * s);
-    const double rise = kPeakRise * std::exp(-s / 4.0) * core * diamonds;
+    const double rise =
+        kPeakRise * std::exp(-s / 4.0) * core * diamonds;
     return {soot, rise * fade};
 }
 
 class ThermalPlumeDemo : public app::Demo {
   public:
-    ThermalPlumeDemo(app::Viewer* viewer, const app::DemoOptions& options)
+    ThermalPlumeDemo(app::Viewer* viewer,
+                     const app::DemoOptions& options)
         : Demo(viewer, options) {
         numFrames = 1;
         Scene& scene = GetScene();
@@ -100,7 +104,8 @@ class ThermalPlumeDemo : public app::Demo {
             .SetThermalTemperature(kChamberKelvin);
         SetXform(scene, "/World/Chamber",
                  {.translate = glm::dvec3(-1.5, 0.0, kAxisHeight)});
-        // The bell's apex towards the chamber, its mouth at the origin.
+        // The bell's apex towards the chamber, its mouth at the
+        // origin.
         Cone::Define(scene, "/World/Bell")
             .SetAxis("X")
             .SetRadius(0.42)
@@ -111,7 +116,8 @@ class ThermalPlumeDemo : public app::Demo {
                  {.translate = glm::dvec3(-0.45, 0.0, kAxisHeight),
                   .rotate = glm::dvec3(0.0, 0.0, 180.0)});
 
-        // The exhaust: soot whose absorption glows at its temperature.
+        // The exhaust: soot whose absorption glows at its
+        // temperature.
         std::vector<float> soot(kNx * kNy * kNz);
         std::vector<float> rise(soot.size());
         for (std::int64_t i = 0; i < kNx; ++i) {
@@ -124,12 +130,12 @@ class ThermalPlumeDemo : public app::Demo {
                                             static_cast<double>(k));
                     const glm::dvec2 at = Exhaust(
                         p.x, std::hypot(p.y, p.z - kAxisHeight));
-                    const auto cell =
-                        static_cast<std::size_t>((i * kNy + j) * kNz + k);
-                    soot[cell] = at.x > 1e-4 ? static_cast<float>(at.x)
-                                             : 0.0f;
-                    rise[cell] = at.x > 1e-4 ? static_cast<float>(at.y)
-                                             : 0.0f;
+                    const auto cell = static_cast<std::size_t>(
+                        (i * kNy + j) * kNz + k);
+                    soot[cell] =
+                        at.x > 1e-4 ? static_cast<float>(at.x) : 0.0f;
+                    rise[cell] =
+                        at.x > 1e-4 ? static_cast<float>(at.y) : 0.0f;
                 }
             }
         }
@@ -138,14 +144,16 @@ class ThermalPlumeDemo : public app::Demo {
             .SetField("density", plume.Child("Density"))
             .SetField("temperature", plume.Child("Temperature"))
             .SetMaterialBinding("/World/Looks/Exhaust");
-        const std::array<std::pair<const char*, const std::vector<float>*>,
-                         2>
+        const std::array<
+            std::pair<const char*, const std::vector<float>*>, 2>
             fields{{{"Density", &soot}, {"Temperature", &rise}}};
         for (const auto& [name, values] : fields) {
             DenseField::Define(scene, plume.Child(name))
                 .SetVoxelSize(kVoxel)
-                .SetValues(Tensor::Copy<float>(*values, {kNx, kNy, kNz}));
-            SetXform(scene, plume.Child(name), {.translate = kGridOrigin});
+                .SetValues(
+                    Tensor::Copy<float>(*values, {kNx, kNy, kNz}));
+            SetXform(scene, plume.Child(name),
+                     {.translate = kGridOrigin});
         }
         Material::Define(scene, "/World/Looks/Exhaust")
             .SetDensity(4.0)
@@ -162,16 +170,18 @@ class ThermalPlumeDemo : public app::Demo {
         // A blue sky, scattered sunlight to none past 1.1 um.
         DomeLight::Define(scene, "/World/Sky")
             .SetSpectrum(std::vector<float>{
-                380.0f,  0.22f,  450.0f,  0.17f, 500.0f, 0.13f,
-                550.0f,  0.10f,  600.0f,  0.075f, 700.0f, 0.04f,
-                850.0f,  0.017f, 1100.0f, 0.0f,  20000.0f, 0.0f});
+                380.0f, 0.22f, 450.0f, 0.17f, 500.0f, 0.13f, 550.0f,
+                0.10f, 600.0f, 0.075f, 700.0f, 0.04f, 850.0f, 0.017f,
+                1100.0f, 0.0f, 20000.0f, 0.0f});
 
         // Visible light by the sunny 16 rule; a 3 to 5 um camera of
-        // flat response exposed for the exhaust, the cool ground dark.
-        DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0}, 17,
-                     {"LdrColor"});
-        DefineCamera(kInfraredCamera, kInfraredProduct, {3000.0, 5000.0},
-                     8, {"LdrColor", "Temperature"});
+        // flat response exposed for the exhaust, the cool ground
+        // dark.
+        DefineCamera(kVisibleCamera, kVisibleProduct, {380.0, 720.0},
+                     17, {"LdrColor"});
+        DefineCamera(kInfraredCamera, kInfraredProduct,
+                     {3000.0, 5000.0}, 8,
+                     {"LdrColor", "Temperature"});
         Camera(scene, kVisibleCamera)
             .SetExposureFStop(16.0)
             .SetExposureTime(0.01)
@@ -191,23 +201,26 @@ class ThermalPlumeDemo : public app::Demo {
             .SetThermalDefaultTemperature(kAmbient)
             .SetThermalBackgroundTemperature(230.0);
 
-        Widgets().Combo("View", {"Visible", "3-5 um", "Temperature"}, 1,
+        Widgets().Combo("View", {"Visible", "3-5 um", "Temperature"},
+                        1,
                         [this](std::size_t index) { Show(index); });
-        Widgets().Slider("Exhaust rise (K)", 200.0, 3000.0, kPeakRise,
-                         [this](double kelvin) {
-                             Material(GetScene(), "/World/Looks/Exhaust")
-                                 .SetTemperatureScale(kelvin / kPeakRise);
-                         });
+        Widgets().Slider(
+            "Exhaust rise (K)", 200.0, 3000.0, kPeakRise,
+            [this](double kelvin) {
+                Material(GetScene(), "/World/Looks/Exhaust")
+                    .SetTemperatureScale(kelvin / kPeakRise);
+            });
         Show(1);
     }
 
-    /// The visible, 3 to 5 um and false-colour Temperature images side
-    /// by side.
+    /// The visible, 3 to 5 um and false-colour Temperature images
+    /// side by side.
     void SaveOutput(const std::filesystem::path& path) override {
         const Images images = RenderAll();
         const std::array<Tensor, 3> row = {
             Rgb(images.visible), Rgb(images.infrared),
-            demos::Heatmap(images.kelvin, Rows(), Cols(), 250.0, 1300.0)};
+            demos::Heatmap(images.kelvin, Rows(), Cols(), 250.0,
+                           1300.0)};
         app::WritePng(path, demos::SideBySide(row));
     }
 
@@ -222,12 +235,13 @@ class ThermalPlumeDemo : public app::Demo {
         const double nozzle = kelvinAt({0.9, 0.0, kAxisHeight});
         const double tail = kelvinAt({9.0, 0.0, kAxisHeight});
         const double ground = kelvinAt({4.0, -4.0, 0.0});
-        const double chamber = kelvinAt({-1.5, 0.0, kAxisHeight + 0.2});
+        const double chamber =
+            kelvinAt({-1.5, 0.0, kAxisHeight + 0.2});
         std::printf("Temperature: nozzle %.0f K, tail %.0f K, ground "
                     "%.0f K, chamber %.0f K\n",
                     nozzle, tail, ground, chamber);
-        // A mean through the cooler sheath about the core, weighted by
-        // what each part holds back.
+        // A mean through the cooler sheath about the core, weighted
+        // by what each part holds back.
         Check(nozzle > 800.0,
               "the exhaust by the nozzle should read over 800 K");
         Check(tail < nozzle - 300.0 && tail > kAmbient,
@@ -236,10 +250,10 @@ class ThermalPlumeDemo : public app::Demo {
               "the ground should read the air's temperature");
         Check(std::abs(chamber - kChamberKelvin) < 0.5,
               "the chamber should read its own temperature");
-        const double plumeIr = Brightness(images.infrared, {1.0, 0.0,
-                                                           kAxisHeight});
-        const double groundIr = Brightness(images.infrared, {4.0, -4.0,
-                                                            0.0});
+        const double plumeIr =
+            Brightness(images.infrared, {1.0, 0.0, kAxisHeight});
+        const double groundIr =
+            Brightness(images.infrared, {4.0, -4.0, 0.0});
         const double plumeVisible =
             Brightness(images.visible, {1.0, 0.0, kAxisHeight});
         const double groundVisible =
@@ -257,7 +271,8 @@ class ThermalPlumeDemo : public app::Demo {
     static constexpr const char* kVisibleCamera = "/World/Visible";
     static constexpr const char* kInfraredCamera = "/World/Infrared";
     static constexpr const char* kVisibleProduct = "/Render/Visible";
-    static constexpr const char* kInfraredProduct = "/Render/Infrared";
+    static constexpr const char* kInfraredProduct =
+        "/Render/Infrared";
 
     struct Images {
         Tensor visible;              // uint8 (rows, cols, 4)
@@ -297,7 +312,8 @@ class ThermalPlumeDemo : public app::Demo {
         }
         GetViewer()->SetActiveCamera(
             Path(index == 0 ? kVisibleCamera : kInfraredCamera));
-        GetViewer()->SetViewVar(index == 2 ? "Temperature" : "LdrColor");
+        GetViewer()->SetViewVar(index == 2 ? "Temperature"
+                                           : "LdrColor");
     }
 
     static std::int64_t Rows() {
@@ -331,7 +347,8 @@ class ThermalPlumeDemo : public app::Demo {
     /// heatmap.
     static Tensor Rgb(const Tensor& image) {
         Tensor rgb = Tensor::Zeros(DType::UInt8, {Rows(), Cols(), 3});
-        const auto* in = static_cast<const std::uint8_t*>(image.Data());
+        const auto* in =
+            static_cast<const std::uint8_t*>(image.Data());
         auto* out = static_cast<std::uint8_t*>(rgb.Data());
         const auto channels = image.Shape()[2];
         for (std::int64_t i = 0; i < Rows() * Cols(); ++i) {
@@ -347,7 +364,8 @@ class ThermalPlumeDemo : public app::Demo {
             glm::normalize(glm::cross(forward, {0.0, 0.0, 1.0}));
         const glm::dvec3 up = glm::cross(right, forward);
         const glm::dvec3 d = point - kEye;
-        const double pixels = kFocalLength / kAperture * kResolution.x;
+        const double pixels =
+            kFocalLength / kAperture * kResolution.x;
         const double depth = glm::dot(d, forward);
         return {static_cast<int>(0.5 * kResolution.x +
                                  pixels * glm::dot(d, right) / depth),
@@ -359,7 +377,8 @@ class ThermalPlumeDemo : public app::Demo {
     /// the cameras see `point`.
     static double Brightness(const Tensor& image, glm::dvec3 point) {
         const glm::ivec2 centre = Pixel(point);
-        const auto* data = static_cast<const std::uint8_t*>(image.Data());
+        const auto* data =
+            static_cast<const std::uint8_t*>(image.Data());
         double sum = 0.0;
         for (int r = -1; r <= 1; ++r) {
             for (int c = -1; c <= 1; ++c) {

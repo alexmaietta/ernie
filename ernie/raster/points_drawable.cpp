@@ -152,14 +152,13 @@ float MaxScale(const glm::mat4& m) {
 
 std::vector<ShaderModuleSource>
 PointsModules(bool pushbroom = false) {
-    return {
-        {"brdf", std::string(BrdfSlang())},
-        ProjectionModule(pushbroom),
-        {"bindless", shaders::kBindlessSlang},
-        {"frame", shaders::kFrameSlang},
-        {"gbuffer", shaders::kGBufferSlang},
-        {"surface", shaders::kSurfaceSlang},
-        {"points", shaders::kPointsSlang}};
+    return {{"brdf", std::string(BrdfSlang())},
+            ProjectionModule(pushbroom),
+            {"bindless", shaders::kBindlessSlang},
+            {"frame", shaders::kFrameSlang},
+            {"gbuffer", shaders::kGBufferSlang},
+            {"surface", shaders::kSurfaceSlang},
+            {"points", shaders::kPointsSlang}};
 }
 
 }  // namespace
@@ -730,7 +729,8 @@ void PointsDrawable::Prepare(
         draw.ids[1] = item.primId;
         draw.ids[2] = item.linkGroup;
         draw.ids[3] = count;
-        draw.thermal[0] = params.thermal.enable ? item.temperature : 0.0f;
+        draw.thermal[0] =
+            params.thermal.enable ? item.temperature : 0.0f;
     }
     const VkDeviceSize bytes = std::max<VkDeviceSize>(
         draws.size() * sizeof(GpuPointsDraw), 16);

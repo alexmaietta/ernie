@@ -680,9 +680,8 @@ struct GpuXform {
 /// for a uniform scale; 4 for orient; 1 for rotateX/Y/Z; 16 for
 /// transform), or arrays that are not contiguous float32 of the same
 /// number of rows.
-std::optional<GpuXform> GpuXformOf(const Scene& scene,
-                                   const Path& path,
-                                   bool host = false);
+std::optional<GpuXform>
+GpuXformOf(const Scene& scene, const Path& path, bool host = false);
 
 /// Whether the quaternions in the prim's arrays put w first
 /// (`tokens::kQuaternionOrder`).

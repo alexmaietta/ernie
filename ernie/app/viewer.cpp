@@ -4,10 +4,10 @@
 #include "ernie/app/builtin_panels.h"
 #include "ernie/app/create.h"
 #include "ernie/app/icons.h"
-#include "ernie/app/property_fields.h"
 #include "ernie/app/logs.h"
 #include "ernie/app/menu.h"
 #include "ernie/app/prim_icons.h"
+#include "ernie/app/property_fields.h"
 #include "ernie/app/session.h"
 #include "ernie/device/compute_interop.h"
 #include "ernie/device/gpu_profile.h"
@@ -3592,8 +3592,8 @@ struct Viewer::State {
                 right - lightWidth - shotWidth - style.ItemSpacing.x -
                     ecoWidth - style.FramePadding.x,
                 origin.y + pad + style.FramePadding.y));
-            ImGui::TextColored(ImVec4(0.30f, 0.78f, 0.35f, 1.0f), "%s",
-                               ecoLabel.c_str());
+            ImGui::TextColored(ImVec4(0.30f, 0.78f, 0.35f, 1.0f),
+                               "%s", ecoLabel.c_str());
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
                     "Eco mode: rendering paused until something "
@@ -3890,14 +3890,14 @@ struct Viewer::State {
         // change meshes and fields every frame: keep rendering.
         const bool loading = std::ranges::any_of(
             view.counters, [](const auto& counter) {
-                return counter.first == raster_stats::kTexturesLoading &&
+                return counter.first ==
+                           raster_stats::kTexturesLoading &&
                        counter.second > 0;
             });
         view.busy = capture.has_value() || recording.has_value() ||
                     loading || delegate->HasWriters();
-        unchangedFrames = view == lastView && !view.busy
-                              ? unchangedFrames + 1
-                              : 0;
+        unchangedFrames =
+            view == lastView && !view.busy ? unchangedFrames + 1 : 0;
         lastView = std::move(view);
         const RenderSettings settings =
             RenderSettings::OrFallbacks(scene, settingsSource);

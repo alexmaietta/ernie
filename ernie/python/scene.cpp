@@ -115,7 +115,8 @@ Device DeviceFromName(std::string_view name) {
         return {DeviceKind::Cuda, 0};
     }
     if (name.starts_with("cuda:")) {
-        return {DeviceKind::Cuda, std::stoi(std::string(name.substr(5)))};
+        return {DeviceKind::Cuda,
+                std::stoi(std::string(name.substr(5)))};
     }
     throw nb::value_error("expected \"cpu\", \"cuda\" or \"cuda:N\"");
 }
@@ -1538,17 +1539,18 @@ void BindScene(nb::module_& m) {
         .def(nb::init<>())
         .def_rw("version", &ChangeCursor::version);
 
-    nb::class_<ColumnChange>(m, "ColumnChange",
-                             "One attribute of many prims written whole "
-                             "as a column's rows; see "
-                             "Scene.column_changes.")
-        .def_prop_ro("paths",
-                     [](const ColumnChange& change) {
-                         return change.paths != nullptr
-                                    ? *change.paths
-                                    : std::vector<Path>();
-                     },
-                     "The prims, in row order.")
+    nb::class_<ColumnChange>(
+        m, "ColumnChange",
+        "One attribute of many prims written whole "
+        "as a column's rows; see "
+        "Scene.column_changes.")
+        .def_prop_ro(
+            "paths",
+            [](const ColumnChange& change) {
+                return change.paths != nullptr ? *change.paths
+                                               : std::vector<Path>();
+            },
+            "The prims, in row order.")
         .def_ro("attribute", &ColumnChange::attribute)
         .def_ro("bits", &ColumnChange::bits)
         .def("__len__", [](const ColumnChange& change) {
@@ -1798,23 +1800,29 @@ void BindScene(nb::module_& m) {
         m, "Column",
         "One attribute of many prims as rows of one array, as a "
         "simulation keeps its bodies' poses (Scene.column): written "
-        "whole from any DLPack array, CPU or CUDA, without copying, or "
+        "whole from any DLPack array, CPU or CUDA, without copying, "
+        "or "
         "mapped and written in place on a device, each write one "
         "change however many prims.")
-        .def_prop_ro("prims",
-                     [](const Column& column) { return column.Prims(); })
+        .def_prop_ro(
+            "prims",
+            [](const Column& column) { return column.Prims(); })
         .def_prop_ro("attribute",
                      [](const Column& column) {
                          return std::string(column.Attribute());
                      })
         .def(
             "write",
-            [](Column& column, const AnyArray& array, nb::handle stream) {
-                column.Write(TensorFromArray(array), StreamOf(stream));
+            [](Column& column, const AnyArray& array,
+               nb::handle stream) {
+                column.Write(TensorFromArray(array),
+                             StreamOf(stream));
             },
             nb::arg("array"), nb::arg("stream").none() = nb::none(),
-            "Takes `array` (one row per prim, any DLPack array) as the "
-            "attribute without copying; for a CUDA array, `stream` is "
+            "Takes `array` (one row per prim, any DLPack array) as "
+            "the "
+            "attribute without copying; for a CUDA array, `stream` "
+            "is "
             "the one its contents are written on.")
         .def(
             "write_arrays",
@@ -1826,7 +1834,8 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("values"), nb::arg("counts"),
             nb::arg("stream").none() = nb::none(),
-            "Takes `values` as the prims' arrays of different lengths "
+            "Takes `values` as the prims' arrays of different "
+            "lengths "
             "(meshes' points, say), one after another: prim i's the "
             "`counts[i]` entries after the prims' before it, each a "
             "view of them, without copying.")
@@ -1838,17 +1847,20 @@ void BindScene(nb::module_& m) {
                 ColumnMapping mapping;
                 mapping.column = nb::borrow(self);
                 mapping.stream = nb::borrow(stream);
-                mapping.array = ArrayFromTensor(
-                    column.Map(DeviceFromName(device), StreamOf(stream)),
-                    true);
+                mapping.array =
+                    ArrayFromTensor(column.Map(DeviceFromName(device),
+                                               StreamOf(stream)),
+                                    true);
                 return mapping;
             },
             nb::arg("device") = "cuda",
             nb::arg("stream").none() = nb::none(),
             "The rows on `device` (\"cpu\", \"cuda\", \"cuda:N\") to "
             "write in place: `with column.map(\"cuda\") as rows:`, "
-            "unmapped on exit. A renderer's own storage when it offers "
-            "it, so nothing is copied; else the rows written last, if "
+            "unmapped on exit. A renderer's own storage when it "
+            "offers "
+            "it, so nothing is copied; else the rows written last, "
+            "if "
             "there; else on the CPU the prims' values gathered.")
         .def(
             "unmap",
@@ -1856,7 +1868,8 @@ void BindScene(nb::module_& m) {
                 column.Unmap(StreamOf(stream));
             },
             nb::arg("stream").none() = nb::none(),
-            "Commits writes into mapped rows, on the GPU after the work "
+            "Commits writes into mapped rows, on the GPU after the "
+            "work "
             "queued on `stream`.")
         .def(
             "read",
@@ -1868,8 +1881,10 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("device").none() = nb::none(),
             "The rows as they are, without copying once written or "
-            "mapped; on `device` (\"cpu\", \"cuda\"), where they live "
-            "there, the renderer's own storage included. Reading is no "
+            "mapped; on `device` (\"cpu\", \"cuda\"), where they "
+            "live "
+            "there, the renderer's own storage included. Reading is "
+            "no "
             "change: nothing to unmap, and writes into the array go "
             "unseen.");
 
@@ -1898,12 +1913,12 @@ void BindScene(nb::module_& m) {
         m, "Selection",
         "The prims of a type holding some attributes (Scene.select), "
         "found again only when they may have changed and kept as one "
-        "PrimSet, so their columns stay theirs: the way to step every "
+        "PrimSet, so their columns stay theirs: the way to step "
+        "every "
         "body of a kind without listing them.")
-        .def_prop_ro("prims",
-                     [](Selection& selection) {
-                         return selection.Prims();
-                     })
+        .def_prop_ro(
+            "prims",
+            [](Selection& selection) { return selection.Prims(); })
         .def("__len__",
              [](Selection& selection) {
                  return selection.Prims().Size();
@@ -1913,13 +1928,14 @@ void BindScene(nb::module_& m) {
              "One attribute of the prims as a column.")
         .def(
             "map",
-            [](nb::handle self, const std::vector<std::string>& attributes,
+            [](nb::handle self,
+               const std::vector<std::string>& attributes,
                std::string_view device, nb::handle stream) {
                 Selection& selection = nb::cast<Selection&>(self);
                 nb::list arrays;
-                for (const Tensor& rows : selection.Map(
-                         DeviceFromName(device), attributes,
-                         StreamOf(stream))) {
+                for (const Tensor& rows :
+                     selection.Map(DeviceFromName(device), attributes,
+                                   StreamOf(stream))) {
                     arrays.append(ArrayFromTensor(rows, true));
                 }
                 SelectionMapping mapping;
@@ -1930,7 +1946,8 @@ void BindScene(nb::module_& m) {
             },
             nb::arg("attributes"), nb::arg("device") = "cuda",
             nb::arg("stream").none() = nb::none(),
-            "Each of `attributes`' rows on `device` to write in place, "
+            "Each of `attributes`' rows on `device` to write in "
+            "place, "
             "in that order: `with selection.map([TRANSLATE, "
             "DISPLAY_COLOR], \"cuda\") as (poses, colours):`, all "
             "unmapped on exit.")
@@ -1947,7 +1964,8 @@ void BindScene(nb::module_& m) {
                 return nb::tuple(arrays);
             },
             nb::arg("attributes"), nb::arg("device") = "cpu",
-            "Each of `attributes`' rows on `device` to read, recording "
+            "Each of `attributes`' rows on `device` to read, "
+            "recording "
             "no change.");
 
     nb::class_<Scene>(
@@ -2148,7 +2166,8 @@ void BindScene(nb::module_& m) {
              "only when they may have changed.")
         .def("column", &Scene::GetColumn, nb::arg("prims"),
              nb::arg("attribute"), nb::keep_alive<0, 1>(),
-             "`attribute` of `prims` (a PrimSet) as one Column, to write "
+             "`attribute` of `prims` (a PrimSet) as one Column, to "
+             "write "
              "whole or map on a device.")
         .def(
             "unmap",
@@ -3071,13 +3090,14 @@ void BindScene(nb::module_& m) {
            int octaves, double lacunarity, double gain,
            std::uint32_t seed) {
             const GradientNoise noise(seed);
-            const auto count = static_cast<std::int64_t>(points.shape(0));
+            const auto count =
+                static_cast<std::int64_t>(points.shape(0));
             Tensor values = Tensor::Zeros(DType::Float64, {count});
             double* out = values.As<double>();
             for (std::int64_t i = 0; i < count; ++i) {
                 const double* p = points.data() + 3 * i;
-                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]), octaves,
-                                   lacunarity, gain);
+                out[i] = noise.Fbm(glm::dvec3(p[0], p[1], p[2]),
+                                   octaves, lacunarity, gain);
             }
             return ArrayFromTensor(values);
         },
@@ -3103,8 +3123,8 @@ void BindScene(nb::module_& m) {
                 glm::ivec3(static_cast<int>(values.shape(0)),
                            static_cast<int>(values.shape(1)),
                            static_cast<int>(values.shape(2))),
-                voxelSize, glm::dvec3(origin[0], origin[1], origin[2]),
-                name);
+                voxelSize,
+                glm::dvec3(origin[0], origin[1], origin[2]), name);
             return ArrayFromTensor(Tensor::Copy<std::uint8_t>(
                 bytes, {static_cast<std::int64_t>(bytes.size())}));
         },

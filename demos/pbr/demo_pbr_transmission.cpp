@@ -65,14 +65,15 @@ const std::array<Tint, 3> kTints = {{
 /// A latitude-longitude studio: a sky brightening upwards, a dim
 /// floor and two soft boxes, linear RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         for (int j = 0; j < cols; ++j) {
             const double a = 360.0 * (j + 0.5) / cols;
             double sky =
                 e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi /
-                                                180.0)
+                                               180.0)
                         : 0.03;
             for (const double centre : {240.0, 330.0}) {
                 if (std::abs(e - 35.0) < 15.0 &&
@@ -121,14 +122,15 @@ glm::dvec3 TileColour(int i, int j) {
 }
 
 /// A vertical quad facing the camera.
-void DefineQuad(Scene& scene, const Path& path, const glm::dvec3& centre,
-                const Path& material, double width = 1.0,
-                double height = 1.2) {
+void DefineQuad(Scene& scene, const Path& path,
+                const glm::dvec3& centre, const Path& material,
+                double width = 1.0, double height = 1.2) {
     const double w = 0.5 * width;
     const double h = 0.5 * height;
     const std::vector<double> points = {
-        centre.x - w, 0.0, centre.z - h, centre.x + w, 0.0, centre.z - h,
-        centre.x + w, 0.0, centre.z + h, centre.x - w, 0.0, centre.z + h};
+        centre.x - w, 0.0,          centre.z - h, centre.x + w,
+        0.0,          centre.z - h, centre.x + w, 0.0,
+        centre.z + h, centre.x - w, 0.0,          centre.z + h};
     Mesh::Define(scene, path)
         .SetPoints(Tensor::Copy<double>(points, {4, 3}))
         .SetFaceVertexCounts(Tensor::Copy<std::int64_t>(
@@ -141,8 +143,8 @@ void DefineQuad(Scene& scene, const Path& path, const glm::dvec3& centre,
 /// The pixel (col, row) of a world point.
 glm::dvec2 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -152,12 +154,13 @@ glm::dvec2 Project(const glm::dvec3& point) {
 }
 
 /// The RGB (0 to 255) of the pixels within `half` of `point`.
-std::vector<glm::dvec3> Window(const Tensor& image,
-                               const glm::dvec3& point, int half = 20) {
+std::vector<glm::dvec3>
+Window(const Tensor& image, const glm::dvec3& point, int half = 20) {
     const glm::dvec2 at = Project(point);
     const int col0 = static_cast<int>(at.x) - half;
     const int row0 = static_cast<int>(at.y) - half;
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
     std::vector<glm::dvec3> pixels;
@@ -225,10 +228,11 @@ class TransmissionDemo : public app::Demo {
                 Cube::Define(scene, tile)
                     .SetSize(1.0)
                     .SetDisplayColor(TileColour(i, j));
-                SetXform(scene, tile,
-                         {.translate = glm::dvec3(-4.0 + 0.25 * (i + 0.5),
-                                                  2.5, 0.25 * (j + 0.5)),
-                          .scale = glm::dvec3(0.25, 0.1, 0.25)});
+                SetXform(
+                    scene, tile,
+                    {.translate = glm::dvec3(-4.0 + 0.25 * (i + 0.5),
+                                             2.5, 0.25 * (j + 0.5)),
+                     .scale = glm::dvec3(0.25, 0.1, 0.25)});
             }
         }
 
@@ -245,7 +249,8 @@ class TransmissionDemo : public app::Demo {
         Material::Define(scene, tinted).SetBrdf("open_pbr");
         scene.Set(tinted, "inputs:specular_roughness", 0.0);
         scene.Set(tinted, "inputs:transmission_weight", 1.0);
-        scene.Set(tinted, "inputs:transmission_color", kTints[0].colour);
+        scene.Set(tinted, "inputs:transmission_color",
+                  kTints[0].colour);
         scene.Set(tinted, "inputs:geometry_thin_walled", 1.0);
         DefineQuad(scene, "/World/Pane", kPane, tinted);
         // Alpha blending: a white UsdPreviewSurface, partly opaque.
@@ -255,8 +260,8 @@ class TransmissionDemo : public app::Demo {
             .SetInfoId(tokens::kUsdPreviewSurface)
             .SetDiffuseColor(glm::dvec3(0.6))
             .SetOpacity(kOpacity);
-        Connect(scene, look, tokens::kSurfaceOutput, look.Child("Surface"),
-                tokens::kSurfaceOutput);
+        Connect(scene, look, tokens::kSurfaceOutput,
+                look.Child("Surface"), tokens::kSurfaceOutput);
         DefineQuad(scene, "/World/Panel", kPanel, look);
         Camera::Define(scene, "/World/Camera")
             .SetFocalLength(kFocal)
@@ -270,15 +275,17 @@ class TransmissionDemo : public app::Demo {
             .SetResolution({kWidth, kHeight})
             .SetAmbient(0.0);
 
-        Widgets().Slider("Ball's IOR", 1.0, 2.5, kIor, [this](double ior) {
-            GetScene().Set("/World/Looks/Glass", "inputs:specular_ior",
-                           ior);
-        });
-        Widgets().Checkbox("Ball thin-walled", false, [this](bool thin) {
-            GetScene().Set("/World/Looks/Glass",
-                           "inputs:geometry_thin_walled",
-                           thin ? 1.0 : 0.0);
-        });
+        Widgets().Slider(
+            "Ball's IOR", 1.0, 2.5, kIor, [this](double ior) {
+                GetScene().Set("/World/Looks/Glass",
+                               "inputs:specular_ior", ior);
+            });
+        Widgets().Checkbox(
+            "Ball thin-walled", false, [this](bool thin) {
+                GetScene().Set("/World/Looks/Glass",
+                               "inputs:geometry_thin_walled",
+                               thin ? 1.0 : 0.0);
+            });
         Widgets().Slider("Transmission", 0.0, 1.0, 1.0,
                          [this](double weight) { Transmit(weight); });
         std::vector<std::string> names;
@@ -287,12 +294,14 @@ class TransmissionDemo : public app::Demo {
         }
         Widgets().Combo("Pane's colour", std::move(names), 0,
                         [this](std::size_t index) {
-                            GetScene().Set("/World/Looks/Tinted",
-                                           "inputs:transmission_color",
-                                           kTints[index].colour);
+                            GetScene().Set(
+                                "/World/Looks/Tinted",
+                                "inputs:transmission_color",
+                                kTints[index].colour);
                         });
-        Widgets().Slider("Panel's opacity", 0.0, 1.0, kOpacity,
-                         [this](double opacity) { SetOpacity(opacity); });
+        Widgets().Slider(
+            "Panel's opacity", 0.0, 1.0, kOpacity,
+            [this](double opacity) { SetOpacity(opacity); });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
             viewer->LookAt(kEye, kTarget);
@@ -311,8 +320,10 @@ class TransmissionDemo : public app::Demo {
         SetOpacity(kOpacity);
 
         // Most of the ball, which turns the wall over about its edge.
-        const std::vector<glm::dvec3> behindBall = Window(wall, kBall, 55);
-        const double bent = Difference(Window(image, kBall, 55), behindBall);
+        const std::vector<glm::dvec3> behindBall =
+            Window(wall, kBall, 55);
+        const double bent =
+            Difference(Window(image, kBall, 55), behindBall);
         const double straight =
             Difference(Window(unbent, kBall, 55), behindBall);
         const glm::dvec3 pane = Mean(Window(image, kPane));
@@ -321,12 +332,14 @@ class TransmissionDemo : public app::Demo {
         const double full = Grey(Mean(Window(opaque, kPanel)));
         const double through = Grey(Mean(Window(wall, kPanel)));
         std::printf(
-            "Ball against the wall: refracted %.1f, at IOR 1 %.1f; pane "
+            "Ball against the wall: refracted %.1f, at IOR 1 %.1f; "
+            "pane "
             "%.1f %.1f %.1f over the wall %.1f %.1f %.1f; panel %.1f "
             "between opaque %.1f and the wall %.1f\n",
-            bent, straight, pane.r, pane.g, pane.b, behind.r, behind.g,
-            behind.b, half, full, through);
-        Check(bent > 2.0 * straight + 10.0, "the glass ball refracts");
+            bent, straight, pane.r, pane.g, pane.b, behind.r,
+            behind.g, behind.b, half, full, through);
+        Check(bent > 2.0 * straight + 10.0,
+              "the glass ball refracts");
         Check(pane.g / pane.r > 1.3 * behind.g / behind.r &&
                   pane.g / pane.b > 1.3 * behind.g / behind.b,
               "the pane tints the wall green");
@@ -339,8 +352,10 @@ class TransmissionDemo : public app::Demo {
 
   private:
     void Transmit(double weight) {
-        for (const char* look : {"/World/Looks/Glass", "/World/Looks/Tinted"}) {
-            GetScene().Set(look, "inputs:transmission_weight", weight);
+        for (const char* look :
+             {"/World/Looks/Glass", "/World/Looks/Tinted"}) {
+            GetScene().Set(look, "inputs:transmission_weight",
+                           weight);
         }
     }
 

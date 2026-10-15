@@ -29,9 +29,9 @@ def soup():
     state = 0x853C49E6748FEA9B
     for r in range(SIDE):
         for c in range(SIDE):
-            state = (state * 6364136223846793005 + 1442695040888963407) % (
-                1 << 64
-            )
+            state = (
+                state * 6364136223846793005 + 1442695040888963407
+            ) % (1 << 64)
             alive[r, c] = (state >> 33) % 3 == 0
     return alive
 
@@ -49,19 +49,29 @@ class Demo(ernie.demo.Demo):
         )
         world.define("Camera", ernie.Camera, focal_length=18.0).set(
             tokens.TRANSFORM,
-            ernie.look_at_transform((0.0, -95.0, 90.0), (0.0, 0.0, 0.0)),
+            ernie.look_at_transform(
+                (0.0, -95.0, 90.0), (0.0, 0.0, 0.0)
+            ),
         )
         self.alive = soup()
         half = 0.5 * (SIDE - 1) * SPACING
         for r in range(SIDE):
-            scene.define(row_path(r), ernie.Xform).set(translate=(0, 0, 0))
+            scene.define(row_path(r), ernie.Xform).set(
+                translate=(0, 0, 0)
+            )
             for c in range(SIDE):
                 scene.define(
                     cell_path(r, c),
                     ernie.Cube,
                     size=1.0,
                     display_color=ALIVE if self.alive[r, c] else DEAD,
-                ).set(translate=(c * SPACING - half, r * SPACING - half, 0.0))
+                ).set(
+                    translate=(
+                        c * SPACING - half,
+                        r * SPACING - half,
+                        0.0,
+                    )
+                )
         self.row = 0
 
     def step(self):
@@ -83,18 +93,24 @@ class Demo(ernie.demo.Demo):
             )
         self.alive = alive
         # A scanning row: the last one down, the next one up.
-        scene.get_prim(row_path(self.row)).set_xform(translate=(0, 0, 0))
+        scene.get_prim(row_path(self.row)).set_xform(
+            translate=(0, 0, 0)
+        )
         self.row = (self.row + 1) % SIDE
-        scene.get_prim(row_path(self.row)).set_xform(translate=(0, 0, 1.0))
+        scene.get_prim(row_path(self.row)).set_xform(
+            translate=(0, 0, 1.0)
+        )
 
     def test_post_step(self):
         scene = self.scene
         for r in range(SIDE):
             for c in range(SIDE):
-                colour = tuple(scene.get(cell_path(r, c), tokens.DISPLAY_COLOR))
-                assert colour == (ALIVE if self.alive[r, c] else DEAD), (
-                    "every cell shows its state"
+                colour = tuple(
+                    scene.get(cell_path(r, c), tokens.DISPLAY_COLOR)
                 )
+                assert colour == (
+                    ALIVE if self.alive[r, c] else DEAD
+                ), "every cell shows its state"
         lifted = scene.world_transform(cell_path(self.row, 0))
         assert lifted[2][3] == 1.0, "the scanning row is lifted"
 

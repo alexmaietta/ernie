@@ -17,7 +17,8 @@ NB_MODULE(_ernie, m) {
     });
     m.def("openvdb_available", &ernie::OpenVdbAvailable,
           "Whether this Ernie reads OpenVDB files (.vdb): built with "
-          "OpenVDB (ERNIE_OPENVDB, on by default). NanoVDB files (.nvdb) "
+          "OpenVDB (ERNIE_OPENVDB, on by default). NanoVDB files "
+          "(.nvdb) "
           "read either way.");
     ernie::python::BindTensor(m);
     ernie::python::BindScene(m);

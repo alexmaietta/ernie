@@ -55,12 +55,14 @@ else()
     target_compile_options(ernie_usd PRIVATE -Wall -Wno-deprecated)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_options(ernie_usd PRIVATE "LINKER:--disable-new-dtags")
+    target_link_options(ernie_usd PRIVATE
+                        "LINKER:--disable-new-dtags")
 endif()
 # Windows has no rpath: the folders of OpenUSD's DLLs, one a line, beside the plugin
 # (ernie_usd.paths), for Ernie to add to the DLL search path before loading it.
 if(WIN32)
-    string(REPLACE ";" "\n" ernie_usd_dll_dirs "${ERNIE_USD_DLL_DIRS}")
+    string(REPLACE ";" "\n" ernie_usd_dll_dirs
+                   "${ERNIE_USD_DLL_DIRS}")
     file(
         GENERATE
         OUTPUT "${CMAKE_BINARY_DIR}/lib/ernie_usd.paths"

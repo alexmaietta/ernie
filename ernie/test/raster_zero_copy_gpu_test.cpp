@@ -164,7 +164,8 @@ TEST_F(RasterDelegateTest,
         std::invalid_argument);
 }
 
-TEST_F(RasterDelegateTest, AMeshsPointsColumnMapsTheRenderersOwnArray) {
+TEST_F(RasterDelegateTest,
+       AMeshsPointsColumnMapsTheRenderersOwnArray) {
     RasterDelegate delegate(*context_);
     std::string why;
     ernie::ComputeInterop* cuda = delegate.Compute(&why);

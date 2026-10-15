@@ -2597,10 +2597,10 @@ TEST_F(RasterDelegateTest, WarmSurfacesGlowByPlanckTimesEmissivity) {
 }
 
 TEST_F(RasterDelegateTest, PrimsGlowAtTheirOwnTemperatures) {
-    // A cube over FlatScene's floor, both of one material at 300 K and
-    // emissivity 0.8, through an 8 to 14 um camera: the cube's own
-    // temperature replaces the material's, in its radiance and in the
-    // Temperature var, to the G-buffer's precision.
+    // A cube over FlatScene's floor, both of one material at 300 K
+    // and emissivity 0.8, through an 8 to 14 um camera: the cube's
+    // own temperature replaces the material's, in its radiance and in
+    // the Temperature var, to the G-buffer's precision.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
     ernie::Camera(scene, "/World/Camera")
@@ -2610,7 +2610,8 @@ TEST_F(RasterDelegateTest, PrimsGlowAtTheirOwnTemperatures) {
         .SetThermalTemperature(300.0)
         .SetThermalEmissivity(
             std::vector<float>{8000.0f, 0.8f, 14000.0f, 0.8f});
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
     ernie::Cube::Define(scene, "/World/Box")
         .SetSize(20.0)
         .SetMaterialBinding("/Looks/Grey");
@@ -2629,13 +2630,14 @@ TEST_F(RasterDelegateTest, PrimsGlowAtTheirOwnTemperatures) {
     const auto expect = [&](double kelvin) {
         ernie::RenderProductSetOutputs outputs = delegate.Step(scene);
         const auto vars = MapVars(outputs);
-        EXPECT_NEAR(At<float>(vars.at("Temperature"), c, c, 0), kelvin,
-                    1e-3);
+        EXPECT_NEAR(At<float>(vars.at("Temperature"), c, c, 0),
+                    kelvin, 1e-3);
         const Tensor& spectral = vars.at("SpectralRadiance");
         for (std::size_t b = 0; b < 6; ++b) {
             const double expected = 0.8 * planck(b, kelvin);
             EXPECT_NEAR(
-                spectral.As<float>()[(b * kVarSize + c) * kVarSize + c],
+                spectral
+                    .As<float>()[(b * kVarSize + c) * kVarSize + c],
                 expected, 2e-3 * expected)
                 << "band " << b << " at " << kelvin << " K";
         }
@@ -2646,7 +2648,8 @@ TEST_F(RasterDelegateTest, PrimsGlowAtTheirOwnTemperatures) {
     expect(300.0);
     ernie::Gprim(scene, "/World/Box").SetThermalTemperature(345.678);
     expect(345.678);
-    ernie::Gprim(scene, "/World/Terrain").SetThermalTemperature(281.5);
+    ernie::Gprim(scene, "/World/Terrain")
+        .SetThermalTemperature(281.5);
     floor = 281.5f;
     expect(345.678);
     // A point in the cube's place, at its own temperature too.
@@ -2660,7 +2663,8 @@ TEST_F(RasterDelegateTest, PrimsGlowAtTheirOwnTemperatures) {
     expect(333.25);
     EXPECT_THROW(
         {
-            ernie::Gprim(scene, "/World/Box").SetThermalTemperature(-1.0);
+            ernie::Gprim(scene, "/World/Box")
+                .SetThermalTemperature(-1.0);
             delegate.Step(scene);
         },
         std::invalid_argument);
@@ -3197,10 +3201,12 @@ TEST_F(RasterDelegateTest, ColumnsOfTemperatureHeatTheirInstances) {
     // view's centre, reads its row, written again whole.
     Scene scene = FlatScene();
     scene.Remove("/World/Sun");
-    ernie::Material(scene, "/Looks/Grey").SetThermalTemperature(300.0);
-    ernie::RenderSettings(scene, "/Render/Settings").SetThermalEnable(true);
-    const std::vector<ernie::Path> cubes = {"/World/Box0", "/World/Box1",
-                                            "/World/Box2"};
+    ernie::Material(scene, "/Looks/Grey")
+        .SetThermalTemperature(300.0);
+    ernie::RenderSettings(scene, "/Render/Settings")
+        .SetThermalEnable(true);
+    const std::vector<ernie::Path> cubes = {
+        "/World/Box0", "/World/Box1", "/World/Box2"};
     std::vector<float> rows;
     for (int i = 0; i < 3; ++i) {
         const float x = -40.0f + 40.0f * static_cast<float>(i);
@@ -3213,7 +3219,8 @@ TEST_F(RasterDelegateTest, ColumnsOfTemperatureHeatTheirInstances) {
     const ernie::PrimSet boxes(cubes);
     scene.GetColumn(boxes, tokens::kTranslate)
         .Write(Tensor::Copy<float>(rows, {3, 3}));
-    ernie::Column kelvin = scene.GetColumn(boxes, tokens::kThermalTemperature);
+    ernie::Column kelvin =
+        scene.GetColumn(boxes, tokens::kThermalTemperature);
     const std::vector<float> warm = {310.0f, 420.5f, 530.0f};
     kelvin.Write(Tensor::Copy<float>(warm, {3}));
     RasterDelegate delegate(*context_);

@@ -4006,7 +4006,7 @@ MeshData MeshDataOf(const Scene& scene, const Path& mesh,
         colorRead ? std::string(kPrimvarsPrefix) + colorRead->name
                   : std::string(kDisplayColor);
     const std::size_t width = colorRead ? colorRead->width : 3;
-    const auto rgb = [width](std::vector<float> values) {
+    const auto rgb = [width](std::vector<float>&& values) {
         if (width == 3) {
             return values;
         }

@@ -80,7 +80,8 @@ struct Change {
 /// since a cursor, as `Scene::Changes` reports it to a consumer that
 /// takes the rows whole.
 struct ColumnChange {
-    std::shared_ptr<const std::vector<Path>> paths;  ///< In row order.
+    std::shared_ptr<const std::vector<Path>>
+        paths;  ///< In row order.
     std::string attribute;
     Dirty bits = Dirty::None;
 };
@@ -206,19 +207,21 @@ class ColumnStorage {
 
     virtual ~ColumnStorage() = default;
     /// Rows of `prims`' `attribute` on `device` holding their values
-    /// now, which the scene then holds as the column (`Scene::Write`);
-    /// nullopt when it offers none there. Work filling them is
-    /// ordered on `stream`.
-    virtual std::optional<Rows>
-    Allocate(Scene& scene, const PrimSet& prims, std::string_view attribute,
-             Device device, std::uintptr_t stream) = 0;
+    /// now, which the scene then holds as the column
+    /// (`Scene::Write`); nullopt when it offers none there. Work
+    /// filling them is ordered on `stream`.
+    virtual std::optional<Rows> Allocate(Scene& scene,
+                                         const PrimSet& prims,
+                                         std::string_view attribute,
+                                         Device device,
+                                         std::uintptr_t stream) = 0;
 };
 
 /// One attribute of many prims as rows of one array, as a simulation
-/// keeps its bodies' poses: written whole from any array (CPU or CUDA,
-/// DLPack, no copy), or mapped and written in place on the device
-/// asked for, each write one change (`ColumnChange`) whatever the
-/// number of prims. From `Scene::GetColumn`.
+/// keeps its bodies' poses: written whole from any array (CPU or
+/// CUDA, DLPack, no copy), or mapped and written in place on the
+/// device asked for, each write one change (`ColumnChange`) whatever
+/// the number of prims. From `Scene::GetColumn`.
 class Column {
   public:
     Column() = default;
@@ -232,19 +235,21 @@ class Column {
 
     /// Takes `rows` (one per prim) as the attribute, sharing its
     /// memory; for CUDA rows written on `stream` (as `Scene::Write`).
-    /// @throws std::invalid_argument as `Scene::Write` of a `PrimSet`.
+    /// @throws std::invalid_argument as `Scene::Write` of a
+    /// `PrimSet`.
     void Write(const Tensor& rows, std::uintptr_t stream = 1);
 
     /// Takes `values` as the prims' arrays of different lengths, one
-    /// after another (`Scene::Write` with counts), sharing its memory.
+    /// after another (`Scene::Write` with counts), sharing its
+    /// memory.
     void WriteArrays(const Tensor& values,
                      std::span<const std::int64_t> counts,
                      std::uintptr_t stream = 1);
 
-    /// The rows on `device` to write in place until `Unmap`: storage a
-    /// consumer offers there (`ColumnStorage`), else the rows written
-    /// last if they are there, else on the CPU the prims' values
-    /// gathered as rows (float32).
+    /// The rows on `device` to write in place until `Unmap`: storage
+    /// a consumer offers there (`ColumnStorage`), else the rows
+    /// written last if they are there, else on the CPU the prims'
+    /// values gathered as rows (float32).
     /// @throws std::invalid_argument when nothing holds the rows on
     /// `device`: `Write` an array there first.
     Tensor Map(Device device, std::uintptr_t stream = 1);
@@ -258,11 +263,11 @@ class Column {
 
     /// The rows on `device` to read, as `Map` would give them but
     /// recording no change (nothing to `Unmap`): a simulation's state
-    /// read where it lives, a renderer's own storage included, without
-    /// the scene or its consumers seeing an edit. Writing into them is
-    /// not seen either.
-    /// @throws std::invalid_argument when the rows are not on `device`
-    /// (on the CPU, the prims' values are gathered).
+    /// read where it lives, a renderer's own storage included,
+    /// without the scene or its consumers seeing an edit. Writing
+    /// into them is not seen either.
+    /// @throws std::invalid_argument when the rows are not on
+    /// `device` (on the CPU, the prims' values are gathered).
     Tensor Read(Device device) const;
 
   private:
@@ -277,15 +282,16 @@ class Column {
 };
 
 /// The prims of a type that hold some attributes (`Scene::Select`),
-/// as a Fabric query finds the buckets of a type and attributes: found
-/// again only once prims of the type come, go, or author or clear an
-/// attribute, and kept in one `PrimSet` meanwhile, so the columns of
-/// its attributes stay theirs from step to step.
+/// as a Fabric query finds the buckets of a type and attributes:
+/// found again only once prims of the type come, go, or author or
+/// clear an attribute, and kept in one `PrimSet` meanwhile, so the
+/// columns of its attributes stay theirs from step to step.
 class Selection {
   public:
     Selection() = default;
 
-    /// The prims, in path order, found again if they may have changed.
+    /// The prims, in path order, found again if they may have
+    /// changed.
     const PrimSet& Prims();
 
     /// One attribute of the prims as a column (`Scene::GetColumn`).
@@ -296,17 +302,18 @@ class Selection {
     /// steps. `Unmap` ends them all.
     /// @throws std::invalid_argument as `Column::Map`; those mapped
     /// before stay mapped until `Unmap`.
-    std::vector<Tensor> Map(Device device,
-                            const std::vector<std::string>& attributes,
-                            std::uintptr_t stream = 1);
-    /// Ends `Map`: every mapped column changed, after `stream`'s work.
+    std::vector<Tensor>
+    Map(Device device, const std::vector<std::string>& attributes,
+        std::uintptr_t stream = 1);
+    /// Ends `Map`: every mapped column changed, after `stream`'s
+    /// work.
     void Unmap(std::uintptr_t stream = 1);
 
     /// Each of `attributes`' rows on `device` to read, recording no
     /// change (`Column::Read`).
     /// @throws std::invalid_argument as `Column::Read`.
-    std::vector<Tensor> Read(Device device,
-                             const std::vector<std::string>& attributes);
+    std::vector<Tensor>
+    Read(Device device, const std::vector<std::string>& attributes);
 
   private:
     friend class Scene;
@@ -454,9 +461,11 @@ class Scene {
     void Unmap(const PrimSet& prims, std::string_view attribute,
                std::uintptr_t stream = 1);
 
-    /// `attribute` of `prims` as one column (`Column`), to write whole
-    /// or map on a device. Checked when first written or mapped.
-    Column GetColumn(const PrimSet& prims, std::string_view attribute);
+    /// `attribute` of `prims` as one column (`Column`), to write
+    /// whole or map on a device. Checked when first written or
+    /// mapped.
+    Column GetColumn(const PrimSet& prims,
+                     std::string_view attribute);
 
     /// The prims of `type` holding every one of `attributes` (set,
     /// written or rows of a column), as a `Selection` that finds them
@@ -465,8 +474,8 @@ class Scene {
     Selection Select(std::string_view type,
                      std::vector<std::string> attributes = {});
 
-    /// Attaches `storage` (held weakly) as where columns mapped on its
-    /// devices live (`Column::Map`); null detaches it. A renderer
+    /// Attaches `storage` (held weakly) as where columns mapped on
+    /// its devices live (`Column::Map`); null detaches it. A renderer
     /// attaches its own to the scenes it renders, changing nothing of
     /// theirs, hence const. Copies of the scene start without.
     void SetColumnStorage(std::weak_ptr<ColumnStorage> storage) const;
@@ -497,16 +506,17 @@ class Scene {
                const Tensor& rows, std::uintptr_t stream = 1);
 
     /// As the `Write` of a PrimSet, for arrays of different lengths
-    /// (meshes' points, of as many points as each has): `values` holds
-    /// them one after another, prim i's the `counts[i]` entries along
-    /// its first dimension after the prims' before it, each prim's
-    /// array a view of them. Written again with the same counts, one
-    /// change as rows are; other counts lay it out anew.
+    /// (meshes' points, of as many points as each has): `values`
+    /// holds them one after another, prim i's the `counts[i]` entries
+    /// along its first dimension after the prims' before it, each
+    /// prim's array a view of them. Written again with the same
+    /// counts, one change as rows are; other counts lay it out anew.
     /// @throws std::invalid_argument if a prim does not exist, the
     /// counts are not one per prim, or they do not add up to the
     /// entries of `values`; nothing is written then.
     void Write(const PrimSet& prims, std::string_view attribute,
-               const Tensor& values, std::span<const std::int64_t> counts,
+               const Tensor& values,
+               std::span<const std::int64_t> counts,
                std::uintptr_t stream = 1);
 
     /// The tensor `attribute` of the prim at `path` was written from
@@ -641,8 +651,9 @@ class Scene {
     /// simulation's bodies, visits none of them. `ExpandColumns`
     /// gives the rest when it cannot. Columns whose prims have
     /// dependents (`AttributeMeta::targetDirty`) come expanded.
-    std::vector<Change> Changes(ChangeCursor& cursor,
-                                std::vector<ColumnChange>& columns) const;
+    std::vector<Change>
+    Changes(ChangeCursor& cursor,
+            std::vector<ColumnChange>& columns) const;
     /// `changes` with `columns`' prims, their descendants and their
     /// dependents merged in, as `Changes` without columns reports.
     std::vector<Change>
@@ -695,8 +706,8 @@ class Scene {
         /// samples either side and how far between.
         mutable std::map<std::string, SampleBracket, std::less<>>
             pending;
-        /// CUDA tensors' streams; mutable as `tensors`, refreshed from
-        /// a column when read (`Refresh`).
+        /// CUDA tensors' streams; mutable as `tensors`, refreshed
+        /// from a column when read (`Refresh`).
         mutable std::map<std::string, std::uintptr_t, std::less<>>
             streams;
         /// Tensors written as rows of one tensor (`Write` of many
@@ -715,9 +726,9 @@ class Scene {
         std::uint64_t latest =
             0;  ///< Its latest stamp, its key in `stamped_`.
         /// Its world transform and visibility as last found
-        /// (`WorldTransform`, `IsVisible`), and the version then: kept
-        /// while no transform or visibility of it or its ancestors
-        /// has been stamped since (a retype stamps both).
+        /// (`WorldTransform`, `IsVisible`), and the version then:
+        /// kept while no transform or visibility of it or its
+        /// ancestors has been stamped since (a retype stamps both).
         mutable glm::dmat4 world{1.0};
         mutable std::uint64_t worldAt = 0;
         mutable bool visible = true;
@@ -745,7 +756,8 @@ class Scene {
         std::uint64_t version = 0;  ///< Its last whole write.
         /// Its first write, which stamped its prims one by one.
         std::uint64_t boundAt = 0;
-        std::pair<std::uint64_t, std::string> key;  ///< `columnOf_`'s.
+        std::pair<std::uint64_t, std::string>
+            key;  ///< `columnOf_`'s.
         /// Its rows are storage a `ColumnStorage` offered.
         bool provided = false;
         /// Of arrays of different lengths, prim i's entries of `rows`
@@ -754,12 +766,13 @@ class Scene {
     };
     /// The `Write`s of a PrimSet: rows, or with `offsets` arrays.
     void WriteColumn(const PrimSet& prims, std::string_view attribute,
-                     const Tensor& rows, std::vector<std::int64_t> offsets,
+                     const Tensor& rows,
+                     std::vector<std::int64_t> offsets,
                      std::uintptr_t stream);
     friend class Column;
     friend class Selection;
-    /// Counts the changes to which prims of `type` there are and which
-    /// attributes they hold (`Selection`).
+    /// Counts the changes to which prims of `type` there are and
+    /// which attributes they hold (`Selection`).
     std::uint64_t TypeVersion(std::string_view type) const;
     void TouchType(std::string_view type);
     std::map<std::string, std::uint64_t, std::less<>> typeVersions_;
@@ -768,15 +781,18 @@ class Scene {
     /// `prims`' `attribute` now, one float32 row each, on the CPU.
     /// @throws std::invalid_argument for a prim without it, or rows
     /// of different sizes.
-    Tensor GatherRows(const PrimSet& prims, std::string_view attribute) const;
+    Tensor GatherRows(const PrimSet& prims,
+                      std::string_view attribute) const;
     /// The column `prims`' `attribute` is, if they are resolved in
     /// this scene and still its rows; null otherwise.
-    ColumnData* ColumnOf(const PrimSet& prims, std::string_view attribute);
+    ColumnData* ColumnOf(const PrimSet& prims,
+                         std::string_view attribute);
     const ColumnData* ColumnOf(const PrimSet& prims,
                                std::string_view attribute) const;
-    /// Brings `prim`'s `attribute`, a column's row, up to the column's
-    /// latest tensor.
-    void Refresh(const PrimData& prim, std::string_view attribute) const;
+    /// Brings `prim`'s `attribute`, a column's row, up to the
+    /// column's latest tensor.
+    void Refresh(const PrimData& prim,
+                 std::string_view attribute) const;
     /// Ends column `id`: its prims keep their rows as their own
     /// tensors, stamped as written now, so no change goes unseen.
     void BreakColumn(std::uint64_t id);
@@ -788,8 +804,9 @@ class Scene {
     /// Adds to `changed` the dependents of what it holds
     /// (`AttributeMeta::targetDirty`), on through theirs.
     void Forward(std::map<Path, Dirty>& changed) const;
-    std::vector<Change> Collect(ChangeCursor& cursor,
-                                std::vector<ColumnChange>* columns) const;
+    std::vector<Change>
+    Collect(ChangeCursor& cursor,
+            std::vector<ColumnChange>* columns) const;
 
     PrimData& Find(const Path& path);
     const PrimData& Find(const Path& path) const;
@@ -841,8 +858,8 @@ class Scene {
     std::set<std::pair<std::uint64_t, Path>> stamped_;
     /// `Dependents`; the prims whose relationships changed, or which
     /// were defined anew or removed, since it was last brought up to
-    /// date (only theirs are indexed again); and the targets each prim
-    /// is indexed under, to take it out.
+    /// date (only theirs are indexed again); and the targets each
+    /// prim is indexed under, to take it out.
     mutable std::map<Path, std::vector<std::pair<Path, Dirty>>>
         dependents_;
     mutable std::set<Path> staleDependents_;

@@ -649,7 +649,7 @@ struct RasterBake::State {
     std::optional<Piece> current;
     std::uint32_t row = 0;
     bool done = false;
-    std::jthread reader;
+    std::thread reader;  ///< Joined by ~RasterBake.
 
     /// Queues `piece`, once there is room.
     void Queue(Piece piece) {
@@ -839,7 +839,7 @@ RasterBake::RasterBake(std::unique_ptr<RasterSource> source,
         throw std::runtime_error("Cannot write " + output.string());
     }
     WriteDdsHeader(s.file, s.layout);
-    s.reader = std::jthread([&s] { s.Read(); });
+    s.reader = std::thread([&s] { s.Read(); });
 }
 
 RasterBake::~RasterBake() {

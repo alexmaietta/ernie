@@ -635,7 +635,8 @@ class Viewer {
     /// letterboxed, else it shows a texel per pixel, centred. The
     /// camera's aspect follows the resolution.
     /// The viewport image's size, as it renders now.
-    std::pair<std::uint32_t, std::uint32_t> ViewportResolution() const;
+    std::pair<std::uint32_t, std::uint32_t>
+    ViewportResolution() const;
     void SetRenderResolution(
         std::optional<std::pair<std::uint32_t, std::uint32_t>> size,
         float scale = 1.0f, bool fill = true);
@@ -774,8 +775,9 @@ class Viewer {
 
     /// Whether eco mode (RenderSettings `ernie:ecoMode:enabled`, as
     /// Omniverse's) has paused the viewport's rendering, nothing it
-    /// shows having changed for `ernie:ecoMode:maxFramesWithoutChange`
-    /// frames; it keeps its last image until something does.
+    /// shows having changed for
+    /// `ernie:ecoMode:maxFramesWithoutChange` frames; it keeps its
+    /// last image until something does.
     bool EcoPaused() const;
     /// Counts as a change for eco mode: for what changes the image
     /// outside the scene, such as GPU arrays written in place.

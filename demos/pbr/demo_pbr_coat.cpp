@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// OpenPBR's coat: a clear (or tinted) layer over four rough bases, red
-// and white plastic, black and a blue metal. A smooth coat lays a sharp
-// reflection over the base's blurred one; its colour tints what passes
-// through it and its darkening deepens the base beneath.
+// OpenPBR's coat: a clear (or tinted) layer over four rough bases,
+// red and white plastic, black and a blue metal. A smooth coat lays a
+// sharp reflection over the base's blurred one; its colour tints what
+// passes through it and its darkening deepens the base beneath.
 //
 // References:
 // - J. Andersson, A. Portsmouth et al., "OpenPBR Surface
@@ -86,14 +86,15 @@ const std::array<CoatInput, 4> kCoat = {{
 /// A latitude-longitude studio: a sky brightening upwards, a dim
 /// floor and two soft boxes, linear RGB.
 Tensor Studio(int rows = 64, int cols = 128) {
-    std::vector<float> texels(static_cast<std::size_t>(rows * cols * 3));
+    std::vector<float> texels(
+        static_cast<std::size_t>(rows * cols * 3));
     for (int i = 0; i < rows; ++i) {
         const double e = 90.0 - 180.0 * (i + 0.5) / rows;
         for (int j = 0; j < cols; ++j) {
             const double a = 360.0 * (j + 0.5) / cols;
             double sky =
                 e > 0.0 ? 0.2 + 0.6 * std::sin(e * std::numbers::pi /
-                                                180.0)
+                                               180.0)
                         : 0.03;
             for (const double centre : {240.0, 330.0}) {
                 if (std::abs(e - 35.0) < 15.0 &&
@@ -115,8 +116,8 @@ Tensor Studio(int rows = 64, int cols = 128) {
 /// depth.
 glm::dvec3 Project(const glm::dvec3& point) {
     const glm::dvec3 forward = glm::normalize(kTarget - kEye);
-    const glm::dvec3 right =
-        glm::normalize(glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
+    const glm::dvec3 right = glm::normalize(
+        glm::cross(forward, glm::dvec3(0.0, 0.0, 1.0)));
     const glm::dvec3 up = glm::cross(right, forward);
     const glm::dvec3 d = point - kEye;
     const double scale =
@@ -128,18 +129,19 @@ glm::dvec3 Project(const glm::dvec3& point) {
 /// Calls `visit(texel)` for each pixel within `outer` of the ball's
 /// radius about `point`, and at least `inner`.
 template <typename Visit>
-void ForDisc(const Tensor& image, const glm::dvec3& point, double inner,
-             double outer, Visit visit) {
+void ForDisc(const Tensor& image, const glm::dvec3& point,
+             double inner, double outer, Visit visit) {
     const glm::dvec3 at = Project(point);
-    const auto* texels = static_cast<const std::uint8_t*>(image.Data());
+    const auto* texels =
+        static_cast<const std::uint8_t*>(image.Data());
     const std::int64_t rows = image.Shape()[0];
     const std::int64_t cols = image.Shape()[1];
     const std::int64_t channels = image.Shape()[2];
     for (std::int64_t row = 0; row < rows; ++row) {
         for (std::int64_t col = 0; col < cols; ++col) {
-            const double r = std::hypot(col + 0.5 - at.x,
-                                        row + 0.5 - at.y) /
-                             (at.z * kRadius);
+            const double r =
+                std::hypot(col + 0.5 - at.x, row + 0.5 - at.y) /
+                (at.z * kRadius);
             if (r >= inner && r < outer) {
                 visit(texels + (row * cols + col) * channels);
             }
@@ -153,10 +155,11 @@ glm::dvec3 DiscMean(const Tensor& image, const glm::dvec3& point,
                     double inner, double outer) {
     glm::dvec3 sum(0.0);
     double count = 0.0;
-    ForDisc(image, point, inner, outer, [&](const std::uint8_t* texel) {
-        sum += glm::dvec3(texel[0], texel[1], texel[2]);
-        count += 1.0;
-    });
+    ForDisc(image, point, inner, outer,
+            [&](const std::uint8_t* texel) {
+                sum += glm::dvec3(texel[0], texel[1], texel[2]);
+                count += 1.0;
+            });
     return demos::SrgbToLinear(sum / (255.0 * count));
 }
 
@@ -201,13 +204,15 @@ class CoatDemo : public app::Demo {
                 .SetBrdf("open_pbr")
                 .SetAlbedo(base.colour);
             scene.Set(look, "inputs:base_metalness", base.metalness);
-            scene.Set(look, "inputs:specular_roughness", base.roughness);
+            scene.Set(look, "inputs:specular_roughness",
+                      base.roughness);
             for (const CoatInput& input : kCoat) {
                 scene.Set(look, "inputs:" + std::string(input.name),
                           input.value);
             }
             scene.Set(look, "inputs:coat_color", kColours[0].colour);
-            const std::string ball = "/World/" + std::string(base.name);
+            const std::string ball =
+                "/World/" + std::string(base.name);
             Sphere::Define(scene, ball)
                 .SetRadius(kRadius)
                 .SetMaterialBinding(look);
@@ -227,10 +232,9 @@ class CoatDemo : public app::Demo {
 
         for (const CoatInput& input : kCoat) {
             const std::string name = input.name;
-            Widgets().Slider(input.label, input.low, input.high,
-                             input.value, [this, name](double value) {
-                                 Coat(name, value);
-                             });
+            Widgets().Slider(
+                input.label, input.low, input.high, input.value,
+                [this, name](double value) { Coat(name, value); });
         }
         std::vector<std::string> names;
         for (const CoatColour& colour : kColours) {
@@ -238,7 +242,8 @@ class CoatDemo : public app::Demo {
         }
         Widgets().Combo("Coat colour", std::move(names), 0,
                         [this](std::size_t index) {
-                            Coat("coat_color", kColours[index].colour);
+                            Coat("coat_color",
+                                 kColours[index].colour);
                         });
         if (viewer != nullptr) {
             viewer->SetActiveCamera("/World/Camera");
@@ -260,21 +265,23 @@ class CoatDemo : public app::Demo {
         const std::vector<glm::dvec3> undarkened = Balls();
         Coat("coat_darkening", 1.0);
         for (std::size_t i = 0; i < kBases.size(); ++i) {
-            std::printf(
-                "%s: coated %.3f %.3f %.3f, bare %.3f %.3f %.3f, amber "
-                "%.3f %.3f %.3f, undarkened %.3f %.3f %.3f\n",
-                kBases[i].name, coated[i].r, coated[i].g, coated[i].b,
-                bare[i].r, bare[i].g, bare[i].b, amber[i].r, amber[i].g,
-                amber[i].b, undarkened[i].r, undarkened[i].g,
-                undarkened[i].b);
+            std::printf("%s: coated %.3f %.3f %.3f, bare %.3f %.3f "
+                        "%.3f, amber "
+                        "%.3f %.3f %.3f, undarkened %.3f %.3f %.3f\n",
+                        kBases[i].name, coated[i].r, coated[i].g,
+                        coated[i].b, bare[i].r, bare[i].g, bare[i].b,
+                        amber[i].r, amber[i].g, amber[i].b,
+                        undarkened[i].r, undarkened[i].g,
+                        undarkened[i].b);
         }
         std::printf(
             "Black ball's brightest pixel coated %.0f, bare %.0f\n",
             sharp, blurred);
         const std::size_t white = 1;
-        Check(sharp > 200.0 && blurred < 0.7 * sharp,
-              "the smooth coat reflects the soft boxes sharply off the "
-              "black ball");
+        Check(
+            sharp > 200.0 && blurred < 0.7 * sharp,
+            "the smooth coat reflects the soft boxes sharply off the "
+            "black ball");
         Check(amber[white].r / amber[white].b >
                   1.5 * coated[white].r / coated[white].b,
               "an amber coat warms the white ball");
@@ -296,13 +303,15 @@ class CoatDemo : public app::Demo {
         const Tensor image = GetRenderer().Render(GetScene());
         std::vector<glm::dvec3> means;
         for (int i = 0; i < static_cast<int>(kBases.size()); ++i) {
-            means.push_back(DiscMean(image, BallCentre(i), 0.0, 0.95));
+            means.push_back(
+                DiscMean(image, BallCentre(i), 0.0, 0.95));
         }
         return means;
     }
 
     double BlackPeak() {
-        return DiscPeak(GetRenderer().Render(GetScene()), BallCentre(2));
+        return DiscPeak(GetRenderer().Render(GetScene()),
+                        BallCentre(2));
     }
 };
 

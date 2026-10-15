@@ -19,10 +19,10 @@
 /// vector), since bindings such as Python's produce doubles.
 namespace ernie {
 
-/// Fills `numbers` from the attribute's array on the CPU when it holds
-/// exactly that many (float32, float64 or int32), as a column's row
-/// does (`Column`); false otherwise. The getters below read rows so
-/// when no value is set.
+/// Fills `numbers` from the attribute's array on the CPU when it
+/// holds exactly that many (float32, float64 or int32), as a column's
+/// row does (`Column`); false otherwise. The getters below read rows
+/// so when no value is set.
 bool GetRow(const Scene& scene, const Path& path,
             std::string_view attribute, std::span<double> numbers);
 

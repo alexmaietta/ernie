@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// A field of cubes riding a travelling wave, every cube's pose, colour
-// and temperature (seen with thermal emission on) written each frame
-// as three columns (one array each, mapped and written in place): one
-// change per array however many cubes.
+// A field of cubes riding a travelling wave, every cube's pose,
+// colour and temperature (seen with thermal emission on) written each
+// frame as three columns (one array each, mapped and written in
+// place): one change per array however many cubes.
 
 #include "ernie/app/demo.h"
 #include "ernie/app/viewer.h"
@@ -26,14 +26,14 @@ namespace {
 using namespace ernie;
 using demos::Check;
 
-constexpr int kSide = 64;  // cubes along each side
-constexpr double kSpacing = 1.2;  // m between cubes
-constexpr double kAmplitude = 1.5;  // m
+constexpr int kSide = 64;             // cubes along each side
+constexpr double kSpacing = 1.2;      // m between cubes
+constexpr double kAmplitude = 1.5;    // m
 constexpr double kWavelength = 18.0;  // m
-constexpr double kSpeed = 6.0;  // m/s
+constexpr double kSpeed = 6.0;        // m/s
 
-/// Cube `i`'s place at `t` seconds: on the grid, lifted by a ring wave
-/// travelling out from the centre.
+/// Cube `i`'s place at `t` seconds: on the grid, lifted by a ring
+/// wave travelling out from the centre.
 glm::dvec3 PlaceAt(int i, double t) {
     const double half = 0.5 * (kSide - 1) * kSpacing;
     const double x = (i % kSide) * kSpacing - half;
@@ -47,8 +47,8 @@ glm::dvec3 PlaceAt(int i, double t) {
 /// A colour from blue (trough) to orange (crest) by height.
 glm::dvec3 ColourAt(double z) {
     const double h = 0.5 + 0.5 * z / kAmplitude;
-    return glm::mix(glm::dvec3(0.1, 0.3, 0.9), glm::dvec3(1.0, 0.5, 0.1),
-                    h);
+    return glm::mix(glm::dvec3(0.1, 0.3, 0.9),
+                    glm::dvec3(1.0, 0.5, 0.1), h);
 }
 
 class ColumnsDemo : public app::Demo {
@@ -76,7 +76,8 @@ class ColumnsDemo : public app::Demo {
         const PrimSet field(cubes);
         poses_ = scene.GetColumn(field, tokens::kTranslate);
         colours_ = scene.GetColumn(field, tokens::kDisplayColor);
-        colours_.Write(Tensor::Zeros(DType::Float32, {kSide * kSide, 3}));
+        colours_.Write(
+            Tensor::Zeros(DType::Float32, {kSide * kSide, 3}));
         kelvin_ = scene.GetColumn(field, tokens::kThermalTemperature);
         kelvin_.Write(Tensor::Zeros(DType::Float32, {kSide * kSide}));
         Place();
@@ -89,7 +90,8 @@ class ColumnsDemo : public app::Demo {
 
     void TestPostStep() override {
         // Rows read as each cube's own attribute.
-        for (const int i : {0, kSide * kSide / 2 + 7, kSide * kSide - 1}) {
+        for (const int i :
+             {0, kSide * kSide / 2 + 7, kSide * kSide - 1}) {
             const glm::dvec3 want = PlaceAt(i, time_);
             const glm::dvec3 at(GetScene().WorldTransform(
                 "/World/Field/Cube" + std::to_string(i))[3]);
@@ -102,9 +104,11 @@ class ColumnsDemo : public app::Demo {
         ChangeCursor cursor{GetScene().Version()};
         Place();
         std::vector<ColumnChange> columns;
-        const std::vector<Change> rest = GetScene().Changes(cursor, columns);
+        const std::vector<Change> rest =
+            GetScene().Changes(cursor, columns);
         Check(columns.size() == 3 && rest.empty(),
-              "a frame's writes are three column changes, none per cube");
+              "a frame's writes are three column changes, none per "
+              "cube");
     }
 
   private:
@@ -122,7 +126,8 @@ class ColumnsDemo : public app::Demo {
                 poses[3 * i + k] = static_cast<float>(p[k]);
                 colours[3 * i + k] = static_cast<float>(c[k]);
             }
-            kelvin[i] = static_cast<float>(300.0 + 50.0 * p.z / kAmplitude);
+            kelvin[i] =
+                static_cast<float>(300.0 + 50.0 * p.z / kAmplitude);
         }
         poses_.Unmap();
         colours_.Unmap();
@@ -137,6 +142,7 @@ class ColumnsDemo : public app::Demo {
 
 }  // namespace
 
-ERNIE_REGISTER_DEMO(ColumnsDemo, "batched", "columns",
-                    "4096 cubes riding a wave, every pose, colour and "
-                    "temperature written each frame as three columns.");
+ERNIE_REGISTER_DEMO(
+    ColumnsDemo, "batched", "columns",
+    "4096 cubes riding a wave, every pose, colour and "
+    "temperature written each frame as three columns.");

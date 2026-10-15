@@ -118,7 +118,11 @@ def luminance(rgb):
     """WCAG's relative luminance of an sRGB colour."""
 
     def linear(c):
-        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        return (
+            c / 12.92
+            if c <= 0.04045
+            else ((c + 0.055) / 1.055) ** 2.4
+        )
 
     r, g, b = (linear(c) for c in rgb[:3])
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
@@ -153,7 +157,9 @@ class Demo(ernie.demo.Demo):
         )
         world.define("Camera", ernie.Camera, focal_length=24.0).set(
             tokens.TRANSFORM,
-            ernie.look_at_transform((0.0, -7.0, 3.0), (0.0, 0.0, 0.6)),
+            ernie.look_at_transform(
+                (0.0, -7.0, 3.0), (0.0, 0.0, 0.6)
+            ),
         )
         self.preset = START
         self.theme = themed(self.preset)
@@ -229,7 +235,9 @@ class Demo(ernie.demo.Demo):
     def apply(self):
         """Shows the theme in the viewer, and its text's contrast."""
         ratio = contrast(self.theme.text, self.theme.panel)
-        self.widgets.set(self.contrast, f"Text contrast {ratio:.1f}:1")
+        self.widgets.set(
+            self.contrast, f"Text contrast {ratio:.1f}:1"
+        )
         if self.viewer is not None:
             self.viewer.theme = self.theme
 
@@ -239,8 +247,13 @@ class Demo(ernie.demo.Demo):
             text = contrast(theme.text, theme.panel)
             muted = contrast(theme.text_muted, theme.panel)
             print(f"{preset}: text {text:.1f}:1, muted {muted:.1f}:1")
-            assert text >= CONTRAST[preset], f"{preset}'s text should read"
-            assert muted >= MUTED_CONTRAST, f"{preset}'s labels should read"
+            assert text >= CONTRAST[preset], (
+                f"{preset}'s text should read"
+            )
+            assert muted >= MUTED_CONTRAST, (
+                f"{preset}'s labels should read"
+            )
+
         # Changing the accent keeps the rest of the theme (single
         # precision, as the viewer stores it).
         def near(a, b):

@@ -1623,15 +1623,18 @@ TEST_F(RasterDelegateTest, ShadowDistancesFitWhatACubeCameraSees) {
     EXPECT_LT(fitted, 200.0f);
 }
 
-TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
+TEST_F(RasterDelegateTest,
+       EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
     Scene scene = MeshScene();
     ernie::Xform::Define(scene, "/World/Group");
     for (const char* name : {"A", "B"}) {
         const Path cube = Path("/World/Group").Child(name);
-        ernie::Cube::Define(scene, cube).SetSize(6.0).SetDisplayColor(
-            {0.2, 0.8, 0.3});
-        ernie::SetXform(scene, cube,
-                        {.translate = {name[0] == 'A' ? -4.0 : 4.0, 8.0, 0.0}});
+        ernie::Cube::Define(scene, cube)
+            .SetSize(6.0)
+            .SetDisplayColor({0.2, 0.8, 0.3});
+        ernie::SetXform(
+            scene, cube,
+            {.translate = {name[0] == 'A' ? -4.0 : 4.0, 8.0, 0.0}});
     }
     RasterDelegate delegate(*context_);
     delegate.Render(scene);
@@ -1642,27 +1645,34 @@ TEST_F(RasterDelegateTest, EditsRedrawOnlyTheirMeshesAsAFullSyncWould) {
         RasterDelegate fresh(*context_);
         const Tensor whole = fresh.Render(scene);
         ASSERT_EQ(kept.Elements(), whole.Elements());
-        EXPECT_EQ(std::memcmp(kept.Data(), whole.Data(),
-                              static_cast<std::size_t>(kept.Elements())),
-                  0)
+        EXPECT_EQ(
+            std::memcmp(kept.Data(), whole.Data(),
+                        static_cast<std::size_t>(kept.Elements())),
+            0)
             << edit;
     };
-    ernie::Cube(scene, "/World/Group/A").SetDisplayColor({0.9, 0.1, 0.9});
+    ernie::Cube(scene, "/World/Group/A")
+        .SetDisplayColor({0.9, 0.1, 0.9});
     expectFresh("a mesh's colour");
-    ernie::SetXform(scene, "/World/Group/B", {.translate = {6.0, -8.0, 0.0}});
+    ernie::SetXform(scene, "/World/Group/B",
+                    {.translate = {6.0, -8.0, 0.0}});
     expectFresh("a mesh's transform");
-    ernie::SetXform(scene, "/World/Group", {.translate = {0.0, 4.0, 0.0}});
+    ernie::SetXform(scene, "/World/Group",
+                    {.translate = {0.0, 4.0, 0.0}});
     expectFresh("its group's transform");
-    ernie::Xform(scene, "/World/Group").SetVisibility(tokens::kInvisible);
+    ernie::Xform(scene, "/World/Group")
+        .SetVisibility(tokens::kInvisible);
     expectFresh("its group hidden");
-    ernie::Xform(scene, "/World/Group").SetVisibility(tokens::kInherited);
+    ernie::Xform(scene, "/World/Group")
+        .SetVisibility(tokens::kInherited);
     expectFresh("its group shown");
     scene.Remove("/World/Group/B");
     ernie::Cube::Define(scene, "/World/Group/C").SetSize(3.0);
     expectFresh("a mesh removed and another added");
     // What reaches meshes from other prims: a material they are bound
     // to, gone and back, and their group's world.
-    ernie::Cube(scene, "/World/Group/A").SetMaterialBinding("/Looks/Red");
+    ernie::Cube(scene, "/World/Group/A")
+        .SetMaterialBinding("/Looks/Red");
     expectFresh("a mesh bound to a material");
     scene.Remove("/Looks/Red");
     expectFresh("the material removed");
@@ -1695,16 +1705,18 @@ TEST_F(RasterDelegateTest, LikeShapesShareOneMeshThatEditsKeepApart) {
         RasterDelegate fresh(*context_);
         const Tensor whole = fresh.Render(scene);
         ASSERT_EQ(kept.Elements(), whole.Elements());
-        EXPECT_EQ(std::memcmp(kept.Data(), whole.Data(),
-                              static_cast<std::size_t>(kept.Elements())),
-                  0)
+        EXPECT_EQ(
+            std::memcmp(kept.Data(), whole.Data(),
+                        static_cast<std::size_t>(kept.Elements())),
+            0)
             << edit;
     };
     delegate.Render(scene);
     const std::uint64_t alone = meshes();
     // A fourth like cube adds a draw, not a mesh.
     ernie::Cube::Define(scene, "/World/Cube3").SetSize(4.0);
-    ernie::SetXform(scene, "/World/Cube3", {.translate = {0.0, -6.0, 0.0}});
+    ernie::SetXform(scene, "/World/Cube3",
+                    {.translate = {0.0, -6.0, 0.0}});
     expectFresh("a like cube added");
     EXPECT_EQ(meshes(), alone);
     // One resized takes a mesh of its own; the others keep theirs.
@@ -1716,7 +1728,8 @@ TEST_F(RasterDelegateTest, LikeShapesShareOneMeshThatEditsKeepApart) {
     expectFresh("a cube resized back");
     EXPECT_EQ(meshes(), alone);
     // The mesh stays while a cube draws it, and goes with the last.
-    for (const char* gone : {"/World/Cube0", "/World/Cube1", "/World/Cube2"}) {
+    for (const char* gone :
+         {"/World/Cube0", "/World/Cube1", "/World/Cube2"}) {
         scene.Remove(gone);
         expectFresh("a cube removed");
         EXPECT_EQ(meshes(), alone);
@@ -1726,14 +1739,15 @@ TEST_F(RasterDelegateTest, LikeShapesShareOneMeshThatEditsKeepApart) {
     EXPECT_EQ(meshes(), alone - 1);
 }
 
-TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
+TEST_F(RasterDelegateTest,
+       ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
     const auto scene = [](bool column, float lift) {
         Scene built = MeshScene();
         std::vector<Path> cubes;
         std::vector<float> rows;
         // Red, green and blue: the colours as a column too.
-        const std::vector<float> colours = {0.9f, 0.1f, 0.1f, 0.1f, 0.9f,
-                                            0.1f, 0.1f, 0.1f, 0.9f};
+        const std::vector<float> colours = {
+            0.9f, 0.1f, 0.1f, 0.1f, 0.9f, 0.1f, 0.1f, 0.1f, 0.9f};
         for (int i = 0; i < 3; ++i) {
             const Path cube("/World/Cube" + std::to_string(i));
             ernie::Cube::Define(built, cube).SetSize(4.0);
@@ -1742,8 +1756,9 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
             ernie::SetXform(built, cube, {.translate = at});
             if (!column) {
                 const auto c = static_cast<std::size_t>(3 * i);
-                ernie::Cube(built, cube).SetDisplayColor(
-                    std::span(colours).subspan(c, 3));
+                ernie::Cube(built, cube)
+                    .SetDisplayColor(
+                        std::span(colours).subspan(c, 3));
             }
             cubes.push_back(cube);
             rows.insert(rows.end(), {static_cast<float>(at.x),
@@ -1753,7 +1768,9 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
         if (column) {
             built.GetColumn(ernie::PrimSet(cubes), tokens::kTranslate)
                 .Write(Tensor::Copy<float>(rows, {3, 3}));
-            built.GetColumn(ernie::PrimSet(cubes), tokens::kDisplayColor)
+            built
+                .GetColumn(ernie::PrimSet(cubes),
+                           tokens::kDisplayColor)
                 .Write(Tensor::Copy<float>(colours, {3, 3}));
         }
         return built;
@@ -1761,8 +1778,9 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
     const auto near = [](const Tensor& a, const Tensor& b) {
         int worst = 0;
         for (std::int64_t i = 0; i < a.Elements(); ++i) {
-            worst = std::max(worst, std::abs(int{a.As<std::uint8_t>()[i]} -
-                                             int{b.As<std::uint8_t>()[i]}));
+            worst = std::max(worst,
+                             std::abs(int{a.As<std::uint8_t>()[i]} -
+                                      int{b.As<std::uint8_t>()[i]}));
         }
         return worst;
     };
@@ -1772,8 +1790,9 @@ TEST_F(RasterDelegateTest, ColumnsOfHostRowsDrawAsTheirPrimsWouldAlone) {
     delegate.Render(columns);
     std::vector<float> lifted;
     for (int i = 0; i < 3; ++i) {
-        lifted.insert(lifted.end(), {-8.0f + 8.0f * static_cast<float>(i),
-                                     -6.0f, 2.0f * static_cast<float>(i)});
+        lifted.insert(lifted.end(),
+                      {-8.0f + 8.0f * static_cast<float>(i), -6.0f,
+                       2.0f * static_cast<float>(i)});
     }
     columns
         .GetColumn(ernie::PrimSet({"/World/Cube0", "/World/Cube1",
@@ -1811,21 +1830,23 @@ TEST_F(RasterDelegateTest, ColumnsOfVisibilityHideAndShowInstances) {
         if (column) {
             built.GetColumn(ernie::PrimSet(cubes), tokens::kTranslate)
                 .Write(Tensor::Copy<float>(rows, {3, 3}));
-            const std::vector<float> shown = {1.0f,
-                                              middleHidden ? 0.0f : 1.0f,
-                                              1.0f};
-            built.GetColumn(ernie::PrimSet(cubes), tokens::kVisibility)
+            const std::vector<float> shown = {
+                1.0f, middleHidden ? 0.0f : 1.0f, 1.0f};
+            built
+                .GetColumn(ernie::PrimSet(cubes), tokens::kVisibility)
                 .Write(Tensor::Copy<float>(shown, {3}));
         } else if (middleHidden) {
-            ernie::Cube(built, cubes[1]).SetVisibility(tokens::kInvisible);
+            ernie::Cube(built, cubes[1])
+                .SetVisibility(tokens::kInvisible);
         }
         return built;
     };
     const auto worst = [](const Tensor& a, const Tensor& b) {
         int most = 0;
         for (std::int64_t i = 0; i < a.Elements(); ++i) {
-            most = std::max(most, std::abs(int{a.As<std::uint8_t>()[i]} -
-                                           int{b.As<std::uint8_t>()[i]}));
+            most = std::max(most,
+                            std::abs(int{a.As<std::uint8_t>()[i]} -
+                                     int{b.As<std::uint8_t>()[i]}));
         }
         return most;
     };
@@ -1841,17 +1862,20 @@ TEST_F(RasterDelegateTest, ColumnsOfVisibilityHideAndShowInstances) {
     const Tensor shown = delegate.Render(columns);
     RasterDelegate every(*context_);
     EXPECT_LE(worst(shown, every.Render(scene(false, false))), 2);
-    EXPECT_GT(worst(hidden, shown), 50) << "the middle cube came back";
+    EXPECT_GT(worst(hidden, shown), 50)
+        << "the middle cube came back";
 }
 
-TEST_F(RasterDelegateTest, EditsBesideGpuPosedGroupsRedrawAsAFullSyncWould) {
+TEST_F(RasterDelegateTest,
+       EditsBesideGpuPosedGroupsRedrawAsAFullSyncWould) {
     Scene scene = MeshScene();
     const std::vector<Path> bodies = {"/World/Body0", "/World/Body1",
                                       "/World/Body2"};
     std::vector<float> rows;
     for (int i = 0; i < 3; ++i) {
         const glm::dvec3 at(-8.0 + 8.0 * i, -6.0, 0.0);
-        ernie::Cube::Define(scene, bodies[static_cast<std::size_t>(i)])
+        ernie::Cube::Define(scene,
+                            bodies[static_cast<std::size_t>(i)])
             .SetSize(4.0)
             .SetXform({.translate = at});
         rows.insert(rows.end(), {static_cast<float>(at.x),
@@ -1872,15 +1896,17 @@ TEST_F(RasterDelegateTest, EditsBesideGpuPosedGroupsRedrawAsAFullSyncWould) {
         ASSERT_EQ(kept.Elements(), whole.Elements());
         int worst = 0;
         for (std::int64_t i = 0; i < kept.Elements(); ++i) {
-            worst = std::max(worst,
-                             std::abs(int{kept.As<std::uint8_t>()[i]} -
-                                      int{whole.As<std::uint8_t>()[i]}));
+            worst = std::max(
+                worst, std::abs(int{kept.As<std::uint8_t>()[i]} -
+                                int{whole.As<std::uint8_t>()[i]}));
         }
         EXPECT_LE(worst, 2) << edit;
     };
-    ernie::Cube(scene, "/World/Lone").SetDisplayColor({0.9, 0.2, 0.2});
+    ernie::Cube(scene, "/World/Lone")
+        .SetDisplayColor({0.9, 0.2, 0.2});
     expectFresh("a lone cube's colour");
-    ernie::SetXform(scene, "/World/Lone", {.translate = {4.0, 8.0, 0.0}});
+    ernie::SetXform(scene, "/World/Lone",
+                    {.translate = {4.0, 8.0, 0.0}});
     expectFresh("a lone cube moved");
     ernie::Cube(scene, bodies[1]).SetDisplayColor({0.2, 0.2, 0.9});
     expectFresh("a posed cube's own colour");

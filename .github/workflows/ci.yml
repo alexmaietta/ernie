@@ -112,13 +112,17 @@ jobs:
         with:
           path: .deps/openusd-*/
           key: openusd-${{ matrix.key }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openusd.cmake') }}
+      # MaterialX's GLSL renderer, which build_usd.py builds, needs X11 and OpenGL's headers.
       - name: Install Ninja
         if: steps.openusd.outputs.cache-hit != 'true'
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then brew install ninja
           elif [ "$RUNNER_OS" = "Windows" ]; then choco install -y ninja
-          else sudo apt-get update && sudo apt-get install -y ninja-build; fi
+          else
+            sudo apt-get update
+            sudo apt-get install -y ninja-build libx11-dev libxt-dev libgl-dev
+          fi
       - uses: actions/setup-python@v7
         if: steps.openusd.outputs.cache-hit != 'true'
         with:

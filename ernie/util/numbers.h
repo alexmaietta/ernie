@@ -32,7 +32,8 @@ glm::vec<N, double> VectorOf(const R& numbers) {
     }
     glm::vec<N, double> vector(0.0);
     for (glm::length_t i = 0; i < N; ++i) {
-        vector[i] = static_cast<double>(values[static_cast<std::size_t>(i)]);
+        vector[i] =
+            static_cast<double>(values[static_cast<std::size_t>(i)]);
     }
     return vector;
 }

@@ -219,9 +219,9 @@ class DenseField : public FieldBase {
 };
 
 /// Ernie's procedural cloud layers: up to four layers over a
-/// repeating weather map, carved from tileable noise at each sample on
-/// the GPU (three-geospatial's clouds, after Horizon Zero Dawn's), in
-/// the field's frame with z up; a Volume's density, its material's
+/// repeating weather map, carved from tileable noise at each sample
+/// on the GPU (three-geospatial's clouds, after Horizon Zero Dawn's),
+/// in the field's frame with z up; a Volume's density, its material's
 /// density scaling it.
 class CloudLayersField : public FieldBase {
     ERNIE_SCHEMA_BODY(CloudLayersField, FieldBase,

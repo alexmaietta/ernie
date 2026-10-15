@@ -150,7 +150,8 @@ double SolarAbsorptivity(const Spectrum& reflectance);
 /// A surface's hemispherical thermal emissivity at `kelvin`: its
 /// spectral `emissivity` weighted by Planck's radiance from 2 to 100
 /// um.
-double ThermalEmissivity(const std::function<double(double)>& emissivity,
-                         double kelvin);
+double
+ThermalEmissivity(const std::function<double(double)>& emissivity,
+                  double kelvin);
 
 }  // namespace ernie

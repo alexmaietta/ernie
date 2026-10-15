@@ -24,7 +24,7 @@ namespace {
 using namespace ernie;
 using demos::Check;
 
-constexpr int kSide = 100;  // cells along each side
+constexpr int kSide = 100;        // cells along each side
 constexpr double kSpacing = 1.1;  // m between cells
 const glm::dvec3 kAlive{0.2, 0.85, 0.3};
 const glm::dvec3 kDead{0.12, 0.12, 0.14};
@@ -59,7 +59,8 @@ class EditsDemo : public app::Demo {
             Xform::Define(scene, RowPath(r));
             SetXform(scene, RowPath(r), {.translate = {0, 0, 0}});
             for (int c = 0; c < kSide; ++c) {
-                state = state * 6364136223846793005ull + 1442695040888963407ull;
+                state = state * 6364136223846793005ull +
+                        1442695040888963407ull;
                 const bool alive = (state >> 33) % 3 == 0;
                 alive_[Index(r, c)] = alive;
                 Cube::Define(scene, CellPath(r, c))
@@ -83,7 +84,8 @@ class EditsDemo : public app::Demo {
                 for (int dr = -1; dr <= 1; ++dr) {
                     for (int dc = -1; dc <= 1; ++dc) {
                         if (dr != 0 || dc != 0) {
-                            around += alive_[Index(r + dr, c + dc)] ? 1 : 0;
+                            around +=
+                                alive_[Index(r + dr, c + dc)] ? 1 : 0;
                         }
                     }
                 }
@@ -109,7 +111,8 @@ class EditsDemo : public app::Demo {
             for (int c = 0; c < kSide; ++c) {
                 const glm::dvec3 colour =
                     Cube(scene, CellPath(r, c)).GetDisplayColor();
-                Check(colour == (alive_[Index(r, c)] ? kAlive : kDead),
+                Check(colour ==
+                          (alive_[Index(r, c)] ? kAlive : kDead),
                       "every cell shows its state");
             }
         }
@@ -130,6 +133,7 @@ class EditsDemo : public app::Demo {
 
 }  // namespace
 
-ERNIE_REGISTER_DEMO(EditsDemo, "batched", "edits",
-                    "The Game of Life on 10,000 cubes: only the cells "
-                    "that flip are written, one prim at a time.");
+ERNIE_REGISTER_DEMO(
+    EditsDemo, "batched", "edits",
+    "The Game of Life on 10,000 cubes: only the cells "
+    "that flip are written, one prim at a time.");

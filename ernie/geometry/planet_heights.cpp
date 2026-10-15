@@ -185,7 +185,7 @@ PlanetHeightsOf(const RasterSource& source, std::uint32_t faceCells,
     // As CubeSphereLod::VertexDirection, so shared edges agree
     // exactly.
     const double scale = 2.0 / static_cast<double>(faceCells);
-    std::vector<std::jthread> faces;
+    std::vector<std::thread> faces;
     for (std::uint32_t face = 0; face < CubeSphereLod::kFaces;
          ++face) {
         faces.emplace_back([&, face] {
@@ -203,6 +203,9 @@ PlanetHeightsOf(const RasterSource& source, std::uint32_t faceCells,
                 }
             }
         });
+    }
+    for (std::thread& face : faces) {
+        face.join();
     }
     return heights;
 }
@@ -674,7 +677,7 @@ PlanetTile PlanetFacesOf(const RasterSource& source,
         }
     };
     {
-        std::vector<std::jthread> threads;
+        std::vector<std::thread> threads;
         for (std::uint32_t i = 1;
              i <
              std::clamp(std::thread::hardware_concurrency(), 1u, 16u);
@@ -682,6 +685,9 @@ PlanetTile PlanetFacesOf(const RasterSource& source,
             threads.emplace_back(work);
         }
         work();
+        for (std::thread& thread : threads) {
+            thread.join();
+        }
     }
     if (failure) {
         std::rethrow_exception(failure);

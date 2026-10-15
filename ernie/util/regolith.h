@@ -19,7 +19,8 @@ namespace ernie {
 /// - P. O. Hayne et al., "Global regolith thermophysical properties
 ///   of the Moon from the Diviner Lunar Radiometer Experiment",
 ///   Journal of Geophysical Research: Planets 122(12):2371-2400,
-///   2017, table A1 and appendix A. https://doi.org/10.1002/2017JE005387
+///   2017, table A1 and appendix A.
+///   https://doi.org/10.1002/2017JE005387
 /// - A. R. Vasavada et al., "Lunar equatorial surface temperatures
 ///   and regolith properties from the Diviner Lunar Radiometer
 ///   Experiment", Journal of Geophysical Research: Planets
@@ -36,8 +37,8 @@ struct RegolithProperties {
     double albedoB = 0.25;
     /// Infrared emissivity.
     double emissivity = 0.95;
-    /// Density at the surface and at depth, kg/m^3, and the depth over
-    /// which it rises, m.
+    /// Density at the surface and at depth, kg/m^3, and the depth
+    /// over which it rises, m.
     double surfaceDensity = 1100.0;
     double deepDensity = 1800.0;
     double densityScale = 0.07;

@@ -21,8 +21,8 @@
 #include <optional>
 #include <set>
 #include <span>
-#include <tuple>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -624,7 +624,8 @@ class MeshDrawable : public RasterDrawable {
     /// without visiting the others. False, changing nothing, when any
     /// differs in layout or an index is out of range, or while the
     /// draws wait to be written whole: then `SetItems` all of them.
-    bool UpdateItems(std::span<std::pair<std::size_t, MeshItem>> items);
+    bool
+    UpdateItems(std::span<std::pair<std::size_t, MeshItem>> items);
 
     /// The draws, as set.
     std::size_t ItemCount() const {
@@ -1040,8 +1041,9 @@ class MeshDrawable : public RasterDrawable {
     struct ItemBox {
         Bounds3 box{};
         bool known = false;
-        bool hostPoints = false;  ///< Its mesh has points on the host.
-        bool anyPoints = false;   ///< Or on the device.
+        bool hostPoints =
+            false;               ///< Its mesh has points on the host.
+        bool anyPoints = false;  ///< Or on the device.
     };
     const ItemBox& PlainBox(std::size_t item) const;
     /// Patches draw `i` with `item` of the same layout (`SetItems`,
@@ -1164,22 +1166,24 @@ class MeshDrawable : public RasterDrawable {
         bool pushedCulled = false;
     };
     /// With `state`, starts from what it says is bound and leaves it
-    /// as bound after. With `keptList`, `ranges` is one of the lists kept
-    /// from frame to frame (`viewDraws_`, `shadowDraws_`,
+    /// as bound after. With `keptList`, `ranges` is one of the lists
+    /// kept from frame to frame (`viewDraws_`, `shadowDraws_`,
     /// `shadowWorldDraws_`): what it records is planned once while
     /// they and the draws stay (`plans_`).
-    std::size_t
-    Record(VkCommandBuffer commands, const RasterFrame& frame,
-           std::span<const VisibleRange> ranges,
-           const glm::mat4& light, const ShadowCasters* casters,
-           bool shadow, bool direct, int culledSet,
-           const DescriptorResource* motion = nullptr,
-           RecordState* state = nullptr,
-           std::optional<bool> transparent = std::nullopt,
-           bool keptList = false) const;
-    /// What `Record` draws, in order: a multi-draw of `count` indirect
-    /// draws from `first` binding draw `item`'s resources, or with
-    /// `range` at 0 or more the direct draw of `ranges[range]`.
+    std::size_t Record(VkCommandBuffer commands,
+                       const RasterFrame& frame,
+                       std::span<const VisibleRange> ranges,
+                       const glm::mat4& light,
+                       const ShadowCasters* casters, bool shadow,
+                       bool direct, int culledSet,
+                       const DescriptorResource* motion = nullptr,
+                       RecordState* state = nullptr,
+                       std::optional<bool> transparent = std::nullopt,
+                       bool keptList = false) const;
+    /// What `Record` draws, in order: a multi-draw of `count`
+    /// indirect draws from `first` binding draw `item`'s resources,
+    /// or with `range` at 0 or more the direct draw of
+    /// `ranges[range]`.
     struct RecordStep {
         std::uint32_t item = 0;
         std::uint32_t first = 0;
@@ -1192,7 +1196,8 @@ class MeshDrawable : public RasterDrawable {
         const VisibleRange* ranges = nullptr;
         std::size_t size = 0;
         std::int32_t world = 0;
-        std::int8_t casters = 0;  ///< None, or with or without shared.
+        std::int8_t casters =
+            0;  ///< None, or with or without shared.
         std::int8_t transparent = 0;  ///< Any, opaque or transparent.
         bool shadow = false;
         bool direct = false;
@@ -1205,7 +1210,8 @@ class MeshDrawable : public RasterDrawable {
     PlanVersion CurrentPlanVersion() const;
     mutable std::map<PlanKey, std::vector<RecordStep>> plans_;
     mutable PlanVersion plansVersion_{};
-    /// Cull lists made anew (`Cull` when not steady), and draws written
+    /// Cull lists made anew (`Cull` when not steady), and draws
+    /// written
     /// (`WriteDraws`), which plans follow.
     std::uint64_t cullLists_ = 0;
     std::uint64_t drawsWritten_ = 0;
@@ -1560,8 +1566,8 @@ class MeshDrawable : public RasterDrawable {
         /// shadow mask and culling stay: their jobs, records and
         /// counts, the totals after them, and the lists.
         bool shadows = false;
-        std::vector<std::tuple<std::optional<std::int32_t>, std::uint32_t,
-                               bool>>
+        std::vector<std::tuple<std::optional<std::int32_t>,
+                               std::uint32_t, bool>>
             cascades;
         std::vector<GpuCullJob> shadowJobs;
         std::vector<glm::uvec4> shadowRecords;

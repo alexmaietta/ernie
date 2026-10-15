@@ -703,8 +703,8 @@ class Importer {
 
     /// The file the asset value `asset` of the prim `path` names, for
     /// Ernie to read: its resolved path, unpacked first into the
-    /// package cache when it is inside a package (a .usdz's texture or
-    /// volume).
+    /// package cache when it is inside a package (a .usdz's texture
+    /// or volume).
     std::string Asset(const std::string& path,
                       const SdfAssetPath& asset) {
         const std::string text = AssetText(asset);

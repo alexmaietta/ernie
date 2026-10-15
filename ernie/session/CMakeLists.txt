@@ -19,5 +19,7 @@ ernie_add_library(
 # MaterialX's data libraries in a build (materialx.h, MaterialXLibraries).
 set_source_files_properties(
     materialx.cpp
-    PROPERTIES COMPILE_DEFINITIONS
-               "ERNIE_MATERIALX_LIBRARIES_BUILD_PATH=\"${ERNIE_MATERIALX_LIBRARIES}\"")
+    PROPERTIES
+        COMPILE_DEFINITIONS
+        "ERNIE_MATERIALX_LIBRARIES_BUILD_PATH=\"${ERNIE_MATERIALX_LIBRARIES}\""
+)

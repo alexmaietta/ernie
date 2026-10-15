@@ -588,8 +588,8 @@ bool MatchesFilter(std::string_view label, std::string_view attribute,
     return contains(label) || contains(attribute);
 }
 
-void DrawIconCentred(ImDrawList* draw, const char* icon, ImVec2 centre,
-                     ImU32 colour) {
+void DrawIconCentred(ImDrawList* draw, const char* icon,
+                     ImVec2 centre, ImU32 colour) {
     unsigned int codepoint = 0;
     ImTextCharFromUtf8(&codepoint, icon, nullptr);
     const ImFontGlyph* glyph =
@@ -612,10 +612,10 @@ bool IconButton(const char* id, const char* icon, float size) {
     const bool clicked = ImGui::Button(id, ImVec2(size, size));
     const ImVec2 low = ImGui::GetItemRectMin();
     const ImVec2 high = ImGui::GetItemRectMax();
-    DrawIconCentred(ImGui::GetWindowDrawList(), icon,
-                    ImVec2(0.5f * (low.x + high.x),
-                           0.5f * (low.y + high.y)),
-                    ImGui::GetColorU32(ImGuiCol_Text));
+    DrawIconCentred(
+        ImGui::GetWindowDrawList(), icon,
+        ImVec2(0.5f * (low.x + high.x), 0.5f * (low.y + high.y)),
+        ImGui::GetColorU32(ImGuiCol_Text));
     return clicked;
 }
 
