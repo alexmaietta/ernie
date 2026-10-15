@@ -124,7 +124,7 @@
               
                 <h1 id="struct-erniegraphicspipelinedesc">Struct ernie::GraphicsPipelineDesc</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>GraphicsPipelineDesc</strong></a></p>
-<p><em>Fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em> </p>
+<p><em>Shaders and fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em> </p>
 <ul>
 <li><code>#include &lt;ernie/device/pipeline.h&gt;</code></li>
 </ul>
@@ -143,7 +143,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">VkFormat</td>
-<td style="text-align: left;"><a href="#variable-colorformat"><strong>colorFormat</strong></a>   = <code>/* multi line expression */</code><br><em>Undefined for depth-only passes.</em></td>
+<td style="text-align: left;"><a href="#variable-colorformat"><strong>colorFormat</strong></a>   = <code>VK\_FORMAT\_UNDEFINED</code><br><em>Undefined for depth-only passes.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; VkFormat &gt;</td>
@@ -178,16 +178,16 @@
 <td style="text-align: left;"><a href="#variable-fragmententry"><strong>fragmentEntry</strong></a>   = <code>"main"</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::span&lt; const std::uint32_t &gt;</td>
-<td style="text-align: left;"><a href="#variable-fragmentspirv"><strong>fragmentSpirv</strong></a>  <br><em>Empty for depth-only passes.</em></td>
+<td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-fragmentspirv"><strong>fragmentSpirv</strong></a>  <br><em>The fragment shader's SPIR-V; empty for depth-only passes.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-vertexentry"><strong>vertexEntry</strong></a>   = <code>"main"</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::span&lt; const std::uint32_t &gt;</td>
-<td style="text-align: left;"><a href="#variable-vertexspirv"><strong>vertexSpirv</strong></a>  <br></td>
+<td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-vertexspirv"><strong>vertexSpirv</strong></a>  <br><em>The vertex shader's SPIR-V, owned so it cannot dangle.</em></td>
 </tr>
 </tbody>
 </table>
@@ -251,8 +251,8 @@
 <hr>
 
 <h3 id="variable-fragmentspirv">variable fragmentSpirv</h3>
-<p><em>Empty for depth-only passes.</em> </p>
-<pre><code class="language-C++">std::span&lt;const std::uint32_t&gt; ernie::GraphicsPipelineDesc::fragmentSpirv;
+<p><em>The fragment shader's SPIR-V; empty for depth-only passes.</em> </p>
+<pre><code class="language-C++">std::vector&lt;std::uint32_t&gt; ernie::GraphicsPipelineDesc::fragmentSpirv;
 </code></pre>
 <hr>
 
@@ -262,7 +262,8 @@
 <hr>
 
 <h3 id="variable-vertexspirv">variable vertexSpirv</h3>
-<pre><code class="language-C++">std::span&lt;const std::uint32_t&gt; ernie::GraphicsPipelineDesc::vertexSpirv;
+<p><em>The vertex shader's SPIR-V, owned so it cannot dangle.</em> </p>
+<pre><code class="language-C++">std::vector&lt;std::uint32_t&gt; ernie::GraphicsPipelineDesc::vertexSpirv;
 </code></pre>
 <hr>
 

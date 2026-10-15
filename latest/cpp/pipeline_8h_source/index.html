@@ -231,13 +231,11 @@ class ComputePipeline {
 void ComputeBarrier(VkCommandBuffer commands);
 
 struct GraphicsPipelineDesc {
-    std::span&lt;const std::uint32_t&gt; vertexSpirv;
-    std::span&lt;const std::uint32_t&gt;
-        fragmentSpirv;  
+    std::vector&lt;std::uint32_t&gt; vertexSpirv;
+    std::vector&lt;std::uint32_t&gt; fragmentSpirv;
     std::string vertexEntry = &quot;main&quot;;
     std::string fragmentEntry = &quot;main&quot;;
-    VkFormat colorFormat =
-        VK_FORMAT_UNDEFINED;  
+    VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     std::vector&lt;VkFormat&gt; colorFormats;
     VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
     VkCompareOp depthCompare = VK_COMPARE_OP_LESS;

@@ -139,15 +139,15 @@
 <tbody>
 <tr>
 <td style="text-align: right;">VkDeviceAddress</td>
-<td style="text-align: left;"><a href="#function-address"><strong>Address</strong></a> () const<br><em>The buffer's address on the GPU, which shaders read it through as a pointer (Slang's</em> <code>T*</code> <em>, in natural layout: the plain</em><code>float[4]</code> <em>structs Ernie writes) in place of a binding.</em></td>
+<td style="text-align: left;"><a href="#function-address"><strong>Address</strong></a> () const<br><em>The buffer's GPU address, which shaders read as a pointer in place of a binding.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">VkDeviceSize</td>
-<td style="text-align: left;"><a href="#function-allocationsize"><strong>AllocationSize</strong></a> () const<br><em>For</em> <code>Shared</code> <em>buffers, the size of the buffer's dedicated memory allocation.</em></td>
+<td style="text-align: left;"><a href="#function-allocationsize"><strong>AllocationSize</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-attach"><strong>Attach</strong></a> (std::shared_ptr&lt; void &gt; object) <br><em>Keeps</em> <code>object</code> <em>, such as a CUDA import of the buffer's memory, until the buffer is destroyed, releasing it before the memory is freed.</em></td>
+<td style="text-align: left;"><a href="#function-attach"><strong>Attach</strong></a> (std::shared_ptr&lt; void &gt; object) <br><em>Keeps</em> <code>object</code> <em>alive until the memory is freed.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const std::shared_ptr&lt; void &gt; &amp;</td>
@@ -155,11 +155,11 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
-<td style="text-align: left;"><a href="#function-exporthandle"><strong>ExportHandle</strong></a> () const<br><em>For</em> <code>Shared</code> <em>buffers, a new handle to the buffer's memory (a file descriptor, or a Win32 handle on Windows), owned by the caller until it imports it elsewhere (</em><code>CloseExternalHandle</code> <em>).</em></td>
+<td style="text-align: left;"><a href="#function-exporthandle"><strong>ExportHandle</strong></a> () const<br><em>Exports a new handle to a</em> <code>Shared</code> <em>buffer's memory.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
-<td style="text-align: left;"><a href="#function-gpubuffer-13"><strong>GpuBuffer</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context, VkDeviceSize size, VkBufferUsageFlags usage, <a href="../namespaceernie/#enum-buffermemory"><strong>BufferMemory</strong></a> memory) <br></td>
+<td style="text-align: left;"><a href="#function-gpubuffer-13"><strong>GpuBuffer</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context, VkDeviceSize size, VkBufferUsageFlags usage, <a href="../namespaceernie/#enum-buffermemory"><strong>BufferMemory</strong></a> memory) <br><em>Allocates a buffer.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
@@ -175,7 +175,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::weak_ptr&lt; const void &gt;</td>
-<td style="text-align: left;"><a href="#function-lifetime"><strong>Lifetime</strong></a> () const<br><em>Expires when the buffer is destroyed or replaced by assignment, for work queued for it later (</em> <code>FrameUploads</code> <em>).</em></td>
+<td style="text-align: left;"><a href="#function-lifetime"><strong>Lifetime</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-buffermemory"><strong>BufferMemory</strong></a></td>
@@ -183,7 +183,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-read"><strong>Read</strong></a> (std::span&lt; std::byte &gt; bytes, VkDeviceSize offset=0) const<br><em>Copies the buffer's contents at</em> <code>offset</code> <em>into</em><code>bytes</code> <em>, after all submitted work that</em><code>VulkanContext::Submit</code> <em>has waited for.</em></td>
+<td style="text-align: left;"><a href="#function-read"><strong>Read</strong></a> (std::span&lt; std::byte &gt; bytes, VkDeviceSize offset=0) const<br><em>Copies the buffer's contents into</em> <code>bytes</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">VkDeviceSize</td>
@@ -191,7 +191,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::span&lt; const std::byte &gt; bytes, VkDeviceSize offset=0) <br><em>Copies</em> <code>bytes</code> <em>to the buffer at</em><code>offset</code> <em>, waiting for the copy when staging is needed.</em></td>
+<td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::span&lt; const std::byte &gt; bytes, VkDeviceSize offset=0) <br><em>Copies</em> <code>bytes</code> <em>into the buffer, waiting for the copy.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>GpuBuffer</strong></a> &amp;</td>
@@ -209,41 +209,54 @@
 </table>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-address">function Address</h3>
-<p><em>The buffer's address on the GPU, which shaders read it through as a pointer (Slang's</em> <code>T*</code> <em>, in natural layout: the plain</em><code>float[4]</code> <em>structs Ernie writes) in place of a binding.</em></p>
+<p><em>The buffer's GPU address, which shaders read as a pointer in place of a binding.</em> </p>
 <pre><code class="language-C++">VkDeviceAddress ernie::GpuBuffer::Address () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>The device address. </p>
 <hr>
 
 <h3 id="function-allocationsize">function AllocationSize</h3>
-<p><em>For</em> <code>Shared</code> <em>buffers, the size of the buffer's dedicated memory allocation.</em></p>
 <pre><code class="language-C++">inline VkDeviceSize ernie::GpuBuffer::AllocationSize () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>The size of a <code>Shared</code> buffer's dedicated allocation. </p>
 <hr>
 
 <h3 id="function-attach">function Attach</h3>
-<p><em>Keeps</em> <code>object</code> <em>, such as a CUDA import of the buffer's memory, until the buffer is destroyed, releasing it before the memory is freed.</em></p>
+<p><em>Keeps</em> <code>object</code> <em>alive until the memory is freed.</em></p>
 <pre><code class="language-C++">inline void ernie::GpuBuffer::Attach (
     std::shared_ptr&lt; void &gt; object
 ) 
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>object</code> Something that uses the memory, such as a CUDA import of it; released first. </li>
+</ul>
 <hr>
 
 <h3 id="function-attached">function Attached</h3>
 <pre><code class="language-C++">inline const std::shared_ptr&lt; void &gt; &amp; ernie::GpuBuffer::Attached () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>The object passed to <code>Attach</code>, or null. </p>
 <hr>
 
 <h3 id="function-exporthandle">function ExportHandle</h3>
-<p><em>For</em> <code>Shared</code> <em>buffers, a new handle to the buffer's memory (a file descriptor, or a Win32 handle on Windows), owned by the caller until it imports it elsewhere (</em><code>CloseExternalHandle</code> <em>).</em></p>
+<p><em>Exports a new handle to a</em> <code>Shared</code> <em>buffer's memory.</em></p>
 <pre><code class="language-C++">ExternalHandle ernie::GpuBuffer::ExportHandle () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>A file descriptor (a Win32 handle on Windows), owned by the caller until imported (<code>CloseExternalHandle</code>). </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::logic_error</code> for other buffers, or std::runtime_error if export fails. </li>
+<li><code>std::logic_error</code> If the buffer is not <code>Shared</code>. </li>
+<li><code>std::runtime_error</code> If the export fails. </li>
 </ul>
 <hr>
 
 <h3 id="function-gpubuffer-13">function GpuBuffer [1/3]</h3>
+<p><em>Allocates a buffer.</em> </p>
 <pre><code class="language-C++">ernie::GpuBuffer::GpuBuffer (
     const VulkanContext &amp; context,
     VkDeviceSize size,
@@ -251,9 +264,16 @@
     BufferMemory memory
 ) 
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>context</code> The device to allocate on. </li>
+<li><code>size</code> The size in bytes. </li>
+<li><code>usage</code> Vulkan usage flags. </li>
+<li><code>memory</code> Where the memory lives. </li>
+</ul>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::runtime_error</code> if allocation fails. </li>
+<li><code>std::runtime_error</code> If allocation fails. </li>
 </ul>
 <hr>
 
@@ -274,47 +294,66 @@
 <h3 id="function-handle">function Handle</h3>
 <pre><code class="language-C++">inline VkBuffer ernie::GpuBuffer::Handle () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>The Vulkan handle. </p>
 <hr>
 
 <h3 id="function-lifetime">function Lifetime</h3>
-<p><em>Expires when the buffer is destroyed or replaced by assignment, for work queued for it later (</em> <code>FrameUploads</code> <em>).</em></p>
 <pre><code class="language-C++">inline std::weak_ptr&lt; const void &gt; ernie::GpuBuffer::Lifetime () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>A token that expires when the buffer is destroyed or replaced, for work queued for it later (<code>FrameUploads</code>). </p>
 <hr>
 
 <h3 id="function-memory">function Memory</h3>
 <pre><code class="language-C++">inline BufferMemory ernie::GpuBuffer::Memory () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>Where the memory lives. </p>
 <hr>
 
 <h3 id="function-read">function Read</h3>
-<p><em>Copies the buffer's contents at</em> <code>offset</code> <em>into</em><code>bytes</code> <em>, after all submitted work that</em><code>VulkanContext::Submit</code> <em>has waited for.</em></p>
+<p><em>Copies the buffer's contents into</em> <code>bytes</code> <em>.</em></p>
 <pre><code class="language-C++">void ernie::GpuBuffer::Read (
     std::span&lt; std::byte &gt; bytes,
     VkDeviceSize offset=0
 ) const
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>bytes</code> Where to copy to; its size sets how much. </li>
+<li><code>offset</code> Where in the buffer to start, in bytes. </li>
+</ul>
+<p><strong>Note:</strong></p>
+<p>Sees all work that <code>VulkanContext::Submit</code> waited for. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::out_of_range</code> if the range does not fit. </li>
+<li><code>std::out_of_range</code> If the range does not fit. </li>
 </ul>
 <hr>
 
 <h3 id="function-size">function Size</h3>
 <pre><code class="language-C++">inline VkDeviceSize ernie::GpuBuffer::Size () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>The size in bytes. </p>
 <hr>
 
 <h3 id="function-write">function Write</h3>
-<p><em>Copies</em> <code>bytes</code> <em>to the buffer at</em><code>offset</code> <em>, waiting for the copy when staging is needed.</em></p>
+<p><em>Copies</em> <code>bytes</code> <em>into the buffer, waiting for the copy.</em></p>
 <pre><code class="language-C++">void ernie::GpuBuffer::Write (
     std::span&lt; const std::byte &gt; bytes,
     VkDeviceSize offset=0
 ) 
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>bytes</code> The data to copy. </li>
+<li><code>offset</code> Where in the buffer to start, in bytes. </li>
+</ul>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::out_of_range</code> if the range does not fit. </li>
+<li><code>std::out_of_range</code> If the range does not fit. </li>
 </ul>
 <hr>
 

@@ -138,9 +138,14 @@
 
 namespace ernie {
 
+std::vector&lt;ShaderModuleSource&gt;
+ResolveImports(std::span&lt;const ShaderModuleSource&gt; modules,
+               std::span&lt;const ShaderModuleSource&gt; library);
+
 class ShaderCompiler {
   public:
-    ShaderCompiler();
+    explicit ShaderCompiler(
+        std::vector&lt;ShaderModuleSource&gt; library = {});
     ~ShaderCompiler();
     ShaderCompiler(const ShaderCompiler&amp;) = delete;
     ShaderCompiler&amp; operator=(const ShaderCompiler&amp;) = delete;

@@ -138,9 +138,9 @@
 namespace ernie {
 
 enum class BufferMemory {
-    Device,  
-    Upload,  
-    Readback,  
+    Device,
+    Upload,
+    Readback,
     Shared,
 };
 
@@ -196,8 +196,7 @@ class GpuBuffer {
     void Release();
 
     const VulkanContext* context_ = nullptr;
-    std::weak_ptr&lt;const void&gt;
-        contextAlive_;  
+    std::weak_ptr&lt;const void&gt; contextAlive_;
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     VkDeviceMemory sharedMemory_ = VK_NULL_HANDLE;
@@ -209,6 +208,12 @@ class GpuBuffer {
     VkDeviceSize size_ = 0;
     BufferMemory memory_ = BufferMemory::Device;
 };
+
+bool Reserve(
+    const VulkanContext&amp; context, std::unique_ptr&lt;GpuBuffer&gt;&amp; buffer,
+    VkDeviceSize bytes,
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    BufferMemory memory = BufferMemory::Device);
 
 }  // namespace ernie
 </code></pre>

@@ -124,7 +124,7 @@
               
                 <h1 id="class-ernieshadercompiler">Class ernie::ShaderCompiler</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>ShaderCompiler</strong></a></p>
-<p><em>Compiles Slang modules at run time with the Slang compiler library, so shaders can be composed from built-in and user-supplied modules (such as custom reflectance models).</em> <a href="#detailed-description">More...</a></p>
+<p><em>Compiles Slang modules at run time.</em> <a href="#detailed-description">More...</a></p>
 <ul>
 <li><code>#include &lt;ernie/device/shader_compiler.h&gt;</code></li>
 </ul>
@@ -139,19 +139,19 @@
 <tbody>
 <tr>
 <td style="text-align: right;">std::size_t</td>
-<td style="text-align: left;"><a href="#function-cachehits"><strong>CacheHits</strong></a> () const<br><em>How many</em> <code>CompileSpirv</code> <em>calls the disk cache answered.</em></td>
+<td style="text-align: left;"><a href="#function-cachehits"><strong>CacheHits</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
-<td style="text-align: left;"><a href="#function-compilespirv"><strong>CompileSpirv</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, const std::string &amp; entryPoint) const<br><em>SPIR-V for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-compilespirv"><strong>CompileSpirv</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, const std::string &amp; entryPoint) const<br><em>Compiles an entry point to SPIR-V 1.6.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string</td>
-<td style="text-align: left;"><a href="#function-compilewgsl"><strong>CompileWgsl</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, const std::string &amp; entryPoint) const<br><em>WGSL source for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-compilewgsl"><strong>CompileWgsl</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, const std::string &amp; entryPoint) const<br><em>Compiles an entry point to WGSL, for a future WebGPU backend.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
-<td style="text-align: left;"><a href="#function-shadercompiler-12"><strong>ShaderCompiler</strong></a> () <br><em>Slang itself starts at the first compile the disk cache does not answer, which throws std::runtime_error if it cannot.</em></td>
+<td style="text-align: left;"><a href="#function-shadercompiler-12"><strong>ShaderCompiler</strong></a> (std::vector&lt; <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; library={}) <br><em>Makes a compiler; Slang itself starts at the first compile the disk cache does not answer.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
@@ -168,47 +168,70 @@
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Modules are loaded from source in the order given, so a module must come after the modules it imports. Compilation targets SPIR-V 1.6 for Vulkan; <code>CompileWgsl</code> emits the same program as WGSL, which keeps shaders usable by a future WebGPU backend.</p>
-<p>Reference: Y. He, K. Fatahalian and T. Foley, "Slang: language
-mechanisms for extensible real-time shading systems", ACM Transactions on Graphics 37(4), 141, 2018. <a href="https://doi.org/10.1145/3197517.3201380">https://doi.org/10.1145/3197517.3201380</a> </p>
+<p>Shaders are composed from built-in and user modules, such as custom reflectance models. A module's <code>import</code>s are found among the modules given to a compile, then in the compiler's library.</p>
+<p>References:
+* Y. He, K. Fatahalian and T. Foley, "Slang: language mechanisms
+  for extensible real-time shading systems", ACM Transactions on Graphics 37(4), 141, 2018. <a href="https://doi.org/10.1145/3197517.3201380">https://doi.org/10.1145/3197517.3201380</a> </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-cachehits">function CacheHits</h3>
-<p><em>How many</em> <code>CompileSpirv</code> <em>calls the disk cache answered.</em></p>
 <pre><code class="language-C++">std::size_t ernie::ShaderCompiler::CacheHits () const
 </code></pre>
+<p><strong>Returns:</strong></p>
+<p>How many <code>CompileSpirv</code> calls the disk cache answered. </p>
 <hr>
 
 <h3 id="function-compilespirv">function CompileSpirv</h3>
-<p><em>SPIR-V for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></p>
+<p><em>Compiles an entry point to SPIR-V 1.6.</em> </p>
 <pre><code class="language-C++">std::vector&lt; std::uint32_t &gt; ernie::ShaderCompiler::CompileSpirv (
     std::span&lt; const ShaderModuleSource &gt; modules,
     const std::string &amp; entryPoint
 ) const
 </code></pre>
-<p>Compiled SPIR-V is kept on disk between runs, keyed by a hash of the Slang version, the target, the entry point and every module's name and source, so a program compiles once until its sources change: in <code>ERNIE_SHADER_CACHE</code> (empty or "0" keeps none), else the user's cache folder (<code>$XDG_CACHE_HOME/ernie/shaders</code>, <code>~/.cache/ernie/shaders</code>). </p>
+<p>Results are cached on disk, keyed by the Slang version, the entry point and every module's name and source: in <code>ERNIE_SHADER_CACHE</code> (empty or "0" turns it off), else <code>$XDG_CACHE_HOME/ernie/shaders</code> or <code>~/.cache/ernie/shaders</code>. </p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>modules</code> The program's modules; the last one holds <code>entryPoint</code>. </li>
+<li><code>entryPoint</code> The entry point's name. </li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The SPIR-V words. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> with Slang's diagnostics if a module fails to compile or the entry point is missing. </li>
+<li><code>std::invalid_argument</code> With Slang's diagnostics if a module fails or the entry point is missing. </li>
+<li><code>std::runtime_error</code> If Slang cannot start. </li>
 </ul>
 <hr>
 
 <h3 id="function-compilewgsl">function CompileWgsl</h3>
-<p><em>WGSL source for</em> <code>entryPoint</code> <em>in the last module of</em><code>modules</code> <em>.</em></p>
+<p><em>Compiles an entry point to WGSL, for a future WebGPU backend.</em> </p>
 <pre><code class="language-C++">std::string ernie::ShaderCompiler::CompileWgsl (
     std::span&lt; const ShaderModuleSource &gt; modules,
     const std::string &amp; entryPoint
 ) const
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>modules</code> As for <code>CompileSpirv</code>. </li>
+<li><code>entryPoint</code> The entry point's name. </li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>The WGSL source. </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> as <code>CompileSpirv</code>. </li>
+<li><code>std::invalid_argument</code> As <code>CompileSpirv</code>. </li>
 </ul>
 <hr>
 
 <h3 id="function-shadercompiler-12">function ShaderCompiler [1/2]</h3>
-<p><em>Slang itself starts at the first compile the disk cache does not answer, which throws std::runtime_error if it cannot.</em> </p>
-<pre><code class="language-C++">ernie::ShaderCompiler::ShaderCompiler () 
+<p><em>Makes a compiler; Slang itself starts at the first compile the disk cache does not answer.</em> </p>
+<pre><code class="language-C++">explicit ernie::ShaderCompiler::ShaderCompiler (
+    std::vector&lt; ShaderModuleSource &gt; library={}
+) 
 </code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>library</code> Modules any compile may import, such as the built-in kernels (<code>shaders::Modules()</code>). </li>
+</ul>
 <hr>
 
 <h3 id="function-shadercompiler-22">function ShaderCompiler [2/2]</h3>

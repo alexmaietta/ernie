@@ -605,7 +605,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
-<td style="text-align: left;"><a href="../structernie_1_1GraphicsPipelineDesc/"><strong>GraphicsPipelineDesc</strong></a> <br><em>Fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em></td>
+<td style="text-align: left;"><a href="../structernie_1_1GraphicsPipelineDesc/"><strong>GraphicsPipelineDesc</strong></a> <br><em>Shaders and fixed-function state of a graphics pipeline that draws triangle lists without vertex buffers.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -1121,7 +1121,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
-<td style="text-align: left;"><a href="../classernie_1_1ShaderCompiler/"><strong>ShaderCompiler</strong></a> <br><em>Compiles Slang modules at run time with the Slang compiler library, so shaders can be composed from built-in and user-supplied modules (such as custom reflectance models).</em></td>
+<td style="text-align: left;"><a href="../classernie_1_1ShaderCompiler/"><strong>ShaderCompiler</strong></a> <br><em>Compiles Slang modules at run time.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
@@ -2578,7 +2578,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1MeshData/"><strong>MeshData</strong></a></td>
-<td style="text-align: left;"><a href="#function-primitivemeshof"><strong>PrimitiveMeshOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>The mesh of the UsdGeom primitive at</em> <code>path</code> <em>from its attributes and their UsdGeom defaults:</em><a href="../classernie_1_1Cube/"><em><strong>Cube</strong></em></a> __<code>size</code> <em>(2);</em><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> __<code>radius</code> <em>(1);</em><a href="../classernie_1_1Cylinder/"><em><strong>Cylinder</strong></em></a> <em>and</em><a href="../classernie_1_1Cone/"><em><strong>Cone</strong></em></a> <em>_kl</em>zwxh:8004 <em>(1),_k</em>zzwxh:8005 <em>(2) an</em><em>klzzw</em>h:8006 <em>("Z");_</em>klzzwxh:8028 <em>_</em>klzzwxh:8007 <em>(0.5</em>,<em>klzzwx</em>:8008 <em>(</em>) and_<code>axis</code> <em>;</em><a href="../classernie_1_1Plane/"><em><strong>Plane</strong></em></a> __<code>width</code> <em>(2),</em><code>length</code> <em>(2) and</em><code>axis</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-primitivemeshof"><strong>PrimitiveMeshOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>The mesh of the UsdGeom primitive at</em> <code>path</code> <em>from its attributes and their UsdGeom defaults:</em><a href="../classernie_1_1Cube/"><em><strong>Cube</strong></em></a> __<code>size</code> <em>(2);</em><a href="../classernie_1_1Sphere/"><em><strong>Sphere</strong></em></a> __<code>radius</code> <em>(1);</em><a href="../classernie_1_1Cylinder/"><em><strong>Cylinder</strong></em></a> <em>and</em><a href="../classernie_1_1Cone/"><em><strong>Cone</strong></em></a> <em>_kl</em>zwxh:8026 <em>(1),_k</em>zzwxh:8027 <em>(2) an</em><em>klzzw</em>h:8028 <em>("Z");_</em>klzzwxh:8050 <em>_</em>klzzwxh:8029 <em>(0.5</em>,<em>klzzwx</em>:8030 <em>(</em>) and_<code>axis</code> <em>;</em><a href="../classernie_1_1Plane/"><em><strong>Plane</strong></em></a> __<code>width</code> <em>(2),</em><code>length</code> <em>(2) and</em><code>axis</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraView/"><strong>CameraView</strong></a></td>
@@ -2674,11 +2674,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-reserve"><strong>Reserve</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context, std::unique_ptr&lt; <a href="../classernie_1_1GpuBuffer/"><strong>GpuBuffer</strong></a> &gt; &amp; buffer, VkDeviceSize bytes, VkBufferUsageFlags usage=VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, <a href="./#enum-buffermemory"><strong>BufferMemory</strong></a> memory=BufferMemory::Device) <br><em>Grows</em> <code>buffer</code> <em>so it holds at least</em><code>bytes</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-resetsxformstack"><strong>ResetsXformStack</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Whether the prim at</em> <code>path</code> <em>ignores its ancestors' transforms (</em><code>!resetXformStack!</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#function-resolvebrdfparams"><strong>ResolveBrdfParams</strong></a> (const <a href="../structernie_1_1BrdfModel/"><strong>BrdfModel</strong></a> &amp; model, std::span&lt; const float &gt; values) <br><em>Parameter values for</em> <code>model</code> <em>:</em><code>values</code> <em>where present and in order, the model's defaults for the rest, each clamped to its parameter's range.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-resolveimports"><strong>ResolveImports</strong></a> (std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; modules, std::span&lt; const <a href="../structernie_1_1ShaderModuleSource/"><strong>ShaderModuleSource</strong></a> &gt; library) <br><em>Orders modules so each loads after the modules it imports.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1RenderPrims/"><strong>RenderPrims</strong></a></td>
@@ -6448,6 +6456,30 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
 </code></pre>
 <hr>
 
+<h3 id="function-reserve">function Reserve</h3>
+<p><em>Grows</em> <code>buffer</code> <em>so it holds at least</em><code>bytes</code> <em>.</em></p>
+<pre><code class="language-C++">bool ernie::Reserve (
+    const VulkanContext &amp; context,
+    std::unique_ptr&lt; GpuBuffer &gt; &amp; buffer,
+    VkDeviceSize bytes,
+    VkBufferUsageFlags usage=VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    BufferMemory memory=BufferMemory::Device
+) 
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>context</code> The device the buffer lives on. </li>
+<li><code>buffer</code> The buffer to keep or replace; may be null. </li>
+<li><code>bytes</code> The size needed (at least 16 bytes are allocated). </li>
+<li><code>usage</code> Usage flags for a new buffer. </li>
+<li><code>memory</code> Memory kind for a new buffer. </li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>True when a new buffer replaced the old one, so its address changed and its contents are undefined. </p>
+<p><strong>Note:</strong></p>
+<p>Waits for the device before replacing a buffer, since submitted work may still read the old one. </p>
+<hr>
+
 <h3 id="function-resetsxformstack">function ResetsXformStack</h3>
 <p><em>Whether the prim at</em> <code>path</code> <em>ignores its ancestors' transforms (</em><code>!resetXformStack!</code> <em>).</em></p>
 <pre><code class="language-C++">bool ernie::ResetsXformStack (
@@ -6464,6 +6496,24 @@ Curves", SIGGRAPH 1985, 245-254. <a href="https://doi.org/10.1145/325165.325242"
     std::span&lt; const float &gt; values
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-resolveimports">function ResolveImports</h3>
+<p><em>Orders modules so each loads after the modules it imports.</em> </p>
+<pre><code class="language-C++">std::vector&lt; ShaderModuleSource &gt; ernie::ResolveImports (
+    std::span&lt; const ShaderModuleSource &gt; modules,
+    std::span&lt; const ShaderModuleSource &gt; library
+) 
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>modules</code> The program's modules; the entry point's is last. </li>
+<li><code>library</code> Modules to add when something imports them and <code>modules</code> does not give them. </li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>modules</code> plus the library modules they import, each after its imports. A name in <code>modules</code> overrides the library's. </p>
+<p><strong>Note:</strong></p>
+<p>Imports found in neither list are left for Slang to report. </p>
 <hr>
 
 <h3 id="function-resolverenderprims">function ResolveRenderPrims</h3>
