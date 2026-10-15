@@ -267,7 +267,8 @@ jobs:
           path: |
             .deps/openvdb-*/
             !.deps/openvdb-work
-          key: openvdb-${{ matrix.name }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openvdb*.cmake') }}
+          # By OS and compiler, as the build is (cache keys take no commas, which names have).
+          key: openvdb-${{ runner.os }}-${{ matrix.cc }}-${{ runner.arch }}-${{ hashFiles('cmake/third_party/openvdb*.cmake') }}
       - name: Configure
         if: runner.os == 'Linux'
         run: >

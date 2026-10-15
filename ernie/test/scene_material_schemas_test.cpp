@@ -196,7 +196,7 @@ TEST(MaterialSchemas, RegistryDescribesTypes) {
 
     const ernie::AttributeDef* id = shader->Find(tokens::kInfoId);
     ASSERT_NE(id, nullptr);
-    EXPECT_EQ(id->meta.options.size(), 5u);
+    EXPECT_EQ(id->meta.options.size(), 7u);
     EXPECT_TRUE(shader->Find(tokens::kFile)->meta.asset);
     EXPECT_EQ(shader->Find(tokens::kShaderTexture)->kind,
               AttributeKind::Tensor);

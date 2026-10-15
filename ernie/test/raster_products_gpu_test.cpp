@@ -1516,6 +1516,7 @@ TEST_F(RasterDelegateTest, IsARenderBackend) {
             std::string(ernie::raster_stats::kTerrainLodLevels),
             std::string(ernie::raster_stats::kMeshDraws),
             std::string(ernie::raster_stats::kMeshDrawCalls),
+            std::string(ernie::raster_stats::kMeshes),
             std::string(ernie::raster_stats::kTexturesLoading)}));
     delegate->Step(scene);
     EXPECT_GT(delegate->Stats().triangles, 0u);
