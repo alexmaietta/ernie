@@ -1465,9 +1465,11 @@ void OverlayPass::RecordPick(VkCommandBuffer commands,
             "batchTriangleVertex", "batchSpriteVertex",
             "batchNumberVertex",   "batchImageVertex"};
         for (std::size_t k = 0; k < pickPipelines_.size(); ++k) {
-            GraphicsPipelineDesc desc;
-            desc.vertexSpirv =
+            // Kept alive here: the desc only holds a span of it.
+            const std::vector<std::uint32_t> vertex =
                 compiler_.CompileSpirv(modules, kEntries[k]);
+            GraphicsPipelineDesc desc;
+            desc.vertexSpirv = vertex;
             desc.fragmentSpirv = fragment;
             desc.colorFormat = kPickFormat;
             desc.depthFormat = VK_FORMAT_UNDEFINED;
