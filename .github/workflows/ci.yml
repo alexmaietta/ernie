@@ -700,7 +700,7 @@ jobs:
           cmake --build consumer
           VK_DRIVER_FILES=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1) consumer/consumer
 
-  # The ernie program in a Docker image (docker/Dockerfile), from the DEB the package tests
+  # The ernie program in a Docker image (Dockerfile), from the DEB the package tests
   # installed: smoke tested by rendering the default scene on lavapipe, then pushed to GitHub's
   # container registry as ghcr.io/alexmaietta/ernie, dev from main and X.Y.Z and latest from
   # release tags. Pull requests build and test it only.
@@ -730,7 +730,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker-context
-          file: docker/Dockerfile
+          file: Dockerfile
           load: true
           tags: ernie:test
           cache-from: type=gha
@@ -751,7 +751,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: docker-context
-          file: docker/Dockerfile
+          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

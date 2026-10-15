@@ -27,7 +27,8 @@ runs:
         version=${{ inputs.version }}
         out=~/.cache/vulkan-validation-$version
         work=$(mktemp -d)
-        curl -sSfL -o "$work/sdk.tar.xz" \
+        # LunarG's server resets some connections; retry them.
+        curl -sSfL --retry 6 --retry-all-errors --retry-delay 15 -o "$work/sdk.tar.xz" \
           "https://sdk.lunarg.com/sdk/download/$version/linux/vulkansdk-linux-x86_64-$version.tar.xz"
         echo "${{ inputs.sha256 }}  $work/sdk.tar.xz" | sha256sum -c -
         tar xJf "$work/sdk.tar.xz" -C "$work" \
