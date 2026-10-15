@@ -663,10 +663,12 @@ TEST(MaterialSettingsOf, ReadsAUsdPreviewSurfaceNetwork) {
                    "/Looks/M/Tex", "outputs:r");
     EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
                  std::invalid_argument);
+    // A primvar reader's connection is not shaded with: the input
+    // keeps its own value.
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kDiffuseColor,
                    "/Looks/M/Uv", "outputs:rgb");
-    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
-                 std::invalid_argument);
+    EXPECT_NO_THROW(
+        ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs));
     scene.Set("/Looks/M",
               std::string(tokens::kSurfaceOutput) + ".connect",
               std::string("not a path"));

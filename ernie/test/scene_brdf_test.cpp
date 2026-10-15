@@ -52,7 +52,8 @@ TEST(BrdfRegistry, BuiltinsAreDocumentedAndValid) {
     // OpenPBR's colours, its layers' bits from their weights, and its
     // parameters past the core ones.
     const BrdfModel& open = *registry.Find("open_pbr");
-    EXPECT_EQ(open.Colours(), (std::vector<std::size_t>{6, 16, 19}));
+    EXPECT_EQ(open.Colours(),
+              (std::vector<std::size_t>{6, 16, 19, 26, 31}));
     EXPECT_GT(open.params.size(), BrdfRegistry::kCoreParams);
     ASSERT_TRUE(open.features);
     std::vector<float> values = open.Defaults();

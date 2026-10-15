@@ -7,6 +7,22 @@ add_library(ernie_usd MODULE usd_plugin.cpp)
 target_include_directories(ernie_usd PRIVATE "${PROJECT_SOURCE_DIR}")
 target_compile_features(ernie_usd PRIVATE cxx_std_20)
 target_link_libraries(ernie_usd PRIVATE ernie_openusd)
+# An OpenUSD Ernie built has its headers patched for GCC 13 (openusd_patch.cmake) once it is
+# built, before the plugin compiles; a host's (ERNIE_USD_ROOT) stays as it is.
+if(NOT ERNIE_USD_ROOT)
+    add_custom_target(
+        ernie_openusd_patch
+        COMMAND
+            ${CMAKE_COMMAND} "-DUSD_INSTALL=${ernie_usd_dir}" -P
+            "${PROJECT_SOURCE_DIR}/cmake/third_party/openusd_patch.cmake"
+        VERBATIM)
+    add_dependencies(ernie_openusd_patch ernie_openusd_build)
+    add_dependencies(ernie_usd ernie_openusd_patch)
+endif()
+# oneTBB's headers ask MSVC to link tbb12.lib, which lies beside OpenUSD's.
+if(WIN32)
+    target_link_directories(ernie_usd PRIVATE "${ERNIE_USD_RPATH}")
+endif()
 # In lib/ whatever the configuration (the generator expression keeps multi-config generators from
 # adding one's folder).
 if(WIN32)
