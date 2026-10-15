@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792032551710,
+  "lastUpdate": 1792033020923,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -13352,6 +13352,128 @@ window.BENCHMARK_DATA = {
             "name": "sanitize-4: ccache miss rate",
             "value": 25.63,
             "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "8dda36fd7fce2a3ff4b951d0534653299375ba1a",
+          "message": "demo_planets_earth builds on Windows: a path's filename converted to a string explicitly",
+          "timestamp": "2026-10-15T02:48:15Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/8dda36fd7fce2a3ff4b951d0534653299375ba1a"
+        },
+        "date": 1792033019647,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 8.37,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.82,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 0.17,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.35,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.07,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.25,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 5.58,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 4.47,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 0.97,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 0.78,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.17,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 1,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): job",
+            "value": 0.87,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.58,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.05,
+            "unit": "min"
           }
         ]
       }
