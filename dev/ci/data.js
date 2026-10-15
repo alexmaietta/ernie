@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792083259983,
+  "lastUpdate": 1792088833501,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -14394,6 +14394,173 @@ window.BENCHMARK_DATA = {
           {
             "name": "test-windows-2: compiles",
             "value": 605,
+            "unit": "files"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "1307606f1280e8ef8f8fe5c84f06520ceac63465",
+          "message": "CI releasable: lavapipe skips its known failures, Windows and macOS tests advisory, OpenUSD header patched for GCC 13, stale tests updated",
+          "timestamp": "2026-10-15T18:23:08Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/1307606f1280e8ef8f8fe5c84f06520ceac63465"
+        },
+        "date": 1792088832324,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 3.47,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.15,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-clang): job",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.98,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.23,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.33,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 0.81,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 377,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 2.66,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 1.36,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 378,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 2.65,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 0.75,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 377,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 2.39,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 0.68,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 313,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 3.17,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-1: compile time",
+            "value": 0.14,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-1: compiles",
+            "value": 604,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-1: ccache miss rate",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "test-gcc-2: compile time",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "test-gcc-2: compiles",
+            "value": 604,
+            "unit": "files"
+          },
+          {
+            "name": "test-gcc-2: ccache miss rate",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "test-macos: compile time",
+            "value": 0.6,
+            "unit": "min"
+          },
+          {
+            "name": "test-macos: compiles",
+            "value": 403,
             "unit": "files"
           }
         ]
