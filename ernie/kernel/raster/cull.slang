@@ -54,6 +54,7 @@
 //   detail and culls occlusion in two passes. https://github.com/zeux/niagara
 
 // A pushbroom's strip projection (projection_pushbroom.slang), for views of its strip.
+import math;
 import projection;
 
 struct CullItem {
@@ -139,15 +140,6 @@ static const uint kTwoPassSecond = 3;
 // Per thread of a chunk, its instance's level plus one, or 0 when not kept.
 groupshared uint chosen[kGroup];
 groupshared uint levelCounts[kMaxLods];
-
-float3 load3(float* buffer, uint i) {
-    return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
-}
-
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
-}
 
 // An instance's bounding sphere in the world, and how much it scales its prototype at most.
 struct Placed {

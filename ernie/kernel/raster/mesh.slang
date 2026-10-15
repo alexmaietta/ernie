@@ -8,6 +8,7 @@
 // The colour pass writes the G-buffer for spectral shading (frame.slang).
 import frame;
 import gbuffer;
+import math;
 import surface;
 
 static const uint kHasNormals = 1;
@@ -167,10 +168,6 @@ DrawCall drawCall(uint drawIndex) {
     return call;
 }
 
-float3 load3(float* buffer, uint i) {
-    return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
-}
-
 float3 transformPoint(float4x4 m, float3 p) {
     return mul(m, float4(p, 1.0)).xyz;
 }
@@ -183,11 +180,6 @@ float3 transformNormal(float4x4 m, float3 n) {
     let c2 = float3(m[0][2], m[1][2], m[2][2]);
     let product = n.x * cross(c1, c2) + n.y * cross(c2, c0) + n.z * cross(c0, c1);
     return dot(c0, cross(c1, c2)) < 0.0 ? -product : product;
-}
-
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
 }
 
 struct MeshVertex {

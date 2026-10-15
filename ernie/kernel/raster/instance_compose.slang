@@ -19,6 +19,8 @@
 // - K. Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985 (quaternions).
 // - K. Shoemake, "Euler Angle Conversion", Graphics Gems IV, 1994.
 
+import math;
+
 static const uint kNone = 0xFFFFFFFFu;
 
 // Op kinds, as `InstanceOpKind`.
@@ -69,11 +71,6 @@ Trs identity() {
 
 float4 qmul(float4 a, float4 b) {
     return float4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
-}
-
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
 }
 
 // a after b: points go through b, then a.

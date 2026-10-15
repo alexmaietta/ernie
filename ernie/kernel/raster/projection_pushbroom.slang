@@ -17,6 +17,8 @@
 // Reference: R. Gupta and R. I. Hartley, "Linear Pushbroom Cameras", IEEE TPAMI 19(9):963-975,
 // 1997.
 
+import math;
+
 public static const bool kPushbroomCamera = true;
 
 struct Strip {
@@ -39,11 +41,6 @@ Strip stripOf(float4x4 packed) {
     strip.fromRotation = columns[2];
     strip.toRotation = columns[3];
     return strip;
-}
-
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
 }
 
 float3 unrotate(float4 q, float3 v) {

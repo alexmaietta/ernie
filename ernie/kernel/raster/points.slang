@@ -19,6 +19,7 @@
 // Surfaces", Eurographics Symposium on Point-Based Graphics, 59-65, 2006.
 import frame;
 import gbuffer;
+import math;
 import surface;
 
 static const uint kHasWidths = 1;
@@ -77,10 +78,6 @@ uint pointOf(uint instance, out bool live) {
 
 // Off every view: a vertex of a point that is not drawn.
 static const float4 kNowhere = float4(2.0, 2.0, 0.5, 1.0);
-
-float3 load3(float* buffer, uint i) {
-    return float3(buffer[3 * i], buffer[3 * i + 1], buffer[3 * i + 2]);
-}
 
 // Point `point`'s centre relative to the origin, at `motion` of the way from the last frame (0) to
 // this one (1), and its radius.

@@ -18,6 +18,8 @@
 //   Quaternion Blending", ACM TOG 27(4), 105, 2008. https://doi.org/10.1145/1409625.1409627
 // - Epic Games, Unreal Engine's GPU skin cache (GpuSkinCacheComputeShader.usf).
 
+import math;
+
 struct SkinConstants {
     // x: points, y: 0 linear or 1 dual quaternions, z: 1 when one set of influences serves all
     // points, w: 1 with blend shapes.
@@ -58,11 +60,6 @@ struct RefineConstants {
 float3 transformRows(float4 r0, float4 r1, float4 r2, float3 p) {
     let h = float4(p, 1.0);
     return float3(dot(r0, h), dot(r1, h), dot(r2, h));
-}
-
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
 }
 
 float4 multiply(float4 a, float4 b) {

@@ -92,6 +92,7 @@ set(ernie_shaders
     raster/volume.slang=kVolumeSlang
     texture/bc7.slang=kBc7Slang
     bindless.slang=kBindlessSlang
+    math.slang=kMathSlang
     raster/pnanovdb_prelude.slang=kPNanoVdbPreludeSlang
     ../../third_party/nanovdb/PNanoVDB.h=kPNanoVdbHeader)
 set(shader_files)

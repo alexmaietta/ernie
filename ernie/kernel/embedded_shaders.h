@@ -168,6 +168,8 @@ extern const char kPlanetShadowSlang[];
 
 /// The bindless heap's arrays (`BindlessHeap`), module `bindless`.
 extern const char kBindlessSlang[];
+/// Vector, quaternion and matrix helpers, module `math`.
+extern const char kMathSlang[];
 
 /// The G-buffer's normal and temperature encoding, module `gbuffer`.
 extern const char kGBufferSlang[];

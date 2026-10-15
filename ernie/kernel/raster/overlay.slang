@@ -18,6 +18,7 @@
 // - I. Quilez, "2D distance functions", https://iquilezles.org/articles/distfunctions2d/: the
 //   marker shapes.
 
+import math;
 import projection;
 
 // frame.slang's Uniforms, as far as this pass reads.
@@ -423,12 +424,6 @@ float4 batchOrientation(Batch b, uint i) {
     }
     let at = b.arrays.z + 4 * i;
     return float4(batchData[at], batchData[at + 1], batchData[at + 2], batchData[at + 3]);
-}
-
-// `v` turned by unit quaternion `q` (x, y, z, w).
-float3 rotate(float4 q, float3 v) {
-    let t = 2.0 * cross(q.xyz, v);
-    return v + q.w * t + cross(q.xyz, t);
 }
 
 uint packColor(float4 color) {
