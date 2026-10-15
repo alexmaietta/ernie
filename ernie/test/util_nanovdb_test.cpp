@@ -225,7 +225,7 @@ TEST(NanoVdb, ReadsOpenVdbFilesAsNanoVdb) {
     EXPECT_TRUE(grids[2].Vector());
 
     // Where cube.nvdb's voxels are, with statistics.
-    const NanoVdbGrid& cube = ReadNanoVdb(Cube())[0];
+    const NanoVdbGrid cube = ReadNanoVdb(Cube())[0];
     EXPECT_EQ(grids[0].indexMin, cube.indexMin);
     EXPECT_EQ(grids[0].indexMax, cube.indexMax);
     const glm::dvec3 origin(grids[0].indexToGrid *

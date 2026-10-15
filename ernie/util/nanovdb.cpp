@@ -121,6 +121,11 @@ NanoVdbGrid HeaderOf(std::span<const std::uint8_t> bytes) {
 
     const pnanovdb_tree_handle_t tree =
         pnanovdb_grid_get_tree(buf, handle);
+    // The tree holds the root's offset.
+    if (!within(tree.address, PNANOVDB_TREE_SIZE)) {
+        throw std::runtime_error(
+            "NanoVDB grid's tree lies past the bytes read");
+    }
     const pnanovdb_root_handle_t root =
         pnanovdb_tree_get_root(buf, tree);
     if (!within(root.address, PNANOVDB_ROOT_BASE_SIZE)) {

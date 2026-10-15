@@ -1,6 +1,4 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# find_package(Ernie): the installed Ernie, as the target Ernie::ernie. libernie carries its
-# dependencies inside, so there is nothing else to find.
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/ErnieTargets.cmake")

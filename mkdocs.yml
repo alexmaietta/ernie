@@ -14,7 +14,6 @@ exclude_docs: |
 
 theme:
   name: readthedocs
-  # The API pages' classes and functions listed in the sidebar under their page.
   navigation_depth: 3
   collapse_navigation: true
   sticky_navigation: true
@@ -22,7 +21,6 @@ theme:
 extra_css:
   - css/extra.css
 
-# The sidebar scrolls to the current page's entry without moving the page (js/sidebar.js).
 extra_javascript:
   - js/sidebar.js
 
@@ -33,40 +31,6 @@ nav:
       - Quickstart: getting-started/quickstart.md
       - Viewer: getting-started/viewer.md
       - Demos: getting-started/demos.md
-  - Concepts:
-      - Scene description: concepts/scene.md
-      - Transforms: concepts/transforms.md
-      - Spectral rendering: concepts/spectral.md
-      - Lighting: concepts/lighting.md
-      - Cameras and lenses: concepts/cameras.md
-      - Sensor filters: concepts/sensor-filters.md
-      - Materials and BRDFs: concepts/materials.md
-      - Shadows: concepts/shadows.md
-      - Terrain and planets: concepts/terrain.md
-      - Star fields: concepts/star-fields.md
-      - Volumes: concepts/volumes.md
-  - Extending Ernie:
-      - Overview: extending/index.md
-      - Materials:
-          - Custom BRDFs: extending/custom-brdfs.md
-      - Cameras and sensors:
-          - Custom sensor filters: extending/custom-sensor-filters.md
-          - Custom AOVs: extending/custom-aovs.md
-          - Custom lenses: extending/custom-lenses.md
-      - Light and sky:
-          - Custom spectra: extending/custom-spectra.md
-          - Custom star catalogs: extending/custom-star-catalogs.md
-      - Viewer:
-          - Custom panels and menus: extending/custom-panels.md
-          - Frame callbacks: extending/frame-callbacks.md
-          - Debug drawing and overlays: extending/debug-draw.md
-      - Rendering:
-          - Custom render delegates: extending/custom-render-delegates.md
-  - Guides:
-      - Describing scenes: guides/scenes.md
-      - Importing USD: guides/usd-import.md
-      - Batched rendering for RL: guides/batched-rendering.md
-      - GPU interop: guides/gpu-interop.md
   - API reference:
       - Python:
           - Scene: api/python/scene.md
@@ -88,15 +52,12 @@ nav:
 
 plugins:
   - search
-  # Versions on GitHub Pages (CI deploys "latest" from main), with a selector between them.
   - mike:
       version_selector: true
       canonical_version: latest
   - mkdoxy:
       projects:
         cpp:
-          # The public API's headers: device/ for the types the others take; raster/ and kernel/
-          # are internal (cmake/ErnieInstall.cmake installs the same).
           src-dirs: ernie/scene ernie/session ernie/app ernie/geometry ernie/util ernie/device
           full-doc: true
           doxy-cfg:
@@ -104,7 +65,6 @@ plugins:
             RECURSIVE: true
             EXTRACT_ALL: true
             JAVADOC_AUTOBRIEF: true
-            # Includes as users write them: "ernie/scene/scene.h".
             FULL_PATH_NAMES: true
             STRIP_FROM_PATH: .
             STRIP_FROM_INC_PATH: .
@@ -113,7 +73,6 @@ plugins:
       default_handler: python
       handlers:
         python:
-          # The built package: the module's stubs (nanobind's stubgen) beside its Python files.
           paths: [build/python]
           options:
             docstring_style: google
@@ -121,8 +80,6 @@ plugins:
             show_source: false
             show_root_heading: true
             show_root_full_path: false
-            # Each page's classes and functions as level-2 headings (the sidebar lists them), and
-            # their members below, each class opening with a table of them.
             heading_level: 2
             members_order: alphabetical
             group_by_category: true

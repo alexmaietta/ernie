@@ -1,8 +1,4 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# cmake -DSOURCE_DIR=<dir> -DOUTPUT=<file.cpp> -DSHADERS=<path=name,...> -P EmbedShaders.cmake
-#
-# Writes the definitions behind ernie/kernel/embedded_shaders.h: each shader under SOURCE_DIR as a
-# raw string named by its entry. Run at build time, so a shader edit recompiles only this file.
 string(
     CONCAT
         content

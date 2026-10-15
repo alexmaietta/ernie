@@ -12,56 +12,47 @@
 
 Ernie is a physically accurate, real-time, spectral renderer for interplanetary environments.
 
-It is a Vulkan rasterizer for Linux, Windows and macOS (through MoltenVK), with C++ and Python APIs and a Hydra-like scene API. Ernie is designed around physical quantities, efficient batched rendering, and user experience.
+It is a Vulkan rasterizer for Linux, Windows and macOS (through MoltenVK), with C++ and Python APIs and a Hydra-like scene API. Ernie is designed around physical quantities, efficient batched rendering, and interoperability.
 
 Ernie is built to be customized and to work alongside other tools. You can add your own BRDFs, sensor filters and light patterns. Rendered outputs and scene attributes (transforms, mesh vertices, light parameters and more) are shared zero copy with any DLPack tensor (PyTorch, JAX, Warp, NumPy), which makes Ernie a good fit for real-time physics simulation and reinforcement learning. Support for OpenUSD and glTF scenes, and for MDL and MaterialX materials, is planned.
 
 Its key features are aimed at planetary robotics and sensing:
 
-| | |
-| --- | --- |
-| **Cameras** | Exposure, aperture, motion blur, rolling shutter, lens distortion and vignetting<br>Perspective, fisheye, orthographic and line-scan pushbroom cameras like LROC's<br>USGS CSM camera models for non-standard instruments |
-| **Sensors** | Quantum efficiency curves, full well, read noise, dark current, PRNU, DSNU, gain and ADC bit depth<br>Sensor filter chains (noise models, lens flare, vignetting), with your own filters written in Slang |
-| **Planets** | Terrain as a built-in prim, with continuous level of detail, updated in place where its heights change<br>Whole planets and moons drawn from orbit down to the ground<br>Earth and Mars atmospheres from physical models, from the ground or from orbit, with aerial perspective<br>Star fields from your own catalogs, with brightness from magnitudes and color from B-V indices |
-| **Light** | Spectral rendering: light carried in bands (16 across 380-780 nm by default) from the sources, through the materials, to the sensor<br>Distant lights with an angular size, for soft penumbrae from the sun's width in the sky<br>Illuminants (blackbody, CIE daylight, the measured solar spectrum) and custom spectral curves, such as Earthshine on the Moon |
-| **Materials** | Hapke, Lommel-Seeliger, lunar-Lambert, Oren-Nayar and Lambert BRDFs built in, and your own for the surfaces you study<br>OpenPBR Surface materials, spectral throughout: coat, fuzz, thin film, anisotropy, transmission and subsurface scattering ([below](#physically-based-materials)) |
-| **Volumes** | Smoke, dust, exhaust plumes and clouds from VDB files, GPU arrays or procedural cloud layers, lit by the sun, sky and ground and casting shadows ([below](#volumes)) |
-| **Thermal infrared** | Surfaces and volumes glow by Planck's law at their temperatures, with emissivity from Kirchhoff's law or measured spectra into the thermal infrared<br>Temperatures from constants, textures, or your own thermal solver writing per point or per node from the host or CUDA<br>Temperatures computed as the scene renders: zero-capacitance balance for spacecraft, and diurnal tables for airless bodies read at each pixel's thermal inertia and albedo<br>Microbolometer cameras with NETD, fixed pattern noise, a time constant and false-colour palettes |
-| **Simulation and learning** | Batch rendering: many worlds, each with its own camera, rendered in one step for RL and Monte Carlo workloads<br>Meshes, instances and points written from CUDA or Warp arrays without copies<br>Columns: one attribute of thousands of prims, such as a simulation's poses and colours, written whole from host, NumPy, PyTorch or CUDA arrays, or mapped in place in the renderer's own buffers, one change per step however many prims (`demo_batched_columns`)<br>Incremental sync: an edit redraws only the prims it reaches, with inheritance and relationships declared in the schemas, so scattered edits among thousands of prims stay cheap (`demo_batched_edits`)<br>A floating origin, so large scenes keep their precision |
-| **Tools** | A viewer with customizable panels, to drive your own simulations and workflows<br>Debug drawing for labels, trajectories and overlays in the scene |
-| **Integrations** | TerrainGen builds on Ernie's viewer, adding its own panels to render synthetic terrain<br>Newton Viewer and IsaacLab renderer backends, and a viewer and renderer for Project Chrono's Chrono Sensor |
+- **Spectral light**
+    - Light carried in bands (16 across 380-780 nm by default, up to 64 into the infrared) from the source, through materials and media, to the sensor
+    - Sun, sky, lamps, domes and lasers in physical units, with measured spectra such as the TSIS-1 sun
+    - Distant lights as limb-darkened discs whose angular size sets every penumbra
+- **Planets and space**
+    - Terrain and whole planets with continuous level of detail from orbit to the ground, their heights and maps streamed from rasters larger than GPU memory
+    - Adaptive spheres and ellipsoids, exact from a pebble to a star, in double precision with a floating origin and reverse-Z depth
+    - Earth and Mars atmospheres from physical models, with refraction, seen from the ground or from orbit
+    - Eclipses cast by real geometry, and star fields from your own catalogues
+- **Materials**
+    - Planetary photometry: Hapke, Lommel-Seeliger and lunar-Lambert, with parameters from texture maps
+    - OpenPBR Surface and UsdPreviewSurface, spectral throughout
+    - Your own BRDFs written in Slang
+- **Cameras and sensors**
+    - Perspective, fisheye, orthographic and line-scan pushbroom cameras, with CAHVORE and USGS CSM instrument models
+    - The EMVA 1288 sensor model: quantum efficiency, shot and read noise, dark current, PRNU, DSNU, full well and ADC
+    - Filter chains for optics and detectors (diffraction, lens flare, blooming, smear, TDI, Bayer, companding), with your own in Slang
+    - Polarization cameras
+- **Thermal infrared**
+    - Planck emission from surfaces and volumes, with emissivity from Kirchhoff's law or measured spectra
+    - Temperatures from your own solver, textures, or models run per pixel: spacecraft energy balance and diurnal tables for airless bodies
+    - Microbolometer cameras with NETD, fixed pattern noise and false-colour palettes
+- **Volumes**
+    - Smoke, dust, exhaust plumes and clouds from VDB files or GPU arrays, ray marched spectrally and casting shadows
+    - Procedural cloud layers, with Mie droplets for silver linings, fogbows and glories
+- **Lasers and structured light**
+    - Gaussian beams and diffractive patterns (lines, grids, dot fields or your own), pulses, speckle, and beams seen in dust and air
+- **Simulation and learning**
+    - Thousands of worlds and cameras rendered in one batched step for RL and Monte Carlo workloads
+    - Inputs and outputs shared without copies with PyTorch, JAX, Warp and NumPy, through CUDA and HIP
+    - Columns and incremental sync: thousands of prims' poses written in one call, and an edit redraws only what it reaches
+- **Tools and integrations**
+    - A viewer with your own panels and debug drawing, and C++ and Python APIs on Linux, Windows and macOS
+    - OpenUSD import, renderer backends for Newton Viewer, IsaacLab and Chrono::Sensor, and TerrainGen built on the viewer
 
-### Volumes
-
-Volumes are UsdVol-style prims: a `Volume` names its fields and a material gives them density, albedo, emission and a phase function. They are ray marched per pixel, spectrally, and composited with the surfaces, the sky and the atmosphere.
-
-| Effect | What it does | Demo |
-| --- | --- | --- |
-| **Grids** | NanoVDB and OpenVDB files, NanoVDB arrays, and dense fields that CUDA or Warp kernels write on the GPU each frame, read without a copy to the host | `volumes_plume`, `volumes_dust_devil`, `volumes_lunar_dust` |
-| **Procedural cloud layers** | Up to four layers of cumulus and cirrus carved at each sample from a weather map and Perlin-Worley noise, drifting with the wind | `volumes_cloud_layers` |
-| **Phase functions** | Henyey-Greenstein, double and dual Henyey-Greenstein, Rayleigh, isotropic, and cloud droplets by Mie theory per band: silver linings, fogbows and glories | `volumes_cloud_droplets` |
-| **Multiple scattering** | Wrenninge's octaves, or Bouthors' collectors for the light clouds scatter many times, with a powder effect at their edges | `volumes_clouds`, `volumes_cloud_droplets` |
-| **Emission** | Black-body glow from temperature fields, emission fields and colours, and the Temperature var for thermal sensors | `volumes_plume`, `volumes_rcs` |
-| **Lighting** | Sun, sky and ground light through a lighting cache; shadows from surfaces onto volumes and from volumes onto surfaces and each other | `volumes_lunar_dust`, `volumes_clouds` |
-| **Clouds and the atmosphere** | Cloud layers lit through their own shadow maps from the sun, light shafts from the sun through the air past clouds and terrain, and aerial perspective in front of the clouds | `volumes_cloud_layers` |
-| **Performance** | Empty space skipped by bricks, temporal amortisation and half-resolution marching, and volumes outside every view left unmarched | |
-
-### Physically based materials
-
-OpenPBR Surface (`open_pbr`) is built in alongside UsdPreviewSurface. Its colours are uplifted to spectra on the GPU, so the thin film's interference and the subsurface radius vary by wavelength. Layers that no material in the scene uses are compiled out of the shaders, and the G-buffer's tangents, the transparent pass and the subsurface pass run only while a material needs them.
-
-| Feature | OpenPBR inputs | Demo |
-| --- | --- | --- |
-| **Rough diffuse** | `base_diffuse_roughness`: energy-preserving Oren-Nayar (EON), flat like the full Moon when rough | `pbr_diffuse_roughness` |
-| **Metals** | `base_metalness`, `specular_color` as the F82 edge tint | `pbr_metals` |
-| **Clear coat** | `coat_weight`, `coat_roughness`, `coat_ior`, `coat_color`, `coat_darkening` | `pbr_coat` |
-| **Fuzz** | `fuzz_weight`, `fuzz_color`, `fuzz_roughness`: Zeltner's sheen, for velvet and dust | `pbr_fuzz` |
-| **Thin film** | `thin_film_weight`, `thin_film_thickness`, `thin_film_ior`: iridescence computed per band | `pbr_thin_film` |
-| **Anisotropy** | `specular_roughness_anisotropy`, along the texture's u, with smooth mesh tangents, in direct and sky light | `pbr_anisotropy` |
-| **Transmission** | `transmission_weight`, `transmission_color`, `geometry_thin_walled`: glass with screen-space refraction, and alpha blending for partly opaque materials | `pbr_transmission` |
-| **Subsurface scattering** | `subsurface_weight`, `subsurface_color`, `subsurface_radius` and its scale per channel, spread across the image by Burley's profile per band | `pbr_subsurface` |
-
-Run a demo with `python -m ernie --demo demo_<name>` (`--list` names them all), or open it from the viewer's Demos panel.
 
 For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
@@ -100,7 +91,7 @@ sudo dnf install ./ernie-*.rpm
 
 ### Docker
 
-The `ernie` program is also published as a Docker image, `ghcr.io/alexmaietta/ernie`, with Mesa's Vulkan drivers. With the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/) and `--gpus all` it renders on your GPU; without them, drop `--gpus all` and it renders on lavapipe. To render a demo into the current directory:
+The `ernie` program is also published as a Docker image.
 
 ```sh
 docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie \
@@ -207,12 +198,6 @@ int main() {
     Tensor image = renderer.Render(scene);  // 480 x 640 x 4 bytes of LdrColor on the CPU
 }
 ```
-
-### Next steps
-
-- [Describing scenes](docs/guides/scenes.md): the prim types and their attributes, transforms, relationships, arrays, validation, loading scenes from JSON and declaring your own types.
-- [The demos](demos/), as `demos/<category>/demo_<category>_<name>.{cpp,py}`: a good starting point for your own; subclass `ernie.demo.Demo` in Python or `ernie::app::Demo` in C++.
-- The [documentation](https://alexmaietta.github.io/ernie/) for every feature in depth.
 
 ## Citation
 

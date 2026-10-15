@@ -582,6 +582,7 @@ class RasterRenderer {
     /// is prepared. Materials' virtual textures serve the tiles the
     /// slot's last frame asked for (`RasterMaterial::BeginFrame`).
     void BeginFrame(std::uint32_t slot);
+
     /// Whether any material reads a virtual texture.
     bool HasVirtualTextures() const;
 

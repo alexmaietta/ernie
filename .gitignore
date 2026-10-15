@@ -15,3 +15,6 @@ __pycache__/
 # The documentation site and its generated C++ reference (docs/README.md).
 site/
 .mkdoxy/
+
+# Merge leftovers.
+*.orig

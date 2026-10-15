@@ -990,17 +990,17 @@ class RasterDelegate : public RenderDelegate {
     /// re-added or dropped since, whose draws are built again.
     std::map<Path, std::optional<MeshItem>> meshItems_;
     std::set<Path> remeshed_;
-    /// Each drawn mesh's index among the drawable's draws as
-    /// `SyncItems` last set them all, and their number; none until
-    /// it has.
-    std::unordered_map<Path, std::size_t> itemIndex_;
-    std::optional<std::size_t> meshItemCount_;
     /// Shared meshes by their geometry's hash, and each one's hash.
     std::unordered_multimap<std::uint64_t, SharedMesh> sharedMeshes_;
     std::unordered_map<std::uint32_t, std::uint64_t> sharedHashes_;
     /// Prims whose shared mesh became their own to write
     /// (`SetMeshWriter`), added again at the next sync.
     std::set<Path> unshared_;
+    /// Each drawn mesh's index among the drawable's draws as
+    /// `SyncItems` last set them all, and their number; none until
+    /// it has.
+    std::unordered_map<Path, std::size_t> itemIndex_;
+    std::optional<std::size_t> meshItemCount_;
     /// The stage's subdivision level's version at the last mesh sync,
     /// which every subdivision surface's key reads.
     std::uint64_t subdivisionVersion_ = 0;

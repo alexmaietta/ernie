@@ -6602,7 +6602,9 @@ void RasterRenderer::RecordFaceRows(VkCommandBuffer commands,
         {},
         sensorPasses_.front().params->Address(),
         0u,
-        0u};
+        0u,
+        0u,
+        sensorUniforms_.Address()};
     // Cleared, then each sensor pixel's row scattered to the face
     // texels its tap reads.
     for (const char* entry : {"faceRowsClearMain", "faceRowsMain"}) {
@@ -6693,7 +6695,9 @@ void RasterRenderer::RecordFaceOverlays(VkCommandBuffer commands,
         {},
         sensorPasses_.front().params->Address(),
         0u,
-        0u};
+        0u,
+        0u,
+        sensorUniforms_.Address()};
     overlayLensLayout_->PushConstants(commands, &constants,
                                       sizeof(constants));
     vkCmdDispatch(commands, Groups(extent_.width),

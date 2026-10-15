@@ -2,7 +2,6 @@
 #include "ernie/device/shader_compiler.h"
 
 #include "ernie/util/disk_cache.h"
-
 #include "ernie/util/log.h"
 
 #include <slang-com-ptr.h>

@@ -1,12 +1,9 @@
 [build-system]
-# numpy: the build imports the module to write its type stubs (nanobind's stubgen).
 requires = ["scikit-build-core>=0.11", "nanobind>=2.4", "numpy>=1.26"]
 build-backend = "scikit_build_core.build"
 
 [project]
-# On PyPI as ernie-renderer ("ernie" is taken); it installs and imports as `ernie`.
 name = "ernie-renderer"
-# From `project(Ernie VERSION ...)` in CMakeLists.txt; see tool.scikit-build.metadata.version.
 dynamic = ["version"]
 description = "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan renderer with a USD-style scene and batched cameras"
 readme = "README.md"
@@ -45,42 +42,29 @@ Repository = "https://github.com/alexmaietta/ernie"
 Issues = "https://github.com/alexmaietta/ernie/issues"
 
 [project.scripts]
-# The native `ernie` program the package ships, which ernie/__main__.py runs in its place: the
-# viewer on a scene file or the default scene, with the Demos panel.
 ernie = "ernie.__main__:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8", "pillow"]
-# Demos whose GPU kernels drive the scene (demos/interop).
 demos = ["warp-lang>=1.0"]
-# Development: formatting, linting and type checking (CONTRIBUTING.md).
 dev = ["ruff>=0.17", "mypy>=2.4", "pre-commit>=4"]
 
-# Formatting and linting: code wraps at 70 columns, as clang-format's.
 [tool.ruff]
 line-length = 70
 target-version = "py312"
 extend-exclude = ["third_party", "build", "dist", "site", ".venv"]
-# Python only: Markdown's code blocks stay as written.
 include = ["*.py", "*.pyi"]
 
 [tool.ruff.lint]
-# pycodestyle errors, pyflakes, warnings, imports, pyupgrade, bugbear.
-# Long lines are left to the formatter: strings, URLs and docstring
-# examples it cannot wrap stay as they are.
 select = ["E4", "E7", "E9", "F", "W", "I", "UP", "B"]
 ignore = ["E501", "B905"]
 
 [tool.ruff.lint.isort]
-# The package as installed, not the repository's ernie/ directory.
 known-first-party = ["ernie"]
 
 [tool.ruff.lint.per-file-ignores]
-# pytest fixtures imported into a test module and taken as arguments.
 "ernie/test/python/*" = ["F811", "B007", "B018"]
 
-# Type checking of the package as built (build/python/ernie, with the
-# extension's stubs) and the demos.
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "build/python"
@@ -95,9 +79,6 @@ exclude = ["build/python/ernie/demos/"]
 module = ["warp", "warp.*", "torch", "torch.*", "PIL", "PIL.*", "newton", "newton.*"]
 ignore_missing_imports = true
 
-# Generated stubs: each prim type's define() and set() name its own
-# attributes where Schema's take any, and nanobind's __eq__ takes its
-# own type.
 [[tool.mypy.overrides]]
 module = ["ernie._ernie", "ernie._ernie.*", "ernie.schema"]
 disable_error_code = ["override"]
@@ -106,17 +87,12 @@ disable_error_code = ["override"]
 minimum-version = "build-system.requires"
 cmake.version = ">=3.22"
 cmake.build-type = "Release"
-# Inside the repository, like Ernie's other builds.
 build-dir = "build/wheel/{wheel_tag}"
-# nanobind's stable ABI: one wheel for CPython 3.12 and later.
 wheel.py-api = "cp312"
 wheel.packages = []
-# Ernie's package only, not its dependencies' install rules.
 install.components = ["python"]
 sdist.exclude = ["build", "dist", ".venv", "assets"]
 
-# One version for the C++ project, its packages and the wheel: project()'s, then the
-# pre-release suffix CI sets between releases (ERNIE_VERSION_SUFFIX, such as ".dev12").
 [tool.scikit-build.metadata.version]
 provider = "scikit_build_core.metadata.regex"
 input = "CMakeLists.txt"
@@ -127,21 +103,11 @@ result = "{value}{suffix}"
 ERNIE_BUILD_PYTHON = "ON"
 ERNIE_BUILD_TESTS = "OFF"
 ERNIE_BUILD_DEMOS = "OFF"
-# The viewer (ernie.app), with GLFW linked in: the windowing libraries load only when a window opens.
 ERNIE_BUILD_APP = "ON"
 ERNIE_USE_SYSTEM_GLFW = "OFF"
-# No libcurl in the wheel: its C++ demos read the cache the Python
-# demos fill (with urllib).
 ERNIE_DEMO_DOWNLOADS = "OFF"
-# The module links Ernie statically; libernie and the C++ install rules are for packages.
 ERNIE_INSTALL = "OFF"
 
-# Release wheels (cibuildwheel): one stable-ABI wheel per architecture, built in manylinux_2_34,
-# the oldest base Slang's prebuilt library runs on (GCC 11's libstdc++).
-# CI's wheel-test job installs the Linux and Windows wheels on plain
-# runners and renders with them on lavapipe; the macOS runners have no
-# Vulkan driver, so cibuildwheel tests the scene API there, and that the
-# package imports with its libraries.
 [tool.cibuildwheel]
 build = "cp312-*"
 skip = "*-musllinux_* *-win32"
@@ -153,28 +119,14 @@ test-command = "python -m pytest -q -p no:cacheprovider {project}/ernie/test/pyt
 test-skip = "*-manylinux_* *-win_amd64"
 
 [tool.cibuildwheel.windows]
-# Slang's DLLs are installed beside the module already, where Windows
-# finds them; delvewheel bundles the rest (the MSVC runtime).
 repair-wheel-command = "delvewheel repair --ignore-existing -w {dest_dir} {wheel}"
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
-# Slang's runtime and MoltenVK are installed beside the module (rpath
-# @loader_path), so delocate has nothing to bundle. The wheel is tagged
-# for macOS 15, where CI tests it: Slang's release libraries are built
-# for macOS 26 (their LC_BUILD_VERSION) yet load on 15, while Ernie's
-# own code needs 13.3, the first macOS whose libc++ formats floats
-# (std::to_chars), and MoltenVK's 12.0.
 repair-wheel-command = "python -m pip install -q 'wheel>=0.42' && cp {wheel} {dest_dir} && python -m wheel tags --remove --platform-tag macosx_15_0_arm64 {dest_dir}/$(basename {wheel})"
 environment = { MACOSX_DEPLOYMENT_TARGET = "13.3" }
 
 [tool.cibuildwheel.linux]
-# The viewer's window system headers to build.
 before-all = "dnf install -y -q --enablerepo=crb libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel libXext-devel wayland-devel wayland-protocols-devel libxkbcommon-devel"
-# Slang's runtime is already in the wheel beside the module, found through $ORIGIN. The native
-# `ernie` program links AlmaLinux 9's crt1.o, marked as needing x86-64-v2 (SSE4.2, CPUs since
-# 2009), which auditwheel would refuse; Ernie needs no more than baseline x86-64 itself.
 repair-wheel-command = "auditwheel repair --disable-isa-ext-check --exclude 'libslang-*' -w {dest_dir} {wheel}"
-# Builds in the container's own directory: a local run copies the checkout in, and a build/wheel
-# tree configured on the host would be refused there.
 environment = { SKBUILD_BUILD_DIR = "/tmp/ernie-wheel" }

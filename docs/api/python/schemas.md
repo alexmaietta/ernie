@@ -1,6 +1,6 @@
 # Prim types
 
-The typed prim classes and the registry they are built from: one class per registered prim type, with a property per attribute (see [Describing scenes](../../guides/scenes.md)). The classes are also exported from `ernie` itself (`ernie.SphereLight`).
+The typed prim classes and the registry they are built from: one class per registered prim type, with a property per attribute. The classes are also exported from `ernie` itself (`ernie.SphereLight`).
 
 ## Registry and loading
 

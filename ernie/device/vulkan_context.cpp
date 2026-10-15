@@ -137,10 +137,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL OnDebugMessage(
     // VK_EXT_dynamic_rendering_unused_attachments discards (the
     // G-buffer's tangents without anisotropic materials): advice,
     // not an error.
+    // Vertex outputs a fragment shader leaves unread, as the minimal
+    // and ids variants of a drawable do from its one vertex shader:
+    // advice too.
     if (data->pMessageIdName != nullptr &&
-        std::string_view(data->pMessageIdName) ==
-            "Undefined-Value-ShaderOutputNotConsumed-"
-            "DynamicRendering") {
+        (std::string_view(data->pMessageIdName) ==
+             "Undefined-Value-ShaderOutputNotConsumed-"
+             "DynamicRendering" ||
+         std::string_view(data->pMessageIdName) ==
+             "WARNING-Shader-OutputNotConsumed")) {
         return VK_FALSE;
     }
     if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {

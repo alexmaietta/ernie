@@ -2779,7 +2779,7 @@ TEST_F(RasterDelegateTest, MeteringMeasuresTheScenesLuminance) {
     EXPECT_NEAR(std::log2(*delegate.MeteredLuminance()),
                 std::log2(0.5 * 20000.0 / M_PI), 0.3);
 
-    // Exposure compensation brightens the photographic image by its
+    // The camera's exposure brightens the photographic image by its
     // stops.
     const auto centre = [&] {
         const Tensor image = delegate.Render(scene);

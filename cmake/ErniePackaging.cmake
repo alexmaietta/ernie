@@ -1,11 +1,4 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Ernie's packages (CPack): one `ernie` package with everything in ErnieInstall.cmake's components
-# (libernie and Slang's runtime, the viewer, the headers and the CMake package), as a TGZ to unpack
-# anywhere, a DEB and an RPM.
-#
-# Configure with the `package-deb` or `package-rpm` preset (CMakePresets.json), which build Release
-# with GLFW linked in, then run `cpack --preset <same name>`. Vulkan and the windowing libraries
-# are loaded at run time (volk, GLFW), so the packages declare them by hand.
 include_guard(GLOBAL)
 
 set(CPACK_PACKAGE_NAME ernie)
@@ -46,13 +39,10 @@ else()
     set(CPACK_GENERATOR TGZ)
 endif()
 
-# Ernie's components only (not the wheel's `python` component, nor rules that dependencies install
-# without one), all in one package.
 set(CPACK_COMPONENTS_ALL runtime dev)
 if(TARGET ernie_viewer)
     list(APPEND CPACK_COMPONENTS_ALL viewer)
 endif()
-# A program per C++ demo (demos/CMakeLists.txt), which is added after this file.
 if(ERNIE_BUILD_DEMOS AND TARGET ernie_app)
     list(APPEND CPACK_COMPONENTS_ALL demos)
 endif()
