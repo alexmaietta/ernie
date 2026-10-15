@@ -79,8 +79,7 @@ class GpuBuffer {
 
     /// @brief Exports a new handle to a `Shared` buffer's memory.
     /// @return A file descriptor (a Win32 handle on Windows), owned
-    /// by
-    ///         the caller until imported (`CloseExternalHandle`).
+    ///         by the caller until imported (`CloseExternalHandle`).
     /// @throws std::logic_error If the buffer is not `Shared`.
     /// @throws std::runtime_error If the export fails.
     ExternalHandle ExportHandle() const;
@@ -90,8 +89,7 @@ class GpuBuffer {
         return allocationSize_;
     }
 
-    /// @brief Keeps `object` alive until the buffer's memory is
-    /// freed.
+    /// @brief Keeps `object` alive until the memory is freed.
     /// @param object Something that uses the memory, such as a CUDA
     ///               import of it; released first.
     void Attach(std::shared_ptr<void> object) {
