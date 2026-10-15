@@ -747,7 +747,9 @@ class Importer {
             std::filesystem::last_write_time(package, error);
         const std::size_t key = std::hash<std::string>{}(
             packaged + "|" + std::to_string(size) + "|" +
-            std::to_string(time.time_since_epoch().count()));
+            // libc++ counts the file clock in __int128.
+            std::to_string(static_cast<long long>(
+                time.time_since_epoch().count())));
         const std::filesystem::path folder =
             std::filesystem::path(request_.packageCache) /
             TfStringPrintf("%016zx", key);

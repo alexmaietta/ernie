@@ -128,7 +128,10 @@ TEST_F(SparseImageTest, TheMipTailIsWrittenWhole) {
     SparseImage image(
         *context_,
         SparseImageDesc{512, 512, 10, VK_FORMAT_R8G8B8A8_UNORM});
-    ASSERT_LT(image.TailMip(), 10u);
+    if (image.TailMip() >= 10u) {
+        // Lavapipe tiles every mip, leaving no tail.
+        GTEST_SKIP() << "the device puts no mips in a tail";
+    }
     std::vector<std::vector<std::uint32_t>> mips;
     std::vector<std::span<const std::byte>> spans;
     for (std::uint32_t mip = image.TailMip(); mip < 10; ++mip) {

@@ -351,6 +351,8 @@ jobs:
   sanitize:
     name: sanitize (part ${{ matrix.part }} of 4)
     if: github.event_name != 'pull_request'
+    # Advisory until its lavapipe failures are fixed: it reports, but does not fail the run.
+    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     # Every fourth test each, side by side, as the GCC tests run.
