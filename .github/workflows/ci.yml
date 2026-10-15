@@ -220,6 +220,8 @@ jobs:
           sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers \
             libvulkan1 xvfb libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libwayland-dev libxkbcommon-dev
+      - uses: ./.github/actions/vulkan-validation
+        if: runner.os == 'Linux' && runner.arch == 'X64'
       - uses: astral-sh/setup-uv@v7
         if: runner.os == 'Linux'
       - name: Python environment
@@ -365,6 +367,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build mesa-vulkan-drivers vulkan-validationlayers libvulkan1
+      - uses: ./.github/actions/vulkan-validation
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: sanitize
@@ -489,6 +492,8 @@ jobs:
           sudo apt-get install -y mesa-vulkan-drivers vulkan-validationlayers libvulkan1 xvfb
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -n1)
           echo "VK_DRIVER_FILES=$VK_DRIVER_FILES" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/vulkan-validation
+        if: runner.os == 'Linux' && runner.arch == 'X64'
       - name: Install Vulkan (lavapipe, Vulkan loader)
         if: runner.os == 'Windows'
         # The loader alone, without the SDK's validation layers: the smoke test checks for a

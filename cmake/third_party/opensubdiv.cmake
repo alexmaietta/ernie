@@ -28,6 +28,8 @@ add_library(ernie_opensubdiv STATIC ${ernie_opensubdiv_sources})
 target_include_directories(ernie_opensubdiv SYSTEM
                            PUBLIC "${opensubdiv_SOURCE_DIR}")
 target_compile_features(ernie_opensubdiv PUBLIC cxx_std_14)
+# Its schemes use M_PI, which MSVC's <cmath> defines only on request.
+target_compile_definitions(ernie_opensubdiv PRIVATE $<$<CXX_COMPILER_ID:MSVC>:_USE_MATH_DEFINES>)
 set_target_properties(
     ernie_opensubdiv
     PROPERTIES POSITION_INDEPENDENT_CODE ON

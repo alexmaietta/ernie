@@ -757,9 +757,12 @@ TEST(MaterialSettingsOf,
     EXPECT_EQ(settings.opacityTexture->channel, 3);
     ernie::Connect(scene, "/Looks/M/Surface", tokens::kEmissiveColor,
                    "/Looks/M/Mr", "outputs:rgb");
-    EXPECT_THROW(ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs),
-                 std::invalid_argument)
-        << "emissive textures are not supported yet";
+    settings = ernie::MaterialSettingsOf(scene, "/Looks/M", brdfs);
+    EXPECT_TRUE(settings.emissionTextured)
+        << "an emissive texture emits as its texels vary";
+    ASSERT_TRUE(settings.albedoTexture.has_value());
+    EXPECT_EQ(settings.emission, glm::vec3(1.0f))
+        << "the texture's scale is the emission";
     scene.Clear("/Looks/M/Surface",
                 std::string(tokens::kEmissiveColor) + ".connect");
 

@@ -123,8 +123,11 @@ std::string UploadKey(const Scene& scene, MaterialTextureSlot slot,
         std::error_code error;
         const auto time =
             std::filesystem::last_write_time(reader.file, error);
-        key += "@" + std::to_string(
-                         error ? 0 : time.time_since_epoch().count());
+        // libc++ counts the file clock in __int128, which to_string
+        // does not take.
+        key +=
+            "@" + std::to_string(static_cast<long long>(
+                      error ? 0 : time.time_since_epoch().count()));
     }
     key += "|" + std::to_string(static_cast<int>(reader.colorSpace));
     const auto values = [&](int c) {
