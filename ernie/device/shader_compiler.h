@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
+/// @file shader_compiler.h
+/// @brief Run-time Slang compilation to SPIR-V and WGSL.
 #pragma once
 
 #include "ernie/util/shader_source.h"
@@ -11,47 +13,66 @@
 
 namespace ernie {
 
-/// Compiles Slang modules at run time with the Slang compiler
-/// library, so shaders can be composed from built-in and
-/// user-supplied modules (such as custom reflectance models).
+/// @brief Orders modules so each loads after the modules it imports.
+/// @param modules The program's modules; the entry point's is last.
+/// @param library Modules to add when something imports them and
+///                `modules` does not give them.
+/// @return `modules` plus the library modules they import, each after
+///         its imports. A name in `modules` overrides the library's.
+/// @note Imports found in neither list are left for Slang to report.
+std::vector<ShaderModuleSource>
+ResolveImports(std::span<const ShaderModuleSource> modules,
+               std::span<const ShaderModuleSource> library);
+
+/// @brief Compiles Slang modules at run time.
 ///
-/// Modules are loaded from source in the order given, so a module
-/// must come after the modules it imports. Compilation targets SPIR-V
-/// 1.6 for Vulkan; `CompileWgsl` emits the same program as WGSL,
-/// which keeps shaders usable by a future WebGPU backend.
+/// Shaders are composed from built-in and user modules, such as
+/// custom reflectance models. A module's `import`s are found among
+/// the modules given to a compile, then in the compiler's library.
 ///
-/// Reference: Y. He, K. Fatahalian and T. Foley, "Slang: language
-/// mechanisms for extensible real-time shading systems", ACM
-/// Transactions on Graphics 37(4), 141, 2018.
-/// https://doi.org/10.1145/3197517.3201380
+/// References:
+/// - Y. He, K. Fatahalian and T. Foley, "Slang: language mechanisms
+///   for extensible real-time shading systems", ACM Transactions on
+///   Graphics 37(4), 141, 2018.
+///   https://doi.org/10.1145/3197517.3201380
 class ShaderCompiler {
   public:
-    /// Slang itself starts at the first compile the disk cache does
-    /// not answer, which throws std::runtime_error if it cannot.
-    ShaderCompiler();
+    /// @brief Makes a compiler; Slang itself starts at the first
+    /// compile the disk cache does not answer.
+    /// @param library Modules any compile may import, such as the
+    ///                built-in kernels (`shaders::Modules()`).
+    explicit ShaderCompiler(
+        std::vector<ShaderModuleSource> library = {});
     ~ShaderCompiler();
     ShaderCompiler(const ShaderCompiler&) = delete;
     ShaderCompiler& operator=(const ShaderCompiler&) = delete;
 
-    /// SPIR-V for `entryPoint` in the last module of `modules`.
+    /// @brief Compiles an entry point to SPIR-V 1.6.
     ///
-    /// Compiled SPIR-V is kept on disk between runs, keyed by a hash
-    /// of the Slang version, the target, the entry point and every
-    /// module's name and source, so a program compiles once until
-    /// its sources change: in `ERNIE_SHADER_CACHE` (empty or "0"
-    /// keeps none), else the user's cache folder
-    /// (`$XDG_CACHE_HOME/ernie/shaders`, `~/.cache/ernie/shaders`).
-    /// @throws std::invalid_argument with Slang's diagnostics if a
-    /// module fails to compile or the entry point is missing.
+    /// Results are cached on disk, keyed by the Slang version, the
+    /// entry point and every module's name and source: in
+    /// `ERNIE_SHADER_CACHE` (empty or "0" turns it off), else
+    /// `$XDG_CACHE_HOME/ernie/shaders` or `~/.cache/ernie/shaders`.
+    /// @param modules    The program's modules; the last one holds
+    ///                   `entryPoint`.
+    /// @param entryPoint The entry point's name.
+    /// @return The SPIR-V words.
+    /// @throws std::invalid_argument With Slang's diagnostics if a
+    ///         module fails or the entry point is missing.
+    /// @throws std::runtime_error If Slang cannot start.
     std::vector<std::uint32_t>
     CompileSpirv(std::span<const ShaderModuleSource> modules,
                  const std::string& entryPoint) const;
 
-    /// How many `CompileSpirv` calls the disk cache answered.
+    /// @return How many `CompileSpirv` calls the disk cache answered.
     std::size_t CacheHits() const;
 
-    /// WGSL source for `entryPoint` in the last module of `modules`.
-    /// @throws std::invalid_argument as `CompileSpirv`.
+    /// @brief Compiles an entry point to WGSL, for a future WebGPU
+    /// backend.
+    /// @param modules    As for `CompileSpirv`.
+    /// @param entryPoint The entry point's name.
+    /// @return The WGSL source.
+    /// @throws std::invalid_argument As `CompileSpirv`.
     std::string
     CompileWgsl(std::span<const ShaderModuleSource> modules,
                 const std::string& entryPoint) const;

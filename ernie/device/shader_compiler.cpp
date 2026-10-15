@@ -8,6 +8,7 @@
 #include <slang.h>
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -17,6 +18,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
@@ -96,7 +99,87 @@ void WriteCached(const fs::path& path,
     }
 }
 
+std::string_view TrimLeft(std::string_view text) {
+    while (!text.empty() &&
+           std::isspace(static_cast<unsigned char>(text.front()))) {
+        text.remove_prefix(1);
+    }
+    return text;
+}
+
+/// @brief The module names a Slang source imports.
+/// @param source Slang source text.
+/// @return The names of its `import` and `__exported import` lines.
+std::vector<std::string_view> ImportsOf(std::string_view source) {
+    constexpr std::string_view kExported = "__exported";
+    constexpr std::string_view kImport = "import";
+    std::vector<std::string_view> names;
+    std::size_t at = 0;
+    while (at < source.size()) {
+        std::size_t end = source.find('\n', at);
+        if (end == std::string_view::npos) {
+            end = source.size();
+        }
+        std::string_view line = TrimLeft(source.substr(at, end - at));
+        at = end + 1;
+        if (line.starts_with(kExported)) {
+            line = TrimLeft(line.substr(kExported.size()));
+        }
+        if (!line.starts_with(kImport) ||
+            line.size() == kImport.size() ||
+            !std::isspace(
+                static_cast<unsigned char>(line[kImport.size()]))) {
+            continue;
+        }
+        line = TrimLeft(line.substr(kImport.size()));
+        std::size_t length = 0;
+        while (
+            length < line.size() &&
+            (std::isalnum(static_cast<unsigned char>(line[length])) ||
+             line[length] == '_')) {
+            ++length;
+        }
+        if (length > 0) {
+            names.push_back(line.substr(0, length));
+        }
+    }
+    return names;
+}
+
 }  // namespace
+
+std::vector<ShaderModuleSource>
+ResolveImports(std::span<const ShaderModuleSource> modules,
+               std::span<const ShaderModuleSource> library) {
+    std::unordered_map<std::string_view, const ShaderModuleSource*>
+        available;
+    for (const ShaderModuleSource& module : library) {
+        available[module.name] = &module;
+    }
+    for (const ShaderModuleSource& module : modules) {
+        available[module.name] = &module;
+    }
+    std::vector<ShaderModuleSource> ordered;
+    std::unordered_set<std::string_view> seen;
+    // Depth first: a module goes in after everything it imports.
+    const auto visit = [&](const auto& self,
+                           const ShaderModuleSource& module) -> void {
+        if (!seen.insert(module.name).second) {
+            return;
+        }
+        for (const std::string_view name : ImportsOf(module.source)) {
+            if (const auto found = available.find(name);
+                found != available.end()) {
+                self(self, *found->second);
+            }
+        }
+        ordered.push_back(module);
+    };
+    for (const ShaderModuleSource& module : modules) {
+        visit(visit, *available.at(module.name));
+    }
+    return ordered;
+}
 
 struct ShaderCompiler::Impl {
     /// Created at the first compile the cache does not answer: it
@@ -107,6 +190,8 @@ struct ShaderCompiler::Impl {
     std::optional<fs::path> cache =
         CacheDirectory("ERNIE_SHADER_CACHE", "shaders");
     mutable std::atomic<std::size_t> cacheHits{0};
+    /// Modules any compile may import.
+    std::vector<ShaderModuleSource> library;
 
     /// `global`, created if need be; under `mutex`.
     slang::IGlobalSession& Global() const {
@@ -118,14 +203,19 @@ struct ShaderCompiler::Impl {
         return *global;
     }
 
+    /// @brief Compiles `entryPoint` of module `entryModule`.
+    /// @param modules     Every module, each after its imports.
+    /// @param entryModule The name of the module with the entry
+    ///                    point.
+    /// @param entryPoint  The entry point's name.
+    /// @param format      The target language.
+    /// @param profile     The target profile, or null.
+    /// @return The generated code.
     Slang::ComPtr<slang::IBlob>
     Compile(std::span<const ShaderModuleSource> modules,
+            const std::string& entryModule,
             const std::string& entryPoint, SlangCompileTarget format,
             const char* profile) const {
-        if (modules.empty()) {
-            throw std::invalid_argument(
-                "No shader modules to compile");
-        }
         std::lock_guard lock(mutex);
         slang::IGlobalSession& slang = Global();
         slang::TargetDesc target{};
@@ -148,28 +238,33 @@ struct ShaderCompiler::Impl {
             throw std::runtime_error("Cannot create a Slang session");
         }
 
-        slang::IModule* last = nullptr;
+        slang::IModule* entryOwner = nullptr;
         for (const ShaderModuleSource& module : modules) {
             Slang::ComPtr<slang::IBlob> diagnostics;
             const std::string path = module.name + ".slang";
-            last = session->loadModuleFromSourceString(
-                module.name.c_str(), path.c_str(),
-                module.source.c_str(), diagnostics.writeRef());
-            if (last == nullptr) {
+            slang::IModule* loaded =
+                session->loadModuleFromSourceString(
+                    module.name.c_str(), path.c_str(),
+                    module.source.c_str(), diagnostics.writeRef());
+            if (loaded == nullptr) {
                 throw std::invalid_argument(
                     "Shader module " + module.name +
                     " failed to compile:\n" + Text(diagnostics));
             }
+            if (module.name == entryModule) {
+                entryOwner = loaded;
+            }
         }
 
         Slang::ComPtr<slang::IEntryPoint> entry;
-        if (SLANG_FAILED(last->findEntryPointByName(
+        if (entryOwner == nullptr ||
+            SLANG_FAILED(entryOwner->findEntryPointByName(
                 entryPoint.c_str(), entry.writeRef()))) {
             throw std::invalid_argument(
-                "Shader module " + modules.back().name +
+                "Shader module " + entryModule +
                 " has no entry point " + entryPoint);
         }
-        slang::IComponentType* parts[] = {last, entry};
+        slang::IComponentType* parts[] = {entryOwner, entry};
         Slang::ComPtr<slang::IComponentType> program;
         Slang::ComPtr<slang::IBlob> diagnostics;
         if (SLANG_FAILED(session->createCompositeComponentType(
@@ -196,7 +291,10 @@ struct ShaderCompiler::Impl {
     }
 };
 
-ShaderCompiler::ShaderCompiler() : impl_(std::make_unique<Impl>()) {
+ShaderCompiler::ShaderCompiler(
+    std::vector<ShaderModuleSource> library)
+    : impl_(std::make_unique<Impl>()) {
+    impl_->library = std::move(library);
     // Under the banner (`VulkanContext::Create`), once a process.
     static std::atomic<bool> announced{false};
     if (!announced.exchange(true)) {
@@ -213,6 +311,11 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
     std::span<const ShaderModuleSource> modules,
     const std::string& entryPoint) const {
     constexpr const char* kProfile = "spirv_1_6";
+    if (modules.empty()) {
+        throw std::invalid_argument("No shader modules to compile");
+    }
+    const std::vector<ShaderModuleSource> program =
+        ResolveImports(modules, impl_->library);
     const auto start = std::chrono::steady_clock::now();
     // As Warp's kernel cache lines: compiles always, cache hits when
     // verbose.
@@ -220,8 +323,7 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
         char line[256];
         std::snprintf(
             line, sizeof(line), "Shader %s:%s %s in %.2f ms",
-            modules.empty() ? "" : modules.back().name.c_str(),
-            entryPoint.c_str(), what,
+            modules.back().name.c_str(), entryPoint.c_str(), what,
             std::chrono::duration<double, std::milli>(
                 std::chrono::steady_clock::now() - start)
                 .count());
@@ -230,13 +332,14 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
     // From the cache when this Slang compiled the same sources for
     // the same entry point and target before.
     std::optional<fs::path> cached;
-    if (impl_->cache && !modules.empty()) {
+    if (impl_->cache) {
         CacheKey key;
         key.Add(kCacheFormat);
         key.Add(spGetBuildTagString());
         key.Add(kProfile);
         key.Add(entryPoint);
-        for (const ShaderModuleSource& module : modules) {
+        key.Add(modules.back().name);
+        for (const ShaderModuleSource& module : program) {
             key.Add(module.name);
             key.Add(module.source);
         }
@@ -249,7 +352,8 @@ std::vector<std::uint32_t> ShaderCompiler::CompileSpirv(
         }
     }
     const Slang::ComPtr<slang::IBlob> code =
-        impl_->Compile(modules, entryPoint, SLANG_SPIRV, kProfile);
+        impl_->Compile(program, modules.back().name, entryPoint,
+                       SLANG_SPIRV, kProfile);
     std::vector<std::uint32_t> words(code->getBufferSize() /
                                      sizeof(std::uint32_t));
     std::memcpy(words.data(), code->getBufferPointer(),
@@ -268,8 +372,12 @@ std::size_t ShaderCompiler::CacheHits() const {
 std::string ShaderCompiler::CompileWgsl(
     std::span<const ShaderModuleSource> modules,
     const std::string& entryPoint) const {
-    return Text(
-        impl_->Compile(modules, entryPoint, SLANG_WGSL, nullptr));
+    if (modules.empty()) {
+        throw std::invalid_argument("No shader modules to compile");
+    }
+    return Text(impl_->Compile(
+        ResolveImports(modules, impl_->library), modules.back().name,
+        entryPoint, SLANG_WGSL, nullptr));
 }
 
 }  // namespace ernie

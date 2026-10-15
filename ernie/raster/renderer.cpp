@@ -28,6 +28,16 @@ namespace ernie {
 
 namespace {
 
+/// @brief The embedded kernels as a compiler library.
+/// @return Every built-in module, so kernels' imports resolve.
+std::vector<ShaderModuleSource> BuiltinShaderModules() {
+    std::vector<ShaderModuleSource> modules;
+    for (const shaders::EmbeddedModule& module : shaders::Modules()) {
+        modules.push_back({module.name, module.source});
+    }
+    return modules;
+}
+
 /// FNV-1a over `values`' bits.
 std::size_t HashFloats(const std::vector<float>& values) {
     std::uint64_t hash = 14695981039346656037ull;
@@ -1706,7 +1716,8 @@ RasterRenderer::RasterRenderer(const VulkanContext& context,
                                VkFormat presentFormat,
                                BrdfRegistry brdfs)
     : context_(context), presentFormat_(presentFormat),
-      brdfs_(std::move(brdfs)), uploads_(context),
+      compiler_(BuiltinShaderModules()), brdfs_(std::move(brdfs)),
+      uploads_(context),
       uniforms_(context, kUniformsStride, kViewUniformUsage,
                 BufferMemory::Device),
       shadowUniforms_(context, sizeof(ShadowUniforms),

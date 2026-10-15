@@ -191,3 +191,44 @@ TEST(ShaderCompiler, CompilesCustomModelsAgainstTheSharedModule) {
                  std::invalid_argument)
         << "missing interface method";
 }
+
+TEST(ResolveImports, AddsLibraryImportsBeforeTheirImporters) {
+    const std::vector<ShaderModuleSource> library{
+        {"math", "public float twice(float x) { return 2 * x; }\n"},
+        {"colour", "import math;\npublic float c() { return 1; }\n"},
+        {"unused", "public float u() { return 0; }\n"}};
+    const std::vector<ShaderModuleSource> modules{
+        {"main", "  import colour;\n__exported import math;\n"
+                 "// import unused;\n"}};
+    const std::vector<ShaderModuleSource> program =
+        ernie::ResolveImports(modules, library);
+    std::vector<std::string> names;
+    for (const ShaderModuleSource& module : program) {
+        names.push_back(module.name);
+    }
+    EXPECT_EQ(names,
+              (std::vector<std::string>{"math", "colour", "main"}));
+}
+
+TEST(ResolveImports, GivenModulesOverrideTheLibrary) {
+    const std::vector<ShaderModuleSource> library{
+        {"projection", "library"}};
+    const std::vector<ShaderModuleSource> modules{
+        {"projection", "given"}, {"main", "import projection;\n"}};
+    const std::vector<ShaderModuleSource> program =
+        ernie::ResolveImports(modules, library);
+    ASSERT_EQ(program.size(), 2u);
+    EXPECT_EQ(program[0].source, "given");
+}
+
+TEST(ShaderCompiler, ResolvesImportsFromItsLibrary) {
+    const ShaderCompiler compiler(
+        {{"helper", "public float twice(float x) {\n"
+                    "    return 2.0 * x;\n}\n"}});
+    const std::vector<ShaderModuleSource> modules{
+        {"main", "import helper;\n"
+                 "RWStructuredBuffer<float> out;\n"
+                 "[shader(\"compute\")][numthreads(1, 1, 1)]\n"
+                 "void main() { out[0] = twice(1.0); }\n"}};
+    EXPECT_EQ(compiler.CompileSpirv(modules, "main")[0], kSpirvMagic);
+}

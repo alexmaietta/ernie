@@ -1,9 +1,27 @@
 // SPDX-License-Identifier: BSD-3-Clause
+/// @file embedded_shaders.h
+/// @brief Ernie's Slang shaders, embedded at build time as source.
+///
+/// ernie/kernel/CMakeLists.txt lists the files; each is a
+/// null-terminated string below and, for .slang files, a module in
+/// `Modules()` named by its file stem.
 #pragma once
 
-/// The Slang shaders, embedded at build time
-/// (ernie/kernel/CMakeLists.txt) as null-terminated source strings.
+#include <span>
+
 namespace ernie::shaders {
+
+/// @brief A built-in Slang module.
+struct EmbeddedModule {
+    /// The name other modules import it by: its file stem.
+    const char* name;
+    /// Its source text.
+    const char* source;
+};
+
+/// @brief Every embedded .slang file as a module.
+/// @return The modules, for `ShaderCompiler` to resolve imports from.
+std::span<const EmbeddedModule> Modules();
 
 /// Shared reflectance-model module (`brdf`) and the built-in models.
 extern const char kBrdfSlang[];
