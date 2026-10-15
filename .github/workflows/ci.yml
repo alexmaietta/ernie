@@ -330,7 +330,7 @@ jobs:
           export VK_DRIVER_FILES VK_ICD_FILENAMES=$VK_DRIVER_FILES
           # Less the tests lavapipe fails (.github/lavapipe-known-failures.txt), until they are fixed.
           xvfb-run -a ctest --test-dir build --output-on-failure -j4 --timeout 1800 ${{ matrix.tests }} \
-            --exclude-from-file .github/lavapipe-known-failures.txt
+            --exclude-from-file "$PWD/.github/lavapipe-known-failures.txt"
       - name: Install Vulkan (lavapipe, Vulkan loader)
         if: runner.os == 'Windows'
         shell: bash
