@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -219,6 +140,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-kbrightnesstemperature"><strong>kBrightnessTemperature</strong></a>   = <code>/* multi line expression */</code><br><em>float32: the brightness temperature in kelvin a thermal camera reads at each pixel, from its radiometric integrator's signal (</em> <code>bolometer</code> <em>) for the object parameters it assumes; 0 without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kdegreeoflinearpolarization"><strong>kDegreeOfLinearPolarization</strong></a>   = <code>/* multi line expression */</code><br><em>float32 in [0, 1]: the degree of linear polarization of the light reaching each sensor pixel, before the camera's polarizer, over the bands: sqrt(S1^2 + S2^2) / S0.</em></td>
 </tr>
 <tr>
@@ -269,6 +194,10 @@
 <td style="text-align: right;">constexpr std::string_view</td>
 <td style="text-align: left;"><a href="#variable-kspectralradiance"><strong>kSpectralRadiance</strong></a>   = <code>/* multi line expression */</code><br><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em></td>
 </tr>
+<tr>
+<td style="text-align: right;">constexpr std::string_view</td>
+<td style="text-align: left;"><a href="#variable-ktemperature"><strong>kTemperature</strong></a>   = <code>"Temperature"</code><br><em>float32: the temperature in kelvin of what each sensor pixel sees, its material's own or the frame's default (</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>'</em><code>ernie:thermal:*</code> <em>); 0 for the background, or with thermal emission off.</em></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
@@ -277,6 +206,13 @@
 <pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kAngleOfLinearPolarization;
 </code></pre>
 <p>Opt-in. </p>
+<hr>
+
+<h3 id="variable-kbrightnesstemperature">variable kBrightnessTemperature</h3>
+<p><em>float32: the brightness temperature in kelvin a thermal camera reads at each pixel, from its radiometric integrator's signal (</em> <code>bolometer</code> <em>) for the object parameters it assumes; 0 without one.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kBrightnessTemperature;
+</code></pre>
+<p>Beside Temperature, the gap is what emissivity and reflections make. Opt-in. </p>
 <hr>
 
 <h3 id="variable-kdegreeoflinearpolarization">variable kDegreeOfLinearPolarization</h3>
@@ -359,6 +295,13 @@ var" leaves it out, as it costs extra passes. </p>
 <p><em>float32 spectral radiance at each sensor pixel, W m^-2 sr^-1 nm^-1, (bands, rows, cols).</em> </p>
 <pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kSpectralRadiance;
 </code></pre>
+<hr>
+
+<h3 id="variable-ktemperature">variable kTemperature</h3>
+<p><em>float32: the temperature in kelvin of what each sensor pixel sees, its material's own or the frame's default (</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>'</em><code>ernie:thermal:*</code> <em>); 0 for the background, or with thermal emission off.</em></p>
+<pre><code class="language-C++">constexpr std::string_view ernie::render_vars::kTemperature;
+</code></pre>
+<p>Opt-in. </p>
 <hr>
 
 <hr />

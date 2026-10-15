@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -241,6 +162,18 @@
 <td style="text-align: left;"><a href="#variable-emission"><strong>emission</strong></a>   = <code>{0.0f}</code><br><em>UsdPreviewSurface's emissiveColor: linear RGB radiance the surface emits, in cd/m^2 for white (the photometric units of lights' luminance), upsampled to a spectrum.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-emissiontextured"><strong>emissionTextured</strong></a>   = <code>false</code><br><em>The emission varies over the surface as its albedo texture does (emissiveColor connected to a texture, which is then the albedo's): each point emits</em> <code>emission</code> <em>times its albedo.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Spectrum/"><strong>Spectrum</strong></a></td>
+<td style="text-align: left;"><a href="#variable-emissivity"><strong>emissivity</strong></a>  <br><em>Its emissivity (</em> <code>tokens::kThermalEmissivity</code> <em>); empty, 1 minus its reflectance by Kirchhoff's law.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1TextureReader/"><strong>TextureReader</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-inertiatexture"><strong>inertiaTexture</strong></a>  <br><em>Its thermal terminal's thermal inertia texture (</em> <code>tokens::kThermalInertiaInput</code> <em>connected): one channel after the reader's scale and bias, in place of the</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s thermal inertia texture.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">int</td>
 <td style="text-align: left;"><a href="#variable-metallicparam"><strong>metallicParam</strong></a>   = <code>-1</code><br></td>
 </tr>
@@ -275,6 +208,34 @@
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1TextureReader/"><strong>TextureReader</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#variable-roughnesstexture"><strong>roughnessTexture</strong></a>  <br><em>UsdPreviewSurface's roughness from one texture channel: its alpha^2 / 2 (alpha its square) joins the pixel's unresolved slope variance, with the model's roughness then 0.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-speckleroughness"><strong>speckleRoughness</strong></a>   = <code>1e-5f</code><br><em>Its rms surface height, m (</em> <code>tokens::kSpeckleRoughness</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-temperature"><strong>temperature</strong></a>   = <code>0.0f</code><br><em>Its temperature in kelvin (</em> <code>tokens::kThermalTemperature</code> <em>): above 0 it emits emissivity times Planck's radiance in every band.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#variable-temperaturemodel"><strong>temperatureModel</strong></a>  <br><em>Its temperature model (</em> <code>tokens::kThermalModel</code> <em>), an id in the renderer's</em><code>TemperatureModelRegistry</code> <em>, empty for none; its parameters and data.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-temperaturemodeldata"><strong>temperatureModelData</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-temperaturemodelparams"><strong>temperatureModelParams</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1TextureReader/"><strong>TextureReader</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-temperaturetexture"><strong>temperatureTexture</strong></a>  <br><em>Its thermal terminal's temperature texture (</em> <code>tokens:: kThermalOutput</code> <em>): one channel, kelvin after the reader's scale and bias, in place of the</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s temperature texture.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-thermalinertia"><strong>thermalInertia</strong></a>   = <code>0.0f</code><br><em>Its thermal inertia, J m^-2 K^-1 s^-1/2 (</em> <code>tokens::kThermalInertia</code> <em>), for its temperature model; 0 for none.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -333,6 +294,24 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-emissiontextured">variable emissionTextured</h3>
+<p><em>The emission varies over the surface as its albedo texture does (emissiveColor connected to a texture, which is then the albedo's): each point emits</em> <code>emission</code> <em>times its albedo.</em></p>
+<pre><code class="language-C++">bool ernie::MaterialSettings::emissionTextured;
+</code></pre>
+<hr>
+
+<h3 id="variable-emissivity">variable emissivity</h3>
+<p><em>Its emissivity (</em> <code>tokens::kThermalEmissivity</code> <em>); empty, 1 minus its reflectance by Kirchhoff's law.</em></p>
+<pre><code class="language-C++">Spectrum ernie::MaterialSettings::emissivity;
+</code></pre>
+<hr>
+
+<h3 id="variable-inertiatexture">variable inertiaTexture</h3>
+<p><em>Its thermal terminal's thermal inertia texture (</em> <code>tokens::kThermalInertiaInput</code> <em>connected): one channel after the reader's scale and bias, in place of the</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s thermal inertia texture.</em></p>
+<pre><code class="language-C++">std::optional&lt;TextureReader&gt; ernie::MaterialSettings::inertiaTexture;
+</code></pre>
+<hr>
+
 <h3 id="variable-metallicparam">variable metallicParam</h3>
 <pre><code class="language-C++">int ernie::MaterialSettings::metallicParam;
 </code></pre>
@@ -382,6 +361,46 @@
 <h3 id="variable-roughnesstexture">variable roughnessTexture</h3>
 <p><em>UsdPreviewSurface's roughness from one texture channel: its alpha^2 / 2 (alpha its square) joins the pixel's unresolved slope variance, with the model's roughness then 0.</em> </p>
 <pre><code class="language-C++">std::optional&lt;TextureReader&gt; ernie::MaterialSettings::roughnessTexture;
+</code></pre>
+<hr>
+
+<h3 id="variable-speckleroughness">variable speckleRoughness</h3>
+<p><em>Its rms surface height, m (</em> <code>tokens::kSpeckleRoughness</code> <em>).</em></p>
+<pre><code class="language-C++">float ernie::MaterialSettings::speckleRoughness;
+</code></pre>
+<hr>
+
+<h3 id="variable-temperature">variable temperature</h3>
+<p><em>Its temperature in kelvin (</em> <code>tokens::kThermalTemperature</code> <em>): above 0 it emits emissivity times Planck's radiance in every band.</em></p>
+<pre><code class="language-C++">float ernie::MaterialSettings::temperature;
+</code></pre>
+<hr>
+
+<h3 id="variable-temperaturemodel">variable temperatureModel</h3>
+<p><em>Its temperature model (</em> <code>tokens::kThermalModel</code> <em>), an id in the renderer's</em><code>TemperatureModelRegistry</code> <em>, empty for none; its parameters and data.</em></p>
+<pre><code class="language-C++">std::string ernie::MaterialSettings::temperatureModel;
+</code></pre>
+<hr>
+
+<h3 id="variable-temperaturemodeldata">variable temperatureModelData</h3>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MaterialSettings::temperatureModelData;
+</code></pre>
+<hr>
+
+<h3 id="variable-temperaturemodelparams">variable temperatureModelParams</h3>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MaterialSettings::temperatureModelParams;
+</code></pre>
+<hr>
+
+<h3 id="variable-temperaturetexture">variable temperatureTexture</h3>
+<p><em>Its thermal terminal's temperature texture (</em> <code>tokens:: kThermalOutput</code> <em>): one channel, kelvin after the reader's scale and bias, in place of the</em><a href="../classernie_1_1Material/"><em><strong>Material</strong></em></a> <em>'s temperature texture.</em></p>
+<pre><code class="language-C++">std::optional&lt;TextureReader&gt; ernie::MaterialSettings::temperatureTexture;
+</code></pre>
+<hr>
+
+<h3 id="variable-thermalinertia">variable thermalInertia</h3>
+<p><em>Its thermal inertia, J m^-2 K^-1 s^-1/2 (</em> <code>tokens::kThermalInertia</code> <em>), for its temperature model; 0 for none.</em></p>
+<pre><code class="language-C++">float ernie::MaterialSettings::thermalInertia;
 </code></pre>
 <hr>
 

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -213,8 +134,9 @@
 
 // clang-format off
 #define ERNIE_IMAGEABLE_ATTRIBUTES(X)                                                              \
-    X(std::string, Visibility, ::ernie::tokens::kVisibility, &quot;inherited&quot;,                          \
-      (::ernie::AttributeMeta{.doc = &quot;\&quot;invisible\&quot; hides the prim and its descendants.&quot;,          \
+    X(::ernie::OrArray&lt;std::string&gt;, Visibility, ::ernie::tokens::kVisibility, &quot;inherited&quot;,        \
+      (::ernie::AttributeMeta{.doc = &quot;\&quot;invisible\&quot; hides the prim and its descendants; as an &quot;    \
+                                     &quot;array (a column's row), 0 hides them.&quot;,                      \
                               .group = &quot;Prim&quot;,                                                     \
                               .options = {::ernie::tokens::kInherited,                             \
                                           ::ernie::tokens::kInvisible},                            \
@@ -222,7 +144,8 @@
     X(int, World, ::ernie::tokens::kWorld, -1,                                                     \
       (::ernie::AttributeMeta{.doc = &quot;The world the prim and its descendants are in, of a &quot;        \
                                      &quot;batch's environments; -1 shared by every world.&quot;,            \
-                              .group = &quot;Prim&quot;, .min = -1.0, .max = 1048576.0}))                    \
+                              .group = &quot;Prim&quot;, .min = -1.0, .max = 1048576.0,                      \
+                              .inherited = true}))                                                 \
     X(std::string, QuaternionOrder, ::ernie::tokens::kQuaternionOrder, ::ernie::tokens::kXyzw,     \
       (::ernie::AttributeMeta{.doc = &quot;Component order of the quaternions in the prim's arrays: &quot;   \
                                      &quot;xyzw (USD, Warp, PhysX) or wxyz (Isaac Lab, MuJoCo).&quot;,       \
@@ -241,13 +164,20 @@
     X(::ernie::OrArray&lt;glm::dvec3&gt;, DisplayColor, ::ernie::tokens::kDisplayColor,                  \
       glm::dvec3(0.5),                                                                             \
       (::ernie::AttributeMeta{.label = &quot;Display colour&quot;,                                           \
-                              .doc = &quot;Linear RGB of the whole prim; colours per vertex are &quot;       \
-                                     &quot;written as an array instead.&quot;,                               \
+                              .doc = &quot;Linear RGB of the whole prim; colours per vertex, face &quot;     \
+                                     &quot;vertex or face are written as an array instead (its &quot;        \
+                                     &quot;:interpolation as USD's, else by count; perhaps indexed).&quot;,  \
                               .group = &quot;Geometry&quot;, .color = true}))                                \
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = &quot;Material&quot;, .doc = &quot;The Material prim it is drawn with.&quot;,   \
                               .group = &quot;Geometry&quot;, .options = {::ernie::tokens::kMaterial},        \
-                              .dirty = ::ernie::Dirty::Material}))
+                              .dirty = ::ernie::Dirty::Material,                                   \
+                              .targetDirty = ::ernie::Dirty::Material}))                                 \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
+      (::ernie::AttributeMeta{.label = &quot;Temperature&quot;,                                              \
+                              .doc = &quot;Kelvin, in place of its material's; 0 for the &quot;              \
+                                     &quot;material's own.&quot;,                                            \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))
 
 #define ERNIE_BOUNDABLE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_BOUNDABLE_ATTRIBUTES(X)
 #define ERNIE_GPRIM_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_GPRIM_ATTRIBUTES(X)

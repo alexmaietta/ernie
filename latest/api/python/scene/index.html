@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -152,9 +73,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.AttributeMapping"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AttributeMapping</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.Column"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Column</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.ColumnMapping"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ColumnMapping</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.Quat"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Quat</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.ChangeCursor"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ChangeCursor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.ColumnChange"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ColumnChange</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.Dirty"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Dirty</a>
     </li>
@@ -276,6 +203,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            animated_prims (ernie.Scene.animated_prims)" href="#ernie.Scene.animated_prims">animated_prims</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The prims with time-sampled attributes.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            attribute_version (ernie.Scene.attribute_version)" href="#ernie.Scene.attribute_version">attribute_version</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -316,10 +251,34 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            clear_samples (ernie.Scene.clear_samples)" href="#ernie.Scene.clear_samples">clear_samples</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Removes <code>attribute</code>'s time samples, keeping its value now.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            clone (ernie.Scene.clone)" href="#ernie.Scene.clone">clone</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Copies <code>source</code> and its descendants to <code>destination</code>, sharing tensors and pointing relationships inside <code>source</code> at their copies; returns the copy.</p>
+                  <p>Copies <code>source</code> and its descendants to <code>destination</code>, sharing tensors and pointing relationships and shader connections inside <code>source</code> at their copies; returns the copy.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            column (ernie.Scene.column)" href="#ernie.Scene.column">column</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p><code>attribute</code> of <code>prims</code> (a PrimSet) as one Column, to write whole or map on a device.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            column_changes (ernie.Scene.column_changes)" href="#ernie.Scene.column_changes">column_changes</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>As <code>changes</code>, but an attribute written whole as a column's rows since <code>cursor</code> comes as one ColumnChange, not as its prims' changes: (changes, columns). <code>expand_columns</code> gives the rest.</p>
                 </div>
               </td>
             </tr>
@@ -340,10 +299,26 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            expand_columns (ernie.Scene.expand_columns)" href="#ernie.Scene.expand_columns">expand_columns</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p><code>changes</code> with <code>columns</code>' prims, their descendants and their dependents merged in, as <code>changes</code> reports them.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            get (ernie.Scene.get)" href="#ernie.Scene.get">get</a></code></td>
               <td>
                 <div class="doc-md-description">
                   
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            get_at (ernie.Scene.get_at)" href="#ernie.Scene.get_at">get_at</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p><code>attribute</code>'s value at <code>time</code>, interpolated from its samples, without moving the stage's time code.</p>
                 </div>
               </td>
             </tr>
@@ -360,6 +335,14 @@
               <td>
                 <div class="doc-md-description">
                   
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            import_usd (ernie.Scene.import_usd)" href="#ernie.Scene.import_usd">import_usd</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Imports a USD file (.usd, .usda, .usdc, .usdz) at root, a prim path, through OpenUSD: composed (sublayers, references, payloads, inherits, variants), then translated prim by prim. The file's default prim becomes root, as a USD reference places it, with its upAxis and metersPerUnit converted into the scene's. variants selects before composing, as {usd_prim_path: {variant_set: selection}}; time is the time code read (the earliest otherwise); proxy and guide also translate prims of those purposes; render_settings False leaves out its RenderSettings, products and vars. Returns a UsdImport. Raises RuntimeError when the plugin (libernie_usd, built with -DERNIE_USD=ON) is missing or the file cannot be opened.</p>
                 </div>
               </td>
             </tr>
@@ -436,10 +419,18 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            sample_times (ernie.Scene.sample_times)" href="#ernie.Scene.sample_times">sample_times</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The time codes of <code>attribute</code>'s samples; empty when it has none.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.Scene.set)" href="#ernie.Scene.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  
+                  <p>Sets <code>attribute</code>, clearing its time samples; with <code>time</code>, sets its time sample at that time code instead. A sampled attribute holds its value at the stage's time code (Stage.time_code), interpolated between samples (linearly; quaternions spherically; tokens, ints and paths held) and held beyond them.</p>
                 </div>
               </td>
             </tr>
@@ -580,6 +571,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Scene.animated_prims" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">animated_prims</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">animated_prims() -&gt; list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The prims with time-sampled attributes.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Scene.attribute_version" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">attribute_version</span>
 
@@ -667,6 +677,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Scene.clear_samples" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">clear_samples</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">clear_samples(path: Path, attribute: str) -&gt; bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Removes <code>attribute</code>'s time samples, keeping its value now.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Scene.clone" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">clone</span>
 
@@ -676,7 +705,47 @@
 
     <div class="doc doc-contents ">
 
-        <p>Copies <code>source</code> and its descendants to <code>destination</code>, sharing tensors and pointing relationships inside <code>source</code> at their copies; returns the copy.</p>
+        <p>Copies <code>source</code> and its descendants to <code>destination</code>, sharing tensors and pointing relationships and shader connections inside <code>source</code> at their copies; returns the copy.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Scene.column" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">column</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">column(prims: PrimSet, attribute: str) -&gt; Column</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p><code>attribute</code> of <code>prims</code> (a PrimSet) as one Column, to write whole or map on a device.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Scene.column_changes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">column_changes</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">column_changes(
+    cursor: ChangeCursor,
+) -&gt; tuple[list[tuple[Path, Dirty]], list[ColumnChange]]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>As <code>changes</code>, but an attribute written whole as a column's rows since <code>cursor</code> comes as one ColumnChange, not as its prims' changes: (changes, columns). <code>expand_columns</code> gives the rest.</p>
 
 
     </div>
@@ -724,6 +793,27 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Scene.expand_columns" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">expand_columns</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">expand_columns(
+    changes: Sequence[tuple[Path, Dirty]], columns: Sequence[ColumnChange]
+) -&gt; list[tuple[Path, Dirty]]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p><code>changes</code> with <code>columns</code>' prims, their descendants and their dependents merged in, as <code>changes</code> reports them.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Scene.get" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get</span>
 
@@ -732,6 +822,27 @@
 <pre class="highlight"><code class="language-python doc-signature">get(path: Path, attribute: str, default: object | None = None) -&gt; object</code></pre>
 
     <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Scene.get_at" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">get_at</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">get_at(
+    path: Path, attribute: str, time: float, default: object | None = None
+) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p><code>attribute</code>'s value at <code>time</code>, interpolated from its samples, without moving the stage's time code.</p>
 
 
     </div>
@@ -766,6 +877,33 @@
 <pre class="highlight"><code class="language-python doc-signature">has(path: Path) -&gt; bool</code></pre>
 
     <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Scene.import_usd" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">import_usd</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">import_usd(
+    root: object,
+    file: str | PathLike,
+    variants: Mapping[str, Mapping[str, str]] | None = None,
+    time: float | None = None,
+    proxy: bool = False,
+    guide: bool = False,
+    render_settings: bool = True,
+) -&gt; UsdImport</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Imports a USD file (.usd, .usda, .usdc, .usdz) at root, a prim path, through OpenUSD: composed (sublayers, references, payloads, inherits, variants), then translated prim by prim. The file's default prim becomes root, as a USD reference places it, with its upAxis and metersPerUnit converted into the scene's. variants selects before composing, as {usd_prim_path: {variant_set: selection}}; time is the time code read (the earliest otherwise); proxy and guide also translate prims of those purposes; render_settings False leaves out its RenderSettings, products and vars. Returns a UsdImport. Raises RuntimeError when the plugin (libernie_usd, built with -DERNIE_USD=ON) is missing or the file cannot be opened.</p>
 
 
     </div>
@@ -934,14 +1072,37 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Scene.sample_times" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">sample_times</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">sample_times(path: Path, attribute: str) -&gt; list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The time codes of <code>attribute</code>'s samples; empty when it has none.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Scene.set" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set</span>
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">set(path: Path, attribute: str, value: object | None) -&gt; None</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">set(
+    path: Path, attribute: str, value: object | None, time: float | None = None
+) -&gt; None</code></pre>
 
     <div class="doc doc-contents ">
+
+        <p>Sets <code>attribute</code>, clearing its time samples; with <code>time</code>, sets its time sample at that time code instead. A sampled attribute holds its value at the stage's time code (Stage.time_code), interpolated between samples (linearly; quaternions spherically; tokens, ints and paths held) and held beyond them.</p>
 
 
     </div>
@@ -1098,7 +1259,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            set (ernie.Prim.set)" href="#ernie.Prim.set">set</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Sets <code>attribute</code>; returns the prim for chaining.</p>
+                  <p>Sets <code>attribute</code>, or with <code>time</code> its time sample there (as Scene.set); returns the prim for chaining.</p>
                 </div>
               </td>
             </tr>
@@ -1114,7 +1275,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            write (ernie.Prim.write)" href="#ernie.Prim.write">write</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Writes any DLPack array as <code>attribute</code> without copying; returns the prim.</p>
+                  <p>Writes any DLPack array as <code>attribute</code> without copying, or with <code>time</code> as its time sample there; returns the prim.</p>
                 </div>
               </td>
             </tr>
@@ -1383,11 +1544,11 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">set(attribute: str, value: object | None) -&gt; Prim</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">set(attribute: str, value: object | None, time: float | None = None) -&gt; Prim</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Sets <code>attribute</code>; returns the prim for chaining.</p>
+        <p>Sets <code>attribute</code>, or with <code>time</code> its time sample there (as Scene.set); returns the prim for chaining.</p>
 
 
     </div>
@@ -1428,11 +1589,15 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">write(attribute: str, array: Annotated[NDArray, dict(writable=False)]) -&gt; Prim</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">write(
+    attribute: str,
+    array: Annotated[NDArray, dict(writable=False)],
+    time: float | None = None,
+) -&gt; Prim</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Writes any DLPack array as <code>attribute</code> without copying; returns the prim.</p>
+        <p>Writes any DLPack array as <code>attribute</code> without copying, or with <code>time</code> as its time sample there; returns the prim.</p>
 
 
     </div>
@@ -2321,6 +2486,473 @@
 
 
 
+<h2 id="ernie.Column" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Column</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>One attribute of many prims as rows of one array, as a simulation keeps its bodies' poses (Scene.column): written whole from any DLPack array, CPU or CUDA, without copying, or mapped and written in place on a device, each write one change however many prims.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            map (ernie.Column.map)" href="#ernie.Column.map">map</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The rows on <code>device</code> ("cpu", "cuda", "cuda:N") to write in place: <code>with column.map("cuda") as rows:</code>, unmapped on exit. A renderer's own storage when it offers it, so nothing is copied; else the rows written last, if there; else on the CPU the prims' values gathered.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            read (ernie.Column.read)" href="#ernie.Column.read">read</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The rows as they are, without copying once written or mapped; on <code>device</code> ("cpu", "cuda"), where they live there, the renderer's own storage included. Reading is no change: nothing to unmap, and writes into the array go unseen.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            unmap (ernie.Column.unmap)" href="#ernie.Column.unmap">unmap</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Commits writes into mapped rows, on the GPU after the work queued on <code>stream</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            write (ernie.Column.write)" href="#ernie.Column.write">write</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Takes <code>array</code> (one row per prim, any DLPack array) as the attribute without copying; for a CUDA array, <code>stream</code> is the one its contents are written on.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            write_arrays (ernie.Column.write_arrays)" href="#ernie.Column.write_arrays">write_arrays</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Takes <code>values</code> as the prims' arrays of different lengths (meshes' points, say), one after another: prim i's the <code>counts[i]</code> entries after the prims' before it, each a view of them, without copying.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>attribute</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>prims</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="            PrimSet (ernie._ernie.PrimSet)" href="#ernie.PrimSet">PrimSet</a></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Column.attribute" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">attribute</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">attribute: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.Column.prims" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">prims</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">prims: PrimSet</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Column.map" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">map(device: str = 'cuda', stream: object | None = None) -&gt; ColumnMapping</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The rows on <code>device</code> ("cpu", "cuda", "cuda:N") to write in place: <code>with column.map("cuda") as rows:</code>, unmapped on exit. A renderer's own storage when it offers it, so nothing is copied; else the rows written last, if there; else on the CPU the prims' values gathered.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Column.read" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">read</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">read(device: str | None = None) -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The rows as they are, without copying once written or mapped; on <code>device</code> ("cpu", "cuda"), where they live there, the renderer's own storage included. Reading is no change: nothing to unmap, and writes into the array go unseen.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Column.unmap" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unmap</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">unmap(stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Commits writes into mapped rows, on the GPU after the work queued on <code>stream</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Column.write" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">write</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">write(
+    array: Annotated[NDArray, dict(writable=False)], stream: object | None = None
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Takes <code>array</code> (one row per prim, any DLPack array) as the attribute without copying; for a CUDA array, <code>stream</code> is the one its contents are written on.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Column.write_arrays" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">write_arrays</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">write_arrays(
+    values: Annotated[NDArray, dict(writable=False)],
+    counts: Sequence[int],
+    stream: object | None = None,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Takes <code>values</code> as the prims' arrays of different lengths (meshes' points, say), one after another: prim i's the <code>counts[i]</code> entries after the prims' before it, each a view of them, without copying.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.ColumnMapping" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">ColumnMapping</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>A column's rows mapped for writing in place (Column.map); a context manager returning the array and unmapping on exit.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            __enter__ (ernie.ColumnMapping.__enter__)" href="#ernie.ColumnMapping.__enter__">__enter__</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            __exit__ (ernie.ColumnMapping.__exit__)" href="#ernie.ColumnMapping.__exit__">__exit__</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            unmap (ernie.ColumnMapping.unmap)" href="#ernie.ColumnMapping.unmap">unmap</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Commits the writes, on the GPU after the work queued on <code>stream</code> (the mapping's when None).</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>array</code></b>
+                  (<code><span title="object">object</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The writable rows.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.ColumnMapping.array" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">array</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">array: object</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The writable rows.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.ColumnMapping.__enter__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__enter__</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">__enter__() -&gt; object</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.ColumnMapping.__exit__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__exit__</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">__exit__(type: object | None, value: object | None, traceback: object | None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.ColumnMapping.unmap" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">unmap</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">unmap(stream: object | None = None) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Commits the writes, on the GPU after the work queued on <code>stream</code> (the mapping's when None).</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
 <h2 id="ernie.Quat" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Quat</span>
 
@@ -2859,6 +3491,200 @@
 
 
 
+<h2 id="ernie.ColumnChange" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">ColumnChange</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>One attribute of many prims written whole as a column's rows; see Scene.column_changes.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            __len__ (ernie.ColumnChange.__len__)" href="#ernie.ColumnChange.__len__">__len__</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>attribute</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>bits</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="            Dirty (ernie._ernie.Dirty)" href="#ernie.Dirty">Dirty</a></code>)
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>paths</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The prims, in row order.</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.ColumnChange.attribute" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">attribute</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">attribute: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.ColumnChange.bits" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">bits</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">bits: Dirty</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.ColumnChange.paths" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">paths</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">paths: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The prims, in row order.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.ColumnChange.__len__" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">__len__</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">__len__() -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
 <h2 id="ernie.Dirty" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Dirty</span>
 
@@ -3274,7 +4100,7 @@
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../../../guides/gpu-interop/" class="btn btn-neutral float-left" title="GPU interop"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../../getting-started/demos/" class="btn btn-neutral float-left" title="Demos"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../schemas/" class="btn btn-neutral float-right" title="Prim types">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -3302,7 +4128,7 @@
         </span>
     
     
-      <span><a href="../../../guides/gpu-interop/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../../../getting-started/demos/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../schemas/" style="color: #fcfcfc">Next &raquo;</a></span>

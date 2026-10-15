@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -289,7 +210,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
-<td style="text-align: left;"><a href="./#define-ernie_render_settings_base_attributes"><strong>ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES</strong></a> (X) <code>/* multi line expression */</code><br><em>Render prims as reflected schemas (</em> <code>prim_type.h</code> <em>), following UsdRender:</em><code>RenderSettings</code> <em>(the rasterizer's options under</em><code>ernie:</code> <em>) and</em><code>RenderProduct</code> <em>share</em><code>RenderSettingsBase</code> <em>(camera, resolution and what a product may override of its settings), a</em><code>RenderVar</code> <em>names an output, and Ernie's</em><code>SensorFilter</code> <em>is one step of a product's or var's sensor chain.</em></td>
+<td style="text-align: left;"><a href="./#define-ernie_render_settings_base_attributes"><strong>ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES</strong></a> (X) <br><em>Render prims as reflected schemas (</em> <code>prim_type.h</code> <em>), following UsdRender:</em><code>RenderSettings</code> <em>(the rasterizer's options under</em><code>ernie:</code> <em>) and</em><code>RenderProduct</code> <em>share</em><code>RenderSettingsBase</code> <em>(camera, resolution and what a product may override of its settings), a</em><code>RenderVar</code> <em>names an output, and Ernie's</em><code>SensorFilter</code> <em>is one step of a product's or var's sensor chain.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">define</td>
@@ -349,7 +270,7 @@
 <p><em>Render prims as reflected schemas (</em> <code>prim_type.h</code> <em>), following UsdRender:</em><code>RenderSettings</code> <em>(the rasterizer's options under</em><code>ernie:</code> <em>) and</em><code>RenderProduct</code> <em>share</em><code>RenderSettingsBase</code> <em>(camera, resolution and what a product may override of its settings), a</em><code>RenderVar</code> <em>names an output, and Ernie's</em><code>SensorFilter</code> <em>is one step of a product's or var's sensor chain.</em></p>
 <pre><code class="language-C++">#define ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES (
     X
-) `/* multi line expression */`
+) 
 </code></pre>
 <p>Each declaration's fallback is the value Ernie renders an unset attribute with, the default of the <code>FrameParams</code>, <code>ShadowSettings</code> or <code>LodSettings</code> field it sets.</p>
 <p>The relationships (<code>camera</code>, <code>products</code>, <code>ernie:lights</code>, <code>orderedVars</code>, <code>ernie:filters</code>) are lists of targets; <code>camera</code> is one target, or on a product a batch of cameras. Not declared: a SensorFilter's <code>inputs:*</code>, which its filter type's model (<code>SensorFilterRegistry</code>) defines.</p>

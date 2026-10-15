@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -217,6 +138,10 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-animatedprims"><strong>AnimatedPrims</strong></a> () const<br><em>The prims with sampled attributes, in path order.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint64_t</td>
 <td style="text-align: left;"><a href="#function-attributeversion"><strong>AttributeVersion</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The version at which</em> <code>attribute</code> <em>was last set, written or cleared on the prim at</em><code>path</code> <em>, or 0 if it never was or the prim does not exist.</em></td>
 </tr>
@@ -225,8 +150,16 @@
 <td style="text-align: left;"><a href="#function-attributes"><strong>Attributes</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The attribute names set or written on the prim at</em> <code>path</code> <em>, in name order.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1SampleBracket/"><strong>SampleBracket</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-bracketat"><strong>BracketAt</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>Where the stage's time code falls among the attribute's samples (</em> <code>BracketOf</code> <em>), for consumers that blend its tensor samples themselves, as a renderer does on the GPU, rather than</em><code>Read</code> <em>them blended on the CPU; none when it has no samples.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1Change/"><strong>Change</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-changes"><strong>Changes</strong></a> (<a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> &amp; cursor) const<br><em>The prims changed since</em> <code>cursor</code> <em>, in path order, and advances</em><code>cursor</code> <em>to</em><code>Version()</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-changes-12"><strong>Changes</strong></a> (<a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> &amp; cursor) const<br><em>The prims changed since</em> <code>cursor</code> <em>, in path order, and advances</em><code>cursor</code> <em>to</em><code>Version()</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1Change/"><strong>Change</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-changes-22"><strong>Changes</strong></a> (<a href="../structernie_1_1ChangeCursor/"><strong>ChangeCursor</strong></a> &amp; cursor, std::vector&lt; <a href="../structernie_1_1ColumnChange/"><strong>ColumnChange</strong></a> &gt; &amp; columns) const<br><em>As</em> <code>Changes</code> <em>, but an attribute written whole as rows of one tensor since the cursor (a</em><code>PrimSet</code> <em>'s</em><code>Write</code> <em>again, or its</em><code>Unmap</code> <em>) comes as one</em><code>ColumnChange</code> <em>in</em><code>columns</code> <em>, not as its prims' changes, their descendants' and their dependents': a consumer taking the rows whole, as a renderer posing a simulation's bodies, visits none of them.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
@@ -237,12 +170,20 @@
 <td style="text-align: left;"><a href="#function-clear"><strong>Clear</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) <br><em>Removes</em> <code>attribute</code> <em>from the prim; false if it was not set.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-clearsamples"><strong>ClearSamples</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) <br><em>Removes the attribute's samples, keeping the value it holds now; false if it had none.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a></td>
-<td style="text-align: left;"><a href="#function-clone"><strong>Clone</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; destination) <br><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes or a bound material, point to their copies.</em></td>
+<td style="text-align: left;"><a href="#function-clone"><strong>Clone</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; destination) <br><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships and shader connections to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes, a bound material or a material's shader network, point to their copies.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a></td>
 <td style="text-align: left;"><a href="#function-define"><strong>Define</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view type) <br><em>Defines the prim at</em> <code>path</code> <em>with</em><code>type</code> <em>and returns it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1Change/"><strong>Change</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-expandcolumns"><strong>ExpandColumns</strong></a> (std::span&lt; const <a href="../structernie_1_1Change/"><strong>Change</strong></a> &gt; changes, std::span&lt; const <a href="../structernie_1_1ColumnChange/"><strong>ColumnChange</strong></a> &gt; columns) const<br><code>changes</code> <em>with</em><code>columns</code> <em>' prims, their descendants and their dependents merged in, as</em><code>Changes</code> <em>without columns reports.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const <a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> *</td>
@@ -255,6 +196,14 @@
 <tr>
 <td style="text-align: right;">T</td>
 <td style="text-align: left;"><a href="#function-get-22"><strong>Get</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, T fallback) const<br><em>The value of</em> <code>attribute</code> <em>as</em><code>T</code> <em>, or</em><code>fallback</code> <em>if it is unset or of another type.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Value/"><strong>Value</strong></a></td>
+<td style="text-align: left;"><a href="#function-getat"><strong>GetAt</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, double time) const<br><em>The attribute's value at</em> <code>time</code> <em>(without moving the stage's time code): its samples interpolated, else its value; empty when it is unset or a tensor.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Column/"><strong>Column</strong></a></td>
+<td style="text-align: left;"><a href="#function-getcolumn"><strong>GetColumn</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute) <br><code>attribute</code> <em>of</em><code>prims</code> <em>as one column (</em><code>Column</code> <em>), to write whole or map on a device.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Overlay/"><strong>Overlay</strong></a> &amp;</td>
@@ -313,6 +262,10 @@
 <td style="text-align: left;"><a href="#function-rowof"><strong>RowOf</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The tensor</em> <code>attribute</code> <em>of the prim at</em><code>path</code> <em>was written from as one row by the</em><code>Write</code> <em>of many paths, and that row; null if it was written or set otherwise since.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1TimeSample/"><strong>TimeSample</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-samplesof"><strong>SamplesOf</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute) const<br><em>The attribute's time samples, in time order; empty when it has none.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"></td>
 <td style="text-align: left;"><a href="#function-scene"><strong>Scene</strong></a> () <br></td>
 </tr>
@@ -321,12 +274,28 @@
 <td style="text-align: left;"><a href="#function-schemaof"><strong>SchemaOf</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) const<br><em>The schema the prim's attributes are checked against: its registered type's, the root's</em> <code>Stage</code> <em>(its stage metadata), or null.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Selection/"><strong>Selection</strong></a></td>
+<td style="text-align: left;"><a href="#function-select"><strong>Select</strong></a> (std::string_view type, std::vector&lt; std::string &gt; attributes={}) <br><em>The prims of</em> <code>type</code> <em>holding every one of</em><code>attributes</code> <em>(set, written or rows of a column), as a</em><code>Selection</code> <em>that finds them again only when they may have changed: the way to step every body of a kind without listing them.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-set"><strong>Set</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value) <br><em>Sets</em> <code>attribute</code> <em>on the prim at</em><code>path</code> <em>, replacing any tensor of that name.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setat"><strong>SetAt</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, double time, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value) <br><em>Sets</em> <code>attribute</code> <em>'s value at time code</em><code>time</code> <em>, a time sample, as USD's</em><code>UsdAttribute::Set(value, time)</code> <em>does.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setcolumnstorage"><strong>SetColumnStorage</strong></a> (std::weak_ptr&lt; <a href="../classernie_1_1ColumnStorage/"><strong>ColumnStorage</strong></a> &gt; storage) const<br><em>Attaches</em> <code>storage</code> <em>(held weakly) as where columns mapped on its devices live (</em><code>Column::Map</code> <em>); null detaches it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-setlocaltransform"><strong>SetLocalTransform</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, const glm::dmat4 &amp; local) <br><em>Gives the prim the local transform</em> <code>local</code> <em>, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-timecode"><strong>TimeCode</strong></a> () const<br><em>The stage's time code (the root's</em> <code>ernie:timeCode</code> <em>), at which sampled attributes are evaluated.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const std::string &amp;</td>
@@ -350,15 +319,23 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-write-13"><strong>Write</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor, std::uintptr_t stream=1) <br><em>Writes</em> <code>tensor</code> <em>as</em><code>attribute</code> <em>of the prim at</em><code>path</code> <em>, replacing any value of that name.</em></td>
+<td style="text-align: left;"><a href="#function-write-14"><strong>Write</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor, std::uintptr_t stream=1) <br><em>Writes</em> <code>tensor</code> <em>as</em><code>attribute</code> <em>of the prim at</em><code>path</code> <em>, replacing any value of that name.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-write-23"><strong>Write</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>Writes row</em> <code>i</code> <em>of</em><code>rows</code> <em>(</em><code>Tensor::Row</code> <em>) as</em><code>attribute</code> <em>of</em><code>paths[i]</code> <em>, so one tensor from a simulation updates many prims at once without copying.</em></td>
+<td style="text-align: left;"><a href="#function-write-24"><strong>Write</strong></a> (std::span&lt; const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt; paths, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>Writes row</em> <code>i</code> <em>of</em><code>rows</code> <em>(</em><code>Tensor::Row</code> <em>) as</em><code>attribute</code> <em>of</em><code>paths[i]</code> <em>, so one tensor from a simulation updates many prims at once without copying.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-write-33"><strong>Write</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>As the</em> <code>Write</code> <em>of many paths, to the prims of</em><code>prims</code> <em>, looked up once and kept (</em><code>PrimSet</code> <em>): the way to write a simulation's arrays every step.</em></td>
+<td style="text-align: left;"><a href="#function-write-34"><strong>Write</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; rows, std::uintptr_t stream=1) <br><em>As the</em> <code>Write</code> <em>of many paths, to the prims of</em><code>prims</code> <em>, looked up once and kept (</em><code>PrimSet</code> <em>): the way to write a simulation's arrays every step.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-write-44"><strong>Write</strong></a> (const <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a> &amp; prims, std::string_view attribute, const <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> &amp; values, std::span&lt; const std::int64_t &gt; counts, std::uintptr_t stream=1) <br><em>As the</em> <code>Write</code> <em>of a</em><a href="../classernie_1_1PrimSet/"><em><strong>PrimSet</strong></em></a> <em>, for arrays of different lengths (meshes' points, of as many points as each has):</em><code>values</code> <em>holds them one after another, prim i's the</em><code>counts[i]</code> <em>entries along its first dimension after the prims' before it, each prim's array a view of them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-writeat"><strong>WriteAt</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view attribute, double time, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor, std::uintptr_t stream=1) <br><code>SetAt</code> <em>for a tensor, kept and shared as</em><code>Write</code> <em>keeps it.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uintptr_t</td>
@@ -374,6 +351,12 @@
 * Pixar, "UsdStage", <a href="https://openusd.org/release/api/class_usd_stage.html">https://openusd.org/release/api/class_usd_stage.html</a>
 * Pixar, "HdChangeTracker" (dirty bits), <a href="https://openusd.org/release/api/class_hd_change_tracker.html">https://openusd.org/release/api/class_hd_change_tracker.html</a> </p>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-animatedprims">function AnimatedPrims</h3>
+<p><em>The prims with sampled attributes, in path order.</em> </p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::Scene::AnimatedPrims () const
+</code></pre>
+<hr>
+
 <h3 id="function-attributeversion">function AttributeVersion</h3>
 <p><em>The version at which</em> <code>attribute</code> <em>was last set, written or cleared on the prim at</em><code>path</code> <em>, or 0 if it never was or the prim does not exist.</em></p>
 <pre><code class="language-C++">std::uint64_t ernie::Scene::AttributeVersion (
@@ -396,13 +379,32 @@
 </ul>
 <hr>
 
-<h3 id="function-changes">function Changes</h3>
+<h3 id="function-bracketat">function BracketAt</h3>
+<p><em>Where the stage's time code falls among the attribute's samples (</em> <code>BracketOf</code> <em>), for consumers that blend its tensor samples themselves, as a renderer does on the GPU, rather than</em><code>Read</code> <em>them blended on the CPU; none when it has no samples.</em></p>
+<pre><code class="language-C++">std::optional&lt; SampleBracket &gt; ernie::Scene::BracketAt (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-changes-12">function Changes [1/2]</h3>
 <p><em>The prims changed since</em> <code>cursor</code> <em>, in path order, and advances</em><code>cursor</code> <em>to</em><code>Version()</code> <em>.</em></p>
 <pre><code class="language-C++">std::vector&lt; Change &gt; ernie::Scene::Changes (
     ChangeCursor &amp; cursor
 ) const
 </code></pre>
 <p>A prim added since the cursor reports <code>Added</code> alone (with <code>Removed</code> if an older prim of that path was removed meanwhile), since consumers rebuild new prims fully. A default cursor sees every prim as added. </p>
+<hr>
+
+<h3 id="function-changes-22">function Changes [2/2]</h3>
+<p><em>As</em> <code>Changes</code> <em>, but an attribute written whole as rows of one tensor since the cursor (a</em><code>PrimSet</code> <em>'s</em><code>Write</code> <em>again, or its</em><code>Unmap</code> <em>) comes as one</em><code>ColumnChange</code> <em>in</em><code>columns</code> <em>, not as its prims' changes, their descendants' and their dependents': a consumer taking the rows whole, as a renderer posing a simulation's bodies, visits none of them.</em></p>
+<pre><code class="language-C++">std::vector&lt; Change &gt; ernie::Scene::Changes (
+    ChangeCursor &amp; cursor,
+    std::vector&lt; ColumnChange &gt; &amp; columns
+) const
+</code></pre>
+<p><code>ExpandColumns</code> gives the rest when it cannot. Columns whose prims have dependents (<code>AttributeMeta::targetDirty</code>) come expanded. </p>
 <hr>
 
 <h3 id="function-children">function Children</h3>
@@ -426,8 +428,17 @@
 </ul>
 <hr>
 
+<h3 id="function-clearsamples">function ClearSamples</h3>
+<p><em>Removes the attribute's samples, keeping the value it holds now; false if it had none.</em> </p>
+<pre><code class="language-C++">bool ernie::Scene::ClearSamples (
+    const Path &amp; path,
+    std::string_view attribute
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-clone">function Clone</h3>
-<p><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes or a bound material, point to their copies.</em></p>
+<p><em>Copies the prim at</em> <code>source</code> <em>and its descendants to</em><code>destination</code> <em>, as one environment is copied into many: types, values and tensors (sharing the tensors' memory) come along, and relationships and shader connections to prims inside</em><code>source</code> <em>, such as a</em><a href="../classernie_1_1PointInstancer/"><em><strong>PointInstancer</strong></em></a> <em>'s prototypes, a bound material or a material's shader network, point to their copies.</em></p>
 <pre><code class="language-C++">Prim ernie::Scene::Clone (
     const Path &amp; source,
     const Path &amp; destination
@@ -452,6 +463,15 @@
 <ul>
 <li><code>std::invalid_argument</code> for the empty path or the root. </li>
 </ul>
+<hr>
+
+<h3 id="function-expandcolumns">function ExpandColumns</h3>
+<p><code>changes</code> <em>with</em><code>columns</code> <em>' prims, their descendants and their dependents merged in, as</em><code>Changes</code> <em>without columns reports.</em></p>
+<pre><code class="language-C++">std::vector&lt; Change &gt; ernie::Scene::ExpandColumns (
+    std::span&lt; const Change &gt; changes,
+    std::span&lt; const ColumnChange &gt; columns
+) const
+</code></pre>
 <hr>
 
 <h3 id="function-findoverlay">function FindOverlay</h3>
@@ -480,6 +500,26 @@ inline T ernie::Scene::Get (
     T fallback
 ) const
 </code></pre>
+<hr>
+
+<h3 id="function-getat">function GetAt</h3>
+<p><em>The attribute's value at</em> <code>time</code> <em>(without moving the stage's time code): its samples interpolated, else its value; empty when it is unset or a tensor.</em></p>
+<pre><code class="language-C++">Value ernie::Scene::GetAt (
+    const Path &amp; path,
+    std::string_view attribute,
+    double time
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-getcolumn">function GetColumn</h3>
+<p><code>attribute</code> <em>of</em><code>prims</code> <em>as one column (</em><code>Column</code> <em>), to write whole or map on a device.</em></p>
+<pre><code class="language-C++">Column ernie::Scene::GetColumn (
+    const PrimSet &amp; prims,
+    std::string_view attribute
+) 
+</code></pre>
+<p>Checked when first written or mapped. </p>
 <hr>
 
 <h3 id="function-getoverlay">function GetOverlay</h3>
@@ -606,6 +646,15 @@ inline T ernie::Scene::Get (
 </code></pre>
 <hr>
 
+<h3 id="function-samplesof">function SamplesOf</h3>
+<p><em>The attribute's time samples, in time order; empty when it has none.</em> </p>
+<pre><code class="language-C++">std::span&lt; const TimeSample &gt; ernie::Scene::SamplesOf (
+    const Path &amp; path,
+    std::string_view attribute
+) const
+</code></pre>
+<hr>
+
 <h3 id="function-scene">function Scene</h3>
 <pre><code class="language-C++">ernie::Scene::Scene () 
 </code></pre>
@@ -623,6 +672,15 @@ inline T ernie::Scene::Get (
 </ul>
 <hr>
 
+<h3 id="function-select">function Select</h3>
+<p><em>The prims of</em> <code>type</code> <em>holding every one of</em><code>attributes</code> <em>(set, written or rows of a column), as a</em><code>Selection</code> <em>that finds them again only when they may have changed: the way to step every body of a kind without listing them.</em></p>
+<pre><code class="language-C++">Selection ernie::Scene::Select (
+    std::string_view type,
+    std::vector&lt; std::string &gt; attributes={}
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-set">function Set</h3>
 <p><em>Sets</em> <code>attribute</code> <em>on the prim at</em><code>path</code> <em>, replacing any tensor of that name.</em></p>
 <pre><code class="language-C++">void ernie::Scene::Set (
@@ -637,12 +695,43 @@ inline T ernie::Scene::Get (
 </ul>
 <hr>
 
+<h3 id="function-setat">function SetAt</h3>
+<p><em>Sets</em> <code>attribute</code> <em>'s value at time code</em><code>time</code> <em>, a time sample, as USD's</em><code>UsdAttribute::Set(value, time)</code> <em>does.</em></p>
+<pre><code class="language-C++">void ernie::Scene::SetAt (
+    const Path &amp; path,
+    std::string_view attribute,
+    double time,
+    Value value
+) 
+</code></pre>
+<p>An attribute with samples holds, as its value (<code>Get</code>, <code>Read</code>), the one at the stage's time code (the root's <code>ernie:timeCode</code>), interpolated between the samples either side (<code>Interpolate</code>, <a href="../time__samples_8h/"><strong>time_samples.h</strong></a>) and held beyond the first and last; setting the time code evaluates every sampled attribute again, recording a change only where its value changed. <code>Set</code> or <code>Write</code> without a time clears the attribute's samples. Samples of an attribute are all values or all tensors: a sample of the other kind replaces them. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the prim does not exist or the value does not fit the attribute. </li>
+</ul>
+<hr>
+
+<h3 id="function-setcolumnstorage">function SetColumnStorage</h3>
+<p><em>Attaches</em> <code>storage</code> <em>(held weakly) as where columns mapped on its devices live (</em><code>Column::Map</code> <em>); null detaches it.</em></p>
+<pre><code class="language-C++">void ernie::Scene::SetColumnStorage (
+    std::weak_ptr&lt; ColumnStorage &gt; storage
+) const
+</code></pre>
+<p>A renderer attaches its own to the scenes it renders, changing nothing of theirs, hence const. Copies of the scene start without. </p>
+<hr>
+
 <h3 id="function-setlocaltransform">function SetLocalTransform</h3>
 <p><em>Gives the prim the local transform</em> <code>local</code> <em>, through its own transform ops where they can represent it (</em><code>LocalTransformEdits</code> <em>).</em></p>
 <pre><code class="language-C++">void ernie::Scene::SetLocalTransform (
     const Path &amp; path,
     const glm::dmat4 &amp; local
 ) 
+</code></pre>
+<hr>
+
+<h3 id="function-timecode">function TimeCode</h3>
+<p><em>The stage's time code (the root's</em> <code>ernie:timeCode</code> <em>), at which sampled attributes are evaluated.</em></p>
+<pre><code class="language-C++">double ernie::Scene::TimeCode () const
 </code></pre>
 <hr>
 
@@ -699,7 +788,7 @@ inline T ernie::Scene::Get (
 </code></pre>
 <hr>
 
-<h3 id="function-write-13">function Write [1/3]</h3>
+<h3 id="function-write-14">function Write [1/4]</h3>
 <p><em>Writes</em> <code>tensor</code> <em>as</em><code>attribute</code> <em>of the prim at</em><code>path</code> <em>, replacing any value of that name.</em></p>
 <pre><code class="language-C++">void ernie::Scene::Write (
     const Path &amp; path,
@@ -715,7 +804,7 @@ inline T ernie::Scene::Get (
 </ul>
 <hr>
 
-<h3 id="function-write-23">function Write [2/3]</h3>
+<h3 id="function-write-24">function Write [2/4]</h3>
 <p><em>Writes row</em> <code>i</code> <em>of</em><code>rows</code> <em>(</em><code>Tensor::Row</code> <em>) as</em><code>attribute</code> <em>of</em><code>paths[i]</code> <em>, so one tensor from a simulation updates many prims at once without copying.</em></p>
 <pre><code class="language-C++">void ernie::Scene::Write (
     std::span&lt; const Path &gt; paths,
@@ -731,7 +820,7 @@ inline T ernie::Scene::Get (
 </ul>
 <hr>
 
-<h3 id="function-write-33">function Write [3/3]</h3>
+<h3 id="function-write-34">function Write [3/4]</h3>
 <p><em>As the</em> <code>Write</code> <em>of many paths, to the prims of</em><code>prims</code> <em>, looked up once and kept (</em><code>PrimSet</code> <em>): the way to write a simulation's arrays every step.</em></p>
 <pre><code class="language-C++">void ernie::Scene::Write (
     const PrimSet &amp; prims,
@@ -744,6 +833,36 @@ inline T ernie::Scene::Get (
 <ul>
 <li><code>std::invalid_argument</code> as the <code>Write</code> of many paths. </li>
 </ul>
+<hr>
+
+<h3 id="function-write-44">function Write [4/4]</h3>
+<p><em>As the</em> <code>Write</code> <em>of a</em><a href="../classernie_1_1PrimSet/"><em><strong>PrimSet</strong></em></a> <em>, for arrays of different lengths (meshes' points, of as many points as each has):</em><code>values</code> <em>holds them one after another, prim i's the</em><code>counts[i]</code> <em>entries along its first dimension after the prims' before it, each prim's array a view of them.</em></p>
+<pre><code class="language-C++">void ernie::Scene::Write (
+    const PrimSet &amp; prims,
+    std::string_view attribute,
+    const Tensor &amp; values,
+    std::span&lt; const std::int64_t &gt; counts,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p>Written again with the same counts, one change as rows are; other counts lay it out anew. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if a prim does not exist, the counts are not one per prim, or they do not add up to the entries of <code>values</code>; nothing is written then. </li>
+</ul>
+<hr>
+
+<h3 id="function-writeat">function WriteAt</h3>
+<p><code>SetAt</code> <em>for a tensor, kept and shared as</em><code>Write</code> <em>keeps it.</em></p>
+<pre><code class="language-C++">void ernie::Scene::WriteAt (
+    const Path &amp; path,
+    std::string_view attribute,
+    double time,
+    Tensor tensor,
+    std::uintptr_t stream=1
+) 
+</code></pre>
+<p><a href="../structernie_1_1Device/"><strong>Device</strong></a> tensors between samples hold the lower sample, for consumers on the device to blend (<code>SamplesOf</code>). </p>
 <hr>
 
 <h3 id="function-writestream">function WriteStream</h3>

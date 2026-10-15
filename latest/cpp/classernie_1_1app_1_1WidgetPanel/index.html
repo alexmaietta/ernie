@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -265,6 +186,10 @@
 <td style="text-align: left;"><a href="#function-plot"><strong>Plot</strong></a> (std::string label, std::function&lt; std::vector&lt; float &gt;()&gt; source) <br><em>A line plot of the values</em> <code>source</code> <em>returns, read each frame.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="./#typedef-id"><strong>Id</strong></a></td>
+<td style="text-align: left;"><a href="#function-progress"><strong>Progress</strong></a> (std::string label) <br><em>A progress bar, empty until</em> <code>Set</code> <em>gives its fraction done (0 to 1) and the text over it (such as a download's megabytes).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-remove"><strong>Remove</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget) <br></td>
 </tr>
@@ -274,7 +199,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-set-15"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, bool value) <br><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>), combo (index) or colour, or the text of a text or text field.</em></td>
+<td style="text-align: left;"><a href="#function-set-15"><strong>Set</strong></a> (<a href="./#typedef-id"><strong>Id</strong></a> widget, bool value) <br><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider or progress bar (</em><code>double</code> <em>), combo (index) or colour, or the text of a text, text field or progress bar.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -436,6 +361,14 @@
 </code></pre>
 <hr>
 
+<h3 id="function-progress">function Progress</h3>
+<p><em>A progress bar, empty until</em> <code>Set</code> <em>gives its fraction done (0 to 1) and the text over it (such as a download's megabytes).</em></p>
+<pre><code class="language-C++">Id ernie::app::WidgetPanel::Progress (
+    std::string label
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-remove">function Remove</h3>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Remove (
     Id widget
@@ -449,7 +382,7 @@
 <hr>
 
 <h3 id="function-set-15">function Set [1/5]</h3>
-<p><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider (</em><code>double</code> <em>), combo (index) or colour, or the text of a text or text field.</em></p>
+<p><em>Sets the value of a checkbox (</em> <code>bool</code> <em>), slider or progress bar (</em><code>double</code> <em>), combo (index) or colour, or the text of a text, text field or progress bar.</em></p>
 <pre><code class="language-C++">void ernie::app::WidgetPanel::Set (
     Id widget,
     bool value

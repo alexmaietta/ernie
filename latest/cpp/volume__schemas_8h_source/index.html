@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -219,8 +140,8 @@
 // clang-format off
 #define ERNIE_FIELD_ASSET_ATTRIBUTES(X)                                                            \
     X(std::string, FilePath, ::ernie::tokens::kFilePath, &quot;&quot;,                                       \
-      (::ernie::AttributeMeta{.doc = &quot;The grid's file: NanoVDB (.nvdb), uncompressed; convert &quot;    \
-                                     &quot;.vdb files first (nanovdb_convert).&quot;,                        \
+      (::ernie::AttributeMeta{.doc = &quot;The grid's file: OpenVDB (.vdb) or NanoVDB (.nvdb), &quot;        \
+                                     &quot;uncompressed.&quot;,                                              \
                               .group = &quot;Field&quot;, .asset = true,                                     \
                               .dirty = ::ernie::Dirty::Points}))                                   \
     X(std::string, FieldName, ::ernie::tokens::kFieldName, &quot;&quot;,                                     \
@@ -276,6 +197,94 @@
                               .group = &quot;Field&quot;, .min = 1e-9, .max = 1e9,                           \
                               .dirty = ::ernie::Dirty::Points}))
 
+#define ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES(X)                                                     \
+    X(double, Coverage, ::ernie::tokens::kCloudCoverage, 0.3,                                      \
+      (::ernie::AttributeMeta{.doc = &quot;How much of the sky the layers cover, over the weather map: &quot; \
+                                     &quot;0 clear, 1 overcast.&quot;,                                       \
+                              .group = &quot;Clouds&quot;, .min = 0.0, .max = 1.0}))                         \
+    X(double, Extent, ::ernie::tokens::kCloudExtent, 20000.0,                                      \
+      (::ernie::AttributeMeta{.doc = &quot;The layers' reach across the field's frame (world units) &quot;    \
+                                     &quot;from its origin in x and y, z up: the volume's bounds.&quot;,     \
+                              .group = &quot;Clouds&quot;, .min = 1.0}))                                     \
+    X(double, StepSize, ::ernie::tokens::kCloudStepSize, 50.0,                                     \
+      (::ernie::AttributeMeta{.doc = &quot;World units the march steps through the layers as a grid's &quot;  \
+                                     &quot;voxel, before the volume's steps per voxel.&quot;,                \
+                              .group = &quot;Clouds&quot;, .min = 1e-3}))                                    \
+    X(double, WeatherTileSize, ::ernie::tokens::kCloudWeatherTileSize, 100000.0,                   \
+      (::ernie::AttributeMeta{.doc = &quot;World units across the repeating weather map: where clouds &quot; \
+                                     &quot;form, each layer from its channel.&quot;,                         \
+                              .group = &quot;Clouds&quot;, .min = 1e-3}))                                    \
+    X(glm::dvec2, WeatherOffset, ::ernie::tokens::kCloudWeatherOffset, glm::dvec2(0.0),             \
+      (::ernie::AttributeMeta{.doc = &quot;The weather map's offset (world units), as wind moves it.&quot;,  \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(double, ShapeTileSize, ::ernie::tokens::kCloudShapeTileSize, 3333.0,                         \
+      (::ernie::AttributeMeta{.doc = &quot;World units across the repeating Perlin-Worley shapes.&quot;,      \
+                              .group = &quot;Clouds&quot;, .min = 1e-3}))                                    \
+    X(double, DetailTileSize, ::ernie::tokens::kCloudDetailTileSize, 166.7,                        \
+      (::ernie::AttributeMeta{.doc = &quot;World units across the repeating Worley details that erode &quot; \
+                                     &quot;the shapes' edges.&quot;,                                         \
+                              .group = &quot;Clouds&quot;, .min = 1e-3}))                                    \
+    X(double, TurbulenceTileSize, ::ernie::tokens::kCloudTurbulenceTileSize, 5000.0,               \
+      (::ernie::AttributeMeta{.doc = &quot;World units across the repeating curl-noise turbulence.&quot;,     \
+                              .group = &quot;Clouds&quot;, .min = 1e-3}))                                    \
+    X(double, TurbulenceDisplacement, ::ernie::tokens::kCloudTurbulenceDisplacement, 350.0,        \
+      (::ernie::AttributeMeta{.doc = &quot;World units the turbulence displaces the shapes, most at &quot;   \
+                                     &quot;their bottoms.&quot;,                                             \
+                              .group = &quot;Clouds&quot;, .min = 0.0}))                                     \
+    X(std::vector&lt;float&gt;, LayerAltitudes, ::ernie::tokens::kCloudLayerAltitudes,                   \
+      (std::vector&lt;float&gt;{750.0f, 1000.0f, 7500.0f}),                                              \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's bottom (z, world units), up to four layers: &quot;   \
+                                     &quot;three-geospatial's low and mid cumulus and cirrus.&quot;,         \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerHeights, ::ernie::tokens::kCloudLayerHeights,                       \
+      (std::vector&lt;float&gt;{650.0f, 1200.0f, 500.0f}),                                               \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's height (world units); 0 none.&quot;,                 \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerDensities, ::ernie::tokens::kCloudLayerDensities,                   \
+      (std::vector&lt;float&gt;{0.2f, 0.2f, 0.003f}),                                                    \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's density scale, its value at its densest, &quot;      \
+                                     &quot;times the material's density.&quot;,                              \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerShapeAmounts, ::ernie::tokens::kCloudLayerShapeAmounts,             \
+      (std::vector&lt;float&gt;{1.0f, 1.0f, 0.4f}),                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;How much each layer's shape noise carves it.&quot;,               \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerDetailAmounts, ::ernie::tokens::kCloudLayerDetailAmounts,           \
+      (std::vector&lt;float&gt;{1.0f, 1.0f, 0.0f}),                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;How much each layer's detail noise erodes its edges.&quot;,       \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerWeatherExponents, ::ernie::tokens::kCloudLayerWeatherExponents,     \
+      (std::vector&lt;float&gt;{1.0f, 1.0f, 1.0f}),                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's weather map's value to this power.&quot;,            \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerShapeBiases, ::ernie::tokens::kCloudLayerShapeBiases,               \
+      (std::vector&lt;float&gt;{0.35f, 0.35f, 0.35f}),                                                   \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's height fraction to this power before its &quot;      \
+                                     &quot;rounding: below 1, flatter bottoms and rounder tops.&quot;,       \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerCoverageFilterWidths,                                               \
+      ::ernie::tokens::kCloudLayerCoverageFilterWidths, (std::vector&lt;float&gt;{0.6f, 0.6f, 0.5f}),    \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's coverage's softness, over its weather.&quot;,        \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerDensityProfiles, ::ernie::tokens::kCloudLayerDensityProfiles,       \
+      (std::vector&lt;float&gt;{0.0f, 0.0f, 0.75f, 0.25f, 0.0f, 0.0f, 0.75f, 0.25f, 0.0f, 0.0f, 0.75f,   \
+                          0.25f}),                                                                 \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's a, b, c and d: its density times a e^(b h) + c &quot; \
+                                     &quot;h + d over its height fraction h, denser at its top.&quot;,       \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerChannels, ::ernie::tokens::kCloudLayerChannels,                     \
+      (std::vector&lt;float&gt;{0.0f, 1.0f, 2.0f}),                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;Each layer's weather map channel: 0 low cumulus cells, 1 &quot;    \
+                                     &quot;mid, 2 high streaks, 3 everywhere.&quot;,                         \
+                              .group = &quot;Clouds&quot;}))                                                 \
+    X(std::vector&lt;float&gt;, LayerShadows, ::ernie::tokens::kCloudLayerShadows,                       \
+      (std::vector&lt;float&gt;{1.0f, 1.0f, 0.0f}),                                                      \
+      (::ernie::AttributeMeta{.doc = &quot;Whether each layer goes in the shadow map from the sun (1) &quot; \
+                                     &quot;or not (0): thin high layers left out, whose faint optical &quot; \
+                                     &quot;depth over kilometres would put the map's front far above &quot;  \
+                                     &quot;the clouds below (as three-geospatial's cirrus).&quot;,           \
+                              .group = &quot;Clouds&quot;}))
+
 #define ERNIE_FIELD_BASE_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ATTRIBUTES(X)
 
@@ -284,6 +293,8 @@
 #define ERNIE_OPENVDB_ASSET_ALL(X) ERNIE_FIELD_ASSET_ALL(X) ERNIE_OPENVDB_ASSET_ATTRIBUTES(X)
 #define ERNIE_NANOVDB_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_NANOVDB_FIELD_ATTRIBUTES(X)
 #define ERNIE_DENSE_FIELD_ALL(X) ERNIE_FIELD_BASE_ALL(X) ERNIE_DENSE_FIELD_ATTRIBUTES(X)
+#define ERNIE_CLOUD_LAYERS_FIELD_ALL(X)                                                            \
+    ERNIE_FIELD_BASE_ALL(X) ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES(X)
 #define ERNIE_VOLUME_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_VOLUME_ATTRIBUTES(X)
 // clang-format on
 
@@ -312,6 +323,12 @@ class NanoVDBField : public FieldBase {
 class DenseField : public FieldBase {
     ERNIE_SCHEMA_BODY(DenseField, FieldBase, ERNIE_DENSE_FIELD_ALL)
     ERNIE_SCHEMA_DEFINE(DenseField)
+};
+
+class CloudLayersField : public FieldBase {
+    ERNIE_SCHEMA_BODY(CloudLayersField, FieldBase,
+                      ERNIE_CLOUD_LAYERS_FIELD_ALL)
+    ERNIE_SCHEMA_DEFINE(CloudLayersField)
 };
 
 class Volume : public Gprim {

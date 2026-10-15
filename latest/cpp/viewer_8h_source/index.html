@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -207,9 +128,11 @@
 <pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
+#include &quot;ernie/app/capture.h&quot;
 #include &quot;ernie/app/file_dialog.h&quot;
 #include &quot;ernie/app/panel.h&quot;
 #include &quot;ernie/app/theme.h&quot;
+#include &quot;ernie/app/timeline.h&quot;
 #include &quot;ernie/device/vulkan_context.h&quot;
 #include &quot;ernie/scene/edit_history.h&quot;
 #include &quot;ernie/scene/path.h&quot;
@@ -223,9 +146,11 @@
 #include &lt;functional&gt;
 #include &lt;memory&gt;
 #include &lt;optional&gt;
+#include &lt;set&gt;
 #include &lt;span&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
+#include &lt;utility&gt;
 #include &lt;vector&gt;
 
 namespace ernie::app {
@@ -265,12 +190,14 @@ struct ViewerOptions {
 };
 
 struct ViewportDisplay {
-    bool lights = true;   
+    bool lights = false;  
     bool cameras = true;  
-    bool grid = false;    
+    bool skeletons = false;  
+    bool grid = false;  
     bool selection = true;  
     bool overlays =
-        true;         
+        true;  
+    std::set&lt;std::string, std::less&lt;&gt;&gt; hiddenOverlays;
     bool hud = true;  
     bool hudFps = true;  
     bool hudDeviceMemory = true;  
@@ -285,8 +212,25 @@ struct ViewportDisplay {
         true;  
     bool toolbarLighting =
         true;  
+    bool ui = true;
 
     bool operator==(const ViewportDisplay&amp;) const = default;
+};
+
+struct CaptureOptions {
+    std::filesystem::path folder =
+        DefaultCaptureFolder();  
+    std::string name = &quot;{scene}_{date}_{time}&quot;;
+    std::vector&lt;std::string&gt; vars;
+    double scale = 1.0;
+};
+
+struct SequenceOptions {
+    std::optional&lt;double&gt; start;
+    std::optional&lt;double&gt; end;
+    int every = 1;  
+    VideoFormat video = VideoFormat::Mp4;
+    bool keepFrames = true;  
 };
 
 enum class LogLevel { Info, Warning, Error };
@@ -301,6 +245,8 @@ struct FrameInfo {
     std::uint64_t frame = 0;  
     double time = 0.0;        
     double delta = 0.0;       
+    double timeCode = 0.0;
+    double timeStep = 0.0;
 };
 
 class Viewer {
@@ -390,6 +336,8 @@ class Viewer {
 
     static const Path&amp; PerspectiveCamera();
 
+    static const Path&amp; SessionSettings();
+
     const std::vector&lt;Path&gt;&amp; Selection() const;
     void SetSelection(std::vector&lt;Path&gt; paths);
 
@@ -434,6 +382,8 @@ class Viewer {
 
     void Frame(std::span&lt;const Path&gt; paths = {});
 
+    void LookAt(const glm::dvec3&amp; eye, const glm::dvec3&amp; target);
+
     Path CameraFromView(const Path&amp; path);
 
     const std::string&amp; ViewVar() const;
@@ -451,6 +401,9 @@ class Viewer {
 
     void StepClock(double seconds);
 
+    Timeline&amp; GetTimeline();
+    const Timeline&amp; GetTimeline() const;
+
     enum class Exposure { Default, Auto, Camera };
     Exposure GetExposure() const;
     void SetExposure(Exposure exposure);
@@ -465,6 +418,8 @@ class Viewer {
     bool GetVsync() const;
     void SetVsync(bool vsync);
 
+    std::pair&lt;std::uint32_t, std::uint32_t&gt;
+    ViewportResolution() const;
     void SetRenderResolution(
         std::optional&lt;std::pair&lt;std::uint32_t, std::uint32_t&gt;&gt; size,
         float scale = 1.0f, bool fill = true);
@@ -497,6 +452,14 @@ class Viewer {
         std::string label, std::function&lt;void(Viewer&amp;)&gt; action,
         std::function&lt;bool(const Viewer&amp;)&gt; checked = {});
 
+    std::uint64_t AddOverlayClickHandler(
+        std::function&lt;void(Viewer&amp;, const std::string&amp;,
+                           std::uint32_t)&gt;
+            clicked);
+
+    std::uint64_t AddOverlayPickHandler(
+        std::function&lt;void(Viewer&amp;, const OverlayHit&amp;)&gt; picked);
+
     void RemoveViewportItem(std::uint64_t id);
 
     const Path&amp; Settings() const;
@@ -505,6 +468,20 @@ class Viewer {
 
     void Capture(const std::filesystem::path&amp; path,
                  std::string var = {});
+
+    CaptureOptions&amp; GetCaptureOptions();
+
+    std::filesystem::path Screenshot();
+
+    void RecordSequence(const SequenceOptions&amp; options);
+    bool Recording() const;
+
+    bool EcoPaused() const;
+    void Redraw();
+    std::pair&lt;std::int64_t, std::int64_t&gt; RecordingProgress() const;
+    void StopRecording();
+    bool Encoding() const;
+    const std::vector&lt;std::filesystem::path&gt;&amp; RecentCaptures() const;
 
     void CaptureWindow(const std::filesystem::path&amp; path);
 

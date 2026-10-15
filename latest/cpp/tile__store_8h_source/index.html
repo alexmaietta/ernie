@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/tile__store_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File tile_store.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File tile_store.h";
+        var mkdocs_page_input_path = "cpp/tile__store_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/tile__store_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File tile_store.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/tile__store_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-tile_storeh">File tile_store.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_b0c7a12f8e9ab3adbc5e778572fb81e7/"><strong>device</strong></a> <strong>&gt;</strong> <a href="../tile__store_8h/"><strong>tile_store.h</strong></a></p>
+<p><a href="../tile__store_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/device/vulkan_context.h&quot;
+
+#include &lt;compare&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdint&gt;
+#include &lt;span&gt;
+
+namespace ernie {
+
+struct SparseTile {
+    std::uint32_t mip = 0;
+    std::uint32_t x = 0;
+    std::uint32_t y = 0;
+
+    auto operator&lt;=&gt;(const SparseTile&amp;) const = default;
+};
+
+class TileStore {
+  public:
+    virtual ~TileStore() = default;
+
+    virtual VkExtent2D TileTexels() const = 0;
+
+    virtual std::uint32_t TileBorder() const = 0;
+
+    virtual std::uint32_t TailMip() const = 0;
+
+    virtual VkExtent2D TileCount(std::uint32_t mip) const = 0;
+
+    virtual VkExtent2D TileExtent(const SparseTile&amp; tile) const = 0;
+
+    virtual VkDeviceSize
+    TileDataBytes(const SparseTile&amp; tile) const = 0;
+
+    virtual VkDeviceSize TileMemoryBytes() const = 0;
+
+    virtual void
+    Write(std::span&lt;const SparseTile&gt; tiles,
+          std::span&lt;const std::span&lt;const std::byte&gt;&gt; texels) = 0;
+
+    virtual void
+    WriteTail(std::span&lt;const std::span&lt;const std::byte&gt;&gt; mips) = 0;
+
+    virtual void Release(std::span&lt;const SparseTile&gt; tiles) = 0;
+
+    virtual bool Bound(const SparseTile&amp; tile) const = 0;
+    virtual std::size_t BoundTiles() const = 0;
+
+    virtual VkDeviceSize Bytes() const = 0;
+};
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

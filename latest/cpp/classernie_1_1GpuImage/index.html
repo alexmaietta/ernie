@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -317,6 +238,14 @@
 <tbody>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-blockbytes"><strong>BlockBytes</strong></a> (VkFormat format) <br><em>Bytes of one 4 x 4 block of a BC1 to BC7 format; 0 for formats that are not block-compressed.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-mipbytes"><strong>MipBytes</strong></a> (VkFormat format, std::uint32_t width, std::uint32_t height) <br><em>Tightly packed bytes of a</em> <code>width</code> <em>x</em><code>height</code> <em>mip of</em><code>format</code> <em>, in whole blocks for block-compressed formats.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#function-texelbytes"><strong>TexelBytes</strong></a> (VkFormat format) <br><em>Bytes per texel of the formats Ernie uploads and reads back.</em></td>
 </tr>
 </tbody>
@@ -494,6 +423,28 @@
 </code></pre>
 <hr>
 <h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-blockbytes">function BlockBytes</h3>
+<p><em>Bytes of one 4 x 4 block of a BC1 to BC7 format; 0 for formats that are not block-compressed.</em> </p>
+<pre><code class="language-C++">static std::uint32_t ernie::GpuImage::BlockBytes (
+    VkFormat format
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-mipbytes">function MipBytes</h3>
+<p><em>Tightly packed bytes of a</em> <code>width</code> <em>x</em><code>height</code> <em>mip of</em><code>format</code> <em>, in whole blocks for block-compressed formats.</em></p>
+<pre><code class="language-C++">static VkDeviceSize ernie::GpuImage::MipBytes (
+    VkFormat format,
+    std::uint32_t width,
+    std::uint32_t height
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a format <code>TexelBytes</code> and <code>BlockBytes</code> do not know. </li>
+</ul>
+<hr>
+
 <h3 id="function-texelbytes">function TexelBytes</h3>
 <p><em>Bytes per texel of the formats Ernie uploads and reads back.</em> </p>
 <pre><code class="language-C++">static std::uint32_t ernie::GpuImage::TexelBytes (

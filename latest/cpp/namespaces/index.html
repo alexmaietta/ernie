@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -205,12 +126,13 @@
 <p>Here is a list of all namespaces with brief descriptions:</p>
 <ul>
 <li><strong>namespace</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <em>Planetary digital elevation models, as the PDS archives them, and the local heightfields Ernie's</em> <a href="../classernie_1_1Terrain/"><em><strong>Terrain</strong></em></a> <em>draws of them.</em>    <ul>
-<li><strong>namespace</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a>     <ul>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1app/"><strong>app</strong></a> <em>Editing a camera's sensor chain (the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel's Filter Chain): a</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> <em>'s</em><code>ernie:filters</code> <em>and its SensorFilter prims, as ordinary scene edits.</em>    <ul>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1app_1_1icons/"><strong>icons</strong></a> <em>Lucide icon glyphs (lucide-static 1.52.0, private-use codepoints) as UTF-8 strings, for text drawn with the viewer's font, which has the icons merged in:</em> <code>ImGui::Button(icons::kSave)</code> <em>, or</em><code>std::string(icons::kCamera) + " Camera"</code> <em>as a label.</em>    </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1app_1_1menu/"><strong>menu</strong></a>     </li>
 </ul>
 </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1detail/"><strong>detail</strong></a> <em>What the view macros expand to.</em>     </li>
+<li><strong>namespace</strong> <a href="../namespaceernie_1_1log/"><strong>log</strong></a> <em>What Ernie prints about itself on standard output, as Warp does (</em> <code>wp.config.quiet</code> <em>,</em><code>wp.config.verbose</code> <em>): a banner once it starts on a GPU, with its version, device and cache folders, and a line for each shader it compiles, more with verbosity (shaders and textures its caches answer) and nothing when quiet.</em>    </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1memory/"><strong>memory</strong></a> <em>The device memory Ernie's buffers and images hold, for the viewer's Profiler panel: each live</em> <code>GpuBuffer</code> <em>and</em><code>GpuImage</code> <em>registers its allocation under a category from its usage (render targets, textures, storage buffers, ...) until it is released.</em>    </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1profiler/"><strong>profiler</strong></a> <em>Summaries of the profiler's frames (</em> <a href="../profiler_8h/"><em><strong>ernie/util/profiler.h</strong></em></a> <em>) as Omniverse Kit's profiler window shows them: each zone nested in the zone that encloses it, with its time averaged over the frames, its share of the frame, and exports as text, JSON and a Chrome trace.</em>    </li>
 <li><strong>namespace</strong> <a href="../namespaceernie_1_1reflectance__table/"><strong>reflectance_table</strong></a>     </li>

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -246,6 +167,10 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-button"><strong>Button</strong></a> (const <a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> &amp; placement, std::string_view label, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::vec2 &amp; size=glm::vec2(0.0f)) <br><em>A button on the image, as</em> <code>Text</code> <em>: a box of</em><code>size</code> <em>pixels (or fitted around</em><code>label</code> <em>when 0) in the style's</em><code>background</code> <em>, or its</em><code>hover</code> <em>colour while hovered, with</em><code>label</code> <em>centred in its</em><code>color</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-circle"><strong>Circle</strong></a> (const glm::dvec3 &amp; centre, const glm::dvec3 &amp; normal, double radius, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, int segments=48) <br><em>A circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>, in the plane facing</em><code>normal</code> <em>.</em></td>
 </tr>
 <tr>
@@ -263,6 +188,14 @@
 <tr>
 <td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlayTriangle/"><strong>OverlayTriangle</strong></a> &gt; &amp;</td>
 <td style="text-align: left;"><a href="#function-fills"><strong>Fills</strong></a> () const<br><em>The filled triangles, of</em> <code>Triangles</code> <em>and arrow heads.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-hovered"><strong>Hovered</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-image"><strong>Image</strong></a> (std::span&lt; const glm::dvec3, 4 &gt; corners, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> image, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}) <br><code>image</code> <em>(</em><code>OverlayBatch::image</code> <em>) on the quad between</em><code>corners</code> <em>in the world: its top left, top right, bottom right and bottom left, in the space of the style's</em><code>anchor</code> <em>if it has one.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -294,7 +227,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
-<td style="text-align: left;"><a href="#function-polyline"><strong>Polyline</strong></a> (std::span&lt; const glm::dvec3 &gt; points, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, bool closed=false) <br><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>.</em></td>
+<td style="text-align: left;"><a href="#function-polyline"><strong>Polyline</strong></a> (std::span&lt; const glm::dvec3 &gt; points, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, bool closed=false, std::span&lt; const glm::vec4 &gt; colors={}) <br><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>; with</em><code>colors</code> <em>(one per point), each blending from its start's to its end's, such as a trail coloured by speed.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
@@ -305,8 +238,20 @@
 <td style="text-align: left;"><a href="#function-replacebatcharray"><strong>ReplaceBatchArray</strong></a> (std::size_t batch, std::string_view array, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> values) <br><em>Replaces array</em> <code>array</code> <em>("points", "ends", "values"...: the field's name) of batch</em><code>batch</code> <em>with</em><code>values</code> <em>of the same type and shape, such as the renderer's own memory for it (</em><code>RenderDelegate::MapOverlay</code> <em>), without a new version: the batch's layout stays.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-screenimage"><strong>ScreenImage</strong></a> (const <a href="../structernie_1_1ScreenPlacement/"><strong>ScreenPlacement</strong></a> &amp; placement, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> image, const <a href="../structernie_1_1OverlayStyle/"><strong>OverlayStyle</strong></a> &amp; style={}, const glm::vec2 &amp; size=glm::vec2(0.0f)) <br><code>image</code> <em>on the screen, as</em><code>Rect</code> <em>,</em><code>size</code> <em>pixels (its own size when 0): a picture in the picture.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-screenitemat"><strong>ScreenItemAt</strong></a> (const glm::vec2 &amp; pixel, const glm::vec2 &amp; extent) const<br><em>The</em> <code>id</code> <em>of the topmost screen item with one covering</em><code>pixel</code> <em>(y down) of an image of</em><code>extent</code> <em>pixels, or 0: what a click or a pointer there would hit.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">const std::vector&lt; <a href="../structernie_1_1OverlaySegment/"><strong>OverlaySegment</strong></a> &gt; &amp;</td>
 <td style="text-align: left;"><a href="#function-segments"><strong>Segments</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-sethovered"><strong>SetHovered</strong></a> (std::uint32_t id) <br><em>Marks the items of</em> <code>id</code> <em>hovered (0 for none), so those with a</em><code>hover</code> <em>colour take it; a new version only when it changes.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Overlay</strong></a> &amp;</td>
@@ -421,6 +366,18 @@
 </code></pre>
 <hr>
 
+<h3 id="function-button">function Button</h3>
+<p><em>A button on the image, as</em> <code>Text</code> <em>: a box of</em><code>size</code> <em>pixels (or fitted around</em><code>label</code> <em>when 0) in the style's</em><code>background</code> <em>, or its</em><code>hover</code> <em>colour while hovered, with</em><code>label</code> <em>centred in its</em><code>color</code> <em>.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Button (
+    const ScreenPlacement &amp; placement,
+    std::string_view label,
+    const OverlayStyle &amp; style={},
+    const glm::vec2 &amp; size=glm::vec2(0.0f)
+) 
+</code></pre>
+<p>Give it the style's <code>id</code>, and hit test it (<code>ScreenItemAt</code>) or let the viewer report its clicks. </p>
+<hr>
+
 <h3 id="function-circle">function Circle</h3>
 <p><em>A circle of</em> <code>radius</code> <em>around</em><code>centre</code> <em>, in the plane facing</em><code>normal</code> <em>.</em></p>
 <pre><code class="language-C++">Overlay &amp; ernie::Overlay::Circle (
@@ -466,6 +423,26 @@
 <p><em>The filled triangles, of</em> <code>Triangles</code> <em>and arrow heads.</em></p>
 <pre><code class="language-C++">inline const std::vector&lt; OverlayTriangle &gt; &amp; ernie::Overlay::Fills () const
 </code></pre>
+<hr>
+
+<h3 id="function-hovered">function Hovered</h3>
+<pre><code class="language-C++">inline std::uint32_t ernie::Overlay::Hovered () const
+</code></pre>
+<hr>
+
+<h3 id="function-image">function Image</h3>
+<p><code>image</code> <em>(</em><code>OverlayBatch::image</code> <em>) on the quad between</em><code>corners</code> <em>in the world: its top left, top right, bottom right and bottom left, in the space of the style's</em><code>anchor</code> <em>if it has one.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::Image (
+    std::span&lt; const glm::dvec3, 4 &gt; corners,
+    Tensor image,
+    const OverlayStyle &amp; style={}
+) 
+</code></pre>
+<p>A GPU image is read again every frame, such as another camera's output written in place. </p>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Batch</code>. </li>
+</ul>
 <hr>
 
 <h3 id="function-isvisible">function IsVisible</h3>
@@ -537,13 +514,18 @@
 <hr>
 
 <h3 id="function-polyline">function Polyline</h3>
-<p><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>.</em></p>
+<p><em>Segments through</em> <code>points</code> <em>in order, back to the first with</em><code>closed</code> <em>; with</em><code>colors</code> <em>(one per point), each blending from its start's to its end's, such as a trail coloured by speed.</em></p>
 <pre><code class="language-C++">Overlay &amp; ernie::Overlay::Polyline (
     std::span&lt; const glm::dvec3 &gt; points,
     const OverlayStyle &amp; style={},
-    bool closed=false
+    bool closed=false,
+    std::span&lt; const glm::vec4 &gt; colors={}
 ) 
 </code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a colour count that differs from the point count. </li>
+</ul>
 <hr>
 
 <h3 id="function-rect">function Rect</h3>
@@ -570,8 +552,40 @@
 </ul>
 <hr>
 
+<h3 id="function-screenimage">function ScreenImage</h3>
+<p><code>image</code> <em>on the screen, as</em><code>Rect</code> <em>,</em><code>size</code> <em>pixels (its own size when 0): a picture in the picture.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::ScreenImage (
+    const ScreenPlacement &amp; placement,
+    Tensor image,
+    const OverlayStyle &amp; style={},
+    const glm::vec2 &amp; size=glm::vec2(0.0f)
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> as <code>Batch</code>. </li>
+</ul>
+<hr>
+
+<h3 id="function-screenitemat">function ScreenItemAt</h3>
+<p><em>The</em> <code>id</code> <em>of the topmost screen item with one covering</em><code>pixel</code> <em>(y down) of an image of</em><code>extent</code> <em>pixels, or 0: what a click or a pointer there would hit.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::Overlay::ScreenItemAt (
+    const glm::vec2 &amp; pixel,
+    const glm::vec2 &amp; extent
+) const
+</code></pre>
+<hr>
+
 <h3 id="function-segments">function Segments</h3>
 <pre><code class="language-C++">inline const std::vector&lt; OverlaySegment &gt; &amp; ernie::Overlay::Segments () const
+</code></pre>
+<hr>
+
+<h3 id="function-sethovered">function SetHovered</h3>
+<p><em>Marks the items of</em> <code>id</code> <em>hovered (0 for none), so those with a</em><code>hover</code> <em>colour take it; a new version only when it changes.</em></p>
+<pre><code class="language-C++">Overlay &amp; ernie::Overlay::SetHovered (
+    std::uint32_t id
+) 
 </code></pre>
 <hr>
 

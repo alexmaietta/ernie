@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -212,6 +133,7 @@
 #include &lt;cstdint&gt;
 #include &lt;deque&gt;
 #include &lt;mutex&gt;
+#include &lt;unordered_map&gt;
 #include &lt;vector&gt;
 
 namespace ernie {
@@ -221,12 +143,13 @@ class VulkanContext;
 class BindlessHeap {
   public:
     enum class Kind : std::uint32_t {
-        Texture2D = 0,          
-        Texture2DArray = 1,     
-        Sampler = 2,            
-        ComparisonSampler = 3,  
+        Texture2D = 0,           
+        Texture2DArray = 1,      
+        Sampler = 2,             
+        ComparisonSampler = 3,   
+        UintTexture2DArray = 4,  
     };
-    static constexpr std::uint32_t kKinds = 4;
+    static constexpr std::uint32_t kKinds = 5;
     static constexpr std::uint32_t kTextures = 4096;
     static constexpr std::uint32_t kSamplers = 256;
     static constexpr std::uint64_t kRetireFrames = 3;
@@ -269,6 +192,8 @@ class BindlessHeap {
 
     Slot AddSampler(VkSampler sampler, bool comparison = false);
 
+    void Forget(std::uint64_t object);
+
     void AdvanceFrame();
 
     VkDescriptorSetLayout Layout() const {
@@ -300,6 +225,26 @@ class BindlessHeap {
     VkDescriptorSet set_ = VK_NULL_HANDLE;
     mutable std::mutex mutex_;
     Array arrays_[kKinds];
+    struct Held {
+        std::uint64_t object = 0;
+        std::uint32_t layout = 0;
+        bool operator==(const Held&amp;) const = default;
+    };
+    struct HeldHash {
+        std::size_t operator()(const Held&amp; held) const {
+            return std::hash&lt;std::uint64_t&gt;()(held.object) ^
+                   (std::hash&lt;std::uint32_t&gt;()(held.layout) &lt;&lt; 1);
+        }
+    };
+    struct SharedSlot {
+        Held held;
+        std::uint32_t holders = 0;
+    };
+    std::unordered_map&lt;Held, std::uint32_t, HeldHash&gt; shared_[kKinds];
+    std::unordered_map&lt;std::uint32_t, SharedSlot&gt; sharedAt_[kKinds];
+
+    Slot Share(Kind kind, const Held&amp; held,
+               const VkDescriptorImageInfo&amp; info);
     std::uint64_t frame_ = 0;
 };
 

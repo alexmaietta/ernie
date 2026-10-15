@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -272,12 +193,20 @@
 <td style="text-align: left;"><a href="#function-deviceuuid"><strong>DeviceUuid</strong></a> () const<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>UUID, which CUDA reports too, for matching devices across APIs.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-driverdescription"><strong>DriverDescription</strong></a> () const<br><em>The device's driver, e.g.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
 <td style="text-align: left;"><a href="#function-exportmemory"><strong>ExportMemory</strong></a> (VkDeviceMemory memory) const<br><em>A new handle to</em> <code>memory</code> <em>, allocated exportable as</em><code>kExternalMemoryHandleType</code> <em>, which the importer takes (</em><code>CloseExternalHandle</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#typedef-externalhandle"><strong>ExternalHandle</strong></a></td>
 <td style="text-align: left;"><a href="#function-exportsemaphore"><strong>ExportSemaphore</strong></a> (VkSemaphore semaphore) const<br><em>A new handle to</em> <code>semaphore</code> <em>, created exportable (</em><code>CreateTimelineSemaphore</code> <em>), as</em><code>ExportMemory</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1BindlessHeap/"><strong>BindlessHeap</strong></a> *</td>
+<td style="text-align: left;"><a href="#function-findbindless"><strong>FindBindless</strong></a> () const<br><em>The bindless heap, or null while the context is made or torn down.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void *</td>
@@ -325,6 +254,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsdepthbiasclamp"><strong>SupportsDepthBiasClamp</strong></a> () const<br><em>Whether a depth bias can be clamped (</em> <code>vkCmdSetDepthBias</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-supportsdepthclamp"><strong>SupportsDepthClamp</strong></a> () const<br><em>Whether pipelines can clamp depth (</em> <code>GraphicsPipelineDesc :: depthClamp</code> <em>).</em></td>
 </tr>
 <tr>
@@ -333,7 +266,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#function-supportsfragmentatomics"><strong>SupportsFragmentAtomics</strong></a> () const<br><em>Whether fragment shaders can write storage buffers and images and use atomics there (virtual shadow maps' casters).</em></td>
+<td style="text-align: left;"><a href="#function-supportsfragmentatomics"><strong>SupportsFragmentAtomics</strong></a> () const<br><em>Whether fragment shaders can write storage buffers and images and use atomics there.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsintegerdotproduct"><strong>SupportsIntegerDotProduct</strong></a> () const<br><em>Whether shaders take dot products of integer vectors (</em> <code>shaderIntegerDotProduct</code> <em>), as DirectXTex's BC7 encoder (the GPU tests' reference) does.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -346,6 +283,18 @@
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-supportsrayquery"><strong>SupportsRayQuery</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportssparseresidency"><strong>SupportsSparseResidency</strong></a> () const<br><em>Whether 2D images can be sparse, their memory bound tile by tile on the queue (</em> <code>SparseImage</code> <em>): virtual textures filtered in hardware; without it they page in software.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportstexturecompressionbc"><strong>SupportsTextureCompressionBc</strong></a> () const<br><em>Whether images can be BC1 to BC7 block-compressed (</em> <code>textureCompressionBC</code> <em>), as DDS and KTX2 textures often are.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-supportsunusedattachments"><strong>SupportsUnusedAttachments</strong></a> () const<br><em>Whether passes may render to null colour attachments their pipelines have formats for, which take no writes (VK_EXT_dynamic_rendering_unused_attachments).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::string &gt;</td>
@@ -366,6 +315,10 @@
 <tr>
 <td style="text-align: right;"></td>
 <td style="text-align: left;"><a href="#function-vulkancontext-12"><strong>VulkanContext</strong></a> (const <a href="./"><strong>VulkanContext</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">const std::string &amp;</td>
+<td style="text-align: left;"><a href="#function-vulkanversion"><strong>VulkanVersion</strong></a> () const<br></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -482,6 +435,13 @@
 </code></pre>
 <hr>
 
+<h3 id="function-driverdescription">function DriverDescription</h3>
+<p><em>The device's driver, e.g.</em> </p>
+<pre><code class="language-C++">inline const std::string &amp; ernie::VulkanContext::DriverDescription () const
+</code></pre>
+<p>"NVIDIA 610.57.04", and the Vulkan version it supports, e.g. "1.4.312". </p>
+<hr>
+
 <h3 id="function-exportmemory">function ExportMemory</h3>
 <p><em>A new handle to</em> <code>memory</code> <em>, allocated exportable as</em><code>kExternalMemoryHandleType</code> <em>, which the importer takes (</em><code>CloseExternalHandle</code> <em>).</em></p>
 <pre><code class="language-C++">ExternalHandle ernie::VulkanContext::ExportMemory (
@@ -504,6 +464,12 @@
 <ul>
 <li><code>std::runtime_error</code> as <code>ExportMemory</code>. </li>
 </ul>
+<hr>
+
+<h3 id="function-findbindless">function FindBindless</h3>
+<p><em>The bindless heap, or null while the context is made or torn down.</em> </p>
+<pre><code class="language-C++">inline BindlessHeap * ernie::VulkanContext::FindBindless () const
+</code></pre>
 <hr>
 
 <h3 id="function-gpuprofiler">function GpuProfiler</h3>
@@ -585,6 +551,12 @@
 </code></pre>
 <hr>
 
+<h3 id="function-supportsdepthbiasclamp">function SupportsDepthBiasClamp</h3>
+<p><em>Whether a depth bias can be clamped (</em> <code>vkCmdSetDepthBias</code> <em>).</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsDepthBiasClamp () const
+</code></pre>
+<hr>
+
 <h3 id="function-supportsdepthclamp">function SupportsDepthClamp</h3>
 <p><em>Whether pipelines can clamp depth (</em> <code>GraphicsPipelineDesc :: depthClamp</code> <em>).</em></p>
 <pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsDepthClamp () const
@@ -598,8 +570,14 @@
 <hr>
 
 <h3 id="function-supportsfragmentatomics">function SupportsFragmentAtomics</h3>
-<p><em>Whether fragment shaders can write storage buffers and images and use atomics there (virtual shadow maps' casters).</em> </p>
+<p><em>Whether fragment shaders can write storage buffers and images and use atomics there.</em> </p>
 <pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsFragmentAtomics () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportsintegerdotproduct">function SupportsIntegerDotProduct</h3>
+<p><em>Whether shaders take dot products of integer vectors (</em> <code>shaderIntegerDotProduct</code> <em>), as DirectXTex's BC7 encoder (the GPU tests' reference) does.</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsIntegerDotProduct () const
 </code></pre>
 <hr>
 
@@ -619,6 +597,24 @@
 
 <h3 id="function-supportsrayquery">function SupportsRayQuery</h3>
 <pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsRayQuery () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportssparseresidency">function SupportsSparseResidency</h3>
+<p><em>Whether 2D images can be sparse, their memory bound tile by tile on the queue (</em> <code>SparseImage</code> <em>): virtual textures filtered in hardware; without it they page in software.</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsSparseResidency () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportstexturecompressionbc">function SupportsTextureCompressionBc</h3>
+<p><em>Whether images can be BC1 to BC7 block-compressed (</em> <code>textureCompressionBC</code> <em>), as DDS and KTX2 textures often are.</em></p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsTextureCompressionBc () const
+</code></pre>
+<hr>
+
+<h3 id="function-supportsunusedattachments">function SupportsUnusedAttachments</h3>
+<p><em>Whether passes may render to null colour attachments their pipelines have formats for, which take no writes (VK_EXT_dynamic_rendering_unused_attachments).</em> </p>
+<pre><code class="language-C++">inline bool ernie::VulkanContext::SupportsUnusedAttachments () const
 </code></pre>
 <hr>
 
@@ -651,6 +647,11 @@
 <pre><code class="language-C++">ernie::VulkanContext::VulkanContext (
     const VulkanContext &amp;
 ) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-vulkanversion">function VulkanVersion</h3>
+<pre><code class="language-C++">inline const std::string &amp; ernie::VulkanContext::VulkanVersion () const
 </code></pre>
 <hr>
 

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -247,6 +168,55 @@ inline constexpr std::string_view kPointInstancer = &quot;PointInstancer&quot;;
 inline constexpr std::string_view kGeomPoints = &quot;Points&quot;;
 inline constexpr std::string_view kVolume = &quot;Volume&quot;;
 
+// Skeletal animation (UsdSkel). A Skeleton's joints, each a path
+// whose parent is the joint path before its last element, carry bind
+// and rest transforms; its animation source, a SkelAnimation, samples
+// the joints' local translations, rotations and scales and blend
+// shape weights at time codes. A Mesh bound to a Skeleton
+// (`skel:skeleton`) has joint indices and weights per point (or one
+// set for all) and may name BlendShapes, offsets added to its points
+// before skinning.
+inline constexpr std::string_view kSkelRoot = &quot;SkelRoot&quot;;
+inline constexpr std::string_view kSkeleton = &quot;Skeleton&quot;;
+inline constexpr std::string_view kSkelAnimation = &quot;SkelAnimation&quot;;
+inline constexpr std::string_view kBlendShape = &quot;BlendShape&quot;;
+inline constexpr std::string_view kJoints = &quot;joints&quot;;
+inline constexpr std::string_view kBindTransforms = &quot;bindTransforms&quot;;
+inline constexpr std::string_view kRestTransforms = &quot;restTransforms&quot;;
+inline constexpr std::string_view kSkelAnimationSource =
+    &quot;skel:animationSource&quot;;
+inline constexpr std::string_view kTranslations = &quot;translations&quot;;
+inline constexpr std::string_view kRotations = &quot;rotations&quot;;
+inline constexpr std::string_view kBlendShapes = &quot;blendShapes&quot;;
+inline constexpr std::string_view kBlendShapeWeights =
+    &quot;blendShapeWeights&quot;;
+inline constexpr std::string_view kAnimationTimes = &quot;ernie:times&quot;;
+inline constexpr std::string_view kOffsets = &quot;offsets&quot;;
+inline constexpr std::string_view kNormalOffsets = &quot;normalOffsets&quot;;
+inline constexpr std::string_view kPointIndices = &quot;pointIndices&quot;;
+inline constexpr std::string_view kInbetweenWeights =
+    &quot;ernie:inbetweenWeights&quot;;
+inline constexpr std::string_view kInbetweenOffsets =
+    &quot;ernie:inbetweenOffsets&quot;;
+inline constexpr std::string_view kInbetweenNormalOffsets =
+    &quot;ernie:inbetweenNormalOffsets&quot;;
+inline constexpr std::string_view kSkelSkeleton = &quot;skel:skeleton&quot;;
+inline constexpr std::string_view kSkelJoints = &quot;skel:joints&quot;;
+inline constexpr std::string_view kSkelJointIndices =
+    &quot;primvars:skel:jointIndices&quot;;
+inline constexpr std::string_view kSkelJointWeights =
+    &quot;primvars:skel:jointWeights&quot;;
+inline constexpr std::string_view kSkelGeomBindTransform =
+    &quot;primvars:skel:geomBindTransform&quot;;
+inline constexpr std::string_view kSkelBlendShapes =
+    &quot;skel:blendShapes&quot;;
+inline constexpr std::string_view kSkelBlendShapeTargets =
+    &quot;skel:blendShapeTargets&quot;;
+inline constexpr std::string_view kSkelSkinningMethod =
+    &quot;skel:skinningMethod&quot;;
+inline constexpr std::string_view kClassicLinear = &quot;classicLinear&quot;;
+inline constexpr std::string_view kDualQuaternion = &quot;dualQuaternion&quot;;
+
 // Volumes (UsdVol). A Volume names its fields with relationships
 // `field:&lt;name&gt;` (`field:density`, `field:temperature`), each to a
 // field prim: an OpenVDBAsset, a grid of a NanoVDB file (.nvdb; .vdb
@@ -275,6 +245,43 @@ inline constexpr std::string_view kNanoVDBField = &quot;NanoVDBField&quot;;
 inline constexpr std::string_view kNanoVdbBuffer =
     &quot;ernie:buffer&quot;;  
 inline constexpr std::string_view kDenseField = &quot;DenseField&quot;;
+inline constexpr std::string_view kCloudLayersField =
+    &quot;CloudLayersField&quot;;
+inline constexpr std::string_view kCloudCoverage = &quot;coverage&quot;;
+inline constexpr std::string_view kCloudExtent = &quot;extent&quot;;
+inline constexpr std::string_view kCloudStepSize = &quot;stepSize&quot;;
+inline constexpr std::string_view kCloudWeatherTileSize =
+    &quot;weatherTileSize&quot;;
+inline constexpr std::string_view kCloudWeatherOffset =
+    &quot;weatherOffset&quot;;
+inline constexpr std::string_view kCloudShapeTileSize =
+    &quot;shapeTileSize&quot;;
+inline constexpr std::string_view kCloudDetailTileSize =
+    &quot;detailTileSize&quot;;
+inline constexpr std::string_view kCloudTurbulenceTileSize =
+    &quot;turbulenceTileSize&quot;;
+inline constexpr std::string_view kCloudTurbulenceDisplacement =
+    &quot;turbulenceDisplacement&quot;;
+inline constexpr std::string_view kCloudLayerAltitudes =
+    &quot;layerAltitudes&quot;;
+inline constexpr std::string_view kCloudLayerHeights = &quot;layerHeights&quot;;
+inline constexpr std::string_view kCloudLayerDensities =
+    &quot;layerDensities&quot;;
+inline constexpr std::string_view kCloudLayerShapeAmounts =
+    &quot;layerShapeAmounts&quot;;
+inline constexpr std::string_view kCloudLayerDetailAmounts =
+    &quot;layerDetailAmounts&quot;;
+inline constexpr std::string_view kCloudLayerWeatherExponents =
+    &quot;layerWeatherExponents&quot;;
+inline constexpr std::string_view kCloudLayerShapeBiases =
+    &quot;layerShapeBiases&quot;;
+inline constexpr std::string_view kCloudLayerCoverageFilterWidths =
+    &quot;layerCoverageFilterWidths&quot;;
+inline constexpr std::string_view kCloudLayerDensityProfiles =
+    &quot;layerDensityProfiles&quot;;
+inline constexpr std::string_view kCloudLayerChannels =
+    &quot;layerChannels&quot;;
+inline constexpr std::string_view kCloudLayerShadows = &quot;layerShadows&quot;;
 inline constexpr std::string_view kDenseValues =
     &quot;ernie:values&quot;;  
 inline constexpr std::string_view kVoxelSize =
@@ -319,8 +326,23 @@ inline constexpr std::string_view kHenyeyGreenstein =
     &quot;henyeyGreenstein&quot;;
 inline constexpr std::string_view kDoubleHenyeyGreenstein =
     &quot;doubleHenyeyGreenstein&quot;;
+inline constexpr std::string_view kDualHenyeyGreenstein =
+    &quot;dualHenyeyGreenstein&quot;;
+inline constexpr std::string_view kVolumeSecondAnisotropy =
+    &quot;inputs:secondAnisotropy&quot;;
+inline constexpr std::string_view kVolumeLobeMix = &quot;inputs:lobeMix&quot;;
+inline constexpr std::string_view kVolumePowder = &quot;inputs:powder&quot;;
+inline constexpr std::string_view kVolumePowderLength =
+    &quot;inputs:powderLength&quot;;
 inline constexpr std::string_view kRayleigh = &quot;rayleigh&quot;;
 inline constexpr std::string_view kIsotropic = &quot;isotropic&quot;;
+inline constexpr std::string_view kCloudDroplets = &quot;cloudDroplets&quot;;
+inline constexpr std::string_view kVolumeDropletRadius =
+    &quot;inputs:dropletRadius&quot;;
+inline constexpr std::string_view kVolumeDropletSpread =
+    &quot;inputs:dropletSpread&quot;;
+inline constexpr std::string_view kVolumeSurfaceDensity =
+    &quot;inputs:surfaceDensity&quot;;
 inline constexpr std::string_view kPhaseB = &quot;inputs:b&quot;;
 inline constexpr std::string_view kPhaseC = &quot;inputs:c&quot;;
 inline constexpr std::string_view kCamera = &quot;Camera&quot;;
@@ -339,8 +361,6 @@ inline constexpr std::string_view kStarField =
     &quot;StarField&quot;;  
 inline constexpr std::string_view kAtmosphere =
     &quot;Atmosphere&quot;;  
-inline constexpr std::string_view kCelestialBody =
-    &quot;CelestialBody&quot;;  
 inline constexpr std::string_view kRenderSettings = &quot;RenderSettings&quot;;
 inline constexpr std::string_view kRenderProduct = &quot;RenderProduct&quot;;
 inline constexpr std::string_view kRenderVar = &quot;RenderVar&quot;;
@@ -386,8 +406,42 @@ inline constexpr std::string_view kFaceVertexIndices =
     &quot;faceVertexIndices&quot;;
 inline constexpr std::string_view kActiveCounts =
     &quot;ernie:activeCounts&quot;;
+// Subdivision surfaces, as UsdGeomMesh tags them (OpenSubdiv's
+// terms).
+inline constexpr std::string_view kSubdivisionScheme =
+    &quot;subdivisionScheme&quot;;
+inline constexpr std::string_view kCatmullClark = &quot;catmullClark&quot;;
+inline constexpr std::string_view kLoop = &quot;loop&quot;;
+inline constexpr std::string_view kBilinear = &quot;bilinear&quot;;
+inline constexpr std::string_view kInterpolateBoundary =
+    &quot;interpolateBoundary&quot;;
+inline constexpr std::string_view kEdgeOnly = &quot;edgeOnly&quot;;
+inline constexpr std::string_view kEdgeAndCorner = &quot;edgeAndCorner&quot;;
+inline constexpr std::string_view kFaceVaryingLinearInterpolation =
+    &quot;faceVaryingLinearInterpolation&quot;;
+inline constexpr std::string_view kCornersOnly = &quot;cornersOnly&quot;;
+inline constexpr std::string_view kCornersPlus1 = &quot;cornersPlus1&quot;;
+inline constexpr std::string_view kCornersPlus2 = &quot;cornersPlus2&quot;;
+inline constexpr std::string_view kBoundaries = &quot;boundaries&quot;;
+inline constexpr std::string_view kAll = &quot;all&quot;;
+inline constexpr std::string_view kTriangleSubdivisionRule =
+    &quot;triangleSubdivisionRule&quot;;
+inline constexpr std::string_view kSmooth = &quot;smooth&quot;;
+inline constexpr std::string_view kCreaseIndices = &quot;creaseIndices&quot;;
+inline constexpr std::string_view kCreaseLengths = &quot;creaseLengths&quot;;
+inline constexpr std::string_view kCreaseSharpnesses =
+    &quot;creaseSharpnesses&quot;;
+inline constexpr std::string_view kCornerIndices = &quot;cornerIndices&quot;;
+inline constexpr std::string_view kCornerSharpnesses =
+    &quot;cornerSharpnesses&quot;;
+inline constexpr std::string_view kHoleIndices = &quot;holeIndices&quot;;
+inline constexpr std::string_view kRefineLevel = &quot;ernie:refineLevel&quot;;
+inline constexpr std::string_view kSubdivisionRefineLevel =
+    &quot;ernie:subdivision:refineLevel&quot;;
 inline constexpr std::string_view kDisplayColor =
     &quot;primvars:displayColor&quot;;
+inline constexpr std::string_view kDisplayOpacity =
+    &quot;primvars:displayOpacity&quot;;
 inline constexpr std::string_view kPositions = &quot;positions&quot;;
 inline constexpr std::string_view kOrientations = &quot;orientations&quot;;
 inline constexpr std::string_view kScales = &quot;scales&quot;;
@@ -417,6 +471,7 @@ inline constexpr std::string_view kUvSphere = &quot;uv&quot;;
 inline constexpr std::string_view kIcosphere = &quot;icosphere&quot;;
 inline constexpr std::string_view kCubeSphere = &quot;cubeSphere&quot;;
 inline constexpr std::string_view kHealpix = &quot;healpix&quot;;
+inline constexpr std::string_view kAdaptiveSphere = &quot;adaptive&quot;;
 
 // Material binding (UsdShade MaterialBindingAPI): a Path.
 inline constexpr std::string_view kMaterialBinding =
@@ -475,6 +530,10 @@ inline constexpr std::string_view kSpectralRange =
     &quot;ernie:spectral:range&quot;;  
 inline constexpr std::string_view kSpectralBands =
     &quot;ernie:spectral:bands&quot;;  
+inline constexpr std::string_view kSpectralMode =
+    &quot;ernie:spectral:mode&quot;;
+inline constexpr std::string_view kSpectral = &quot;spectral&quot;;
+inline constexpr std::string_view kRgb = &quot;rgb&quot;;
 inline constexpr std::string_view kLensProjection =
     &quot;ernie:lens:projection&quot;;
 inline constexpr std::string_view kFisheye = &quot;fisheye&quot;;
@@ -578,6 +637,10 @@ inline constexpr std::string_view kLaserDotJitter =
     &quot;ernie:laser:dotJitter&quot;;
 inline constexpr std::string_view kLaserDotSeed =
     &quot;ernie:laser:dotSeed&quot;;
+inline constexpr std::string_view kLaserScanFrequencies =
+    &quot;ernie:laser:scanFrequencies&quot;;
+inline constexpr std::string_view kLaserScanPhase =
+    &quot;ernie:laser:scanPhase&quot;;
 inline constexpr std::string_view kLaserPulseRate =
     &quot;ernie:laser:pulse:rate&quot;;
 inline constexpr std::string_view kLaserPulseWidth =
@@ -618,6 +681,7 @@ inline constexpr std::string_view kLine = &quot;line&quot;;
 inline constexpr std::string_view kGrid = &quot;grid&quot;;
 inline constexpr std::string_view kImage = &quot;image&quot;;
 inline constexpr std::string_view kDots = &quot;dots&quot;;
+inline constexpr std::string_view kScan = &quot;scan&quot;;
 inline constexpr std::string_view kFlat = &quot;flat&quot;;
 inline constexpr std::string_view kGaussian = &quot;gaussian&quot;;
 inline constexpr std::string_view kShapingConeAngle =
@@ -665,6 +729,8 @@ inline constexpr std::string_view kPolarizationAngle =
     &quot;ernie:polarization:angle&quot;;
 inline constexpr std::string_view kPolarizationRetention =
     &quot;ernie:polarization:retention&quot;;
+inline constexpr std::string_view kSpeckleRoughness =
+    &quot;ernie:speckle:roughness&quot;;
 inline constexpr std::string_view kPolarizerType =
     &quot;ernie:polarizer:type&quot;;
 inline constexpr std::string_view kPolarizerAngle =
@@ -747,6 +813,8 @@ inline constexpr std::string_view kAtmosphereHazeOpticalDepth =
     &quot;ernie:atmosphere:hazeOpticalDepth&quot;;
 inline constexpr std::string_view kAtmosphereOzoneColumn =
     &quot;ernie:atmosphere:ozoneColumn&quot;;
+inline constexpr std::string_view kAtmosphereSodiumColumn =
+    &quot;ernie:atmosphere:sodiumColumn&quot;;
 inline constexpr std::string_view kAtmosphereDustOpticalDepth =
     &quot;ernie:atmosphere:dustOpticalDepth&quot;;
 inline constexpr std::string_view kAtmosphereCloudTop =
@@ -757,13 +825,6 @@ inline constexpr std::string_view kAtmosphereAnchor =
     &quot;ernie:atmosphere:anchor&quot;;
 inline constexpr std::string_view kAnchorGround = &quot;ground&quot;;
 inline constexpr std::string_view kAnchorCentre = &quot;centre&quot;;
-
-// CelestialBody (Ernie): a sphere far beyond the scene, such as a
-// moon, at its transform's origin, drawn in the sky and casting
-// eclipse shadows.
-//
-inline constexpr std::string_view kBodyRadius = &quot;ernie:body:radius&quot;;
-inline constexpr std::string_view kBodyAlbedo = &quot;ernie:body:albedo&quot;;
 
 // Terrain (Ernie): a north-up heightfield, x east, y north, z up.
 inline constexpr std::string_view kHeights =
@@ -779,6 +840,10 @@ inline constexpr std::string_view kExaggeration =
 inline constexpr std::string_view kPlanetRadius = &quot;ernie:radius&quot;;
 inline constexpr std::string_view kPlanetRadii = &quot;ernie:radii&quot;;
 inline constexpr std::string_view kFinestCell = &quot;ernie:finestCell&quot;;
+inline constexpr std::string_view kHeightsFile = &quot;ernie:heights:file&quot;;
+inline constexpr std::string_view kHeightsUnit = &quot;ernie:heights:unit&quot;;
+inline constexpr std::string_view kHeightsReference =
+    &quot;ernie:heights:reference&quot;;
 inline constexpr std::string_view kHeightsDirty =
     &quot;ernie:heights:dirty&quot;;
 
@@ -853,11 +918,30 @@ inline constexpr std::string_view kDetailHexSharpness =
 inline constexpr std::string_view kShader = &quot;Shader&quot;;
 inline constexpr std::string_view kInfoId =
     &quot;info:id&quot;;  
+// A Material's MaterialX surface: a network of Shader prims of
+// MaterialX node definitions (info:id &quot;ND_standard_surface_
+// surfaceshader&quot; and the like) its outputs:mtlx:surface connects to,
+// as UsdShade's mtlx render context holds it, or a material of a
+// MaterialX document (.mtlx) it names.
+//
+// Reference: Academy Software Foundation, &quot;MaterialX Specification&quot;,
+// https://materialx.org/Specification.html
+inline constexpr std::string_view kMtlxSurface =
+    &quot;outputs:mtlx:surface&quot;;
+inline constexpr std::string_view kMaterialXFile =
+    &quot;ernie:materialx:file&quot;;  
+inline constexpr std::string_view kMaterialXElement =
+    &quot;ernie:materialx:element&quot;;
 inline constexpr std::string_view kUsdPreviewSurface =
     &quot;UsdPreviewSurface&quot;;
 inline constexpr std::string_view kUsdUVTexture = &quot;UsdUVTexture&quot;;
 inline constexpr std::string_view kUsdPrimvarReaderFloat2 =
     &quot;UsdPrimvarReader_float2&quot;;
+inline constexpr std::string_view kUsdPrimvarReaderFloat =
+    &quot;UsdPrimvarReader_float&quot;;
+inline constexpr std::string_view kUsdPrimvarReaderFloat3 =
+    &quot;UsdPrimvarReader_float3&quot;;
+inline constexpr std::string_view kFallbackInput = &quot;inputs:fallback&quot;;
 inline constexpr std::string_view kUsdTransform2d = &quot;UsdTransform2d&quot;;
 inline constexpr std::string_view kConnectSuffix = &quot;.connect&quot;;
 inline constexpr std::string_view kSurfaceOutput = &quot;outputs:surface&quot;;
@@ -876,6 +960,55 @@ inline constexpr std::string_view kClearcoatRoughness =
     &quot;inputs:clearcoatRoughness&quot;;
 inline constexpr std::string_view kEmissiveColor =
     &quot;inputs:emissiveColor&quot;;
+inline constexpr std::string_view kThermalTemperature =
+    &quot;ernie:thermal:temperature&quot;;
+inline constexpr std::string_view kThermalEmissivity =
+    &quot;ernie:thermal:emissivity&quot;;
+inline constexpr std::string_view kThermalTemperatureTexture =
+    &quot;ernie:thermal:temperatureTexture&quot;;
+inline constexpr std::string_view kThermalModel =
+    &quot;ernie:thermal:model&quot;;
+inline constexpr std::string_view kThermalModelParams =
+    &quot;ernie:thermal:model:params&quot;;
+inline constexpr std::string_view kThermalModelData =
+    &quot;ernie:thermal:model:data&quot;;
+inline constexpr std::string_view kThermalInertia =
+    &quot;ernie:thermal:inertia&quot;;
+inline constexpr std::string_view kThermalInertiaTexture =
+    &quot;ernie:thermal:inertiaTexture&quot;;
+inline constexpr std::string_view kThermalOutput =
+    &quot;outputs:ernie:thermal&quot;;
+inline constexpr std::string_view kErnieThermal = &quot;ErnieThermal&quot;;
+inline constexpr std::string_view kThermalTemperatureInput =
+    &quot;inputs:temperature&quot;;
+inline constexpr std::string_view kThermalEmissivityInput =
+    &quot;inputs:emissivity&quot;;
+inline constexpr std::string_view kThermalInertiaInput =
+    &quot;inputs:thermalInertia&quot;;
+inline constexpr std::string_view kThermalModelInput =
+    &quot;inputs:temperatureModel&quot;;
+inline constexpr std::string_view kThermalModelParamsInput =
+    &quot;inputs:temperatureModelParams&quot;;
+inline constexpr std::string_view kThermalModelDataInput =
+    &quot;inputs:temperatureModelData&quot;;
+inline constexpr std::string_view kThermalTemperatures =
+    &quot;ernie:thermal:temperatures&quot;;
+inline constexpr std::string_view kThermalNodeIds =
+    &quot;ernie:thermal:nodeIds&quot;;
+inline constexpr std::string_view kThermalNodeTemperatures =
+    &quot;ernie:thermal:nodeTemperatures&quot;;
+inline constexpr std::string_view kTextureLoading =
+    &quot;ernie:textureLoading&quot;;
+inline constexpr std::string_view kTextureLoadingDebug =
+    &quot;ernie:textureLoading:debug&quot;;
+inline constexpr std::string_view kComplete = &quot;complete&quot;;
+inline constexpr std::string_view kAsync = &quot;async&quot;;
+inline constexpr std::string_view kThermalEnable =
+    &quot;ernie:thermal:enable&quot;;
+inline constexpr std::string_view kThermalDefaultTemperature =
+    &quot;ernie:thermal:defaultTemperature&quot;;
+inline constexpr std::string_view kThermalBackgroundTemperature =
+    &quot;ernie:thermal:backgroundTemperature&quot;;
 inline constexpr std::string_view kOpacity = &quot;inputs:opacity&quot;;
 inline constexpr std::string_view kOpacityThreshold =
     &quot;inputs:opacityThreshold&quot;;
@@ -888,6 +1021,8 @@ inline constexpr std::string_view kShaderScale = &quot;inputs:scale&quot;;
 inline constexpr std::string_view kShaderBias = &quot;inputs:bias&quot;;
 inline constexpr std::string_view kSourceColorSpace =
     &quot;inputs:sourceColorSpace&quot;;
+inline constexpr std::string_view kVirtualTexture =
+    &quot;ernie:virtualTexture&quot;;
 inline constexpr std::string_view kVarname =
     &quot;inputs:varname&quot;;  
 inline constexpr std::string_view kIn = &quot;inputs:in&quot;;
@@ -928,6 +1063,8 @@ inline constexpr std::string_view kOutputsInPlace =
 inline constexpr std::string_view kSensorFilter =
     &quot;SensorFilter&quot;;  
 inline constexpr std::string_view kFilterType = &quot;ernie:filter:type&quot;;
+inline constexpr std::string_view kFilterEnabled =
+    &quot;ernie:filter:enabled&quot;;
 inline constexpr std::string_view kSourceName =
     &quot;sourceName&quot;;  
 inline constexpr std::string_view kAmbient = &quot;ernie:ambient&quot;;
@@ -963,6 +1100,10 @@ inline constexpr std::string_view kDiffuseGlossyEmission =
     &quot;diffuseGlossyEmission&quot;;
 inline constexpr std::string_view kMinimalConstantColor =
     &quot;ernie:minimal:constantColor&quot;;
+inline constexpr std::string_view kSpectralPrecision =
+    &quot;ernie:spectral:precision&quot;;
+inline constexpr std::string_view kFloat32 = &quot;float32&quot;;
+inline constexpr std::string_view kFloat16 = &quot;float16&quot;;
 inline constexpr std::string_view kCulling = &quot;ernie:culling&quot;;
 inline constexpr std::string_view kCpu = &quot;cpu&quot;;
 inline constexpr std::string_view kGpu = &quot;gpu&quot;;
@@ -1002,31 +1143,40 @@ inline constexpr std::string_view kVolumeShadowResolution =
     &quot;ernie:volumes:shadowResolution&quot;;
 inline constexpr std::string_view kVolumeLightCache =
     &quot;ernie:volumes:lightCache&quot;;
+inline constexpr std::string_view kVolumeTemporal =
+    &quot;ernie:volumes:temporal&quot;;
+inline constexpr std::string_view kVolumeTemporalBlock =
+    &quot;ernie:volumes:temporalBlock&quot;;
+inline constexpr std::string_view kVolumeTemporalAnimated =
+    &quot;ernie:volumes:temporalAnimated&quot;;
+inline constexpr std::string_view kVolumeResolutionScale =
+    &quot;ernie:volumes:resolutionScale&quot;;
+inline constexpr std::string_view kVolumeMultipleScattering =
+    &quot;ernie:volumes:multipleScattering&quot;;
+inline constexpr std::string_view kOctaves = &quot;octaves&quot;;
+inline constexpr std::string_view kCollectors = &quot;collectors&quot;;
+inline constexpr std::string_view kVolumeStepsPerPixel =
+    &quot;ernie:volumes:stepsPerPixel&quot;;
+inline constexpr std::string_view kVolumeThinOpticalDepth =
+    &quot;ernie:volumes:thinOpticalDepth&quot;;
 inline constexpr std::string_view kScene = &quot;scene&quot;;
 inline constexpr std::string_view kWorldFit = &quot;world&quot;;
 inline constexpr std::string_view kShadowWorldMargin =
     &quot;ernie:shadows:worldMargin&quot;;
-inline constexpr std::string_view kShadowVirtual =
-    &quot;ernie:shadows:virtual&quot;;
-inline constexpr std::string_view kShadowVirtualPages =
-    &quot;ernie:shadows:virtualPages&quot;;
-inline constexpr std::string_view kShadowVirtualBias =
-    &quot;ernie:shadows:virtualBias&quot;;
-inline constexpr std::string_view kShadowVirtualDebug =
-    &quot;ernie:shadows:virtualDebug&quot;;
-inline constexpr std::string_view kLevels = &quot;levels&quot;;
-inline constexpr std::string_view kPages = &quot;pages&quot;;
-inline constexpr std::string_view kShadowFit = &quot;ernie:shadows:fit&quot;;
-inline constexpr std::string_view kExposureCompensation =
-    &quot;ernie:exposure&quot;;
 inline constexpr std::string_view kMeter = &quot;ernie:meter&quot;;
-inline constexpr std::string_view kVisible = &quot;visible&quot;;
+inline constexpr std::string_view kEcoMode = &quot;ernie:ecoMode:enabled&quot;;
+inline constexpr std::string_view kEcoModeFrames =
+    &quot;ernie:ecoMode:maxFramesWithoutChange&quot;;
 inline constexpr std::string_view kShadowSoftness =
     &quot;ernie:shadows:softness&quot;;
 inline constexpr std::string_view kShadowNormalOffset =
     &quot;ernie:shadows:normalOffset&quot;;
-inline constexpr std::string_view kShadowSplitLambda =
-    &quot;ernie:shadows:splitLambda&quot;;
+inline constexpr std::string_view kShadowSplitExponent =
+    &quot;ernie:shadows:splitExponent&quot;;
+inline constexpr std::string_view kShadowDistance =
+    &quot;ernie:shadows:distance&quot;;
+inline constexpr std::string_view kShadowHorizons =
+    &quot;ernie:shadows:horizons&quot;;
 inline constexpr std::string_view kShadowShowCascades =
     &quot;ernie:shadows:showCascades&quot;;
 inline constexpr std::string_view kLodEnable = &quot;ernie:lod:enable&quot;;

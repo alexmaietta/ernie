@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -212,6 +133,7 @@
 #include &quot;ernie/scene/tokens.h&quot;
 #include &quot;ernie/scene/value.h&quot;
 #include &quot;ernie/scene/xform.h&quot;
+#include &quot;ernie/util/numbers.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;glm/glm.hpp&gt;
@@ -219,7 +141,9 @@
 #include &lt;cstddef&gt;
 #include &lt;initializer_list&gt;
 #include &lt;optional&gt;
+#include &lt;ranges&gt;
 #include &lt;span&gt;
+#include &lt;stdexcept&gt;
 #include &lt;string&gt;
 #include &lt;string_view&gt;
 #include &lt;type_traits&gt;
@@ -242,24 +166,27 @@ enum class AttributeKind {
     Tensor,         
     Quat,           
     Matrix,  
+    TokenArray,  
 };
 
 struct AttributeMeta {
-    std::string_view label;  
-    std::string_view doc;
+    std::string_view label{};  
+    std::string_view doc{};
     std::string_view
-        group;  
+        group{};  
     double min = 0.0;  
     double max = 0.0;
     std::vector&lt;std::string_view&gt;
-        options;  
+        options{};  
     bool color =
         false;  
     bool asset = false;  
     bool integer = false;
     bool lenient = false;
-    std::optional&lt;Dirty&gt; dirty;
-    std::string_view plural;
+    std::optional&lt;Dirty&gt; dirty{};
+    bool inherited = false;
+    std::optional&lt;Dirty&gt; targetDirty{};
+    std::string_view plural{};
     bool array = false;
 };
 
@@ -424,6 +351,17 @@ template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;float&gt;&gt; {
     static std::optional&lt;std::vector&lt;float&gt;&gt; From(const Value&amp; value);
 };
 
+template &lt;&gt; struct AttributeTraits&lt;std::vector&lt;std::string&gt;&gt; {
+    static constexpr AttributeKind kKind = AttributeKind::TokenArray;
+    using Result = std::vector&lt;std::string&gt;;
+    using Arg = std::vector&lt;std::string&gt;;
+    static std::vector&lt;std::string&gt;
+    Read(const Scene&amp; scene, const Path&amp; path, std::string_view name,
+         const std::vector&lt;std::string&gt;&amp; fallback);
+    static std::optional&lt;std::vector&lt;std::string&gt;&gt;
+    From(const Value&amp; value);
+};
+
 template &lt;&gt; struct AttributeTraits&lt;Tensor&gt; {
     static constexpr AttributeKind kKind = AttributeKind::Tensor;
     using Result = const Tensor*;
@@ -570,6 +508,22 @@ class SchemaView {
                                               token, value);         \
         return static_cast&lt;Self&amp;&gt;(*this);                            \
     }                                                                \
+                                 \
+    template &lt;typename R&gt;                                            \
+        requires ::ernie::detail::SetsFromNumbers&lt;Type, R&gt;           \
+    Self&amp; Set##Name(const R&amp; values) {                               \
+        return Set##Name(                                            \
+            ::ernie::detail::FromNumbers&lt;Type&gt;(values));             \
+    }                                                                \
+      \
+    template &lt;typename R, typename T = Type&gt;                         \
+        requires(std::is_same_v&lt;T, ::ernie::Tensor&gt; &amp;&amp;               \
+                 ::ernie::NumberRange&lt;R&gt;)                            \
+    Self&amp; Set##Name(const R&amp; values,                                 \
+                    std::vector&lt;std::int64_t&gt; shape = {}) {          \
+        return Set##Name(::ernie::detail::TensorFromNumbers(         \
+            values, std::move(shape)));                              \
+    }                                                                \
     Self&amp; Clear##Name() {                                            \
         Edit().Clear(GetPath(), token);                              \
         return static_cast&lt;Self&amp;&gt;(*this);                            \
@@ -586,6 +540,13 @@ class SchemaView {
     Self&amp; Write##Name(::ernie::Tensor array) {                       \
         Edit().Write(GetPath(), token, std::move(array));            \
         return static_cast&lt;Self&amp;&gt;(*this);                            \
+    }                                                                \
+                                       \
+    template &lt;typename R, typename T = Type&gt;                         \
+        requires(::ernie::kIsOrArray&lt;T&gt; &amp;&amp; ::ernie::NumberRange&lt;R&gt;)  \
+    Self&amp; Write##Name(const R&amp; values) {                             \
+        return Write##Name(                                          \
+            ::ernie::detail::ArrayFromNumbers&lt;T&gt;(values));           \
     }
 
 #define ERNIE_SCHEMA_BODY(Class, Base, ATTRIBUTES)                   \
@@ -682,6 +643,72 @@ void WriteAttribute(Scene&amp; scene, const Path&amp; path,
     } else {
         scene.Set(path, name, Value(value));
     }
+}
+
+template &lt;typename T&gt; inline constexpr std::size_t kVectorSize = 0;
+template &lt;&gt; inline constexpr std::size_t kVectorSize&lt;glm::dvec2&gt; = 2;
+template &lt;&gt; inline constexpr std::size_t kVectorSize&lt;glm::dvec3&gt; = 3;
+template &lt;&gt; inline constexpr std::size_t kVectorSize&lt;glm::dvec4&gt; = 4;
+
+template &lt;typename T&gt; struct ValueTypeOf {
+    using Type = T;
+};
+template &lt;typename T&gt; struct ValueTypeOf&lt;OrArray&lt;T&gt;&gt; {
+    using Type = T;
+};
+template &lt;typename T&gt; using ValueType = typename ValueTypeOf&lt;T&gt;::Type;
+
+template &lt;typename T, typename R&gt;
+concept SetsFromNumbers =
+    NumberRange&lt;R&gt; &amp;&amp;
+    (kVectorSize&lt;ValueType&lt;T&gt;&gt; &gt; 0 ||
+     std::is_same_v&lt;ValueType&lt;T&gt;, std::vector&lt;float&gt;&gt;) &amp;&amp;
+    !std::is_convertible_v&lt;const R&amp;,
+                           typename AttributeTraits&lt;T&gt;::Arg&gt;;
+
+template &lt;typename T, NumberRange R&gt;
+ValueType&lt;T&gt; FromNumbers(const R&amp; values) {
+    using V = ValueType&lt;T&gt;;
+    if constexpr (kVectorSize&lt;V&gt; &gt; 0) {
+        return VectorOf&lt;static_cast&lt;glm::length_t&gt;(kVectorSize&lt;V&gt;)&gt;(
+            values);
+    } else {
+        const std::span numbers(values);
+        return V(numbers.begin(), numbers.end());
+    }
+}
+
+template &lt;typename T, NumberRange R&gt;
+Tensor ArrayFromNumbers(const R&amp; values) {
+    const std::span numbers(values);
+    const std::vector&lt;float&gt; floats(numbers.begin(), numbers.end());
+    const auto count = static_cast&lt;std::int64_t&gt;(floats.size());
+    constexpr auto n =
+        static_cast&lt;std::int64_t&gt;(kVectorSize&lt;ValueType&lt;T&gt;&gt;);
+    if constexpr (n &gt; 0) {
+        if (count % n != 0) {
+            throw std::invalid_argument(
+                &quot;Expected rows of &quot; + std::to_string(n) +
+                &quot; numbers, not &quot; + std::to_string(count) +
+                &quot; numbers&quot;);
+        }
+        return Tensor::Copy&lt;float&gt;(floats, {count / n, n});
+    } else {
+        return Tensor::Copy&lt;float&gt;(floats, {count});
+    }
+}
+
+template &lt;NumberRange R&gt;
+Tensor TensorFromNumbers(const R&amp; values,
+                         std::vector&lt;std::int64_t&gt; shape) {
+    const std::span numbers(values);
+    using E =
+        std::remove_cv_t&lt;typename decltype(numbers)::element_type&gt;;
+    if (shape.empty()) {
+        shape = {static_cast&lt;std::int64_t&gt;(numbers.size())};
+    }
+    return Tensor::Copy&lt;E&gt;(std::span&lt;const E&gt;(numbers),
+                           std::move(shape));
 }
 
 template &lt;typename T, typename Fallback&gt;

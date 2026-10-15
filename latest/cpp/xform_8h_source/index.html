@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -209,6 +130,7 @@
 
 #include &quot;ernie/scene/path.h&quot;
 #include &quot;ernie/scene/value.h&quot;
+#include &quot;ernie/util/numbers.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
 
 #include &lt;glm/glm.hpp&gt;
@@ -242,14 +164,62 @@ glm::dmat3 EulerRotation(glm::dvec3 degrees, RotationOrder order);
 glm::dvec3 EulerAngles(const glm::dmat3&amp; rotation,
                        RotationOrder order);
 
+template &lt;typename T&gt; class XformPart {
+  public:
+    XformPart() = default;
+    XformPart(std::nullopt_t) {}
+    XformPart(const T&amp; value) : value_(value) {}
+
+    explicit operator bool() const {
+        return value_.has_value();
+    }
+    bool has_value() const {
+        return value_.has_value();
+    }
+    const T&amp; operator*() const {
+        return *value_;
+    }
+    const T* operator-&gt;() const {
+        return &amp;*value_;
+    }
+    void reset() {
+        value_.reset();
+    }
+
+  private:
+    std::optional&lt;T&gt; value_;
+};
+
+class XformVector : public XformPart&lt;glm::dvec3&gt; {
+  public:
+    using XformPart::XformPart;
+    XformVector() = default;
+    XformVector(double x, double y, double z)
+        : XformPart(glm::dvec3(x, y, z)) {}
+    template &lt;NumberRange R&gt;
+    XformVector(const R&amp; numbers) : XformPart(VectorOf&lt;3&gt;(numbers)) {}
+};
+
+class XformRotation : public XformPart&lt;glm::dquat&gt; {
+  public:
+    using XformPart::XformPart;
+    XformRotation() = default;
+    XformRotation(double real, const glm::dvec3&amp; imaginary)
+        : XformPart(glm::dquat(real, imaginary.x, imaginary.y,
+                               imaginary.z)) {}
+    template &lt;NumberRange R&gt;
+    XformRotation(double real, const R&amp; imaginary)
+        : XformRotation(real, VectorOf&lt;3&gt;(imaginary)) {}
+};
+
 struct XformOps {
-    std::optional&lt;glm::dvec3&gt; translate;
-    std::optional&lt;glm::dvec3&gt;
+    XformVector translate;
+    XformVector
         rotate;  
     RotationOrder rotationOrder = RotationOrder::XYZ;
-    std::optional&lt;glm::dquat&gt;
+    XformRotation
         orient;  
-    std::optional&lt;glm::dvec3&gt; scale;
+    XformVector scale;
 };
 
 void SetXform(Scene&amp; scene, const Path&amp; path, const XformOps&amp; xform);

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -481,12 +402,12 @@
                               .group = &quot;Beam&quot;, .max = 100.0}))                                     \
     X(std::string, Pattern, ::ernie::tokens::kLaserPattern, &quot;spot&quot;,                                \
       (::ernie::AttributeMeta{.doc = &quot;The beam itself, a line fanned along x, a grid of &quot;          \
-                                     &quot;beamlets, a field of dots, an image, or a registered &quot;       \
-                                     &quot;custom pattern.&quot;,                                            \
+                                     &quot;beamlets, a field of dots, an image, a scanned Lissajous &quot;   \
+                                     &quot;figure, or a registered custom pattern.&quot;,                    \
                               .group = &quot;Pattern&quot;,                                                  \
                               .options = {::ernie::tokens::kSpot, ::ernie::tokens::kLine,          \
                                           ::ernie::tokens::kGrid, ::ernie::tokens::kDots,          \
-                                          ::ernie::tokens::kImage}}))                              \
+                                          ::ernie::tokens::kImage, ::ernie::tokens::kScan}}))      \
     X(double, FanAngle, ::ernie::tokens::kLaserFanAngle, 60.0,                                     \
       (::ernie::AttributeMeta{.label = &quot;Fan angle&quot;,                                                \
                               .doc = &quot;A line's full angle along x, degrees.&quot;, .group = &quot;Pattern&quot;,  \
@@ -528,6 +449,15 @@
     X(int, DotSeed, ::ernie::tokens::kLaserDotSeed, 1,                                             \
       (::ernie::AttributeMeta{.label = &quot;Dot seed&quot;, .doc = &quot;The seed the dots derive from.&quot;,        \
                               .group = &quot;Pattern&quot;, .max = 1000000.0}))                              \
+    X(glm::dvec2, ScanFrequencies, ::ernie::tokens::kLaserScanFrequencies, glm::dvec2(3.0, 2.0),   \
+      (::ernie::AttributeMeta{.label = &quot;Scan frequencies&quot;,                                         \
+                              .doc = &quot;A scan's Lissajous figure: its turns along x and y each &quot;    \
+                                     &quot;period, the beam swept faster than the camera sees.&quot;,        \
+                              .group = &quot;Pattern&quot;, .max = 64.0}))                                   \
+    X(double, ScanPhase, ::ernie::tokens::kLaserScanPhase, 90.0,                                   \
+      (::ernie::AttributeMeta{.label = &quot;Scan phase&quot;,                                               \
+                              .doc = &quot;A scan's phase along x, degrees.&quot;, .group = &quot;Pattern&quot;,       \
+                              .min = -360.0, .max = 360.0}))                                       \
     X(double, Efficiency, ::ernie::tokens::kLaserEfficiency, 1.0,                                  \
       (::ernie::AttributeMeta{.doc = &quot;Fraction of the power that goes into the line or the &quot;       \
                                      &quot;grid's beamlets.&quot;,                                           \
@@ -549,7 +479,8 @@
     X(glm::dvec2, PatternFieldOfView, ::ernie::tokens::kLaserPatternFieldOfView,                   \
       glm::dvec2(40.0, 30.0),                                                                      \
       (::ernie::AttributeMeta{.label = &quot;Field of view&quot;,                                            \
-                              .doc = &quot;Full angles an image or dots span along x and y, degrees.&quot;,  \
+                              .doc = &quot;Full angles an image, dots or a scan span along x and y, &quot;   \
+                                     &quot;degrees.&quot;,                                                   \
                               .group = &quot;Pattern&quot;, .min = 0.01, .max = 170.0}))                     \
     X(std::vector&lt;float&gt;, PatternParams, ::ernie::tokens::kLaserPatternParams,                     \
       std::vector&lt;float&gt;{},                                                                        \

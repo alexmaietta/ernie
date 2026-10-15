@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -222,7 +143,11 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
-<td style="text-align: left;"><a href="#variable-colors"><strong>colors</strong></a>  <br><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em></td>
+<td style="text-align: left;"><a href="#variable-chars"><strong>chars</strong></a>  <br><em>(n, k) int32: texts' character codes (printable ASCII), each row up to its first 0; their number when they have no points.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-colors"><strong>colors</strong></a>  <br><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity; a trail's may be one per point, (n, length, 3 or 4), each segment taking its newer point's.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
@@ -261,6 +186,14 @@
 <td style="text-align: left;"><a href="#variable-heads"><strong>heads</strong></a>  <br><em>(n,) int32: the index in each trail's row of its newest point; without it, the last.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-image"><strong>image</strong></a>  <br><em>(rows, cols, 3 or 4) uint8: an image's display (sRGB-encoded) colours and opacity, row 0 at its top, such as another camera's LdrColor; filtered between texels, times the style's colour.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::vec2</td>
+<td style="text-align: left;"><a href="#variable-imagesize"><strong>imageSize</strong></a>   = <code>{0.0f}</code><br><em>A screen image's size in pixels; its own when 0.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-overlaybatchkind"><strong>OverlayBatchKind</strong></a></td>
 <td style="text-align: left;"><a href="#variable-kind"><strong>kind</strong></a>   = <code>OverlayBatchKind::Lines</code><br></td>
 </tr>
@@ -291,6 +224,10 @@
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
 <td style="text-align: left;"><a href="#variable-poseindices"><strong>poseIndices</strong></a>  <br><em>(n,) int32: each item's pose.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
+<td style="text-align: left;"><a href="#variable-poseworlds"><strong>poseWorlds</strong></a>  <br><em>(m,) int32: each pose's world (Newton's</em> <code>body_world</code> <em>), the world of the items under it without worlds of their own.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a></td>
@@ -359,8 +296,14 @@
 <p>The style's anchor without them. </p>
 <hr>
 
+<h3 id="variable-chars">variable chars</h3>
+<p><em>(n, k) int32: texts' character codes (printable ASCII), each row up to its first 0; their number when they have no points.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::chars;
+</code></pre>
+<hr>
+
 <h3 id="variable-colors">variable colors</h3>
-<p><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity.</em> </p>
+<p><em>(n, 3) or (n, 4) display (sRGB-encoded) colours, and opacity; a trail's may be one per point, (n, length, 3 or 4), each segment taking its newer point's.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::colors;
 </code></pre>
 <hr>
@@ -420,6 +363,18 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-image">variable image</h3>
+<p><em>(rows, cols, 3 or 4) uint8: an image's display (sRGB-encoded) colours and opacity, row 0 at its top, such as another camera's LdrColor; filtered between texels, times the style's colour.</em> </p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::image;
+</code></pre>
+<hr>
+
+<h3 id="variable-imagesize">variable imageSize</h3>
+<p><em>A screen image's size in pixels; its own when 0.</em> </p>
+<pre><code class="language-C++">glm::vec2 ernie::OverlayBatch::imageSize;
+</code></pre>
+<hr>
+
 <h3 id="variable-kind">variable kind</h3>
 <pre><code class="language-C++">OverlayBatchKind ernie::OverlayBatch::kind;
 </code></pre>
@@ -465,6 +420,12 @@
 <h3 id="variable-poseindices">variable poseIndices</h3>
 <p><em>(n,) int32: each item's pose.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::poseIndices;
+</code></pre>
+<hr>
+
+<h3 id="variable-poseworlds">variable poseWorlds</h3>
+<p><em>(m,) int32: each pose's world (Newton's</em> <code>body_world</code> <em>), the world of the items under it without worlds of their own.</em></p>
+<pre><code class="language-C++">Tensor ernie::OverlayBatch::poseWorlds;
 </code></pre>
 <hr>
 
@@ -518,6 +479,7 @@
 <p><em>(n,) int32: the world whose views show each.</em> </p>
 <pre><code class="language-C++">Tensor ernie::OverlayBatch::worlds;
 </code></pre>
+<p>Without them and a style's world, items posed under prims or poses take their anchors' (<code>tokens::kWorld</code>, <code>poseWorlds</code>). </p>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-count">function Count</h3>

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -209,6 +130,7 @@
 
 #include &quot;ernie/device/vulkan_context.h&quot;
 #include &quot;ernie/geometry/mesh_data.h&quot;
+#include &quot;ernie/geometry/subdivision.h&quot;
 #include &quot;ernie/scene/brdf.h&quot;
 #include &quot;ernie/scene/camera.h&quot;
 #include &quot;ernie/scene/material.h&quot;
@@ -245,7 +167,6 @@ struct RenderPrims {
     Path ground;
     Path stars;       
     Path atmosphere;  
-    std::vector&lt;Path&gt; bodies;
     std::optional&lt;glm::dmat4&gt; cameraTransform;
     std::map&lt;Path, glm::dmat4&gt; lightTransforms;
 };
@@ -301,6 +222,13 @@ ResolveRenderProducts(const Scene&amp; scene,
                       std::span&lt;const Path&gt; products,
                       const Path&amp; settings);
 
+Path ViewChainProduct(const Scene&amp; scene, const Path&amp; settings,
+                      const Path&amp; camera);
+
+std::vector&lt;SensorFilterStep&gt;
+SensorFilterStepsOf(const Scene&amp; scene,
+                    const std::vector&lt;Path&gt;&amp; filters);
+
 RenderPrims ResolveRenderPrims(const Scene&amp; scene,
                                const Path&amp; settings);
 
@@ -309,9 +237,23 @@ std::optional&lt;std::uint64_t&gt; FrameOf(const Scene&amp; scene,
 
 Path BoundMaterial(const Scene&amp; scene, const Path&amp; prim);
 
+std::string TextureCoordinateSetOf(const Scene&amp; scene,
+                                   const Path&amp; material);
+
+struct ColorPrimvar {
+    std::string name;
+    std::size_t width = 3;
+    glm::vec3 fallback{0.0f};
+};
+
+std::optional&lt;ColorPrimvar&gt; ColorPrimvarOf(const Scene&amp; scene,
+                                           const Path&amp; material);
+
 std::vector&lt;float&gt; SunIrradianceOf(const Scene&amp; scene,
                                    const Path&amp; light,
                                    const SpectralBands&amp; bands);
+
+double SunIlluminanceOf(const Scene&amp; scene, const Path&amp; light);
 
 LightParams LightParamsOf(const Scene&amp; scene, const Path&amp; path,
                           const SpectralBands&amp; bands);
@@ -378,8 +320,6 @@ std::optional&lt;PlanetSphere&gt; PlanetOf(const Scene&amp; scene);
 
 Path NearestAtmosphere(const Scene&amp; scene, const glm::dvec3&amp; point);
 
-BodyParams BodyParamsOf(const Scene&amp; scene, const Path&amp; path);
-
 double OverscanOf(const CameraParams&amp; camera);
 
 std::string_view WireframeToken(Wireframe mode);
@@ -398,7 +338,15 @@ MaterialSettings MaterialSettingsOf(const Scene&amp; scene,
                                     const Path&amp; material,
                                     const BrdfRegistry&amp; brdfs);
 
-MeshData MeshDataOf(const Scene&amp; scene, const Path&amp; mesh);
+struct MeshDataOptions {
+    bool posed = true;
+    RefinementStencils* stencils = nullptr;
+};
+MeshData MeshDataOf(const Scene&amp; scene, const Path&amp; mesh,
+                    const MeshDataOptions&amp; options = {});
+
+std::optional&lt;int&gt; SubdivisionLevelOf(const Scene&amp; scene,
+                                      const Path&amp; mesh);
 
 bool IsMeshType(std::string_view type);
 
@@ -426,8 +374,8 @@ struct GpuXform {
     bool wFirst = false;  
 };
 
-std::optional&lt;GpuXform&gt; GpuXformOf(const Scene&amp; scene,
-                                   const Path&amp; path);
+std::optional&lt;GpuXform&gt;
+GpuXformOf(const Scene&amp; scene, const Path&amp; path, bool host = false);
 
 bool QuaternionsWFirst(const Scene&amp; scene, const Path&amp; path);
 

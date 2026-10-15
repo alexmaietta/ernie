@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -222,6 +143,8 @@
 
 namespace ernie {
 
+class Scene;
+
 enum class OverlayDepth : std::uint8_t {
     Test,    
     XRay,    
@@ -249,7 +172,11 @@ struct OverlayStyle {
     glm::vec4 background{
         0.0f, 0.0f, 0.0f,
         0.55f};  
+    float halo = 0.0f;
     Path anchor;
+    std::uint32_t id = 0;
+    std::optional&lt;glm::vec4&gt; hover;
+    bool metric = false;
 };
 
 struct ScreenPlacement {
@@ -258,7 +185,13 @@ struct ScreenPlacement {
     std::optional&lt;glm::vec2&gt; align;
 
     glm::vec2 Align() const {
-        return align.value_or(at);
+        if (align) {
+            return *align;
+        }
+        const auto snap = [](float t) {
+            return t &lt; 0.5f ? 0.0f : (t &gt; 0.5f ? 1.0f : 0.5f);
+        };
+        return {snap(at.x), snap(at.y)};
     }
 };
 
@@ -267,6 +200,9 @@ struct OverlayItem {
     OverlayDepth depth = OverlayDepth::Test;
     std::int32_t world = -1;
     std::uint32_t anchor = 0;
+    std::uint32_t id = 0;            
+    std::optional&lt;glm::vec4&gt; hover;  
+    bool metric = false;             
 };
 
 struct OverlaySegment {
@@ -275,6 +211,7 @@ struct OverlaySegment {
     float width = 2.0f;
     OverlayItem item;
     float dash = 0.0f;
+    std::optional&lt;glm::vec4&gt; endColor;
 };
 
 struct OverlayTriangle {
@@ -287,20 +224,41 @@ struct OverlaySprite {
     glm::vec4 rect{0.0f};
     MarkerShape shape = MarkerShape::Square;
     OverlayItem item;
-    char glyph = 0;
+    std::uint8_t glyph = 0;
     bool screen = false;
+    float halo = 0.0f;
+    glm::vec4 haloColor{0.0f};
 };
 
-inline constexpr int kOverlayGlyphCell = 16;
 inline constexpr float kOverlayLineHeight = 12.0f;
+inline constexpr float kOverlayFieldTexels =
+    40.0f / kOverlayLineHeight;
+inline constexpr int kOverlayFieldPadding = 8;
+inline constexpr float kOverlayFieldLevels = 16.0f;
 
 struct OverlayGlyph {
-    std::array&lt;std::uint16_t, kOverlayGlyphCell&gt; rows{};
-    std::array&lt;std::uint8_t, 4&gt; box{};
-    std::uint8_t advance = 0;
+    glm::vec4 box{0.0f};
+    float advance = 0.0f;
+    std::uint32_t texel = 0;
+    std::uint16_t width = 0;
+    std::uint16_t height = 0;
 };
 
-std::span&lt;const OverlayGlyph&gt; OverlayGlyphs();
+inline constexpr std::uint32_t kOverlayKernFirst = 32;
+inline constexpr std::uint32_t kOverlayKernCodes = 224;
+
+struct OverlayFont {
+    std::array&lt;OverlayGlyph, 256&gt; glyphs{};
+    std::vector&lt;std::int8_t&gt; kerning;
+    std::vector&lt;std::uint8_t&gt; field;
+    float textHeight = 0.0f;
+
+    float Kerning(std::uint8_t a, std::uint8_t b) const;
+};
+
+const OverlayFont&amp; OverlayTextFont();
+
+std::vector&lt;std::uint8_t&gt; OverlayCodes(std::string_view text);
 
 glm::vec2 OverlayTextSize(std::string_view text, float size);
 
@@ -314,6 +272,8 @@ enum class OverlayBatchKind : std::uint8_t {
     Numbers,  
     Trails,   
     Capsules,  
+    Texts,     
+    Image,     
 };
 
 struct OverlayNumberFormat {
@@ -337,15 +297,19 @@ struct OverlayBatch {
     Tensor count;
     Tensor poses;
     Tensor poseIndices;  
+    Tensor poseWorlds;
     glm::dmat4 poseFrame{1.0};
     Tensor values;
+    Tensor chars;
+    Tensor image;
+    glm::vec2 imageSize{0.0f};
     OverlayNumberFormat format;  
     bool screen = false;
     ScreenPlacement placement;
     std::vector&lt;Path&gt; anchors;
     Tensor colors;
     Tensor sizes;
-    Tensor worlds;  
+    Tensor worlds;
     double head = 0.0;
     double length = 1.0;
     MarkerShape shape = MarkerShape::Circle;
@@ -379,7 +343,8 @@ class Overlay {
 
     Overlay&amp; Polyline(std::span&lt;const glm::dvec3&gt; points,
                       const OverlayStyle&amp; style = {},
-                      bool closed = false);
+                      bool closed = false,
+                      std::span&lt;const glm::vec4&gt; colors = {});
 
     Overlay&amp; Lines(std::span&lt;const glm::dvec3&gt; endpoints,
                    const OverlayStyle&amp; style = {},
@@ -429,6 +394,27 @@ class Overlay {
     Overlay&amp; Rect(const ScreenPlacement&amp; placement,
                   const glm::vec2&amp; size,
                   const OverlayStyle&amp; style = {});
+
+    Overlay&amp; Image(std::span&lt;const glm::dvec3, 4&gt; corners,
+                   Tensor image, const OverlayStyle&amp; style = {});
+
+    Overlay&amp; ScreenImage(const ScreenPlacement&amp; placement,
+                         Tensor image, const OverlayStyle&amp; style = {},
+                         const glm::vec2&amp; size = glm::vec2(0.0f));
+
+    Overlay&amp; Button(const ScreenPlacement&amp; placement,
+                    std::string_view label,
+                    const OverlayStyle&amp; style = {},
+                    const glm::vec2&amp; size = glm::vec2(0.0f));
+
+    std::uint32_t ScreenItemAt(const glm::vec2&amp; pixel,
+                               const glm::vec2&amp; extent) const;
+
+    Overlay&amp; SetHovered(std::uint32_t id);
+
+    std::uint32_t Hovered() const {
+        return hovered_;
+    }
 
     Overlay&amp; Marker(const glm::dvec3&amp; point,
                     const OverlayStyle&amp; style = {},
@@ -491,9 +477,20 @@ class Overlay {
     std::vector&lt;OverlaySprite&gt; sprites_;
     std::vector&lt;OverlayBatch&gt; batches_;
     std::vector&lt;Path&gt; anchors_;
+    std::uint32_t hovered_ = 0;
     bool visible_ = true;
     std::uint64_t version_ = 0;
 };
+
+struct OverlayHit {
+    std::string overlay;
+    std::int32_t batch = -1;
+    std::uint32_t item = 0;
+};
+
+std::array&lt;glm::dvec3, 4&gt; CameraImageCorners(const Scene&amp; scene,
+                                             const Path&amp; camera,
+                                             double distance);
 
 std::vector&lt;std::string&gt;
 SelectOverlays(std::string_view spec,

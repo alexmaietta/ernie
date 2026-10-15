@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -218,7 +139,27 @@
 <tbody>
 <tr>
 <td style="text-align: right;">constexpr std::size_t</td>
-<td style="text-align: left;"><a href="#variable-kmaxparams"><strong>kMaxParams</strong></a>   = <code>16</code><br><em>Most parameters a model may declare; the shaders pack them into four vec4s.</em></td>
+<td style="text-align: left;"><a href="#variable-kcoreparams"><strong>kCoreParams</strong></a>   = <code>16</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::size_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxcolours"><strong>kMaxColours</strong></a>   = <code>6</code><br><em>Most colour parameters (</em> <code>BrdfParam::colour</code> <em>) a model may declare.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::size_t</td>
+<td style="text-align: left;"><a href="#variable-kmaxparams"><strong>kMaxParams</strong></a>   = <code>48</code><br><em>Most parameters a model may declare: the first</em> <code>kCoreParams</code> <em>, packed with each material, and the rest in a buffer the shaders read only where the model asks for them (</em><code>BrdfParams::extended</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-ksubsurfacefeature"><strong>kSubsurfaceFeature</strong></a>   = <code>1u &amp;lt;&amp;lt; 29</code><br><em>The feature bit of a material that scatters light beneath its surface (</em> <code>IBrdf::subsurface</code> <em>): its subsurface light is spread across the image by</em><code>BrdfModel::subsurfaceRadius</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-ktangentsfeature"><strong>kTangentsFeature</strong></a>   = <code>1u &amp;lt;&amp;lt; 31</code><br><em>The feature bit (</em> <code>BrdfModel::features</code> <em>) of a material that reads the surface's tangent (</em><code>BrdfInput</code> <em>'s frame), such as an anisotropic one: the renderer keeps the G-buffer's tangents only while a material has it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">constexpr std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-ktransmissionfeature"><strong>kTransmissionFeature</strong></a>   = <code>1u &amp;lt;&amp;lt; 30</code><br><em>The feature bit of a material that lets light from behind it through (</em> <code>IBrdf::transmission</code> <em>): drawn after the opaque surfaces, in front of what it shows through.</em></td>
 </tr>
 </tbody>
 </table>
@@ -260,14 +201,43 @@
 <tbody>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>BrdfRegistry</strong></a></td>
-<td style="text-align: left;"><a href="#function-withbuiltins"><strong>WithBuiltins</strong></a> () <br><em>A registry with the built-in models: "lambert", "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke" and "preview_surface".</em></td>
+<td style="text-align: left;"><a href="#function-withbuiltins"><strong>WithBuiltins</strong></a> () <br><em>A registry with the built-in models: "lambert", "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke", "preview_surface" and "open_pbr".</em></td>
 </tr>
 </tbody>
 </table>
 <h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
+<h3 id="variable-kcoreparams">variable kCoreParams</h3>
+<pre><code class="language-C++">constexpr std::size_t ernie::BrdfRegistry::kCoreParams;
+</code></pre>
+<hr>
+
+<h3 id="variable-kmaxcolours">variable kMaxColours</h3>
+<p><em>Most colour parameters (</em> <code>BrdfParam::colour</code> <em>) a model may declare.</em></p>
+<pre><code class="language-C++">constexpr std::size_t ernie::BrdfRegistry::kMaxColours;
+</code></pre>
+<hr>
+
 <h3 id="variable-kmaxparams">variable kMaxParams</h3>
-<p><em>Most parameters a model may declare; the shaders pack them into four vec4s.</em> </p>
+<p><em>Most parameters a model may declare: the first</em> <code>kCoreParams</code> <em>, packed with each material, and the rest in a buffer the shaders read only where the model asks for them (</em><code>BrdfParams::extended</code> <em>).</em></p>
 <pre><code class="language-C++">constexpr std::size_t ernie::BrdfRegistry::kMaxParams;
+</code></pre>
+<hr>
+
+<h3 id="variable-ksubsurfacefeature">variable kSubsurfaceFeature</h3>
+<p><em>The feature bit of a material that scatters light beneath its surface (</em> <code>IBrdf::subsurface</code> <em>): its subsurface light is spread across the image by</em><code>BrdfModel::subsurfaceRadius</code> <em>.</em></p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BrdfRegistry::kSubsurfaceFeature;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktangentsfeature">variable kTangentsFeature</h3>
+<p><em>The feature bit (</em> <code>BrdfModel::features</code> <em>) of a material that reads the surface's tangent (</em><code>BrdfInput</code> <em>'s frame), such as an anisotropic one: the renderer keeps the G-buffer's tangents only while a material has it.</em></p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BrdfRegistry::kTangentsFeature;
+</code></pre>
+<hr>
+
+<h3 id="variable-ktransmissionfeature">variable kTransmissionFeature</h3>
+<p><em>The feature bit of a material that lets light from behind it through (</em> <code>IBrdf::transmission</code> <em>): drawn after the opaque surfaces, in front of what it shows through.</em></p>
+<pre><code class="language-C++">constexpr std::uint32_t ernie::BrdfRegistry::kTransmissionFeature;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
@@ -280,7 +250,7 @@
 <p>Its shader source is only checked superficially here; it is compiled when a renderer first uses it (<code>RasterRenderer::AddBrdf</code> compiles eagerly). </p>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> if the id is empty, not an identifier or taken, there are more than <code>kMaxParams</code> parameters, a parameter's range is empty or excludes its default, or its Slang source is empty or does not mention <code>typeName</code>. </li>
+<li><code>std::invalid_argument</code> if the id is empty, not an identifier or taken, there are more than <code>kMaxParams</code> parameters or <code>kMaxColours</code> colours, a colour lacks its green and blue, a parameter's range is empty or excludes its default, or its Slang source is empty or does not mention <code>typeName</code>. </li>
 </ul>
 <hr>
 
@@ -304,7 +274,7 @@
 <hr>
 <h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
 <h3 id="function-withbuiltins">function WithBuiltins</h3>
-<p><em>A registry with the built-in models: "lambert", "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke" and "preview_surface".</em> </p>
+<p><em>A registry with the built-in models: "lambert", "lommel_seeliger", "lunar_lambert", "oren_nayar", "hapke", "preview_surface" and "open_pbr".</em> </p>
 <pre><code class="language-C++">static BrdfRegistry ernie::BrdfRegistry::WithBuiltins () 
 </code></pre>
 <hr>

@@ -56,92 +56,7 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Demos</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#running-a-demo">Running a demo</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#writing-a-demo">Writing a demo</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#demos-in-your-own-project">Demos in your own project</a>
-    </li>
     </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
@@ -211,171 +126,12 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="demos">Demos</h1>
-<p>Ernie's demos show its features one at a time: lighting in physical units, real orbital cameras, terrain and planets, GPU interop, batched rendering for reinforcement learning. They live in <code>demos/&lt;category&gt;/</code>, each a pair, <code>demo_&lt;category&gt;_&lt;name&gt;.cpp</code> and <code>demo_&lt;category&gt;_&lt;name&gt;.py</code>: the same scene and checks in each language, rendering the same image. Only <code>demos/interop/</code>, which shows Python's GPU interop (Warp, DLPack, CUDA streams), is Python alone. A demo is named as its files, <code>demo_&lt;category&gt;_&lt;name&gt;</code>, such as <code>demo_lighting_illuminants</code>, wherever it runs: <code>--demo</code>, <code>python -m ernie.demos</code> and its own program. They run the same way, after Newton's examples.</p>
-<h2 id="running-a-demo">Running a demo</h2>
-<p>The <code>ernie</code> program, which <code>pip install ernie-renderer</code> puts on the path, runs the C++ demos:</p>
-<pre><code class="language-sh">ernie                                  # the viewer on the default scene, with the Demos panel
-ernie --demo demo_lighting_illuminants # the viewer with a demo running
-ernie --list                           # every demo's name
-ernie scene.json                       # the viewer on a scene file (ernie.save_scene's JSON)
-ernie scene.json --output scene.png    # renders a scene file without a window
-</code></pre>
-<p><code>python -m ernie.demos</code> runs the Python demos, which the package ships as <code>ernie.demos</code>:</p>
-<pre><code class="language-sh">python -m ernie.demos                            # demo_viewer_custom_panel
-python -m ernie.demos --list
-python -m ernie.demos demo_lighting_illuminants  # one by name, with its options after it
-</code></pre>
-<p>From a checkout, run the files themselves (<code>PYTHONPATH=build/python python demos/lighting/demo_lighting_illuminants.py</code>), or a C++ demo's own program, which <code>-DERNIE_BUILD_DEMOS=ON</code> builds under the same name (<code>build/bin/demo_lighting_illuminants</code>).</p>
-<p>Each opens the viewer with a Demos panel in the upper right, a tab beside the Stage. It lists the demos in the same language under a collapsing header per category; choosing one clears the scene and builds that demo in the same window. Below the list it pauses, single-steps and resets the running demo, describes it, and shows its options. A demo builds its options from widgets (<code>widgets</code> in Python, <code>Widgets()</code> in C++): text, text fields, buttons, checkboxes, sliders, drop-downs (combos), colour pickers and live plots; <code>demo_viewer_custom_panel</code> uses each. C++ demos can also draw Dear ImGui directly in <code>Gui()</code>.</p>
-<p>Every demo takes these options:</p>
-<table>
-<thead>
-<tr>
-<th>Option</th>
-<th>Effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--viewer window</code></td>
-<td>Opens the viewer (the default).</td>
-</tr>
-<tr>
-<td><code>--viewer null</code></td>
-<td>No viewer: each frame renders the scene's RenderSettings (or its first camera) with an <code>ernie.Renderer</code>.</td>
-</tr>
-<tr>
-<td><code>--headless</code></td>
-<td>Renders the viewer without a window, overlays and all; no display needed.</td>
-</tr>
-<tr>
-<td><code>--num-frames N</code></td>
-<td>Stops after N frames. Without it a window runs until closed, and the other modes run the demo's own count.</td>
-</tr>
-<tr>
-<td><code>--benchmark [SECONDS]</code></td>
-<td>Implies <code>--viewer null</code> and prints frames per second after a few frames' warm-up, stopping after SECONDS or <code>--num-frames</code>.</td>
-</tr>
-<tr>
-<td><code>--test</code></td>
-<td>Runs the demo's checks: <code>test_post_step</code> after every step and <code>test_final</code> at the end.</td>
-</tr>
-<tr>
-<td><code>--output PATH</code></td>
-<td>Writes the last frame, or the demo's own composite, as PNG.</td>
-</tr>
-<tr>
-<td><code>--paused</code></td>
-<td>Starts paused; the Demos panel resumes.</td>
-</tr>
-<tr>
-<td><code>--device NAME</code></td>
-<td>Prefers the GPU whose name contains NAME.</td>
-</tr>
-<tr>
-<td><code>--renderer NAME</code></td>
-<td>The render backend.</td>
-</tr>
-<tr>
-<td><code>--validation</code></td>
-<td>Enables the Vulkan validation layer where installed.</td>
-</tr>
-<tr>
-<td><code>--vsync</code></td>
-<td>Waits for the display's refresh.</td>
-</tr>
-</tbody>
-</table>
-<p>A demo's own options follow these; <code>--help</code> lists them all. For example:</p>
-<pre><code class="language-sh">ernie --demo demo_lighting_illuminants --viewer null --output illuminants.png
-python -m ernie.demos demo_lighting_illuminants --viewer null --output illuminants.png
-python -m ernie.demos demo_viewer_custom_panel --headless --test
-ernie --demo demo_viewer_custom_panel --benchmark --num-frames 300
-</code></pre>
-<p>The Python tests (<code>ernie/test/python/test_demos.py</code>) run every demo in both languages with <code>--viewer null --test</code>, check that each has its twin, and check that the twins' <code>--output</code> images match.</p>
-<h2 id="writing-a-demo">Writing a demo</h2>
-<p>A demo subclasses <code>ernie.demo.Demo</code>. It builds its scene into <code>self.scene</code> in <code>__init__</code>, moves it in <code>step</code> by <code>self.frame_dt</code> seconds, and checks itself in <code>test_final</code>:</p>
-<pre><code class="language-python">import ernie
-import ernie.demo
-from ernie import tokens
-
-
-class Demo(ernie.demo.Demo):
-    num_frames = 120  # frames to run without a window
-
-    def __init__(self, viewer, args):
-        super().__init__(viewer, args)
-        world = self.scene.define(&quot;/World&quot;, ernie.Xform)
-        world.define(&quot;Ground&quot;, ernie.GroundPlane, checker=True)
-        self.ball = world.define(&quot;Ball&quot;, ernie.Sphere, radius=0.5, translate=(0, 0, 0.5))
-        world.define(&quot;Sun&quot;, ernie.DistantLight).set(
-            tokens.TRANSFORM, ernie.distant_light_transform((0.4, -0.6, 0.7)))
-        world.define(&quot;Camera&quot;, ernie.Camera).set(
-            tokens.TRANSFORM, ernie.look_at_transform((0, -8, 3), (0, 0, 0.5)))
-        # The demo's options, shown in the Demos panel.
-        self.widgets.slider(&quot;Radius&quot;, 0.1, 2.0, 0.5,
-                            on_change=lambda value: self.ball.set(radius=value))
-
-    def step(self):
-        self.ball.set(translate=(2.0 * self.time, 0, 0.5))
-
-    def test_final(self):
-        assert self.render_image()[..., :3].std() &gt; 1.0
-
-
-if __name__ == &quot;__main__&quot;:
-    ernie.demo.main(Demo)
-</code></pre>
-<p>What to know:</p>
-<ul>
-<li>A demo's own controls go in the Demos panel's Options section: add widgets to <code>self.widgets</code> (sliders, checkboxes, combos, buttons, plots), which works with or without a viewer. C++ demos can also override <code>Gui()</code> and draw there with Dear ImGui, as Newton's examples' <code>gui(ui)</code> does.</li>
-<li><code>viewer</code> is <code>None</code> under <code>--viewer null</code>, so put other viewer calls (such as <code>active_camera</code>) under <code>if viewer is not None</code>. Give the scene a camera of its own: without a viewer, and in tests, the scene renders through it.</li>
-<li>In a window <code>frame_dt</code> is the real time since the last frame (at most <code>max_frame_dt</code>). Without one it is <code>fixed_dt</code>, so runs repeat exactly. <code>self.time</code> is the demo's clock at the start of the step.</li>
-<li>A demo uses the viewer as any application does: <code>add_panel</code>, <code>on_frame</code>, <code>add_hud_item</code>, <code>active_camera</code>, <code>viewport_display</code>. A demo registers in a scope of its own (<code>Viewer.scope</code>), so when the Demos panel switches away, what it added is removed, and the viewport's display settings are restored. A camera, lighting or RenderSettings it chooses is kept over the viewer's reset of its session.</li>
-<li>Add your own options by overriding the class method <code>create_parser</code>, adding to what <code>super().create_parser()</code> returns. Give every option a default: the Demos panel opens demos with their defaults.</li>
-<li>Override <code>save_output(path)</code> for a composite <code>--output</code> (images side by side, a contact sheet), and <code>render</code> when the per-frame render should differ, as for batch renders through <code>self.renderer</code>. <code>self.map(path, attribute, stream)</code> maps an attribute through the viewer or the renderer, whichever draws the demo, for in-place GPU writes. <code>close()</code> runs when the demo ends or is switched away.</li>
-<li>Put it in <code>demos/&lt;category&gt;/&lt;name&gt;.py</code> beside its C++ twin, <code>&lt;name&gt;.cpp</code>, and the Demos panel lists it under its category. The image helpers both languages share are <code>ernie.demo</code>'s (<code>side_by_side</code>, <code>srgb_to_linear</code>, <code>mean_linear_rgb</code>, <code>heatmap</code>, <code>write_png</code>) and <code>demos/util.h</code>'s.</li>
-</ul>
-<p><code>ernie.demo.init</code> and <code>ernie.demo.run</code> are <code>main</code>'s two halves, for a script that builds its own parser or runs a demo it constructs itself.</p>
-<h2 id="demos-in-your-own-project">Demos in your own project</h2>
-<p>The base class and the loop are C++ (<code>ernie::app::Demo</code> and <code>ernie::app::DemoRunner</code>, in <code>ernie/app/demo.h</code>), and <code>ernie.demo.Demo</code> derives from them through Python bindings. So a project of your own, in Python or in C++, writes demos the same way, outside Ernie's repository, and runs them with the same options, the same <code>--test</code> checks and the same Demos panel, which lists the demo files beside the one that runs.</p>
-<p>In C++, derive from <code>ernie::app::Demo</code>, override what you need, and hand the demos to <code>DemoMain</code>, which parses the shared options (leaving the others in <code>DemoOptions::extra</code>), opens the viewer and runs the first; its Demos panel lists them all:</p>
-<pre><code class="language-cpp">#include &lt;ernie/app/demo.h&gt;
-#include &lt;ernie/scene/geometry_schemas.h&gt;
-
-class BallDemo : public ernie::app::Demo {
-  public:
-    BallDemo(ernie::app::Viewer* viewer, const ernie::app::DemoOptions&amp; options)
-        : Demo(viewer, options) {
-        numFrames = 120;
-        ernie::Sphere::Define(GetScene(), &quot;/World/Ball&quot;).SetRadius(0.5);
-        // ... a sun, a camera, and options: Widgets().Slider(...), or override Gui()
-    }
-
-    void Step() override {
-        ernie::SetXform(GetScene(), &quot;/World/Ball&quot;, {.translate = glm::dvec3(2.0 * time, 0.0, 0.5)});
-    }
-
-    void TestFinal() override {
-        if (RenderImage().Empty()) {
-            throw std::runtime_error(&quot;nothing rendered&quot;);
-        }
-    }
-};
-
-int main(int argc, char** argv) {
-    return ernie::app::DemoMain(argc, argv,
-                                {ernie::app::MakeDemoInfo&lt;BallDemo&gt;(&quot;example&quot;, &quot;ball&quot;)});
-}
-</code></pre>
-<p>The C++ names follow Python's: <code>Step</code>, <code>Render</code>, <code>SaveOutput</code>, <code>TestPostStep</code>, <code>TestFinal</code> and <code>Close</code> to override; <code>GetScene</code>, <code>GetViewer</code> (null without one), <code>GetRenderer</code>, <code>RenderImage</code>, <code>frame</code>, <code>time</code> and <code>frameDt</code>; and <code>numFrames</code>, <code>fixedDt</code>, <code>maxFrameDt</code> and <code>description</code> to set. <code>WritePng</code> writes an image.</p>
-<p>Ernie's own C++ demos register themselves instead, with <code>ERNIE_REGISTER_DEMO(Class, "category", "name", "description")</code> at the end of their file, and <code>RegisteredDemos()</code> lists them; an application linking its demos' object files can do the same and pass <code>RegisteredDemos()</code> to <code>DemoMain</code>.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href="../viewer/" class="btn btn-neutral float-left" title="Viewer"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../../concepts/scene/" class="btn btn-neutral float-right" title="Scene description">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../../api/python/scene/" class="btn btn-neutral float-right" title="Scene">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -405,7 +161,7 @@ int main(int argc, char** argv) {
       <span><a href="../viewer/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../../concepts/scene/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../../api/python/scene/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

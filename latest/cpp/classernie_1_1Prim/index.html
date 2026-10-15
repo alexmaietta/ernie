@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -262,6 +183,10 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-setat"><strong>SetAt</strong></a> (std::string_view attribute, double time, <a href="../classernie_1_1Value/"><strong>Value</strong></a> value) <br><em>As</em> <code>Scene::SetAt</code> <em>and</em><code>Scene::WriteAt</code> <em>: a time sample; return this handle for chaining.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-setxform"><strong>SetXform</strong></a> (const <a href="../structernie_1_1XformOps/"><strong>XformOps</strong></a> &amp; xform) <br><em>As</em> <code>SetXform</code> <em>(</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>); returns this handle for chaining.</em></td>
 </tr>
 <tr>
@@ -271,6 +196,10 @@
 <tr>
 <td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
 <td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::string_view attribute, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor) <br><em>As</em> <code>Scene::Write</code> <em>; returns this handle for chaining.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>Prim</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-writeat"><strong>WriteAt</strong></a> (std::string_view attribute, double time, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a> tensor) <br></td>
 </tr>
 <tr>
 <td style="text-align: right;"></td>
@@ -368,6 +297,16 @@ T ernie::Prim::Get (
 </code></pre>
 <hr>
 
+<h3 id="function-setat">function SetAt</h3>
+<p><em>As</em> <code>Scene::SetAt</code> <em>and</em><code>Scene::WriteAt</code> <em>: a time sample; return this handle for chaining.</em></p>
+<pre><code class="language-C++">Prim &amp; ernie::Prim::SetAt (
+    std::string_view attribute,
+    double time,
+    Value value
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-setxform">function SetXform</h3>
 <p><em>As</em> <code>SetXform</code> <em>(</em><a href="../xform_8h/"><em><strong>ernie/scene/xform.h</strong></em></a> <em>); returns this handle for chaining.</em></p>
 <pre><code class="language-C++">Prim &amp; ernie::Prim::SetXform (
@@ -389,6 +328,15 @@ T ernie::Prim::Get (
 <p><em>As</em> <code>Scene::Write</code> <em>; returns this handle for chaining.</em></p>
 <pre><code class="language-C++">Prim &amp; ernie::Prim::Write (
     std::string_view attribute,
+    Tensor tensor
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-writeat">function WriteAt</h3>
+<pre><code class="language-C++">Prim &amp; ernie::Prim::WriteAt (
+    std::string_view attribute,
+    double time,
     Tensor tensor
 ) 
 </code></pre>

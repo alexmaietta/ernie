@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -291,6 +212,10 @@
 <td style="text-align: left;"><a href="#function-frame"><strong>Frame</strong></a> (const glm::dvec3 &amp; boundsMin, const glm::dvec3 &amp; boundsMax) <br><em>Aims at the centre of the axis-aligned box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from a distance at which its bounding sphere fits the vertical field of view with a small margin.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-frameview"><strong>FrameView</strong></a> (const glm::dvec3 &amp; boundsMin, const glm::dvec3 &amp; boundsMax, double aspect) <br><em>Aims at the centre of the box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from the current direction, at the distance where all its corners fit a view</em><code>aspect</code> <em>(width over height) wide with a small margin: a flat or long box fills the view rather than its bounding sphere.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
 <td style="text-align: left;"><a href="#function-makecamera"><strong>MakeCamera</strong></a> (std::uint32_t width, std::uint32_t height) const<br><em>A default camera of</em> <code>width</code> <em>x</em><code>height</code> <em>with this pose, field of view and clipping range.</em></td>
 </tr>
@@ -400,6 +325,16 @@
 <pre><code class="language-C++">void ernie::OrbitController::Frame (
     const glm::dvec3 &amp; boundsMin,
     const glm::dvec3 &amp; boundsMax
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-frameview">function FrameView</h3>
+<p><em>Aims at the centre of the box [</em> <code>boundsMin</code> <em>,</em><code>boundsMax</code> <em>] from the current direction, at the distance where all its corners fit a view</em><code>aspect</code> <em>(width over height) wide with a small margin: a flat or long box fills the view rather than its bounding sphere.</em></p>
+<pre><code class="language-C++">void ernie::OrbitController::FrameView (
+    const glm::dvec3 &amp; boundsMin,
+    const glm::dvec3 &amp; boundsMax,
+    double aspect
 ) 
 </code></pre>
 <hr>

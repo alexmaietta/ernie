@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -306,7 +227,7 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="prim-types">Prim types</h1>
-<p>The typed prim classes and the registry they are built from: one class per registered prim type, with a property per attribute (see <a href="../../../guides/scenes/">Describing scenes</a>). The classes are also exported from <code>ernie</code> itself (<code>ernie.SphereLight</code>).</p>
+<p>The typed prim classes and the registry they are built from: one class per registered prim type, with a property per attribute. The classes are also exported from <code>ernie</code> itself (<code>ernie.SphereLight</code>).</p>
 <h2 id="registry-and-loading">Registry and loading</h2>
 
 
@@ -881,14 +802,15 @@ derived from it.</p>
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">set(*attribute: Any, **attributes: Any) -&gt; Self</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">set(*attribute: Any, time: float | None = None, **attributes: Any) -&gt; Self</code></pre>
 
     <div class="doc doc-contents ">
 
         <p>Sets attributes by Python name, and the transform from
 <code>translate</code>, <code>rotate</code>, <code>rotation_order</code>, <code>orient</code> and
-<code>scale</code>; <code>set(token, value)</code> sets one by USD name. Returns
-this prim.</p>
+<code>scale</code>; <code>set(token, value)</code> sets one by USD name. With
+<code>time</code>, sets their time samples at that time code instead
+(Scene.set), arrays as Scene.write's. Returns this prim.</p>
 
 
     </div>
@@ -2160,6 +2082,13 @@ path.</p>
               </div>
             </li>
             <li>
+              <b><code>TOKEN_ARRAY</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
               <b><code>VEC2</code></b>
               –
               <div class="doc-md-description">
@@ -2420,6 +2349,28 @@ path.</p>
 
 
 
+<h3 id="ernie.AttributeKind.TOKEN_ARRAY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">TOKEN_ARRAY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">TOKEN_ARRAY = 13</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.AttributeKind.VEC2" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VEC2</span>
 
@@ -2605,10 +2556,10 @@ path.</p>
             </li>
             <li>
               <b><code>visibility</code></b>
-                  (<code><span title="str">str</span></code>)
+                  (<code><span title="str">str</span> | <span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
-                <p>"invisible" hides the prim and its descendants. Default 'inherited'. USD name <code>visibility</code>.</p>
+                <p>"invisible" hides the prim and its descendants; as an array (a column's row), 0 hides them.</p>
               </div>
             </li>
             <li>
@@ -2672,11 +2623,12 @@ path.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">visibility: str</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">visibility: str | Any</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>"invisible" hides the prim and its descendants. Default 'inherited'. USD name <code>visibility</code>.</p>
+        <p>"invisible" hides the prim and its descendants; as an array (a column's row), 0 hides them.
+Default 'inherited'. USD name <code>visibility</code>.</p>
 
     </div>
 
@@ -2719,7 +2671,7 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     translate: Sequence[float] = ...,
@@ -2865,7 +2817,7 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     translate: Sequence[float] = ...,
@@ -3011,7 +2963,7 @@ world. Default -1. USD name <code>ernie:world</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     translate: Sequence[float] = ...,
@@ -3160,7 +3112,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
@@ -3254,7 +3206,7 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
                   (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>] | <span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
-                <p>Linear RGB of the whole prim; colours per vertex are written as an array instead. Default</p>
+                <p>Linear RGB of the whole prim; colours per vertex, face vertex or face are written as an</p>
               </div>
             </li>
             <li>
@@ -3263,6 +3215,14 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
               –
               <div class="doc-md-description">
                 <p>The Material prim it is drawn with. USD name <code>material:binding</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin, in place of its material's; 0 for the material's own. Default 0.0. USD name</p>
               </div>
             </li>
         </ul>
@@ -3298,8 +3258,9 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
     <div class="doc doc-contents ">
 
-        <p>Linear RGB of the whole prim; colours per vertex are written as an array instead. Default
-(0.5, 0.5, 0.5). USD name <code>primvars:displayColor</code>.</p>
+        <p>Linear RGB of the whole prim; colours per vertex, face vertex or face are written as an
+array instead (its :interpolation as USD's, else by count; perhaps indexed). Default (0.5,
+0.5, 0.5). USD name <code>primvars:displayColor</code>.</p>
 
     </div>
 
@@ -3328,6 +3289,30 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Gprim.thermal_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin, in place of its material's; 0 for the material's own. Default 0.0. USD name
+<code>ernie:thermal:temperature</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -3341,12 +3326,13 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -3522,12 +3508,13 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     size: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -3724,8 +3711,9 @@ geometry. A (2, 3) array written in its place is read too. USD name <code>extent
     <div class="doc doc-contents ">
 
         <p>uv: latitude rings and meridians; icosphere: a divided icosahedron; cubeSphere: a cube's
-faces as planet Terrains'; healpix: HEALPix's equal-area pixels. Each has equirectangular
-texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
+faces as planet Terrains'; healpix: HEALPix's equal-area pixels; adaptive: a planet's cube-
+sphere LOD, finer towards the eye, exact at any scale (raster; a cube sphere elsewhere).
+Each has equirectangular texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 
     </div>
 
@@ -3768,12 +3756,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     radius: float = ...,
     tessellation: str = ...,
     tessellation_level: int = ...,
@@ -3922,12 +3911,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     axis: str = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -4134,12 +4124,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     axis: str = ...,
     radius: float = ...,
     height: float = ...,
@@ -4348,12 +4339,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     axis: str = ...,
     radius: float = ...,
     height: float = ...,
@@ -4562,12 +4554,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     axis: str = ...,
     radius: float = ...,
     height: float = ...,
@@ -4776,12 +4769,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     axis: str = ...,
     width: float = ...,
     length: float = ...,
@@ -4930,12 +4924,13 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     points: Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
@@ -5031,11 +5026,67 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>blend_shape_targets</code></b>
+                  (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The BlendShape prim of each name. USD name <code>skel:blendShapeTargets</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>corner_indices</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Integer indices of sharp corner points. USD name <code>cornerIndices</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>corner_sharpnesses</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Sharpness of each corner. USD name <code>cornerSharpnesses</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>crease_indices</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Integer point indices of crease chains, one after another. USD name <code>creaseIndices</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>crease_lengths</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Integer number of points of each crease chain. USD name <code>creaseLengths</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>crease_sharpnesses</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Sharpness of each crease, or of each crease edge; 10 or more is infinitely sharp. USD name</p>
+              </div>
+            </li>
+            <li>
               <b><code>define</code></b>
                   (<code><span title="ernie.schema._Define">_Define</span>[<span title="ernie.schema._MeshDefine">_MeshDefine</span>]</code>)
               –
               <div class="doc-md-description">
                 
+              </div>
+            </li>
+            <li>
+              <b><code>face_varying_linear_interpolation</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Where texture coordinates stay linear, not smoothed: none smooths them everywhere, all keeps</p>
               </div>
             </li>
             <li>
@@ -5055,11 +5106,131 @@ texture coordinates. Default 'uv'. USD name <code>ernie:tessellation</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>geom_bind_transform</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="tuple">tuple</span>[<span title="float">float</span>, ...], ...]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Places its points in the Skeleton's space when bound. Default array([[1., 0., 0., 0.],</p>
+              </div>
+            </li>
+            <li>
+              <b><code>hole_indices</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Integer indices of faces left out of the surface. USD name <code>holeIndices</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>interpolate_boundary</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>How boundary edges and corners are interpolated. Default 'edgeAndCorner'. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>joint_indices</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Integer (points, k) joints influencing each point, or (1, k) for all points (rigid). USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>joint_weights</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>(points, k) or (1, k) weights of the joint indices. USD name <code>primvars:skel:jointWeights</code>.</p>
+              </div>
+            </li>
+            <li>
               <b><code>normals</code></b>
                   (<code><span title="typing.Any">Any</span></code>)
               –
               <div class="doc-md-description">
-                <p>(n, 3) normals, one per point; ignored when of another count. USD name <code>normals</code>.</p>
+                <p>(n, 3) normals: one per point, or per face vertex, face or mesh (normals:interpolation as</p>
+              </div>
+            </li>
+            <li>
+              <b><code>refine_level</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>2^level segments along each control edge; -1 for the stage's ernie:subdivision:refineLevel.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>skel_blend_shapes</code></b>
+                  (<code><span title="list">list</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Its names for its blend shapes, as animations weight them. USD name <code>skel:blendShapes</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>skel_joints</code></b>
+                  (<code><span title="list">list</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The Skeleton's joints its joint indices count, in their order; unset, all of them in the</p>
+              </div>
+            </li>
+            <li>
+              <b><code>skeleton</code></b>
+                  (<code><a class="autorefs autorefs-internal" title="            Path (ernie._ernie.Path)" href="../scene/#ernie.Path">Path</a> | None</code>)
+              –
+              <div class="doc-md-description">
+                <p>The Skeleton skinning it; unset, it is not skinned. USD name <code>skel:skeleton</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>skinning_method</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>How joint transforms blend: linearly, or as dual quaternions, which keep volume at twisting</p>
+              </div>
+            </li>
+            <li>
+              <b><code>subdivision_scheme</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The surface the faces are the control mesh of, refined by OpenSubdiv; none draws the faces</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_node_ids</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>int32 (n,), each point's node in a thermal network, whose temperatures the node temperatures</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_node_temperatures</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>float32 (nodes,) kelvin per node of the node ids, on the CPU or a CUDA device, as a thermal</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperatures</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>float32 (n,) kelvin, one per point, on the CPU or a CUDA device, as a thermal solver writes</p>
+              </div>
+            </li>
+            <li>
+              <b><code>triangle_subdivision_rule</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Catmull-Clark's weights for triangles, or smoother ones. Default 'catmullClark'. USD name</p>
               </div>
             </li>
         </ul>
@@ -5108,6 +5279,145 @@ nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 
 
 
+<h3 id="ernie.schema.Mesh.blend_shape_targets" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">blend_shape_targets</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">blend_shape_targets: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The BlendShape prim of each name. USD name <code>skel:blendShapeTargets</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.corner_indices" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">corner_indices</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">corner_indices: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Integer indices of sharp corner points. USD name <code>cornerIndices</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.corner_sharpnesses" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">corner_sharpnesses</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">corner_sharpnesses: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Sharpness of each corner. USD name <code>cornerSharpnesses</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.crease_indices" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">crease_indices</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">crease_indices: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Integer point indices of crease chains, one after another. USD name <code>creaseIndices</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.crease_lengths" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">crease_lengths</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">crease_lengths: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Integer number of points of each crease chain. USD name <code>creaseLengths</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.crease_sharpnesses" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">crease_sharpnesses</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">crease_sharpnesses: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Sharpness of each crease, or of each crease edge; 10 or more is infinitely sharp. USD name
+<code>creaseSharpnesses</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Mesh.define" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">define</span>
 
@@ -5120,6 +5430,30 @@ nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 <pre class="highlight"><code class="language-python doc-signature">define: _Define[_MeshDefine]</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.face_varying_linear_interpolation" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">face_varying_linear_interpolation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">face_varying_linear_interpolation: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where texture coordinates stay linear, not smoothed: none smooths them everywhere, all keeps
+them linear. Default 'cornersPlus1'. USD name <code>faceVaryingLinearInterpolation</code>.</p>
 
     </div>
 
@@ -5175,6 +5509,125 @@ nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 
 
 
+<h3 id="ernie.schema.Mesh.geom_bind_transform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">geom_bind_transform</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">geom_bind_transform: tuple[tuple[float, ...], ...]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Places its points in the Skeleton's space when bound. Default array([[1., 0., 0., 0.],
+[0., 1., 0., 0.],        [0., 0., 1., 0.],        [0., 0., 0., 1.]]). USD name
+<code>primvars:skel:geomBindTransform</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.hole_indices" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">hole_indices</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">hole_indices: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Integer indices of faces left out of the surface. USD name <code>holeIndices</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.interpolate_boundary" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">interpolate_boundary</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">interpolate_boundary: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>How boundary edges and corners are interpolated. Default 'edgeAndCorner'. USD name
+<code>interpolateBoundary</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.joint_indices" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">joint_indices</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">joint_indices: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Integer (points, k) joints influencing each point, or (1, k) for all points (rigid). USD
+name <code>primvars:skel:jointIndices</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.joint_weights" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">joint_weights</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">joint_weights: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(points, k) or (1, k) weights of the joint indices. USD name <code>primvars:skel:jointWeights</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Mesh.normals" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">normals</span>
 
@@ -5188,7 +5641,254 @@ nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>(n, 3) normals, one per point; ignored when of another count. USD name <code>normals</code>.</p>
+        <p>(n, 3) normals: one per point, or per face vertex, face or mesh (normals:interpolation as
+USD's, else by count) for hard edges; primvars:normals, perhaps indexed, in their place;
+ignored when of another count. Without them, smooth ones from the triangles, computed on the
+GPU. USD name <code>normals</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.refine_level" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">refine_level</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">refine_level: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>2^level segments along each control edge; -1 for the stage's ernie:subdivision:refineLevel.
+Default -1. USD name <code>ernie:refineLevel</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.skel_blend_shapes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">skel_blend_shapes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">skel_blend_shapes: list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Its names for its blend shapes, as animations weight them. USD name <code>skel:blendShapes</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.skel_joints" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">skel_joints</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">skel_joints: list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The Skeleton's joints its joint indices count, in their order; unset, all of them in the
+Skeleton's order. USD name <code>skel:joints</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.skeleton" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">skeleton</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">skeleton: Path | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The Skeleton skinning it; unset, it is not skinned. USD name <code>skel:skeleton</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.skinning_method" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">skinning_method</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">skinning_method: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>How joint transforms blend: linearly, or as dual quaternions, which keep volume at twisting
+joints. Default 'classicLinear'. USD name <code>skel:skinningMethod</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.subdivision_scheme" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">subdivision_scheme</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">subdivision_scheme: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The surface the faces are the control mesh of, refined by OpenSubdiv; none draws the faces
+themselves (USD's fallback is catmullClark, which import keeps). Normals are the surface's,
+not the authored ones. Points written on the GPU draw the control mesh. Default 'none'. USD
+name <code>subdivisionScheme</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.thermal_node_ids" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_node_ids</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_node_ids: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>int32 (n,), each point's node in a thermal network, whose temperatures the node temperatures
+give; a face takes its own node where its points are its own. USD name
+<code>ernie:thermal:nodeIds</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.thermal_node_temperatures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_node_temperatures</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_node_temperatures: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>float32 (nodes,) kelvin per node of the node ids, on the CPU or a CUDA device, as a thermal
+network's solver writes them each step; the points' own temperatures, when given, come
+first. USD name <code>ernie:thermal:nodeTemperatures</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.thermal_temperatures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperatures</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperatures: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>float32 (n,) kelvin, one per point, on the CPU or a CUDA device, as a thermal solver writes
+them back each step: with thermal emission on, in place of the prim's own and its
+material's, interpolated across its faces; 0 at a point for those. USD name
+<code>ernie:thermal:temperatures</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Mesh.triangle_subdivision_rule" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">triangle_subdivision_rule</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">triangle_subdivision_rule: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Catmull-Clark's weights for triangles, or smoother ones. Default 'catmullClark'. USD name
+<code>triangleSubdivisionRule</code>.</p>
 
     </div>
 
@@ -5207,17 +5907,44 @@ nor bounded. USD name <code>ernie:activeCounts</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     points: Any = ...,
     face_vertex_counts: Any = ...,
     face_vertex_indices: Any = ...,
     normals: Any = ...,
     active_counts: Any = ...,
+    subdivision_scheme: str = ...,
+    refine_level: int = ...,
+    interpolate_boundary: str = ...,
+    face_varying_linear_interpolation: str = ...,
+    triangle_subdivision_rule: str = ...,
+    crease_indices: Any = ...,
+    crease_lengths: Any = ...,
+    crease_sharpnesses: Any = ...,
+    corner_indices: Any = ...,
+    corner_sharpnesses: Any = ...,
+    hole_indices: Any = ...,
+    skeleton: str | Path | Prim | Schema = ...,
+    skel_joints: list[str] = ...,
+    joint_indices: Any = ...,
+    joint_weights: Any = ...,
+    geom_bind_transform: tuple[tuple[float, ...], ...] = ...,
+    skinning_method: str = ...,
+    skel_blend_shapes: list[str] = ...,
+    blend_shape_targets: str
+    | Path
+    | Prim
+    | Schema
+    | Sequence[str | Path | Prim | Schema] = ...,
+    thermal_temperatures: Any = ...,
+    thermal_node_ids: Any = ...,
+    thermal_node_temperatures: Any = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -5393,12 +6120,13 @@ array instead. Default [1.0]. USD name <code>widths</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     points: Any = ...,
     widths: float | Sequence[float] | Any = ...,
     translate: Sequence[float] = ...,
@@ -5765,7 +6493,7 @@ all when unset. USD name <code>protoIndices</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
@@ -5978,12 +6706,13 @@ volume inputs.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -6141,6 +6870,14 @@ optionally as a checkerboard.</p>
               –
               <div class="doc-md-description">
                 <p>The Material prim it is drawn with. USD name <code>material:binding</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin, in place of its material's; 0 for the material's own. Default 0.0. USD name</p>
               </div>
             </li>
         </ul>
@@ -6319,6 +7056,30 @@ optionally as a checkerboard.</p>
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.GroundPlane.thermal_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin, in place of its material's; 0 for the material's own. Default 0.0. USD name
+<code>ernie:thermal:temperature</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -6332,7 +7093,7 @@ optionally as a checkerboard.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     height: float = ...,
@@ -6341,6 +7102,7 @@ optionally as a checkerboard.</p>
     checker_color0: Sequence[float] = ...,
     checker_color1: Sequence[float] = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -6473,6 +7235,30 @@ six cube faces.</p>
               –
               <div class="doc-md-description">
                 <p>float32 (rows, cols) heights in world units, the first row the northern; a planet's float32</p>
+              </div>
+            </li>
+            <li>
+              <b><code>heights_file</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A planet's heights as a latitude-longitude raster (TIFF, PDS3, PNG or JPEG; the whole body</p>
+              </div>
+            </li>
+            <li>
+              <b><code>heights_reference</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>World units subtracted from the heights file's values: the radius, for files of radii.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>heights_unit</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>World units in a unit of the heights file's values: 1000 for kilometres. Default 1.0. USD</p>
               </div>
             </li>
             <li>
@@ -6683,6 +7469,79 @@ quads about this size; 0 stops at the heights'. Default 1.0. USD name <code>erni
 
 
 
+<h3 id="ernie.schema.Terrain.heights_file" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">heights_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">heights_file: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A planet's heights as a latitude-longitude raster (TIFF, PDS3, PNG or JPEG; the whole body
+from 180 W unless the file says), in place of the heights: faces of up to 1024 quads read at
+once, finer ones paged in as views need them. USD name <code>ernie:heights:file</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.heights_reference" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">heights_reference</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">heights_reference: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>World units subtracted from the heights file's values: the radius, for files of radii.
+Default 0.0. USD name <code>ernie:heights:reference</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Terrain.heights_unit" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">heights_unit</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">heights_unit: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>World units in a unit of the heights file's values: 1000 for kilometres. Default 1.0. USD
+name <code>ernie:heights:unit</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Terrain.hillshade_altitude" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">hillshade_altitude</span>
 
@@ -6837,12 +7696,13 @@ size do not apply. Default 0.0. USD name <code>ernie:radius</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     extent: float | Sequence[float] | Any = ...,
     display_color: Sequence[float] | Any = ...,
     material_binding: str | Path | Prim | Schema = ...,
+    thermal_temperature: float = ...,
     heights: Any = ...,
     origin: Sequence[float] = ...,
     cell_size: float = ...,
@@ -6854,6 +7714,9 @@ size do not apply. Default 0.0. USD name <code>ernie:radius</code>.</p>
     planet_radius: float = ...,
     planet_radii: Sequence[float] = ...,
     finest_cell: float = ...,
+    heights_file: str = ...,
+    heights_unit: float = ...,
+    heights_reference: float = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -7730,7 +8593,7 @@ nm^-1 for a sphere, W m^-2 sr^-1 nm^-1 for a rect, disk or dome. USD name <code>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -8174,7 +9037,7 @@ intensity. Default False. USD name <code>inputs:shaping:ies:normalize</code>.</p
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -8373,7 +9236,7 @@ brightness. Default 10000.0. USD name <code>photometric:illuminance</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -8623,7 +9486,7 @@ physical. Default 1361.0. USD name <code>ernie:irradiance</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -8907,7 +9770,7 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -9223,7 +10086,7 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -9484,7 +10347,7 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -9712,7 +10575,7 @@ Default True. USD name <code>visibleInPrimaryRay</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     intensity: float = ...,
@@ -10192,7 +11055,7 @@ the Sun's. USD name <code>ernie:stars:temperature</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     magnitude_limit: float = ...,
@@ -10312,7 +11175,7 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>Stops; scales the photographic outputs. Default 0.0. USD name <code>exposure</code>.</p>
+                <p>Stops; scales the photographic outputs, and in "auto" mode compensates: the metered scene</p>
               </div>
             </li>
             <li>
@@ -10716,6 +11579,14 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
               </div>
             </li>
             <li>
+              <b><code>spectral_mode</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>spectral: bands over the range; rgb: three bands of linear sRGB, colours as a 3-channel</p>
+              </div>
+            </li>
+            <li>
               <b><code>spectral_range</code></b>
                   (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>]</code>)
               –
@@ -10824,7 +11695,8 @@ shutter, and Ernie's lens, scan, spectral sampling, sensor and view poses.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Stops; scales the photographic outputs. Default 0.0. USD name <code>exposure</code>.</p>
+        <p>Stops; scales the photographic outputs, and in "auto" mode compensates: the metered scene
+that many stops off middle grey. Default 0.0. USD name <code>exposure</code>.</p>
 
     </div>
 
@@ -12011,6 +12883,30 @@ name <code>ernie:shutter:rolling</code>.</p>
 
 
 
+<h3 id="ernie.schema.Camera.spectral_mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">spectral_mode</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">spectral_mode: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>spectral: bands over the range; rgb: three bands of linear sRGB, colours as a 3-channel
+renderer keeps them, faster. Default 'spectral'. USD name <code>ernie:spectral:mode</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Camera.spectral_range" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">spectral_range</span>
 
@@ -12112,7 +13008,7 @@ name <code>ernie:shutter:rolling</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     projection: str = ...,
@@ -12152,6 +13048,7 @@ name <code>ernie:shutter:rolling</code>.</p>
     pushbroom_line_offset: float = ...,
     spectral_range: Sequence[float] = ...,
     spectral_bands: int = ...,
+    spectral_mode: str = ...,
     sensor_type: str = ...,
     sensor_noise: bool = ...,
     sensor_full_well: float = ...,
@@ -12434,6 +13331,22 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>droplet_radius</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Cloud droplets' effective radius, micrometres: about 5 to 10 in stratus, 10 to 15 in</p>
+              </div>
+            </li>
+            <li>
+              <b><code>droplet_spread</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The gamma of their size distribution: larger, more alike in size, their fogbow and glory</p>
+              </div>
+            </li>
+            <li>
               <b><code>emission_color</code></b>
                   (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>, <span title="float">float</span>]</code>)
               –
@@ -12463,6 +13376,30 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 <p>Linear RGB radiance in cd/m^2 for white, without a UsdPreviewSurface (whose own is read</p>
+              </div>
+            </li>
+            <li>
+              <b><code>lobe_mix</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The second lobe's share of the dual Henyey-Greenstein phase function. Default 0.5. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>material_x_element</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The material (or shader) of the file to render, by name path; empty, its first renderable</p>
+              </div>
+            </li>
+            <li>
+              <b><code>material_x_file</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A MaterialX document (.mtlx) whose material this is, in place of a network on</p>
               </div>
             </li>
             <li>
@@ -12506,6 +13443,22 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>powder</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The powder effect's strength: light scattered in dimmed by 1 - powder e^(-sigma length),</p>
+              </div>
+            </li>
+            <li>
+              <b><code>powder_length</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The powder effect's length (world units) times the extinction: over how much medium it</p>
+              </div>
+            </li>
+            <li>
               <b><code>reflectance</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
               –
@@ -12530,11 +13483,35 @@ connects to.</p>
               </div>
             </li>
             <li>
+              <b><code>second_anisotropy</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The dual Henyey-Greenstein phase function's second lobe's g, backwards below 0 (clouds' 0.7</p>
+              </div>
+            </li>
+            <li>
               <b><code>sky_light</code></b>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
                 <p>Scales the light of the sky and the ground around the medium, from the atmosphere's distant</p>
+              </div>
+            </li>
+            <li>
+              <b><code>speckle_roughness</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>RMS surface height, m: rough (the default) shows laser speckle fully, polished (0) none.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>surface_density</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Cloud droplets' surface, the density field's value where it begins, for multiple scattering</p>
               </div>
             </li>
             <li>
@@ -12559,6 +13536,70 @@ connects to.</p>
               –
               <div class="doc-md-description">
                 <p>Takes the temperature field's values to kelvin. Default 1.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_emissivity</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>(nm, value) pairs in [0, 1], wavelengths increasing; the nearest value outside them. Unset,</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_inertia</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>J m^-2 K^-1 s^-1/2, which the temperature model reads (the diurnal table's inertia axis); 0</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_inertia_texture</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>float32 (rows, cols) or (rows, cols, 1) thermal inertia through mesh texture coordinates,</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A temperature model computing its pixels' temperature as they render: balance (zero-</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model_data</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Floats the temperature model reads, such as a diurnal table (DiurnalTable::ModelData). USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model_params</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The temperature model's parameters in its order; missing ones its defaults. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin; above 0 the surface glows by Planck's law times its emissivity, in every band.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperature_texture</code></b>
+                  (<code><span title="typing.Any">Any</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>float32 (rows, cols) or (rows, cols, 1) kelvin through mesh texture coordinates, row 0 at</p>
               </div>
             </li>
             <li>
@@ -13110,6 +14151,55 @@ surface. USD name <code>inputs:detailNormal</code>.</p>
 
 
 
+<h3 id="ernie.schema.Material.droplet_radius" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">droplet_radius</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">droplet_radius: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Cloud droplets' effective radius, micrometres: about 5 to 10 in stratus, 10 to 15 in
+cumulus; larger droplets scatter more forwards and tighten the glory. Default 7.0. USD name
+<code>inputs:dropletRadius</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.droplet_spread" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">droplet_spread</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">droplet_spread: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The gamma of their size distribution: larger, more alike in size, their fogbow and glory
+more coloured. Default 2.0. USD name <code>inputs:dropletSpread</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.emission_color" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">emission_color</span>
 
@@ -13195,6 +14285,78 @@ surface. USD name <code>inputs:detailNormal</code>.</p>
 
         <p>Linear RGB radiance in cd/m^2 for white, without a UsdPreviewSurface (whose own is read
 then). Default (0.0, 0.0, 0.0). USD name <code>inputs:emissiveColor</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.lobe_mix" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">lobe_mix</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">lobe_mix: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The second lobe's share of the dual Henyey-Greenstein phase function. Default 0.5. USD name
+<code>inputs:lobeMix</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.material_x_element" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">material_x_element</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">material_x_element: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The material (or shader) of the file to render, by name path; empty, its first renderable
+one. USD name <code>ernie:materialx:element</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.material_x_file" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">material_x_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">material_x_file: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A MaterialX document (.mtlx) whose material this is, in place of a network on
+outputs:mtlx:surface. USD name <code>ernie:materialx:file</code>.</p>
 
     </div>
 
@@ -13291,8 +14453,9 @@ more evenly. Default 0.5. USD name <code>inputs:octavePhase</code>.</p>
 
         <p>How what scatters spreads its light: Henyey-Greenstein by the anisotropy; Hapke's double
 Henyey-Greenstein by the b and c a Hapke surface reads (inputs:b, inputs:c), so dust and the
-regolith it rose from scatter alike; Rayleigh; or isotropic. Default 'henyeyGreenstein'. USD
-name <code>inputs:phaseFunction</code>.</p>
+regolith it rose from scatter alike; Rayleigh; isotropic; or cloud droplets' Mie scattering
+by their radius and spread, with clouds' silver linings, fogbows and glories. Default
+'henyeyGreenstein'. USD name <code>inputs:phaseFunction</code>.</p>
 
     </div>
 
@@ -13317,6 +14480,55 @@ name <code>inputs:phaseFunction</code>.</p>
 
         <p>Share of incident polarization diffuse reflection keeps, 0 to 1; dark, single-scattering
 surfaces keep more. Default 0.0. USD name <code>ernie:polarization:retention</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.powder" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">powder</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">powder: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The powder effect's strength: light scattered in dimmed by 1 - powder e^(-sigma length),
+darkening thin edges facing the light as light scattered many times has yet to build up
+there (Schneider and Vos 2015). 0, none. Default 0.0. USD name <code>inputs:powder</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.powder_length" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">powder_length</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">powder_length: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The powder effect's length (world units) times the extinction: over how much medium it
+fades. Default 150.0. USD name <code>inputs:powderLength</code>.</p>
 
     </div>
 
@@ -13400,6 +14612,30 @@ many times does. Default 1. USD name <code>inputs:scatteringOctaves</code>.</p>
 
 
 
+<h3 id="ernie.schema.Material.second_anisotropy" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">second_anisotropy</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">second_anisotropy: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The dual Henyey-Greenstein phase function's second lobe's g, backwards below 0 (clouds' 0.7
+and -0.2 by halves, three-geospatial's). Default -0.2. USD name <code>inputs:secondAnisotropy</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.sky_light" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">sky_light</span>
 
@@ -13415,6 +14651,55 @@ many times does. Default 1. USD name <code>inputs:scatteringOctaves</code>.</p>
 
         <p>Scales the light of the sky and the ground around the medium, from the atmosphere's distant
 lights; 1 is physical, 0 none. Default 1.0. USD name <code>inputs:skyLight</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.speckle_roughness" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">speckle_roughness</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">speckle_roughness: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>RMS surface height, m: rough (the default) shows laser speckle fully, polished (0) none.
+Default 1e-05. USD name <code>ernie:speckle:roughness</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.surface_density" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">surface_density</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">surface_density: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Cloud droplets' surface, the density field's value where it begins, for multiple scattering
+by collectors: their light found where it entered there. Default 0.1. USD name
+<code>inputs:surfaceDensity</code>.</p>
 
     </div>
 
@@ -13497,6 +14782,201 @@ one (the ambient air's); 0, no glow without a field. Default 0.0. USD name
 
 
 
+<h3 id="ernie.schema.Material.thermal_emissivity" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_emissivity</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_emissivity: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>(nm, value) pairs in [0, 1], wavelengths increasing; the nearest value outside them. Unset,
+1 minus the reflectance (Kirchhoff). USD name <code>ernie:thermal:emissivity</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_inertia" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_inertia</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_inertia: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>J m^-2 K^-1 s^-1/2, which the temperature model reads (the diurnal table's inertia axis); 0
+for none. Default 0.0. USD name <code>ernie:thermal:inertia</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_inertia_texture" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_inertia_texture</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_inertia_texture: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>float32 (rows, cols) or (rows, cols, 1) thermal inertia through mesh texture coordinates,
+row 0 at the top, in place of the thermal inertia where above 0. USD name
+<code>ernie:thermal:inertiaTexture</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_model" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A temperature model computing its pixels' temperature as they render: balance (zero-
+capacitance, spacecraft), diurnal (a latitude and local time table, the Moon's by default)
+or a registered one; empty for none. USD name <code>ernie:thermal:model</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_model_data" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model_data</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model_data: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Floats the temperature model reads, such as a diurnal table (DiurnalTable::ModelData). USD
+name <code>ernie:thermal:model:data</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_model_params" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model_params</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model_params: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The temperature model's parameters in its order; missing ones its defaults. USD name
+<code>ernie:thermal:model:params</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin; above 0 the surface glows by Planck's law times its emissivity, in every band.
+Default 0.0. USD name <code>ernie:thermal:temperature</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Material.thermal_temperature_texture" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperature_texture</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperature_texture: Any</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>float32 (rows, cols) or (rows, cols, 1) kelvin through mesh texture coordinates, row 0 at
+the top, in place of the temperature; 0 or below there for the temperature. USD name
+<code>ernie:thermal:temperatureTexture</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Material.volume_albedo" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_albedo</span>
 
@@ -13530,20 +15010,31 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     brdf: str = ...,
+    material_x_file: str = ...,
+    material_x_element: str = ...,
     albedo: Sequence[float] = ...,
     reflectance: float | Sequence[float] = ...,
     reflectance_library: str = ...,
     polarization_retention: float = ...,
+    speckle_roughness: float = ...,
     albedo_map_enable: bool = ...,
     albedo_map: Any = ...,
     albedo_map_origin: Sequence[float] = ...,
     albedo_map_cell_size: float = ...,
     albedo_map_no_data: float = ...,
     emissive_color: Sequence[float] = ...,
+    thermal_temperature: float = ...,
+    thermal_emissivity: float | Sequence[float] = ...,
+    thermal_temperature_texture: Any = ...,
+    thermal_model: str = ...,
+    thermal_model_params: float | Sequence[float] = ...,
+    thermal_model_data: float | Sequence[float] = ...,
+    thermal_inertia: float = ...,
+    thermal_inertia_texture: Any = ...,
     detail_albedo: Any = ...,
     detail_normal: Any = ...,
     detail_tile_size: float = ...,
@@ -13558,7 +15049,14 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
     density_field: str = ...,
     volume_albedo: Sequence[float] = ...,
     phase_function: str = ...,
+    droplet_radius: float = ...,
+    droplet_spread: float = ...,
+    surface_density: float = ...,
     anisotropy: float = ...,
+    second_anisotropy: float = ...,
+    lobe_mix: float = ...,
+    powder: float = ...,
+    powder_length: float = ...,
     scattering_octaves: int = ...,
     octave_attenuation: float = ...,
     octave_extinction: float = ...,
@@ -13717,7 +15215,7 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
                   (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>The shader's type; Ernie reads the four below. USD name <code>info:id</code>.</p>
+                <p>The shader's type; Ernie reads the seven below. USD name <code>info:id</code>.</p>
               </div>
             </li>
             <li>
@@ -13793,6 +15291,54 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>thermal_emissivity</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>0 to 1 at every wavelength; below 0, 1 minus the reflectance (Kirchhoff). Default -1.0. USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_inertia</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>J m^-2 K^-1 s^-1/2 for the temperature model, 0 for none; connectable to one channel of a</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>As the Material's ernie:thermal:model. USD name <code>inputs:temperatureModel</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model_data</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>USD name <code>inputs:temperatureModelData</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_model_params</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>USD name <code>inputs:temperatureModelParams</code>.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin, 0 for none; connectable to one channel of a UsdUVTexture, kelvin after its scale and</p>
+              </div>
+            </li>
+            <li>
               <b><code>translation</code></b>
                   (<code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>]</code>)
               –
@@ -13813,7 +15359,15 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
                   (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>The mesh primvar of the texture coordinates. Default 'st'. USD name <code>inputs:varname</code>.</p>
+                <p>The mesh primvar it reads: texture coordinates, or the colours a diffuse colour takes</p>
+              </div>
+            </li>
+            <li>
+              <b><code>virtual_texture</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Only the tiles in view resident, for textures past device memory or image size (DDS or KTX2</p>
               </div>
             </li>
             <li>
@@ -14026,7 +15580,7 @@ absorbs. Default (0.0, 0.0, 0.0). USD name <code>inputs:volumeAlbedo</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The shader's type; Ernie reads the four below. USD name <code>info:id</code>.</p>
+        <p>The shader's type; Ernie reads the seven below. USD name <code>info:id</code>.</p>
 
     </div>
 
@@ -14246,6 +15800,147 @@ name <code>ernie:texture</code>.</p>
 
 
 
+<h3 id="ernie.schema.Shader.thermal_emissivity" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_emissivity</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_emissivity: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>0 to 1 at every wavelength; below 0, 1 minus the reflectance (Kirchhoff). Default -1.0. USD
+name <code>inputs:emissivity</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.thermal_inertia" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_inertia</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_inertia: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>J m^-2 K^-1 s^-1/2 for the temperature model, 0 for none; connectable to one channel of a
+UsdUVTexture. Default 0.0. USD name <code>inputs:thermalInertia</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.thermal_model" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>As the Material's ernie:thermal:model. USD name <code>inputs:temperatureModel</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.thermal_model_data" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model_data</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model_data: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>USD name <code>inputs:temperatureModelData</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.thermal_model_params" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_model_params</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_model_params: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>USD name <code>inputs:temperatureModelParams</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.thermal_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin, 0 for none; connectable to one channel of a UsdUVTexture, kelvin after its scale and
+bias. Default 0.0. USD name <code>inputs:temperature</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.Shader.translation" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">translation</span>
 
@@ -14306,7 +16001,33 @@ name <code>ernie:texture</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The mesh primvar of the texture coordinates. Default 'st'. USD name <code>inputs:varname</code>.</p>
+        <p>The mesh primvar it reads: texture coordinates, or the colours a diffuse colour takes
+(float, float3 readers). Default 'st'. USD name <code>inputs:varname</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.Shader.virtual_texture" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">virtual_texture</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">virtual_texture: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Only the tiles in view resident, for textures past device memory or image size (DDS or KTX2
+with every mip, devices with sparse residency). auto: albedo textures over 8192 texels a
+side. Default 'auto'. USD name <code>ernie:virtualTexture</code>.</p>
 
     </div>
 
@@ -14371,7 +16092,7 @@ name <code>ernie:texture</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     info_id: str = ...,
@@ -14391,10 +16112,17 @@ name <code>ernie:texture</code>.</p>
     wrap_s: str = ...,
     wrap_t: str = ...,
     source_color_space: str = ...,
+    virtual_texture: str = ...,
     bias: Sequence[float] = ...,
     rotation: float = ...,
     translation: Sequence[float] = ...,
     varname: str = ...,
+    thermal_temperature: float = ...,
+    thermal_emissivity: float = ...,
+    thermal_inertia: float = ...,
+    thermal_model: str = ...,
+    thermal_model_params: float | Sequence[float] = ...,
+    thermal_model_data: float | Sequence[float] = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -14528,6 +16256,14 @@ in place of its settings'.</p>
               –
               <div class="doc-md-description">
                 <p>Pixels, width and height; a product's, unset, its settings'. Default (2048.0, 1080.0). USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>spectral_precision</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Each band's radiance between shading and the sensor: float32, or float16 for half the memory</p>
               </div>
             </li>
         </ul>
@@ -14691,6 +16427,30 @@ name <code>resolution</code>.</p>
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettingsBase.spectral_precision" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">spectral_precision</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">spectral_precision: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Each band's radiance between shading and the sensor: float32, or float16 for half the memory
+and traffic. Default 'float32'. USD name <code>ernie:spectral:precision</code>.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -14704,7 +16464,7 @@ name <code>resolution</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     camera: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
@@ -14713,6 +16473,7 @@ name <code>resolution</code>.</p>
     overlays: str = ...,
     minimal_mode: str = ...,
     minimal_constant_color: Sequence[float] = ...,
+    spectral_precision: str = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",
@@ -14863,11 +16624,19 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
-              <b><code>exposure_compensation</code></b>
-                  (<code><span title="float">float</span></code>)
+              <b><code>eco_mode</code></b>
+                  (<code><span title="bool">bool</span></code>)
               –
               <div class="doc-md-description">
-                <p>Stops on the photographic outputs, on top of the camera's exposure. Default 0.0. USD name</p>
+                <p>The viewer stops rendering once nothing has changed for the frames below, as Omniverse's ECO</p>
+              </div>
+            </li>
+            <li>
+              <b><code>eco_mode_frames</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Unchanged frames before the viewer stops rendering. Default 500. USD name</p>
               </div>
             </li>
             <li>
@@ -14963,15 +16732,23 @@ name <code>resolution</code>.</p>
                   (<code><span title="int">int</span></code>)
               –
               <div class="doc-md-description">
-                <p>Default 3. USD name <code>ernie:shadows:cascades</code>.</p>
+                <p>Near cascades, over the first 200 m; far ones, each 8 times deeper, go on to the farthest</p>
               </div>
             </li>
             <li>
-              <b><code>shadow_fit</code></b>
-                  (<code><span title="str">str</span></code>)
+              <b><code>shadow_distance</code></b>
+                  (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>scene: the casters' bounds, an image the same every time; visible: sample distribution</p>
+                <p>Farthest the cascades reach (m); 0 for as far as the view sees. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>shadow_horizons</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Terrains' horizon maps shadow them towards each distant light where its cascades grow</p>
               </div>
             </li>
             <li>
@@ -15007,43 +16784,11 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
-              <b><code>shadow_split_lambda</code></b>
+              <b><code>shadow_split_exponent</code></b>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>Logarithmic weight of the cascades' splits. Default 0.8. USD name</p>
-              </div>
-            </li>
-            <li>
-              <b><code>shadow_virtual</code></b>
-                  (<code><span title="bool">bool</span></code>)
-              –
-              <div class="doc-md-description">
-                <p>The sun shadows through a virtual shadow map: about a texel a pixel from near to far.</p>
-              </div>
-            </li>
-            <li>
-              <b><code>shadow_virtual_bias</code></b>
-                  (<code><span title="float">float</span></code>)
-              –
-              <div class="doc-md-description">
-                <p>Levels coarser (+) or finer (-) than a texel a pixel. Default 0.0. USD name</p>
-              </div>
-            </li>
-            <li>
-              <b><code>shadow_virtual_debug</code></b>
-                  (<code><span title="str">str</span></code>)
-              –
-              <div class="doc-md-description">
-                <p>levels: tint by the clipmap level shadowing a point; pages: black where no page backs it.</p>
-              </div>
-            </li>
-            <li>
-              <b><code>shadow_virtual_pages</code></b>
-                  (<code><span title="int">int</span></code>)
-              –
-              <div class="doc-md-description">
-                <p>Physical pages of 128² texels. Default 1024. USD name <code>ernie:shadows:virtualPages</code>.</p>
+                <p>Each cascade's depth over the last's. Default 3.0. USD name <code>ernie:shadows:splitExponent</code>.</p>
               </div>
             </li>
             <li>
@@ -15079,6 +16824,46 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>texture_loading</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether a frame waits for every texture its materials read ("complete") or draws a</p>
+              </div>
+            </li>
+            <li>
+              <b><code>texture_loading_debug</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Surfaces coloured by their textures' loading: magenta while the albedo texture loads;</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_background_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin of the sky or space, a black body all around that also lights the scene (through the</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_default_temperature</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Kelvin, of materials without their own; 0 none. Default 0.0. USD name</p>
+              </div>
+            </li>
+            <li>
+              <b><code>thermal_enable</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Materials glow at their temperatures by Planck's law times their emissivity. Default False.</p>
+              </div>
+            </li>
+            <li>
               <b><code>volume_air_steps</code></b>
                   (<code><span title="int">int</span></code>)
               –
@@ -15111,6 +16896,22 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>volume_multiple_scattering</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Cloud droplets' light scattered more than once: octaves, Wrenninge's along the march; or</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_resolution_scale</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The march's resolution against the image's: 1, or 0.5 for a pixel a 2 x 2 of the image's,</p>
+              </div>
+            </li>
+            <li>
               <b><code>volume_shadow_resolution</code></b>
                   (<code><span title="int">int</span></code>)
               –
@@ -15135,11 +16936,51 @@ name <code>resolution</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>volume_steps_per_pixel</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Far off, where a pixel spans more of a volume's steps, at most this many steps per pixel's</p>
+              </div>
+            </li>
+            <li>
               <b><code>volume_steps_per_voxel</code></b>
                   (<code><span title="float">float</span></code>)
               –
               <div class="doc-md-description">
-                <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 2.0. USD</p>
+                <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 1.0. USD</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_temporal</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>March a pixel of each block a frame and reproject the others' last results, about four times</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_temporal_animated</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Volumes whose grids are written again each frame (field writers, simulations) reproject too,</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_temporal_block</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Temporal amortisation's blocks, 2 or 4 pixels across: a pixel of each marched a frame, the</p>
+              </div>
+            </li>
+            <li>
+              <b><code>volume_thin_optical_depth</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>A brick of 8^3 voxels whose densest holds back less than this across it is stepped through</p>
               </div>
             </li>
             <li>
@@ -15361,8 +17202,8 @@ directions; limited: reflections only. Default 'approximate'. USD name
 
 
 
-<h3 id="ernie.schema.RenderSettings.exposure_compensation" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">exposure_compensation</span>
+<h3 id="ernie.schema.RenderSettings.eco_mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">eco_mode</span>
 
 
   <span class="doc doc-labels">
@@ -15370,12 +17211,36 @@ directions; limited: reflections only. Default 'approximate'. USD name
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">exposure_compensation: float</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">eco_mode: bool</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Stops on the photographic outputs, on top of the camera's exposure. Default 0.0. USD name
-<code>ernie:exposure</code>.</p>
+        <p>The viewer stops rendering once nothing has changed for the frames below, as Omniverse's ECO
+mode. Default True. USD name <code>ernie:ecoMode:enabled</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.eco_mode_frames" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">eco_mode_frames</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">eco_mode_frames: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Unchanged frames before the viewer stops rendering. Default 500. USD name
+<code>ernie:ecoMode:maxFramesWithoutChange</code>.</p>
 
     </div>
 
@@ -15656,7 +17521,8 @@ frame (twoPass). Default 'off'. USD name <code>ernie:occlusion</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Default 3. USD name <code>ernie:shadows:cascades</code>.</p>
+        <p>Near cascades, over the first 200 m; far ones, each 8 times deeper, go on to the farthest
+depth seen. Default 3. USD name <code>ernie:shadows:cascades</code>.</p>
 
     </div>
 
@@ -15666,8 +17532,8 @@ frame (twoPass). Default 'off'. USD name <code>ernie:occlusion</code>.</p>
 
 
 
-<h3 id="ernie.schema.RenderSettings.shadow_fit" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_fit</span>
+<h3 id="ernie.schema.RenderSettings.shadow_distance" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_distance</span>
 
 
   <span class="doc doc-labels">
@@ -15675,13 +17541,36 @@ frame (twoPass). Default 'off'. USD name <code>ernie:occlusion</code>.</p>
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_fit: str</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">shadow_distance: float</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>scene: the casters' bounds, an image the same every time; visible: sample distribution
-shadow maps, from the depths a recent frame saw. Default 'scene'. USD name
-<code>ernie:shadows:fit</code>.</p>
+        <p>Farthest the cascades reach (m); 0 for as far as the view sees. Default 0.0. USD name
+<code>ernie:shadows:distance</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.shadow_horizons" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_horizons</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">shadow_horizons: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Terrains' horizon maps shadow them towards each distant light where its cascades grow
+coarse, at any distance. Default True. USD name <code>ernie:shadows:horizons</code>.</p>
 
     </div>
 
@@ -15783,8 +17672,8 @@ shadow maps, from the depths a recent frame saw. Default 'scene'. USD name
 
 
 
-<h3 id="ernie.schema.RenderSettings.shadow_split_lambda" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_split_lambda</span>
+<h3 id="ernie.schema.RenderSettings.shadow_split_exponent" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_split_exponent</span>
 
 
   <span class="doc doc-labels">
@@ -15792,107 +17681,11 @@ shadow maps, from the depths a recent frame saw. Default 'scene'. USD name
   </span>
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_split_lambda: float</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">shadow_split_exponent: float</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Logarithmic weight of the cascades' splits. Default 0.8. USD name
-<code>ernie:shadows:splitLambda</code>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie.schema.RenderSettings.shadow_virtual" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_virtual: bool</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>The sun shadows through a virtual shadow map: about a texel a pixel from near to far.
-Default False. USD name <code>ernie:shadows:virtual</code>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie.schema.RenderSettings.shadow_virtual_bias" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_bias</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_bias: float</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>Levels coarser (+) or finer (-) than a texel a pixel. Default 0.0. USD name
-<code>ernie:shadows:virtualBias</code>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie.schema.RenderSettings.shadow_virtual_debug" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_debug</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_debug: str</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>levels: tint by the clipmap level shadowing a point; pages: black where no page backs it.
-Default 'off'. USD name <code>ernie:shadows:virtualDebug</code>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie.schema.RenderSettings.shadow_virtual_pages" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">shadow_virtual_pages</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">shadow_virtual_pages: int</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>Physical pages of 128² texels. Default 1024. USD name <code>ernie:shadows:virtualPages</code>.</p>
+        <p>Each cascade's depth over the last's. Default 3.0. USD name <code>ernie:shadows:splitExponent</code>.</p>
 
     </div>
 
@@ -15987,6 +17780,129 @@ Default 'off'. USD name <code>ernie:shadows:virtualDebug</code>.</p>
 
         <p>Batches of views of several worlds: a map per world, one of what they share, or one of every
 world's casters. Default 'separate'. USD name <code>ernie:shadows:worlds</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.texture_loading" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">texture_loading</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">texture_loading: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether a frame waits for every texture its materials read ("complete") or draws a
+placeholder for those still loading ("async"); "auto" is complete for a step and async for
+the viewport. Default 'auto'. USD name <code>ernie:textureLoading</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.texture_loading_debug" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">texture_loading_debug</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">texture_loading_debug: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Surfaces coloured by their textures' loading: magenta while the albedo texture loads;
+virtual ones green where their tiles are as fine as wanted, yellow a mip coarser, red three
+or more. Default False. USD name <code>ernie:textureLoading:debug</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.thermal_background_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_background_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_background_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin of the sky or space, a black body all around that also lights the scene (through the
+DomeLight, whose map tints it, or a dome of its own); 0 none. Default 0.0. USD name
+<code>ernie:thermal:backgroundTemperature</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.thermal_default_temperature" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_default_temperature</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_default_temperature: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Kelvin, of materials without their own; 0 none. Default 0.0. USD name
+<code>ernie:thermal:defaultTemperature</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.thermal_enable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">thermal_enable</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">thermal_enable: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Materials glow at their temperatures by Planck's law times their emissivity. Default False.
+USD name <code>ernie:thermal:enable</code>.</p>
 
     </div>
 
@@ -16092,6 +18008,57 @@ images. Default True. USD name <code>ernie:volumes:lightCache</code>.</p>
 
 
 
+<h3 id="ernie.schema.RenderSettings.volume_multiple_scattering" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_multiple_scattering</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_multiple_scattering: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Cloud droplets' light scattered more than once: octaves, Wrenninge's along the march; or
+collectors, Bouthors et al. 2008's, found once per pixel where the view enters a cloud's
+surface (its material's surface density) from slab transport simulated once and cached on
+disk, the octaves meanwhile. Default 'octaves'. USD name <code>ernie:volumes:multipleScattering</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_resolution_scale" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_resolution_scale</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_resolution_scale: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The march's resolution against the image's: 1, or 0.5 for a pixel a 2 x 2 of the image's,
+about four times faster, upsampled by depth so volumes keep to the edges of what stands
+before them. Default 1.0. USD name <code>ernie:volumes:resolutionScale</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.RenderSettings.volume_shadow_resolution" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_shadow_resolution</span>
 
@@ -16164,6 +18131,31 @@ let through; 0, all. Default 6. USD name <code>ernie:volumes:skyLightSteps</code
 
 
 
+<h3 id="ernie.schema.RenderSettings.volume_steps_per_pixel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_steps_per_pixel</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_steps_per_pixel: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Far off, where a pixel spans more of a volume's steps, at most this many steps per pixel's
+width, the steps growing with distance; 0 keeps every step a volume's own. Default 2.0. USD
+name <code>ernie:volumes:stepsPerPixel</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.RenderSettings.volume_steps_per_voxel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_steps_per_voxel</span>
 
@@ -16177,8 +18169,110 @@ let through; 0, all. Default 6. USD name <code>ernie:volumes:skyLightSteps</code
 
     <div class="doc doc-contents ">
 
-        <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 2.0. USD
+        <p>Steps through a volume per voxel of its densest field, fewer for speed. Default 1.0. USD
 name <code>ernie:volumes:stepsPerVoxel</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_temporal" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_temporal</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_temporal: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>March a pixel of each block a frame and reproject the others' last results, about four times
+faster; a frame whose volumes, materials or lights changed, and pixels whose history does
+not hold, march in full. Off, for reference images. Default True. USD name
+<code>ernie:volumes:temporal</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_temporal_animated" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_temporal_animated</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_temporal_animated: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Volumes whose grids are written again each frame (field writers, simulations) reproject too,
+each pixel clamped to what the frame marched about it; off, they march in full each frame.
+Default True. USD name <code>ernie:volumes:temporalAnimated</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_temporal_block" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_temporal_block</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_temporal_block: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Temporal amortisation's blocks, 2 or 4 pixels across: a pixel of each marched a frame, the
+others reprojected or, where that fails, the block's marched one's where the geometry behind
+is as far. 2 is about half as fast, its history up to 4 frames old rather than 16. Default
+4. USD name <code>ernie:volumes:temporalBlock</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.schema.RenderSettings.volume_thin_optical_depth" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">volume_thin_optical_depth</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">volume_thin_optical_depth: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A brick of 8^3 voxels whose densest holds back less than this across it is stepped through
+as one step, lit once; 0 steps through every brick alike. Default 0.05. USD name
+<code>ernie:volumes:thinOpticalDepth</code>.</p>
 
     </div>
 
@@ -16221,7 +18315,7 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     camera: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
@@ -16230,15 +18324,22 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     overlays: str = ...,
     minimal_mode: str = ...,
     minimal_constant_color: Sequence[float] = ...,
+    spectral_precision: str = ...,
     products: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
     lights: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
     ambient: float = ...,
     ambient_color: Sequence[float] = ...,
+    thermal_enable: bool = ...,
+    thermal_default_temperature: float = ...,
+    thermal_background_temperature: float = ...,
+    texture_loading: str = ...,
+    texture_loading_debug: bool = ...,
     clear_color: Sequence[float] = ...,
     wireframe: str = ...,
     frame: int = ...,
-    exposure_compensation: float = ...,
     meter: bool = ...,
+    eco_mode: bool = ...,
+    eco_mode_frames: int = ...,
     culling: str = ...,
     occlusion: str = ...,
     lod_mesh_error: float = ...,
@@ -16247,22 +18348,21 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     lod_morph_start: float = ...,
     lod_freeze: bool = ...,
     lod_show_levels: bool = ...,
-    shadow_fit: str = ...,
     shadow_cascades: int = ...,
     shadow_resolution: int = ...,
     shadow_softness: float = ...,
     shadow_normal_offset: float = ...,
-    shadow_split_lambda: float = ...,
+    shadow_split_exponent: float = ...,
+    shadow_distance: float = ...,
+    shadow_horizons: bool = ...,
     shadow_show_cascades: bool = ...,
     shadow_worlds: str = ...,
     shadow_world_fit: str = ...,
     shadow_world_resolution: int = ...,
     shadow_world_margin: float = ...,
-    shadow_virtual: bool = ...,
-    shadow_virtual_pages: int = ...,
-    shadow_virtual_bias: float = ...,
-    shadow_virtual_debug: str = ...,
     volume_steps_per_voxel: float = ...,
+    volume_steps_per_pixel: float = ...,
+    volume_thin_optical_depth: float = ...,
     volume_max_steps: int = ...,
     volume_shadow_steps: int = ...,
     volume_sky_light_steps: int = ...,
@@ -16270,6 +18370,11 @@ The viewport's toolbar may override it. Default 'off'. USD name <code>ernie:wire
     volume_max_octaves: int = ...,
     volume_shadow_resolution: int = ...,
     volume_light_cache: bool = ...,
+    volume_temporal: bool = ...,
+    volume_temporal_block: int = ...,
+    volume_temporal_animated: bool = ...,
+    volume_resolution_scale: float = ...,
+    volume_multiple_scattering: str = ...,
     dome_light_mode: str = ...,
     dome_shadow_radius: float = ...,
     dome_directions: int = ...,
@@ -16510,7 +18615,7 @@ without a copy; off, each map copies. Default True. USD name <code>ernie:outputs
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     camera: str | Path | Prim | Schema | Sequence[str | Path | Prim | Schema] = ...,
@@ -16519,6 +18624,7 @@ without a copy; off, each map copies. Default True. USD name <code>ernie:outputs
     overlays: str = ...,
     minimal_mode: str = ...,
     minimal_constant_color: Sequence[float] = ...,
+    spectral_precision: str = ...,
     ordered_vars: str
     | Path
     | Prim
@@ -16733,7 +18839,7 @@ name <code>sourceName</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     source_name: str = ...,
@@ -16832,6 +18938,14 @@ name <code>sourceName</code>.</p>
               </div>
             </li>
             <li>
+              <b><code>filter_enabled</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Off, the chain runs without it (bypassed). Default True. USD name <code>ernie:filter:enabled</code>.</p>
+              </div>
+            </li>
+            <li>
               <b><code>filter_type</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -16880,6 +18994,29 @@ name <code>sourceName</code>.</p>
 
 
 
+<h3 id="ernie.schema.SensorFilter.filter_enabled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">filter_enabled</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">filter_enabled: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Off, the chain runs without it (bypassed). Default True. USD name <code>ernie:filter:enabled</code>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie.schema.SensorFilter.filter_type" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">filter_type</span>
 
@@ -16913,10 +19050,11 @@ parameters are inputs:*. USD name <code>ernie:filter:type</code>.</p>
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">set(
     *attribute: Any,
-    visibility: str = ...,
+    visibility: str | Any = ...,
     world: int = ...,
     quaternion_order: str = ...,
     filter_type: str = ...,
+    filter_enabled: bool = ...,
     translate: Sequence[float] = ...,
     rotate: Sequence[float] = ...,
     rotation_order: str = "XYZ",

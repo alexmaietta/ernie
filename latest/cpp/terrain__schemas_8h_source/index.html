@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -268,7 +189,22 @@
       (::ernie::AttributeMeta{.label = &quot;Finest cell&quot;, .doc = &quot;World units. A planet's LOD &quot;        \
                                      &quot;refines below its heights' quads, bilinear between them, &quot;   \
                                      &quot;down to quads about this size; 0 stops at the heights'.&quot;,   \
-                              .group = &quot;Terrain&quot;, .max = 1e6}))
+                              .group = &quot;Terrain&quot;, .max = 1e6}))                                    \
+    X(std::string, HeightsFile, ::ernie::tokens::kHeightsFile, &quot;&quot;,                                 \
+      (::ernie::AttributeMeta{.label = &quot;Heights file&quot;, .doc = &quot;A planet's heights as a &quot;          \
+                                     &quot;latitude-longitude raster (TIFF, PDS3, PNG or JPEG; the &quot;    \
+                                     &quot;whole body from 180 W unless the file says), in place of &quot;   \
+                                     &quot;the heights: faces of up to 1024 quads read at once, finer &quot; \
+                                     &quot;ones paged in as views need them.&quot;,                          \
+                              .group = &quot;Terrain&quot;, .asset = true}))                                 \
+    X(double, HeightsUnit, ::ernie::tokens::kHeightsUnit, 1.0,                                     \
+      (::ernie::AttributeMeta{.label = &quot;Heights unit&quot;, .doc = &quot;World units in a unit of the &quot;     \
+                                     &quot;heights file's values: 1000 for kilometres.&quot;,                \
+                              .group = &quot;Terrain&quot;, .max = 1e6}))                                    \
+    X(double, HeightsReference, ::ernie::tokens::kHeightsReference, 0.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Heights reference&quot;, .doc = &quot;World units subtracted from &quot; \
+                                     &quot;the heights file's values: the radius, for files of radii.&quot;, \
+                              .group = &quot;Terrain&quot;}))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \
     X(double, MagnitudeLimit, ::ernie::tokens::kStarsMagnitudeLimit, 99.0,                         \
@@ -322,6 +258,11 @@
     X(double, OzoneColumn, ::ernie::tokens::kAtmosphereOzoneColumn, 300.0,                         \
       (::ernie::AttributeMeta{.doc = &quot;Earth: total column ozone, Dobson units.&quot;,                   \
                               .group = &quot;Atmosphere&quot;, .max = 1000.0}))                              \
+    X(double, SodiumColumn, ::ernie::tokens::kAtmosphereSodiumColumn, 4e13,                        \
+      (::ernie::AttributeMeta{.doc = &quot;Earth: the mesospheric sodium layer's atoms per square &quot;     \
+                                     &quot;metre (about 2e13 to 8e13), which a laser tuned to the &quot;     \
+                                     &quot;589 nm D2 line lights as a guide star 92 km up.&quot;,            \
+                              .group = &quot;Atmosphere&quot;, .max = 1e15}))                                \
     X(double, DustOpticalDepth, ::ernie::tokens::kAtmosphereDustOpticalDepth, 0.5,                 \
       (::ernie::AttributeMeta{.doc = &quot;Mars: the dust's vertical optical depth at 880 nm (about &quot;   \
                                      &quot;0.3 to 0.9 in clear seasons, above 1 in dust storms).&quot;,      \
@@ -350,18 +291,7 @@
                               .options = {::ernie::tokens::kAnchorGround,                          \
                                           ::ernie::tokens::kAnchorCentre}}))
 
-#define ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)                                                         \
-    X(double, Radius, ::ernie::tokens::kBodyRadius, 1737.4e3,                                      \
-      (::ernie::AttributeMeta{.doc = &quot;Metres; the Moon's mean radius by default.&quot;,                 \
-                              .group = &quot;Body&quot;, .max = 1e9}))                                       \
-    X(glm::dvec3, Albedo, ::ernie::tokens::kBodyAlbedo, glm::dvec3(0.12),                          \
-      (::ernie::AttributeMeta{.doc = &quot;Normal albedo, linear RGB: its brightness lit and seen &quot;     \
-                                     &quot;head on over a white Lambertian surface's (the Moon's &quot;      \
-                                     &quot;about 0.12).&quot;,                                               \
-                              .group = &quot;Body&quot;, .color = true}))
-
 #define ERNIE_TERRAIN_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_TERRAIN_ATTRIBUTES(X)
-#define ERNIE_CELESTIAL_BODY_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_CELESTIAL_BODY_ATTRIBUTES(X)
 #define ERNIE_STAR_FIELD_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_STAR_FIELD_ATTRIBUTES(X)
 #define ERNIE_ATMOSPHERE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_ATMOSPHERE_ATTRIBUTES(X)
 // clang-format on
@@ -381,12 +311,6 @@ class StarField : public Imageable {
 class Atmosphere : public Imageable {
     ERNIE_SCHEMA_BODY(Atmosphere, Imageable, ERNIE_ATMOSPHERE_ALL)
     ERNIE_SCHEMA_DEFINE(Atmosphere)
-};
-
-class CelestialBody : public Imageable {
-    ERNIE_SCHEMA_BODY(CelestialBody, Imageable,
-                      ERNIE_CELESTIAL_BODY_ALL)
-    ERNIE_SCHEMA_DEFINE(CelestialBody)
 };
 
 std::vector&lt;const PrimTypeDef*&gt; TerrainSchemaTypes();

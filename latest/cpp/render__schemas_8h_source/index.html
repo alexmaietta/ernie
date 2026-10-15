@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -246,7 +167,15 @@
                                           ::ernie::tokens::kDiffuseGlossyEmission}}))              \
     X(glm::dvec3, MinimalConstantColor, ::ernie::tokens::kMinimalConstantColor, glm::dvec3(1.0),   \
       (::ernie::AttributeMeta{.label = &quot;Constant colour&quot;, .doc = &quot;Linear RGB of constantDiffuse.&quot;, \
-                              .group = &quot;Minimal&quot;, .color = true}))
+                              .group = &quot;Minimal&quot;, .color = true}))                                 \
+    X(std::string, SpectralPrecision, ::ernie::tokens::kSpectralPrecision,                         \
+      ::ernie::tokens::kFloat32,                                                                   \
+      (::ernie::AttributeMeta{.label = &quot;Spectral precision&quot;,                                       \
+                              .doc = &quot;Each band's radiance between shading and the sensor: &quot;      \
+                                     &quot;float32, or float16 for half the memory and traffic.&quot;,      \
+                              .group = &quot;Image&quot;,                                                    \
+                              .options = {::ernie::tokens::kFloat32,                               \
+                                          ::ernie::tokens::kFloat16}}))
 
 #define ERNIE_RENDER_SETTINGS_ATTRIBUTES(X)                                                        \
     X(std::vector&lt;::ernie::Path&gt;, Products, ::ernie::tokens::kProducts,                            \
@@ -269,6 +198,37 @@
                               .doc = &quot;Linear RGB of the ambient light, whose luminance &quot;           \
                                      &quot;`ernie:ambient` sets whatever the colour's brightness.&quot;,     \
                               .group = &quot;Image&quot;, .color = true}))                                   \
+    X(bool, ThermalEnable, ::ernie::tokens::kThermalEnable, false,                                 \
+      (::ernie::AttributeMeta{.label = &quot;Thermal emission&quot;,                                         \
+                              .doc = &quot;Materials glow at their temperatures by Planck's law &quot;       \
+                                     &quot;times their emissivity.&quot;,                                    \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(double, ThermalDefaultTemperature, ::ernie::tokens::kThermalDefaultTemperature, 0.0,         \
+      (::ernie::AttributeMeta{.label = &quot;Default temperature&quot;,                                      \
+                              .doc = &quot;Kelvin, of materials without their own; 0 none.&quot;,            \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))                                 \
+    X(double, ThermalBackgroundTemperature, ::ernie::tokens::kThermalBackgroundTemperature, 0.0,   \
+      (::ernie::AttributeMeta{.label = &quot;Background temperature&quot;,                                   \
+                              .doc = &quot;Kelvin of the sky or space, a black body all around that &quot;   \
+                                     &quot;also lights the scene (through the DomeLight, whose map &quot;    \
+                                     &quot;tints it, or a dome of its own); 0 none.&quot;,                   \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))                                 \
+    X(std::string, TextureLoading, ::ernie::tokens::kTextureLoading, ::ernie::tokens::kAuto,       \
+      (::ernie::AttributeMeta{.label = &quot;Texture loading&quot;,                                          \
+                              .doc = &quot;Whether a frame waits for every texture its materials &quot;     \
+                                     &quot;read (\&quot;complete\&quot;) or draws a placeholder for those still &quot; \
+                                     &quot;loading (\&quot;async\&quot;); \&quot;auto\&quot; is complete for a step and &quot;   \
+                                     &quot;async for the viewport.&quot;,                                    \
+                              .group = &quot;Image&quot;,                                                    \
+                              .options = {::ernie::tokens::kAuto, ::ernie::tokens::kComplete,      \
+                                          ::ernie::tokens::kAsync}}))                              \
+    X(bool, TextureLoadingDebug, ::ernie::tokens::kTextureLoadingDebug, false,                     \
+      (::ernie::AttributeMeta{.label = &quot;Texture loading view&quot;,                                     \
+                              .doc = &quot;Surfaces coloured by their textures' loading: magenta &quot;      \
+                                     &quot;while the albedo texture loads; virtual ones green where &quot;   \
+                                     &quot;their tiles are as fine as wanted, yellow a mip coarser, &quot;   \
+                                     &quot;red three or more.&quot;,                                         \
+                              .group = &quot;Image&quot;}))                                                  \
     X(glm::dvec3, ClearColor, ::ernie::tokens::kClearColor, glm::dvec3(0.0),                       \
       (::ernie::AttributeMeta{.label = &quot;Background&quot;, .doc = &quot;Linear display colour of LdrColor's &quot; \
                                                             &quot;background.&quot;,                         \
@@ -285,14 +245,19 @@
       (::ernie::AttributeMeta{.doc = &quot;The frame noise derives from; counts up by itself unless &quot;   \
                                      &quot;set.&quot;,                                                       \
                               .group = &quot;Image&quot;}))                                                  \
-    X(double, ExposureCompensation, ::ernie::tokens::kExposureCompensation, 0.0,                   \
-      (::ernie::AttributeMeta{.label = &quot;Exposure&quot;, .doc = &quot;Stops on the photographic outputs, on &quot; \
-                                                          &quot;top of the camera's exposure.&quot;,         \
-                              .group = &quot;Image&quot;, .min = -16.0, .max = 16.0}))                       \
     X(bool, Meter, ::ernie::tokens::kMeter, false,                                                 \
       (::ernie::AttributeMeta{.doc = &quot;Measure each frame's luminance, for automatic exposure and &quot; \
                                      &quot;meters.&quot;,                                                    \
                               .group = &quot;Image&quot;}))                                                  \
+    X(bool, EcoMode, ::ernie::tokens::kEcoMode, true,                                              \
+      (::ernie::AttributeMeta{.label = &quot;Enabled&quot;,                                                  \
+                              .doc = &quot;The viewer stops rendering once nothing has changed for &quot;    \
+                                     &quot;the frames below, as Omniverse's ECO mode.&quot;,                 \
+                              .group = &quot;Eco mode&quot;}))                                               \
+    X(int, EcoModeFrames, ::ernie::tokens::kEcoModeFrames, 500,                                    \
+      (::ernie::AttributeMeta{.label = &quot;Frames without change&quot;,                                    \
+                              .doc = &quot;Unchanged frames before the viewer stops rendering.&quot;,        \
+                              .group = &quot;Eco mode&quot;, .min = 1.0, .max = 10000.0}))                   \
     X(std::string, Culling, ::ernie::tokens::kCulling, ::ernie::tokens::kGpu,                      \
       (::ernie::AttributeMeta{.doc = &quot;What lies outside a view is skipped: whole draws (cpu), &quot;    \
                                      &quot;then every instance (gpu).&quot;,                                 \
@@ -323,15 +288,11 @@
       (::ernie::AttributeMeta{.label = &quot;Freeze LOD&quot;, .group = &quot;Culling and LOD&quot;}))                 \
     X(bool, LodShowLevels, ::ernie::tokens::kLodShowLevels, false,                                 \
       (::ernie::AttributeMeta{.label = &quot;Show LOD levels&quot;, .group = &quot;Culling and LOD&quot;}))            \
-    X(std::string, ShadowFit, ::ernie::tokens::kShadowFit, ::ernie::tokens::kScene,                \
-      (::ernie::AttributeMeta{.label = &quot;Fit&quot;,                                                      \
-                              .doc = &quot;scene: the casters' bounds, an image the same every time; &quot; \
-                                     &quot;visible: sample distribution shadow maps, from the depths a &quot; \
-                                     &quot;recent frame saw.&quot;,                                           \
-                              .group = &quot;Shadows&quot;,                                                  \
-                              .options = {::ernie::tokens::kScene, ::ernie::tokens::kVisible}}))   \
     X(int, ShadowCascades, ::ernie::tokens::kShadowCascades, 3,                                    \
-      (::ernie::AttributeMeta{.label = &quot;Cascades&quot;, .group = &quot;Shadows&quot;, .min = 1.0, .max = 4.0}))   \
+      (::ernie::AttributeMeta{.label = &quot;Cascades&quot;,                                                 \
+                              .doc = &quot;Near cascades, over the first 200 m; far ones, each 8 &quot;      \
+                                     &quot;times deeper, go on to the farthest depth seen.&quot;,            \
+                              .group = &quot;Shadows&quot;, .min = 1.0, .max = 4.0}))                        \
     X(int, ShadowResolution, ::ernie::tokens::kShadowResolution, 2048,                             \
       (::ernie::AttributeMeta{.label = &quot;Resolution&quot;, .doc = &quot;Texels along each cascade's side.&quot;,   \
                               .group = &quot;Shadows&quot;, .min = 256.0, .max = 8192.0}))                   \
@@ -341,10 +302,20 @@
     X(double, ShadowNormalOffset, ::ernie::tokens::kShadowNormalOffset, 1.5,                       \
       (::ernie::AttributeMeta{.label = &quot;Normal offset&quot;, .doc = &quot;Texels along the normal.&quot;,         \
                               .group = &quot;Shadows&quot;, .max = 8.0}))                                    \
-    X(double, ShadowSplitLambda, ::ernie::tokens::kShadowSplitLambda, 0.8,                         \
-      (::ernie::AttributeMeta{.label = &quot;Split lambda&quot;,                                             \
-                              .doc = &quot;Logarithmic weight of the cascades' splits.&quot;,                \
-                              .group = &quot;Shadows&quot;, .max = 1.0}))                                    \
+    X(double, ShadowSplitExponent, ::ernie::tokens::kShadowSplitExponent, 3.0,                     \
+      (::ernie::AttributeMeta{.label = &quot;Split exponent&quot;,                                           \
+                              .doc = &quot;Each cascade's depth over the last's.&quot;,                      \
+                              .group = &quot;Shadows&quot;, .min = 1.0, .max = 8.0}))                        \
+    X(double, ShadowDistance, ::ernie::tokens::kShadowDistance, 0.0,                               \
+      (::ernie::AttributeMeta{.label = &quot;Distance&quot;,                                                 \
+                              .doc = &quot;Farthest the cascades reach (m); 0 for as far as the view &quot;  \
+                                     &quot;sees.&quot;,                                                      \
+                              .group = &quot;Shadows&quot;, .max = 1e7}))                                    \
+    X(bool, ShadowHorizons, ::ernie::tokens::kShadowHorizons, true,                                \
+      (::ernie::AttributeMeta{.label = &quot;Terrain horizons&quot;,                                         \
+                              .doc = &quot;Terrains' horizon maps shadow them towards each distant &quot;    \
+                                     &quot;light where its cascades grow coarse, at any distance.&quot;,     \
+                              .group = &quot;Shadows&quot;}))                                                \
     X(bool, ShadowShowCascades, ::ernie::tokens::kShadowShowCascades, false,                       \
       (::ernie::AttributeMeta{.label = &quot;Show cascades&quot;, .group = &quot;Shadows&quot;}))                      \
     X(std::string, ShadowWorlds, ::ernie::tokens::kShadowWorlds, ::ernie::tokens::kSeparate,       \
@@ -366,28 +337,23 @@
     X(double, ShadowWorldMargin, ::ernie::tokens::kShadowWorldMargin, 1.0,                         \
       (::ernie::AttributeMeta{.label = &quot;World margin&quot;, .doc = &quot;Metres past the world's casters.&quot;,  \
                               .group = &quot;Shadows&quot;, .max = 100.0}))                                  \
-    X(bool, ShadowVirtual, ::ernie::tokens::kShadowVirtual, false,                                 \
-      (::ernie::AttributeMeta{.label = &quot;Virtual&quot;, .doc = &quot;The sun shadows through a virtual &quot;      \
-                                     &quot;shadow map: about a texel a pixel from near to far.&quot;,        \
-                              .group = &quot;Shadows&quot;}))                                                \
-    X(int, ShadowVirtualPages, ::ernie::tokens::kShadowVirtualPages, 1024,                         \
-      (::ernie::AttributeMeta{.label = &quot;Virtual pages&quot;, .doc = &quot;Physical pages of 128² texels.&quot;,  \
-                              .group = &quot;Shadows&quot;, .min = 16.0, .max = 16384.0}))                   \
-    X(double, ShadowVirtualBias, ::ernie::tokens::kShadowVirtualBias, 0.0,                         \
-      (::ernie::AttributeMeta{.label = &quot;Virtual bias&quot;, .doc = &quot;Levels coarser (+) or finer (-) &quot;   \
-                                     &quot;than a texel a pixel.&quot;,                                      \
-                              .group = &quot;Shadows&quot;, .min = -4.0, .max = 8.0}))                       \
-    X(std::string, ShadowVirtualDebug, ::ernie::tokens::kShadowVirtualDebug, ::ernie::tokens::kOff,\
-      (::ernie::AttributeMeta{.label = &quot;Virtual debug&quot;, .doc = &quot;levels: tint by the clipmap level &quot;\
-                                     &quot;shadowing a point; pages: black where no page backs it.&quot;,  \
-                              .group = &quot;Shadows&quot;,                                                  \
-                              .options = {::ernie::tokens::kOff, ::ernie::tokens::kLevels,        \
-                                          ::ernie::tokens::kPages}}))                              \
-    X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 2.0,                     \
+    X(double, VolumeStepsPerVoxel, ::ernie::tokens::kVolumeStepsPerVoxel, 1.0,                     \
       (::ernie::AttributeMeta{.label = &quot;Steps per voxel&quot;,                                          \
                               .doc = &quot;Steps through a volume per voxel of its densest field, &quot;     \
                                      &quot;fewer for speed.&quot;,                                           \
                               .group = &quot;Volumes&quot;, .min = 0.1, .max = 8.0}))                        \
+    X(double, VolumeStepsPerPixel, ::ernie::tokens::kVolumeStepsPerPixel, 2.0,                    \
+      (::ernie::AttributeMeta{.label = &quot;Steps per pixel&quot;,                                          \
+                              .doc = &quot;Far off, where a pixel spans more of a volume's steps, at &quot;  \
+                                     &quot;most this many steps per pixel's width, the steps growing &quot;  \
+                                     &quot;with distance; 0 keeps every step a volume's own.&quot;,          \
+                              .group = &quot;Volumes&quot;, .max = 16.0}))                                   \
+    X(double, VolumeThinOpticalDepth, ::ernie::tokens::kVolumeThinOpticalDepth, 0.05,              \
+      (::ernie::AttributeMeta{.label = &quot;Thin optical depth&quot;,                                       \
+                              .doc = &quot;A brick of 8^3 voxels whose densest holds back less than &quot;   \
+                                     &quot;this across it is stepped through as one step, lit once; &quot;   \
+                                     &quot;0 steps through every brick alike.&quot;,                         \
+                              .group = &quot;Volumes&quot;, .max = 1.0}))                                    \
     X(int, VolumeMaxSteps, ::ernie::tokens::kVolumeMaxSteps, 256,                                  \
       (::ernie::AttributeMeta{.label = &quot;Most steps&quot;, .doc = &quot;Steps through one volume, at most.&quot;,  \
                               .group = &quot;Volumes&quot;, .min = 1.0, .max = 4096.0}))                     \
@@ -422,6 +388,47 @@
                                      &quot;voxels, rather than marched to at every step; off, for &quot;     \
                                      &quot;reference images.&quot;,                                          \
                               .group = &quot;Volumes&quot;}))                                                \
+    X(bool, VolumeTemporal, ::ernie::tokens::kVolumeTemporal, true,                                \
+      (::ernie::AttributeMeta{.label = &quot;Temporal amortisation&quot;,                                    \
+                              .doc = &quot;March a pixel of each block a frame and reproject the &quot;      \
+                                     &quot;others' last results, about four times faster; a frame &quot;     \
+                                     &quot;whose volumes, materials or lights changed, and pixels &quot;     \
+                                     &quot;whose history does not hold, march in full. Off, for &quot;       \
+                                     &quot;reference images.&quot;,                                          \
+                              .group = &quot;Volumes&quot;}))                                                \
+    X(int, VolumeTemporalBlock, ::ernie::tokens::kVolumeTemporalBlock, 4,                          \
+      (::ernie::AttributeMeta{.label = &quot;Temporal block&quot;,                                           \
+                              .doc = &quot;Temporal amortisation's blocks, 2 or 4 pixels across: a &quot;    \
+                                     &quot;pixel of each marched a frame, the others reprojected or, &quot;  \
+                                     &quot;where that fails, the block's marched one's where the &quot;      \
+                                     &quot;geometry behind is as far. 2 is about half as fast, its &quot;    \
+                                     &quot;history up to 4 frames old rather than 16.&quot;,                 \
+                              .group = &quot;Volumes&quot;, .min = 2.0, .max = 4.0}))                        \
+    X(bool, VolumeTemporalAnimated, ::ernie::tokens::kVolumeTemporalAnimated, true,                \
+      (::ernie::AttributeMeta{.label = &quot;Amortise animated volumes&quot;,                                \
+                              .doc = &quot;Volumes whose grids are written again each frame (field &quot;    \
+                                     &quot;writers, simulations) reproject too, each pixel clamped &quot;    \
+                                     &quot;to what the frame marched about it; off, they march in &quot;     \
+                                     &quot;full each frame.&quot;,                                           \
+                              .group = &quot;Volumes&quot;}))                                                \
+    X(double, VolumeResolutionScale, ::ernie::tokens::kVolumeResolutionScale, 1.0,                 \
+      (::ernie::AttributeMeta{.label = &quot;Resolution scale&quot;,                                         \
+                              .doc = &quot;The march's resolution against the image's: 1, or 0.5 &quot;     \
+                                     &quot;for a pixel a 2 x 2 of the image's, about four times &quot;       \
+                                     &quot;faster, upsampled by depth so volumes keep to the edges &quot;    \
+                                     &quot;of what stands before them.&quot;,                                \
+                              .group = &quot;Volumes&quot;, .min = 0.5, .max = 1.0}))                        \
+    X(std::string, VolumeMultipleScattering, ::ernie::tokens::kVolumeMultipleScattering,           \
+      &quot;octaves&quot;,                                                                                   \
+      (::ernie::AttributeMeta{.label = &quot;Multiple scattering&quot;,                                      \
+                              .doc = &quot;Cloud droplets' light scattered more than once: octaves, &quot;   \
+                                     &quot;Wrenninge's along the march; or collectors, Bouthors et &quot;    \
+                                     &quot;al. 2008's, found once per pixel where the view enters a &quot;   \
+                                     &quot;cloud's surface (its material's surface density) from slab &quot; \
+                                     &quot;transport simulated once and cached on disk, the octaves &quot;   \
+                                     &quot;meanwhile.&quot;,                                                 \
+                              .group = &quot;Volumes&quot;,                                                  \
+                              .options = {&quot;octaves&quot;, &quot;collectors&quot;}}))                              \
     X(std::string, DomeLightMode, ::ernie::tokens::kDomeLightMode, &quot;approximate&quot;,                  \
       (::ernie::AttributeMeta{.label = &quot;Mode&quot;,                                                     \
                               .doc = &quot;approximate: unoccluded; full: also shadowed; directions: &quot;  \
@@ -475,7 +482,11 @@
                               .doc = &quot;A built-in filter (lens, qe, noise, adc, cie, exposure) or &quot; \
                                      &quot;a custom filter's id; its parameters are inputs:*.&quot;,         \
                               .group = &quot;Filter&quot;,                                                   \
-                              .options = {&quot;lens&quot;, &quot;qe&quot;, &quot;noise&quot;, &quot;adc&quot;, &quot;cie&quot;, &quot;exposure&quot;}}))
+                              .options = {&quot;lens&quot;, &quot;qe&quot;, &quot;noise&quot;, &quot;adc&quot;, &quot;cie&quot;, &quot;exposure&quot;}}))      \
+    X(bool, FilterEnabled, ::ernie::tokens::kFilterEnabled, true,                                  \
+      (::ernie::AttributeMeta{.label = &quot;Enabled&quot;,                                                  \
+                              .doc = &quot;Off, the chain runs without it (bypassed).&quot;,                 \
+                              .group = &quot;Filter&quot;}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_RENDER_SETTINGS_BASE_ALL(X)                                                          \

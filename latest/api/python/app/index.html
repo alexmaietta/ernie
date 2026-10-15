@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -163,8 +84,6 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.DemoOptions"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DemoOptions</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.DemoRunner"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DemoRunner</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.Dock"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Dock</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie._ernie.app.Exposure"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Exposure</a>
     </li>
@@ -299,14 +218,6 @@
             <td>
               <div class="doc-md-description">
                 <p>Runs demos as Newton's examples run: in a window, headless or without a viewer, writing --output, running --test checks and reporting --benchmark; in a window a Demos panel switches between the catalogue's demos.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="            Dock (ernie._ernie.app.Dock)" href="#ernie._ernie.app.Dock">Dock</a></code></td>
-            <td>
-              <div class="doc-md-description">
-                <p>Where a panel docks in the default layout.</p>
               </div>
             </td>
           </tr>
@@ -1440,6 +1351,14 @@
               </div>
             </li>
             <li>
+              <b><code>profile_warmup</code></b>
+                  (<code><span title="int">int</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The first frames the profile leaves out; 0 keeps the scene's loading.</p>
+              </div>
+            </li>
+            <li>
               <b><code>renderer</code></b>
                   (<code><span title="str">str</span></code>)
               –
@@ -1784,6 +1703,30 @@
     <div class="doc doc-contents ">
 
         <p>Where to also write a Chrome trace, or ''.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.DemoOptions.profile_warmup" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">profile_warmup</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">profile_warmup: int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The first frames the profile leaves out; 0 keeps the scene's loading.</p>
 
     </div>
 
@@ -2221,224 +2164,6 @@
 
 
 
-<h2 id="ernie._ernie.app.Dock" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Dock</span>
-
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><span title="enum.Enum">Enum</span></code></p>
-
-
-
-        <p>Where a panel docks in the default layout.</p>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<table class="field-list">
-  <colgroup>
-    <col class="field-name" />
-    <col class="field-body" />
-  </colgroup>
-  <tbody valign="top">
-    <tr class="field">
-      <th class="field-name">Attributes:</th>
-      <td class="field-body">
-        <ul class="first simple">
-            <li>
-              <b><code>BOTTOM</code></b>
-              –
-              <div class="doc-md-description">
-                
-              </div>
-            </li>
-            <li>
-              <b><code>FLOATING</code></b>
-              –
-              <div class="doc-md-description">
-                <p>Not docked: a free window.</p>
-              </div>
-            </li>
-            <li>
-              <b><code>LEFT</code></b>
-              –
-              <div class="doc-md-description">
-                
-              </div>
-            </li>
-            <li>
-              <b><code>RIGHT</code></b>
-              –
-              <div class="doc-md-description">
-                
-              </div>
-            </li>
-            <li>
-              <b><code>RIGHT_LOWER</code></b>
-              –
-              <div class="doc-md-description">
-                <p>The right column's lower part.</p>
-              </div>
-            </li>
-        </ul>
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie._ernie.app.Dock.BOTTOM" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">BOTTOM</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">BOTTOM = 2</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie._ernie.app.Dock.FLOATING" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FLOATING</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">FLOATING = 3</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>Not docked: a free window.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie._ernie.app.Dock.LEFT" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">LEFT</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">LEFT = 0</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie._ernie.app.Dock.RIGHT" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">RIGHT</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">RIGHT = 1</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="ernie._ernie.app.Dock.RIGHT_LOWER" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">RIGHT_LOWER</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
-      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
-  </span>
-
-</h3>
-<pre class="highlight"><code class="language-python doc-signature">RIGHT_LOWER = 4</code></pre>
-
-    <div class="doc doc-contents ">
-
-        <p>The right column's lower part.</p>
-
-    </div>
-
-</div>
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
 <h2 id="ernie._ernie.app.Exposure" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Exposure</span>
 
@@ -2660,6 +2385,22 @@
                 <p>Seconds since the viewer opened.</p>
               </div>
             </li>
+            <li>
+              <b><code>time_code</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The time code the timeline put the animation at.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>time_step</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Seconds of animation the timeline advanced: 0 while paused, a frame's while playing every frame.</p>
+              </div>
+            </li>
         </ul>
       </td>
     </tr>
@@ -2740,6 +2481,52 @@
     <div class="doc doc-contents ">
 
         <p>Seconds since the viewer opened.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.FrameInfo.time_code" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">time_code</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">time_code: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The time code the timeline put the animation at.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.FrameInfo.time_step" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">time_step</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">time_step: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Seconds of animation the timeline advanced: 0 while paused, a frame's while playing every frame.</p>
 
     </div>
 
@@ -3168,6 +2955,38 @@
               </div>
             </li>
             <li>
+              <b><code>button</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Buttons.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>button_lit</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>A pressed or chosen button.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>check_box</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>A checked box.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>check_mark</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The check in it.</p>
+              </div>
+            </li>
+            <li>
               <b><code>error</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
               –
@@ -3208,6 +3027,14 @@
               </div>
             </li>
             <li>
+              <b><code>frame_padding</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Space inside fields and buttons, (x, y) pixels.</p>
+              </div>
+            </li>
+            <li>
               <b><code>header</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
               –
@@ -3221,6 +3048,14 @@
               –
               <div class="doc-md-description">
                 <p>Icon size in pixels at a content scale of 1.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>item_spacing</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Space between widgets, (x, y) pixels.</p>
               </div>
             </li>
             <li>
@@ -3240,11 +3075,27 @@
               </div>
             </li>
             <li>
+              <b><code>overlay_border</code></b>
+                  (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The toolbar buttons' edge.</p>
+              </div>
+            </li>
+            <li>
               <b><code>panel</code></b>
                   (<code><span title="list">list</span>[<span title="float">float</span>]</code>)
               –
               <div class="doc-md-description">
                 <p>Panel bodies.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>pill_rounding</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Corner radius of the viewport's toolbar buttons.</p>
               </div>
             </li>
             <li>
@@ -3395,6 +3246,102 @@
 
 
 
+<h3 id="ernie._ernie.app.Theme.button" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">button</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">button: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Buttons.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.button_lit" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">button_lit</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">button_lit: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A pressed or chosen button.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.check_box" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">check_box</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">check_box: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A checked box.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.check_mark" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">check_mark</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">check_mark: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The check in it.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Theme.error" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">error</span>
 
@@ -3515,6 +3462,30 @@
 
 
 
+<h3 id="ernie._ernie.app.Theme.frame_padding" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">frame_padding</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">frame_padding: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Space inside fields and buttons, (x, y) pixels.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Theme.header" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">header</span>
 
@@ -3554,6 +3525,30 @@
     <div class="doc doc-contents ">
 
         <p>Icon size in pixels at a content scale of 1.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.item_spacing" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">item_spacing</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">item_spacing: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Space between widgets, (x, y) pixels.</p>
 
     </div>
 
@@ -3611,6 +3606,30 @@
 
 
 
+<h3 id="ernie._ernie.app.Theme.overlay_border" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">overlay_border</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">overlay_border: list[float]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The toolbar buttons' edge.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Theme.panel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">panel</span>
 
@@ -3626,6 +3645,30 @@
     <div class="doc doc-contents ">
 
         <p>Panel bodies.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Theme.pill_rounding" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">pill_rounding</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pill_rounding: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Corner radius of the viewport's toolbar buttons.</p>
 
     </div>
 
@@ -3887,6 +3930,22 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            add_overlay_click_handler (ernie._ernie.app.Viewer.add_overlay_click_handler)" href="#ernie._ernie.app.Viewer.add_overlay_click_handler">add_overlay_click_handler</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Calls clicked(viewer, overlay, id) when a click in the viewport lands on a screen overlay item with an id (a button's, <code>Overlay.button</code>), in place of picking the scene there; the item under the pointer shows its hover colour. Returns an id for <code>remove_viewport_item</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            add_overlay_pick_handler (ernie._ernie.app.Viewer.add_overlay_pick_handler)" href="#ernie._ernie.app.Viewer.add_overlay_pick_handler">add_overlay_pick_handler</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Calls picked(viewer, hit) when a click in the viewport lands on an overlay item in the world (an <code>OverlayHit</code>: a marker, a line, a batch's item), in place of picking the scene there. Returns an id for <code>remove_viewport_item</code>.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            add_panel (ernie._ernie.app.Viewer.add_panel)" href="#ernie._ernie.app.Viewer.add_panel">add_panel</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4012,6 +4071,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            evict_textures (ernie._ernie.app.Viewer.evict_textures)" href="#ernie._ernie.app.Viewer.evict_textures">evict_textures</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Drops every texture the viewport's materials read, as Renderer.evict_textures does.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            focus_panel (ernie._ernie.app.Viewer.focus_panel)" href="#ernie._ernie.app.Viewer.focus_panel">focus_panel</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4092,6 +4159,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            look_at (ernie._ernie.app.Viewer.look_at)" href="#ernie._ernie.app.Viewer.look_at">look_at</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Puts the active camera at <code>eye</code> looking at <code>target</code> (z up), which it then orbits and zooms towards.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            map (ernie._ernie.app.Viewer.map)" href="#ernie._ernie.app.Viewer.map">map</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4164,6 +4239,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            pause (ernie._ernie.app.Viewer.pause)" href="#ernie._ernie.app.Viewer.pause">pause</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Pauses the timeline where it is.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            pick (ernie._ernie.app.Viewer.pick)" href="#ernie._ernie.app.Viewer.pick">pick</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4172,10 +4255,34 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            play (ernie._ernie.app.Viewer.play)" href="#ernie._ernie.app.Viewer.play">play</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Plays the timeline: each frame advances the stage's time code, before the on_frame callbacks.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            record_sequence (ernie._ernie.app.Viewer.record_sequence)" href="#ernie._ernie.app.Viewer.record_sequence">record_sequence</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Records the timeline's frames from <code>start</code> to <code>end</code> (its range by default), every <code>every</code> frames, a frame a step, as PNGs in a folder of the capture folder; then encodes them with ffmpeg into <code>video</code> ("mp4", "prores" or "none") in the background.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            redo (ernie._ernie.app.Viewer.redo)" href="#ernie._ernie.app.Viewer.redo">redo</a></code></td>
               <td>
                 <div class="doc-md-description">
                   <p>Redoes the last undone GUI edit.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            redraw (ernie._ernie.app.Viewer.redraw)" href="#ernie._ernie.app.Viewer.redraw">redraw</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Counts as a change for eco mode: for what changes the image outside the scene, such as GPU arrays written in place.</p>
                 </div>
               </td>
             </tr>
@@ -4260,6 +4367,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            screenshot (ernie._ernie.app.Viewer.screenshot)" href="#ernie._ernie.app.Viewer.screenshot">screenshot</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Saves the next viewport frame as PNG in the capture folder (as F10 does): the image with the scene's overlays, without the viewer's UI. Returns its path.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            set_hud_item_shown (ernie._ernie.app.Viewer.set_hud_item_shown)" href="#ernie._ernie.app.Viewer.set_hud_item_shown">set_hud_item_shown</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -4296,6 +4411,30 @@
               <td>
                 <div class="doc-md-description">
                   <p>Advances the sensor clock by <code>seconds</code> at the next frame, paused or not.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            step_frames (ernie._ernie.app.Viewer.step_frames)" href="#ernie._ernie.app.Viewer.step_frames">step_frames</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Pauses the timeline and moves it <code>frames</code> frames on (back for negative), within its range.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            stop (ernie._ernie.app.Viewer.stop)" href="#ernie._ernie.app.Viewer.stop">stop</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Pauses the timeline, back at its range's start.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            stop_recording (ernie._ernie.app.Viewer.stop_recording)" href="#ernie._ernie.app.Viewer.stop_recording">stop_recording</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Ends the recording, encoding what it wrote.</p>
                 </div>
               </td>
             </tr>
@@ -4372,6 +4511,38 @@
               </div>
             </li>
             <li>
+              <b><code>capture_folder</code></b>
+                  (<code><span title="pathlib.Path">Path</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Where screenshots and sequences go; made when first written to.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>capture_name</code></b>
+                  (<code><span title="str">str</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Capture file names without extension: {scene}, {camera}, {date} and {time} fill in.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>capture_scale</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The rendered size over the viewport's render resolution, such as 2 or 4 for stills larger than the screen.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>capture_vars</code></b>
+                  (<code><span title="list">list</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The render vars a capture writes, rendered anew through the active camera: LdrColor as PNG, the others as EXR named _<var>. Empty writes the viewport's image as shown.</p>
+              </div>
+            </li>
+            <li>
               <b><code>clock_paused</code></b>
                   (<code><span title="bool">bool</span></code>)
               –
@@ -4385,6 +4556,22 @@
               –
               <div class="doc-md-description">
                 
+              </div>
+            </li>
+            <li>
+              <b><code>eco_paused</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether eco mode (RenderSettings ernie:ecoMode:enabled, as Omniverse's) has paused the viewport's rendering, nothing having changed for ernie:ecoMode:maxFramesWithoutChange frames.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>encoding</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether a sequence's video is still encoding.</p>
               </div>
             </li>
             <li>
@@ -4444,6 +4631,14 @@
               </div>
             </li>
             <li>
+              <b><code>looping</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether playing past the range's end starts over at its start; otherwise it stops there. On by default.</p>
+              </div>
+            </li>
+            <li>
               <b><code>metered_ev</code></b>
                   (<code><span title="float">float</span> | None</code>)
               –
@@ -4473,6 +4668,46 @@
               –
               <div class="doc-md-description">
                 <p>(arg: object, /) -&gt; ernie._ernie.Path</p>
+              </div>
+            </li>
+            <li>
+              <b><code>play_every_frame</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether playing advances a frame each step however long it took (and the sensor clock a frame's seconds), rather than real time.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>playing</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether the timeline is playing.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>recent_captures</code></b>
+                  (<code><span title="list">list</span>[<span title="pathlib.Path">Path</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>The files captured since the viewer opened, latest last.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>recording</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Whether a sequence is recording.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>recording_progress</code></b>
+                  (<code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>A recording sequence's frames written and all.</p>
               </div>
             </li>
             <li>
@@ -4537,6 +4772,14 @@
               –
               <div class="doc-md-description">
                 
+              </div>
+            </li>
+            <li>
+              <b><code>time_code</code></b>
+                  (<code><span title="float">float</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The stage's time code, which the timeline plays.</p>
               </div>
             </li>
             <li>
@@ -4673,6 +4916,102 @@
 
 
 
+<h3 id="ernie._ernie.app.Viewer.capture_folder" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">capture_folder</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">capture_folder: Path</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Where screenshots and sequences go; made when first written to.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.capture_name" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">capture_name</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">capture_name: str</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Capture file names without extension: {scene}, {camera}, {date} and {time} fill in.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.capture_scale" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">capture_scale</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">capture_scale: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The rendered size over the viewport's render resolution, such as 2 or 4 for stills larger than the screen.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.capture_vars" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">capture_vars</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">capture_vars: list[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The render vars a capture writes, rendered anew through the active camera: LdrColor as PNG, the others as EXR named _<var>. Empty writes the viewport's image as shown.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Viewer.clock_paused" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">clock_paused</span>
 
@@ -4709,6 +5048,52 @@
 <pre class="highlight"><code class="language-python doc-signature">device_name: str</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.eco_paused" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">eco_paused</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">eco_paused: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether eco mode (RenderSettings ernie:ecoMode:enabled, as Omniverse's) has paused the viewport's rendering, nothing having changed for ernie:ecoMode:maxFramesWithoutChange frames.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.encoding" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">encoding</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">encoding: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether a sequence's video is still encoding.</p>
 
     </div>
 
@@ -4874,6 +5259,30 @@
 
 
 
+<h3 id="ernie._ernie.app.Viewer.looping" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">looping</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">looping: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether playing past the range's end starts over at its start; otherwise it stops there. On by default.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.Viewer.metered_ev" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">metered_ev</span>
 
@@ -4959,6 +5368,122 @@
     <div class="doc doc-contents ">
 
         <p>(arg: object, /) -&gt; ernie._ernie.Path</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.play_every_frame" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">play_every_frame</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">play_every_frame: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether playing advances a frame each step however long it took (and the sensor clock a frame's seconds), rather than real time.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.playing" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">playing</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">playing: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the timeline is playing.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.recent_captures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">recent_captures</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">recent_captures: list[Path]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The files captured since the viewer opened, latest last.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.recording" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">recording</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">recording: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether a sequence is recording.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.recording_progress" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">recording_progress</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">recording_progress: tuple[int, int]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>A recording sequence's frames written and all.</p>
 
     </div>
 
@@ -5142,6 +5667,30 @@
 <pre class="highlight"><code class="language-python doc-signature">theme: Theme</code></pre>
 
     <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.Viewer.time_code" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">time_code</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">time_code: float</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The stage's time code, which the timeline plays.</p>
 
     </div>
 
@@ -5353,6 +5902,44 @@
     <div class="doc doc-contents ">
 
         <p>Adds <code>label</code> to the menu bar's <code>menu</code>; calls action(viewer).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.add_overlay_click_handler" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_overlay_click_handler</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">add_overlay_click_handler(clicked: Callable) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Calls clicked(viewer, overlay, id) when a click in the viewport lands on a screen overlay item with an id (a button's, <code>Overlay.button</code>), in place of picking the scene there; the item under the pointer shows its hover colour. Returns an id for <code>remove_viewport_item</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.add_overlay_pick_handler" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_overlay_pick_handler</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">add_overlay_pick_handler(picked: Callable) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Calls picked(viewer, hit) when a click in the viewport lands on an overlay item in the world (an <code>OverlayHit</code>: a marker, a line, a batch's item), in place of picking the scene there. Returns an id for <code>remove_viewport_item</code>.</p>
 
 
     </div>
@@ -5651,6 +6238,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.evict_textures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">evict_textures</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">evict_textures(cache: bool = False) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Drops every texture the viewport's materials read, as Renderer.evict_textures does.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.focus_panel" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">focus_panel</span>
 
@@ -5837,6 +6443,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.look_at" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">look_at</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">look_at(eye: Sequence[float], target: Sequence[float]) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Puts the active camera at <code>eye</code> looking at <code>target</code> (z up), which it then orbits and zooms towards.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.map" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">map</span>
 
@@ -6013,6 +6638,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.pause" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">pause</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pause() -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Pauses the timeline where it is.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.pick" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">pick</span>
 
@@ -6032,6 +6676,50 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.play" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">play</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">play() -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Plays the timeline: each frame advances the stage's time code, before the on_frame callbacks.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.record_sequence" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">record_sequence</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">record_sequence(
+    start: float | None = None,
+    end: float | None = None,
+    every: int = 1,
+    video: str = "mp4",
+    keep_frames: bool = True,
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Records the timeline's frames from <code>start</code> to <code>end</code> (its range by default), every <code>every</code> frames, a frame a step, as PNGs in a folder of the capture folder; then encodes them with ffmpeg into <code>video</code> ("mp4", "prores" or "none") in the background.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.redo" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">redo</span>
 
@@ -6042,6 +6730,25 @@
     <div class="doc doc-contents ">
 
         <p>Redoes the last undone GUI edit.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.redraw" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">redraw</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">redraw() -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Counts as a change for eco mode: for what changes the image outside the scene, such as GPU arrays written in place.</p>
 
 
     </div>
@@ -6235,6 +6942,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie._ernie.app.Viewer.screenshot" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">screenshot</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">screenshot() -&gt; pathlib.Path</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Saves the next viewport frame as PNG in the capture folder (as F10 does): the image with the scene's overlays, without the viewer's UI. Returns its path.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie._ernie.app.Viewer.set_hud_item_shown" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_hud_item_shown</span>
 
@@ -6317,6 +7043,63 @@
     <div class="doc doc-contents ">
 
         <p>Advances the sensor clock by <code>seconds</code> at the next frame, paused or not.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.step_frames" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">step_frames</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">step_frames(frames: int = 1) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Pauses the timeline and moves it <code>frames</code> frames on (back for negative), within its range.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.stop" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">stop</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">stop() -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Pauses the timeline, back at its range's start.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.Viewer.stop_recording" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">stop_recording</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">stop_recording() -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Ends the recording, encoding what it wrote.</p>
 
 
     </div>
@@ -6483,6 +7266,14 @@
               </div>
             </li>
             <li>
+              <b><code>hidden_overlays</code></b>
+                  (<code><span title="set">set</span>[<span title="str">str</span>]</code>)
+              –
+              <div class="doc-md-description">
+                <p>Scene overlays the viewport leaves out, by name, while <code>overlays</code> shows the others.</p>
+              </div>
+            </li>
+            <li>
               <b><code>hud</code></b>
                   (<code><span title="bool">bool</span></code>)
               –
@@ -6563,6 +7354,14 @@
               </div>
             </li>
             <li>
+              <b><code>skeletons</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>Every Skeleton's bones and joints, posed at the time code.</p>
+              </div>
+            </li>
+            <li>
               <b><code>toolbar_camera</code></b>
                   (<code><span title="bool">bool</span></code>)
               –
@@ -6592,6 +7391,14 @@
               –
               <div class="doc-md-description">
                 <p>The toolbar's menu of the render var the viewport shows.</p>
+              </div>
+            </li>
+            <li>
+              <b><code>ui</code></b>
+                  (<code><span title="bool">bool</span></code>)
+              –
+              <div class="doc-md-description">
+                <p>The viewport's own UI (toolbar and menus, heads-up display, tool strip, axis indicator, gizmo); off, as the H key toggles, only the image and the scene's overlays show.</p>
               </div>
             </li>
         </ul>
@@ -6653,6 +7460,30 @@
     <div class="doc doc-contents ">
 
         <p>A grid on the ground (z = 0).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.ViewportDisplay.hidden_overlays" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">hidden_overlays</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">hidden_overlays: set[str]</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Scene overlays the viewport leaves out, by name, while <code>overlays</code> shows the others.</p>
 
     </div>
 
@@ -6902,6 +7733,30 @@
 
 
 
+<h3 id="ernie._ernie.app.ViewportDisplay.skeletons" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">skeletons</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">skeletons: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Every Skeleton's bones and joints, posed at the time code.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="ernie._ernie.app.ViewportDisplay.toolbar_camera" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">toolbar_camera</span>
 
@@ -6989,6 +7844,30 @@
     <div class="doc doc-contents ">
 
         <p>The toolbar's menu of the render var the viewport shows.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie._ernie.app.ViewportDisplay.ui" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ui</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">ui: bool</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The viewport's own UI (toolbar and menus, heads-up display, tool strip, axis indicator, gizmo); off, as the H key toggles, only the image and the scene's overlays show.</p>
 
     </div>
 
@@ -7116,6 +7995,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            progress (ernie._ernie.app.WidgetPanel.progress)" href="#ernie._ernie.app.WidgetPanel.progress">progress</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Adds a progress bar, empty until <code>set</code> gives it a float fraction done (0 to 1) and a str to show over it; returns its id.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            remove (ernie._ernie.app.WidgetPanel.remove)" href="#ernie._ernie.app.WidgetPanel.remove">remove</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -7173,7 +8060,7 @@
         <ul class="first simple">
             <li>
               <b><code>dock</code></b>
-                  (<code><a class="autorefs autorefs-internal" title="            Dock (ernie._ernie.app.Dock)" href="#ernie._ernie.app.Dock">Dock</a></code>)
+                  (<code><span title="ernie._ernie.app.Dock">Dock</span></code>)
               –
               <div class="doc-md-description">
                 
@@ -7286,7 +8173,7 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">button(label: str, on_click: Callable[[], None]) -&gt; int</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">button(label: str, on_click: Callable) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7303,9 +8190,7 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">checkbox(
-    label: str, value: bool, on_change: Callable[[bool], None] | None = None
-) -&gt; int</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">checkbox(label: str, value: bool, on_change: object | None = None) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7339,11 +8224,7 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">color(
-    label: str,
-    value: Sequence[float],
-    on_change: Callable[[Sequence[float]], None] | None = None,
-) -&gt; int</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">color(label: str, value: Sequence[float], on_change: object | None = None) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7363,10 +8244,7 @@
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">combo(
-    label: str,
-    items: Sequence[str],
-    selected: int = 0,
-    on_change: Callable[[int], None] | None = None,
+    label: str, items: Sequence[str], selected: int = 0, on_change: object | None = None
 ) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
@@ -7384,9 +8262,7 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">input_text(
-    label: str, value: str = "", on_change: Callable[[str], None] | None = None
-) -&gt; int</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">input_text(label: str, value: str = '', on_change: object | None = None) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7405,11 +8281,30 @@
 
 
 </h3>
-<pre class="highlight"><code class="language-python doc-signature">plot(label: str, source: Callable[[], Sequence[float]]) -&gt; int</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">plot(label: str, source: Callable) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">
 
         <p>A line plot of the floats <code>source()</code> returns, read each frame.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie._ernie.app.WidgetPanel.progress" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">progress</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">progress(label: str) -&gt; int</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Adds a progress bar, empty until <code>set</code> gives it a float fraction done (0 to 1) and a str to show over it; returns its id.</p>
 
 
     </div>
@@ -7478,11 +8373,7 @@
 
 </h3>
 <pre class="highlight"><code class="language-python doc-signature">slider(
-    label: str,
-    min: float,
-    max: float,
-    value: float,
-    on_change: Callable[[float], None] | None = None,
+    label: str, min: float, max: float, value: float, on_change: object | None = None
 ) -&gt; int</code></pre>
 
     <div class="doc doc-contents ">

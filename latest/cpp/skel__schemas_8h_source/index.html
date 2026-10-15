@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/skel__schemas_8h_source/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>File skel_schemas.h - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "File skel_schemas.h";
+        var mkdocs_page_input_path = "cpp/skel__schemas_8h_source.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/skel__schemas_8h_source/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">File skel_schemas.h</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/skel__schemas_8h_source.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="file-skel_schemash">File skel_schemas.h</h1>
+<p><a href="../files/"><strong>File List</strong></a> <strong>&gt;</strong> <a href="../dir_057d52706067b881d9371cf136c38c31/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="../dir_572d817874f40c61a249f0e7684d4315/"><strong>scene</strong></a> <strong>&gt;</strong> <a href="../skel__schemas_8h/"><strong>skel_schemas.h</strong></a></p>
+<p><a href="../skel__schemas_8h/">Go to the documentation of this file</a></p>
+<pre><code class="language-C++">// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+#include &quot;ernie/scene/base_schemas.h&quot;
+#include &quot;ernie/scene/prim_type.h&quot;
+#include &quot;ernie/scene/tokens.h&quot;
+
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+
+// clang-format off
+#define ERNIE_SKEL_ROOT_ATTRIBUTES(X)
+
+#define ERNIE_SKELETON_ATTRIBUTES(X)                                                               \
+    X(std::vector&lt;std::string&gt;, Joints, ::ernie::tokens::kJoints, std::vector&lt;std::string&gt;{},      \
+      (::ernie::AttributeMeta{.doc = &quot;The joints, each a path (\&quot;Hips/Spine\&quot;) whose parent is &quot;   \
+                                     &quot;the path without its last element; parents come first.&quot;,     \
+                              .group = &quot;Skeleton&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(::ernie::Tensor, BindTransforms, ::ernie::tokens::kBindTransforms, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = &quot;(joints, 4, 4) each joint's skeleton-space transform when &quot;  \
+                                     &quot;the meshes were bound.&quot;,                                     \
+                              .group = &quot;Skeleton&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(::ernie::Tensor, RestTransforms, ::ernie::tokens::kRestTransforms, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = &quot;(joints, 4, 4) each joint's transform relative to its &quot;      \
+                                     &quot;parent with no animation.&quot;,                                  \
+                              .group = &quot;Skeleton&quot;, .dirty = ::ernie::Dirty::Points}))              \
+    X(::ernie::Path, AnimationSource, ::ernie::tokens::kSkelAnimationSource, ::ernie::Path(),      \
+      (::ernie::AttributeMeta{.label = &quot;Animation&quot;,                                                \
+                              .doc = &quot;The SkelAnimation posing its joints; unset, the rest pose.&quot;, \
+                              .group = &quot;Skeleton&quot;, .options = {::ernie::tokens::kSkelAnimation},   \
+                              .dirty = ::ernie::Dirty::Points,                                     \
+                              .targetDirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_SKEL_ANIMATION_ATTRIBUTES(X)                                                         \
+    X(std::vector&lt;std::string&gt;, Joints, ::ernie::tokens::kJoints, std::vector&lt;std::string&gt;{},      \
+      (::ernie::AttributeMeta{.doc = &quot;The joints it animates, by the Skeleton's names, in the &quot;    \
+                                     &quot;order of its arrays.&quot;,                                       \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Topology}))           \
+    X(::ernie::Tensor, Times, ::ernie::tokens::kAnimationTimes, nullptr,                           \
+      (::ernie::AttributeMeta{.doc = &quot;(samples,) increasing time codes of the samples; unset, &quot;    \
+                                     &quot;one sample for all time.&quot;,                                   \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(::ernie::Tensor, Translations, ::ernie::tokens::kTranslations, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;(samples, joints, 3) each joint's translation from its &quot;     \
+                                     &quot;parent.&quot;,                                                    \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(::ernie::Tensor, Rotations, ::ernie::tokens::kRotations, nullptr,                            \
+      (::ernie::AttributeMeta{.doc = &quot;(samples, joints, 4) each joint's rotation from its &quot;        \
+                                     &quot;parent, quaternions x, y, z, w.&quot;,                            \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(::ernie::Tensor, Scales, ::ernie::tokens::kScales, nullptr,                                  \
+      (::ernie::AttributeMeta{.doc = &quot;(samples, joints, 3) each joint's scale.&quot;,                   \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Points}))             \
+    X(std::vector&lt;std::string&gt;, BlendShapes, ::ernie::tokens::kBlendShapes,                        \
+      std::vector&lt;std::string&gt;{},                                                                  \
+      (::ernie::AttributeMeta{.doc = &quot;The blend shapes it weights, by the meshes' names for &quot;      \
+                                     &quot;them.&quot;,                                                      \
+                              .group = &quot;Animation&quot;, .dirty = ::ernie::Dirty::Topology}))           \
+    X(::ernie::Tensor, BlendShapeWeights, ::ernie::tokens::kBlendShapeWeights, nullptr,            \
+      (::ernie::AttributeMeta{.doc = &quot;(samples, blend shapes) weights.&quot;, .group = &quot;Animation&quot;,     \
+                              .dirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_BLEND_SHAPE_ATTRIBUTES(X)                                                            \
+    X(::ernie::Tensor, Offsets, ::ernie::tokens::kOffsets, nullptr,                                \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) offsets of the mesh's points at weight 1.&quot;,           \
+                              .group = &quot;Blend shape&quot;, .dirty = ::ernie::Dirty::Points}))           \
+    X(::ernie::Tensor, NormalOffsets, ::ernie::tokens::kNormalOffsets, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) offsets of the mesh's normals at weight 1.&quot;,          \
+                              .group = &quot;Blend shape&quot;, .dirty = ::ernie::Dirty::Points}))           \
+    X(::ernie::Tensor, PointIndices, ::ernie::tokens::kPointIndices, nullptr,                      \
+      (::ernie::AttributeMeta{.doc = &quot;(n,) the points the offsets move; unset, every point in &quot;    \
+                                     &quot;order.&quot;,                                                     \
+                              .group = &quot;Blend shape&quot;, .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Points}))                                   \
+    X(::ernie::Tensor, InbetweenWeights, ::ernie::tokens::kInbetweenWeights, nullptr,              \
+      (::ernie::AttributeMeta{.doc = &quot;(k,) the weights of its inbetween shapes.&quot;,                  \
+                              .group = &quot;Blend shape&quot;, .dirty = ::ernie::Dirty::Points}))           \
+    X(::ernie::Tensor, InbetweenOffsets, ::ernie::tokens::kInbetweenOffsets, nullptr,              \
+      (::ernie::AttributeMeta{.doc = &quot;(k, n, 3) the inbetween shapes' offsets, at its points.&quot;,    \
+                              .group = &quot;Blend shape&quot;, .dirty = ::ernie::Dirty::Points}))           \
+    X(::ernie::Tensor, InbetweenNormalOffsets, ::ernie::tokens::kInbetweenNormalOffsets, nullptr,  \
+      (::ernie::AttributeMeta{.doc = &quot;(k, n, 3) the inbetween shapes' normal offsets.&quot;,            \
+                              .group = &quot;Blend shape&quot;, .dirty = ::ernie::Dirty::Points}))
+
+#define ERNIE_SKEL_ROOT_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_SKEL_ROOT_ATTRIBUTES(X)
+#define ERNIE_SKELETON_ALL(X) ERNIE_BOUNDABLE_ALL(X) ERNIE_SKELETON_ATTRIBUTES(X)
+#define ERNIE_SKEL_ANIMATION_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SKEL_ANIMATION_ATTRIBUTES(X)
+#define ERNIE_BLEND_SHAPE_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_BLEND_SHAPE_ATTRIBUTES(X)
+// clang-format on
+
+namespace ernie {
+
+class SkelRoot : public Boundable {
+    ERNIE_SCHEMA_BODY(SkelRoot, Boundable, ERNIE_SKEL_ROOT_ALL)
+    ERNIE_SCHEMA_DEFINE(SkelRoot)
+};
+
+class Skeleton : public Boundable {
+    ERNIE_SCHEMA_BODY(Skeleton, Boundable, ERNIE_SKELETON_ALL)
+    ERNIE_SCHEMA_DEFINE(Skeleton)
+};
+
+class SkelAnimation : public Imageable {
+    ERNIE_SCHEMA_BODY(SkelAnimation, Imageable,
+                      ERNIE_SKEL_ANIMATION_ALL)
+    ERNIE_SCHEMA_DEFINE(SkelAnimation)
+};
+
+class BlendShape : public Imageable {
+    ERNIE_SCHEMA_BODY(BlendShape, Imageable, ERNIE_BLEND_SHAPE_ALL)
+    ERNIE_SCHEMA_DEFINE(BlendShape)
+};
+
+std::vector&lt;const PrimTypeDef*&gt; SkelSchemaTypes();
+
+}  // namespace ernie
+</code></pre>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

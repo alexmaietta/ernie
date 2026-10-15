@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -221,12 +142,16 @@
 <td style="text-align: left;"><a href="#variable-cascades"><strong>cascades</strong></a>   = <code>3</code><br><em>Number of cascades, 1 to 4.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-distance"><strong>distance</strong></a>   = <code>0.0f</code><br><em>The farthest a single view's cascades reach (m), nothing past it shadowed; 0 for as far as the view sees.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-enabled"><strong>enabled</strong></a>   = <code>true</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;"><a href="../namespaceernie/#enum-shadowfit"><strong>ShadowFit</strong></a></td>
-<td style="text-align: left;"><a href="#variable-fit"><strong>fit</strong></a>   = <code>/* multi line expression */</code><br><em>What bounds a single view's cascades.</em></td>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-horizons"><strong>horizons</strong></a>   = <code>true</code><br><em>Whether Terrains' horizon maps shadow them towards each distant light where its cascades grow coarse.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
@@ -250,23 +175,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-splitlambda"><strong>splitLambda</strong></a>   = <code>/* multi line expression */</code><br><em>Logarithmic weight of the practical split scheme.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">float</td>
-<td style="text-align: left;"><a href="#variable-virtualbias"><strong>virtualBias</strong></a>   = <code>0.0f</code><br></td>
-</tr>
-<tr>
-<td style="text-align: right;">std::uint32_t</td>
-<td style="text-align: left;"><a href="#variable-virtualdebug"><strong>virtualDebug</strong></a>   = <code>0</code><br><em>The virtual shadow map's debugging (</em> <code>tokens::kShadowVirtualDebug</code> <em>): 0 off, 1 levels, 2 pages.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-virtualmaps"><strong>virtualMaps</strong></a>   = <code>false</code><br><em>The first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>) of</em><code>virtualPages</code> <em>physical pages, its levels</em><code>virtualBias</code> <em>coarser than a texel a pixel.</em></td>
-</tr>
-<tr>
-<td style="text-align: right;">std::uint32_t</td>
-<td style="text-align: left;"><a href="#variable-virtualpages"><strong>virtualPages</strong></a>   = <code>1024</code><br></td>
+<td style="text-align: left;"><a href="#variable-splitexponent"><strong>splitExponent</strong></a>   = <code>/* multi line expression */</code><br><em>Each cascade's depth over the last's.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-worldshadowfit"><strong>WorldShadowFit</strong></a></td>
@@ -308,14 +217,20 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-distance">variable distance</h3>
+<p><em>The farthest a single view's cascades reach (m), nothing past it shadowed; 0 for as far as the view sees.</em> </p>
+<pre><code class="language-C++">float ernie::ShadowSettings::distance;
+</code></pre>
+<hr>
+
 <h3 id="variable-enabled">variable enabled</h3>
 <pre><code class="language-C++">bool ernie::ShadowSettings::enabled;
 </code></pre>
 <hr>
 
-<h3 id="variable-fit">variable fit</h3>
-<p><em>What bounds a single view's cascades.</em> </p>
-<pre><code class="language-C++">ShadowFit ernie::ShadowSettings::fit;
+<h3 id="variable-horizons">variable horizons</h3>
+<p><em>Whether Terrains' horizon maps shadow them towards each distant light where its cascades grow coarse.</em> </p>
+<pre><code class="language-C++">bool ernie::ShadowSettings::horizons;
 </code></pre>
 <hr>
 
@@ -349,31 +264,9 @@
 </code></pre>
 <hr>
 
-<h3 id="variable-splitlambda">variable splitLambda</h3>
-<p><em>Logarithmic weight of the practical split scheme.</em> </p>
-<pre><code class="language-C++">float ernie::ShadowSettings::splitLambda;
-</code></pre>
-<hr>
-
-<h3 id="variable-virtualbias">variable virtualBias</h3>
-<pre><code class="language-C++">float ernie::ShadowSettings::virtualBias;
-</code></pre>
-<hr>
-
-<h3 id="variable-virtualdebug">variable virtualDebug</h3>
-<p><em>The virtual shadow map's debugging (</em> <code>tokens::kShadowVirtualDebug</code> <em>): 0 off, 1 levels, 2 pages.</em></p>
-<pre><code class="language-C++">std::uint32_t ernie::ShadowSettings::virtualDebug;
-</code></pre>
-<hr>
-
-<h3 id="variable-virtualmaps">variable virtualMaps</h3>
-<p><em>The first shadowed distant light of a single view shadows through a virtual shadow map (</em> <code>VirtualShadowMap</code> <em>) of</em><code>virtualPages</code> <em>physical pages, its levels</em><code>virtualBias</code> <em>coarser than a texel a pixel.</em></p>
-<pre><code class="language-C++">bool ernie::ShadowSettings::virtualMaps;
-</code></pre>
-<hr>
-
-<h3 id="variable-virtualpages">variable virtualPages</h3>
-<pre><code class="language-C++">std::uint32_t ernie::ShadowSettings::virtualPages;
+<h3 id="variable-splitexponent">variable splitExponent</h3>
+<p><em>Each cascade's depth over the last's.</em> </p>
+<pre><code class="language-C++">float ernie::ShadowSettings::splitExponent;
 </code></pre>
 <hr>
 

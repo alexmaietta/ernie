@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -238,6 +159,22 @@
 </tr>
 <tr>
 <td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-halo"><strong>halo</strong></a>   = <code>0.0f</code><br><em>Text's halo: an outline this many pixels wide around each character in</em> <code>background</code> <em>'s colour, in place of the backing box, up to a fifth of</em><code>size</code> <em>; 0 for the box.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; glm::vec4 &gt;</td>
+<td style="text-align: left;"><a href="#variable-hover"><strong>hover</strong></a>  <br><em>The colour items with</em> <code>id</code> <em>take while it is hovered (</em><code>Overlay::SetHovered</code> <em>); none keeps their colour.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-id"><strong>id</strong></a>   = <code>0</code><br><em>A number the application gives the items, which hit tests and picks report (</em> <code>Overlay::ScreenItemAt</code> <em>), such as a button's; 0 for none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-metric"><strong>metric</strong></a>   = <code>false</code><br><em>Markers' and text's</em> <code>size</code> <em>in metres rather than pixels: in the world they grow and shrink with distance as things there do, still facing the view.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#variable-size"><strong>size</strong></a>   = <code>/* multi line expression */</code><br><em>Marker diameter, or label text height, in pixels.</em></td>
 </tr>
 <tr>
@@ -246,7 +183,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::int32_t</td>
-<td style="text-align: left;"><a href="#variable-world"><strong>world</strong></a>   = <code>-1</code><br><em>The world whose views show the item; -1 shows it in every view.</em></td>
+<td style="text-align: left;"><a href="#variable-world"><strong>world</strong></a>   = <code>-1</code><br><em>The world whose views show the item; -1 shows it in every view, or in its anchor's world's.</em></td>
 </tr>
 </tbody>
 </table>
@@ -281,6 +218,30 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-halo">variable halo</h3>
+<p><em>Text's halo: an outline this many pixels wide around each character in</em> <code>background</code> <em>'s colour, in place of the backing box, up to a fifth of</em><code>size</code> <em>; 0 for the box.</em></p>
+<pre><code class="language-C++">float ernie::OverlayStyle::halo;
+</code></pre>
+<hr>
+
+<h3 id="variable-hover">variable hover</h3>
+<p><em>The colour items with</em> <code>id</code> <em>take while it is hovered (</em><code>Overlay::SetHovered</code> <em>); none keeps their colour.</em></p>
+<pre><code class="language-C++">std::optional&lt;glm::vec4&gt; ernie::OverlayStyle::hover;
+</code></pre>
+<hr>
+
+<h3 id="variable-id">variable id</h3>
+<p><em>A number the application gives the items, which hit tests and picks report (</em> <code>Overlay::ScreenItemAt</code> <em>), such as a button's; 0 for none.</em></p>
+<pre><code class="language-C++">std::uint32_t ernie::OverlayStyle::id;
+</code></pre>
+<hr>
+
+<h3 id="variable-metric">variable metric</h3>
+<p><em>Markers' and text's</em> <code>size</code> <em>in metres rather than pixels: in the world they grow and shrink with distance as things there do, still facing the view.</em></p>
+<pre><code class="language-C++">bool ernie::OverlayStyle::metric;
+</code></pre>
+<hr>
+
 <h3 id="variable-size">variable size</h3>
 <p><em>Marker diameter, or label text height, in pixels.</em> </p>
 <pre><code class="language-C++">float ernie::OverlayStyle::size;
@@ -294,7 +255,7 @@
 <hr>
 
 <h3 id="variable-world">variable world</h3>
-<p><em>The world whose views show the item; -1 shows it in every view.</em> </p>
+<p><em>The world whose views show the item; -1 shows it in every view, or in its anchor's world's.</em> </p>
 <pre><code class="language-C++">std::int32_t ernie::OverlayStyle::world;
 </code></pre>
 <hr>

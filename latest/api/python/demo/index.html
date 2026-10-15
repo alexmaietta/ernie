@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -162,9 +83,13 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.__all__"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;__all__</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.AsyncDownload"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AsyncDownload</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.Demo"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Demo</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.DemoEntry"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DemoEntry</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.DownloadCancelled"><code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;DownloadCancelled</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.demo.cache_dir"><code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;cache_dir</a>
     </li>
@@ -283,6 +208,14 @@
       </thead>
       <tbody>
           <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            AsyncDownload (ernie.demo.AsyncDownload)" href="#ernie.demo.AsyncDownload">AsyncDownload</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>download</code> on a thread of its own, so a demo runs while its</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><a class="autorefs autorefs-internal" title="            Demo (ernie.demo.Demo)" href="#ernie.demo.Demo">Demo</a></code></td>
             <td>
               <div class="doc-md-description">
@@ -295,6 +228,14 @@
             <td>
               <div class="doc-md-description">
                 <p>A demo file, <code>&lt;category&gt;/demo_&lt;category&gt;_&lt;name&gt;.py</code>: its path,</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            DownloadCancelled (ernie.demo.DownloadCancelled)" href="#ernie.demo.DownloadCancelled">DownloadCancelled</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>A download stopped by its <code>cancel</code>: its part is kept, to</p>
               </div>
             </td>
           </tr>
@@ -365,7 +306,7 @@
               <td><code><a class="autorefs autorefs-internal" title="            download (ernie.demo.download)" href="#ernie.demo.download">download</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed,</p>
+                  <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed:</p>
                 </div>
               </td>
             </tr>
@@ -539,9 +480,11 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">__all__ = [
+    "AsyncDownload",
     "COMMON_ARGS",
     "Demo",
     "DemoEntry",
+    "DownloadCancelled",
     "cache_dir",
     "can_download",
     "catalog",
@@ -570,6 +513,344 @@
 </div>
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.demo.AsyncDownload" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">AsyncDownload</span>
+
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">AsyncDownload(url, path)</code></pre>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p><code>download</code> on a thread of its own, so a demo runs while its
+data comes: its progress and outcome are messages for the demo to
+show as it steps (<code>take_messages</code>, such as into the viewer's log),
+and its bytes so far for a progress bar (<code>fraction</code>, <code>status</code>).
+<code>cancel</code> stops it, keeping its part to resume next time.</p>
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            cancel (ernie.demo.AsyncDownload.cancel)" href="#ernie.demo.AsyncDownload.cancel">cancel</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Stops the download, keeping its part to resume.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            take_messages (ernie.demo.AsyncDownload.take_messages)" href="#ernie.demo.AsyncDownload.take_messages">take_messages</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The (text, is_error) messages since the last call.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Attributes:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+              <b><code>bytes</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>cancelled</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>done</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>fraction</code></b>
+              –
+              <div class="doc-md-description">
+                <p>The fraction in hand, 0 to 1 (0 until the total is known).</p>
+              </div>
+            </li>
+            <li>
+              <b><code>status</code></b>
+              –
+              <div class="doc-md-description">
+                <p>Megabytes in hand and in all, as "120 of 2,100 MB".</p>
+              </div>
+            </li>
+            <li>
+              <b><code>succeeded</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+            <li>
+              <b><code>total</code></b>
+              –
+              <div class="doc-md-description">
+                
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.bytes" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">bytes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">bytes = 0</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.cancelled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">cancelled</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cancelled = False</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.done" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">done</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">done = False</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.fraction" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">fraction</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">fraction</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The fraction in hand, 0 to 1 (0 until the total is known).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.status" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">status</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">status</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Megabytes in hand and in all, as "120 of 2,100 MB".</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.succeeded" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">succeeded</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">succeeded = False</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="ernie.demo.AsyncDownload.total" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">total</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">total = 0</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.AsyncDownload.cancel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">cancel</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">cancel()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Stops the download, keeping its part to resume.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.demo.AsyncDownload.take_messages" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">take_messages</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">take_messages()</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The (text, is_error) messages since the last call.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -1317,6 +1598,43 @@ former <code>&lt;category&gt;/&lt;name&gt;.py</code> form gets the same id.</p>
 
 </div>
 
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="ernie.demo.DownloadCancelled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">DownloadCancelled</span>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>A download stopped by its <code>cancel</code>: its part is kept, to
+resume.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+
+</div>
+
 
 <div class="doc doc-object doc-function">
 
@@ -1470,12 +1788,18 @@ files that define a Demo class, by category and name.</p>
 
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">download(url, path)</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">download(url, path, report=print, progress=None)</code></pre>
 
     <div class="doc doc-contents ">
 
-        <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed,
-through <code>path</code> + ".part", renamed when complete.</p>
+        <p>Downloads <code>url</code> to <code>path</code>, its directory made as needed:
+streamed into <code>path</code> + ".part", renamed when complete. A part left
+by a download stopped or failed before is resumed (an HTTP range
+request; from the start if the server ignores it), and failed
+attempts resume up to five times, going to <code>report</code>. <code>progress</code>,
+when given, is kept up to date: its <code>bytes</code> in hand, its <code>total</code>
+(0 until the server says), and its <code>cancelled</code>, which stops the
+download (<code>DownloadCancelled</code>).</p>
 
 
     </div>

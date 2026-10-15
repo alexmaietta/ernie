@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -230,15 +151,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="../namespaceernie/#enum-dirty"><strong>Dirty</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#variable-dirty"><strong>dirty</strong></a>  <br><em>What changing it stamps (</em> <code>DirtyOf</code> <em>):</em><code>Dirty::Points</code> <em>for bulk positions, say.</em></td>
+<td style="text-align: left;"><a href="#variable-dirty"><strong>dirty</strong></a>   = <code>{}</code><br><em>What changing it stamps (</em> <code>DirtyOf</code> <em>):</em><code>Dirty::Points</code> <em>for bulk positions, say.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string_view</td>
-<td style="text-align: left;"><a href="#variable-doc"><strong>doc</strong></a>  <br></td>
+<td style="text-align: left;"><a href="#variable-doc"><strong>doc</strong></a>   = <code>{}</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string_view</td>
-<td style="text-align: left;"><a href="#variable-group"><strong>group</strong></a>  <br><em>The panel section, such as "Light" or "Shape".</em></td>
+<td style="text-align: left;"><a href="#variable-group"><strong>group</strong></a>   = <code>{}</code><br><em>The panel section, such as "Light" or "Shape".</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
+<td style="text-align: left;"><a href="#variable-inherited"><strong>inherited</strong></a>   = <code>[**false**](structernie_1_1AttributeMeta.md#variable-array)</code><br><em>Whether it applies to the prim's descendants too, as</em> <code>ernie:world</code> <em>does: changing it stamps them as well, as transforms and visibility do.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
@@ -246,7 +171,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::string_view</td>
-<td style="text-align: left;"><a href="#variable-label"><strong>label</strong></a>  <br><em>For panels; derived from the name ("Color temperature") if empty.</em></td>
+<td style="text-align: left;"><a href="#variable-label"><strong>label</strong></a>   = <code>{}</code><br><em>For panels; derived from the name ("Color temperature") if empty.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./#variable-array"><strong>bool</strong></a></td>
@@ -262,16 +187,20 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; std::string_view &gt;</td>
-<td style="text-align: left;"><a href="#variable-options"><strong>options</strong></a>  <br><em>A token's choices, or a relationship's target type.</em></td>
+<td style="text-align: left;"><a href="#variable-options"><strong>options</strong></a>   = <code>{}</code><br><em>A token's choices, or a relationship's target type.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string_view</td>
-<td style="text-align: left;"><a href="#variable-plural"><strong>plural</strong></a>  <br><em>For a list of targets usually holding one (a product's camera, or a batch's cameras): the plural name Python reads the list by, its own name then reading the first target alone.</em></td>
+<td style="text-align: left;"><a href="#variable-plural"><strong>plural</strong></a>   = <code>{}</code><br><em>For a list of targets usually holding one (a product's camera, or a batch's cameras): the plural name Python reads the list by, its own name then reading the first target alone.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../namespaceernie/#enum-dirty"><strong>Dirty</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-targetdirty"><strong>targetDirty</strong></a>   = <code>{}</code><br><em>For a relationship: what a change at or under any of its targets stamps the prim holding it with (</em> <code>Scene::Changes</code> <em>), as a material's edits reach the prims bound to it.</em></td>
 </tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Declared with designated initializers in this order. </p>
+<p>Declared with designated initializers in this order; every member has a default initializer, so those naming only some draw no -Wmissing-field-initializers. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-array">variable array</h3>
 <p><em>It also takes an array written in place of its value (</em> <code>Scene::Write</code> <em>): colours per vertex for one</em><code>displayColor</code> <em>, a width per point, a pose per prim for a transform op.</em></p>
@@ -307,6 +236,12 @@
 <h3 id="variable-group">variable group</h3>
 <p><em>The panel section, such as "Light" or "Shape".</em> </p>
 <pre><code class="language-C++">std::string_view ernie::AttributeMeta::group;
+</code></pre>
+<hr>
+
+<h3 id="variable-inherited">variable inherited</h3>
+<p><em>Whether it applies to the prim's descendants too, as</em> <code>ernie:world</code> <em>does: changing it stamps them as well, as transforms and visibility do.</em></p>
+<pre><code class="language-C++">bool ernie::AttributeMeta::inherited;
 </code></pre>
 <hr>
 
@@ -349,6 +284,13 @@
 <p><em>For a list of targets usually holding one (a product's camera, or a batch's cameras): the plural name Python reads the list by, its own name then reading the first target alone.</em> </p>
 <pre><code class="language-C++">std::string_view ernie::AttributeMeta::plural;
 </code></pre>
+<hr>
+
+<h3 id="variable-targetdirty">variable targetDirty</h3>
+<p><em>For a relationship: what a change at or under any of its targets stamps the prim holding it with (</em> <code>Scene::Changes</code> <em>), as a material's edits reach the prims bound to it.</em></p>
+<pre><code class="language-C++">std::optional&lt;Dirty&gt; ernie::AttributeMeta::targetDirty;
+</code></pre>
+<p>Unset, none. </p>
 <hr>
 
 <hr />

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -226,6 +147,10 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <td style="text-align: left;"><a href="#variable-grid"><strong>grid</strong></a>   = <code>false</code><br><em>A grid on the ground (z = 0) with the x and y axes.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::set&lt; std::string, std::less&lt;&gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-hiddenoverlays"><strong>hiddenOverlays</strong></a>  <br><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>overlays the viewport leaves out while</em><code>overlays</code> <em>shows the others, by name: the eye menu's</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>Overlays submenu toggles each.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-hud"><strong>hud</strong></a>   = <code>true</code><br><em>The heads-up display at the top left, with the items below.</em></td>
 </tr>
@@ -255,7 +180,7 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
-<td style="text-align: left;"><a href="#variable-lights"><strong>lights</strong></a>   = <code>true</code><br><em>Every light's gizmo: its shape and the direction it shines.</em></td>
+<td style="text-align: left;"><a href="#variable-lights"><strong>lights</strong></a>   = <code>false</code><br><em>Every light's gizmo: its shape and the direction it shines; off by default.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -264,6 +189,10 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-selection"><strong>selection</strong></a>   = <code>true</code><br><em>The selection's outline.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-skeletons"><strong>skeletons</strong></a>   = <code>false</code><br><em>Every</em> <a href="../classernie_1_1Skeleton/"><em><strong>Skeleton</strong></em></a> <em>'s bones and joints, posed at the time code; off by default.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -280,6 +209,10 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-toolbarvar"><strong>toolbarVar</strong></a>   = <code>true</code><br><em>The render var the viewport shows.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-ui"><strong>ui</strong></a>   = <code>true</code><br><em>The viewport's own UI: its toolbar and menus, heads-up display, tool strip, axis indicator and transform gizmo.</em></td>
 </tr>
 </tbody>
 </table>
@@ -310,6 +243,12 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <h3 id="variable-grid">variable grid</h3>
 <p><em>A grid on the ground (z = 0) with the x and y axes.</em> </p>
 <pre><code class="language-C++">bool ernie::app::ViewportDisplay::grid;
+</code></pre>
+<hr>
+
+<h3 id="variable-hiddenoverlays">variable hiddenOverlays</h3>
+<p><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>overlays the viewport leaves out while</em><code>overlays</code> <em>shows the others, by name: the eye menu's</em><a href="../classernie_1_1Scene/"><em><strong>Scene</strong></em></a> <em>Overlays submenu toggles each.</em></p>
+<pre><code class="language-C++">std::set&lt;std::string, std::less&lt;&gt; &gt; ernie::app::ViewportDisplay::hiddenOverlays;
 </code></pre>
 <hr>
 
@@ -356,7 +295,7 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <hr>
 
 <h3 id="variable-lights">variable lights</h3>
-<p><em>Every light's gizmo: its shape and the direction it shines.</em> </p>
+<p><em>Every light's gizmo: its shape and the direction it shines; off by default.</em> </p>
 <pre><code class="language-C++">bool ernie::app::ViewportDisplay::lights;
 </code></pre>
 <hr>
@@ -370,6 +309,12 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <h3 id="variable-selection">variable selection</h3>
 <p><em>The selection's outline.</em> </p>
 <pre><code class="language-C++">bool ernie::app::ViewportDisplay::selection;
+</code></pre>
+<hr>
+
+<h3 id="variable-skeletons">variable skeletons</h3>
+<p><em>Every</em> <a href="../classernie_1_1Skeleton/"><em><strong>Skeleton</strong></em></a> <em>'s bones and joints, posed at the time code; off by default.</em></p>
+<pre><code class="language-C++">bool ernie::app::ViewportDisplay::skeletons;
 </code></pre>
 <hr>
 
@@ -396,6 +341,13 @@ type" menu (the eye) and heads-up display settings choose.</em> <a href="#detail
 <p><em>The render var the viewport shows.</em> </p>
 <pre><code class="language-C++">bool ernie::app::ViewportDisplay::toolbarVar;
 </code></pre>
+<hr>
+
+<h3 id="variable-ui">variable ui</h3>
+<p><em>The viewport's own UI: its toolbar and menus, heads-up display, tool strip, axis indicator and transform gizmo.</em> </p>
+<pre><code class="language-C++">bool ernie::app::ViewportDisplay::ui;
+</code></pre>
+<p>Off (the H key toggles it), only the image and the scene's overlays show. </p>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
 <h3 id="function-operator">function operator==</h3>

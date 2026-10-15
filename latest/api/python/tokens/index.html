@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -161,6 +82,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens"><code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;tokens</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ACTIVE_COUNTS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ACTIVE_COUNTS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ADAPTIVE_SPHERE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ADAPTIVE_SPHERE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ALBEDO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ALBEDO</a>
     </li>
@@ -204,15 +127,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE_PRESET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE_PRESET</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ATMOSPHERE_SODIUM_COLUMN"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ATMOSPHERE_SODIUM_COLUMN</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.AUTO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;AUTO</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.AXIS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;AXIS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BLACKBODY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BLACKBODY</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BODY_ALBEDO"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BODY_ALBEDO</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BODY_RADIUS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BODY_RADIUS</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BLEND_SHAPE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BLEND_SHAPE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.BRDF"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;BRDF</a>
     </li>
@@ -226,8 +149,6 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CAPSULE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CAPSULE</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CELESTIAL_BODY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CELESTIAL_BODY</a>
-    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CELL_SIZE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CELL_SIZE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CHECKER"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CHECKER</a>
@@ -238,6 +159,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CHECKER_SIZE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CHECKER_SIZE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLASSIC_LINEAR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLASSIC_LINEAR</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLEARCOAT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLEARCOAT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLEARCOAT_ROUGHNESS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLEARCOAT_ROUGHNESS</a>
@@ -245,6 +168,10 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLEAR_COLOR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLEAR_COLOR</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLIPPING_RANGE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLIPPING_RANGE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLOUD_DROPLETS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLOUD_DROPLETS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.CLOUD_LAYERS_FIELD"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;CLOUD_LAYERS_FIELD</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.COLOR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;COLOR</a>
     </li>
@@ -306,11 +233,17 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DISPLAY_COLOR"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DISPLAY_COLOR</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DISPLAY_OPACITY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DISPLAY_OPACITY</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DISTANT_LIGHT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DISTANT_LIGHT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DOME_LIGHT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DOME_LIGHT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DOUBLE_HENYEY_GREENSTEIN"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DOUBLE_HENYEY_GREENSTEIN</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DUAL_HENYEY_GREENSTEIN"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DUAL_HENYEY_GREENSTEIN</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.DUAL_QUATERNION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;DUAL_QUATERNION</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EARTH"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EARTH</a>
     </li>
@@ -320,13 +253,13 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.END_TIME_CODE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;END_TIME_CODE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ERNIE_THERMAL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ERNIE_THERMAL</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXAGGERATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXAGGERATION</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_ADAPTATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_ADAPTATION</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_COMPENSATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_COMPENSATION</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.EXPOSURE_FSTOP"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;EXPOSURE_FSTOP</a>
     </li>
@@ -344,6 +277,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FACE_VERTEX_INDICES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FACE_VERTEX_INDICES</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FALLBACK_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FALLBACK_INPUT</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FIELD_INDEX"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FIELD_INDEX</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FIELD_NAME"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FIELD_NAME</a>
@@ -359,6 +294,10 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FINEST_CELL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FINEST_CELL</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FISHEYE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FISHEYE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FLOAT16"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FLOAT16</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FLOAT32"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FLOAT32</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.FOCAL_LENGTH"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;FOCAL_LENGTH</a>
     </li>
@@ -393,6 +332,12 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS_DIRTY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS_DIRTY</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS_FILE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS_FILE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS_REFERENCE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS_REFERENCE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HEIGHTS_UNIT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HEIGHTS_UNIT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.HENYEY_GREENSTEIN"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;HENYEY_GREENSTEIN</a>
     </li>
@@ -598,6 +543,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.RESOLUTION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;RESOLUTION</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.RGB"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;RGB</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ROTATE_X"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ROTATE_X</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.ROTATE_XYZ"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ROTATE_XYZ</a>
@@ -672,9 +619,11 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_CASCADES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_CASCADES</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_DISTANCE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_DISTANCE</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_ENABLE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_ENABLE</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_FIT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_FIT</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_HORIZONS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_HORIZONS</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_NORMAL_OFFSET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_NORMAL_OFFSET</a>
     </li>
@@ -684,15 +633,7 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_SOFTNESS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_SOFTNESS</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_SPLIT_LAMBDA"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_SPLIT_LAMBDA</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_VIRTUAL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_VIRTUAL</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_VIRTUAL_BIAS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_VIRTUAL_BIAS</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_VIRTUAL_DEBUG"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_VIRTUAL_DEBUG</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_VIRTUAL_PAGES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_VIRTUAL_PAGES</a>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_SPLIT_EXPONENT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_SPLIT_EXPONENT</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SHADOW_WORLDS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SHADOW_WORLDS</a>
     </li>
@@ -718,11 +659,31 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SIZE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SIZE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKELETON"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKELETON</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_ANIMATION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_ANIMATION</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_JOINT_INDICES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_JOINT_INDICES</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_JOINT_WEIGHTS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_JOINT_WEIGHTS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_ROOT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_ROOT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_SKELETON"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_SKELETON</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SKEL_SKINNING_METHOD"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SKEL_SKINNING_METHOD</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SOURCE_COLOR_SPACE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SOURCE_COLOR_SPACE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SOURCE_NAME"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SOURCE_NAME</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SPECTRAL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SPECTRAL</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SPECTRAL_BANDS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SPECTRAL_BANDS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SPECTRAL_MODE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SPECTRAL_MODE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SPECTRAL_PRECISION"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SPECTRAL_PRECISION</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.SPECTRAL_RANGE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;SPECTRAL_RANGE</a>
     </li>
@@ -768,6 +729,38 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TEXTURE_FILE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TEXTURE_FILE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_EMISSIVITY_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_EMISSIVITY_INPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_INERTIA"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_INERTIA</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_INERTIA_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_INERTIA_INPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_INERTIA_TEXTURE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_INERTIA_TEXTURE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL_DATA"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL_DATA</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL_DATA_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL_DATA_INPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL_INPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL_PARAMS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL_PARAMS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_MODEL_PARAMS_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_MODEL_PARAMS_INPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_NODE_IDS"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_NODE_IDS</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_NODE_TEMPERATURES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_NODE_TEMPERATURES</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_OUTPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_OUTPUT</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_TEMPERATURE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_TEMPERATURE</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_TEMPERATURES"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_TEMPERATURES</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.THERMAL_TEMPERATURE_INPUT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;THERMAL_TEMPERATURE_INPUT</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TIME_CODE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TIME_CODE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.TIME_CODES_PER_SECOND"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;TIME_CODES_PER_SECOND</a>
@@ -786,7 +779,11 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USD_PREVIEW_SURFACE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USD_PREVIEW_SURFACE</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USD_PRIMVAR_READER_FLOAT"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USD_PRIMVAR_READER_FLOAT</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USD_PRIMVAR_READER_FLOAT2"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USD_PRIMVAR_READER_FLOAT2</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USD_PRIMVAR_READER_FLOAT3"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USD_PRIMVAR_READER_FLOAT3</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.USD_TRANSFORM2D"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;USD_TRANSFORM2D</a>
     </li>
@@ -805,8 +802,6 @@
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VERTICAL_APERTURE_OFFSET"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VERTICAL_APERTURE_OFFSET</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VISIBILITY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VISIBILITY</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VISIBLE"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VISIBLE</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ernie.tokens.VISIBLE_IN_PRIMARY_RAY"><code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;VISIBLE_IN_PRIMARY_RAY</a>
     </li>
@@ -941,6 +936,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">ACTIVE_COUNTS: str = 'ernie:activeCounts'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.ADAPTIVE_SPHERE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ADAPTIVE_SPHERE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ADAPTIVE_SPHERE: str = 'adaptive'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1393,6 +1409,27 @@
 
 
 
+<h2 id="ernie.tokens.ATMOSPHERE_SODIUM_COLUMN" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ATMOSPHERE_SODIUM_COLUMN</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ATMOSPHERE_SODIUM_COLUMN: str = 'ernie:atmosphere:sodiumColumn'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.AUTO" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">AUTO</span>
 
@@ -1456,8 +1493,8 @@
 
 
 
-<h2 id="ernie.tokens.BODY_ALBEDO" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">BODY_ALBEDO</span>
+<h2 id="ernie.tokens.BLEND_SHAPE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">BLEND_SHAPE</span>
 
 
   <span class="doc doc-labels">
@@ -1465,28 +1502,7 @@
   </span>
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">BODY_ALBEDO: str = 'ernie:body:albedo'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.BODY_RADIUS" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">BODY_RADIUS</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">BODY_RADIUS: str = 'ernie:body:radius'</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">BLEND_SHAPE: str = 'BlendShape'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -1624,27 +1640,6 @@
 
 
 
-<h2 id="ernie.tokens.CELESTIAL_BODY" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CELESTIAL_BODY</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">CELESTIAL_BODY: str = 'CelestialBody'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
 <h2 id="ernie.tokens.CELL_SIZE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CELL_SIZE</span>
 
@@ -1750,6 +1745,27 @@
 
 
 
+<h2 id="ernie.tokens.CLASSIC_LINEAR" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CLASSIC_LINEAR</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">CLASSIC_LINEAR: str = 'classicLinear'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.CLEARCOAT" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CLEARCOAT</span>
 
@@ -1823,6 +1839,48 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">CLIPPING_RANGE: str = 'clippingRange'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.CLOUD_DROPLETS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CLOUD_DROPLETS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">CLOUD_DROPLETS: str = 'cloudDroplets'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.CLOUD_LAYERS_FIELD" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">CLOUD_LAYERS_FIELD</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">CLOUD_LAYERS_FIELD: str = 'CloudLayersField'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2464,6 +2522,27 @@
 
 
 
+<h2 id="ernie.tokens.DISPLAY_OPACITY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">DISPLAY_OPACITY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">DISPLAY_OPACITY: str = 'primvars:displayOpacity'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.DISTANT_LIGHT" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">DISTANT_LIGHT</span>
 
@@ -2516,6 +2595,48 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">DOUBLE_HENYEY_GREENSTEIN: str = 'doubleHenyeyGreenstein'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.DUAL_HENYEY_GREENSTEIN" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">DUAL_HENYEY_GREENSTEIN</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">DUAL_HENYEY_GREENSTEIN: str = 'dualHenyeyGreenstein'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.DUAL_QUATERNION" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">DUAL_QUATERNION</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">DUAL_QUATERNION: str = 'dualQuaternion'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2611,6 +2732,27 @@
 
 
 
+<h2 id="ernie.tokens.ERNIE_THERMAL" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ERNIE_THERMAL</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">ERNIE_THERMAL: str = 'ErnieThermal'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.EXAGGERATION" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">EXAGGERATION</span>
 
@@ -2663,27 +2805,6 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">EXPOSURE_ADAPTATION: str = 'ernie:exposure:adaptation'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.EXPOSURE_COMPENSATION" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">EXPOSURE_COMPENSATION</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">EXPOSURE_COMPENSATION: str = 'ernie:exposure'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -2863,6 +2984,27 @@
 
 
 
+<h2 id="ernie.tokens.FALLBACK_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FALLBACK_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FALLBACK_INPUT: str = 'inputs:fallback'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.FIELD_INDEX" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FIELD_INDEX</span>
 
@@ -3020,6 +3162,48 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">FISHEYE: str = 'fisheye'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.FLOAT16" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FLOAT16</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FLOAT16: str = 'float16'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.FLOAT32" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">FLOAT32</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">FLOAT32: str = 'float32'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -3377,6 +3561,69 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">HEIGHTS_DIRTY: str = 'ernie:heights:dirty'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.HEIGHTS_FILE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HEIGHTS_FILE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">HEIGHTS_FILE: str = 'ernie:heights:file'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.HEIGHTS_REFERENCE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HEIGHTS_REFERENCE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">HEIGHTS_REFERENCE: str = 'ernie:heights:reference'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.HEIGHTS_UNIT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">HEIGHTS_UNIT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">HEIGHTS_UNIT: str = 'ernie:heights:unit'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -5530,6 +5777,27 @@
 
 
 
+<h2 id="ernie.tokens.RGB" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">RGB</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">RGB: str = 'rgb'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.ROTATE_X" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ROTATE_X</span>
 
@@ -6307,6 +6575,27 @@
 
 
 
+<h2 id="ernie.tokens.SHADOW_DISTANCE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_DISTANCE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SHADOW_DISTANCE: str = 'ernie:shadows:distance'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.SHADOW_ENABLE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_ENABLE</span>
 
@@ -6328,8 +6617,8 @@
 
 
 
-<h2 id="ernie.tokens.SHADOW_FIT" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_FIT</span>
+<h2 id="ernie.tokens.SHADOW_HORIZONS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_HORIZONS</span>
 
 
   <span class="doc doc-labels">
@@ -6337,7 +6626,7 @@
   </span>
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_FIT: str = 'ernie:shadows:fit'</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">SHADOW_HORIZONS: str = 'ernie:shadows:horizons'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -6433,8 +6722,8 @@
 
 
 
-<h2 id="ernie.tokens.SHADOW_SPLIT_LAMBDA" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_SPLIT_LAMBDA</span>
+<h2 id="ernie.tokens.SHADOW_SPLIT_EXPONENT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_SPLIT_EXPONENT</span>
 
 
   <span class="doc doc-labels">
@@ -6442,91 +6731,7 @@
   </span>
 
 </h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_SPLIT_LAMBDA: str = 'ernie:shadows:splitLambda'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.SHADOW_VIRTUAL" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_VIRTUAL</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_VIRTUAL: str = 'ernie:shadows:virtual'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.SHADOW_VIRTUAL_BIAS" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_VIRTUAL_BIAS</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_VIRTUAL_BIAS: str = 'ernie:shadows:virtualBias'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.SHADOW_VIRTUAL_DEBUG" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_VIRTUAL_DEBUG</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_VIRTUAL_DEBUG: str = 'ernie:shadows:virtualDebug'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.SHADOW_VIRTUAL_PAGES" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SHADOW_VIRTUAL_PAGES</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">SHADOW_VIRTUAL_PAGES: str = 'ernie:shadows:virtualPages'</code></pre>
+<pre class="highlight"><code class="language-python doc-signature">SHADOW_SPLIT_EXPONENT: str = 'ernie:shadows:splitExponent'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -6790,6 +6995,153 @@
 
 
 
+<h2 id="ernie.tokens.SKELETON" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKELETON</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKELETON: str = 'Skeleton'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_ANIMATION" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_ANIMATION</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_ANIMATION: str = 'SkelAnimation'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_JOINT_INDICES" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_JOINT_INDICES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_JOINT_INDICES: str = 'primvars:skel:jointIndices'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_JOINT_WEIGHTS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_JOINT_WEIGHTS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_JOINT_WEIGHTS: str = 'primvars:skel:jointWeights'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_ROOT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_ROOT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_ROOT: str = 'SkelRoot'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_SKELETON" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_SKELETON</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_SKELETON: str = 'skel:skeleton'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SKEL_SKINNING_METHOD" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SKEL_SKINNING_METHOD</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SKEL_SKINNING_METHOD: str = 'skel:skinningMethod'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.SOURCE_COLOR_SPACE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SOURCE_COLOR_SPACE</span>
 
@@ -6832,6 +7184,27 @@
 
 
 
+<h2 id="ernie.tokens.SPECTRAL" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SPECTRAL</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SPECTRAL: str = 'spectral'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.SPECTRAL_BANDS" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SPECTRAL_BANDS</span>
 
@@ -6842,6 +7215,48 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">SPECTRAL_BANDS: str = 'ernie:spectral:bands'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SPECTRAL_MODE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SPECTRAL_MODE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SPECTRAL_MODE: str = 'ernie:spectral:mode'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.SPECTRAL_PRECISION" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">SPECTRAL_PRECISION</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">SPECTRAL_PRECISION: str = 'ernie:spectral:precision'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7315,6 +7730,342 @@
 
 
 
+<h2 id="ernie.tokens.THERMAL_EMISSIVITY_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_EMISSIVITY_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_EMISSIVITY_INPUT: str = 'inputs:emissivity'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_INERTIA" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_INERTIA</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_INERTIA: str = 'ernie:thermal:inertia'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_INERTIA_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_INERTIA_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_INERTIA_INPUT: str = 'inputs:thermalInertia'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_INERTIA_TEXTURE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_INERTIA_TEXTURE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_INERTIA_TEXTURE: str = 'ernie:thermal:inertiaTexture'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL: str = 'ernie:thermal:model'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL_DATA" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL_DATA</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL_DATA: str = 'ernie:thermal:model:data'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL_DATA_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL_DATA_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL_DATA_INPUT: str = 'inputs:temperatureModelData'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL_INPUT: str = 'inputs:temperatureModel'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL_PARAMS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL_PARAMS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL_PARAMS: str = 'ernie:thermal:model:params'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_MODEL_PARAMS_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_MODEL_PARAMS_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_MODEL_PARAMS_INPUT: str = 'inputs:temperatureModelParams'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_NODE_IDS" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_NODE_IDS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_NODE_IDS: str = 'ernie:thermal:nodeIds'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_NODE_TEMPERATURES" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_NODE_TEMPERATURES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_NODE_TEMPERATURES: str = 'ernie:thermal:nodeTemperatures'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_OUTPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_OUTPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_OUTPUT: str = 'outputs:ernie:thermal'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_TEMPERATURE" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_TEMPERATURE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_TEMPERATURE: str = 'ernie:thermal:temperature'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_TEMPERATURES" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_TEMPERATURES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_TEMPERATURES: str = 'ernie:thermal:temperatures'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.THERMAL_TEMPERATURE_INPUT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">THERMAL_TEMPERATURE_INPUT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">THERMAL_TEMPERATURE_INPUT: str = 'inputs:temperature'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.TIME_CODE" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">TIME_CODE</span>
 
@@ -7504,6 +8255,27 @@
 
 
 
+<h2 id="ernie.tokens.USD_PRIMVAR_READER_FLOAT" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">USD_PRIMVAR_READER_FLOAT</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">USD_PRIMVAR_READER_FLOAT: str = 'UsdPrimvarReader_float'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h2 id="ernie.tokens.USD_PRIMVAR_READER_FLOAT2" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">USD_PRIMVAR_READER_FLOAT2</span>
 
@@ -7514,6 +8286,27 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">USD_PRIMVAR_READER_FLOAT2: str = 'UsdPrimvarReader_float2'</code></pre>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="ernie.tokens.USD_PRIMVAR_READER_FLOAT3" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">USD_PRIMVAR_READER_FLOAT3</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h2>
+<pre class="highlight"><code class="language-python doc-signature">USD_PRIMVAR_READER_FLOAT3: str = 'UsdPrimvarReader_float3'</code></pre>
 
     <div class="doc doc-contents ">
 
@@ -7703,27 +8496,6 @@
 
 </h2>
 <pre class="highlight"><code class="language-python doc-signature">VISIBILITY: str = 'visibility'</code></pre>
-
-    <div class="doc doc-contents ">
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="ernie.tokens.VISIBLE" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">VISIBLE</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span>
-
-</h2>
-<pre class="highlight"><code class="language-python doc-signature">VISIBLE: str = 'visible'</code></pre>
 
     <div class="doc doc-contents ">
 

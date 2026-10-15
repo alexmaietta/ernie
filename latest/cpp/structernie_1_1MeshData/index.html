@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -207,6 +128,21 @@
 <ul>
 <li><code>#include &lt;ernie/geometry/mesh_data.h&gt;</code></li>
 </ul>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1MeshData_1_1Level/"><strong>Level</strong></a> <br><em>A coarser level of detail:</em> <code>count</code> <em>entries of</em><code>lodIndices</code> <em>from</em><code>first</code> <em>, at most</em><code>error</code> <em>(in mesh units) from the full mesh.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -221,8 +157,36 @@
 <td style="text-align: left;"><a href="#variable-colors"><strong>colors</strong></a>  <br><em>Empty, or linear r, g, b per vertex.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-cornercolors"><strong>cornerColors</strong></a>  <br><em>Empty, or linear r, g, b per triangle corner (per entry of</em> <code>indices</code> <em>), for face-varying and uniform colours.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-cornernormals"><strong>cornerNormals</strong></a>  <br><em>Empty, or normals x, y, z per triangle corner (per entry of</em> <code>indices</code> <em>), for face-varying and uniform normals: hard edges without split vertices.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
 <td style="text-align: left;"><a href="#variable-indices"><strong>indices</strong></a>  <br><em>Three vertex indices per triangle.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1MeshData_1_1Level/"><strong>Level</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#variable-levels"><strong>levels</strong></a>  <br><em>Empty, or coarser levels of detail the mesh comes with, finest first, as a subdivision surface's coarser tessellations; a renderer simplifies a mesh without them itself.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-lodcornercolors"><strong>lodCornerColors</strong></a>  <br><em>Empty, or r, g, b per entry of</em> <code>lodIndices</code> <em>(with</em><code>cornerColors</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-lodcornernormals"><strong>lodCornerNormals</strong></a>  <br><em>Empty, or x, y, z per entry of</em> <code>lodIndices</code> <em>(with</em><code>cornerNormals</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; std::uint32_t &gt;</td>
+<td style="text-align: left;"><a href="#variable-lodindices"><strong>lodIndices</strong></a>  <br><em>The levels' triangles, three indices of</em> <code>points</code> <em>each.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::vector&lt; float &gt;</td>
+<td style="text-align: left;"><a href="#variable-loduvs"><strong>lodUvs</strong></a>  <br><em>Empty, or s, t per entry of</em> <code>lodIndices</code> <em>(with</em><code>uvs</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
@@ -245,9 +209,53 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-cornercolors">variable cornerColors</h3>
+<p><em>Empty, or linear r, g, b per triangle corner (per entry of</em> <code>indices</code> <em>), for face-varying and uniform colours.</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MeshData::cornerColors;
+</code></pre>
+<p>In place of <code>colors</code>. </p>
+<hr>
+
+<h3 id="variable-cornernormals">variable cornerNormals</h3>
+<p><em>Empty, or normals x, y, z per triangle corner (per entry of</em> <code>indices</code> <em>), for face-varying and uniform normals: hard edges without split vertices.</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MeshData::cornerNormals;
+</code></pre>
+<p>In place of <code>normals</code>. </p>
+<hr>
+
 <h3 id="variable-indices">variable indices</h3>
 <p><em>Three vertex indices per triangle.</em> </p>
 <pre><code class="language-C++">std::vector&lt;std::uint32_t&gt; ernie::MeshData::indices;
+</code></pre>
+<hr>
+
+<h3 id="variable-levels">variable levels</h3>
+<p><em>Empty, or coarser levels of detail the mesh comes with, finest first, as a subdivision surface's coarser tessellations; a renderer simplifies a mesh without them itself.</em> </p>
+<pre><code class="language-C++">std::vector&lt;Level&gt; ernie::MeshData::levels;
+</code></pre>
+<hr>
+
+<h3 id="variable-lodcornercolors">variable lodCornerColors</h3>
+<p><em>Empty, or r, g, b per entry of</em> <code>lodIndices</code> <em>(with</em><code>cornerColors</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MeshData::lodCornerColors;
+</code></pre>
+<hr>
+
+<h3 id="variable-lodcornernormals">variable lodCornerNormals</h3>
+<p><em>Empty, or x, y, z per entry of</em> <code>lodIndices</code> <em>(with</em><code>cornerNormals</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MeshData::lodCornerNormals;
+</code></pre>
+<hr>
+
+<h3 id="variable-lodindices">variable lodIndices</h3>
+<p><em>The levels' triangles, three indices of</em> <code>points</code> <em>each.</em></p>
+<pre><code class="language-C++">std::vector&lt;std::uint32_t&gt; ernie::MeshData::lodIndices;
+</code></pre>
+<hr>
+
+<h3 id="variable-loduvs">variable lodUvs</h3>
+<p><em>Empty, or s, t per entry of</em> <code>lodIndices</code> <em>(with</em><code>uvs</code> <em>).</em></p>
+<pre><code class="language-C++">std::vector&lt;float&gt; ernie::MeshData::lodUvs;
 </code></pre>
 <hr>
 

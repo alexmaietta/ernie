@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" >Python</a>
@@ -284,6 +205,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            add_temperature_model (ernie.Renderer.add_temperature_model)" href="#ernie.Renderer.add_temperature_model">add_temperature_model</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Registers a temperature model written in Slang, for materials to name in ernie:thermal:model: struct <code>type_name</code> in module <code>slang</code> (which may <code>import temperature_model;</code>) implementing ITemperatureModel, whose <code>float kelvin(TemperatureInput input, TemperatureParams p)</code> gives a pixel's temperature from its point and normal, the sunlight on it, the material's absorptivity, emissivity and own temperature, and the time. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; materials set them in ernie:thermal:model:params, read with p.get(i), and ernie:thermal:model:data is p.data(i). Built in: "balance" and "diurnal". Raises ValueError for an invalid model or one that fails to compile, with the compiler's diagnostics.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            backends
 
 
@@ -321,6 +250,14 @@
               </td>
             </tr>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            evict_textures (ernie.Renderer.evict_textures)" href="#ernie.Renderer.evict_textures">evict_textures</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Drops every texture the materials read, so the next render loads them afresh; with <code>cache</code>, their copies in the texture cache too.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            has_light_pattern (ernie.Renderer.has_light_pattern)" href="#ernie.Renderer.has_light_pattern">has_light_pattern</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -333,6 +270,14 @@
               <td>
                 <div class="doc-md-description">
                   <p>Maps array <code>array</code> ("points", "ends", "values", "colors", "sizes", "worlds"...) of batch <code>batch</code> of overlay <code>overlay</code> for writing in place on the GPU, without copies: a CUDA array over the renderer's own memory for it, holding its values, which the batch now holds. Write into it on <code>stream</code> (which first waits for frames already submitted); the next frames draw it. The batch must have been drawn once. Map again every step (the same memory, no copy), so the stream waits for the frames still reading it.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            pick_overlay (ernie.Renderer.pick_overlay)" href="#ernie.Renderer.pick_overlay">pick_overlay</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The overlay item the viewer's last frame drew at pixel (<code>x</code>, <code>y</code>) (an <code>OverlayHit</code>), or None. Waits for the device, so for clicks rather than every frame.</p>
                 </div>
               </td>
             </tr>
@@ -389,6 +334,14 @@
               <td>
                 <div class="doc-md-description">
                   <p>Vulkan validation messages since the last call.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            wait_for_textures (ernie.Renderer.wait_for_textures)" href="#ernie.Renderer.wait_for_textures">wait_for_textures</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Syncs <code>scene</code> and waits up to <code>timeout</code> seconds (none: as long as it takes) for the textures its materials read to load in the background, for a program that renders only once none is missing; returns what is still loading or failed.</p>
                 </div>
               </td>
             </tr>
@@ -759,6 +712,32 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Renderer.add_temperature_model" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_temperature_model</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">add_temperature_model(
+    id: str,
+    type_name: str,
+    slang: str,
+    params: object | None = None,
+    name: str = "",
+    description: str = "",
+) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Registers a temperature model written in Slang, for materials to name in ernie:thermal:model: struct <code>type_name</code> in module <code>slang</code> (which may <code>import temperature_model;</code>) implementing ITemperatureModel, whose <code>float kelvin(TemperatureInput input, TemperatureParams p)</code> gives a pixel's temperature from its point and normal, the sunlight on it, the material's absorptivity, emissivity and own temperature, and the time. <code>params</code> is {name: default} in order, or a list of {"name", "default", "description"}; materials set them in ernie:thermal:model:params, read with p.get(i), and ernie:thermal:model:data is p.data(i). Built in: "balance" and "diurnal". Raises ValueError for an invalid model or one that fails to compile, with the compiler's diagnostics.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Renderer.backends" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">backends</span>
 
@@ -843,6 +822,25 @@
 <div class="doc doc-object doc-function">
 
 
+<h3 id="ernie.Renderer.evict_textures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">evict_textures</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">evict_textures(cache: bool = False) -&gt; None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Drops every texture the materials read, so the next render loads them afresh; with <code>cache</code>, their copies in the texture cache too.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="ernie.Renderer.has_light_pattern" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">has_light_pattern</span>
 
@@ -874,6 +872,25 @@
     <div class="doc doc-contents ">
 
         <p>Maps array <code>array</code> ("points", "ends", "values", "colors", "sizes", "worlds"...) of batch <code>batch</code> of overlay <code>overlay</code> for writing in place on the GPU, without copies: a CUDA array over the renderer's own memory for it, holding its values, which the batch now holds. Write into it on <code>stream</code> (which first waits for frames already submitted); the next frames draw it. The batch must have been drawn once. Map again every step (the same memory, no copy), so the stream waits for the frames still reading it.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.pick_overlay" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">pick_overlay</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">pick_overlay(scene: Scene, x: int, y: int) -&gt; OverlayHit | None</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>The overlay item the viewer's last frame drew at pixel (<code>x</code>, <code>y</code>) (an <code>OverlayHit</code>), or None. Waits for the device, so for clicks rather than every frame.</p>
 
 
     </div>
@@ -1017,6 +1034,25 @@
     <div class="doc doc-contents ">
 
         <p>Vulkan validation messages since the last call.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ernie.Renderer.wait_for_textures" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">wait_for_textures</span>
+
+
+</h3>
+<pre class="highlight"><code class="language-python doc-signature">wait_for_textures(scene: Scene, timeout: float | None = None) -&gt; TextureWait</code></pre>
+
+    <div class="doc doc-contents ">
+
+        <p>Syncs <code>scene</code> and waits up to <code>timeout</code> seconds (none: as long as it takes) for the textures its materials read to load in the background, for a program that renders only once none is missing; returns what is still loading or failed.</p>
 
 
     </div>

@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -325,6 +246,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setcellranges"><strong>SetCellRanges</strong></a> (std::uint32_t face, std::span&lt; const glm::vec2 &gt; ranges) <br><em>Widens the heights of face</em> <code>face</code> <em>'s nodes to</em><code>ranges</code> <em>, its data quads' (min, max) heights row by row (</em><code>FaceCells()</code> <em>squared): for a surface finer than the data's vertices, which it is drawn from where finer heights are paged in, rather than their bilinear blend.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-setleaves"><strong>SetLeaves</strong></a> (std::uint32_t face, std::span&lt; const glm::vec2 &gt; leaves) <br><em>Replaces the (min, max) height of every leaf of face</em> <code>face</code> <em>, min above max for a leaf without valid samples, and rebuilds that face's levels above.</em></td>
 </tr>
 <tr>
@@ -379,7 +304,7 @@
 <p><code>Select</code> runs Strugar's algorithm on all six trees, using distances to each node's <code>CubeSphereRegion</code>. Neighbouring patches, across faces too, differ by at most one level when the first range is at least <code>MinFirstRange</code>. Odd vertices of a patch morph in 3D towards the midpoint of their two neighbours on the next coarser level: along the patch's edges these are the edge's own neighbours, and for vertices odd in both directions those on the quad diagonal from (1, 0) to (0, 1). Unlike the flat terrain's slide towards lower indices, this does not depend on which way a face's grid runs, so edges between faces match, and a fully morphed patch is exactly the coarser mesh.</p>
 <p>Refinement (<code>SetRefinement</code>) adds levels finer than the data: with k extra levels each face is a grid of <code>FineCells()</code> = 2^k <code>FaceCells()</code> quads, the data's vertices every 2^k of its lines and heights between them interpolated, so the surface keeps its shape (the sphere's curvature and the data's heights) down to cells 2^k times smaller than the data's near the eye. Levels then count from the finest, a data level l being level l + k, and patches' origins are on the fine grid. A refined node's heights are its data leaf's.</p>
 <p>The body may be an ellipsoid (<code>SetRadii</code>), triaxial or not: the cube's grid stays the same in direction, a height of 0 lies on the ellipsoid along the vertex's direction (<code>BasePoint</code>), and heights rise along the ellipsoid's geodetic normal there (<code>SurfaceNormal</code>). Node regions widen by bounds on how much the surface radius and the normal's tilt can vary, so selection stays conservative.</p>
-<p>Positions on a planet need more precision than single floats. Selection works in doubles, and its frustum is relative to the eye: build it from a view-projection matrix whose view has the eye at the origin and the body frame's axes.</p>
+<p>Positions on a planet need more precision than single floats. <a href="../classernie_1_1Selection/"><strong>Selection</strong></a> works in doubles, and its frustum is relative to the eye: build it from a view-projection matrix whose view has the eye at the origin and the body frame's axes.</p>
 <p>References:
 * C. Ronchi, R. Iacono and P. S. Paolucci, "The 'Cubed Sphere': A
   New Method for the Solution of Partial Differential Equations in
@@ -586,6 +511,19 @@
     std::vector&lt; LodPatch &gt; &amp; out
 ) const
 </code></pre>
+<hr>
+
+<h3 id="function-setcellranges">function SetCellRanges</h3>
+<p><em>Widens the heights of face</em> <code>face</code> <em>'s nodes to</em><code>ranges</code> <em>, its data quads' (min, max) heights row by row (</em><code>FaceCells()</code> <em>squared): for a surface finer than the data's vertices, which it is drawn from where finer heights are paged in, rather than their bilinear blend.</em></p>
+<pre><code class="language-C++">void ernie::CubeSphereLod::SetCellRanges (
+    std::uint32_t face,
+    std::span&lt; const glm::vec2 &gt; ranges
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a count other than <code>FaceCells()</code> squared or a face out of range. </li>
+</ul>
 <hr>
 
 <h3 id="function-setleaves">function SetLeaves</h3>

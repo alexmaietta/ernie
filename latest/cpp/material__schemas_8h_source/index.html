@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -222,6 +143,16 @@
                               .doc = &quot;The reflectance model, a BrdfRegistry id; unset with a &quot;     \
                                      &quot;UsdPreviewSurface connected, \&quot;preview_surface\&quot;.&quot;,          \
                               .group = &quot;Surface&quot;}))                                                \
+    X(std::string, MaterialXFile, ::ernie::tokens::kMaterialXFile, &quot;&quot;,                             \
+      (::ernie::AttributeMeta{.label = &quot;MaterialX file&quot;,                                           \
+                              .doc = &quot;A MaterialX document (.mtlx) whose material this is, in &quot;    \
+                                     &quot;place of a network on outputs:mtlx:surface.&quot;,                \
+                              .group = &quot;MaterialX&quot;, .asset = true}))                               \
+    X(std::string, MaterialXElement, ::ernie::tokens::kMaterialXElement, &quot;&quot;,                       \
+      (::ernie::AttributeMeta{.label = &quot;MaterialX element&quot;,                                        \
+                              .doc = &quot;The material (or shader) of the file to render, by name &quot;    \
+                                     &quot;path; empty, its first renderable one.&quot;,                     \
+                              .group = &quot;MaterialX&quot;}))                                              \
     X(glm::dvec3, Albedo, ::ernie::tokens::kAlbedo, glm::dvec3(1.0),                               \
       (::ernie::AttributeMeta{.doc = &quot;Linear RGB&quot;, .group = &quot;Surface&quot;, .color = true}))            \
     X(std::vector&lt;float&gt;, Reflectance, ::ernie::tokens::kReflectance, std::vector&lt;float&gt;{},        \
@@ -245,6 +176,11 @@
                               .doc = &quot;Share of incident polarization diffuse reflection keeps, 0 &quot; \
                                      &quot;to 1; dark, single-scattering surfaces keep more.&quot;,          \
                               .group = &quot;Surface&quot;, .max = 1.0}))                                    \
+    X(double, SpeckleRoughness, ::ernie::tokens::kSpeckleRoughness, 1e-5,                          \
+      (::ernie::AttributeMeta{.label = &quot;Speckle roughness&quot;,                                        \
+                              .doc = &quot;RMS surface height, m: rough (the default) shows laser &quot;     \
+                                     &quot;speckle fully, polished (0) none.&quot;,                          \
+                              .group = &quot;Surface&quot;, .max = 1e-3}))                                   \
     X(bool, AlbedoMapEnable, ::ernie::tokens::kAlbedoMapEnable, true,                              \
       (::ernie::AttributeMeta{.label = &quot;Use albedo map&quot;, .group = &quot;Surface&quot;}))                     \
     X(::ernie::Tensor, AlbedoMap, ::ernie::tokens::kAlbedoMap, nullptr,                            \
@@ -265,6 +201,55 @@
                               .doc = &quot;Linear RGB radiance in cd/m^2 for white, without a &quot;         \
                                      &quot;UsdPreviewSurface (whose own is read then).&quot;,                \
                               .group = &quot;Surface&quot;, .color = true}))                                 \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
+      (::ernie::AttributeMeta{.label = &quot;Temperature&quot;,                                              \
+                              .doc = &quot;Kelvin; above 0 the surface glows by Planck's law times &quot;    \
+                                     &quot;its emissivity, in every band.&quot;,                             \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))                                 \
+    X(std::vector&lt;float&gt;, ThermalEmissivity, ::ernie::tokens::kThermalEmissivity,                  \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.label = &quot;Emissivity&quot;,                                               \
+                              .doc = &quot;(nm, value) pairs in [0, 1], wavelengths increasing; the &quot;   \
+                                     &quot;nearest value outside them. Unset, 1 minus the &quot;             \
+                                     &quot;reflectance (Kirchhoff).&quot;,                                   \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(::ernie::Tensor, ThermalTemperatureTexture, ::ernie::tokens::kThermalTemperatureTexture,     \
+      nullptr,                                                                                     \
+      (::ernie::AttributeMeta{.label = &quot;Temperature texture&quot;,                                      \
+                              .doc = &quot;float32 (rows, cols) or (rows, cols, 1) kelvin through &quot;     \
+                                     &quot;mesh texture coordinates, row 0 at the top, in place of &quot;    \
+                                     &quot;the temperature; 0 or below there for the temperature.&quot;,     \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(std::string, ThermalModel, ::ernie::tokens::kThermalModel, &quot;&quot;,                               \
+      (::ernie::AttributeMeta{.label = &quot;Temperature model&quot;,                                        \
+                              .doc = &quot;A temperature model computing its pixels' temperature as &quot;   \
+                                     &quot;they render: balance (zero-capacitance, spacecraft), &quot;       \
+                                     &quot;diurnal (a latitude and local time table, the Moon's by &quot;    \
+                                     &quot;default) or a registered one; empty for none.&quot;,              \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(std::vector&lt;float&gt;, ThermalModelParams, ::ernie::tokens::kThermalModelParams,                \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.label = &quot;Model parameters&quot;,                                         \
+                              .doc = &quot;The temperature model's parameters in its order; missing &quot;   \
+                                     &quot;ones its defaults.&quot;,                                         \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(std::vector&lt;float&gt;, ThermalModelData, ::ernie::tokens::kThermalModelData,                    \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.label = &quot;Model data&quot;,                                               \
+                              .doc = &quot;Floats the temperature model reads, such as a diurnal &quot;      \
+                                     &quot;table (DiurnalTable::ModelData).&quot;,                           \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(double, ThermalInertia, ::ernie::tokens::kThermalInertia, 0.0,                               \
+      (::ernie::AttributeMeta{.label = &quot;Thermal inertia&quot;,                                          \
+                              .doc = &quot;J m^-2 K^-1 s^-1/2, which the temperature model reads (the &quot; \
+                                     &quot;diurnal table's inertia axis); 0 for none.&quot;,                 \
+                              .group = &quot;Thermal&quot;, .min = 0.0, .max = 10000.0}))                    \
+    X(::ernie::Tensor, ThermalInertiaTexture, ::ernie::tokens::kThermalInertiaTexture, nullptr,    \
+      (::ernie::AttributeMeta{.label = &quot;Thermal inertia texture&quot;,                                  \
+                              .doc = &quot;float32 (rows, cols) or (rows, cols, 1) thermal inertia &quot;    \
+                                     &quot;through mesh texture coordinates, row 0 at the top, in &quot;     \
+                                     &quot;place of the thermal inertia where above 0.&quot;,                \
+                              .group = &quot;Thermal&quot;}))                                                \
     X(::ernie::Tensor, DetailAlbedo, ::ernie::tokens::kDetailAlbedo, nullptr,                      \
       (::ernie::AttributeMeta{.doc = &quot;float32 linear or uint8 sRGB (rows, cols, 1, 3 or 4) albedo &quot; \
                                      &quot;tiled over the surface.&quot;,                                    \
@@ -323,17 +308,61 @@
                               .doc = &quot;How what scatters spreads its light: Henyey-Greenstein by &quot;  \
                                      &quot;the anisotropy; Hapke's double Henyey-Greenstein by the b &quot;  \
                                      &quot;and c a Hapke surface reads (inputs:b, inputs:c), so dust &quot;  \
-                                     &quot;and the regolith it rose from scatter alike; Rayleigh; or &quot;  \
-                                     &quot;isotropic.&quot;,                                                 \
+                                     &quot;and the regolith it rose from scatter alike; Rayleigh; &quot;     \
+                                     &quot;isotropic; or cloud droplets' Mie scattering by their &quot;      \
+                                     &quot;radius and spread, with clouds' silver linings, fogbows &quot;    \
+                                     &quot;and glories.&quot;,                                               \
                               .group = &quot;Volume&quot;,                                                   \
                               .options = {::ernie::tokens::kHenyeyGreenstein,                      \
                                           ::ernie::tokens::kDoubleHenyeyGreenstein,                \
+                                          ::ernie::tokens::kDualHenyeyGreenstein,                  \
                                           ::ernie::tokens::kRayleigh,                              \
-                                          ::ernie::tokens::kIsotropic}}))                          \
+                                          ::ernie::tokens::kIsotropic,                             \
+                                          ::ernie::tokens::kCloudDroplets}}))                      \
+    X(double, DropletRadius, ::ernie::tokens::kVolumeDropletRadius, 7.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Droplet radius (um)&quot;,                                      \
+                              .doc = &quot;Cloud droplets' effective radius, micrometres: about 5 to &quot;  \
+                                     &quot;10 in stratus, 10 to 15 in cumulus; larger droplets &quot;        \
+                                     &quot;scatter more forwards and tighten the glory.&quot;,               \
+                              .group = &quot;Volume&quot;, .min = 1.0, .max = 30.0}))                        \
+    X(double, DropletSpread, ::ernie::tokens::kVolumeDropletSpread, 2.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Droplet spread&quot;,                                           \
+                              .doc = &quot;The gamma of their size distribution: larger, more alike &quot;   \
+                                     &quot;in size, their fogbow and glory more coloured.&quot;,             \
+                              .group = &quot;Volume&quot;, .min = 0.5, .max = 20.0}))                        \
+    X(double, SurfaceDensity, ::ernie::tokens::kVolumeSurfaceDensity, 0.1,                         \
+      (::ernie::AttributeMeta{.label = &quot;Surface density&quot;,                                          \
+                              .doc = &quot;Cloud droplets' surface, the density field's value where &quot;   \
+                                     &quot;it begins, for multiple scattering by collectors: their &quot;    \
+                                     &quot;light found where it entered there.&quot;,                        \
+                              .group = &quot;Volume&quot;, .min = 0.0}))                                     \
     X(double, Anisotropy, ::ernie::tokens::kVolumeAnisotropy, 0.0,                                 \
       (::ernie::AttributeMeta{.doc = &quot;Henyey-Greenstein g: above 0 scatters forwards, below 0 &quot;    \
                                      &quot;backwards.&quot;,                                                 \
                               .group = &quot;Volume&quot;, .min = -0.99, .max = 0.99}))                      \
+    X(double, SecondAnisotropy, ::ernie::tokens::kVolumeSecondAnisotropy, -0.2,                    \
+      (::ernie::AttributeMeta{.label = &quot;Second anisotropy&quot;,                                        \
+                              .doc = &quot;The dual Henyey-Greenstein phase function's second lobe's &quot;  \
+                                     &quot;g, backwards below 0 (clouds' 0.7 and -0.2 by halves, &quot;      \
+                                     &quot;three-geospatial's).&quot;,                                       \
+                              .group = &quot;Volume&quot;, .min = -0.99, .max = 0.99}))                      \
+    X(double, LobeMix, ::ernie::tokens::kVolumeLobeMix, 0.5,                                       \
+      (::ernie::AttributeMeta{.label = &quot;Lobe mix&quot;,                                                 \
+                              .doc = &quot;The second lobe's share of the dual Henyey-Greenstein &quot;      \
+                                     &quot;phase function.&quot;,                                            \
+                              .group = &quot;Volume&quot;, .min = 0.0, .max = 1.0}))                         \
+    X(double, Powder, ::ernie::tokens::kVolumePowder, 0.0,                                         \
+      (::ernie::AttributeMeta{.label = &quot;Powder&quot;,                                                   \
+                              .doc = &quot;The powder effect's strength: light scattered in dimmed by &quot; \
+                                     &quot;1 - powder e^(-sigma length), darkening thin edges facing &quot;  \
+                                     &quot;the light as light scattered many times has yet to build &quot;   \
+                                     &quot;up there (Schneider and Vos 2015). 0, none.&quot;,                \
+                              .group = &quot;Volume&quot;, .min = 0.0, .max = 1.0}))                         \
+    X(double, PowderLength, ::ernie::tokens::kVolumePowderLength, 150.0,                           \
+      (::ernie::AttributeMeta{.label = &quot;Powder length&quot;,                                            \
+                              .doc = &quot;The powder effect's length (world units) times the &quot;         \
+                                     &quot;extinction: over how much medium it fades.&quot;,                 \
+                              .group = &quot;Volume&quot;, .min = 0.0}))                                     \
     X(int, ScatteringOctaves, ::ernie::tokens::kVolumeScatteringOctaves, 1,                        \
       (::ernie::AttributeMeta{.doc = &quot;Orders of scattering approximated, after Wrenninge et al. &quot;  \
                                      &quot;(2013): 1 is single scattering; dense media such as clouds &quot; \
@@ -390,12 +419,15 @@
 #define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
     X(std::string, InfoId, ::ernie::tokens::kInfoId, &quot;&quot;,                                           \
       (::ernie::AttributeMeta{.label = &quot;Shader&quot;,                                                   \
-                              .doc = &quot;The shader's type; Ernie reads the four below.&quot;,             \
+                              .doc = &quot;The shader's type; Ernie reads the seven below.&quot;,            \
                               .group = &quot;Shader&quot;,                                                   \
                               .options = {::ernie::tokens::kUsdPreviewSurface,                     \
                                           ::ernie::tokens::kUsdUVTexture,                          \
                                           ::ernie::tokens::kUsdPrimvarReaderFloat2,                \
-                                          ::ernie::tokens::kUsdTransform2d}}))                     \
+                                          ::ernie::tokens::kUsdTransform2d,                        \
+                                          ::ernie::tokens::kErnieThermal,                          \
+                                          ::ernie::tokens::kUsdPrimvarReaderFloat,                 \
+                                          ::ernie::tokens::kUsdPrimvarReaderFloat3}}))             \
     X(glm::dvec3, DiffuseColor, ::ernie::tokens::kDiffuseColor, glm::dvec3(0.18),                  \
       (::ernie::AttributeMeta{.label = &quot;Diffuse colour&quot;, .doc = &quot;Linear RGB albedo.&quot;,              \
                               .group = &quot;Preview surface&quot;, .color = true}))                         \
@@ -447,6 +479,13 @@
       (::ernie::AttributeMeta{.label = &quot;Colour space&quot;,                                             \
                               .doc = &quot;auto: sRGB for 8-bit images, raw otherwise.&quot;,                \
                               .group = &quot;Texture&quot;, .options = {&quot;auto&quot;, &quot;raw&quot;, &quot;sRGB&quot;}}))            \
+    X(std::string, VirtualTexture, ::ernie::tokens::kVirtualTexture, &quot;auto&quot;,                       \
+      (::ernie::AttributeMeta{.label = &quot;Virtual&quot;,                                                  \
+                              .doc = &quot;Only the tiles in view resident, for textures past device &quot;  \
+                                     &quot;memory or image size (DDS or KTX2 with every mip, devices &quot;  \
+                                     &quot;with sparse residency). auto: albedo textures over 8192 &quot;    \
+                                     &quot;texels a side.&quot;,                                             \
+                              .group = &quot;Texture&quot;, .options = {&quot;auto&quot;, &quot;on&quot;, &quot;off&quot;}}))              \
     X(glm::dvec4, Bias, ::ernie::tokens::kShaderBias, glm::dvec4(0.0),                             \
       (::ernie::AttributeMeta{.doc = &quot;Added to the texture's linear values after its scale.&quot;,      \
                               .group = &quot;Texture&quot;}))                                                \
@@ -457,8 +496,34 @@
       (::ernie::AttributeMeta{.doc = &quot;Added after the rotation.&quot;, .group = &quot;Transform 2D&quot;}))       \
     X(std::string, Varname, ::ernie::tokens::kVarname, &quot;st&quot;,                                       \
       (::ernie::AttributeMeta{.label = &quot;Primvar&quot;,                                                  \
-                              .doc = &quot;The mesh primvar of the texture coordinates.&quot;,               \
-                              .group = &quot;Primvar reader&quot;}))
+                              .doc = &quot;The mesh primvar it reads: texture coordinates, or the &quot;     \
+                                     &quot;colours a diffuse colour takes (float, float3 readers).&quot;,    \
+                              .group = &quot;Primvar reader&quot;}))                                         \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperatureInput, 0.0,                  \
+      (::ernie::AttributeMeta{.label = &quot;Temperature&quot;,                                              \
+                              .doc = &quot;Kelvin, 0 for none; connectable to one channel of a &quot;        \
+                                     &quot;UsdUVTexture, kelvin after its scale and bias.&quot;,             \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))                                 \
+    X(double, ThermalEmissivity, ::ernie::tokens::kThermalEmissivityInput, -1.0,                   \
+      (::ernie::AttributeMeta{.label = &quot;Emissivity&quot;,                                               \
+                              .doc = &quot;0 to 1 at every wavelength; below 0, 1 minus the &quot;           \
+                                     &quot;reflectance (Kirchhoff).&quot;,                                   \
+                              .group = &quot;Thermal&quot;, .min = -1.0, .max = 1.0}))                       \
+    X(double, ThermalInertia, ::ernie::tokens::kThermalInertiaInput, 0.0,                          \
+      (::ernie::AttributeMeta{.label = &quot;Thermal inertia&quot;,                                          \
+                              .doc = &quot;J m^-2 K^-1 s^-1/2 for the temperature model, 0 for none; &quot;  \
+                                     &quot;connectable to one channel of a UsdUVTexture.&quot;,              \
+                              .group = &quot;Thermal&quot;, .min = 0.0, .max = 10000.0}))                    \
+    X(std::string, ThermalModel, ::ernie::tokens::kThermalModelInput, &quot;&quot;,                          \
+      (::ernie::AttributeMeta{.label = &quot;Temperature model&quot;,                                        \
+                              .doc = &quot;As the Material's ernie:thermal:model.&quot;,                     \
+                              .group = &quot;Thermal&quot;}))                                                \
+    X(std::vector&lt;float&gt;, ThermalModelParams, ::ernie::tokens::kThermalModelParamsInput,           \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.label = &quot;Model parameters&quot;, .group = &quot;Thermal&quot;}))                   \
+    X(std::vector&lt;float&gt;, ThermalModelData, ::ernie::tokens::kThermalModelDataInput,               \
+      std::vector&lt;float&gt;{},                                                                        \
+      (::ernie::AttributeMeta{.label = &quot;Model data&quot;, .group = &quot;Thermal&quot;}))
 
 #define ERNIE_MATERIAL_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_MATERIAL_ATTRIBUTES(X)
 #define ERNIE_SHADER_ALL(X) ERNIE_IMAGEABLE_ATTRIBUTES(X) ERNIE_SHADER_ATTRIBUTES(X)

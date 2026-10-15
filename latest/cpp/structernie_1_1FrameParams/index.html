@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -244,10 +165,6 @@
 <td style="text-align: left;"><a href="#variable-atmosphere"><strong>atmosphere</strong></a>  <br><em>The planet's atmosphere.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1BodyParams/"><strong>BodyParams</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#variable-bodies"><strong>bodies</strong></a>  <br><em>Bodies such as moons, at most</em> <code>kMaxBodies</code> <em>.</em></td>
-</tr>
-<tr>
 <td style="text-align: right;"><a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a></td>
 <td style="text-align: left;"><a href="#variable-camera"><strong>camera</strong></a>  <br><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em></td>
 </tr>
@@ -294,6 +211,10 @@
 <tr>
 <td style="text-align: right;">std::uint64_t</td>
 <td style="text-align: left;"><a href="#variable-frame"><strong>frame</strong></a>   = <code>0</code><br><em>The frame number temporal noise derives from (</em> <code>FrameSeed</code> <em>): rendering the same frame again gives the same image, and consecutive frames independent noise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-halfradiance"><strong>halfRadiance</strong></a>   = <code>false</code><br><em>Whether each band's radiance is kept as 16-bit floats between shading and the sensor (</em> <code>tokens::kSpectralPrecision</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1LightParams/"><strong>LightParams</strong></a> &gt;</td>
@@ -368,6 +289,14 @@
 <td style="text-align: left;"><a href="#variable-stream"><strong>stream</strong></a>   = <code>0</code><br><em>Decorrelates images rendered with the same seed and frame, such as the products of one step:</em> <code>StreamOf</code> <em>the render product's path.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-textureloadingdebug"><strong>textureLoadingDebug</strong></a>   = <code>false</code><br><em>Surfaces coloured by their textures' loading (</em> <code>ernie:textureLoading:debug</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../structernie_1_1ThermalSettings/"><strong>ThermalSettings</strong></a></td>
+<td style="text-align: left;"><a href="#variable-thermal"><strong>thermal</strong></a>  <br><em>Thermal emission (</em> <code>ernie:thermal:*</code> <em>).</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-time"><strong>time</strong></a>   = <code>0.0</code><br><em>The frame on the sensor clock (</em> <code>RenderDelegate::Time</code> <em>), seconds: it ends at</em><code>time</code> <em>, its frame-relative time 0, and starts at</em><code>startTime</code> <em>, the last frame's end, -1.</em></td>
 </tr>
@@ -398,21 +327,6 @@
 <tr>
 <td style="text-align: right;">std::vector&lt; std::int32_t &gt;</td>
 <td style="text-align: left;"><a href="#variable-worlds"><strong>worlds</strong></a>  <br><em>The world each view sees (</em> <code>tokens::kWorld</code> <em>): its own and the shared one, or every world for -1; empty for every view seeing every world.</em></td>
-</tr>
-</tbody>
-</table>
-<h2 id="public-static-attributes">Public Static Attributes</h2>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Type</th>
-<th style="text-align: left;">Name</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;">constexpr std::size_t</td>
-<td style="text-align: left;"><a href="#variable-kmaxbodies"><strong>kMaxBodies</strong></a>   = <code>4</code><br></td>
 </tr>
 </tbody>
 </table>
@@ -507,12 +421,6 @@
 </code></pre>
 <hr>
 
-<h3 id="variable-bodies">variable bodies</h3>
-<p><em>Bodies such as moons, at most</em> <code>kMaxBodies</code> <em>.</em></p>
-<pre><code class="language-C++">std::vector&lt;BodyParams&gt; ernie::FrameParams::bodies;
-</code></pre>
-<hr>
-
 <h3 id="variable-camera">variable camera</h3>
 <p><em>The camera: pose, projection, spectral bands, exposure, lens and sensor.</em> </p>
 <pre><code class="language-C++">CameraParams ernie::FrameParams::camera;
@@ -579,6 +487,12 @@
 <h3 id="variable-frame">variable frame</h3>
 <p><em>The frame number temporal noise derives from (</em> <code>FrameSeed</code> <em>): rendering the same frame again gives the same image, and consecutive frames independent noise.</em></p>
 <pre><code class="language-C++">std::uint64_t ernie::FrameParams::frame;
+</code></pre>
+<hr>
+
+<h3 id="variable-halfradiance">variable halfRadiance</h3>
+<p><em>Whether each band's radiance is kept as 16-bit floats between shading and the sensor (</em> <code>tokens::kSpectralPrecision</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::halfRadiance;
 </code></pre>
 <hr>
 
@@ -691,6 +605,18 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-textureloadingdebug">variable textureLoadingDebug</h3>
+<p><em>Surfaces coloured by their textures' loading (</em> <code>ernie:textureLoading:debug</code> <em>).</em></p>
+<pre><code class="language-C++">bool ernie::FrameParams::textureLoadingDebug;
+</code></pre>
+<hr>
+
+<h3 id="variable-thermal">variable thermal</h3>
+<p><em>Thermal emission (</em> <code>ernie:thermal:*</code> <em>).</em></p>
+<pre><code class="language-C++">ThermalSettings ernie::FrameParams::thermal;
+</code></pre>
+<hr>
+
 <h3 id="variable-time">variable time</h3>
 <p><em>The frame on the sensor clock (</em> <code>RenderDelegate::Time</code> <em>), seconds: it ends at</em><code>time</code> <em>, its frame-relative time 0, and starts at</em><code>startTime</code> <em>, the last frame's end, -1.</em></p>
 <pre><code class="language-C++">double ernie::FrameParams::time;
@@ -736,11 +662,6 @@
 <h3 id="variable-worlds">variable worlds</h3>
 <p><em>The world each view sees (</em> <code>tokens::kWorld</code> <em>): its own and the shared one, or every world for -1; empty for every view seeing every world.</em></p>
 <pre><code class="language-C++">std::vector&lt;std::int32_t&gt; ernie::FrameParams::worlds;
-</code></pre>
-<hr>
-<h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
-<h3 id="variable-kmaxbodies">variable kMaxBodies</h3>
-<pre><code class="language-C++">constexpr std::size_t ernie::FrameParams::kMaxBodies;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>

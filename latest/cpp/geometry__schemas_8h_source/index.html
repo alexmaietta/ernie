@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -227,12 +148,14 @@
     X(std::string, Tessellation, ::ernie::tokens::kTessellation, ::ernie::tokens::kUvSphere,       \
       (::ernie::AttributeMeta{.doc = &quot;uv: latitude rings and meridians; icosphere: a divided &quot;     \
                                      &quot;icosahedron; cubeSphere: a cube's faces as planet &quot;          \
-                                     &quot;Terrains'; healpix: HEALPix's equal-area pixels. Each &quot;      \
-                                     &quot;has equirectangular texture coordinates.&quot;,                   \
+                                     &quot;Terrains'; healpix: HEALPix's equal-area pixels; adaptive: &quot; \
+                                     &quot;a planet's cube-sphere LOD, finer towards the eye, exact &quot;   \
+                                     &quot;at any scale (raster; a cube sphere elsewhere). Each has &quot;   \
+                                     &quot;equirectangular texture coordinates.&quot;,                       \
                               .group = &quot;Shape&quot;,                                                    \
                               .options = {::ernie::tokens::kUvSphere, ::ernie::tokens::kIcosphere, \
-                                          ::ernie::tokens::kCubeSphere,                            \
-                                          ::ernie::tokens::kHealpix}}))                            \
+                                          ::ernie::tokens::kCubeSphere, ::ernie::tokens::kHealpix, \
+                                          ::ernie::tokens::kAdaptiveSphere}}))                     \
     X(int, TessellationLevel, ::ernie::tokens::kTessellationLevel, 0,                              \
       (::ernie::AttributeMeta{.label = &quot;Level&quot;, .doc = &quot;UV stacks, icosphere subdivisions, cube &quot;  \
                                      &quot;quads a face edge or HEALPix N_side; 0 for some 2,000 to &quot;   \
@@ -282,8 +205,11 @@
                               .group = &quot;Geometry&quot;, .integer = true,                                \
                               .dirty = ::ernie::Dirty::Topology}))                                 \
     X(::ernie::Tensor, Normals, ::ernie::tokens::kNormals, nullptr,                                \
-      (::ernie::AttributeMeta{.doc = &quot;(n, 3) normals, one per point; ignored when of another &quot;     \
-                                     &quot;count.&quot;,                                                     \
+      (::ernie::AttributeMeta{.doc = &quot;(n, 3) normals: one per point, or per face vertex, face or &quot;  \
+                                     &quot;mesh (normals:interpolation as USD's, else by count) for &quot;   \
+                                     &quot;hard edges; primvars:normals, perhaps indexed, in their &quot;    \
+                                     &quot;place; ignored when of another count. Without them, smooth &quot; \
+                                     &quot;ones from the triangles, computed on the GPU.&quot;,              \
                               .group = &quot;Geometry&quot;, .dirty = ::ernie::Dirty::Points}))              \
     X(::ernie::Tensor, ActiveCounts, ::ernie::tokens::kActiveCounts, nullptr,                      \
       (::ernie::AttributeMeta{.doc = &quot;int32 (n &gt;= 2,): the points and triangle indices in use, &quot;   \
@@ -291,7 +217,131 @@
                                      &quot;topology that changes on the GPU within their capacity, &quot;    \
                                      &quot;as simulators count them (more entries are ignored); read &quot;  \
                                      &quot;on the GPU, the rest neither drawn nor bounded.&quot;,            \
-                              .group = &quot;Geometry&quot;, .integer = true}))
+                              .group = &quot;Geometry&quot;, .integer = true}))                              \
+    X(std::string, SubdivisionScheme, ::ernie::tokens::kSubdivisionScheme, ::ernie::tokens::kNone, \
+      (::ernie::AttributeMeta{.label = &quot;Subdivision&quot;,                                              \
+                              .doc = &quot;The surface the faces are the control mesh of, refined by &quot;  \
+                                     &quot;OpenSubdiv; none draws the faces themselves (USD's &quot;         \
+                                     &quot;fallback is catmullClark, which import keeps). Normals are &quot; \
+                                     &quot;the surface's, not the authored ones. Points written on &quot;    \
+                                     &quot;the GPU draw the control mesh.&quot;,                             \
+                              .group = &quot;Subdivision&quot;,                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kCatmullClark,  \
+                                          ::ernie::tokens::kLoop, ::ernie::tokens::kBilinear},     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(int, RefineLevel, ::ernie::tokens::kRefineLevel, -1,                                         \
+      (::ernie::AttributeMeta{.label = &quot;Refine level&quot;,                                             \
+                              .doc = &quot;2^level segments along each control edge; -1 for the &quot;       \
+                                     &quot;stage's ernie:subdivision:refineLevel.&quot;,                     \
+                              .group = &quot;Subdivision&quot;, .min = -1.0, .max = 8.0,                     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, InterpolateBoundary, ::ernie::tokens::kInterpolateBoundary,                     \
+      ::ernie::tokens::kEdgeAndCorner,                                                             \
+      (::ernie::AttributeMeta{.doc = &quot;How boundary edges and corners are interpolated.&quot;,           \
+                              .group = &quot;Subdivision&quot;,                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kEdgeOnly,      \
+                                          ::ernie::tokens::kEdgeAndCorner},                        \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, FaceVaryingLinearInterpolation,                                                 \
+      ::ernie::tokens::kFaceVaryingLinearInterpolation, ::ernie::tokens::kCornersPlus1,            \
+      (::ernie::AttributeMeta{.doc = &quot;Where texture coordinates stay linear, not smoothed: none &quot;  \
+                                     &quot;smooths them everywhere, all keeps them linear.&quot;,            \
+                              .group = &quot;Subdivision&quot;,                                              \
+                              .options = {::ernie::tokens::kNone, ::ernie::tokens::kCornersOnly,   \
+                                          ::ernie::tokens::kCornersPlus1,                          \
+                                          ::ernie::tokens::kCornersPlus2,                          \
+                                          ::ernie::tokens::kBoundaries, ::ernie::tokens::kAll},    \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::string, TriangleSubdivisionRule, ::ernie::tokens::kTriangleSubdivisionRule,             \
+      ::ernie::tokens::kCatmullClark,                                                              \
+      (::ernie::AttributeMeta{.doc = &quot;Catmull-Clark's weights for triangles, or smoother ones.&quot;,   \
+                              .group = &quot;Subdivision&quot;,                                              \
+                              .options = {::ernie::tokens::kCatmullClark,                          \
+                                          ::ernie::tokens::kSmooth},                               \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseIndices, ::ernie::tokens::kCreaseIndices, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = &quot;Integer point indices of crease chains, one after another.&quot;, \
+                              .group = &quot;Subdivision&quot;, .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseLengths, ::ernie::tokens::kCreaseLengths, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = &quot;Integer number of points of each crease chain.&quot;,             \
+                              .group = &quot;Subdivision&quot;, .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CreaseSharpnesses, ::ernie::tokens::kCreaseSharpnesses, nullptr,            \
+      (::ernie::AttributeMeta{.doc = &quot;Sharpness of each crease, or of each crease edge; 10 or &quot;    \
+                                     &quot;more is infinitely sharp.&quot;,                                  \
+                              .group = &quot;Subdivision&quot;, .dirty = ::ernie::Dirty::Topology}))         \
+    X(::ernie::Tensor, CornerIndices, ::ernie::tokens::kCornerIndices, nullptr,                    \
+      (::ernie::AttributeMeta{.doc = &quot;Integer indices of sharp corner points.&quot;,                    \
+                              .group = &quot;Subdivision&quot;, .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, CornerSharpnesses, ::ernie::tokens::kCornerSharpnesses, nullptr,            \
+      (::ernie::AttributeMeta{.doc = &quot;Sharpness of each corner.&quot;, .group = &quot;Subdivision&quot;,          \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, HoleIndices, ::ernie::tokens::kHoleIndices, nullptr,                        \
+      (::ernie::AttributeMeta{.doc = &quot;Integer indices of faces left out of the surface.&quot;,          \
+                              .group = &quot;Subdivision&quot;, .integer = true,                             \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Path, Skeleton, ::ernie::tokens::kSkelSkeleton, ::ernie::Path(),                    \
+      (::ernie::AttributeMeta{.doc = &quot;The Skeleton skinning it; unset, it is not skinned.&quot;,        \
+                              .group = &quot;Skinning&quot;, .options = {::ernie::tokens::kSkeleton},        \
+                              .dirty = ::ernie::Dirty::Topology,                                   \
+                              .targetDirty = ::ernie::Dirty::Points}))                                 \
+    X(std::vector&lt;std::string&gt;, SkelJoints, ::ernie::tokens::kSkelJoints,                          \
+      std::vector&lt;std::string&gt;{},                                                                  \
+      (::ernie::AttributeMeta{.doc = &quot;The Skeleton's joints its joint indices count, in their &quot;    \
+                                     &quot;order; unset, all of them in the Skeleton's order.&quot;,         \
+                              .group = &quot;Skinning&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(::ernie::Tensor, JointIndices, ::ernie::tokens::kSkelJointIndices, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = &quot;Integer (points, k) joints influencing each point, or &quot;      \
+                                     &quot;(1, k) for all points (rigid).&quot;,                             \
+                              .group = &quot;Skinning&quot;, .integer = true,                                \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, JointWeights, ::ernie::tokens::kSkelJointWeights, nullptr,                  \
+      (::ernie::AttributeMeta{.doc = &quot;(points, k) or (1, k) weights of the joint indices.&quot;,        \
+                              .group = &quot;Skinning&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(glm::dmat4, GeomBindTransform, ::ernie::tokens::kSkelGeomBindTransform, glm::dmat4(1.0),     \
+      (::ernie::AttributeMeta{.doc = &quot;Places its points in the Skeleton's space when bound.&quot;,      \
+                              .group = &quot;Skinning&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(std::string, SkinningMethod, ::ernie::tokens::kSkelSkinningMethod,                           \
+      ::ernie::tokens::kClassicLinear,                                                             \
+      (::ernie::AttributeMeta{.doc = &quot;How joint transforms blend: linearly, or as dual &quot;           \
+                                     &quot;quaternions, which keep volume at twisting joints.&quot;,         \
+                              .group = &quot;Skinning&quot;,                                                 \
+                              .options = {::ernie::tokens::kClassicLinear,                         \
+                                          ::ernie::tokens::kDualQuaternion},                       \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(std::vector&lt;std::string&gt;, SkelBlendShapes, ::ernie::tokens::kSkelBlendShapes,                \
+      std::vector&lt;std::string&gt;{},                                                                  \
+      (::ernie::AttributeMeta{.doc = &quot;Its names for its blend shapes, as animations weight them.&quot;, \
+                              .group = &quot;Skinning&quot;, .dirty = ::ernie::Dirty::Topology}))            \
+    X(std::vector&lt;::ernie::Path&gt;, BlendShapeTargets, ::ernie::tokens::kSkelBlendShapeTargets,      \
+      std::vector&lt;::ernie::Path&gt;{},                                                                \
+      (::ernie::AttributeMeta{.doc = &quot;The BlendShape prim of each name.&quot;, .group = &quot;Skinning&quot;,     \
+                              .dirty = ::ernie::Dirty::Topology}))                                 \
+    X(::ernie::Tensor, ThermalTemperatures, ::ernie::tokens::kThermalTemperatures, nullptr,        \
+      (::ernie::AttributeMeta{.label = &quot;Temperatures&quot;,                                             \
+                              .doc = &quot;float32 (n,) kelvin, one per point, on the CPU or a CUDA &quot;   \
+                                     &quot;device, as a thermal solver writes them back each step: &quot;    \
+                                     &quot;with thermal emission on, in place of the prim's own and &quot;   \
+                                     &quot;its material's, interpolated across its faces; 0 at a &quot;      \
+                                     &quot;point for those.&quot;,                                           \
+                              .group = &quot;Thermal&quot;, .dirty = ::ernie::Dirty::Points}))              \
+    X(::ernie::Tensor, ThermalNodeIds, ::ernie::tokens::kThermalNodeIds, nullptr,                  \
+      (::ernie::AttributeMeta{.label = &quot;Node ids&quot;,                                                 \
+                              .doc = &quot;int32 (n,), each point's node in a thermal network, whose &quot;  \
+                                     &quot;temperatures the node temperatures give; a face takes its &quot;  \
+                                     &quot;own node where its points are its own.&quot;,                     \
+                              .group = &quot;Thermal&quot;, .integer = true,                                 \
+                              .dirty = ::ernie::Dirty::Points}))                                   \
+    X(::ernie::Tensor, ThermalNodeTemperatures, ::ernie::tokens::kThermalNodeTemperatures,         \
+      nullptr,                                                                                     \
+      (::ernie::AttributeMeta{.label = &quot;Node temperatures&quot;,                                        \
+                              .doc = &quot;float32 (nodes,) kelvin per node of the node ids, on the &quot;   \
+                                     &quot;CPU or a CUDA device, as a thermal network's solver writes &quot; \
+                                     &quot;them each step; the points' own temperatures, when given, &quot;  \
+                                     &quot;come first.&quot;,                                                \
+                              .group = &quot;Thermal&quot;, .dirty = ::ernie::Dirty::Points}))
 
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
     X(::ernie::OrArray&lt;std::vector&lt;float&gt;&gt;, Widths, ::ernie::tokens::kWidths,                      \
@@ -348,7 +398,13 @@
     X(::ernie::Path, MaterialBinding, ::ernie::tokens::kMaterialBinding, ::ernie::Path(),          \
       (::ernie::AttributeMeta{.label = &quot;Material&quot;, .doc = &quot;The Material prim it is drawn with.&quot;,   \
                               .group = &quot;Ground&quot;, .options = {::ernie::tokens::kMaterial},          \
-                              .dirty = ::ernie::Dirty::Material}))
+                              .dirty = ::ernie::Dirty::Material,                                   \
+                              .targetDirty = ::ernie::Dirty::Material}))                                 \
+    X(double, ThermalTemperature, ::ernie::tokens::kThermalTemperature, 0.0,                       \
+      (::ernie::AttributeMeta{.label = &quot;Temperature&quot;,                                              \
+                              .doc = &quot;Kelvin, in place of its material's; 0 for the &quot;              \
+                                     &quot;material's own.&quot;,                                            \
+                              .group = &quot;Thermal&quot;, .max = 5000.0}))
 
 // Every attribute of each type, its bases' first, for its accessors.
 #define ERNIE_CUBE_ALL(X) ERNIE_GPRIM_ALL(X) ERNIE_CUBE_ATTRIBUTES(X)

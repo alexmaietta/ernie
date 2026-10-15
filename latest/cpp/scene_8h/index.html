@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -207,6 +128,7 @@
 <ul>
 <li><code>#include "ernie/scene/overlay.h"</code></li>
 <li><code>#include "ernie/scene/path.h"</code></li>
+<li><code>#include "ernie/scene/time_samples.h"</code></li>
 <li><code>#include "ernie/scene/value.h"</code></li>
 <li><code>#include "ernie/scene/xform.h"</code></li>
 <li><code>#include "ernie/util/tensor.h"</code></li>
@@ -215,6 +137,8 @@
 <li><code>#include &lt;cstdint&gt;</code></li>
 <li><code>#include &lt;functional&gt;</code></li>
 <li><code>#include &lt;map&gt;</code></li>
+<li><code>#include &lt;memory&gt;</code></li>
+<li><code>#include &lt;optional&gt;</code></li>
 <li><code>#include &lt;set&gt;</code></li>
 <li><code>#include &lt;span&gt;</code></li>
 <li><code>#include &lt;string&gt;</code></li>
@@ -255,6 +179,22 @@
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Column/"><strong>Column</strong></a> <br><em>One attribute of many prims as rows of one array, as a simulation keeps its bodies' poses: written whole from any array (CPU or CUDA, DLPack, no copy), or mapped and written in place on the device asked for, each write one change (</em> <code>ColumnChange</code> <em>) whatever the number of prims.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1ColumnChange/"><strong>ColumnChange</strong></a> <br><em>One attribute of many prims written whole as rows of one tensor (</em> <code>Scene::Write</code> <em>of a</em><code>PrimSet</code> <em>again, or</em><code>Scene::Unmap</code> <em>of it) since a cursor, as</em><code>Scene::Changes</code> <em>reports it to a consumer that takes the rows whole.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1ColumnStorage/"><strong>ColumnStorage</strong></a> <br><em>Storage a consumer of columns offers for them on a device it reads them on, such as a renderer's interop buffers: a column mapped there (</em> <code>Column::Map</code> <em>) is then written where the consumer reads it, copying nothing.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1ColumnStorage_1_1Rows/"><strong>Rows</strong></a> <br><a href="../structernie_1_1ColumnStorage_1_1Rows/"><em><strong>Rows</strong></em></a> <em>a consumer offers, and whether they are storage it keeps (mapped again, the same rows) rather than a copy made there for now.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Prim/"><strong>Prim</strong></a> <br><em>Handle to a prim in a</em> <code>Scene</code> <em>: its path plus the scene, for chained edits.</em></td>
 </tr>
 <tr>
@@ -264,6 +204,14 @@
 <tr>
 <td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1Scene/"><strong>Scene</strong></a> <br><em>A lightweight, USD-shaped scene for Ernie: a tree of typed prims named by</em> <code>Path</code> <em>, each holding attributes by USD name, plus change tracking for render delegates.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Scene_1_1PrimData_1_1Bound/"><strong>Bound</strong></a> <br><em>Attributes that are rows of a column (</em> <code>columns_</code> <em>): which, its row, and the column's version its tensors last took (</em><code>Refresh</code> <em>), so a column written whole costs its prims nothing until read.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1Selection/"><strong>Selection</strong></a> <br><em>The prims of a type that hold some attributes (</em> <code>Scene::Select</code> <em>), as a Fabric query finds the buckets of a type and attributes: found again only once prims of the type come, go, or author or clear an attribute, and kept in one</em><code>PrimSet</code> <em>meanwhile, so the columns of its attributes stay theirs from step to step.</em></td>
 </tr>
 </tbody>
 </table>

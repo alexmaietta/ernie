@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -248,7 +169,7 @@
 <tbody>
 <tr>
 <td style="text-align: right;">constexpr std::uint32_t</td>
-<td style="text-align: left;"><a href="#variable-kkinds"><strong>kKinds</strong></a>   = <code>4</code><br></td>
+<td style="text-align: left;"><a href="#variable-kkinds"><strong>kKinds</strong></a>   = <code>5</code><br></td>
 </tr>
 <tr>
 <td style="text-align: right;">constexpr std::uint64_t</td>
@@ -279,7 +200,7 @@
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../classernie_1_1BindlessHeap_1_1Slot/"><strong>Slot</strong></a></td>
-<td style="text-align: left;"><a href="#function-addsampler"><strong>AddSampler</strong></a> (VkSampler sampler, bool comparison=false) <br><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not.</em></td>
+<td style="text-align: left;"><a href="#function-addsampler"><strong>AddSampler</strong></a> (VkSampler sampler, bool comparison=false) <br><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not, shared as</em><code>AddImage</code> <em>'s are: samplers are few (</em><code>Sampler</code> <em>s of the same state share one), the materials using them many.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
@@ -296,6 +217,10 @@
 <tr>
 <td style="text-align: right;"></td>
 <td style="text-align: left;"><a href="#function-bindlessheap-22"><strong>BindlessHeap</strong></a> (const <a href="./"><strong>BindlessHeap</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-forget"><strong>Forget</strong></a> (std::uint64_t object) <br><em>Stops sharing the slots of</em> <code>object</code> <em>(an image view or sampler), which is being destroyed, so that a new object given its handle gets a slot of its own; slots still held stay until released.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
@@ -326,7 +251,8 @@
     Texture2D = 0,
     Texture2DArray = 1,
     Sampler = 2,
-    ComparisonSampler = 3
+    ComparisonSampler = 3,
+    UintTexture2DArray = 4
 };
 </code></pre>
 <hr>
@@ -360,6 +286,7 @@
     VkImageLayout layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 ) 
 </code></pre>
+<p>Every slot of the same view and layout is the same one, freed with the last: textures shared by many materials take one. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::runtime_error</code> when the kind's array is full of slots in use. </li>
@@ -367,7 +294,7 @@
 <hr>
 
 <h3 id="function-addsampler">function AddSampler</h3>
-<p><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not.</em></p>
+<p><em>A slot holding</em> <code>sampler</code> <em>, a comparison sampler or not, shared as</em><code>AddImage</code> <em>'s are: samplers are few (</em><code>Sampler</code> <em>s of the same state share one), the materials using them many.</em></p>
 <pre><code class="language-C++">Slot ernie::BindlessHeap::AddSampler (
     VkSampler sampler,
     bool comparison=false
@@ -406,6 +333,14 @@
 <pre><code class="language-C++">ernie::BindlessHeap::BindlessHeap (
     const BindlessHeap &amp;
 ) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-forget">function Forget</h3>
+<p><em>Stops sharing the slots of</em> <code>object</code> <em>(an image view or sampler), which is being destroyed, so that a new object given its handle gets a slot of its own; slots still held stay until released.</em></p>
+<pre><code class="language-C++">void ernie::BindlessHeap::Forget (
+    std::uint64_t object
+) 
 </code></pre>
 <hr>
 

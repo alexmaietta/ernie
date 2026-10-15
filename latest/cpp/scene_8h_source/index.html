@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -209,6 +130,7 @@
 
 #include &quot;ernie/scene/overlay.h&quot;
 #include &quot;ernie/scene/path.h&quot;
+#include &quot;ernie/scene/time_samples.h&quot;
 #include &quot;ernie/scene/value.h&quot;
 #include &quot;ernie/scene/xform.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
@@ -219,6 +141,8 @@
 #include &lt;cstdint&gt;
 #include &lt;functional&gt;
 #include &lt;map&gt;
+#include &lt;memory&gt;
+#include &lt;optional&gt;
 #include &lt;set&gt;
 #include &lt;span&gt;
 #include &lt;string&gt;
@@ -267,6 +191,13 @@ struct Change {
     Dirty bits = Dirty::None;
 };
 
+struct ColumnChange {
+    std::shared_ptr&lt;const std::vector&lt;Path&gt;&gt;
+        paths;  
+    std::string attribute;
+    Dirty bits = Dirty::None;
+};
+
 struct ChangeCursor {
     std::uint64_t version = 0;
 };
@@ -300,6 +231,10 @@ class Prim {
     Prim&amp; Set(std::string_view attribute, Value value);
 
     Prim&amp; Write(std::string_view attribute, Tensor tensor);
+
+    Prim&amp; SetAt(std::string_view attribute, double time, Value value);
+    Prim&amp; WriteAt(std::string_view attribute, double time,
+                  Tensor tensor);
 
     Prim&amp; SetXform(const XformOps&amp; xform);
 
@@ -339,6 +274,91 @@ class PrimSet {
     mutable std::vector&lt;void*&gt; prims_;
     mutable std::uint64_t sceneId_ = 0;
     mutable std::uint64_t removals_ = 0;
+    // Its own, for the columns scenes keep of it (`Scene::Write`);
+    // copies share it, as they share its prims. 0 until first used.
+    mutable std::uint64_t id_ = 0;
+};
+
+class ColumnStorage {
+  public:
+    struct Rows {
+        Tensor rows;
+        bool kept = true;
+    };
+
+    virtual ~ColumnStorage() = default;
+    virtual std::optional&lt;Rows&gt; Allocate(Scene&amp; scene,
+                                         const PrimSet&amp; prims,
+                                         std::string_view attribute,
+                                         Device device,
+                                         std::uintptr_t stream) = 0;
+};
+
+class Column {
+  public:
+    Column() = default;
+
+    const PrimSet&amp; Prims() const {
+        return prims_;
+    }
+    std::string_view Attribute() const {
+        return attribute_;
+    }
+
+    void Write(const Tensor&amp; rows, std::uintptr_t stream = 1);
+
+    void WriteArrays(const Tensor&amp; values,
+                     std::span&lt;const std::int64_t&gt; counts,
+                     std::uintptr_t stream = 1);
+
+    Tensor Map(Device device, std::uintptr_t stream = 1);
+
+    void Unmap(std::uintptr_t stream = 1);
+
+    Tensor Read() const;
+
+    Tensor Read(Device device) const;
+
+  private:
+    friend class Scene;
+    Column(Scene&amp; scene, PrimSet prims, std::string attribute)
+        : scene_(&amp;scene), prims_(std::move(prims)),
+          attribute_(std::move(attribute)) {}
+
+    Scene* scene_ = nullptr;
+    PrimSet prims_;
+    std::string attribute_;
+};
+
+class Selection {
+  public:
+    Selection() = default;
+
+    const PrimSet&amp; Prims();
+
+    Column GetColumn(std::string_view attribute);
+
+    std::vector&lt;Tensor&gt;
+    Map(Device device, const std::vector&lt;std::string&gt;&amp; attributes,
+        std::uintptr_t stream = 1);
+    void Unmap(std::uintptr_t stream = 1);
+
+    std::vector&lt;Tensor&gt;
+    Read(Device device, const std::vector&lt;std::string&gt;&amp; attributes);
+
+  private:
+    friend class Scene;
+    Selection(Scene&amp; scene, std::string type,
+              std::vector&lt;std::string&gt; attributes)
+        : scene_(&amp;scene), type_(std::move(type)),
+          attributes_(std::move(attributes)) {}
+
+    Scene* scene_ = nullptr;
+    std::string type_;
+    std::vector&lt;std::string&gt; attributes_;
+    std::uint64_t found_ = ~0ull;  
+    PrimSet prims_;
+    std::vector&lt;std::string&gt; mapped_;
 };
 
 class Scene {
@@ -387,6 +407,14 @@ class Scene {
     void Unmap(const PrimSet&amp; prims, std::string_view attribute,
                std::uintptr_t stream = 1);
 
+    Column GetColumn(const PrimSet&amp; prims,
+                     std::string_view attribute);
+
+    Selection Select(std::string_view type,
+                     std::vector&lt;std::string&gt; attributes = {});
+
+    void SetColumnStorage(std::weak_ptr&lt;ColumnStorage&gt; storage) const;
+
     std::uintptr_t WriteStream(const Path&amp; path,
                                std::string_view attribute) const;
 
@@ -396,6 +424,11 @@ class Scene {
 
     void Write(const PrimSet&amp; prims, std::string_view attribute,
                const Tensor&amp; rows, std::uintptr_t stream = 1);
+
+    void Write(const PrimSet&amp; prims, std::string_view attribute,
+               const Tensor&amp; values,
+               std::span&lt;const std::int64_t&gt; counts,
+               std::uintptr_t stream = 1);
 
     const std::pair&lt;Tensor, std::int64_t&gt;*
     RowOf(const Path&amp; path, std::string_view attribute) const;
@@ -418,6 +451,27 @@ class Scene {
 
     void SetLocalTransform(const Path&amp; path, const glm::dmat4&amp; local);
 
+    void SetAt(const Path&amp; path, std::string_view attribute,
+               double time, Value value);
+    void WriteAt(const Path&amp; path, std::string_view attribute,
+                 double time, Tensor tensor,
+                 std::uintptr_t stream = 1);
+
+    std::span&lt;const TimeSample&gt;
+    SamplesOf(const Path&amp; path, std::string_view attribute) const;
+
+    Value GetAt(const Path&amp; path, std::string_view attribute,
+                double time) const;
+
+    bool ClearSamples(const Path&amp; path, std::string_view attribute);
+
+    std::vector&lt;Path&gt; AnimatedPrims() const;
+
+    double TimeCode() const;
+
+    std::optional&lt;SampleBracket&gt;
+    BracketAt(const Path&amp; path, std::string_view attribute) const;
+
     bool IsVisible(const Path&amp; path) const;
 
     std::uint64_t Version() const {
@@ -429,6 +483,12 @@ class Scene {
     }
 
     std::vector&lt;Change&gt; Changes(ChangeCursor&amp; cursor) const;
+    std::vector&lt;Change&gt;
+    Changes(ChangeCursor&amp; cursor,
+            std::vector&lt;ColumnChange&gt;&amp; columns) const;
+    std::vector&lt;Change&gt;
+    ExpandColumns(std::span&lt;const Change&gt; changes,
+                  std::span&lt;const ColumnChange&gt; columns) const;
 
     Overlay&amp; GetOverlay(std::string_view name);
 
@@ -458,24 +518,82 @@ class Scene {
         std::string type;
         const PrimTypeDef* schema = nullptr;
         std::map&lt;std::string, Value, std::less&lt;&gt;&gt; values;
-        std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; tensors;
-        std::map&lt;std::string, std::uintptr_t, std::less&lt;&gt;&gt;
-            streams;  
-        std::map&lt;std::string, std::pair&lt;Tensor, std::int64_t&gt;,
-                 std::less&lt;&gt;&gt;
+        mutable std::map&lt;std::string, Tensor, std::less&lt;&gt;&gt; tensors;
+        mutable std::map&lt;std::string, SampleBracket, std::less&lt;&gt;&gt;
+            pending;
+        mutable std::map&lt;std::string, std::uintptr_t, std::less&lt;&gt;&gt;
+            streams;
+        mutable std::map&lt;std::string, std::pair&lt;Tensor, std::int64_t&gt;,
+                         std::less&lt;&gt;&gt;
             rows;
         std::map&lt;std::string, std::uint64_t, std::less&lt;&gt;&gt; versions;
+        std::map&lt;std::string, std::vector&lt;TimeSample&gt;, std::less&lt;&gt;&gt;
+            samples;
         std::array&lt;std::uint64_t, kStampCount&gt; stamps{};
         std::uint64_t ownTransform = 0;  
+        std::set&lt;std::string, std::less&lt;&gt;&gt; cleared;
         std::uint64_t latest =
             0;  
+        mutable glm::dmat4 world{1.0};
+        mutable std::uint64_t worldAt = 0;
+        mutable bool visible = true;
+        mutable std::uint64_t visibleAt = 0;
+        struct Bound {
+            std::uint64_t column = 0;
+            std::int64_t row = 0;
+            std::uint64_t seen = 0;
+        };
+        mutable std::map&lt;std::string, Bound, std::less&lt;&gt;&gt; bound;
     };
+
+    struct ColumnData {
+        std::shared_ptr&lt;const std::vector&lt;Path&gt;&gt; paths;  
+        std::vector&lt;Path&gt; sorted;  
+        std::string attribute;
+        Tensor rows;
+        std::uintptr_t stream = 1;
+        std::uint64_t version = 0;  
+        std::uint64_t boundAt = 0;
+        std::pair&lt;std::uint64_t, std::string&gt;
+            key;  
+        bool provided = false;
+        std::vector&lt;std::int64_t&gt; offsets;
+    };
+    void WriteColumn(const PrimSet&amp; prims, std::string_view attribute,
+                     const Tensor&amp; rows,
+                     std::vector&lt;std::int64_t&gt; offsets,
+                     std::uintptr_t stream);
+    friend class Column;
+    friend class Selection;
+    std::uint64_t TypeVersion(std::string_view type) const;
+    void TouchType(std::string_view type);
+    std::map&lt;std::string, std::uint64_t, std::less&lt;&gt;&gt; typeVersions_;
+    static void IdentifyPrimSet(const PrimSet&amp; prims);
+    Tensor GatherRows(const PrimSet&amp; prims,
+                      std::string_view attribute) const;
+    ColumnData* ColumnOf(const PrimSet&amp; prims,
+                         std::string_view attribute);
+    const ColumnData* ColumnOf(const PrimSet&amp; prims,
+                               std::string_view attribute) const;
+    void Refresh(const PrimData&amp; prim,
+                 std::string_view attribute) const;
+    void BreakColumn(std::uint64_t id);
+    void AddColumn(std::map&lt;Path, Dirty&gt;&amp; changed,
+                   const std::vector&lt;Path&gt;&amp; paths,
+                   std::string_view attribute) const;
+    void Forward(std::map&lt;Path, Dirty&gt;&amp; changed) const;
+    std::vector&lt;Change&gt;
+    Collect(ChangeCursor&amp; cursor,
+            std::vector&lt;ColumnChange&gt;* columns) const;
 
     PrimData&amp; Find(const Path&amp; path);
     const PrimData&amp; Find(const Path&amp; path) const;
     void Stamp(const Path&amp; path, PrimData&amp; prim,
                std::string_view attribute);
-    void Stamp(const Path&amp; path, PrimData&amp; prim, Dirty bit);
+    void Stamp(const Path&amp; path, PrimData&amp; prim, Dirty bit,
+               bool descendants = false);
+    const std::map&lt;Path, std::vector&lt;std::pair&lt;Path, Dirty&gt;&gt;&gt;&amp;
+    Dependents() const;
     PrimData&amp; CreateIfMissing(const Path&amp; path);
     void WriteTensor(const Path&amp; path, PrimData&amp; prim,
                      std::string_view attribute, Tensor tensor,
@@ -484,10 +602,38 @@ class Scene {
                          row = std::nullopt,
                      bool checked = false);
 
+    void AddSample(const Path&amp; path, PrimData&amp; prim,
+                   std::string_view attribute, TimeSample sample);
+    void DropSamples(const Path&amp; path, PrimData&amp; prim,
+                     std::string_view attribute);
+    void Evaluate(const Path&amp; path, PrimData&amp; prim,
+                  std::string_view attribute, double time);
     std::map&lt;Path, PrimData&gt; prims_;
+    std::set&lt;Path&gt; animated_;
     std::uint64_t removals_ = 0;  
     std::map&lt;Path, std::uint64_t&gt; removed_;
     std::set&lt;std::pair&lt;std::uint64_t, Path&gt;&gt; stamped_;
+    mutable std::map&lt;Path, std::vector&lt;std::pair&lt;Path, Dirty&gt;&gt;&gt;
+        dependents_;
+    mutable std::set&lt;Path&gt; staleDependents_;
+    mutable std::map&lt;Path, std::vector&lt;Path&gt;&gt; dependencyTargets_;
+    std::map&lt;std::uint64_t, ColumnData&gt; columns_;
+    std::map&lt;std::pair&lt;std::uint64_t, std::string&gt;, std::uint64_t&gt;
+        columnOf_;
+    std::uint64_t nextColumn_ = 1;
+    std::array&lt;std::uint64_t, kStampCount&gt; columnStamps_{};
+    struct StorageLink {
+        std::weak_ptr&lt;ColumnStorage&gt; storage;
+        StorageLink() = default;
+        StorageLink(const StorageLink&amp;) {}
+        StorageLink&amp; operator=(const StorageLink&amp;) {
+            storage.reset();
+            return *this;
+        }
+        StorageLink(StorageLink&amp;&amp;) noexcept = default;
+        StorageLink&amp; operator=(StorageLink&amp;&amp;) noexcept = default;
+    };
+    mutable StorageLink columnStorage_;
     std::map&lt;std::string, std::set&lt;Path&gt;, std::less&lt;&gt;&gt; byType_;
     std::map&lt;std::string, Overlay, std::less&lt;&gt;&gt; overlays_;
     std::uint64_t version_ = 0;

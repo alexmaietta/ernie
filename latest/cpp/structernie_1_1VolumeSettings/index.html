@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -222,6 +143,10 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-collectors"><strong>collectors</strong></a>   = <code>false</code><br><em>Cloud droplets' multiple scattering by collectors (Bouthors et al.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#variable-lightcache"><strong>lightCache</strong></a>   = <code>true</code><br><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>each volume from its lighting cache, its optical depth to the lights, the sky and the ground at a cell per two voxels found once a frame, rather than marching to them every step.</em></td>
 </tr>
 <tr>
@@ -231,6 +156,10 @@
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
 <td style="text-align: left;"><a href="#variable-maxsteps"><strong>maxSteps</strong></a>   = <code>256</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-resolutionscale"><strong>resolutionScale</strong></a>   = <code>1.0</code><br><em>The march's resolution against the image's: 1, or 0.5 for a pixel a 2 x 2 of the image's, upsampled by depth.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::uint32_t</td>
@@ -246,7 +175,27 @@
 </tr>
 <tr>
 <td style="text-align: right;">double</td>
-<td style="text-align: left;"><a href="#variable-stepspervoxel"><strong>stepsPerVoxel</strong></a>   = <code>2.0</code><br></td>
+<td style="text-align: left;"><a href="#variable-stepsperpixel"><strong>stepsPerPixel</strong></a>   = <code>2.0</code><br><em>Steps per pixel far off, at most: the march's steps grow with distance once a pixel spans more than this many of the volume's own; 0 keeps them the volume's own everywhere.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-stepspervoxel"><strong>stepsPerVoxel</strong></a>   = <code>1.0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-temporal"><strong>temporal</strong></a>   = <code>true</code><br><em>March a pixel of each block a frame and reproject the others' last results; in full where the volumes, materials or lights changed or a pixel's history does not hold.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-temporalanimated"><strong>temporalAnimated</strong></a>   = <code>true</code><br><em>Volumes whose grids are written again each frame reproject too, clamped to what the frame marched about each pixel; off, they march in full.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint32_t</td>
+<td style="text-align: left;"><a href="#variable-temporalblock"><strong>temporalBlock</strong></a>   = <code>4</code><br><em>Its blocks' pixels across, 2 or 4: a pixel of 4 or of 16 marched a frame.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#variable-thinopticaldepth"><strong>thinOpticalDepth</strong></a>   = <code>0.05</code><br><em>A brick of 8^3 voxels whose largest density holds back less than this across it has its steps taken as one; 0, never.</em></td>
 </tr>
 </tbody>
 </table>
@@ -271,6 +220,13 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-collectors">variable collectors</h3>
+<p><em>Cloud droplets' multiple scattering by collectors (Bouthors et al.</em> </p>
+<pre><code class="language-C++">bool ernie::VolumeSettings::collectors;
+</code></pre>
+<p>2008) rather than octaves. </p>
+<hr>
+
 <h3 id="variable-lightcache">variable lightCache</h3>
 <p><a href="../classernie_1_1Light/"><em><strong>Light</strong></em></a> <em>each volume from its lighting cache, its optical depth to the lights, the sky and the ground at a cell per two voxels found once a frame, rather than marching to them every step.</em></p>
 <pre><code class="language-C++">bool ernie::VolumeSettings::lightCache;
@@ -284,6 +240,12 @@
 
 <h3 id="variable-maxsteps">variable maxSteps</h3>
 <pre><code class="language-C++">std::uint32_t ernie::VolumeSettings::maxSteps;
+</code></pre>
+<hr>
+
+<h3 id="variable-resolutionscale">variable resolutionScale</h3>
+<p><em>The march's resolution against the image's: 1, or 0.5 for a pixel a 2 x 2 of the image's, upsampled by depth.</em> </p>
+<pre><code class="language-C++">double ernie::VolumeSettings::resolutionScale;
 </code></pre>
 <hr>
 
@@ -302,8 +264,38 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-stepsperpixel">variable stepsPerPixel</h3>
+<p><em>Steps per pixel far off, at most: the march's steps grow with distance once a pixel spans more than this many of the volume's own; 0 keeps them the volume's own everywhere.</em> </p>
+<pre><code class="language-C++">double ernie::VolumeSettings::stepsPerPixel;
+</code></pre>
+<hr>
+
 <h3 id="variable-stepspervoxel">variable stepsPerVoxel</h3>
 <pre><code class="language-C++">double ernie::VolumeSettings::stepsPerVoxel;
+</code></pre>
+<hr>
+
+<h3 id="variable-temporal">variable temporal</h3>
+<p><em>March a pixel of each block a frame and reproject the others' last results; in full where the volumes, materials or lights changed or a pixel's history does not hold.</em> </p>
+<pre><code class="language-C++">bool ernie::VolumeSettings::temporal;
+</code></pre>
+<hr>
+
+<h3 id="variable-temporalanimated">variable temporalAnimated</h3>
+<p><em>Volumes whose grids are written again each frame reproject too, clamped to what the frame marched about each pixel; off, they march in full.</em> </p>
+<pre><code class="language-C++">bool ernie::VolumeSettings::temporalAnimated;
+</code></pre>
+<hr>
+
+<h3 id="variable-temporalblock">variable temporalBlock</h3>
+<p><em>Its blocks' pixels across, 2 or 4: a pixel of 4 or of 16 marched a frame.</em> </p>
+<pre><code class="language-C++">std::uint32_t ernie::VolumeSettings::temporalBlock;
+</code></pre>
+<hr>
+
+<h3 id="variable-thinopticaldepth">variable thinOpticalDepth</h3>
+<p><em>A brick of 8^3 voxels whose largest density holds back less than this across it has its steps taken as one; 0, never.</em> </p>
+<pre><code class="language-C++">double ernie::VolumeSettings::thinOpticalDepth;
 </code></pre>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>

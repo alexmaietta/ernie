@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1TextureCache/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::TextureCache - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::TextureCache";
+        var mkdocs_page_input_path = "cpp/classernie_1_1TextureCache.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1TextureCache/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::TextureCache</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1TextureCache.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-ernietexturecache">Class ernie::TextureCache</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>TextureCache</strong></a></p>
+<p><em>Textures prepared at load kept between runs as DDS files (as</em> <code>RasterDelegate</code> <em>keeps image files' textures encoded to BC7 on the GPU), so that a texture decodes, mips and encodes once until its file, or how it is read, changes.</em><a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/util/texture_cache.h&gt;</code></li>
+</ul>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-enabled"><strong>Enabled</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; std::filesystem::path &gt;</td>
+<td style="text-align: left;"><a href="#function-partialpath"><strong>PartialPath</strong></a> (std::string_view key) const<br><em>A new file beside the cache's for a DDS file to be written to in parts (a</em> <code>RasterBake</code> <em>), then cached by</em><code>Publish</code> <em>; none without a cache.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-publish"><strong>Publish</strong></a> (const std::filesystem::path &amp; partial, std::string_view key) const<br><em>Caches the DDS file written whole at</em> <code>partial</code> <em>under</em><code>key</code> <em>, moving it, then removes the least recently used past the capacity, never it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::optional&lt; <a href="../structernie_1_1TextureData/"><strong>TextureData</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-read"><strong>Read</strong></a> (std::string_view key) const<br><em>The texture cached under</em> <code>key</code> <em>(mapped, as</em><code>LoadTextureFile</code> <em>), marked as just used; none if absent or unreadable.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-remove"><strong>Remove</strong></a> (std::string_view key) const<br><em>Forgets the texture cached under</em> <code>key</code> <em>, if any.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-texturecache"><strong>TextureCache</strong></a> (std::optional&lt; std::filesystem::path &gt; directory=<a href="./#function-defaultdirectory"><strong>DefaultDirectory</strong></a>(), std::uintmax_t capacity=std::uintmax_t{16}&lt;&lt; 30) <br><em>A cache in</em> <code>directory</code> <em>, none without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::string_view key, const <a href="../structernie_1_1TextureData/"><strong>TextureData</strong></a> &amp; texture) const<br><em>Caches</em> <code>texture</code> <em>under</em><code>key</code> <em>, written whole or not at all, then removes the least recently used past the capacity.</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">std::optional&lt; std::filesystem::path &gt;</td>
+<td style="text-align: left;"><a href="#function-defaultdirectory"><strong>DefaultDirectory</strong></a> () <br><em>The default folder:</em> <code>ERNIE_TEXTURE_CACHE</code> <em>(empty or "0" for none), else the user's cache folder (</em><code>$XDG_CACHE_HOME/ernie/textures</code> <em>,</em><code>~/.cache/ernie/textures</code> <em>).</em></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Entries are keyed by a hash of everything they depend on; past <code>capacity</code> bytes the least recently used go (16 GB by default: a global mosaic of Blue Marble's eight tiles is 5 GB of BC7). Any thread may read; failures to read or write are a miss, never an error. </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-enabled">function Enabled</h3>
+<pre><code class="language-C++">inline bool ernie::TextureCache::Enabled () const
+</code></pre>
+<hr>
+
+<h3 id="function-partialpath">function PartialPath</h3>
+<p><em>A new file beside the cache's for a DDS file to be written to in parts (a</em> <code>RasterBake</code> <em>), then cached by</em><code>Publish</code> <em>; none without a cache.</em></p>
+<pre><code class="language-C++">std::optional&lt; std::filesystem::path &gt; ernie::TextureCache::PartialPath (
+    std::string_view key
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-publish">function Publish</h3>
+<p><em>Caches the DDS file written whole at</em> <code>partial</code> <em>under</em><code>key</code> <em>, moving it, then removes the least recently used past the capacity, never it.</em></p>
+<pre><code class="language-C++">bool ernie::TextureCache::Publish (
+    const std::filesystem::path &amp; partial,
+    std::string_view key
+) const
+</code></pre>
+<p>False if it could not be moved (it is removed). </p>
+<hr>
+
+<h3 id="function-read">function Read</h3>
+<p><em>The texture cached under</em> <code>key</code> <em>(mapped, as</em><code>LoadTextureFile</code> <em>), marked as just used; none if absent or unreadable.</em></p>
+<pre><code class="language-C++">std::optional&lt; TextureData &gt; ernie::TextureCache::Read (
+    std::string_view key
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-remove">function Remove</h3>
+<p><em>Forgets the texture cached under</em> <code>key</code> <em>, if any.</em></p>
+<pre><code class="language-C++">void ernie::TextureCache::Remove (
+    std::string_view key
+) const
+</code></pre>
+<hr>
+
+<h3 id="function-texturecache">function TextureCache</h3>
+<p><em>A cache in</em> <code>directory</code> <em>, none without one.</em></p>
+<pre><code class="language-C++">explicit ernie::TextureCache::TextureCache (
+    std::optional&lt; std::filesystem::path &gt; directory=DefaultDirectory (),
+    std::uintmax_t capacity=std::uintmax_t{16}&lt;&lt; 30
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-write">function Write</h3>
+<p><em>Caches</em> <code>texture</code> <em>under</em><code>key</code> <em>, written whole or not at all, then removes the least recently used past the capacity.</em></p>
+<pre><code class="language-C++">void ernie::TextureCache::Write (
+    std::string_view key,
+    const TextureData &amp; texture
+) const
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-defaultdirectory">function DefaultDirectory</h3>
+<p><em>The default folder:</em> <code>ERNIE_TEXTURE_CACHE</code> <em>(empty or "0" for none), else the user's cache folder (</em><code>$XDG_CACHE_HOME/ernie/textures</code> <em>,</em><code>~/.cache/ernie/textures</code> <em>).</em></p>
+<pre><code class="language-C++">static std::optional&lt; std::filesystem::path &gt; ernie::TextureCache::DefaultDirectory () 
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/util/texture_cache.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

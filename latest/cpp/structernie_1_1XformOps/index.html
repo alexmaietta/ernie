@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -217,11 +138,11 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: right;">std::optional&lt; glm::dquat &gt;</td>
+<td style="text-align: right;"><a href="../classernie_1_1XformRotation/"><strong>XformRotation</strong></a></td>
 <td style="text-align: left;"><a href="#variable-orient"><strong>orient</strong></a>  <br><em>A unit quaternion, in place of</em> <code>rotate</code> <em>.</em></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::optional&lt; glm::dvec3 &gt;</td>
+<td style="text-align: right;"><a href="../classernie_1_1XformVector/"><strong>XformVector</strong></a></td>
 <td style="text-align: left;"><a href="#variable-rotate"><strong>rotate</strong></a>  <br><em>Euler angles in degrees, in</em> <code>rotationOrder</code> <em>.</em></td>
 </tr>
 <tr>
@@ -229,27 +150,27 @@
 <td style="text-align: left;"><a href="#variable-rotationorder"><strong>rotationOrder</strong></a>   = <code>RotationOrder::XYZ</code><br></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::optional&lt; glm::dvec3 &gt;</td>
+<td style="text-align: right;"><a href="../classernie_1_1XformVector/"><strong>XformVector</strong></a></td>
 <td style="text-align: left;"><a href="#variable-scale"><strong>scale</strong></a>  <br></td>
 </tr>
 <tr>
-<td style="text-align: right;">std::optional&lt; glm::dvec3 &gt;</td>
+<td style="text-align: right;"><a href="../classernie_1_1XformVector/"><strong>XformVector</strong></a></td>
 <td style="text-align: left;"><a href="#variable-translate"><strong>translate</strong></a>  <br></td>
 </tr>
 </tbody>
 </table>
 <h2 id="detailed-description">Detailed Description</h2>
-<p>Unset parts are left out. </p>
+<p>Unset parts are left out. Each part takes glm types or plain numbers: <code>{.translate = {1, 2, 3}, .orient = {1, {0, 0, 0}}}</code>. </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
 <h3 id="variable-orient">variable orient</h3>
 <p><em>A unit quaternion, in place of</em> <code>rotate</code> <em>.</em></p>
-<pre><code class="language-C++">std::optional&lt;glm::dquat&gt; ernie::XformOps::orient;
+<pre><code class="language-C++">XformRotation ernie::XformOps::orient;
 </code></pre>
 <hr>
 
 <h3 id="variable-rotate">variable rotate</h3>
 <p><em>Euler angles in degrees, in</em> <code>rotationOrder</code> <em>.</em></p>
-<pre><code class="language-C++">std::optional&lt;glm::dvec3&gt; ernie::XformOps::rotate;
+<pre><code class="language-C++">XformVector ernie::XformOps::rotate;
 </code></pre>
 <hr>
 
@@ -259,12 +180,12 @@
 <hr>
 
 <h3 id="variable-scale">variable scale</h3>
-<pre><code class="language-C++">std::optional&lt;glm::dvec3&gt; ernie::XformOps::scale;
+<pre><code class="language-C++">XformVector ernie::XformOps::scale;
 </code></pre>
 <hr>
 
 <h3 id="variable-translate">variable translate</h3>
-<pre><code class="language-C++">std::optional&lt;glm::dvec3&gt; ernie::XformOps::translate;
+<pre><code class="language-C++">XformVector ernie::XformOps::translate;
 </code></pre>
 <hr>
 

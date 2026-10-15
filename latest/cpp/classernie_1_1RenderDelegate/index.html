@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -225,6 +146,10 @@
 <td style="text-align: left;"><a href="#function-addsensorfilter"><strong>AddSensorFilter</strong></a> (<a href="../structernie_1_1SensorFilterModel/"><strong>SensorFilterModel</strong></a> model) = 0<br><em>Registers custom sensor filter</em> <code>model</code> <em>for SensorFilter prims to name in</em><code>ernie:filter:type</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-addtemperaturemodel"><strong>AddTemperatureModel</strong></a> (<a href="../structernie_1_1TemperatureModel/"><strong>TemperatureModel</strong></a> model) <br><em>Registers custom temperature model</em> <code>model</code> <em>for materials to name in</em><code>ernie:thermal:model</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-advancetime"><strong>AdvanceTime</strong></a> (double deltaTime) <br><em>Moves the clock on by</em> <code>deltaTime</code> <em>seconds, which the next frame spans.</em></td>
 </tr>
@@ -237,8 +162,16 @@
 <td style="text-align: left;"><a href="#function-compute"><strong>Compute</strong></a> (std::string * why=nullptr) = 0<br><em>The compute interop (CUDA or HIP) of the delegate's device, connected on first use; null if unavailable, with the reason in</em> <code>why</code> <em>if given.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-evicttextures"><strong>EvictTextures</strong></a> (bool cache) <br><em>Drops every texture the materials read, so that the next sync loads them afresh (as a first run would, placeholders and all); with</em> <code>cache</code> <em>, their copies in the texture cache too, so that they are decoded and compressed again.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">virtual bool</td>
-<td style="text-align: left;"><a href="#function-haslightpattern"><strong>HasLightPattern</strong></a> (std::string_view id) const<br><em>Whether light pattern</em> <code>id</code> <em>is registered, built in or added.</em></td>
+<td style="text-align: left;"><a href="#function-haslightpattern"><strong>HasLightPattern</strong></a> (std::string_view) const<br><em>Whether light pattern</em> <code>id</code> <em>is registered, built in or added.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual bool</td>
+<td style="text-align: left;"><a href="#function-haswriters"><strong>HasWriters</strong></a> () const<br><em>Whether any mesh or field writer is set, so that every frame may change outside the scene (the viewer's eco mode keeps rendering).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual const <a href="../structernie_1_1RendererInfo/"><strong>RendererInfo</strong></a> &amp;</td>
@@ -263,6 +196,10 @@
 <tr>
 <td style="text-align: right;">virtual <a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
 <td style="text-align: left;"><a href="#function-pick"><strong>Pick</strong></a> (std::uint32_t x, std::uint32_t y) <br><em>The prim the last frame</em> <code>Record</code> <em>drew shows at pixel (</em><code>x</code> <em>,</em><code>y</code> <em>) of its image, from its PrimId; the empty path for the background, a pixel outside the image, or a backend that cannot tell.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::optional&lt; <a href="../structernie_1_1OverlayHit/"><strong>OverlayHit</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-pickoverlay"><strong>PickOverlay</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, std::uint32_t x, std::uint32_t y) <br><em>The overlay item the view's last frame drew at pixel (</em> <code>x</code> <em>,</em><code>y</code> <em>), among</em><code>scene</code> <em>'s overlays (</em><code>OverlayHit</code> <em>): a marker, a line, a contact of a batch.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual <a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
@@ -310,11 +247,19 @@
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setviewstage"><strong>SetViewStage</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; filter) <br><em>Ends the view's sensor chain after the SensorFilter prim</em> <code>filter</code> <em>of the product it runs (</em><code>ViewChainProduct</code> <em>), so its vars show the image there, the last domain it writes; empty, or a filter not in that chain, runs it whole.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-setviewvar"><strong>SetViewVar</strong></a> (std::string_view var) <br><em>The render var the next</em> <code>Record</code> <em>draws, for</em><code>Update</code> <em>to prepare the vars only drawing it needs (such as the opt-in MotionVector); call before</em><code>Update</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual void</td>
 <td style="text-align: left;"><a href="#function-setviewportautoexposure"><strong>SetViewportAutoExposure</strong></a> (std::optional&lt; float &gt; blend) <br><em>Exposes the viewport's frames (</em> <code>Record</code> <em>) automatically, as a viewer's automatic exposure asks: each frame moves</em><code>blend</code> <em>of the way (1 at once) to the exposure that keys the metered luminance to middle grey, on the GPU where the backend can; none for the camera's own exposure.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-setviewportexposure"><strong>SetViewportExposure</strong></a> (double stops) <br><em>Stops on the viewport's photographic outputs (</em> <code>Record</code> <em>) on top of its camera's exposure, as a viewer's compensation asks; the viewport's frames meter their luminance too.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">virtual <a href="../structernie_1_1RenderStats/"><strong>RenderStats</strong></a></td>
@@ -347,6 +292,10 @@
 <tr>
 <td style="text-align: right;">virtual std::vector&lt; std::string &gt;</td>
 <td style="text-align: left;"><a href="#function-viewvars"><strong>ViewVars</strong></a> () const<br><em>The render vars</em> <code>Record</code> <em>can draw of the frame the last</em><code>Update</code> <em>prepared:</em><code>Info() .viewVars</code> <em>and what that frame adds, such as the AOVs its sensor filters write ("aov:&lt;name&gt;").</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual <a href="../structernie_1_1TextureWait/"><strong>TextureWait</strong></a></td>
+<td style="text-align: left;"><a href="#function-waitfortextures"><strong>WaitForTextures</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, double timeoutSeconds) <br><em>Waits up to</em> <code>timeoutSeconds</code> <em>(infinity for no limit) for the textures</em><code>scene</code> <em>'s materials read to load (they load in the background,</em><code>ernie:textureLoading</code> <em>), so that a program can render only once none is missing.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="./"><strong>RenderDelegate</strong></a> &amp;</td>
@@ -412,6 +361,18 @@
 </ul>
 <hr>
 
+<h3 id="function-addtemperaturemodel">function AddTemperatureModel</h3>
+<p><em>Registers custom temperature model</em> <code>model</code> <em>for materials to name in</em><code>ernie:thermal:model</code> <em>.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::AddTemperatureModel (
+    TemperatureModel model
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> if the model is invalid or fails to compile, or the backend runs no custom models (the default). </li>
+</ul>
+<hr>
+
 <h3 id="function-advancetime">function AdvanceTime</h3>
 <p><em>Moves the clock on by</em> <code>deltaTime</code> <em>seconds, which the next frame spans.</em></p>
 <pre><code class="language-C++">void ernie::RenderDelegate::AdvanceTime (
@@ -438,12 +399,28 @@
 </code></pre>
 <hr>
 
+<h3 id="function-evicttextures">function EvictTextures</h3>
+<p><em>Drops every texture the materials read, so that the next sync loads them afresh (as a first run would, placeholders and all); with</em> <code>cache</code> <em>, their copies in the texture cache too, so that they are decoded and compressed again.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::EvictTextures (
+    bool cache
+) 
+</code></pre>
+<p>Nothing by default. </p>
+<hr>
+
 <h3 id="function-haslightpattern">function HasLightPattern</h3>
 <p><em>Whether light pattern</em> <code>id</code> <em>is registered, built in or added.</em></p>
 <pre><code class="language-C++">inline virtual bool ernie::RenderDelegate::HasLightPattern (
-    std::string_view id
+    std::string_view
 ) const
 </code></pre>
+<hr>
+
+<h3 id="function-haswriters">function HasWriters</h3>
+<p><em>Whether any mesh or field writer is set, so that every frame may change outside the scene (the viewer's eco mode keeps rendering).</em> </p>
+<pre><code class="language-C++">inline virtual bool ernie::RenderDelegate::HasWriters () const
+</code></pre>
+<p>None by default. </p>
 <hr>
 
 <h3 id="function-info">function Info</h3>
@@ -477,6 +454,9 @@
 ) 
 </code></pre>
 <p>Unmap every prim (<code>Scene::Unmap</code> of the <a href="../classernie_1_1PrimSet/"><strong>PrimSet</strong></a>) after writing. </p>
+<p><strong>Deprecated</strong></p>
+<p>Map a column instead, <code>Scene::GetColumn(prims,
+attribute).Map(device, stream)</code> then <code>Column::Unmap</code>: it maps these same rows where the delegate offers them (<code>ColumnStorage</code>), and others on any device besides. </p>
 <p><strong>Exception:</strong></p>
 <ul>
 <li><code>std::invalid_argument</code> as the single prim's. </li>
@@ -514,6 +494,17 @@
 ) 
 </code></pre>
 <p>Waits for the device, so for clicks rather than every frame. </p>
+<hr>
+
+<h3 id="function-pickoverlay">function PickOverlay</h3>
+<p><em>The overlay item the view's last frame drew at pixel (</em> <code>x</code> <em>,</em><code>y</code> <em>), among</em><code>scene</code> <em>'s overlays (</em><code>OverlayHit</code> <em>): a marker, a line, a contact of a batch.</em></p>
+<pre><code class="language-C++">inline virtual std::optional&lt; OverlayHit &gt; ernie::RenderDelegate::PickOverlay (
+    const Scene &amp; scene,
+    std::uint32_t x,
+    std::uint32_t y
+) 
+</code></pre>
+<p>None where none is, or for a backend that cannot tell. Waits for the device, as <code>Pick</code>. </p>
 <hr>
 
 <h3 id="function-primpath">function PrimPath</h3>
@@ -632,6 +623,15 @@
 </code></pre>
 <hr>
 
+<h3 id="function-setviewstage">function SetViewStage</h3>
+<p><em>Ends the view's sensor chain after the SensorFilter prim</em> <code>filter</code> <em>of the product it runs (</em><code>ViewChainProduct</code> <em>), so its vars show the image there, the last domain it writes; empty, or a filter not in that chain, runs it whole.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewStage (
+    const Path &amp; filter
+) 
+</code></pre>
+<p>Call before <code>Update</code>. Backends without sensor chains ignore it. </p>
+<hr>
+
 <h3 id="function-setviewvar">function SetViewVar</h3>
 <p><em>The render var the next</em> <code>Record</code> <em>draws, for</em><code>Update</code> <em>to prepare the vars only drawing it needs (such as the opt-in MotionVector); call before</em><code>Update</code> <em>.</em></p>
 <pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewVar (
@@ -647,6 +647,15 @@
     std::optional&lt; float &gt; blend
 ) 
 </code></pre>
+<hr>
+
+<h3 id="function-setviewportexposure">function SetViewportExposure</h3>
+<p><em>Stops on the viewport's photographic outputs (</em> <code>Record</code> <em>) on top of its camera's exposure, as a viewer's compensation asks; the viewport's frames meter their luminance too.</em></p>
+<pre><code class="language-C++">inline virtual void ernie::RenderDelegate::SetViewportExposure (
+    double stops
+) 
+</code></pre>
+<p>The scene and its products' outputs are untouched. </p>
 <hr>
 
 <h3 id="function-stats">function Stats</h3>
@@ -726,6 +735,16 @@
 <p><em>The render vars</em> <code>Record</code> <em>can draw of the frame the last</em><code>Update</code> <em>prepared:</em><code>Info() .viewVars</code> <em>and what that frame adds, such as the AOVs its sensor filters write ("aov:&lt;name&gt;").</em></p>
 <pre><code class="language-C++">inline virtual std::vector&lt; std::string &gt; ernie::RenderDelegate::ViewVars () const
 </code></pre>
+<hr>
+
+<h3 id="function-waitfortextures">function WaitForTextures</h3>
+<p><em>Waits up to</em> <code>timeoutSeconds</code> <em>(infinity for no limit) for the textures</em><code>scene</code> <em>'s materials read to load (they load in the background,</em><code>ernie:textureLoading</code> <em>), so that a program can render only once none is missing.</em></p>
+<pre><code class="language-C++">inline virtual TextureWait ernie::RenderDelegate::WaitForTextures (
+    const Scene &amp; scene,
+    double timeoutSeconds
+) 
+</code></pre>
+<p>Nothing to wait for by default. </p>
 <hr>
 
 <h3 id="function-operator">function operator=</h3>

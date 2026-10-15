@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -228,6 +149,10 @@
 <td style="text-align: right;">double</td>
 <td style="text-align: left;"><a href="#variable-minnm"><strong>minNm</strong></a>   = <code>380.0</code><br></td>
 </tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-rgb"><strong>rgb</strong></a>   = <code>false</code><br><em>RGB mode (</em> <code>Rgb</code> <em>): the three bands carry linear sRGB blue, green and red rather than averages over them, so colours come through as a 3-channel renderer's do, where so few spectral bands would shift them.</em></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-static-attributes">Public Static Attributes</h2>
@@ -276,6 +201,21 @@
 </tr>
 </tbody>
 </table>
+<h2 id="public-static-functions">Public Static Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>SpectralBands</strong></a></td>
+<td style="text-align: left;"><a href="#function-rgb"><strong>Rgb</strong></a> () <br><em>RGB mode's bands: 400-700 nm in three, centred on blue, green and red, for what still reads wavelengths (the air, say).</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="detailed-description">Detailed Description</h2>
 <p>Band <code>i</code> covers [<code>Lower(i)</code>, <code>Lower(i) +  Width()</code>). </p>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
@@ -292,6 +232,13 @@
 <h3 id="variable-minnm">variable minNm</h3>
 <pre><code class="language-C++">double ernie::SpectralBands::minNm;
 </code></pre>
+<hr>
+
+<h3 id="variable-rgb">variable rgb</h3>
+<p><em>RGB mode (</em> <code>Rgb</code> <em>): the three bands carry linear sRGB blue, green and red rather than averages over them, so colours come through as a 3-channel renderer's do, where so few spectral bands would shift them.</em></p>
+<pre><code class="language-C++">bool ernie::SpectralBands::rgb;
+</code></pre>
+<p>Spectra project onto the channels (<code>BandValue</code>). </p>
 <hr>
 <h2 id="public-static-attributes-documentation">Public Static Attributes Documentation</h2>
 <h3 id="variable-kmaxbands">variable kMaxBands</h3>
@@ -311,7 +258,7 @@
 </code></pre>
 <p><strong>Exception:</strong></p>
 <ul>
-<li><code>std::invalid_argument</code> unless 0 &lt; minNm &lt; maxNm and 1 &lt;= count &lt;= kMaxBands. </li>
+<li><code>std::invalid_argument</code> unless 0 &lt; minNm &lt; maxNm and 1 &lt;= count &lt;= kMaxBands, and 3 bands in RGB mode. </li>
 </ul>
 <hr>
 
@@ -331,6 +278,12 @@
 <pre><code class="language-C++">bool ernie::SpectralBands::operator== (
     const SpectralBands &amp;
 ) const
+</code></pre>
+<hr>
+<h2 id="public-static-functions-documentation">Public Static Functions Documentation</h2>
+<h3 id="function-rgb">function Rgb</h3>
+<p><em>RGB mode's bands: 400-700 nm in three, centred on blue, green and red, for what still reads wavelengths (the air, say).</em> </p>
+<pre><code class="language-C++">static inline SpectralBands ernie::SpectralBands::Rgb () 
 </code></pre>
 <hr>
 

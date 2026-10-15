@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -320,6 +241,10 @@
 <td style="text-align: left;"><a href="#variable-tangent"><strong>tangent</strong></a>   = <code>{1.0f, 0.0f, 0.0f}</code><br><em>Rect and disk: unit vector along the emitter's width, the light's +x; its height runs along the light's +y,</em> <code>tangent</code> <em>x</em><code>direction</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">float</td>
+<td style="text-align: left;"><a href="#variable-totalirradiance"><strong>totalIrradiance</strong></a>   = <code>0.0f</code><br><em>Distant: its irradiance over all wavelengths at normal incidence, W/m^2, as temperature models absorb it (</em> <code>TemperatureModel</code> <em>); 0 for other lights.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;"><a href="../namespaceernie/#enum-lighttype"><strong>LightType</strong></a></td>
 <td style="text-align: left;"><a href="#variable-type"><strong>type</strong></a>   = <code>LightType::Sphere</code><br></td>
 </tr>
@@ -482,6 +407,12 @@ Occluded Polyhedral Sources", SIGGRAPH '94, 343-350, 1994. <a href="https://doi.
 <h3 id="variable-tangent">variable tangent</h3>
 <p><em>Rect and disk: unit vector along the emitter's width, the light's +x; its height runs along the light's +y,</em> <code>tangent</code> <em>x</em><code>direction</code> <em>.</em></p>
 <pre><code class="language-C++">glm::vec3 ernie::LightParams::tangent;
+</code></pre>
+<hr>
+
+<h3 id="variable-totalirradiance">variable totalIrradiance</h3>
+<p><em>Distant: its irradiance over all wavelengths at normal incidence, W/m^2, as temperature models absorb it (</em> <code>TemperatureModel</code> <em>); 0 for other lights.</em></p>
+<pre><code class="language-C++">float ernie::LightParams::totalIrradiance;
 </code></pre>
 <hr>
 

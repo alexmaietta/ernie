@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -238,6 +159,10 @@
 <tbody>
 <tr>
 <td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1CloudLayersField/"><strong>CloudLayersField</strong></a> <br><em>Ernie's procedural cloud layers: up to four layers over a repeating weather map, carved from tileable noise at each sample on the GPU (three-geospatial's clouds, after Horizon Zero Dawn's), in the field's frame with z up; a</em> <a href="../classernie_1_1Volume/"><em><strong>Volume</strong></em></a> <em>'s density, its material's density scaling it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
 <td style="text-align: left;"><a href="../classernie_1_1DenseField/"><strong>DenseField</strong></a> <br><em>Ernie's field of a dense array of values, such as a grid solver's smoke or dust each step (Warp's arrays): sampled as a NanoVDB grid of every voxel, which a device array fills in place on the GPU.</em></td>
 </tr>
 <tr>
@@ -271,6 +196,14 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_cloud_layers_field_all"><strong>ERNIE_CLOUD_LAYERS_FIELD_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_CLOUD\_LAYERS\_FIELD\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_cloud_layers_field_attributes)(X)</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">define</td>
+<td style="text-align: left;"><a href="./#define-ernie_cloud_layers_field_attributes"><strong>ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES</strong></a> (X) <br></td>
+</tr>
 <tr>
 <td style="text-align: right;">define</td>
 <td style="text-align: left;"><a href="./#define-ernie_dense_field_all"><strong>ERNIE_DENSE_FIELD_ALL</strong></a> (X) <code>[**ERNIE\_FIELD\_BASE\_ALL**](volume__schemas_8h.md#define-ernie_field_base_all)(X) [**ERNIE\_DENSE\_FIELD\_ATTRIBUTES**](volume__schemas_8h.md#define-ernie_dense_field_attributes)(X)</code><br></td>
@@ -322,6 +255,20 @@
 </tbody>
 </table>
 <h2 id="macro-definition-documentation">Macro Definition Documentation</h2>
+<h3 id="define-ernie_cloud_layers_field_all">define ERNIE_CLOUD_LAYERS_FIELD_ALL</h3>
+<pre><code class="language-C++">#define ERNIE_CLOUD_LAYERS_FIELD_ALL (
+    X
+) `ERNIE_FIELD_BASE_ALL (X) ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES (X)`
+</code></pre>
+<hr>
+
+<h3 id="define-ernie_cloud_layers_field_attributes">define ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES</h3>
+<pre><code class="language-C++">#define ERNIE_CLOUD_LAYERS_FIELD_ATTRIBUTES (
+    X
+) 
+</code></pre>
+<hr>
+
 <h3 id="define-ernie_dense_field_all">define ERNIE_DENSE_FIELD_ALL</h3>
 <pre><code class="language-C++">#define ERNIE_DENSE_FIELD_ALL (
     X

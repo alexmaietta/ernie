@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -213,6 +134,7 @@
 #include &quot;ernie/scene/brdf.h&quot;
 #include &quot;ernie/scene/light_pattern.h&quot;
 #include &quot;ernie/scene/scene.h&quot;
+#include &quot;ernie/scene/temperature_model.h&quot;
 #include &quot;ernie/session/frame_params.h&quot;
 #include &quot;ernie/session/outputs.h&quot;
 #include &quot;ernie/util/tensor.h&quot;
@@ -238,6 +160,15 @@ struct RendererInfo {
     std::string name;  
     bool progressive = false;
     std::vector&lt;std::string&gt; viewVars;
+};
+
+struct TextureWait {
+    std::uint64_t loading = 0;
+    std::vector&lt;std::string&gt; failed;
+
+    bool Complete() const {
+        return loading == 0 &amp;&amp; failed.empty();
+    }
 };
 
 struct RenderStats {
@@ -292,8 +223,14 @@ class RenderDelegate {
             model.id);
     }
 
-    virtual bool HasLightPattern(std::string_view id) const {
+    virtual bool HasLightPattern(std::string_view /*id*/) const {
         return false;
+    }
+
+    virtual void AddTemperatureModel(TemperatureModel model) {
+        throw std::invalid_argument(
+            &quot;This renderer runs no custom temperature models: &quot; +
+            model.id);
     }
 
     virtual const SensorFilterRegistry&amp; SensorFilters() const = 0;
@@ -324,6 +261,10 @@ class RenderDelegate {
     virtual void SetFieldWriter(const Path&amp; path,
                                 std::array&lt;std::uint32_t, 3&gt; shape,
                                 FieldWriter writer);
+
+    virtual bool HasWriters() const {
+        return false;
+    }
 
     virtual std::vector&lt;std::string&gt; ViewVars() const {
         return Info().viewVars;
@@ -357,12 +298,20 @@ class RenderDelegate {
         static_cast&lt;void&gt;(blend);
     }
 
+    virtual void SetViewportExposure(double stops) {
+        static_cast&lt;void&gt;(stops);
+    }
+
     virtual void SetViewBand(int band) {
         static_cast&lt;void&gt;(band);
     }
 
     virtual void SetViewVar(std::string_view var) {
         static_cast&lt;void&gt;(var);
+    }
+
+    virtual void SetViewStage(const Path&amp; filter) {
+        static_cast&lt;void&gt;(filter);
     }
 
     virtual void SetHighlight(std::span&lt;const Path&gt; paths,
@@ -377,7 +326,27 @@ class RenderDelegate {
         return {};
     }
 
+    virtual std::optional&lt;OverlayHit&gt; PickOverlay(const Scene&amp; scene,
+                                                  std::uint32_t x,
+                                                  std::uint32_t y) {
+        static_cast&lt;void&gt;(scene);
+        static_cast&lt;void&gt;(x);
+        static_cast&lt;void&gt;(y);
+        return std::nullopt;
+    }
+
     virtual RenderStats Stats() const = 0;
+
+    virtual TextureWait WaitForTextures(const Scene&amp; scene,
+                                        double timeoutSeconds) {
+        static_cast&lt;void&gt;(scene);
+        static_cast&lt;void&gt;(timeoutSeconds);
+        return {};
+    }
+
+    virtual void EvictTextures(bool cache) {
+        static_cast&lt;void&gt;(cache);
+    }
 
     virtual std::optional&lt;Bounds3&gt; SceneBounds() const = 0;
 

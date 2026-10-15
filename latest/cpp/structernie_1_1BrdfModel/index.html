@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -221,6 +142,10 @@
 <td style="text-align: left;"><a href="#variable-description"><strong>description</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::function&lt; std::uint32_t(std::span&lt; const float &gt;)&gt;</td>
+<td style="text-align: left;"><a href="#variable-features"><strong>features</strong></a>  <br><em>The layers a material of these parameters uses, as bits, for models whose layers cost nothing where no material has them: the renderer compiles the model with</em> <code>BRDF_FEATURES</code> <em>defined as the union over the scene's materials of it (so code under a bit none has falls away), and gives each material's own to</em><code>BrdfParams::features</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-id"><strong>id</strong></a>  <br><em>Stable identifier used in settings, e.g. "hapke".</em></td>
 </tr>
@@ -241,6 +166,10 @@
 <td style="text-align: left;"><a href="#variable-slang"><strong>slang</strong></a>  <br></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::function&lt; glm::vec3(std::span&lt; const float &gt;)&gt;</td>
+<td style="text-align: left;"><a href="#variable-subsurfaceradius"><strong>subsurfaceRadius</strong></a>  <br><em>For models that scatter light beneath their surfaces (</em> <code>BrdfRegistry::kSubsurfaceFeature</code> <em>): how far, per linear RGB channel in scene units, for a material of these parameters; the renderer spreads its subsurface light over this radius, per band.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::string</td>
 <td style="text-align: left;"><a href="#variable-typename"><strong>typeName</strong></a>  <br><em>Slang struct implementing</em> <code>IBrdf</code> <em>, e.g.</em></td>
 </tr>
@@ -256,6 +185,10 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::vector&lt; std::size_t &gt;</td>
+<td style="text-align: left;"><a href="#function-colours"><strong>Colours</strong></a> () const<br><em>The indices of its colour parameters' red ones, in order.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; float &gt;</td>
 <td style="text-align: left;"><a href="#function-defaults"><strong>Defaults</strong></a> () const<br><em>Default value of every parameter, in order.</em></td>
 </tr>
@@ -268,6 +201,13 @@
 <h3 id="variable-description">variable description</h3>
 <pre><code class="language-C++">std::string ernie::BrdfModel::description;
 </code></pre>
+<hr>
+
+<h3 id="variable-features">variable features</h3>
+<p><em>The layers a material of these parameters uses, as bits, for models whose layers cost nothing where no material has them: the renderer compiles the model with</em> <code>BRDF_FEATURES</code> <em>defined as the union over the scene's materials of it (so code under a bit none has falls away), and gives each material's own to</em><code>BrdfParams::features</code> <em>.</em></p>
+<pre><code class="language-C++">std::function&lt;std::uint32_t(std::span&lt;const float&gt;)&gt; ernie::BrdfModel::features;
+</code></pre>
+<p>Empty for models without layers. </p>
 <hr>
 
 <h3 id="variable-id">variable id</h3>
@@ -297,6 +237,12 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-subsurfaceradius">variable subsurfaceRadius</h3>
+<p><em>For models that scatter light beneath their surfaces (</em> <code>BrdfRegistry::kSubsurfaceFeature</code> <em>): how far, per linear RGB channel in scene units, for a material of these parameters; the renderer spreads its subsurface light over this radius, per band.</em></p>
+<pre><code class="language-C++">std::function&lt;glm::vec3(std::span&lt;const float&gt;)&gt; ernie::BrdfModel::subsurfaceRadius;
+</code></pre>
+<hr>
+
 <h3 id="variable-typename">variable typeName</h3>
 <p><em>Slang struct implementing</em> <code>IBrdf</code> <em>, e.g.</em></p>
 <pre><code class="language-C++">std::string ernie::BrdfModel::typeName;
@@ -304,6 +250,12 @@
 <p>"Hapke". </p>
 <hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-colours">function Colours</h3>
+<p><em>The indices of its colour parameters' red ones, in order.</em> </p>
+<pre><code class="language-C++">std::vector&lt; std::size_t &gt; ernie::BrdfModel::Colours () const
+</code></pre>
+<hr>
+
 <h3 id="function-defaults">function Defaults</h3>
 <p><em>Default value of every parameter, in order.</em> </p>
 <pre><code class="language-C++">std::vector&lt; float &gt; ernie::BrdfModel::Defaults () const

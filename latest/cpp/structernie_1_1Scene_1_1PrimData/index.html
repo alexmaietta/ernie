@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -203,6 +124,21 @@
               
                 <h1 id="struct-erniesceneprimdata">Struct ernie::Scene::PrimData</h1>
 <p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="./"><strong>PrimData</strong></a></p>
+<h2 id="classes">Classes</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1Scene_1_1PrimData_1_1Bound/"><strong>Bound</strong></a> <br><em>Attributes that are rows of a column (</em> <code>columns_</code> <em>): which, its row, and the column's version its tensors last took (</em><code>Refresh</code> <em>), so a column written whole costs its prims nothing until read.</em></td>
+</tr>
+</tbody>
+</table>
 <h2 id="public-attributes">Public Attributes</h2>
 <table>
 <thead>
@@ -213,6 +149,14 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;">std::map&lt; std::string, <a href="../structernie_1_1Scene_1_1PrimData_1_1Bound/"><strong>Bound</strong></a>, std::less&lt;&gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-bound"><strong>bound</strong></a>  <br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::set&lt; std::string, std::less&lt;&gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-cleared"><strong>cleared</strong></a>  <br><em>Attributes</em> <code>Clear</code> <em>ed since last authored, for</em><code>Selection</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::uint64_t</td>
 <td style="text-align: left;"><a href="#variable-latest"><strong>latest</strong></a>   = <code>/* multi line expression */</code><br><em>Its latest stamp, its key in</em> <code>stamped_</code> <em>.</em></td>
 </tr>
@@ -221,8 +165,16 @@
 <td style="text-align: left;"><a href="#variable-owntransform"><strong>ownTransform</strong></a>   = <code>0</code><br><code>OwnTransformVersion</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::map&lt; std::string, <a href="../structernie_1_1SampleBracket/"><strong>SampleBracket</strong></a>, std::less&lt;&gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-pending"><strong>pending</strong></a>  <br><em>Sampled tensors between samples not yet blended: the samples either side and how far between.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::map&lt; std::string, std::pair&lt; <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a>, std::int64_t &gt;, std::less&lt;&gt; &gt;</td>
 <td style="text-align: left;"><a href="#variable-rows"><strong>rows</strong></a>  <br><em>Tensors written as rows of one tensor (</em> <code>Write</code> <em>of many paths): that tensor and the row.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::map&lt; std::string, std::vector&lt; <a href="../structernie_1_1TimeSample/"><strong>TimeSample</strong></a> &gt;, std::less&lt;&gt; &gt;</td>
+<td style="text-align: left;"><a href="#variable-samples"><strong>samples</strong></a>  <br><em>Sampled attributes' samples, in time order (</em> <code>SetAt</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const <a href="../structernie_1_1PrimTypeDef/"><strong>PrimTypeDef</strong></a> *</td>
@@ -234,11 +186,11 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::map&lt; std::string, std::uintptr_t, std::less&lt;&gt; &gt;</td>
-<td style="text-align: left;"><a href="#variable-streams"><strong>streams</strong></a>  <br><em>CUDA tensors' streams.</em></td>
+<td style="text-align: left;"><a href="#variable-streams"><strong>streams</strong></a>  <br><em>CUDA tensors' streams; mutable as</em> <code>tensors</code> <em>, refreshed from a column when read (</em><code>Refresh</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::map&lt; std::string, <a href="../classernie_1_1Tensor/"><strong>Tensor</strong></a>, std::less&lt;&gt; &gt;</td>
-<td style="text-align: left;"><a href="#variable-tensors"><strong>tensors</strong></a>  <br></td>
+<td style="text-align: left;"><a href="#variable-tensors"><strong>tensors</strong></a>  <br><em>Mutable: a sampled tensor between two samples is blended when first read (</em> <code>pending</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::string</td>
@@ -252,9 +204,36 @@
 <td style="text-align: right;">std::map&lt; std::string, std::uint64_t, std::less&lt;&gt; &gt;</td>
 <td style="text-align: left;"><a href="#variable-versions"><strong>versions</strong></a>  <br></td>
 </tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#variable-visible"><strong>visible</strong></a>   = <code>true</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-visibleat"><strong>visibleAt</strong></a>   = <code>0</code><br></td>
+</tr>
+<tr>
+<td style="text-align: right;">glm::dmat4</td>
+<td style="text-align: left;"><a href="#variable-world"><strong>world</strong></a>   = <code>{1.0}</code><br><em>Its world transform and visibility as last found (</em> <code>WorldTransform</code> <em>,</em><code>IsVisible</code> <em>), and the version then: kept while no transform or visibility of it or its ancestors has been stamped since (a retype stamps both).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::uint64_t</td>
+<td style="text-align: left;"><a href="#variable-worldat"><strong>worldAt</strong></a>   = <code>0</code><br></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-attributes-documentation">Public Attributes Documentation</h2>
+<h3 id="variable-bound">variable bound</h3>
+<pre><code class="language-C++">std::map&lt;std::string, Bound, std::less&lt;&gt; &gt; ernie::Scene::PrimData::bound;
+</code></pre>
+<hr>
+
+<h3 id="variable-cleared">variable cleared</h3>
+<p><em>Attributes</em> <code>Clear</code> <em>ed since last authored, for</em><code>Selection</code> <em>.</em></p>
+<pre><code class="language-C++">std::set&lt;std::string, std::less&lt;&gt; &gt; ernie::Scene::PrimData::cleared;
+</code></pre>
+<hr>
+
 <h3 id="variable-latest">variable latest</h3>
 <p><em>Its latest stamp, its key in</em> <code>stamped_</code> <em>.</em></p>
 <pre><code class="language-C++">std::uint64_t ernie::Scene::PrimData::latest;
@@ -267,9 +246,21 @@
 </code></pre>
 <hr>
 
+<h3 id="variable-pending">variable pending</h3>
+<p><em>Sampled tensors between samples not yet blended: the samples either side and how far between.</em> </p>
+<pre><code class="language-C++">std::map&lt;std::string, SampleBracket, std::less&lt;&gt; &gt; ernie::Scene::PrimData::pending;
+</code></pre>
+<hr>
+
 <h3 id="variable-rows">variable rows</h3>
 <p><em>Tensors written as rows of one tensor (</em> <code>Write</code> <em>of many paths): that tensor and the row.</em></p>
 <pre><code class="language-C++">std::map&lt;std::string, std::pair&lt;Tensor, std::int64_t&gt;, std::less&lt;&gt; &gt; ernie::Scene::PrimData::rows;
+</code></pre>
+<hr>
+
+<h3 id="variable-samples">variable samples</h3>
+<p><em>Sampled attributes' samples, in time order (</em> <code>SetAt</code> <em>).</em></p>
+<pre><code class="language-C++">std::map&lt;std::string, std::vector&lt;TimeSample&gt;, std::less&lt;&gt; &gt; ernie::Scene::PrimData::samples;
 </code></pre>
 <hr>
 
@@ -285,12 +276,13 @@
 <hr>
 
 <h3 id="variable-streams">variable streams</h3>
-<p><em>CUDA tensors' streams.</em> </p>
+<p><em>CUDA tensors' streams; mutable as</em> <code>tensors</code> <em>, refreshed from a column when read (</em><code>Refresh</code> <em>).</em></p>
 <pre><code class="language-C++">std::map&lt;std::string, std::uintptr_t, std::less&lt;&gt; &gt; ernie::Scene::PrimData::streams;
 </code></pre>
 <hr>
 
 <h3 id="variable-tensors">variable tensors</h3>
+<p><em>Mutable: a sampled tensor between two samples is blended when first read (</em> <code>pending</code> <em>).</em></p>
 <pre><code class="language-C++">std::map&lt;std::string, Tensor, std::less&lt;&gt; &gt; ernie::Scene::PrimData::tensors;
 </code></pre>
 <hr>
@@ -307,6 +299,27 @@
 
 <h3 id="variable-versions">variable versions</h3>
 <pre><code class="language-C++">std::map&lt;std::string, std::uint64_t, std::less&lt;&gt; &gt; ernie::Scene::PrimData::versions;
+</code></pre>
+<hr>
+
+<h3 id="variable-visible">variable visible</h3>
+<pre><code class="language-C++">bool ernie::Scene::PrimData::visible;
+</code></pre>
+<hr>
+
+<h3 id="variable-visibleat">variable visibleAt</h3>
+<pre><code class="language-C++">std::uint64_t ernie::Scene::PrimData::visibleAt;
+</code></pre>
+<hr>
+
+<h3 id="variable-world">variable world</h3>
+<p><em>Its world transform and visibility as last found (</em> <code>WorldTransform</code> <em>,</em><code>IsVisible</code> <em>), and the version then: kept while no transform or visibility of it or its ancestors has been stamped since (a retype stamps both).</em></p>
+<pre><code class="language-C++">glm::dmat4 ernie::Scene::PrimData::world;
+</code></pre>
+<hr>
+
+<h3 id="variable-worldat">variable worldAt</h3>
+<pre><code class="language-C++">std::uint64_t ernie::Scene::PrimData::worldAt;
 </code></pre>
 <hr>
 

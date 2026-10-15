@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://alexmaietta.github.io/ernie/latest/cpp/classernie_1_1SparseImage/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Class ernie::SparseImage - Ernie</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../../assets/_mkdocstrings.css" rel="stylesheet" />
+        <link href="../../css/extra.css" rel="stylesheet" />
+        <link href="../../css/version-select.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Class ernie::SparseImage";
+        var mkdocs_page_input_path = "cpp/classernie_1_1SparseImage.md";
+        var mkdocs_page_url = "/ernie/latest/cpp/classernie_1_1SparseImage/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Ernie
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Installation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/quickstart/">Quickstart</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/viewer/">Viewer</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">API reference</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" >Python</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/scene/">Scene</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/schemas/">Prim types</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/rendering/">Rendering</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/cameras/">Cameras and sensor models</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/astronomy/">Astronomy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/batch/">Batched cameras</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/app/">Viewer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/demo/">Demos</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/python/tokens/">Tokens</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >C++</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../api/cpp/">Overview</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../annotated/">Classes</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../hierarchy/">Class hierarchy</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespace_member_functions/">Functions</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../namespaceernie/">Namespace ernie</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../files/">Files</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Ernie</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Class ernie::SparseImage</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/alexmaietta/ernie/blob/main/docs/cpp/classernie_1_1SparseImage.md">Edit on alexmaietta/ernie</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="class-erniesparseimage">Class ernie::SparseImage</h1>
+<p><a href="../annotated/"><strong>ClassList</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>SparseImage</strong></a></p>
+<p><em>A 2D image whose memory is bound tile by tile (Vulkan sparse residency), the hardware path of virtual textures: a texture far larger than device memory holds only the tiles in view, and filtering spans tiles in hardware.</em> <a href="#detailed-description">More...</a></p>
+<ul>
+<li><code>#include &lt;ernie/device/sparse_image.h&gt;</code></li>
+</ul>
+<p>Inherits the following classes: <a href="../classernie_1_1TileStore/">ernie::TileStore</a></p>
+<h2 id="public-functions">Public Functions</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">virtual bool</td>
+<td style="text-align: left;"><a href="#function-bound"><strong>Bound</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) override const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::size_t</td>
+<td style="text-align: left;"><a href="#function-boundtiles"><strong>BoundTiles</strong></a> () override const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-bytes"><strong>Bytes</strong></a> () override const<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory bound: the mip tail and every bound tile.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const <a href="../structernie_1_1SparseImageDesc/"><strong>SparseImageDesc</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-desc"><strong>Desc</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImage</td>
+<td style="text-align: left;"><a href="#function-handle"><strong>Handle</strong></a> () const<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-release"><strong>Release</strong></a> (std::span&lt; const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &gt; tiles) override<br><em>Unbinds</em> <code>tiles</code> <em>and frees their memory now; no work in flight may read them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-sparseimage-12"><strong>SparseImage</strong></a> (const <a href="../classernie_1_1VulkanContext/"><strong>VulkanContext</strong></a> &amp; context, const <a href="../structernie_1_1SparseImageDesc/"><strong>SparseImageDesc</strong></a> &amp; desc) <br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-sparseimage-22"><strong>SparseImage</strong></a> (const <a href="./"><strong>SparseImage</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-tailmip"><strong>TailMip</strong></a> () override const<br><em>The first mip in the mip tail;</em> <code>Desc() .mips</code> <em>when there is none.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::uint32_t</td>
+<td style="text-align: left;"><a href="#function-tileborder"><strong>TileBorder</strong></a> () override const<br><em>None: hardware filtering spans tiles.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="#function-tilecount"><strong>TileCount</strong></a> (std::uint32_t mip) override const<br><em>Tiles across and down mip</em> <code>mip</code> <em>(below</em><code>TailMip</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-tiledatabytes"><strong>TileDataBytes</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) override const<br><em>Bytes of tightly packed texels (or blocks) of</em> <code>tile</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="#function-tileextent"><strong>TileExtent</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) override const<br><em>Texels across and down</em> <code>tile</code> <em>, a whole tile but where it overhangs its mip's right or bottom edge.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="#function-tilememorybytes"><strong>TileMemoryBytes</strong></a> () override const<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory a tile takes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="#function-tiletexels"><strong>TileTexels</strong></a> () override const<br><em>Texels along a tile's sides.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">VkImageView</td>
+<td style="text-align: left;"><a href="#function-view"><strong>View</strong></a> () const<br><em>View of every mip, sampled in</em> <code>VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-write"><strong>Write</strong></a> (std::span&lt; const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &gt; tiles, std::span&lt; const std::span&lt; const std::byte &gt; &gt; texels) override<br><em>Binds memory to the tiles not yet bound among</em> <code>tiles</code> <em>and writes</em><code>texels[i]</code> <em>(</em><code>TileDataBytes(tiles[i])</code> <em>bytes, rows top to bottom) into tile</em><code>i</code> <em>, for work submitted after it to read.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="#function-writetail"><strong>WriteTail</strong></a> (std::span&lt; const std::span&lt; const std::byte &gt; &gt; mips) override<br><em>Writes the mip tail:</em> <code>mips[i]</code> <em>holds mip</em><code>TailMip() + i</code> <em>, tightly packed, for work submitted after it to read.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="./"><strong>SparseImage</strong></a> &amp;</td>
+<td style="text-align: left;"><a href="#function-operator"><strong>operator=</strong></a> (const <a href="./"><strong>SparseImage</strong></a> &amp;) = delete<br></td>
+</tr>
+<tr>
+<td style="text-align: right;"></td>
+<td style="text-align: left;"><a href="#function-sparseimage"><strong>~SparseImage</strong></a> () override<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-functions-inherited-from-ernietilestore">Public Functions inherited from ernie::TileStore</h2>
+<p>See <a href="../classernie_1_1TileStore/">ernie::TileStore</a></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Type</th>
+<th style="text-align: left;">Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">virtual bool</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-bound"><strong>Bound</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) const = 0<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::size_t</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-boundtiles"><strong>BoundTiles</strong></a> () const = 0<br></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-bytes"><strong>Bytes</strong></a> () const = 0<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory held.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-release"><strong>Release</strong></a> (std::span&lt; const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &gt; tiles) = 0<br><em>Frees</em> <code>tiles</code> <em>now; no work in flight may read them.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::uint32_t</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tailmip"><strong>TailMip</strong></a> () const = 0<br><em>The first mip in the tail.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual std::uint32_t</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tileborder"><strong>TileBorder</strong></a> () const = 0<br><em>Texels of the neighbouring tiles written around each tile (</em> <code>TileDataBytes</code> <em>counts them), so filtering stays inside it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tilecount"><strong>TileCount</strong></a> (std::uint32_t mip) const = 0<br><em>Tiles across and down mip</em> <code>mip</code> <em>(below</em><code>TailMip</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tiledatabytes"><strong>TileDataBytes</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) const = 0<br><em>Bytes of the texels (or blocks)</em> <code>Write</code> <em>takes for</em><code>tile</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tileextent"><strong>TileExtent</strong></a> (const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &amp; tile) const = 0<br><em>Texels across and down</em> <code>tile</code> <em>, a whole tile but where it overhangs its mip's right or bottom edge.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkDeviceSize</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tilememorybytes"><strong>TileMemoryBytes</strong></a> () const = 0<br><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory a tile takes.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual VkExtent2D</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tiletexels"><strong>TileTexels</strong></a> () const = 0<br><em>Texels along a tile's sides.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-write"><strong>Write</strong></a> (std::span&lt; const <a href="../structernie_1_1SparseTile/"><strong>SparseTile</strong></a> &gt; tiles, std::span&lt; const std::span&lt; const std::byte &gt; &gt; texels) = 0<br><em>Makes</em> <code>tiles</code> <em>resident, writing</em><code>texels[i]</code> <em>into tile</em><code>i</code> <em>, for work submitted after it to read.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual void</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-writetail"><strong>WriteTail</strong></a> (std::span&lt; const std::span&lt; const std::byte &gt; &gt; mips) = 0<br><em>Writes the tail:</em> <code>mips[i]</code> <em>holds mip</em><code>TailMip() + i</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">virtual</td>
+<td style="text-align: left;"><a href="../classernie_1_1TileStore/#function-tilestore"><strong>~TileStore</strong></a> () = default<br></td>
+</tr>
+</tbody>
+</table>
+<h2 id="detailed-description">Detailed Description</h2>
+<p>Shaders keep their samples to bound tiles by sampling no finer than the finest mip resident there (<code>VirtualTexture</code>'s min-LOD map).</p>
+<p>Tiles have the format's standard block shape (64 KiB each: 128 x 128 texels of 32-bit texels, 256 x 256 of BC7). Mips smaller than a tile share the mip tail, bound at creation and written with <code>WriteTail</code>. Binding waits for the bind alone; texels are copied in submissions the host does not wait for, ordered before work submitted after them. Releasing unbinds at once: callers keep work in flight off the tiles they release (<code>VirtualTexture</code> lets a frame pass first).</p>
+<p>Requires <code>VulkanContext::SupportsSparseResidency</code>.</p>
+<p>Reference: Khronos, "Sparse Resources", Vulkan specification, chapter 33. <a href="https://docs.vulkan.org/spec/latest/chapters/sparsemem.html">https://docs.vulkan.org/spec/latest/chapters/sparsemem.html</a> </p>
+<h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-bound">function Bound</h3>
+<pre><code class="language-C++">inline virtual bool ernie::SparseImage::Bound (
+    const SparseTile &amp; tile
+) override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-bound"><em>ernie::TileStore::Bound</em></a></p>
+<hr>
+
+<h3 id="function-boundtiles">function BoundTiles</h3>
+<pre><code class="language-C++">inline virtual std::size_t ernie::SparseImage::BoundTiles () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-boundtiles"><em>ernie::TileStore::BoundTiles</em></a></p>
+<hr>
+
+<h3 id="function-bytes">function Bytes</h3>
+<p><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory bound: the mip tail and every bound tile.</em></p>
+<pre><code class="language-C++">virtual VkDeviceSize ernie::SparseImage::Bytes () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-bytes"><em>ernie::TileStore::Bytes</em></a></p>
+<hr>
+
+<h3 id="function-desc">function Desc</h3>
+<pre><code class="language-C++">inline const SparseImageDesc &amp; ernie::SparseImage::Desc () const
+</code></pre>
+<hr>
+
+<h3 id="function-handle">function Handle</h3>
+<pre><code class="language-C++">inline VkImage ernie::SparseImage::Handle () const
+</code></pre>
+<hr>
+
+<h3 id="function-release">function Release</h3>
+<p><em>Unbinds</em> <code>tiles</code> <em>and frees their memory now; no work in flight may read them.</em></p>
+<pre><code class="language-C++">virtual void ernie::SparseImage::Release (
+    std::span&lt; const SparseTile &gt; tiles
+) override
+</code></pre>
+<p>Tiles not bound are skipped. </p>
+<p>Implements <a href="../classernie_1_1TileStore/#function-release"><em>ernie::TileStore::Release</em></a></p>
+<hr>
+
+<h3 id="function-sparseimage-12">function SparseImage [1/2]</h3>
+<pre><code class="language-C++">ernie::SparseImage::SparseImage (
+    const VulkanContext &amp; context,
+    const SparseImageDesc &amp; desc
+) 
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::runtime_error</code> without sparse residency, or for a format the device cannot make sparse. </li>
+</ul>
+<hr>
+
+<h3 id="function-sparseimage-22">function SparseImage [2/2]</h3>
+<pre><code class="language-C++">ernie::SparseImage::SparseImage (
+    const SparseImage &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-tailmip">function TailMip</h3>
+<p><em>The first mip in the mip tail;</em> <code>Desc() .mips</code> <em>when there is none.</em></p>
+<pre><code class="language-C++">inline virtual std::uint32_t ernie::SparseImage::TailMip () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tailmip"><em>ernie::TileStore::TailMip</em></a></p>
+<hr>
+
+<h3 id="function-tileborder">function TileBorder</h3>
+<p><em>None: hardware filtering spans tiles.</em> </p>
+<pre><code class="language-C++">inline virtual std::uint32_t ernie::SparseImage::TileBorder () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tileborder"><em>ernie::TileStore::TileBorder</em></a></p>
+<hr>
+
+<h3 id="function-tilecount">function TileCount</h3>
+<p><em>Tiles across and down mip</em> <code>mip</code> <em>(below</em><code>TailMip</code> <em>).</em></p>
+<pre><code class="language-C++">virtual VkExtent2D ernie::SparseImage::TileCount (
+    std::uint32_t mip
+) override const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> for a mip in the tail or beyond. </li>
+</ul>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tilecount"><em>ernie::TileStore::TileCount</em></a></p>
+<hr>
+
+<h3 id="function-tiledatabytes">function TileDataBytes</h3>
+<p><em>Bytes of tightly packed texels (or blocks) of</em> <code>tile</code> <em>.</em></p>
+<pre><code class="language-C++">virtual VkDeviceSize ernie::SparseImage::TileDataBytes (
+    const SparseTile &amp; tile
+) override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tiledatabytes"><em>ernie::TileStore::TileDataBytes</em></a></p>
+<hr>
+
+<h3 id="function-tileextent">function TileExtent</h3>
+<p><em>Texels across and down</em> <code>tile</code> <em>, a whole tile but where it overhangs its mip's right or bottom edge.</em></p>
+<pre><code class="language-C++">virtual VkExtent2D ernie::SparseImage::TileExtent (
+    const SparseTile &amp; tile
+) override const
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::out_of_range</code> for a tile the image does not have. </li>
+</ul>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tileextent"><em>ernie::TileStore::TileExtent</em></a></p>
+<hr>
+
+<h3 id="function-tilememorybytes">function TileMemoryBytes</h3>
+<p><a href="../structernie_1_1Device/"><em><strong>Device</strong></em></a> <em>memory a tile takes.</em></p>
+<pre><code class="language-C++">inline virtual VkDeviceSize ernie::SparseImage::TileMemoryBytes () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tilememorybytes"><em>ernie::TileStore::TileMemoryBytes</em></a></p>
+<hr>
+
+<h3 id="function-tiletexels">function TileTexels</h3>
+<p><em>Texels along a tile's sides.</em> </p>
+<pre><code class="language-C++">inline virtual VkExtent2D ernie::SparseImage::TileTexels () override const
+</code></pre>
+<p>Implements <a href="../classernie_1_1TileStore/#function-tiletexels"><em>ernie::TileStore::TileTexels</em></a></p>
+<hr>
+
+<h3 id="function-view">function View</h3>
+<p><em>View of every mip, sampled in</em> <code>VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL</code> <em>.</em></p>
+<pre><code class="language-C++">inline VkImageView ernie::SparseImage::View () const
+</code></pre>
+<hr>
+
+<h3 id="function-write">function Write</h3>
+<p><em>Binds memory to the tiles not yet bound among</em> <code>tiles</code> <em>and writes</em><code>texels[i]</code> <em>(</em><code>TileDataBytes(tiles[i])</code> <em>bytes, rows top to bottom) into tile</em><code>i</code> <em>, for work submitted after it to read.</em></p>
+<pre><code class="language-C++">virtual void ernie::SparseImage::Write (
+    std::span&lt; const SparseTile &gt; tiles,
+    std::span&lt; const std::span&lt; const std::byte &gt; &gt; texels
+) override
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for a tile the image does not have, or data of the wrong size. </li>
+</ul>
+<p>Implements <a href="../classernie_1_1TileStore/#function-write"><em>ernie::TileStore::Write</em></a></p>
+<hr>
+
+<h3 id="function-writetail">function WriteTail</h3>
+<p><em>Writes the mip tail:</em> <code>mips[i]</code> <em>holds mip</em><code>TailMip() + i</code> <em>, tightly packed, for work submitted after it to read.</em></p>
+<pre><code class="language-C++">virtual void ernie::SparseImage::WriteTail (
+    std::span&lt; const std::span&lt; const std::byte &gt; &gt; mips
+) override
+</code></pre>
+<p><strong>Exception:</strong></p>
+<ul>
+<li><code>std::invalid_argument</code> for the wrong number of mips or a mip of the wrong size. </li>
+</ul>
+<p>Implements <a href="../classernie_1_1TileStore/#function-writetail"><em>ernie::TileStore::WriteTail</em></a></p>
+<hr>
+
+<h3 id="function-operator">function operator=</h3>
+<pre><code class="language-C++">SparseImage &amp; ernie::SparseImage::operator= (
+    const SparseImage &amp;
+) = delete
+</code></pre>
+<hr>
+
+<h3 id="function-sparseimage">function ~SparseImage</h3>
+<pre><code class="language-C++">ernie::SparseImage::~SparseImage () override
+</code></pre>
+<hr>
+
+<hr />
+<p>The documentation for this class was generated from the following file <code>ernie/device/sparse_image.h</code></p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/alexmaietta/ernie" class="fa fa-code-fork" style="color: #fcfcfc"> alexmaietta/ernie</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../js/sidebar.js"></script>
+      <script src="../../search/main.js"></script>
+      <script src="../../js/version-select.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

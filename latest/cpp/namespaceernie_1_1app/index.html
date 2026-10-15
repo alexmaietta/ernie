@@ -57,85 +57,6 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../getting-started/demos/">Demos</a>
                   </li>
               </ul>
-              <p class="caption"><span class="caption-text">Concepts</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/scene/">Scene description</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/transforms/">Transforms</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/spectral/">Spectral rendering</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/lighting/">Lighting</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/cameras/">Cameras and lenses</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/sensor-filters/">Sensor filters</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/materials/">Materials and BRDFs</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/shadows/">Shadows</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/terrain/">Terrain and planets</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/star-fields/">Star fields</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../concepts/volumes/">Volumes</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Extending Ernie</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../extending/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Materials</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-brdfs/">Custom BRDFs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Cameras and sensors</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-sensor-filters/">Custom sensor filters</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-aovs/">Custom AOVs</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-lenses/">Custom lenses</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Light and sky</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-spectra/">Custom spectra</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-star-catalogs/">Custom star catalogs</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Viewer</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-panels/">Custom panels and menus</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/frame-callbacks/">Frame callbacks</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/debug-draw/">Debug drawing and overlays</a>
-                </li>
-    </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" >Rendering</a>
-    <ul>
-                <li class="toctree-l2"><a class="reference internal" href="../../extending/custom-render-delegates/">Custom render delegates</a>
-                </li>
-    </ul>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">Guides</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/scenes/">Describing scenes</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/batched-rendering/">Batched rendering for RL</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../guides/gpu-interop/">GPU interop</a>
-                  </li>
-              </ul>
               <p class="caption"><span class="caption-text">API reference</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" >Python</a>
@@ -203,6 +124,7 @@
               
                 <h1 id="namespace-ernieapp">Namespace ernie::app</h1>
 <p><a href="../namespaces/"><strong>Namespace List</strong></a> <strong>&gt;</strong> <a href="../namespaceernie/"><strong>ernie</strong></a> <strong>&gt;</strong> <a href="./"><strong>app</strong></a></p>
+<p><em>Editing a camera's sensor chain (the</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel's Filter Chain): a</em><a href="../classernie_1_1RenderProduct/"><em><strong>RenderProduct</strong></em></a> <em>'s</em><code>ernie:filters</code> <em>and its SensorFilter prims, as ordinary scene edits.</em></p>
 <h2 id="namespaces">Namespaces</h2>
 <table>
 <thead>
@@ -231,6 +153,14 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1CaptureNameFields/"><strong>CaptureNameFields</strong></a> <br><em>What a capture's file name may name (</em> <code>ExpandCaptureName</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1CaptureOptions/"><strong>CaptureOptions</strong></a> <br><em>Where the viewer's captures go (</em> <code>Viewer::GetCaptureOptions</code> <em>).</em></td>
+</tr>
 <tr>
 <td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> <br><em>A prim type the viewer's Create menu makes, with its menu label and group, the name new prims take, and the prim they go under unless a group prim is selected.</em></td>
@@ -305,7 +235,15 @@
 </tr>
 <tr>
 <td style="text-align: right;">struct</td>
+<td style="text-align: left;"><a href="../structernie_1_1app_1_1SequenceOptions/"><strong>SequenceOptions</strong></a> <br><em>A sequence to record (</em> <code>Viewer::RecordSequence</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">struct</td>
 <td style="text-align: left;"><a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> <br><em>Colours (sRGB-encoded with alpha, as written to the screen) and metrics of the viewer's UI: a classic scientific desktop look, as Qt's and GTK's of the 2000s that tools such as PANGU wear (colours read from PANGU v7's renderer GUI): light grey-green windows (#D4D7D0), white sunken fields and raised buttons with one-pixel edges, square corners, black text, a navy accent and pale-blue selection.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">class</td>
+<td style="text-align: left;"><a href="../classernie_1_1app_1_1Timeline/"><strong>Timeline</strong></a> <br><em>The animation's clock, as Omniverse Kit's timeline: plays the scene's time code (</em> <code>Stage::GetTimeCode</code> <em>) over the stage's range, from its start time code to its end, in real time or a frame at a time, looping or stopping at the end.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">class</td>
@@ -354,6 +292,10 @@
 <td style="text-align: right;">enum</td>
 <td style="text-align: left;"><a href="#enum-loglevel"><strong>LogLevel</strong></a>  <br><em>How serious a log message is.</em></td>
 </tr>
+<tr>
+<td style="text-align: right;">enum</td>
+<td style="text-align: left;"><a href="#enum-videoformat"><strong>VideoFormat</strong></a>  <br><em>The video a sequence encodes into, with ffmpeg.</em></td>
+</tr>
 </tbody>
 </table>
 <h2 id="public-functions">Public Functions</h2>
@@ -366,6 +308,10 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-addchainfilter"><strong>AddChainFilter</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, const std::string &amp; type, const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp; registry) <br><em>Adds a SensorFilter of</em> <code>type</code> <em>to</em><code>product</code> <em>'s chain, beside its other filters' prims (or under the product's path plus "Chain"): right after the last filter leaving what it reads (</em><code>bayer</code> <em>after</em><code>noise</code> <em>,</em><code>whiteBalance</code> <em>after</em><code>cie</code> <em>) when the chain stays valid there (</em><code>CheckFilterChain</code> <em>with</em><code>registry</code> <em>), else at the latest place it does, else at its end.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-applytheme"><strong>ApplyTheme</strong></a> (const <a href="../structernie_1_1app_1_1Theme/"><strong>Theme</strong></a> &amp; theme, float contentScale, ImGuiStyle &amp; style) <br><em>Resets</em> <code>style</code> <em>and writes</em><code>theme</code> <em>'s colours and metrics into it, with sizes and fonts scaled by</em><code>contentScale</code> <em>.</em></td>
 </tr>
@@ -376,6 +322,10 @@
 <tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-authordefaultprim"><strong>AuthorDefaultPrim</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path, std::string_view type, const <a href="../structernie_1_1app_1_1CreateContext/"><strong>CreateContext</strong></a> &amp; context) <br><em>Defines a prim of</em> <code>type</code> <em>at</em><code>path</code> <em>in</em><code>scene</code> <em>(a scratch scene, copied into the real one as one undo step) with defaults that make it show: geometry at the view's target at the view's scale, lights above it shining down, a camera with the view's pose and lens, a terrain of gentle relief, a point instancer of a few spheres, and render prims wired to the active camera.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-baketexturemain"><strong>BakeTextureMain</strong></a> (std::span&lt; const std::string &gt; args) <br><code>ernie bake-texture input output.dds [options]</code> <em>(</em><code>args</code> <em>after</em><code>bake-texture</code> <em>): bakes an image into a mipped, block-compressed DDS file (</em><code>BakeTexture</code> <em>).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -390,6 +340,18 @@
 <td style="text-align: left;"><a href="#function-cameraschema"><strong>CameraSchema</strong></a> () <br><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections from its declaration (</em><code>Camera</code> <em>): lens, exposure, shutter, sensor and views, without the "Prim" section every prim has.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-chaindescriptionof"><strong>ChainDescriptionOf</strong></a> (std::string_view type, const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp; registry) <br><em>What filter</em> <code>type</code> <em>does, in a sentence or two: a registered filter's description, or the built-in's; empty for a type neither built in nor in</em><code>registry</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-chainflowof"><strong>ChainFlowOf</strong></a> (std::string_view type, const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp; registry) <br><em>What filter</em> <code>type</code> _works on, and what it makes: "spectrum &gt;</td>
+</tr>
+<tr>
+<td style="text-align: right;">electrons" for_<code>qe</code> <em>, "electrons" for</em><code>noise</code> <em>; "unknown" for a type neither built in nor in</em><code>registry</code> <em>.</em></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::optional&lt; std::filesystem::path &gt;</td>
 <td style="text-align: left;"><a href="#function-chosenpath"><strong>ChosenPath</strong></a> (const std::filesystem::path &amp; directory, const std::string &amp; name, const <a href="../structernie_1_1app_1_1FileFilter/"><strong>FileFilter</strong></a> * filter, bool save) <br><em>The path a dialog in</em> <code>directory</code> <em>returns for</em><code>name</code> <em>as typed: an absolute name as it is, else</em><code>directory / name</code> <em>, made lexically normal.</em></td>
 </tr>
@@ -400,6 +362,14 @@
 <tr>
 <td style="text-align: right;">std::span&lt; const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-creatabletypes"><strong>CreatableTypes</strong></a> () <br><em>Every type the Create menu offers, by group.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;"><a href="../classernie_1_1Path/"><strong>Path</strong></a></td>
+<td style="text-align: left;"><a href="#function-customizechain"><strong>CustomizeChain</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera) <br><em>Gives</em> <code>camera</code> <em>a render product of its own,</em><code>/Render/&lt;camera&gt; Sensor</code> <em>(numbered when taken; under the session root for a camera there, the viewer's own), holding LdrColor, with a copy of the default chain as SensorFilter prims under its path plus "Chain"; the viewport then runs it (</em><code>ViewChainProduct</code> <em>).</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::filesystem::path</td>
+<td style="text-align: left;"><a href="#function-defaultcapturefolder"><strong>DefaultCaptureFolder</strong></a> () <br><em>Where captures go unless chosen: the user's Pictures/Ernie, else</em> <code>captures</code> <em>in the working directory.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp;</td>
@@ -419,6 +389,14 @@
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-drawcamerasections"><strong>DrawCameraSections</strong></a> (<a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera, std::span&lt; const <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt; sections, float labelWidth, std::string_view filter) <br><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections in the Properties panel beyond its other attributes: its exposure (the Exposure section of</em><code>sections</code> <em>, its schema's, which changes its products' outputs, with its exposure value and the viewport's meter), each channel's quantum efficiency over wavelength and as binned into its bands, its render products (their settings and vars, and new ones), and the sensor chain of one of them (the viewport's unless chosen) to edit (bypass, reorder, remove, add and the filters' inputs; a camera without a product customizes the default chain) and to view at any stage, the viewport then looking through the camera and showing the image right after that filter.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-drawiconcentred"><strong>DrawIconCentred</strong></a> (ImDrawList * draw, const char * icon, ImVec2 centre, ImU32 colour) <br><em>Draws the icon glyph</em> <code>icon</code> <em>(one UTF-8 character) centred on</em><code>centre</code> <em>by its ink, not its advance, which icon fonts leave uneven.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-drawprimicon"><strong>DrawPrimIcon</strong></a> (ImDrawList * draw, const ImVec2 &amp; corner, float size, std::string_view type) <br><em>Draws the icon of a prim of</em> <code>type</code> <em>into the square of</em><code>size</code> <em>pixels at</em><code>corner</code> <em>of</em><code>draw</code> <em>: small coloured vector drawings in the manner of Omniverse Kit's stage icons (an axis tripod for transforms, a folder for scopes, shaded solids for geometry, a sphere for materials, yellow lamps for lights, a camera, a film frame for render prims), drawn rather than taken from a font so they stay crisp at any size and need no image assets.</em></td>
 </tr>
 <tr>
@@ -434,8 +412,16 @@
 <td style="text-align: left;"><a href="#function-drawrenderericon"><strong>DrawRendererIcon</strong></a> (ImDrawList * draw, const ImVec2 &amp; corner, float size) <br><em>Draws the viewport's renderer icon, a lit ball on the ground, into the square of</em> <code>size</code> <em>pixels at</em><code>corner</code> <em>.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; std::string &gt;</td>
+<td style="text-align: left;"><a href="#function-encodecommand"><strong>EncodeCommand</strong></a> (const std::filesystem::path &amp; ffmpeg, const std::filesystem::path &amp; framePattern, double fps, const std::filesystem::path &amp; video, <a href="./#enum-videoformat"><strong>VideoFormat</strong></a> format) <br><em>The command line that encodes the frames</em> <code>framePattern</code> <em>(an ffmpeg image pattern such as</em><code>shot_%04d.png</code> <em>, numbered from 0) at</em><code>fps</code> <em>into</em><code>video</code> <em>as</em><code>format</code> <em>, with</em><code>ffmpeg</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">int</td>
 <td style="text-align: left;"><a href="#function-erniemain"><strong>ErnieMain</strong></a> (std::span&lt; const std::string &gt; args, std::string_view version) <br><em>The</em> <code>ernie</code> <em>program, also the</em><code>ernie</code> <em>command a pip install puts on the path:</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string</td>
+<td style="text-align: left;"><a href="#function-expandcapturename"><strong>ExpandCaptureName</strong></a> (std::string_view pattern, const <a href="../structernie_1_1app_1_1CaptureNameFields/"><strong>CaptureNameFields</strong></a> &amp; fields) <br><code>pattern</code> <em>with its fields filled in:</em><code>{scene}</code> <em>,</em><code>{camera}</code> <em>,</em><code>{date}</code> <em>(YYYY-MM-DD),</em><code>{time}</code> <em>(HH-MM-SS, local) and</em><code>{frame}</code> <em>(four digits at least).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">const <a href="../structernie_1_1app_1_1CreatableType/"><strong>CreatableType</strong></a> *</td>
@@ -444,6 +430,10 @@
 <tr>
 <td style="text-align: right;">std::optional&lt; std::size_t &gt;</td>
 <td style="text-align: left;"><a href="#function-finddemo"><strong>FindDemo</strong></a> (std::span&lt; const <a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a> &gt; demos, std::string_view id) <br><em>Finds the demo</em> <code>id</code> <em>among</em><code>demos</code> <em>: its id (such as "demo_lighting_illuminants"), the former "category/name", or the panel's label "category: name"; underscores and spaces match each other.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::filesystem::path</td>
+<td style="text-align: left;"><a href="#function-findffmpeg"><strong>FindFfmpeg</strong></a> () <br><em>ffmpeg's executable on the PATH, or empty when it is not there.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
@@ -455,11 +445,27 @@
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-holdsvar"><strong>HoldsVar</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, std::string_view name) <br><em>Whether</em> <code>product</code> <em>holds a render var of source name</em><code>name</code> <em>.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
+<td style="text-align: left;"><a href="#function-iconbutton"><strong>IconButton</strong></a> (const char * id, const char * icon, float size) <br><em>A square button</em> <code>size</code> <em>pixels across showing</em><code>icon</code> <em>centred by its ink (</em><code>DrawIconCentred</code> <em>);</em><code>id</code> <em>its ImGui id.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-inputstring"><strong>InputString</strong></a> (const char * label, std::string &amp; text, int flags=0) <br><em>ImGui::InputText on a std::string, which grows as the user types;</em> <code>flags</code> <em>are ImGuiInputTextFlags.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-issessionpath"><strong>IsSessionPath</strong></a> (const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; path) <br><em>Whether</em> <code>path</code> <em>is the session root or under it.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-keyilluminance"><strong>KeyIlluminance</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene) <br><em>The illuminance in lux a camera keyed to the scene's light expects on a surface facing it: the brightest visible</em> <a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>'s outside the session root (</em><code>SunIlluminanceOf</code> <em>), or pi, a light of intensity 1's, without one.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">double</td>
+<td style="text-align: left;"><a href="#function-keyedexposuretime"><strong>KeyedExposureTime</strong></a> (const <a href="../structernie_1_1CameraParams/"><strong>CameraParams</strong></a> &amp; camera, double illuminance) <br><em>The exposure time in seconds that keys</em> <code>camera</code> <em>to</em><code>illuminance</code> <em>lux, its f-stop, ISO and responsivity kept: an 18% grey surface facing the light shows middle grey before the camera's exposure stops, which stay its compensation (automatic exposure's too).</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1DirectoryEntry/"><strong>DirectoryEntry</strong></a> &gt;</td>
@@ -471,7 +477,7 @@
 </tr>
 <tr>
 <td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
-<td style="text-align: left;"><a href="#function-makecamerapanel"><strong>MakeCameraPanel</strong></a> () <br><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel: the active camera's lens, exposure and sensor, its channels' quantum efficiency over wavelength and as binned into its bands, and Create</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>from View.</em></td>
+<td style="text-align: left;"><a href="#function-makecapturepanel"><strong>MakeCapturePanel</strong></a> () <br><em>The Capture panel: where captures go and how they are named, a screenshot (F10), recording a sequence of the timeline's frames (optionally into a video with ffmpeg), and the recent captures.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;"><a href="../structernie_1_1app_1_1DemoInfo/"><strong>DemoInfo</strong></a></td>
@@ -498,12 +504,20 @@
 <td style="text-align: left;"><a href="#function-makestagepanel"><strong>MakeStagePanel</strong></a> () <br><em>The</em> <a href="../classernie_1_1Stage/"><em><strong>Stage</strong></em></a> <em>panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::unique_ptr&lt; <a href="../classernie_1_1app_1_1Panel/"><strong>Panel</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-maketimelinepanel"><strong>MakeTimelinePanel</strong></a> () <br><em>The</em> <a href="../classernie_1_1app_1_1Timeline/"><em><strong>Timeline</strong></em></a> <em>panel, a strip under the viewport after Kit's timeline: the stage's start time code, a ruler to scrub across its range, its end, the current time code, the transport (first frame, a frame back, play or pause, stop, a frame on, last frame), loop, and a menu of the frame rate and playing every frame.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-matchesfilter"><strong>MatchesFilter</strong></a> (std::string_view label, std::string_view attribute, std::string_view filter) <br><em>Whether</em> <code>label</code> <em>or</em><code>attribute</code> <em>contains</em><code>filter</code> <em>, ignoring case; always for an empty filter.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">void</td>
 <td style="text-align: left;"><a href="#function-mirrorsettings"><strong>MirrorSettings</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; source, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; session, const std::map&lt; std::string, <a href="../classernie_1_1Value/"><strong>Value</strong></a>, std::less&lt;&gt; &gt; &amp; overrides, std::map&lt; std::string, std::uint64_t &gt; &amp; versions) <br><em>Mirrors the</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>source</code> <em>into the session's</em><a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim</em><code>session</code> <em>, defining it if needed: every value attribute of</em><code>source</code> <em>is copied, except those in</em><code>overrides</code> <em>, which take the given values; attributes neither has any more are cleared.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-movechainfilter"><strong>MoveChainFilter</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, std::size_t index, int offset) <br><em>Moves</em> <code>product</code> <em>'s filter</em><code>index</code> <em>up (</em><code>offset</code> <em>-1) or down (+1), as far as the chain's ends allow.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::optional&lt; <a href="../classernie_1_1OrbitController/"><strong>OrbitController</strong></a> &gt;</td>
@@ -518,6 +532,10 @@
 <td style="text-align: left;"><a href="#function-primicon"><strong>PrimIcon</strong></a> (std::string_view type, float size) <br><em>Reserves a</em> <code>size</code> <em>square at the cursor, as an item, and draws</em><code>type</code> <em>'s icon in it.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
+<td style="text-align: left;"><a href="#function-productsof"><strong>ProductsOf</strong></a> (const <a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; camera) <br><em>The RenderProducts looking through</em> <code>camera</code> <em>(their first camera), in scene order; those under the session root only for a camera there.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">float</td>
 <td style="text-align: left;"><a href="#function-propertylabelwidth"><strong>PropertyLabelWidth</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer) <br><em>The label column's width in pixels for the viewer's theme and font.</em></td>
 </tr>
@@ -526,12 +544,20 @@
 <td style="text-align: left;"><a href="#function-registereddemos"><strong>RegisteredDemos</strong></a> () <br><em>The demos registered with</em> <code>ERNIE_REGISTER_DEMO</code> <em>, sorted by category then name: Ernie's own (the ernie_demos library, in the</em><code>ernie</code> <em>program and the Python module) and any an application links in.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-removechainfilter"><strong>RemoveChainFilter</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, std::size_t index) <br><em>Removes</em> <code>product</code> <em>'s filter</em><code>index</code> <em>from its chain, and its prim when no product or var's chain names it any more.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-rendersettingsschema"><strong>RenderSettingsSchema</strong></a> () <br><em>A</em> <a href="../classernie_1_1RenderSettings/"><em><strong>RenderSettings</strong></em></a> <em>prim's sections: image, culling and level of detail, and shadows.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">bool</td>
 <td style="text-align: left;"><a href="#function-resetsquare"><strong>ResetSquare</strong></a> (const <a href="../classernie_1_1app_1_1Viewer/"><strong>Viewer</strong></a> &amp; viewer, bool authored) <br><em>A row's reset square: filled with the accent when</em> <code>authored</code> <em>, an outline otherwise.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">int</td>
+<td style="text-align: left;"><a href="#function-runprocess"><strong>RunProcess</strong></a> (const std::vector&lt; std::string &gt; &amp; command) <br><em>Runs</em> <code>command</code> <em>(the program, then its arguments) and waits for it, without a shell; its output is discarded.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../structernie_1_1app_1_1PropertySection/"><strong>PropertySection</strong></a> &gt;</td>
@@ -546,12 +572,28 @@
 <td style="text-align: left;"><a href="#function-sessionrootpath"><strong>SessionRootPath</strong></a> () <br><code>/__session</code> <em>: the root of the prims the viewer defines for its own use.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">void</td>
+<td style="text-align: left;"><a href="#function-setproductvar"><strong>SetProductVar</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const <a href="../classernie_1_1Path/"><strong>Path</strong></a> &amp; product, std::string_view name, bool held) <br><em>Adds a</em> <a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>of source name</em><code>name</code> <em>to</em><code>product</code> <em>'s ordered vars (a child of the product named as it, numbered when taken), or with</em><code>held</code> <em>false removes those of that name and their prims.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">std::string_view</td>
+<td style="text-align: left;"><a href="#function-stagevarof"><strong>StageVarOf</strong></a> (std::string_view type, const <a href="../classernie_1_1SensorFilterRegistry/"><strong>SensorFilterRegistry</strong></a> &amp; registry) <br><em>The render var showing the image right after filter</em> <code>type</code> <em>, the domain it leaves: SpectralRadiance, Electrons, RawDN, HdrColor or LdrColor; LdrColor for a type neither built in nor in</em><code>registry</code> <em>.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt;</td>
 <td style="text-align: left;"><a href="#function-union"><strong>Union</strong></a> (const std::vector&lt; std::optional&lt; <a href="../namespaceernie/#typedef-bounds3"><strong>Bounds3</strong></a> &gt; &gt; &amp; bounds) <br><em>The union of</em> <code>bounds</code> <em>, ignoring missing ones; none if all are missing.</em></td>
 </tr>
 <tr>
+<td style="text-align: right;">std::filesystem::path</td>
+<td style="text-align: left;"><a href="#function-uniquepath"><strong>UniquePath</strong></a> (const std::filesystem::path &amp; path) <br><code>path</code> <em>if nothing is there, else with</em><code>_1</code> <em>,</em><code>_2</code> <em>, ... before its extension: a capture never overwrites another.</em></td>
+</tr>
+<tr>
 <td style="text-align: right;">void</td>
-<td style="text-align: left;"><a href="#function-updatesessionlights"><strong>UpdateSessionLights</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const glm::dmat4 &amp; cameraWorld) <br><em>Defines the session lights if missing, and turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>; sets nothing that is already so.</em></td>
+<td style="text-align: left;"><a href="#function-updatesessionlights"><strong>UpdateSessionLights</strong></a> (<a href="../classernie_1_1Scene/"><strong>Scene</strong></a> &amp; scene, const glm::dmat4 &amp; cameraWorld, double illuminance=0.0) <br><em>Defines the session lights if missing, turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>and gives both</em><code>illuminance</code> <em>lux on a surface facing them (when above 0); sets nothing that is already so.</em></td>
+</tr>
+<tr>
+<td style="text-align: right;">const char *</td>
+<td style="text-align: left;"><a href="#function-videoextension"><strong>VideoExtension</strong></a> (<a href="./#enum-videoformat"><strong>VideoFormat</strong></a> format) <br><em>The file extension of</em> <code>format</code> <em>'s videos (".mp4", ".mov"), or "" for</em><code>None</code> <em>.</em></td>
 </tr>
 <tr>
 <td style="text-align: right;">std::vector&lt; <a href="../classernie_1_1Path/"><strong>Path</strong></a> &gt;</td>
@@ -571,7 +613,8 @@
     Right,
     Bottom,
     Floating,
-    RightLower
+    RightLower,
+    Timeline
 };
 </code></pre>
 <hr>
@@ -584,7 +627,7 @@
     Default
 };
 </code></pre>
-<p>The viewer opens with <code>Stage</code> when the scene has lights and <code>Default</code> otherwise. </p>
+<p>The viewer opens with <code>Stage</code> when the scene has lights and <code>Default</code> otherwise. The <code>Camera</code> and <code>Default</code> lights are as bright as the active camera's exposure needs to show an 18% grey surface facing them at middle grey: a sun's illuminance through a camera set for daylight. </p>
 <hr>
 
 <h3 id="enum-loglevel">enum LogLevel</h3>
@@ -596,7 +639,29 @@
 };
 </code></pre>
 <hr>
+
+<h3 id="enum-videoformat">enum VideoFormat</h3>
+<p><em>The video a sequence encodes into, with ffmpeg.</em> </p>
+<pre><code class="language-C++">enum ernie::app::VideoFormat {
+    None,
+    Mp4,
+    ProRes
+};
+</code></pre>
+<hr>
 <h2 id="public-functions-documentation">Public Functions Documentation</h2>
+<h3 id="function-addchainfilter">function AddChainFilter</h3>
+<p><em>Adds a SensorFilter of</em> <code>type</code> <em>to</em><code>product</code> <em>'s chain, beside its other filters' prims (or under the product's path plus "Chain"): right after the last filter leaving what it reads (</em><code>bayer</code> <em>after</em><code>noise</code> <em>,</em><code>whiteBalance</code> <em>after</em><code>cie</code> <em>) when the chain stays valid there (</em><code>CheckFilterChain</code> <em>with</em><code>registry</code> <em>), else at the latest place it does, else at its end.</em></p>
+<pre><code class="language-C++">Path ernie::app::AddChainFilter (
+    Scene &amp; scene,
+    const Path &amp; product,
+    const std::string &amp; type,
+    const SensorFilterRegistry &amp; registry
+) 
+</code></pre>
+<p>Returns the new prim. </p>
+<hr>
+
 <h3 id="function-applytheme">function ApplyTheme</h3>
 <p><em>Resets</em> <code>style</code> <em>and writes</em><code>theme</code> <em>'s colours and metrics into it, with sizes and fonts scaled by</em><code>contentScale</code> <em>.</em></p>
 <pre><code class="language-C++">void ernie::app::ApplyTheme (
@@ -636,6 +701,15 @@
 </ul>
 <hr>
 
+<h3 id="function-baketexturemain">function BakeTextureMain</h3>
+<p><code>ernie bake-texture input output.dds [options]</code> <em>(</em><code>args</code> <em>after</em><code>bake-texture</code> <em>): bakes an image into a mipped, block-compressed DDS file (</em><code>BakeTexture</code> <em>).</em></p>
+<pre><code class="language-C++">int ernie::app::BakeTextureMain (
+    std::span&lt; const std::string &gt; args
+) 
+</code></pre>
+<p>Returns the exit status, printing any error. </p>
+<hr>
+
 <h3 id="function-beginpropertytable">function BeginPropertyTable</h3>
 <p><em>Sets up a property table</em> <code>id</code> <em>of a label column</em><code>labelWidth</code> <em>wide, a value column and a reset column; returns false (and nothing to end) when it is clipped.</em></p>
 <pre><code class="language-C++">bool ernie::app::BeginPropertyTable (
@@ -654,6 +728,25 @@
 <h3 id="function-cameraschema">function CameraSchema</h3>
 <p><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections from its declaration (</em><code>Camera</code> <em>): lens, exposure, shutter, sensor and views, without the "Prim" section every prim has.</em></p>
 <pre><code class="language-C++">std::vector&lt; PropertySection &gt; ernie::app::CameraSchema () 
+</code></pre>
+<hr>
+
+<h3 id="function-chaindescriptionof">function ChainDescriptionOf</h3>
+<p><em>What filter</em> <code>type</code> <em>does, in a sentence or two: a registered filter's description, or the built-in's; empty for a type neither built in nor in</em><code>registry</code> <em>.</em></p>
+<pre><code class="language-C++">std::string ernie::app::ChainDescriptionOf (
+    std::string_view type,
+    const SensorFilterRegistry &amp; registry
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-chainflowof">function ChainFlowOf</h3>
+<p><em>What filter</em> <code>type</code> <em>works on, and what it makes: "spectrum &gt;
+electrons" for</em><code>qe</code> <em>, "electrons" for</em><code>noise</code> <em>; "unknown" for a type neither built in nor in</em><code>registry</code> <em>.</em></p>
+<pre><code class="language-C++">std::string ernie::app::ChainFlowOf (
+    std::string_view type,
+    const SensorFilterRegistry &amp; registry
+) 
 </code></pre>
 <hr>
 
@@ -686,6 +779,22 @@
 </code></pre>
 <hr>
 
+<h3 id="function-customizechain">function CustomizeChain</h3>
+<p><em>Gives</em> <code>camera</code> <em>a render product of its own,</em><code>/Render/&lt;camera&gt; Sensor</code> <em>(numbered when taken; under the session root for a camera there, the viewer's own), holding LdrColor, with a copy of the default chain as SensorFilter prims under its path plus "Chain"; the viewport then runs it (</em><code>ViewChainProduct</code> <em>).</em></p>
+<pre><code class="language-C++">Path ernie::app::CustomizeChain (
+    Scene &amp; scene,
+    const Path &amp; camera
+) 
+</code></pre>
+<p>Returns the product. </p>
+<hr>
+
+<h3 id="function-defaultcapturefolder">function DefaultCaptureFolder</h3>
+<p><em>Where captures go unless chosen: the user's Pictures/Ernie, else</em> <code>captures</code> <em>in the working directory.</em></p>
+<pre><code class="language-C++">std::filesystem::path ernie::app::DefaultCaptureFolder () 
+</code></pre>
+<hr>
+
 <h3 id="function-defaultlightpath">function DefaultLightPath</h3>
 <p><em>The session's default light,</em> <code>/__session/Lights/Default</code> <em>: a white sun from above with shadows.</em></p>
 <pre><code class="language-C++">const Path &amp; ernie::app::DefaultLightPath () 
@@ -715,6 +824,30 @@
 <h3 id="function-demooptionshelp">function DemoOptionsHelp</h3>
 <p><em>The shared options' help, one per line, for a demo's</em> <code>--help</code> <em>.</em></p>
 <pre><code class="language-C++">std::string_view ernie::app::DemoOptionsHelp () 
+</code></pre>
+<hr>
+
+<h3 id="function-drawcamerasections">function DrawCameraSections</h3>
+<p><em>A</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>prim's sections in the Properties panel beyond its other attributes: its exposure (the Exposure section of</em><code>sections</code> <em>, its schema's, which changes its products' outputs, with its exposure value and the viewport's meter), each channel's quantum efficiency over wavelength and as binned into its bands, its render products (their settings and vars, and new ones), and the sensor chain of one of them (the viewport's unless chosen) to edit (bypass, reorder, remove, add and the filters' inputs; a camera without a product customizes the default chain) and to view at any stage, the viewport then looking through the camera and showing the image right after that filter.</em></p>
+<pre><code class="language-C++">void ernie::app::DrawCameraSections (
+    Viewer &amp; viewer,
+    const Path &amp; camera,
+    std::span&lt; const PropertySection &gt; sections,
+    float labelWidth,
+    std::string_view filter
+) 
+</code></pre>
+<p>With a <code>filter</code>, only the sections whose titles match it. </p>
+<hr>
+
+<h3 id="function-drawiconcentred">function DrawIconCentred</h3>
+<p><em>Draws the icon glyph</em> <code>icon</code> <em>(one UTF-8 character) centred on</em><code>centre</code> <em>by its ink, not its advance, which icon fonts leave uneven.</em></p>
+<pre><code class="language-C++">void ernie::app::DrawIconCentred (
+    ImDrawList * draw,
+    const char * icon,
+    ImVec2 centre,
+    ImU32 colour
+) 
 </code></pre>
 <hr>
 
@@ -764,6 +897,18 @@
 </code></pre>
 <hr>
 
+<h3 id="function-encodecommand">function EncodeCommand</h3>
+<p><em>The command line that encodes the frames</em> <code>framePattern</code> <em>(an ffmpeg image pattern such as</em><code>shot_%04d.png</code> <em>, numbered from 0) at</em><code>fps</code> <em>into</em><code>video</code> <em>as</em><code>format</code> <em>, with</em><code>ffmpeg</code> <em>.</em></p>
+<pre><code class="language-C++">std::vector&lt; std::string &gt; ernie::app::EncodeCommand (
+    const std::filesystem::path &amp; ffmpeg,
+    const std::filesystem::path &amp; framePattern,
+    double fps,
+    const std::filesystem::path &amp; video,
+    VideoFormat format
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-erniemain">function ErnieMain</h3>
 <p><em>The</em> <code>ernie</code> <em>program, also the</em><code>ernie</code> <em>command a pip install puts on the path:</em></p>
 <pre><code class="language-C++">int ernie::app::ErnieMain (
@@ -772,6 +917,16 @@
 ) 
 </code></pre>
 <p>It takes the options every demo takes (<code>ParseDemoOptions</code>), so a scene file renders headless or without a viewer as a demo does, and <code>--version</code>. The Demos panel lists the scene (the default or the file's) and every registered demo (<code>RegisteredDemos</code>). <code>args</code> is the command line without the program name; returns the exit status, printing any error. </p>
+<hr>
+
+<h3 id="function-expandcapturename">function ExpandCaptureName</h3>
+<p><code>pattern</code> <em>with its fields filled in:</em><code>{scene}</code> <em>,</em><code>{camera}</code> <em>,</em><code>{date}</code> <em>(YYYY-MM-DD),</em><code>{time}</code> <em>(HH-MM-SS, local) and</em><code>{frame}</code> <em>(four digits at least).</em></p>
+<pre><code class="language-C++">std::string ernie::app::ExpandCaptureName (
+    std::string_view pattern,
+    const CaptureNameFields &amp; fields
+) 
+</code></pre>
+<p>Characters a file name cannot hold become <code>_</code>. </p>
 <hr>
 
 <h3 id="function-findcreatable">function FindCreatable</h3>
@@ -792,6 +947,12 @@
 <p>Returns its index. </p>
 <hr>
 
+<h3 id="function-findffmpeg">function FindFfmpeg</h3>
+<p><em>ffmpeg's executable on the PATH, or empty when it is not there.</em> </p>
+<pre><code class="language-C++">std::filesystem::path ernie::app::FindFfmpeg () 
+</code></pre>
+<hr>
+
 <h3 id="function-hasstagelights">function HasStageLights</h3>
 <p><em>Whether the scene has a visible light outside the session root.</em> </p>
 <pre><code class="language-C++">bool ernie::app::HasStageLights (
@@ -808,6 +969,27 @@
 </code></pre>
 <hr>
 
+<h3 id="function-holdsvar">function HoldsVar</h3>
+<p><em>Whether</em> <code>product</code> <em>holds a render var of source name</em><code>name</code> <em>.</em></p>
+<pre><code class="language-C++">bool ernie::app::HoldsVar (
+    const Scene &amp; scene,
+    const Path &amp; product,
+    std::string_view name
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-iconbutton">function IconButton</h3>
+<p><em>A square button</em> <code>size</code> <em>pixels across showing</em><code>icon</code> <em>centred by its ink (</em><code>DrawIconCentred</code> <em>);</em><code>id</code> <em>its ImGui id.</em></p>
+<pre><code class="language-C++">bool ernie::app::IconButton (
+    const char * id,
+    const char * icon,
+    float size
+) 
+</code></pre>
+<p>Returns whether it was clicked. </p>
+<hr>
+
 <h3 id="function-inputstring">function InputString</h3>
 <p><em>ImGui::InputText on a std::string, which grows as the user types;</em> <code>flags</code> <em>are ImGuiInputTextFlags.</em></p>
 <pre><code class="language-C++">bool ernie::app::InputString (
@@ -822,6 +1004,23 @@
 <p><em>Whether</em> <code>path</code> <em>is the session root or under it.</em></p>
 <pre><code class="language-C++">bool ernie::app::IsSessionPath (
     const Path &amp; path
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-keyilluminance">function KeyIlluminance</h3>
+<p><em>The illuminance in lux a camera keyed to the scene's light expects on a surface facing it: the brightest visible</em> <a href="../classernie_1_1DistantLight/"><em><strong>DistantLight</strong></em></a> <em>'s outside the session root (</em><code>SunIlluminanceOf</code> <em>), or pi, a light of intensity 1's, without one.</em></p>
+<pre><code class="language-C++">double ernie::app::KeyIlluminance (
+    const Scene &amp; scene
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-keyedexposuretime">function KeyedExposureTime</h3>
+<p><em>The exposure time in seconds that keys</em> <code>camera</code> <em>to</em><code>illuminance</code> <em>lux, its f-stop, ISO and responsivity kept: an 18% grey surface facing the light shows middle grey before the camera's exposure stops, which stay its compensation (automatic exposure's too).</em></p>
+<pre><code class="language-C++">double ernie::app::KeyedExposureTime (
+    const CameraParams &amp; camera,
+    double illuminance
 ) 
 </code></pre>
 <hr>
@@ -851,9 +1050,9 @@
 </code></pre>
 <hr>
 
-<h3 id="function-makecamerapanel">function MakeCameraPanel</h3>
-<p><em>The</em> <a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>panel: the active camera's lens, exposure and sensor, its channels' quantum efficiency over wavelength and as binned into its bands, and Create</em><a href="../classernie_1_1Camera/"><em><strong>Camera</strong></em></a> <em>from View.</em></p>
-<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeCameraPanel () 
+<h3 id="function-makecapturepanel">function MakeCapturePanel</h3>
+<p><em>The Capture panel: where captures go and how they are named, a screenshot (F10), recording a sequence of the timeline's frames (optionally into a video with ffmpeg), and the recent captures.</em> </p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeCapturePanel () 
 </code></pre>
 <hr>
 
@@ -884,6 +1083,7 @@ DemoInfo ernie::app::MakeDemoInfo (
 <p><em>The Properties panel: the selected prim's attributes as widgets by value type, editing through the viewer's undo history, with a reset back to each attribute's fallback; bulk data shows its shape.</em> </p>
 <pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakePropertiesPanel () 
 </code></pre>
+<p>A camera adds its exposure, quantum efficiency, render products and sensor chain (<code>DrawCameraSections</code>). </p>
 <hr>
 
 <h3 id="function-makesettingspanel">function MakeSettingsPanel</h3>
@@ -896,6 +1096,12 @@ DemoInfo ernie::app::MakeDemoInfo (
 <h3 id="function-makestagepanel">function MakeStagePanel</h3>
 <p><em>The</em> <a href="../classernie_1_1Stage/"><em><strong>Stage</strong></em></a> <em>panel: the scene's prim tree, with selection, framing, visibility toggles and a filter; the session's own prims show on request.</em></p>
 <pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeStagePanel () 
+</code></pre>
+<hr>
+
+<h3 id="function-maketimelinepanel">function MakeTimelinePanel</h3>
+<p><em>The</em> <a href="../classernie_1_1app_1_1Timeline/"><em><strong>Timeline</strong></em></a> <em>panel, a strip under the viewport after Kit's timeline: the stage's start time code, a ruler to scrub across its range, its end, the current time code, the transport (first frame, a frame back, play or pause, stop, a frame on, last frame), loop, and a menu of the frame rate and playing every frame.</em></p>
+<pre><code class="language-C++">std::unique_ptr&lt; Panel &gt; ernie::app::MakeTimelinePanel () 
 </code></pre>
 <hr>
 
@@ -920,6 +1126,17 @@ DemoInfo ernie::app::MakeDemoInfo (
 ) 
 </code></pre>
 <p>Only what changed is set: <code>versions</code> remembers what was copied, so pass the same map every frame. An empty <code>source</code> leaves only the overrides. </p>
+<hr>
+
+<h3 id="function-movechainfilter">function MoveChainFilter</h3>
+<p><em>Moves</em> <code>product</code> <em>'s filter</em><code>index</code> <em>up (</em><code>offset</code> <em>-1) or down (+1), as far as the chain's ends allow.</em></p>
+<pre><code class="language-C++">void ernie::app::MoveChainFilter (
+    Scene &amp; scene,
+    const Path &amp; product,
+    std::size_t index,
+    int offset
+) 
+</code></pre>
 <hr>
 
 <h3 id="function-orbitaboutplanet">function OrbitAboutPlanet</h3>
@@ -957,6 +1174,15 @@ DemoInfo ernie::app::MakeDemoInfo (
 </code></pre>
 <hr>
 
+<h3 id="function-productsof">function ProductsOf</h3>
+<p><em>The RenderProducts looking through</em> <code>camera</code> <em>(their first camera), in scene order; those under the session root only for a camera there.</em></p>
+<pre><code class="language-C++">std::vector&lt; Path &gt; ernie::app::ProductsOf (
+    const Scene &amp; scene,
+    const Path &amp; camera
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-propertylabelwidth">function PropertyLabelWidth</h3>
 <p><em>The label column's width in pixels for the viewer's theme and font.</em> </p>
 <pre><code class="language-C++">float ernie::app::PropertyLabelWidth (
@@ -968,6 +1194,16 @@ DemoInfo ernie::app::MakeDemoInfo (
 <h3 id="function-registereddemos">function RegisteredDemos</h3>
 <p><em>The demos registered with</em> <code>ERNIE_REGISTER_DEMO</code> <em>, sorted by category then name: Ernie's own (the ernie_demos library, in the</em><code>ernie</code> <em>program and the Python module) and any an application links in.</em></p>
 <pre><code class="language-C++">std::vector&lt; DemoInfo &gt; ernie::app::RegisteredDemos () 
+</code></pre>
+<hr>
+
+<h3 id="function-removechainfilter">function RemoveChainFilter</h3>
+<p><em>Removes</em> <code>product</code> <em>'s filter</em><code>index</code> <em>from its chain, and its prim when no product or var's chain names it any more.</em></p>
+<pre><code class="language-C++">void ernie::app::RemoveChainFilter (
+    Scene &amp; scene,
+    const Path &amp; product,
+    std::size_t index
+) 
 </code></pre>
 <hr>
 
@@ -985,6 +1221,15 @@ DemoInfo ernie::app::MakeDemoInfo (
 ) 
 </code></pre>
 <p>Returns whether it was clicked while authored. </p>
+<hr>
+
+<h3 id="function-runprocess">function RunProcess</h3>
+<p><em>Runs</em> <code>command</code> <em>(the program, then its arguments) and waits for it, without a shell; its output is discarded.</em></p>
+<pre><code class="language-C++">int ernie::app::RunProcess (
+    const std::vector&lt; std::string &gt; &amp; command
+) 
+</code></pre>
+<p>Returns its exit status, or -1 when it could not start. </p>
 <hr>
 
 <h3 id="function-schemaof">function SchemaOf</h3>
@@ -1014,6 +1259,26 @@ DemoInfo ernie::app::MakeDemoInfo (
 </code></pre>
 <hr>
 
+<h3 id="function-setproductvar">function SetProductVar</h3>
+<p><em>Adds a</em> <a href="../classernie_1_1RenderVar/"><em><strong>RenderVar</strong></em></a> <em>of source name</em><code>name</code> <em>to</em><code>product</code> <em>'s ordered vars (a child of the product named as it, numbered when taken), or with</em><code>held</code> <em>false removes those of that name and their prims.</em></p>
+<pre><code class="language-C++">void ernie::app::SetProductVar (
+    Scene &amp; scene,
+    const Path &amp; product,
+    std::string_view name,
+    bool held
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-stagevarof">function StageVarOf</h3>
+<p><em>The render var showing the image right after filter</em> <code>type</code> <em>, the domain it leaves: SpectralRadiance, Electrons, RawDN, HdrColor or LdrColor; LdrColor for a type neither built in nor in</em><code>registry</code> <em>.</em></p>
+<pre><code class="language-C++">std::string_view ernie::app::StageVarOf (
+    std::string_view type,
+    const SensorFilterRegistry &amp; registry
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-union">function Union</h3>
 <p><em>The union of</em> <code>bounds</code> <em>, ignoring missing ones; none if all are missing.</em></p>
 <pre><code class="language-C++">std::optional&lt; Bounds3 &gt; ernie::app::Union (
@@ -1022,11 +1287,28 @@ DemoInfo ernie::app::MakeDemoInfo (
 </code></pre>
 <hr>
 
+<h3 id="function-uniquepath">function UniquePath</h3>
+<p><code>path</code> <em>if nothing is there, else with</em><code>_1</code> <em>,</em><code>_2</code> <em>, ... before its extension: a capture never overwrites another.</em></p>
+<pre><code class="language-C++">std::filesystem::path ernie::app::UniquePath (
+    const std::filesystem::path &amp; path
+) 
+</code></pre>
+<hr>
+
 <h3 id="function-updatesessionlights">function UpdateSessionLights</h3>
-<p><em>Defines the session lights if missing, and turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>; sets nothing that is already so.</em></p>
+<p><em>Defines the session lights if missing, turns the camera light to shine along the -z axis of</em> <code>cameraWorld</code> <em>and gives both</em><code>illuminance</code> <em>lux on a surface facing them (when above 0); sets nothing that is already so.</em></p>
 <pre><code class="language-C++">void ernie::app::UpdateSessionLights (
     Scene &amp; scene,
-    const glm::dmat4 &amp; cameraWorld
+    const glm::dmat4 &amp; cameraWorld,
+    double illuminance=0.0
+) 
+</code></pre>
+<hr>
+
+<h3 id="function-videoextension">function VideoExtension</h3>
+<p><em>The file extension of</em> <code>format</code> <em>'s videos (".mp4", ".mov"), or "" for</em><code>None</code> <em>.</em></p>
+<pre><code class="language-C++">const char * ernie::app::VideoExtension (
+    VideoFormat format
 ) 
 </code></pre>
 <hr>
