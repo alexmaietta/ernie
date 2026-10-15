@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791798930799,
+  "lastUpdate": 1792027249926,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -12861,6 +12861,128 @@ window.BENCHMARK_DATA = {
             "name": "test-windows-2: compiles",
             "value": 761,
             "unit": "files"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "a5cecd802e54c7a617472516a1ce13ebe7dd8b28",
+          "message": "demo_shadows_low_sun: a ridge's shadow on a Moon-sized planet under a low sun, through cascades, horizon maps and both; ernie:shadows:horizons turns the horizon maps off",
+          "timestamp": "2026-10-14T02:25:54Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/a5cecd802e54c7a617472516a1ce13ebe7dd8b28"
+        },
+        "date": 1792027248219,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 66.72,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 66.67,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): Build OpenUSD",
+            "value": 64.18,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 41.03,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): Build OpenUSD",
+            "value": 40.37,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.1,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.07,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 27.98,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 474,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 44.61,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 27.09,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 472,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 44.37,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 28.17,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 474,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 44.4,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 24.29,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 475,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 44.73,
+            "unit": "%"
           }
         ]
       }
