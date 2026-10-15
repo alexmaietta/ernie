@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792027249926,
+  "lastUpdate": 1792031204588,
   "repoUrl": "https://github.com/alexmaietta/ernie",
   "entries": {
     "CI": [
@@ -12982,6 +12982,223 @@ window.BENCHMARK_DATA = {
           {
             "name": "sanitize-4: ccache miss rate",
             "value": 44.73,
+            "unit": "%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "committer": {
+            "name": "Alex Maietta",
+            "username": "alexmaietta",
+            "email": "maiettaalex@gmail.com"
+          },
+          "id": "5c95782e28a6b91b82bb1dc078ecc81462a02ab4",
+          "message": "CI fixed: HEAD compiles again, std::thread for Apple's libc++, OpenVDB deps find their tools, X11 for MaterialX, every file formatted",
+          "timestamp": "2026-10-15T01:44:52Z",
+          "url": "https://github.com/alexmaietta/ernie/commit/5c95782e28a6b91b82bb1dc078ecc81462a02ab4"
+        },
+        "date": 1792031202442,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "CI: wall time",
+            "value": 40.03,
+            "unit": "min"
+          },
+          {
+            "name": "format: job",
+            "value": 0.82,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): job",
+            "value": 23.37,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (linux-gcc): Build OpenUSD",
+            "value": 22.87,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (macos): job",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "openusd (windows): job",
+            "value": 0.3,
+            "unit": "min"
+          },
+          {
+            "name": "version: job",
+            "value": 0.12,
+            "unit": "min"
+          },
+          {
+            "name": "packages: job",
+            "value": 25.55,
+            "unit": "min"
+          },
+          {
+            "name": "packages: Build the packages",
+            "value": 24.22,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): job",
+            "value": 11.52,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-aarch64): wheel build",
+            "value": 11.37,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): job",
+            "value": 15.62,
+            "unit": "min"
+          },
+          {
+            "name": "wheel (linux-x86_64): wheel build",
+            "value": 15.47,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: job",
+            "value": 0.22,
+            "unit": "min"
+          },
+          {
+            "name": "sdist: Build and check the sdist",
+            "value": 0.07,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): job",
+            "value": 0.75,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (fedora:latest): Build and run an application against them",
+            "value": 0.2,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): job",
+            "value": 0.87,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:24.04): Build and run an application against them",
+            "value": 0.27,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): job",
+            "value": 0.92,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (ubuntu:22.04): Build and run an application against them",
+            "value": 0.28,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): job",
+            "value": 0.88,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (rockylinux:9): Build and run an application against them",
+            "value": 0.18,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): job",
+            "value": 0.62,
+            "unit": "min"
+          },
+          {
+            "name": "package-test (debian:12): Build and run an application against them",
+            "value": 0.05,
+            "unit": "min"
+          },
+          {
+            "name": "docker: job",
+            "value": 1.38,
+            "unit": "min"
+          },
+          {
+            "name": "docker: Build",
+            "value": 0.7,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compile time",
+            "value": 21.65,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-1: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-1: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-2: compile time",
+            "value": 36.55,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-2: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-2: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-3: compile time",
+            "value": 34.94,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-3: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-3: ccache miss rate",
+            "value": 25.63,
+            "unit": "%"
+          },
+          {
+            "name": "sanitize-4: compile time",
+            "value": 35.82,
+            "unit": "min"
+          },
+          {
+            "name": "sanitize-4: compiles",
+            "value": 594,
+            "unit": "files"
+          },
+          {
+            "name": "sanitize-4: ccache miss rate",
+            "value": 25.63,
             "unit": "%"
           }
         ]
