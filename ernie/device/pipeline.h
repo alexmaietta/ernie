@@ -138,16 +138,17 @@ class ComputePipeline {
 /// Vulkan functions it keeps to itself.
 void ComputeBarrier(VkCommandBuffer commands);
 
-/// Fixed-function state of a graphics pipeline that draws triangle
-/// lists without vertex buffers.
+/// @brief Shaders and fixed-function state of a graphics pipeline
+/// that draws triangle lists without vertex buffers.
 struct GraphicsPipelineDesc {
-    std::span<const std::uint32_t> vertexSpirv;
-    std::span<const std::uint32_t>
-        fragmentSpirv;  ///< Empty for depth-only passes.
+    /// The vertex shader's SPIR-V, owned so it cannot dangle.
+    std::vector<std::uint32_t> vertexSpirv;
+    /// The fragment shader's SPIR-V; empty for depth-only passes.
+    std::vector<std::uint32_t> fragmentSpirv;
     std::string vertexEntry = "main";
     std::string fragmentEntry = "main";
-    VkFormat colorFormat =
-        VK_FORMAT_UNDEFINED;  ///< Undefined for depth-only passes.
+    /// Undefined for depth-only passes.
+    VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     /// Several colour attachments in this order, replacing
     /// `colorFormat` when not empty.
     std::vector<VkFormat> colorFormats;
