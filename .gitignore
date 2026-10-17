@@ -1,0 +1,9 @@
+# Local design documents
+docs/requirements/
+
+# Build output
+build/
+dist/
+*.egg-info/
+__pycache__/
+.venv/
