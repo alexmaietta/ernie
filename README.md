@@ -94,8 +94,7 @@ sudo dnf install ./ernie-*.rpm
 The `ernie` program is also published as a Docker image.
 
 ```sh
-docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie \
-  --demo demo_atmosphere_earth --viewer null --output /out/earth.png
+docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie --demo demo_atmosphere_earth --viewer null --output /out/earth.png
 ```
 
 ### Build from source

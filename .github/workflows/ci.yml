@@ -270,11 +270,16 @@ jobs:
           apt-get install -y --no-install-recommends ./*.deb mesa-vulkan-drivers
       - name: Install
         if: ${{ startsWith(matrix.image, 'rockylinux') }}
-        run: dnf install -y ./*.rpm mesa-vulkan-drivers
+        run: dnf install -y ./*.rpm
+      # Rocky 9 has no lavapipe for aarch64, so there the program is only run, not given a device.
+      - name: Install lavapipe
+        if: ${{ startsWith(matrix.image, 'rockylinux') && matrix.arch == 'x86_64' }}
+        run: dnf install -y mesa-vulkan-drivers
       - name: Run
-        run: |
-          ernie --version
-          ernie --devices | grep -i llvmpipe
+        run: ernie --version
+      - name: List devices
+        if: ${{ !(startsWith(matrix.image, 'rockylinux') && matrix.arch == 'aarch64') }}
+        run: ernie --devices | grep -i llvmpipe
 
   # The ernie program's image, built from source; pushed to GHCR from main (dev) and release tags.
   docker:
