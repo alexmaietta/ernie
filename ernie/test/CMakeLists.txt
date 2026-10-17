@@ -1,7 +1,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 include("${PROJECT_SOURCE_DIR}/cmake/ErnieTesting.cmake")
 
-ernie_add_test_suite(core SOURCES core/version_test.cpp LIBRARIES ernie_core)
+ernie_add_test_suite(
+    core
+    SOURCES
+        core/disk_cache_test.cpp
+        core/log_test.cpp
+        core/mapped_file_test.cpp
+        core/noise_test.cpp
+        core/profile_report_test.cpp
+        core/profiler_test.cpp
+        core/random_test.cpp
+        core/tensor_test.cpp
+        core/version_test.cpp
+        core/worker_pool_test.cpp
+    LIBRARIES ernie_core ernie_json
+)
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)
 
 if(TARGET _ernie)

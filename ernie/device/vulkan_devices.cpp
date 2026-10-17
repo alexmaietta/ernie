@@ -73,7 +73,7 @@ class ScopedInstance {
     VkInstance instance_ = VK_NULL_HANDLE;
 };
 
-VulkanDeviceType DeviceTypeOf(VkPhysicalDeviceType type) {
+VulkanDeviceType ToDeviceType(VkPhysicalDeviceType type) {
     switch (type) {
     case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
         return VulkanDeviceType::IntegratedGpu;
@@ -88,11 +88,11 @@ VulkanDeviceType DeviceTypeOf(VkPhysicalDeviceType type) {
     }
 }
 
-VulkanDeviceInfo InfoOf(VkPhysicalDevice device) {
+VulkanDeviceInfo ReadDeviceInfo(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(device, &properties);
     return {.name = properties.deviceName,
-            .type = DeviceTypeOf(properties.deviceType),
+            .type = ToDeviceType(properties.deviceType),
             .apiMajor = VK_API_VERSION_MAJOR(properties.apiVersion),
             .apiMinor = VK_API_VERSION_MINOR(properties.apiVersion),
             .rayQuery = HasExtension(DeviceExtensions(device), VK_KHR_RAY_QUERY_EXTENSION_NAME)};
@@ -109,7 +109,7 @@ std::vector<VulkanDeviceInfo> ListVulkanDevices() {
 
     std::vector<VulkanDeviceInfo> infos;
     infos.reserve(devices.size());
-    std::ranges::transform(devices, std::back_inserter(infos), InfoOf);
+    std::ranges::transform(devices, std::back_inserter(infos), ReadDeviceInfo);
     return infos;
 }
 

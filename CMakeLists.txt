@@ -1,5 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.21)
+# Extracted downloads get the time they were extracted, so they rebuild when they change.
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 
 project(
     Ernie
@@ -18,6 +22,7 @@ option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
 option(ERNIE_BUILD_APP "Build the ernie program" ON)
 option(ERNIE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(ERNIE_ASSERTS "Keep assertions in optimised builds" OFF)
+option(ERNIE_TRACY "Send profiling zones to the Tracy profiler too" OFF)
 
 get_property(ernie_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(PROJECT_IS_TOP_LEVEL AND NOT ernie_multi_config AND NOT CMAKE_BUILD_TYPE)
@@ -34,6 +39,10 @@ if(ERNIE_BUILD_PYTHON)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
+include(cmake/third_party/glm.cmake)
+include(cmake/third_party/dlpack.cmake)
+include(cmake/third_party/json.cmake)
+include(cmake/third_party/tracy.cmake)
 include(cmake/third_party/vulkan_headers.cmake)
 include(cmake/third_party/volk.cmake)
 
