@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+include("${PROJECT_SOURCE_DIR}/cmake/ErnieTesting.cmake")
+
+ernie_add_test_suite(core SOURCES core/version_test.cpp LIBRARIES ernie_core)
+ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)
+
+if(TARGET _ernie)
+    # The interpreter tests run with; CI passes the one on its PATH.
+    set(ERNIE_TEST_PYTHON
+        "${Python_EXECUTABLE}"
+        CACHE STRING
+        "Python interpreter for the Python tests"
+    )
+    file(GLOB python_tests CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/python/test_*.py")
+    foreach(file ${python_tests})
+        get_filename_component(name "${file}" NAME_WE)
+        add_test(
+            NAME ernie.python.${name}
+            COMMAND "${ERNIE_TEST_PYTHON}" -m pytest -q "${file}"
+        )
+        set_tests_properties(
+            ernie.python.${name}
+            PROPERTIES
+                ENVIRONMENT "PYTHONPATH=${PROJECT_BINARY_DIR}/python"
+                LABELS python
+                TIMEOUT ${ERNIE_TEST_TIMEOUT_python}
+        )
+    endforeach()
+endif()

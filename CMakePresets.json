@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development",
+      "description": "Everything built, with tests, in build/dev",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ERNIE_BUILD_TESTS": "ON",
+        "ERNIE_BUILD_PYTHON": "ON",
+        "ERNIE_BUILD_APP": "ON"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI",
+      "description": "Release with assertions and warnings as errors, as CI builds it, in build/ci",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build/ci",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ERNIE_ASSERTS": "ON",
+        "ERNIE_WARNINGS_AS_ERRORS": "ON",
+        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+      }
+    },
+    {
+      "name": "package",
+      "displayName": "Packages",
+      "description": "Release build of the ernie program for DEB, RPM and TGZ packages, in build/package",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/package",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "/usr",
+        "ERNIE_BUILD_APP": "ON",
+        "ERNIE_BUILD_TESTS": "OFF",
+        "ERNIE_BUILD_PYTHON": "OFF",
+        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
+    },
+    {
+      "name": "package",
+      "configurePreset": "package"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

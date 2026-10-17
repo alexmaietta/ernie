@@ -1,9 +1,12 @@
 # Local design documents
 docs/requirements/
 
-# Build output
+# Build output and fetched dependencies
 build/
 dist/
+.deps/
 *.egg-info/
 __pycache__/
 .venv/
+.pytest_cache/
+.ruff_cache/
