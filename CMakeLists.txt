@@ -40,7 +40,11 @@ include(cmake/third_party/volk.cmake)
 add_library(ernie_build_options INTERFACE)
 if(MSVC)
     target_compile_options(ernie_build_options INTERFACE /W4 /permissive- /Zc:__cplusplus /utf-8)
-    target_compile_definitions(ernie_build_options INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN)
+    # The CRT's "unsafe function" deprecations (getenv, fopen) would fail warnings-as-errors builds.
+    target_compile_definitions(
+        ernie_build_options
+        INTERFACE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS
+    )
 else()
     target_compile_options(
         ernie_build_options

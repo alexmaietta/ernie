@@ -17,6 +17,12 @@ set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 
 # The program loads the Vulkan loader at run time, so it is a dependency the linker cannot see.
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+# Set here, as CPack otherwise asks dpkg, which the manylinux build image lacks.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE amd64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE arm64)
+endif()
 # Built on manylinux_2_34 (glibc 2.34, GCC 11's libstdc++), so these are the floors.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.34), libstdc++6 (>= 11), libvulkan1")
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "mesa-vulkan-drivers")
