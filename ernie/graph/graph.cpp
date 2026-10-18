@@ -68,17 +68,32 @@ ImageUsage NeededUsage(Use use) {
 
 }  // namespace
 
-std::uint32_t PassBuilder::Declare(std::uint32_t id, std::uint32_t version, bool image, Use use,
+std::uint32_t PassBuilder::Declare(std::uint32_t id, std::uint32_t version, Shape shape, Use use,
                                    Layers layers, Reach reach, bool write) {
-    if (id >= graph_.resources_.size() || graph_.resources_[id].image != image) {
-        throw std::invalid_argument(std::string("An invalid ") + (image ? "image" : "buffer") +
-                                    " handle");
+    const auto shapeOf = [](const Graph::Resource& resource) {
+        return resource.image                     ? Shape::Image
+               : resource.acceleration != nullptr ? Shape::Acceleration
+                                                  : Shape::Buffer;
+    };
+    if (id >= graph_.resources_.size() || shapeOf(graph_.resources_[id]) != shape) {
+        static constexpr const char* kShapes[] = {"image", "buffer", "acceleration structure"};
+        throw std::invalid_argument(std::string("An invalid ") +
+                                    kShapes[static_cast<std::size_t>(shape)] + " handle");
     }
     Graph::Resource& resource = graph_.resources_[id];
     Graph::Pass& pass = graph_.passes_[pass_];
     if (Writes(use) != write) {
         throw std::invalid_argument("Pass '" + pass.name + "' declares " + ToString(use) + " on '" +
                                     resource.name + "' as a " + (write ? "write" : "read"));
+    }
+    // Structures are built and traced; the memory they live in is no plain buffer, and the other
+    // way round.
+    const bool structureUse = use == Use::BuildOutput || use == Use::Trace;
+    if (structureUse != (shape == Shape::Acceleration) && use != Use::BuildInput) {
+        throw std::invalid_argument(
+            "Pass '" + pass.name + "' declares " + ToString(use) + " on '" + resource.name +
+            "', which " +
+            (structureUse ? "is no acceleration structure" : "is an acceleration structure"));
     }
     if (version > resource.version) {
         throw GraphError("Pass '" + pass.name + "' uses a version of '" + resource.name +
@@ -92,35 +107,53 @@ std::uint32_t PassBuilder::Declare(std::uint32_t id, std::uint32_t version, bool
 }
 
 Image PassBuilder::Read(Image image, Use use, Layers layers) {
-    Declare(image.id, image.version, true, use, layers, Reach::Descriptor, false);
+    Declare(image.id, image.version, Shape::Image, use, layers, Reach::Descriptor, false);
     return image;
 }
 
 Image PassBuilder::Write(Image image, Use use, Layers layers) {
-    return {image.id, Declare(image.id, image.version, true, use, layers, Reach::Descriptor, true)};
+    return {image.id,
+            Declare(image.id, image.version, Shape::Image, use, layers, Reach::Descriptor, true)};
 }
 
 Buffer PassBuilder::Read(Buffer buffer, Use use) {
-    Declare(buffer.id, buffer.version, false, use, {}, Reach::Descriptor, false);
+    Declare(buffer.id, buffer.version, Shape::Buffer, use, {}, Reach::Descriptor, false);
     return buffer;
 }
 
 Buffer PassBuilder::Write(Buffer buffer, Use use) {
-    return {buffer.id, Declare(buffer.id, buffer.version, false, use, {}, Reach::Descriptor, true)};
+    return {buffer.id,
+            Declare(buffer.id, buffer.version, Shape::Buffer, use, {}, Reach::Descriptor, true)};
 }
 
 Image PassBuilder::ReadBindless(Image image, Use use, Layers layers) {
-    Declare(image.id, image.version, true, use, layers, Reach::Bindless, false);
+    Declare(image.id, image.version, Shape::Image, use, layers, Reach::Bindless, false);
     return image;
 }
 
 Buffer PassBuilder::ReadAddress(Buffer buffer, Use use) {
-    Declare(buffer.id, buffer.version, false, use, {}, Reach::Address, false);
+    Declare(buffer.id, buffer.version, Shape::Buffer, use, {}, Reach::Address, false);
     return buffer;
 }
 
 Buffer PassBuilder::WriteAddress(Buffer buffer, Use use) {
-    return {buffer.id, Declare(buffer.id, buffer.version, false, use, {}, Reach::Address, true)};
+    return {buffer.id,
+            Declare(buffer.id, buffer.version, Shape::Buffer, use, {}, Reach::Address, true)};
+}
+
+Acceleration PassBuilder::Build(Acceleration structure) {
+    return {structure.id, Declare(structure.id, structure.version, Shape::Acceleration,
+                                  Use::BuildOutput, {}, Reach::Address, true)};
+}
+
+Acceleration PassBuilder::Read(Acceleration structure, Use use) {
+    if (use != Use::Trace && use != Use::BuildInput) {
+        throw std::invalid_argument(std::string("An acceleration structure is traced or read by "
+                                                "builds, not used as ") +
+                                    ToString(use));
+    }
+    Declare(structure.id, structure.version, Shape::Acceleration, use, {}, Reach::Address, false);
+    return structure;
 }
 
 void PassBuilder::NeverCull() {
@@ -145,6 +178,11 @@ DeviceImage& PassContext::Get(Image image) const {
 BufferSlice PassContext::Get(Buffer buffer) const {
     Check(buffer.id);
     return graph_.resources_[buffer.id].slice;
+}
+
+const AccelerationStructure& PassContext::Get(Acceleration structure) const {
+    Check(structure.id);
+    return *graph_.resources_[structure.id].acceleration;
 }
 
 VkImageLayout PassContext::Layout(Image image) const {
@@ -191,11 +229,26 @@ Buffer Graph::Import(const DeviceColumn& column, std::string_view name) {
     return Import(column.Storage(), column.Range().offset, column.Bytes(), name);
 }
 
+Acceleration Graph::Import(const AccelerationStructure& structure) {
+    const auto found = std::ranges::find(resources_, &structure, &Resource::acceleration);
+    if (found != resources_.end()) {
+        return {static_cast<std::uint32_t>(found - resources_.begin()), found->version};
+    }
+    return {AddResource(
+                {.name = structure.Name(),
+                 .imported = true,
+                 .slice = {&structure.Storage(), structure.Range().offset, structure.Range().size},
+                 .acceleration = &structure,
+                 .origin = Origin::Imported}),
+            0};
+}
+
 Buffer Graph::Import(const ernie::Buffer& buffer, std::uint64_t offset, std::uint64_t size,
                      std::string_view name) {
     const auto found = std::ranges::find_if(resources_, [&](const Resource& resource) {
-        return resource.imported && !resource.image && resource.slice.buffer == &buffer &&
-               resource.slice.offset == offset && resource.slice.size == size;
+        return resource.imported && !resource.image && resource.acceleration == nullptr &&
+               resource.slice.buffer == &buffer && resource.slice.offset == offset &&
+               resource.slice.size == size;
     });
     if (found != resources_.end()) {
         return {static_cast<std::uint32_t>(found - resources_.begin()), found->version};
@@ -469,8 +522,11 @@ std::string Graph::Dot() const {
     dot << "digraph FrameGraph {\n  rankdir=LR;\n";
     for (std::size_t r = 0; r < resources_.size(); ++r) {
         const Resource& resource = resources_[r];
-        dot << "  r" << r << " [shape=" << (resource.image ? "ellipse" : "cylinder") << ", label=\""
-            << resource.name << "\"" << (resource.imported ? ", style=bold" : "") << "];\n";
+        const char* shape = resource.image                     ? "ellipse"
+                            : resource.acceleration != nullptr ? "hexagon"
+                                                               : "cylinder";
+        dot << "  r" << r << " [shape=" << shape << ", label=\"" << resource.name << "\""
+            << (resource.imported ? ", style=bold" : "") << "];\n";
     }
     for (std::size_t p = 0; p < passes_.size(); ++p) {
         const Pass& pass = passes_[p];

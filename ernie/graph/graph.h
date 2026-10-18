@@ -29,6 +29,7 @@
 /// - H.-K. Arntzen, "Render graphs and Vulkan — a deep dive", 2017.
 #pragma once
 
+#include "ernie/device/acceleration.h"
 #include "ernie/device/column.h"
 #include "ernie/device/image.h"
 #include "ernie/graph/blackboard.h"
@@ -72,6 +73,15 @@ struct Buffer {
     }
 };
 
+/// @brief A graph's acceleration structure; each build or refit makes a new version.
+struct Acceleration {
+    std::uint32_t id = ~0u;
+    std::uint32_t version = 0;
+    bool Valid() const {
+        return id != ~0u;
+    }
+};
+
 /// @brief A buffer resource as a pass records with it: a range of a device buffer.
 struct BufferSlice {
     const ernie::Buffer* buffer = nullptr;
@@ -102,14 +112,22 @@ class PassBuilder {
     Buffer ReadAddress(Buffer buffer, Use use = Use::StorageRead);
     /// @brief Declares a write through a device address.
     Buffer WriteAddress(Buffer buffer, Use use = Use::StorageReadWrite);
+    /// @brief Declares building, refitting or compacting into a structure.
+    /// @return The new version.
+    Acceleration Build(Acceleration structure);
+    /// @brief Declares tracing a structure, or reading it to build a top level, copy or query it
+    /// (`Use::BuildInput`).
+    /// @throws std::invalid_argument for a use other than tracing or a build's input.
+    Acceleration Read(Acceleration structure, Use use = Use::Trace);
     /// @brief Keeps the pass though nothing reads what it writes, as for one the host reads.
     void NeverCull();
 
   private:
     friend class Graph;
+    enum class Shape : std::uint8_t { Image, Buffer, Acceleration };
     PassBuilder(Graph& graph, std::uint32_t pass) : graph_(graph), pass_(pass) {}
 
-    std::uint32_t Declare(std::uint32_t id, std::uint32_t version, bool image, Use use,
+    std::uint32_t Declare(std::uint32_t id, std::uint32_t version, Shape shape, Use use,
                           Layers layers, Reach reach, bool write);
 
     Graph& graph_;
@@ -124,6 +142,7 @@ class PassContext {
     /// @throws std::logic_error unless the pass declared it.
     DeviceImage& Get(Image image) const;
     BufferSlice Get(Buffer buffer) const;
+    const AccelerationStructure& Get(Acceleration structure) const;
     /// @return The image's layout during the pass, for attachments.
     VkImageLayout Layout(Image image) const;
     DeviceContext& Context() const;
@@ -159,6 +178,9 @@ class Graph {
     /// @brief Uses a range of a buffer owned outside the graph.
     Buffer Import(const ernie::Buffer& buffer, std::uint64_t offset, std::uint64_t size,
                   std::string_view name);
+    /// @brief Uses an acceleration structure owned outside the graph, such as a pooled bottom or
+    /// top level; importing it again returns the same resource.
+    Acceleration Import(const AccelerationStructure& structure);
     /// @brief Declares an image living for one execution; the usage its passes declare is
     /// added to `description`'s.
     Image Create(const ImageDescription& description, std::string_view name);
@@ -237,7 +259,9 @@ class Graph {
         bool image = false;
         bool imported = false;
         DeviceImage* deviceImage = nullptr;
+        /// A buffer's range, or the memory a structure lives in.
         BufferSlice slice;
+        const AccelerationStructure* acceleration = nullptr;
         /// A transient's description, or size, and its leased range.
         ImageDescription description;
         std::uint64_t bytes = 0;

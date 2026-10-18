@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstring>
 #include <vector>
 
@@ -212,6 +213,149 @@ TEST_F(FrameGraph, RecordsPassesInNestedScopes) {
     const std::vector<std::uint32_t> read =
         Read(*context_, values, graph.Execute(context_->Main()));
     EXPECT_EQ(read[10], 21u);
+}
+
+/// Traces a ray along +z from (x, 0, 0) for each x, writing the hit distance or -1.
+const ShaderModule kTrace{"trace", R"(
+struct Parameters { uint64_t scene; float* xs; float* hits; uint count; };
+[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void main(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= parameters.count) {
+        return;
+    }
+    RayDesc ray;
+    ray.Origin = float3(parameters.xs[id.x], 0, 0);
+    ray.Direction = float3(0, 0, 1);
+    ray.TMin = 0;
+    ray.TMax = 1e30;
+    RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(RaytracingAccelerationStructure(parameters.scene), RAY_FLAG_NONE, 0xff,
+                         ray);
+    query.Proceed();
+    parameters.hits[id.x] =
+        query.CommittedStatus() == COMMITTED_TRIANGLE_HIT ? query.CommittedRayT() : -1;
+}
+)"};
+
+struct TraceParameters {
+    VkDeviceAddress scene, xs, hits;
+    std::uint32_t count, pad;
+};
+
+TEST_F(FrameGraph, OrdersBuildsBeforeTheBuildsAndTracesThatReadThem) {
+    if (!context_->Capabilities().rayQuery) {
+        GTEST_SKIP() << context_->Info().name << " has no ray queries";
+    }
+    const ComputeKernel trace(*context_, compiler_.Spirv(std::span(&kTrace, 1), "main"), "trace",
+                              std::uint32_t{sizeof(TraceParameters)});
+    AccelerationPool structures(*context_, "test structures");
+    // A triangle at z = 0 around the z axis, an instance of it at z = 5, and two rays.
+    const ernie::Buffer geometry(*context_, 256, MemoryUse::Device, "geometry");
+    const ernie::Buffer inputs(*context_, 256, MemoryUse::Device, "instances and rays");
+    const DeviceColumn hits(*arenas_, "hits", DType::Float32, {}, 2);
+    const TriangleGeometry triangle{.vertices = {&geometry, 0},
+                                    .vertexCount = 3,
+                                    .indices = {&geometry, 64},
+                                    .triangleCount = 1};
+    const AccelerationStructure bottom(
+        structures, Sizes(*context_, std::span(&triangle, 1), kStatic), "triangle");
+    const AccelerationStructure top(structures, Sizes(*context_, 1, kRebuilt), "scene");
+    AccelerationInstance instance;
+    instance.transform[2][3] = 5.0f;
+    instance.bottom = bottom.Address();
+    Uploader uploader(*context_, context_->Main());
+    uploader.Write(geometry, 0,
+                   std::span<const float>(std::array<float, 9>{-1, -1, 0, 1, -1, 0, 0, 1, 0}));
+    uploader.Write(geometry, 64,
+                   std::span<const std::uint32_t>(std::array<std::uint32_t, 3>{0, 1, 2}));
+    uploader.Write(inputs, 0, std::span<const AccelerationInstance>(&instance, 1));
+    uploader.Write(inputs, 128, std::span<const float>(std::array<float, 2>{0.0f, 4.0f}));
+    const Ticket uploaded = uploader.Flush();
+
+    Graph graph(*context_, *pool_);
+    graph::Acceleration triangles = graph.Import(bottom);
+    graph::Acceleration scene = graph.Import(top);
+    const graph::Buffer vertices = graph.Import(geometry, 0, geometry.Size(), "geometry");
+    const graph::Buffer instances = graph.Import(inputs, 0, 128, "instances");
+    const graph::Buffer rays = graph.Import(inputs, 128, 8, "rays");
+    graph::Buffer distances = graph.Import(hits, "hits");
+    const BottomBuild bottomBuild{.target = &bottom, .triangles = std::span(&triangle, 1)};
+    const TopBuild topBuild{.target = &top, .count = 1};
+    graph::Buffer bottomScratch =
+        graph.Create(ScratchBytes(std::span(&bottomBuild, 1), {}), "scratch");
+    graph::Buffer topScratch = graph.Create(ScratchBytes({}, std::span(&topBuild, 1)), "scratch");
+    graph.Add(
+        "Build bottom levels", Kind::Build,
+        [&](PassBuilder& pass) {
+            pass.Read(vertices, Use::BuildInput);
+            bottomScratch = pass.Write(bottomScratch, Use::BuildScratch);
+            triangles = pass.Build(triangles);
+        },
+        [&](PassContext& pass) {
+            const BufferSlice scratch = pass.Get(bottomScratch);
+            RecordBuilds(pass.commands, std::span(&bottomBuild, 1), {},
+                         {scratch.buffer, scratch.offset});
+        });
+    graph.Add(
+        "Build the top level", Kind::Build,
+        [&](PassBuilder& pass) {
+            pass.Read(triangles, Use::BuildInput);
+            pass.Read(instances, Use::BuildInput);
+            topScratch = pass.Write(topScratch, Use::BuildScratch);
+            scene = pass.Build(scene);
+        },
+        [&](PassContext& pass) {
+            const BufferSlice scratch = pass.Get(topScratch);
+            TopBuild build = topBuild;
+            build.instances = {pass.Get(instances).buffer, pass.Get(instances).offset};
+            RecordBuilds(pass.commands, {}, std::span(&build, 1), {scratch.buffer, scratch.offset});
+        });
+    graph.Add(
+        "Trace", Kind::Compute,
+        [&](PassBuilder& pass) {
+            pass.Read(scene);
+            pass.ReadAddress(rays);
+            distances = pass.WriteAddress(distances, Use::StorageWrite);
+        },
+        [&](PassContext& pass) {
+            trace.Dispatch(pass.commands, {1, 1, 1},
+                           TraceParameters{pass.Get(scene).Address(), pass.Get(rays).Address(),
+                                           pass.Get(distances).Address(), 2, 0});
+        });
+    EXPECT_NE(graph.Dot().find("shape=hexagon"), std::string::npos) << "structures drawn as such";
+    const Ticket done = graph.Execute(context_->Main(), std::span(&uploaded, 1));
+    Readback readback(*context_, context_->Main(), hits.Storage(), hits.Range().offset, 8,
+                      std::span(&done, 1));
+    std::array<float, 2> found{};
+    std::memcpy(found.data(), readback.Bytes().data(), sizeof(found));
+    EXPECT_NEAR(found[0], 5.0f, 1e-5f) << "through the triangle";
+    EXPECT_EQ(found[1], -1.0f) << "beside it";
+}
+
+TEST_F(FrameGraph, KeepsStructuresAndBuffersToTheirOwnUses) {
+    if (!context_->Capabilities().rayQuery) {
+        GTEST_SKIP() << context_->Info().name << " has no ray queries";
+    }
+    AccelerationPool structures(*context_, "test structures");
+    const AccelerationStructure top(structures, Sizes(*context_, 1, kRebuilt), "scene");
+    const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);
+    Graph graph(*context_, *pool_);
+    const graph::Acceleration scene = graph.Import(top);
+    const graph::Buffer buffer = graph.Import(values, "values");
+    EXPECT_THROW(graph.Add(
+                     "Trace a buffer", Kind::Compute,
+                     [&](PassBuilder& pass) { pass.Read(buffer, Use::Trace); },
+                     [](PassContext&) {}),
+                 std::invalid_argument);
+    EXPECT_THROW(graph.Add(
+                     "Sample a structure", Kind::Compute,
+                     [&](PassBuilder& pass) { pass.Read(scene, Use::StorageRead); },
+                     [](PassContext&) {}),
+                 std::invalid_argument);
+    EXPECT_EQ(graph.Import(top).id, scene.id) << "importing it again finds the same resource";
 }
 
 TEST_F(FrameGraph, ReportsReadsOfWhatNothingWrote) {
