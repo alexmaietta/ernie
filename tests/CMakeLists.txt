@@ -71,6 +71,7 @@ ernie_add_test_suite(
         scene/schema_test.cpp
         scene/shade_test.cpp
         scene/storage_test.cpp
+        scene/time_samples_test.cpp
         scene/vol_test.cpp
         scene/xform_test.cpp
     LIBRARIES ernie_static

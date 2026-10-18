@@ -20,6 +20,8 @@ inline constexpr std::string_view kTypeName = "typeName";
 inline constexpr std::string_view kApis = "apiSchemas";
 inline constexpr std::string_view kXform = "xform";
 inline constexpr std::string_view kArray = "$array";
+/// The suffix of an attribute's samples by time code, as USD's text format writes them.
+inline constexpr std::string_view kTimeSamples = ".timeSamples";
 
 /// @return A value as scene files write it: vectors as arrays, quaternions as [w, x, y, z],
 /// matrices as 4 rows, paths as strings, floats in their shortest form.

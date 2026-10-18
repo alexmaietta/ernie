@@ -80,6 +80,7 @@ bool Scene::Remove(const Path& path) {
         const PathId next = pending.back();
         pending.pop_back();
         if (const std::optional<PrimId> prim = store_.Find(next)) {
+            animated_.erase(prim->slot);
             store_.Remove(*prim);
         }
         store_.Paths().ForEachChild(next, [&](PathId child) { pending.push_back(child); });
@@ -137,6 +138,15 @@ std::vector<Path> Scene::Prims(std::string_view type) const {
 }
 
 void Scene::Set(PrimId prim, std::string_view attribute, const Value& value) {
+    ClearSamples(prim, attribute);
+    Author(prim, attribute, value);
+}
+
+void Scene::Set(const Path& path, std::string_view attribute, const Value& value) {
+    Set(Require(path), attribute, value);
+}
+
+void Scene::Author(PrimId prim, std::string_view attribute, const Value& value, Value* checked) {
     const AttributeId token = store_.Tokens().Intern(attribute);
     const AttributeDef* def = Declared(store_.PrimBucket(prim), token);
     if (def != nullptr) {
@@ -149,17 +159,23 @@ void Scene::Set(PrimId prim, std::string_view attribute, const Value& value) {
             throw std::invalid_argument(Describe(*this, prim) + ": '" + std::string(attribute) +
                                         "' takes another type of value");
         }
-        store_.Set(prim, token, std::move(*element));
+        if (checked != nullptr) {
+            *checked = ToValue(store_.Paths(), *element);
+        } else {
+            store_.Set(prim, token, std::move(*element));
+        }
     });
 }
 
-void Scene::Set(const Path& path, std::string_view attribute, const Value& value) {
-    Set(Require(path), attribute, value);
+void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
+    ClearSamples(prim, attribute);
+    CheckArray(prim, attribute, array);
+    store_.Set(prim, store_.Tokens().Intern(attribute), std::move(array));
 }
 
-void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
-    const AttributeId token = store_.Tokens().Intern(attribute);
-    const AttributeDef* def = Declared(store_.PrimBucket(prim), token);
+void Scene::CheckArray(PrimId prim, std::string_view attribute, const Tensor& array) const {
+    const std::optional<Token> token = store_.Tokens().Find(attribute);
+    const AttributeDef* def = token ? Declared(store_.PrimBucket(prim), *token) : nullptr;
     if (def == nullptr && !TakesUndeclared(prim, attribute)) {
         throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
                                     std::string(attribute) + "'");
@@ -167,7 +183,6 @@ void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
     if (def != nullptr) {
         ValidateArray(*def, attribute, array, PrimPath(prim));
     }
-    store_.Set(prim, token, std::move(array));
 }
 
 const Tensor* Scene::Read(PrimId prim, std::string_view attribute) const {

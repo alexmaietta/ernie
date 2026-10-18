@@ -239,6 +239,11 @@ Json PrimSchema() {
              {{kTypeName, {{"enum", Names(SchemaKind::Concrete)}}},
               {kApis, ArrayOf(api)},
               {kXform, Ref("XformOps")}}},
+            {"patternProperties",
+             {{Literal(kTimeSamples) + "$",
+               {{"type", "object"},
+                {"description", "The attribute's values by time code."},
+                {"propertyNames", {{"pattern", "^-?[0-9]+(\\.[0-9]+)?([eE][-+]?[0-9]+)?$"}}}}}}},
             {"allOf", std::move(conditions)},
             {"unevaluatedProperties", false}};
 }

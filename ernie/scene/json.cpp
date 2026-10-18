@@ -201,8 +201,13 @@ XformOps ReadXform(const Json& json) {
     return xform;
 }
 
+/// Authors an attribute's value, or with `time` its sample there.
 void LoadAttribute(Scene& scene, PrimId prim, const std::string& name, const Json& json,
-                   std::span<const Tensor> arrays) {
+                   std::span<const Tensor> arrays, std::optional<double> time = std::nullopt) {
+    const auto write = [&](Tensor array) {
+        time ? scene.WriteAt(prim, name, *time, std::move(array))
+             : scene.Write(prim, name, std::move(array));
+    };
     const AttributeDef* def = scene.Declaration(prim, name);
     if (json.is_object() && json.contains(kArray)) {
         const auto index = json[kArray].get<std::size_t>();
@@ -210,14 +215,31 @@ void LoadAttribute(Scene& scene, PrimId prim, const std::string& name, const Jso
             throw std::invalid_argument("names array " + std::to_string(index) + " of " +
                                         std::to_string(arrays.size()));
         }
-        scene.Write(prim, name, arrays[index]);
+        write(arrays[index]);
         return;
     }
     const ColumnType type = def != nullptr ? def->type : Infer(name, json);
     if (type == ColumnType::Tensor) {
-        scene.Write(prim, name, ReadTensor(json, def != nullptr ? &def->meta : nullptr));
+        write(ReadTensor(json, def != nullptr ? &def->meta : nullptr));
     } else {
-        scene.Set(prim, name, ReadValue(json, type));
+        const Value value = ReadValue(json, type);
+        time ? scene.SetAt(prim, name, *time, value) : scene.Set(prim, name, value);
+    }
+}
+
+/// Authors an attribute's samples: `"radius.timeSamples": {"0": 1, "24": 2}`, as USD writes them.
+void LoadSamples(Scene& scene, PrimId prim, const std::string& name, const Json& json,
+                 std::span<const Tensor> arrays) {
+    if (!json.is_object()) {
+        throw std::invalid_argument("maps time codes to values");
+    }
+    for (const auto& [time, value] : json.items()) {
+        std::size_t end = 0;
+        const double code = std::stod(time, &end);
+        if (end != time.size()) {
+            throw std::invalid_argument("'" + time + "' is no time code");
+        }
+        LoadAttribute(scene, prim, name, value, arrays, code);
     }
 }
 
@@ -282,6 +304,9 @@ void LoadPrim(Scene& scene, const Path& path, const Json& json, std::span<const 
         Attempt(problems, path, key, [&] {
             if (key == kXform) {
                 SetXform(scene, path, ReadXform(value));
+            } else if (key.ends_with(kTimeSamples)) {
+                LoadSamples(scene, prim, key.substr(0, key.size() - kTimeSamples.size()), value,
+                            arrays);
             } else {
                 LoadAttribute(scene, prim, key, value, arrays);
             }
@@ -394,6 +419,15 @@ Json WriteTensor(const Tensor& tensor) {
     return nest(nest, 0);
 }
 
+Json WriteSamples(std::span<const TimeSample> samples) {
+    Json json = Json::object();
+    for (const TimeSample& sample : samples) {
+        json[Finite(sample.time).dump()] =
+            sample.tensor.Empty() ? WriteValue(sample.value) : WriteTensor(sample.tensor);
+    }
+    return json;
+}
+
 /// Prints JSON with 2-space indents, keeping arrays of scalars on one line.
 void Print(const Json& json, std::size_t indent, std::string& out) {
     const std::string pad(indent + 2, ' ');
@@ -503,6 +537,10 @@ std::string SaveScene(const Scene& scene) {
                 const Tensor* tensor = scene.Read(prim, name);
                 json[name] =
                     tensor != nullptr ? WriteTensor(*tensor) : WriteValue(*scene.Get(prim, name));
+                if (const std::span<const TimeSample> samples = scene.Samples(prim, name);
+                    !samples.empty()) {
+                    json[name + std::string(kTimeSamples)] = WriteSamples(samples);
+                }
             } catch (const std::exception& error) {
                 throw std::invalid_argument(
                     SceneProblem{path.String(), name, error.what()}.Message());

@@ -2,6 +2,7 @@
 add_library(
     ernie_scene
     OBJECT
+    animation.cpp
     extent_cache.cpp
     holder_index.cpp
     inherit.cpp
@@ -11,6 +12,7 @@ add_library(
     schema.cpp
     scene.cpp
     storage.cpp
+    time_samples.cpp
     usd_plugin.cpp
     validate.cpp
     view.cpp

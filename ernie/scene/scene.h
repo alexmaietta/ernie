@@ -8,10 +8,12 @@
 #include "ernie/scene/holder_index.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/storage.h"
+#include "ernie/scene/time_samples.h"
 #include "ernie/scene/value.h"
 
 #include <glm/glm.hpp>
 
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -79,6 +81,30 @@ class Scene {
     void Write(PrimId prim, std::string_view attribute, Tensor array);
     /// @return The authored array, or null.
     const Tensor* Read(PrimId prim, std::string_view attribute) const;
+
+    /// @brief Sets the attribute's value at a time code, a time sample, as `UsdAttribute::Set`
+    /// with a time does. A sampled attribute holds its samples' value at `Time`, interpolated
+    /// between the samples either side and held beyond the ends; `Set` or `Write` without a time
+    /// drops its samples. An attribute's samples are all values or all arrays.
+    /// @throws std::invalid_argument as `Set` does.
+    void SetAt(PrimId prim, std::string_view attribute, double time, const Value& value);
+    /// @brief `SetAt` for an array, kept and shared as `Write` keeps one. Device arrays between
+    /// samples hold the lower one, for their consumers to mix on the device (`Samples`).
+    void WriteAt(PrimId prim, std::string_view attribute, double time, Tensor array);
+    /// @return The attribute's samples in time order; empty when it has none.
+    std::span<const TimeSample> Samples(PrimId prim, std::string_view attribute) const;
+    /// @return The attribute's value at `time` without moving the clock: its samples', else its
+    /// authored value; none when unset or an array.
+    std::optional<Value> GetAt(PrimId prim, std::string_view attribute, double time) const;
+    /// @brief Drops the attribute's samples, keeping the value it holds now.
+    /// @return Whether it had any.
+    bool ClearSamples(PrimId prim, std::string_view attribute);
+    /// @brief Moves the clock, evaluating every sampled attribute and stamping those whose value
+    /// changes.
+    void SetTime(double timeCode);
+    double Time() const {
+        return time_;
+    }
     /// @return Whether the attribute was authored.
     bool Clear(PrimId prim, std::string_view attribute);
     bool IsAuthored(PrimId prim, std::string_view attribute) const;
@@ -150,6 +176,16 @@ class Scene {
         return &store_.Read<T>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
     }
     std::optional<Value> CellValue(PrimId prim, const Column* column) const;
+    /// Checks a value against the attribute and authors it; with `checked`, converts it there
+    /// instead, as `Get` would return it.
+    void Author(PrimId prim, std::string_view attribute, const Value& value,
+                Value* checked = nullptr);
+    /// @throws std::invalid_argument if the attribute takes no such array.
+    void CheckArray(PrimId prim, std::string_view attribute, const Tensor& array) const;
+    /// Adds a checked sample, then authors the attribute's value at the clock.
+    void AddSample(PrimId prim, std::string_view attribute, TimeSample sample);
+    /// Authors a sampled attribute's value at the clock, if it changed.
+    void Evaluate(PrimId prim, AttributeId attribute, std::span<const TimeSample> samples);
 
     /// Resolves every inherited attribute for the subtrees changed since the last resolve.
     void Resolve();
@@ -182,6 +218,13 @@ class Scene {
     PrimStore store_;
     /// The store version inherited attributes were last resolved at.
     std::uint64_t resolved_ = 0;
+    /// The sampled attributes of each prim, by its slot; sparse, as few attributes are animated.
+    struct Animated {
+        PrimId prim;
+        std::map<AttributeId, std::vector<TimeSample>> samples;
+    };
+    std::unordered_map<std::uint32_t, Animated> animated_;
+    double time_ = 0.0;
     Token inherited_ = 0;
     Token invisible_ = 0;
     Token defaultPurpose_ = 0;

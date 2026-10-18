@@ -99,6 +99,11 @@
     "/World/Sun": {
       "typeName": "DistantLight",
       "inputs:angle": 0.53,
+      "inputs:exposure": 0.0,
+      "inputs:exposure.timeSamples": {
+        "0.0": 0.0,
+        "48.0": -2.5
+      },
       "inputs:intensity": 120000.0,
       "xformOp:rotateZYX": [-35.0, 0.0, 20.0],
       "xformOpOrder": ["xformOp:rotateZYX"]
