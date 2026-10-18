@@ -45,18 +45,23 @@ public struct RayTracer {
         RayQuery<RAY_FLAG_NONE> query;
         ShapeHit nearest;
         Run(query, ray, mask, nearest);
-        Hit hit;
+        Hit hit = {};
         uint status = query.CommittedStatus();
         hit.found = status != COMMITTED_NOTHING;
         hit.t = query.CommittedRayT();
-        hit.instance = hit.found ? query.CommittedInstanceIndex() : 0;
-        hit.primitive = hit.found ? query.CommittedPrimitiveIndex() : 0;
-        hit.geometry = hit.found ? query.CommittedInstanceID() : 0;
-        hit.barycentrics = status == COMMITTED_TRIANGLE_HIT ? query.CommittedTriangleBarycentrics()
-                                                            : float2(0);
-        hit.objectNormal = nearest.normal;
-        hit.objectToWorld = query.CommittedObjectToWorld3x4();
-        hit.worldToObject = query.CommittedWorldToObject3x4();
+        // A committed instance's values are read only once there is one: lavapipe faults on them
+        // after a miss.
+        if (hit.found) {
+            hit.instance = query.CommittedInstanceIndex();
+            hit.primitive = query.CommittedPrimitiveIndex();
+            hit.geometry = query.CommittedInstanceID();
+            if (status == COMMITTED_TRIANGLE_HIT) {
+                hit.barycentrics = query.CommittedTriangleBarycentrics();
+            }
+            hit.objectNormal = nearest.normal;
+            hit.objectToWorld = query.CommittedObjectToWorld3x4();
+            hit.worldToObject = query.CommittedWorldToObject3x4();
+        }
         return hit;
     }
 
