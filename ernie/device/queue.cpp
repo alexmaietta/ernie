@@ -101,12 +101,16 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                      std::span<const Ticket> waits) {
     std::vector<VkSemaphoreSubmitInfo> waitInfos;
     for (const Ticket& wait : waits) {
-        if (wait.Done()) {
+        if (wait.timeline == nullptr) {
             continue;
         }
+        // Checked first, so the error does not depend on how quickly the other device runs.
         if (wait.timeline->Device() != device_) {
             throw DeviceError(DeviceErrorKind::Failed,
                               name_ + " cannot wait on another device's " + wait.timeline->Name());
+        }
+        if (wait.Done()) {
+            continue;
         }
         waitInfos.push_back({.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                              .semaphore = wait.timeline->Handle(),

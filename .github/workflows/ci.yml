@@ -366,12 +366,14 @@ jobs:
         run: |
           cmake --preset package
           cd build/package
-          for libdir in "lib/$(uname -m)-linux-gnu DEB" "lib64 RPM" "lib TGZ"; do
-            set -- $libdir
+          package() {
             cmake "-DCMAKE_INSTALL_LIBDIR=$1" .
             cmake --build . --parallel 4
             cpack -G "$2"
-          done
+          }
+          package "lib/$(uname -m)-linux-gnu" DEB
+          package lib64 RPM
+          package lib TGZ
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-linux-${{ matrix.arch }}
