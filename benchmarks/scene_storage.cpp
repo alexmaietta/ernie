@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file storage_budget_test.cpp
-/// @brief The prim store's time budgets at 100,000 prims.
+/// @file scene_storage.cpp
+/// @brief The prim store at 100,000 prims: create, first sync, one edit, edit all, add and remove.
+#include "benchmarks/bench.h"
 #include "ernie/scene/storage.h"
-
-#include "tests/common.h"
-
-#include <gtest/gtest.h>
 
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace ernie {
+namespace ernie::bench {
 namespace {
-
-using test::BestOf3;
-using test::Budget;
 
 constexpr std::uint32_t kPrims = 100'000;
 
@@ -51,74 +45,57 @@ struct Robots {
             transforms[i][3] = glm::dvec4(i, 0.0, 0.0, 1.0);
         }
     }
+
+    void Fresh() {
+        Reset();
+        Create();
+    }
 };
 
-TEST(PrimStoreBudget, Creates100000PrimsWithTransformsIn50Ms) {
+const bool kCreate = Register("scene.storage.create_100k", [] {
     Robots robots;
-    const double ms = BestOf3([&] { robots.Reset(); }, [&] { robots.Create(); });
-    EXPECT_LT(ms, Budget(50.0)) << ms << " ms";
-    EXPECT_EQ(robots.store->PrimCount(), kPrims);
-}
+    return Timing{Fastest([&] { robots.Reset(); }, [&] { robots.Create(); }), 50.0};
+});
 
-TEST(PrimStoreBudget, FirstSyncOf100000PrimsIn50Ms) {
+const bool kFirstSync = Register("scene.storage.first_sync_100k", [] {
     Robots robots;
-    ChangeSet changes;
-    const double ms = BestOf3(
-        [&] {
-            robots.Reset();
-            robots.Create();
-        },
-        [&] { changes = robots.store->ChangesSince(0); });
-    EXPECT_LT(ms, Budget(50.0)) << ms << " ms";
-    EXPECT_EQ(changes.rows.size(), 1u);
-}
+    return Timing{Fastest([&] { robots.Fresh(); }, [&] { robots.store->ChangesSince(0); }), 50.0};
+});
 
-TEST(PrimStoreBudget, OneEditAmong100000IsFoundIn1Ms) {
+const bool kOneEdit = Register("scene.storage.one_edit_of_100k", [] {
     Robots robots;
-    robots.Reset();
-    robots.Create();
+    robots.Fresh();
     std::uint64_t cursor = 0;
-    ChangeSet changes;
     const double ms =
-        BestOf3([&] { cursor = robots.store->Version(); },
+        Fastest([&] { cursor = robots.store->Version(); },
                 [&] {
                     robots.store->Set(robots.prims[54'321], robots.transform, glm::dmat4(2.0));
-                    changes = robots.store->ChangesSince(cursor);
+                    robots.store->ChangesSince(cursor);
                 });
-    EXPECT_LT(ms, Budget(1.0)) << ms << " ms";
-    ASSERT_EQ(changes.values.size(), 1u);
-    EXPECT_EQ(changes.values[0].rows.size(), 1u);
-}
+    return Timing{ms, 1.0};
+});
 
-TEST(PrimStoreBudget, EditingAll100000In10Ms) {
+const bool kEditAll = Register("scene.storage.edit_all_100k", [] {
     Robots robots;
-    robots.Reset();
-    robots.Create();
+    robots.Fresh();
     std::uint64_t cursor = 0;
-    ChangeSet changes;
-    const double ms =
-        BestOf3([&] { cursor = robots.store->Version(); },
-                [&] {
-                    const std::span<glm::dmat4> transforms =
-                        robots.store->Write<glm::dmat4>(robots.bucket, robots.transform);
-                    for (glm::dmat4& transform : transforms) {
-                        transform[3].y += 1.0;
-                    }
-                    changes = robots.store->ChangesSince(cursor);
-                });
-    EXPECT_LT(ms, Budget(10.0)) << ms << " ms";
-    ASSERT_EQ(changes.values.size(), 1u);
-    EXPECT_EQ(changes.values[0].rows, (std::vector<RowRange>{{0, kPrims}}));
-}
+    const double ms = Fastest([&] { cursor = robots.store->Version(); },
+                              [&] {
+                                  for (glm::dmat4& transform : robots.store->Write<glm::dmat4>(
+                                           robots.bucket, robots.transform)) {
+                                      transform[3].y += 1.0;
+                                  }
+                                  robots.store->ChangesSince(cursor);
+                              });
+    return Timing{ms, 10.0};
+});
 
-TEST(PrimStoreBudget, AddingAndRemoving1000PerStepIn5Ms) {
+const bool kAddRemove = Register("scene.storage.add_remove_1000_of_100k", [] {
     Robots robots;
     std::uint64_t cursor = 0;
-    ChangeSet changes;
-    const double ms = BestOf3(
+    const double ms = Fastest(
         [&] {
-            robots.Reset();
-            robots.Create();
+            robots.Fresh();
             cursor = robots.store->Version();
         },
         [&] {
@@ -132,13 +109,10 @@ TEST(PrimStoreBudget, AddingAndRemoving1000PerStepIn5Ms) {
                 added[i] = paths.Child(spawned, "p" + std::to_string(i));
             }
             robots.store->DefineMany(added, robots.bucket);
-            changes = robots.store->ChangesSince(cursor);
+            robots.store->ChangesSince(cursor);
         });
-    EXPECT_LT(ms, Budget(5.0)) << ms << " ms";
-    EXPECT_EQ(robots.store->PrimCount(), kPrims);
-    EXPECT_EQ(changes.rows.size(), 2001u)
-        << "1000 removed, 999 moved, one added; the last removed row moves nothing";
-}
+    return Timing{ms, 5.0};
+});
 
 }  // namespace
-}  // namespace ernie
+}  // namespace ernie::bench

@@ -4,7 +4,6 @@
 /// one array per bucket, with versions per bucket, column and 64-row chunk for change tracking.
 #pragma once
 
-#include "ernie/export.h"
 #include "ernie/scene/path.h"
 #include "ernie/util/bytes.h"
 #include "ernie/util/glm.h"
@@ -97,7 +96,7 @@ struct ColumnTypeOf<Target> : std::integral_constant<ColumnType, ColumnType::Rel
 inline constexpr std::uint32_t kChunkRows = BitSet::kWordBits;
 
 /// @brief A column's values, their element type erased.
-class ERNIE_API ColumnValues {
+class ColumnValues {
   public:
     virtual ~ColumnValues() = default;
     virtual ColumnType Type() const = 0;
@@ -256,7 +255,7 @@ struct ChangeSet {
 /// One writer at a time; readers between writes. Every write stamps a new version; a reader's
 /// cursor is the version it last saw, and `ChangesSince` returns what changed after it without
 /// scanning unchanged buckets, columns or chunks.
-class ERNIE_API PrimStore {
+class PrimStore {
   public:
     PrimStore() = default;
     PrimStore(const PrimStore&) = delete;

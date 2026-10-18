@@ -19,6 +19,7 @@ set(ERNIE_VERSION_SUFFIX "" CACHE STRING "Pre-release suffix of Ernie's version"
 set(ERNIE_VERSION "${PROJECT_VERSION}${ERNIE_VERSION_SUFFIX}")
 
 option(ERNIE_BUILD_TESTS "Build Ernie's tests" OFF)
+option(ERNIE_BUILD_BENCHMARKS "Build Ernie's benchmarks" OFF)
 option(ERNIE_BUILD_PYTHON "Build Ernie's Python module" OFF)
 option(ERNIE_BUILD_APP "Build the ernie program" ON)
 option(ERNIE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
@@ -109,6 +110,9 @@ endif()
 if(ERNIE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+if(ERNIE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()
 
 if(PROJECT_IS_TOP_LEVEL AND NOT SKBUILD)

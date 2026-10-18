@@ -4,7 +4,7 @@ include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/third_party/googletest.cmake")
 include(GoogleTest)
 
-# Hard timeouts per label; the time budgets tests aim for are far smaller.
+# Hard timeouts per label, to catch hangs; timings are tracked by benchmarks/.
 set(ERNIE_TEST_TIMEOUT_unit 10)
 set(ERNIE_TEST_TIMEOUT_gpu 60)
 set(ERNIE_TEST_TIMEOUT_accuracy 120)
@@ -27,9 +27,7 @@ function(ernie_add_test_suite name)
     target_link_libraries(${target} PRIVATE ${ARG_LIBRARIES} GTest::gtest_main ernie_build_options)
     target_compile_definitions(
         ${target}
-        PRIVATE
-            ERNIE_TEST_FIXTURES="${PROJECT_SOURCE_DIR}/tests/fixtures"
-            "ERNIE_TEST_BUDGET_SCALE=$<IF:$<OR:$<CONFIG:Debug>,$<BOOL:${ERNIE_COVERAGE}>>,10,1>"
+        PRIVATE ERNIE_TEST_FIXTURES="${PROJECT_SOURCE_DIR}/tests/fixtures"
     )
     gtest_discover_tests(
         ${target}

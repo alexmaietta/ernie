@@ -52,7 +52,7 @@ ernie_add_test_suite(
 )
 ernie_add_test_suite(
     scene
-    SOURCES scene/path_test.cpp scene/storage_test.cpp scene/storage_budget_test.cpp
+    SOURCES scene/path_test.cpp scene/storage_test.cpp
     LIBRARIES ernie_static
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_static)

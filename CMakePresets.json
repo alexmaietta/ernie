@@ -15,6 +15,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "ERNIE_BUILD_TESTS": "ON",
+        "ERNIE_BUILD_BENCHMARKS": "ON",
         "ERNIE_BUILD_PYTHON": "ON",
         "ERNIE_BUILD_APP": "ON"
       }
