@@ -7,9 +7,21 @@ add_library(
     geometry.cpp
     instances.cpp
     prim_rows.cpp
+    ray_tracer.cpp
     scene_columns.cpp
     top_levels.cpp
     transform_graph.cpp
+)
+ernie_add_shaders(
+    ernie_render
+    shaders/affine.slang
+    shaders/compose.slang
+    shaders/double_float.slang
+    shaders/local.slang
+    shaders/ray_tracer.slang
+    shaders/shapes.slang
+    shaders/world.slang
+    shaders/write_instances.slang
 )
 target_link_libraries(
     ernie_render

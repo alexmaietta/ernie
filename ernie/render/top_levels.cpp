@@ -3,6 +3,7 @@
 /// @brief Writing instance records on the device and building the top level over them.
 #include "ernie/render/top_levels.h"
 
+#include "ernie/render/shaders/write_instances.h"
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
@@ -12,38 +13,6 @@
 namespace ernie {
 namespace {
 
-const ShaderModule kWriteInstances{"write_instances", R"(
-import affine;
-import world;
-/// VkAccelerationStructureInstanceKHR.
-struct Instance { float4 rows[3]; uint indexAndMask; uint offsetAndFlags; uint64_t bottom; };
-struct Parameters {
-    float4* worlds; uint* nodes; uint* geometries; float4* shapes; uint64_t* bottoms;
-    Instance* instances; uint count;
-};
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
-
-[shader("compute")]
-[numthreads(64, 1, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
-    uint row = id.x;
-    if (row >= parameters.count) {
-        return;
-    }
-    uint geometry = parameters.geometries[row];
-    Affine m = Mul(LoadWorld(parameters.worlds, parameters.nodes[row]),
-                   Load(parameters.shapes, row));
-    uint64_t bottom = parameters.bottoms[geometry];
-    Instance instance;
-    instance.rows = m.rows;
-    // An instance whose bottom level is not built yet is switched off.
-    instance.indexAndMask = (bottom == 0 ? 0u : 0xff000000u) | (geometry & 0xffffffu);
-    instance.offsetAndFlags = 0;
-    instance.bottom = bottom;
-    parameters.instances[row] = instance;
-}
-)"};
-
 struct WriteParameters {
     VkDeviceAddress worlds, nodes, geometries, shapes, bottoms, instances;
     std::uint32_t count, pad;
@@ -52,7 +21,7 @@ struct WriteParameters {
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     std::vector<ShaderModule> modules(TransformGraph::WorldModules().begin(),
                                       TransformGraph::WorldModules().end());
-    modules.push_back(kWriteInstances);
+    modules.push_back(shaders::kWriteInstances);
     return compiler.Spirv(modules, "main");
 }
 

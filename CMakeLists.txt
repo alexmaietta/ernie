@@ -54,6 +54,7 @@ include(cmake/ErnieFetch.cmake)
 include(cmake/third_party/openexr.cmake)
 include(cmake/third_party/tracy.cmake)
 include(cmake/third_party/slang.cmake)
+include(cmake/ErnieShaders.cmake)
 add_subdirectory(third_party)
 
 add_library(ernie_build_options INTERFACE)
