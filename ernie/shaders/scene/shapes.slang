@@ -7,9 +7,9 @@
 import geometry;
 
 /// The nearest hit along a ray, and the shape's outward normal there in its own frame.
-public struct ShapeHit {
-    public float t;
-    public float3 normal;
+struct ShapeHit {
+    float t;
+    float3 normal;
 };
 
 /// Keeps `t` if it is in [tMin, hit.t) and nearer than what `hit` holds.
@@ -130,8 +130,8 @@ bool Plane(float3 o, float3 d, float tMin, inout ShapeHit hit) {
 
 /// @return Whether the ray meets a unit shape nearer than `hit.t` and from `tMin`; the hit then
 /// holds the distance and the outward normal, both in the shape's frame.
-public bool IntersectShape(uint kind, float halfLength, float3 o, float3 d, float tMin,
-                           inout ShapeHit hit) {
+bool IntersectShape(uint kind, float halfLength, float3 o, float3 d, float tMin,
+                    inout ShapeHit hit) {
     // Each hit is taken only when nearer, so a shape tried in pieces keeps its nearest.
     if (kind == kSphere) {
         return Sphere(o, d, float3(0), 1, tMin, hit);

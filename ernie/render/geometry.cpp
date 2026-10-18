@@ -364,8 +364,8 @@ void GeometryPool::AddUploads(graph::Graph& graph) {
                                 .halfLength = geometry.halfLength,
                                 .vertexCount = geometry.vertexCount,
                                 .triangleCount = geometry.triangleCount,
-                                .vertices = address(geometry.vertices),
-                                .indices = address(geometry.indices)};
+                                .vertices = {address(geometry.vertices)},
+                                .indices = {address(geometry.indices)}};
         }
         StageRows(uploader_, *records_, hostRecords_, dirtyRecords_);
         dirtyRecords_.clear();

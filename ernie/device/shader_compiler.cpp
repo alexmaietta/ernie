@@ -52,8 +52,13 @@ struct ShaderCompiler::Session {
         std::array<slang::CompilerOptionEntry, 1> options{};
         options[0].name = slang::CompilerOptionName::MatrixLayoutColumn;
         options[0].value.intValue0 = 1;
+        // WebGPU has no buffer pointers: ref.slang reads buffers through bound arenas there.
+        const slang::PreprocessorMacroDesc webGpu{.name = "ERNIE_WEBGPU", .value = "1"};
+        const bool wgsl = format == SLANG_WGSL;
         const slang::SessionDesc description{.targets = &target,
                                              .targetCount = 1,
+                                             .preprocessorMacros = wgsl ? &webGpu : nullptr,
+                                             .preprocessorMacroCount = wgsl ? 1 : 0,
                                              .compilerOptionEntries = options.data(),
                                              .compilerOptionEntryCount =
                                                  static_cast<std::uint32_t>(options.size())};

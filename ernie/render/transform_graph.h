@@ -13,6 +13,7 @@
 #include "ernie/render/prim_rows.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/xform.h"
+#include "ernie/shaders/scene/transform.slang"
 
 #include <array>
 #include <cstdint>
@@ -47,30 +48,17 @@ namespace ernie {
 /// them over by walking only that subtree.
 class TransformGraph {
   public:
-    static constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
-    /// The most ops a program holds: device ops and the folded host ops between them.
-    static constexpr std::uint32_t kMaxOps = 8;
-    /// A transform's top three rows in double-float, as the device keeps them: the high floats'
-    /// twelve, then the low floats' twelve, each value their sum.
-    using SplitRows = std::array<float, 24>;
+    static constexpr std::uint32_t kNone = shaders::kNone;
+    static constexpr std::uint32_t kMaxOps = shaders::kMaxOps;
+    /// A transform's top three rows in double-float, as the device keeps them.
+    using SplitRows = shaders::SplitRows;
     /// One op of a program, as the device reads it.
-    struct DeviceOp {
-        std::uint32_t kind = 0;
-        /// Bit 0 inverts; bits 8 to 15 count the floats the op reads.
-        std::uint32_t flags = 0;
-        VkDeviceAddress source = 0;
-        SplitRows constant{};
-        bool operator==(const DeviceOp&) const = default;
-    };
+    using DeviceOp = shaders::Op;
     using Program = std::array<DeviceOp, kMaxOps>;
-    /// A `DeviceOp::kind`: a folded constant, then each `XformOpKind` after it.
-    static constexpr std::uint32_t kConstantOp = 0;
+    /// @return An op's kind: each `XformOpKind` after the folded constant's.
     static constexpr std::uint32_t OpKind(XformOpKind kind) {
         return 1 + static_cast<std::uint32_t>(kind);
     }
-    /// `DeviceOp::flags`' inverting bit, and where its float count starts.
-    static constexpr std::uint32_t kInvertFlag = 1;
-    static constexpr std::uint32_t kFloatsShift = 8;
 
     TransformGraph(DeviceContext& context, Arenas& arenas, const Scene& scene,
                    const ShaderCompiler& compiler);

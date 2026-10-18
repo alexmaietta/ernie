@@ -4,11 +4,12 @@
 /// error-free sums and Veltkamp-split products, about 48 bits of mantissa from pairs of floats.
 /// `precise` keeps every step as written (SPIR-V NoContraction).
 import affine;
+import ref;
 
 /// Four values, each the unevaluated sum of a high float and a low one.
-public struct Double4 {
-    public float4 hi;
-    public float4 lo;
+struct Double4 {
+    float4 hi;
+    float4 lo;
 };
 
 Double4 Pair(float4 hi, float4 lo) {
@@ -33,7 +34,7 @@ Double4 QuickTwoSum(float4 a, float4 b) {
     return Pair(s, e);
 }
 
-public Double4 Add(Double4 a, Double4 b) {
+Double4 Add(Double4 a, Double4 b) {
     Double4 s = TwoSum(a.hi, b.hi);
     precise float4 e = s.lo + (a.lo + b.lo);
     return QuickTwoSum(s.hi, e);
@@ -61,18 +62,18 @@ Double4 TwoProduct(float4 a, float4 b) {
 }
 
 /// `a` times the double-float scalar `hi + lo`.
-public Double4 Scale(Double4 a, float hi, float lo) {
+Double4 Scale(Double4 a, float hi, float lo) {
     Double4 p = TwoProduct(a.hi, float4(hi));
     precise float4 e = p.lo + (a.hi * lo + a.lo * hi);
     return QuickTwoSum(p.hi, e);
 }
 
 /// A 3x4 affine transform's rows in double-float.
-public struct DoubleAffine {
-    public Double4 rows[3];
+struct DoubleAffine {
+    Double4 rows[3];
 };
 
-public DoubleAffine Promote(Affine m) {
+DoubleAffine Promote(Affine m) {
     DoubleAffine d;
     for (uint r = 0; r < 3; ++r) {
         d.rows[r] = Pair(m.rows[r], float4(0));
@@ -80,7 +81,7 @@ public DoubleAffine Promote(Affine m) {
     return d;
 }
 
-public DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
+DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
     DoubleAffine c;
     for (uint r = 0; r < 3; ++r) {
         Double4 row = a.rows[r];
@@ -93,7 +94,7 @@ public DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
 }
 
 /// Each transform as six float4: its three high rows, then its three low rows.
-public DoubleAffine LoadDouble(float4* matrices, uint index) {
+DoubleAffine LoadDouble(Ref<float4> matrices, uint index) {
     DoubleAffine m;
     for (uint r = 0; r < 3; ++r) {
         m.rows[r] = Pair(matrices[6 * index + r], matrices[6 * index + 3 + r]);
@@ -101,14 +102,14 @@ public DoubleAffine LoadDouble(float4* matrices, uint index) {
     return m;
 }
 
-public void StoreDouble(float4* matrices, uint index, DoubleAffine m) {
+void StoreDouble(Ref<float4> matrices, uint index, DoubleAffine m) {
     for (uint r = 0; r < 3; ++r) {
         matrices[6 * index + r] = m.rows[r].hi;
         matrices[6 * index + 3 + r] = m.rows[r].lo;
     }
 }
 
-public Affine Round(DoubleAffine m) {
+Affine Round(DoubleAffine m) {
     Affine f;
     for (uint r = 0; r < 3; ++r) {
         f.rows[r] = m.rows[r].hi + m.rows[r].lo;

@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file write_instances.slang
 /// @brief The top level's instance records from the transform graph's worlds, one thread a row.
+/// The records and parameters are shared with C++ (rt/top_levels.cpp).
+#ifdef __cplusplus
+#pragma once
+#include "ernie/shaders/shared.h"
+namespace ernie::shaders {
+#else
 import affine;
+import ref;
 import transform;
+#endif
 
-/// VkAccelerationStructureInstanceKHR.
+/// A top level's instance, as Vulkan's VkAccelerationStructureInstanceKHR lays it out.
 struct Instance {
     /// The instance's transform: the geometry's frame to the scene's.
     float4 rows[3];
@@ -16,24 +24,26 @@ struct Instance {
     uint64_t bottom;
 };
 
-/// As top_levels.cpp's `WriteParameters`.
-struct Parameters {
+struct WriteParameters {
     /// The transform graph's worlds, by slot.
-    float4* worlds;
+    Ref<float4> worlds;
     /// Each instance row's transform-graph slot, geometry id, and shape transform.
-    uint* nodes;
-    uint* geometries;
-    float4* shapes;
+    Ref<uint> nodes;
+    Ref<uint> geometries;
+    Ref<float4> shapes;
     /// Each geometry's bottom-level address, 0 until it is built.
-    uint64_t* bottoms;
-    Instance* instances;
+    Ref<uint64_t> bottoms;
+    Ref<Instance> instances;
     uint count;
 };
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
+
+#ifdef __cplusplus
+}  // namespace ernie::shaders
+#else
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
+void main(uint3 id : SV_DispatchThreadID, uniform WriteParameters parameters) {
     uint row = id.x;
     if (row >= parameters.count) {
         return;
@@ -50,3 +60,5 @@ void main(uint3 id : SV_DispatchThreadID) {
     instance.bottom = bottom;
     parameters.instances[row] = instance;
 }
+
+#endif

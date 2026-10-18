@@ -6,6 +6,6 @@
 ///     import bindless;
 ///     images[NonUniformResourceIndex(parameters.image)][pixel] = colour;
 
-[[vk::binding(0, 0)]] public Texture2D textures[];
-[[vk::binding(1, 0)]] public RWTexture2D<float4> images[];
-[[vk::binding(2, 0)]] public SamplerState samplers[];
+[[vk::binding(0, 0)]] Texture2D textures[];
+[[vk::binding(1, 0)]] RWTexture2D<float4> images[];
+[[vk::binding(2, 0)]] SamplerState samplers[];

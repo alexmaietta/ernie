@@ -15,10 +15,8 @@
 namespace ernie {
 namespace {
 
-struct WriteParameters {
-    VkDeviceAddress worlds, nodes, geometries, shapes, bottoms, instances;
-    std::uint32_t count, pad;
-};
+using shaders::WriteParameters;
+static_assert(sizeof(shaders::Instance) == sizeof(AccelerationInstance));
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     std::vector<ShaderModule> modules(TransformGraph::WorldModules().begin(),
@@ -81,8 +79,13 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
         [this, reads, records, count](graph::PassContext& pass) {
             const auto address = [&](std::size_t read) { return pass.Get(reads[read]).Address(); };
             writer_.Dispatch(pass.commands, {DivideRoundUp(count, 64u), 1, 1},
-                             WriteParameters{address(0), address(1), address(2), address(3),
-                                             address(4), pass.Get(records).Address(), count, 0});
+                             WriteParameters{{address(0)},
+                                             {address(1)},
+                                             {address(2)},
+                                             {address(3)},
+                                             {address(4)},
+                                             pass.Get(records).Ref<shaders::Instance>(),
+                                             count});
         });
 }
 

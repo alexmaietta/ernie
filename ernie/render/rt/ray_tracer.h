@@ -16,6 +16,7 @@
 #include "ernie/render/rt/bottom_levels.h"
 #include "ernie/render/rt/top_levels.h"
 #include "ernie/render/transform_graph.h"
+#include "ernie/shaders/rt/ray_tracer.slang"
 
 #include <glm/vec3.hpp>
 
@@ -24,14 +25,8 @@
 
 namespace ernie {
 
-/// @brief What a tracing kernel hands `RayTracer`, as ray_tracer.slang's `TracerParameters`.
-struct TracerParameters {
-    /// The top level's device address.
-    std::uint64_t scene = 0;
-    /// `GeometryPool::Records`' device address.
-    std::uint64_t records = 0;
-};
-static_assert(sizeof(TracerParameters) == 16);
+/// @brief What a tracing kernel hands its `RayTracer`, as ray_tracer.slang defines it.
+using TracerParameters = shaders::TracerParameters;
 
 /// @brief What a frame's passes trace, left on the graph's blackboard by `RayTracer::AddBuild`.
 struct TraceScene {
@@ -39,9 +34,9 @@ struct TraceScene {
     graph::Acceleration top;
     graph::Buffer records;
     std::uint32_t instances = 0;
-    /// Each instance row's albedo, three linear RGB floats, and their device address.
+    /// Each instance row's albedo, three linear RGB floats, and kernels' handle of them.
     graph::Buffer colours;
-    std::uint64_t colourAddress = 0;
+    shaders::Ref<float> colourRef;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 

@@ -2,45 +2,91 @@
 /// @file transform.slang
 /// @brief The transform graph on the device: programs of ops evaluated into local transforms,
 /// composed level by level into worlds relative to the render origin, all in double-float, and
-/// the worlds read back as floats by the kernels that place things.
+/// the worlds read back as floats by the kernels that place things. The programs' layout is
+/// shared with C++ (transform_graph.h).
 ///
 ///     import transform;
 ///     Affine world = LoadWorld(parameters.worlds, slot);
+#ifdef __cplusplus
+#pragma once
+#include "ernie/shaders/shared.h"
+namespace ernie::shaders {
+#else
 import affine;
 import double_float;
+import ref;
+#endif
 
-/// A program's op kinds, as `TransformGraph::DeviceOp` encodes them; a test holds these to the
-/// C++ constants. A folded constant, then each `XformOpKind` after it.
-public static const uint kConstant = 0;
-public static const uint kTranslate = 1;
-public static const uint kScale = 2;
-public static const uint kRotateX = 3;
-public static const uint kRotateXYZ = 6;
-public static const uint kOrient = 12;
+/// A program's op kinds: a folded constant, then each of the host's transform op kinds after it,
+/// in its order; the Euler rotations run from `kRotateXYZ` to `kOrient`.
+static const uint kConstant = 0;
+static const uint kTranslate = 1;
+static const uint kScale = 2;
+static const uint kRotateX = 3;
+static const uint kRotateXYZ = 6;
+static const uint kOrient = 12;
 
-/// `DeviceOp::flags`: bit 0 inverts; bits 8 to 15 count the floats the op reads.
-public static const uint kInvert = 1;
-public static const uint kFloatsShift = 8;
+/// An op's flags: bit 0 inverts it; bits 8 to 15 count the floats it reads.
+static const uint kInvert = 1;
+static const uint kFloatsShift = 8;
 
-public static const uint kMaxOps = 8;
+/// The most ops a program holds: device ops and the folded host ops between them.
+static const uint kMaxOps = 8;
 /// No slot: a root's parent.
-public static const uint kNone = 0xffffffff;
+static const uint kNone = 0xffffffff;
 
-/// A slot's world transform relative to the render origin, as float rows.
-public Affine LoadWorld(float4* worlds, uint slot) {
-    return Round(LoadDouble(worlds, slot));
-}
+/// A transform's top three rows in double-float, as the device keeps them: each value the sum of
+/// its high float and its low one.
+struct SplitRows {
+    float4 high[3];
+    float4 low[3];
+#ifdef __cplusplus
+    bool operator==(const SplitRows&) const = default;
+#endif
+};
 
-/// As `TransformGraph::DeviceOp`.
+/// One op of a program.
 struct Op {
     uint kind;
     uint flags;
     /// A bound op's row of floats.
-    float* source;
-    /// A folded constant's rows, each value split into a high float and a low one.
-    float4 hi[3];
-    float4 lo[3];
+    Ref<float> source;
+    /// A folded constant, exactly as the host split it.
+    SplitRows constant;
+#ifdef __cplusplus
+    bool operator==(const Op&) const = default;
+#endif
 };
+
+struct LocalParameters {
+    /// Each programmed node's slot, program of `kMaxOps` ops and its length.
+    Ref<uint> slots;
+    Ref<Op> programs;
+    Ref<uint> lengths;
+    /// The locals, by slot.
+    Ref<float4> locals;
+    uint count;
+};
+
+struct ComposeParameters {
+    /// The level's slots.
+    Ref<uint> slots;
+    /// Each slot's parent, or `kNone`.
+    Ref<uint> parents;
+    /// The locals and worlds, by slot.
+    Ref<float4> locals;
+    Ref<float4> worlds;
+    uint count;
+};
+
+#ifdef __cplusplus
+}  // namespace ernie::shaders
+#else
+
+/// A slot's world transform relative to the render origin, as float rows.
+Affine LoadWorld(Ref<float4> worlds, uint slot) {
+    return Round(LoadDouble(worlds, slot));
+}
 
 static const uint3 kAxes[6] = { uint3(0, 1, 2), uint3(0, 2, 1), uint3(1, 0, 2),
                                 uint3(1, 2, 0), uint3(2, 0, 1), uint3(2, 1, 0) };
@@ -81,7 +127,7 @@ Affine Inverse(Affine m) {
 /// A bound op's matrix from the floats it reads.
 Affine OpMatrix(Op op) {
     Affine m = Identity();
-    float* v = op.source;
+    Ref<float> v = op.source;
     uint floats = (op.flags >> kFloatsShift) & 0xff;
     if (op.kind == kTranslate) {
         m.rows[0].w = v[0];
@@ -123,22 +169,11 @@ DoubleAffine OpDoubleMatrix(Op op) {
     }
     DoubleAffine m;
     for (uint r = 0; r < 3; ++r) {
-        m.rows[r].hi = op.hi[r];
-        m.rows[r].lo = op.lo[r];
+        m.rows[r].hi = op.constant.high[r];
+        m.rows[r].lo = op.constant.low[r];
     }
     return m;
 }
-
-/// As transform_graph.cpp's `LocalParameters`.
-struct LocalParameters {
-    /// Each programmed node's slot, program of `kMaxOps` ops and its length.
-    uint* slots;
-    Op* programs;
-    uint* lengths;
-    /// The locals, by slot, in double-float.
-    float4* locals;
-    uint count;
-};
 
 /// One thread a programmed node, its program at its place in the list.
 [shader("compute")]
@@ -155,18 +190,6 @@ void Local(uint3 id : SV_DispatchThreadID, uniform LocalParameters parameters) {
     StoreDouble(parameters.locals, parameters.slots[at], local);
 }
 
-/// As transform_graph.cpp's `ComposeParameters`.
-struct ComposeParameters {
-    /// The level's slots.
-    uint* slots;
-    /// Each slot's parent, or `kNone`.
-    uint* parents;
-    /// The locals and worlds, by slot, in double-float.
-    float4* locals;
-    float4* worlds;
-    uint count;
-};
-
 /// One level of the graph: each node's world from its parent's and its local.
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -180,3 +203,5 @@ void Compose(uint3 id : SV_DispatchThreadID, uniform ComposeParameters parameter
     StoreDouble(parameters.worlds, slot,
                 parent == kNone ? local : Mul(LoadDouble(parameters.worlds, parent), local));
 }
+
+#endif

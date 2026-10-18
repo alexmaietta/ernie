@@ -6,6 +6,7 @@
 
 #include "ernie/device/arena.h"
 #include "ernie/device/staging.h"
+#include "ernie/shaders/shared.h"
 #include "ernie/util/algorithm.h"
 #include "ernie/util/tensor.h"
 
@@ -105,6 +106,11 @@ class DeviceColumn {
     std::uint64_t capacity_;
     BufferRange range_;
 };
+
+/// @return A shader's handle of a column's rows as `T`s.
+template <typename T> shaders::Ref<T> ToRef(const DeviceColumn& column) {
+    return {column.Address()};
+}
 
 /// @brief Stages `rows` of a host mirror into the same rows of `column`. The rows are sorted and
 /// made unique in place, and those past the mirror's end dropped; the caller clears them.

@@ -7,40 +7,53 @@
 ///     RayTracer tracer = RayTracer(parameters.tracer);
 ///     Hit hit = tracer.TraceClosest(ray, 0xff);
 ///     if (hit.found) { float3 n = tracer.WorldNormal(hit); }
+///
+/// What a pass hands its tracer is shared with C++ (rt/ray_tracer.h).
+#ifdef __cplusplus
+#pragma once
+#include "ernie/shaders/scene/geometry.slang"
+namespace ernie::shaders {
+#else
 import geometry;
+import ref;
 import shapes;
+#endif
 
-/// What a pass hands its tracer, as the C++ `TracerParameters`.
-public struct TracerParameters {
+/// What a pass hands its tracer.
+struct TracerParameters {
     /// The top level's device address.
-    public uint64_t scene;
-    public GeometryRecord* records;
+    uint64_t scene;
+    Ref<GeometryRecord> records;
 };
 
-/// What a ray hit: where along it, which instance, primitive and geometry, and the transforms
-/// between the instance's frame and the scene's. Surfaces are reconstructed from it.
-public struct Hit {
-    public bool found;
-    public float t;
+#ifdef __cplusplus
+}  // namespace ernie::shaders
+#else
+
+/// What a ray hit: where along it, which instance, primitive and geometry, and the transform
+/// from the scene's frame to the instance's. Surfaces are reconstructed from it.
+struct Hit {
+    bool found;
+    float t;
     /// The instance's row: `InstanceIndex()`.
-    public uint instance;
-    public uint primitive;
-    public uint geometry;
-    public float2 barycentrics;
+    uint instance;
+    uint primitive;
+    uint geometry;
+    float2 barycentrics;
     /// An implicit shape's outward normal, in its own frame.
-    public float3 objectNormal;
-    public float3x4 worldToObject;
+    float3 objectNormal;
+    float3x4 worldToObject;
 };
 
-public struct RayTracer {
+struct RayTracer {
     TracerParameters parameters;
 
-    public __init(TracerParameters parameters) {
+    __init(TracerParameters parameters) {
         this.parameters = parameters;
     }
 
     /// @return The nearest hit along the ray among instances in `mask`.
-    public Hit TraceClosest(RayDesc ray, uint mask) {
+    Hit TraceClosest(RayDesc ray, uint mask) {
         RayQuery<RAY_FLAG_NONE> query;
         ShapeHit nearest;
         Run(query, ray, mask, nearest);
@@ -64,7 +77,7 @@ public struct RayTracer {
     }
 
     /// @return Whether anything in `mask` blocks the ray, for visibility.
-    public bool TraceAny(RayDesc ray, uint mask) {
+    bool TraceAny(RayDesc ray, uint mask) {
         RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
         ShapeHit nearest;
         Run(query, ray, mask, nearest);
@@ -73,7 +86,7 @@ public struct RayTracer {
 
     /// @return The surface's geometric normal at a hit, in the scene's frame, facing out of an
     /// implicit shape or by a triangle's winding.
-    public float3 WorldNormal(Hit hit) {
+    float3 WorldNormal(Hit hit) {
         float3 normal = hit.objectNormal;
         GeometryRecord record = parameters.records[hit.geometry];
         if (record.kind == kTriangles) {
@@ -111,3 +124,5 @@ public struct RayTracer {
         }
     }
 }
+
+#endif

@@ -10,6 +10,7 @@
 #include "ernie/graph/graph.h"
 #include "ernie/render/prim_rows.h"
 #include "ernie/scene/scene.h"
+#include "ernie/shaders/scene/geometry.slang"
 
 #include <glm/glm.hpp>
 
@@ -24,7 +25,15 @@ namespace ernie {
 /// cylinder and cone about +z with z in [-1, 1] (the cone's apex at +1), a capsule of radius 1
 /// about a segment of half-length `Geometry::halfLength`, and a unit square in z = 0 facing +z
 /// (planes, and ground planes 200 km across).
-enum class GeometryKind : std::uint8_t { Triangles, Sphere, Cube, Cylinder, Cone, Capsule, Plane };
+enum class GeometryKind : std::uint8_t {
+    Triangles = shaders::kTriangles,
+    Sphere = shaders::kSphere,
+    Cube = shaders::kCube,
+    Cylinder = shaders::kCylinder,
+    Cone = shaders::kCone,
+    Capsule = shaders::kCapsule,
+    Plane = shaders::kPlane,
+};
 
 using GeometryId = std::uint32_t;
 
@@ -41,19 +50,8 @@ struct Geometry {
     float halfLength = 0.0f;
 };
 
-/// @brief A geometry as kernels read it from `GeometryPool::Records`, by geometry id: an instance's
-/// custom index.
-struct GeometryRecord {
-    /// A `GeometryKind`.
-    std::uint32_t kind = 0;
-    float halfLength = 0.0f;
-    std::uint32_t vertexCount = 0;
-    std::uint32_t triangleCount = 0;
-    /// Triangles' float x, y, z positions and their uint32 indices, by device address.
-    std::uint64_t vertices = 0;
-    std::uint64_t indices = 0;
-};
-static_assert(sizeof(GeometryRecord) == 32);
+/// @brief A geometry as kernels read it from `GeometryPool::Records`, as geometry.slang defines it.
+using GeometryRecord = shaders::GeometryRecord;
 
 /// @brief What a prim draws: its geometry, and the transform from the geometry's frame to the
 /// prim's, which sizes and turns a unit shape.

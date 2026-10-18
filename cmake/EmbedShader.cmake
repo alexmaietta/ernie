@@ -17,6 +17,7 @@ endforeach()
 
 set(chunks "")
 string(LENGTH "${source}" length)
+# MSVC limits a string literal to 16 KB; concatenated pieces may total any length.
 set(chunk 8192)
 set(at 0)
 while(at LESS length)
@@ -29,8 +30,14 @@ if(chunks STREQUAL "")
 endif()
 
 file(RELATIVE_PATH from "${ROOT}" "${INPUT}")
+# A file with a part C++ reads shares its types: the header brings them too.
+set(shared "")
+string(FIND "${source}" "#ifdef __cplusplus" cplusplus)
+if(NOT cplusplus EQUAL -1)
+    set(shared "#include \"${from}\"\n")
+endif()
 set(header
-    "// Generated from ${from} by cmake/EmbedShader.cmake: edit that file.\n#pragma once\n\n#include \"ernie/device/shader_compiler.h\"\n\nnamespace ernie::shaders {\n\ninline const ShaderModule ${identifier}{\n    \"${NAME}\",\n${chunks}};\n\n}  // namespace ernie::shaders\n"
+    "// Generated from ${from} by cmake/EmbedShader.cmake: edit that file.\n#pragma once\n\n#include \"ernie/device/shader_compiler.h\"\n${shared}\nnamespace ernie::shaders {\n\ninline const ShaderModule ${identifier}{\n    \"${NAME}\",\n${chunks}};\n\n}  // namespace ernie::shaders\n"
 )
 # Unchanged headers keep their times, so nothing that includes them rebuilds.
 if(EXISTS "${OUTPUT}")

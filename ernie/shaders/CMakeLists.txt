@@ -2,6 +2,7 @@
 ernie_add_shaders(
     ernie_shaders
     device/bindless.slang
+    device/ref.slang
     math/affine.slang
     math/double_float.slang
     rt/ray_tracer.slang

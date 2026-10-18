@@ -54,13 +54,13 @@ inline constexpr float kDisagree = -2.0f;
 /// Traces each ray, writing its hit distance and world normal, `kMiss`, or `kDisagree`.
 inline const ShaderModule kTrace{"trace", R"(
 import ray_tracer;
+import ref;
 struct Ray { float4 origin; float4 direction; };
-struct Parameters { TracerParameters tracer; Ray* rays; float4* hits; uint count; };
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
+struct Parameters { TracerParameters tracer; Ref<Ray> rays; Ref<float4> hits; uint count; };
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
+void main(uint3 id : SV_DispatchThreadID, uniform Parameters parameters) {
     if (id.x >= parameters.count) {
         return;
     }
@@ -125,8 +125,9 @@ class RayTracingTest : public ::testing::Test {
   private:
     struct TraceParameters {
         TracerParameters tracer;
-        VkDeviceAddress rays, hits;
-        std::uint32_t count, pad;
+        shaders::Ref<Ray> rays;
+        shaders::Ref<glm::vec4> hits;
+        std::uint32_t count;
     };
     std::unique_ptr<ComputeKernel> trace_;
     std::unique_ptr<DeviceColumn> rays_;
@@ -164,8 +165,8 @@ inline std::vector<glm::vec4> RayTracingTest::Trace(std::span<const Ray> rays) {
                 },
                 [this, from, to, count, tracer = scene.parameters](graph::PassContext& pass) {
                     trace_->Dispatch(pass.commands, {(count + 63) / 64, 1, 1},
-                                     TraceParameters{tracer, pass.Get(from).Address(),
-                                                     pass.Get(to).Address(), count, 0});
+                                     TraceParameters{tracer, pass.Get(from).Ref<Ray>(),
+                                                     pass.Get(to).Ref<glm::vec4>(), count});
                 });
         },
         std::span(&uploaded, 1));

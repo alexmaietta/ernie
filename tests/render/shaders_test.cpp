@@ -1,87 +1,100 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file shaders_test.cpp
-/// @brief The embedded shaders: the constants and layouts they share with C++ match it, and the
-/// ray tracer compiles into a kernel without a device.
+/// @brief The embedded shaders: the structs they share with C++ lay out alike in both, the
+/// kernels that need no ray tracing stay portable to WebGPU, and the ray tracer compiles without a
+/// device.
 #include "ernie/device/kernel.h"
-#include "ernie/device/staging.h"
-#include "ernie/render/geometry.h"
+#include "ernie/render/rt/camera_pass.h"
 #include "ernie/render/rt/ray_tracer.h"
 #include "ernie/render/transform_graph.h"
-#include "ernie/shaders/scene/geometry.h"
+#include "ernie/shaders/device/bindless.h"
+#include "ernie/shaders/rt/write_instances.h"
+#include "ernie/shaders/sensors/camera.h"
+#include "ernie/shaders/spectral/spectrum.h"
 
 #include "tests/render/common.h"
 
 #include <gtest/gtest.h>
 
-#include <cstring>
+#include <cstddef>
 #include <vector>
 
 namespace ernie {
 namespace {
 
-/// Writes each value the C++ side mirrors, in the order `kExpected` lists them.
-const ShaderModule kShared{"shared", R"(
+/// Writes the size of each struct shared with C++, as kernels lay them out, in `kExpected`'s order.
+const ShaderModule kSizes{"sizes", R"(
+import camera;
 import geometry;
+import ray_tracer;
+import ref;
 import transform;
-struct Parameters { uint* values; };
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
-
+import write_instances;
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main() {
-    uint values[] = { kTriangles, kSphere, kCube, kCylinder, kCone, kCapsule, kPlane,
-                      sizeof(GeometryRecord), kConstant, kTranslate, kScale, kRotateX, kRotateXYZ,
-                      kOrient, kInvert, kFloatsShift, kMaxOps, kNone };
+void main(uniform Ref<uint> sizes) {
+    uint values[] = { sizeof(GeometryRecord), sizeof(TracerParameters), sizeof(SplitRows),
+                      sizeof(Op), sizeof(LocalParameters), sizeof(ComposeParameters),
+                      sizeof(Instance), sizeof(WriteParameters), sizeof(View),
+                      sizeof(CameraParameters) };
     for (uint i = 0; i < values.getCount(); ++i) {
-        parameters.values[i] = values[i];
+        sizes[i] = values[i];
     }
 }
 )"};
 
-using Graph = TransformGraph;
-constexpr std::uint32_t Kind(GeometryKind kind) {
-    return static_cast<std::uint32_t>(kind);
-}
+/// The bytes a kernel's parameters use: Slang's scalar layout has no tail padding there.
+template <typename T> constexpr std::uint32_t kUsedBytes = offsetof(T, count) + sizeof(T::count);
+
 const std::vector<std::uint32_t> kExpected{
-    Kind(GeometryKind::Triangles),
-    Kind(GeometryKind::Sphere),
-    Kind(GeometryKind::Cube),
-    Kind(GeometryKind::Cylinder),
-    Kind(GeometryKind::Cone),
-    Kind(GeometryKind::Capsule),
-    Kind(GeometryKind::Plane),
-    sizeof(GeometryRecord),
-    Graph::kConstantOp,
-    Graph::OpKind(XformOpKind::Translate),
-    Graph::OpKind(XformOpKind::Scale),
-    Graph::OpKind(XformOpKind::RotateX),
-    Graph::OpKind(XformOpKind::RotateXYZ),
-    Graph::OpKind(XformOpKind::Orient),
-    Graph::kInvertFlag,
-    Graph::kFloatsShift,
-    Graph::kMaxOps,
-    Graph::kNone,
+    sizeof(shaders::GeometryRecord),
+    sizeof(shaders::TracerParameters),
+    sizeof(shaders::SplitRows),
+    sizeof(shaders::Op),
+    kUsedBytes<shaders::LocalParameters>,
+    kUsedBytes<shaders::ComposeParameters>,
+    sizeof(shaders::Instance),
+    kUsedBytes<shaders::WriteParameters>,
+    sizeof(shaders::View),
+    kUsedBytes<shaders::CameraParameters>,
 };
 
-TEST(Shaders, ConstantsAndLayoutsMatchTheirCppMirrors) {
+/// @return Every module a kernel importing the camera and the instance writer needs, in order.
+std::vector<ShaderModule> SharedModules() {
+    std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
+    for (const ShaderModule& module : TransformGraph::WorldModules().subspan(1)) {
+        modules.push_back(module);
+    }
+    modules.insert(modules.end(), {shaders::kBindless, shaders::kSpectrum, shaders::kCamera,
+                                   shaders::kWriteInstances});
+    return modules;
+}
+
+TEST(Shaders, SharedStructsLayOutAsInCpp) {
     ERNIE_CONTEXT(context);
-    const ShaderCompiler compiler;
-    std::vector<ShaderModule> modules(TransformGraph::WorldModules().begin(),
-                                      TransformGraph::WorldModules().end());
-    modules.insert(modules.end(), {shaders::kGeometry, kShared});
-    const ComputeKernel shared(*context, compiler.Spirv(modules, "main"), "shared",
-                               sizeof(VkDeviceAddress));
-    Arenas arenas(*context, MemoryUse::Device, "values", 1 << 12);
+    std::vector<ShaderModule> modules = SharedModules();
+    modules.push_back(kSizes);
+    const ComputeKernel sizes(*context, ShaderCompiler().Spirv(modules, "main"), "sizes",
+                              sizeof(shaders::Ref<std::uint32_t>));
+    Arenas arenas(*context, MemoryUse::Device, "sizes", 1 << 12);
     const BufferRange range = arenas.Allocate(kExpected.size() * sizeof(std::uint32_t));
     const Ticket written = context->Main().Submit([&](VkCommandBuffer commands) {
-        shared.Dispatch(commands, {1, 1, 1}, arenas.Address(range));
+        sizes.Dispatch(commands, {1, 1, 1}, shaders::Ref<std::uint32_t>{arenas.Address(range)});
     });
     Readback readback(*context, context->Main(), arenas.Storage(range), range.offset, range.size,
                       std::span(&written, 1));
-    std::vector<std::uint32_t> values(kExpected.size());
-    std::memcpy(values.data(), readback.Bytes().data(), range.size);
-    EXPECT_EQ(values, kExpected) << "geometry.slang and transform.slang against their C++";
+    EXPECT_EQ(readback.Values<std::uint32_t>(), kExpected);
     test::ExpectClean(*context);
+}
+
+// WebGPU has no ray queries, but everything else stays in the subset WGSL takes.
+TEST(Shaders, TheTransformKernelsCompileForWebGpu) {
+    const ShaderCompiler compiler;
+    for (const char* entry : {"Local", "Compose"}) {
+        EXPECT_NE(compiler.Wgsl(TransformGraph::WorldModules(), entry).find("@compute"),
+                  std::string::npos)
+            << entry;
+    }
 }
 
 // Without a device that ray traces, the tests that trace are skipped; this still compiles them.

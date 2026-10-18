@@ -3,6 +3,7 @@
 /// @brief Keeping the acceleration structures up to date each frame.
 #include "ernie/render/rt/ray_tracer.h"
 
+#include "ernie/shaders/device/ref.h"
 #include "ernie/shaders/rt/ray_tracer.h"
 #include "ernie/shaders/scene/geometry.h"
 #include "ernie/shaders/scene/shapes.h"
@@ -17,7 +18,8 @@ RayTracer::RayTracer(DeviceContext& context, Arenas& arenas, const ShaderCompile
     : geometry_(geometry), bottoms_(context, arenas, geometry), tops_(context, compiler) {}
 
 std::span<const ShaderModule> RayTracer::Modules() {
-    static const std::array modules{shaders::kGeometry, shaders::kShapes, shaders::kRayTracer};
+    static const std::array modules{shaders::kRef, shaders::kGeometry, shaders::kShapes,
+                                    shaders::kRayTracer};
     return modules;
 }
 
@@ -30,14 +32,14 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
     const graph::Acceleration top = tops_.AddBuild(graph, transforms, instances, bottoms_);
     const DeviceColumn& records = geometry_.Records();
     const DeviceColumn& colours = instances.Colours();
-    graph.Board().Put(TraceScene{
-        .parameters = {.scene = tops_.Structure()->Address(), .records = records.Address()},
-        .top = top,
-        .records = graph.Import(records),
-        .instances = instances.Count(),
-        .colours = graph.Import(colours),
-        .colourAddress = colours.Address(),
-        .origin = transforms.Origin()});
+    graph.Board().Put(TraceScene{.parameters = {.scene = tops_.Structure()->Address(),
+                                                .records = ToRef<shaders::GeometryRecord>(records)},
+                                 .top = top,
+                                 .records = graph.Import(records),
+                                 .instances = instances.Count(),
+                                 .colours = graph.Import(colours),
+                                 .colourRef = ToRef<float>(colours),
+                                 .origin = transforms.Origin()});
 }
 
 }  // namespace ernie

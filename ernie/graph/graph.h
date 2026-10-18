@@ -90,6 +90,10 @@ struct BufferSlice {
     VkDeviceAddress Address() const {
         return buffer->Address() + offset;
     }
+    /// @return A shader's handle of the slice as `T`s.
+    template <typename T> shaders::Ref<T> Ref() const {
+        return {Address()};
+    }
 };
 
 class Graph;

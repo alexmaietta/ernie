@@ -20,24 +20,8 @@
 namespace ernie {
 namespace {
 
-constexpr std::uint32_t kNoImage = 0xffffffff;
-
-/// A view as camera.slang's `View` reads it.
-struct ViewRecord {
-    std::array<glm::vec4, 3> rows;
-    glm::vec2 halfExtent;
-    glm::uvec2 size;
-    glm::vec3 background;
-    std::uint32_t colour;
-    VkDeviceAddress distances, normals, instances, albedos, ldr;
-};
-static_assert(sizeof(ViewRecord) == 120);
-
-struct CameraParameters {
-    TracerParameters tracer;
-    VkDeviceAddress views, colours;
-    std::uint32_t count, pad;
-};
+using shaders::CameraParameters;
+using shaders::View;
 
 /// The most `vkCmdUpdateBuffer` writes at once.
 constexpr std::size_t kUpdateBytes = 65536;
@@ -50,17 +34,24 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
 
 /// @return A view's record, its output addresses left for the pass to fill in once the graph has
 /// placed them.
-ViewRecord ToViewRecord(const PinholeView& view, const CameraOutputs& outputs,
-                        const glm::dvec3& origin) {
+/// @return A kernel's handle of an output, or a null one when it is left out.
+template <typename T>
+shaders::Ref<T> RefOrNull(const graph::PassContext& pass,
+                          const std::optional<graph::Buffer>& buffer) {
+    return buffer ? pass.Get(*buffer).Ref<T>() : shaders::Ref<T>{};
+}
+
+View ToView(const PinholeView& view, const CameraOutputs& outputs, const glm::dvec3& origin) {
     // Relative to the origin in double, then rounded: values near the camera stay small.
     const glm::dmat4 relative = glm::translate(glm::dmat4(1.0), -origin) * view.cameraToWorld;
     const double tangent = std::tan(0.5 * view.verticalFov);
     const double aspect = static_cast<double>(view.size.x) / static_cast<double>(view.size.y);
-    return {.rows = ToAffineRows(relative),
+    const std::array<glm::vec4, 3> rows = ToAffineRows(relative);
+    return {.rows = {rows[0], rows[1], rows[2]},
             .halfExtent = glm::vec2(tangent * aspect, tangent),
             .size = view.size,
             .background = outputs.background,
-            .colour = outputs.colour ? outputs.colourIndex.value : kNoImage};
+            .colour = outputs.colour ? outputs.colourIndex.value : shaders::kNoImage};
 }
 
 }  // namespace
@@ -83,13 +74,13 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
     if (views.empty()) {
         return;
     }
-    std::vector<ViewRecord> records;
+    std::vector<View> records;
     glm::uvec2 largest{0};
     for (const CameraView& view : views) {
-        records.push_back(ToViewRecord(view.view, view.outputs, scene->origin));
+        records.push_back(ToView(view.view, view.outputs, scene->origin));
         largest = glm::max(largest, view.view.size);
     }
-    graph::Buffer staged = graph.Create(records.size() * sizeof(ViewRecord), "camera views");
+    graph::Buffer staged = graph.Create(records.size() * sizeof(View), "camera views");
     // For the recording to look up: any version of a resource names it.
     std::vector<CameraOutputs> outputs;
     for (const CameraView& view : views) {
@@ -116,31 +107,27 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
             }
         },
         [this, staged, largest, records = std::move(records), outputs = std::move(outputs),
-         parameters =
-             CameraParameters{.tracer = scene->parameters, .colours = scene->colourAddress}](
+         parameters = CameraParameters{.tracer = scene->parameters, .colours = scene->colourRef}](
             graph::PassContext& pass) mutable {
-            const auto address = [&](const std::optional<graph::Buffer>& buffer) {
-                return buffer ? pass.Get(*buffer).Address() : VkDeviceAddress{0};
-            };
             for (std::size_t i = 0; i < records.size(); ++i) {
-                records[i].distances = address(outputs[i].distances);
-                records[i].normals = address(outputs[i].normals);
-                records[i].instances = address(outputs[i].instances);
-                records[i].albedos = address(outputs[i].albedos);
-                records[i].ldr = address(outputs[i].ldr);
+                records[i].distances = RefOrNull<float>(pass, outputs[i].distances);
+                records[i].normals = RefOrNull<float>(pass, outputs[i].normals);
+                records[i].instances = RefOrNull<shaders::uint>(pass, outputs[i].instances);
+                records[i].albedos = RefOrNull<float>(pass, outputs[i].albedos);
+                records[i].ldr = RefOrNull<shaders::uint>(pass, outputs[i].ldr);
             }
             // The records hold the outputs' addresses, known only now, so the pass writes them
             // itself before it reads them.
             const graph::BufferSlice slice = pass.Get(staged);
             const auto* bytes = reinterpret_cast<const std::byte*>(records.data());
-            const std::size_t size = records.size() * sizeof(ViewRecord);
+            const std::size_t size = records.size() * sizeof(View);
             for (std::size_t at = 0; at < size; at += kUpdateBytes) {
                 vkCmdUpdateBuffer(pass.commands, slice.buffer->Handle(), slice.offset + at,
                                   std::min(kUpdateBytes, size - at), bytes + at);
             }
             Barrier(pass.commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
                     VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
-            parameters.views = slice.Address();
+            parameters.views = slice.Ref<View>();
             parameters.count = static_cast<std::uint32_t>(records.size());
             kernel_.Dispatch(
                 pass.commands,

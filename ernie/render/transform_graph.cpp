@@ -6,6 +6,7 @@
 
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/shaders/device/ref.h"
 #include "ernie/shaders/math/affine.h"
 #include "ernie/shaders/math/double_float.h"
 #include "ernie/shaders/scene/transform.h"
@@ -21,25 +22,25 @@
 namespace ernie {
 namespace {
 
-struct LocalParameters {
-    VkDeviceAddress slots, programs, lengths, locals;
-    std::uint32_t count, pad;
-};
-struct ComposeParameters {
-    VkDeviceAddress slots, parents, locals, worlds;
-    std::uint32_t count, pad;
-};
-static_assert(sizeof(TransformGraph::DeviceOp) == 112);
+using shaders::ComposeParameters;
+using shaders::LocalParameters;
+
+// The shaders tell op kinds apart by these, so `XformOpKind` keeps its order.
+static_assert(TransformGraph::OpKind(XformOpKind::Translate) == shaders::kTranslate);
+static_assert(TransformGraph::OpKind(XformOpKind::Scale) == shaders::kScale);
+static_assert(TransformGraph::OpKind(XformOpKind::RotateX) == shaders::kRotateX);
+static_assert(TransformGraph::OpKind(XformOpKind::RotateXYZ) == shaders::kRotateXYZ);
+static_assert(TransformGraph::OpKind(XformOpKind::Orient) == shaders::kOrient);
 
 /// @return A transform's top three rows, each value split exactly into a high and a low float.
 TransformGraph::SplitRows Split(const glm::dmat4& m) {
     TransformGraph::SplitRows rows{};
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
-            const auto at = static_cast<std::size_t>(r * 4 + c);
             const double value = m[c][r];
-            rows[at] = static_cast<float>(value);
-            rows[12 + at] = static_cast<float>(value - static_cast<double>(rows[at]));
+            const auto high = static_cast<float>(value);
+            rows.high[r][c] = high;
+            rows.low[r][c] = static_cast<float>(value - static_cast<double>(high));
         }
     }
     return rows;
@@ -131,7 +132,8 @@ void TransformGraph::SetOrigin(const glm::dvec3& origin) {
 }
 
 std::span<const ShaderModule> TransformGraph::WorldModules() {
-    static const std::array modules{shaders::kAffine, shaders::kDoubleFloat, shaders::kTransform};
+    static const std::array modules{shaders::kRef, shaders::kAffine, shaders::kDoubleFloat,
+                                    shaders::kTransform};
     return modules;
 }
 
@@ -366,7 +368,7 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
     // Runs of the host's ops become one matrix each.
     const auto fold = [&] {
         if (folded != glm::dmat4(1.0) && built.onDevice) {
-            push({.kind = kConstantOp, .constant = Split(folded)});
+            push({.kind = shaders::kConstant, .constant = Split(folded)});
             folded = glm::dmat4(1.0);
         }
     };
@@ -381,8 +383,8 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
         const DeviceColumn& column = *bound->column;
         const auto floats = static_cast<std::uint32_t>(CountFloats(column));
         push({.kind = OpKind(op.kind),
-              .flags = (op.invert ? kInvertFlag : 0u) | floats << kFloatsShift,
-              .source = bound->address + row * column.RowBytes()});
+              .flags = (op.invert ? shaders::kInvert : 0u) | floats << shaders::kFloatsShift,
+              .source = {bound->address + row * column.RowBytes()}});
     }
     fold();
     built.local = Split(folded);
@@ -508,17 +510,19 @@ void TransformGraph::UploadDirty() {
 }
 
 void TransformGraph::DispatchLocals(VkCommandBuffer commands) const {
-    local_.Dispatch(commands, Groups(programmed_.slots.size()),
-                    LocalParameters{programmed_.device->Address(), programColumn_->Address(),
-                                    lengthColumn_->Address(), localColumn_->Address(),
-                                    static_cast<std::uint32_t>(programmed_.slots.size()), 0});
+    local_.Dispatch(
+        commands, Groups(programmed_.slots.size()),
+        LocalParameters{ToRef<shaders::uint>(*programmed_.device), ToRef<DeviceOp>(*programColumn_),
+                        ToRef<shaders::uint>(*lengthColumn_), ToRef<shaders::float4>(*localColumn_),
+                        static_cast<std::uint32_t>(programmed_.slots.size())});
 }
 
 void TransformGraph::DispatchLevel(VkCommandBuffer commands, const SlotList& level) const {
-    compose_.Dispatch(commands, Groups(level.slots.size()),
-                      ComposeParameters{level.device->Address(), parentColumn_->Address(),
-                                        localColumn_->Address(), worlds_->Address(),
-                                        static_cast<std::uint32_t>(level.slots.size()), 0});
+    compose_.Dispatch(
+        commands, Groups(level.slots.size()),
+        ComposeParameters{ToRef<shaders::uint>(*level.device), ToRef<shaders::uint>(*parentColumn_),
+                          ToRef<shaders::float4>(*localColumn_), ToRef<shaders::float4>(*worlds_),
+                          static_cast<std::uint32_t>(level.slots.size())});
 }
 
 Ticket TransformGraph::Update(std::span<const Ticket> waits) {

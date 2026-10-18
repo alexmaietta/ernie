@@ -12,6 +12,8 @@
 #include "ernie/device/kernel.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/graph/graph.h"
+#include "ernie/shaders/sensors/camera.slang"
+#include "ernie/shaders/spectral/spectrum.slang"
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
@@ -64,9 +66,9 @@ struct CameraView {
 /// pixel, shading what each hits by its albedo and a headlight.
 class CameraPass {
   public:
-    static constexpr std::uint32_t kNoInstance = 0xffffffff;
+    static constexpr std::uint32_t kNoInstance = shaders::kNoInstance;
     /// The spectral bands albedos carry: RGB mode's three, linear sRGB.
-    static constexpr std::uint32_t kBands = 3;
+    static constexpr std::uint32_t kBands = shaders::kBands;
 
     CameraPass(DeviceContext& context, const ShaderCompiler& compiler, const BindlessHeap& heap);
 

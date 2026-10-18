@@ -101,7 +101,7 @@ TEST_F(Geometries, MeshesBecomeTrianglesAndShapesShareUnitGeometry) {
     std::memcpy(static_cast<void*>(&record), words.data(), sizeof(record));
     EXPECT_EQ(record.kind, static_cast<std::uint32_t>(GeometryKind::Triangles));
     EXPECT_EQ(record.triangleCount, 2u);
-    EXPECT_EQ(record.indices, arenas_->Address(triangles.indices));
+    EXPECT_EQ(record.indices.handle, arenas_->Address(triangles.indices));
 
     const PrimGeometry ball = *geometry_->Find(ball_);
     EXPECT_EQ(geometry_->Find(pebble_)->geometry, ball.geometry) << "one unit sphere for both";
