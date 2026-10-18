@@ -1,5 +1,5 @@
 # Vendored sources stay byte for byte as their upstream release.
-exclude: ^third_party/(basisu|nanovdb)/
+exclude: ^third_party/[^/]+/
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

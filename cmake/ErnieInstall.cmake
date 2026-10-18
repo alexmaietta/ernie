@@ -67,7 +67,7 @@ install(
     COMPONENT dev
 )
 install(
-    DIRECTORY "${glm_SOURCE_DIR}/glm"
+    DIRECTORY "${PROJECT_SOURCE_DIR}/third_party/glm/glm"
     DESTINATION "${ERNIE_THIRD_PARTY_INCLUDEDIR}/glm"
     COMPONENT dev
     FILES_MATCHING
@@ -76,7 +76,7 @@ install(
     PATTERN "*.h"
 )
 install(
-    FILES "${dlpack_SOURCE_DIR}/include/dlpack/dlpack.h"
+    FILES "${PROJECT_SOURCE_DIR}/third_party/dlpack/include/dlpack/dlpack.h"
     DESTINATION "${ERNIE_THIRD_PARTY_INCLUDEDIR}/dlpack/dlpack"
     COMPONENT dev
 )
@@ -112,20 +112,20 @@ install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION "${ernie_doc_dir}" COM
 set(ernie_notices
     "basisu|${PROJECT_SOURCE_DIR}/third_party/basisu/LICENSE"
     "basisu|${PROJECT_SOURCE_DIR}/third_party/basisu/NOTICE"
-    "bc7enc_rdo|${bc7enc_SOURCE_DIR}/LICENSE"
-    "dlpack|${dlpack_SOURCE_DIR}/LICENSE"
-    "glm|${glm_SOURCE_DIR}/copying.txt"
+    "bc7enc_rdo|${PROJECT_SOURCE_DIR}/third_party/bc7enc/LICENSE"
+    "dlpack|${PROJECT_SOURCE_DIR}/third_party/dlpack/LICENSE"
+    "glm|${PROJECT_SOURCE_DIR}/third_party/glm/copying.txt"
     "imath|${imath_SOURCE_DIR}/LICENSE.md"
     "libdeflate|${openexr_SOURCE_DIR}/external/deflate/COPYING"
     "nanovdb|${PROJECT_SOURCE_DIR}/third_party/nanovdb/LICENSE"
-    "nlohmann_json|${nlohmann_json_SOURCE_DIR}/LICENSE.MIT"
+    "nlohmann_json|${PROJECT_SOURCE_DIR}/third_party/json/LICENSE.MIT"
     "openexr|${openexr_SOURCE_DIR}/LICENSE.md"
     "openjph|${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE"
     "slang|${slang_SOURCE_DIR}/LICENSE"
-    "stb|${stb_SOURCE_DIR}/LICENSE"
-    "vma|${vma_SOURCE_DIR}/LICENSE.txt"
-    "volk|${volk_SOURCE_DIR}/LICENSE.md"
-    "vulkan_headers|${vulkan_headers_SOURCE_DIR}/LICENSE.md"
+    "stb|${PROJECT_SOURCE_DIR}/third_party/stb/LICENSE"
+    "vma|${PROJECT_SOURCE_DIR}/third_party/vma/LICENSE.txt"
+    "volk|${PROJECT_SOURCE_DIR}/third_party/volk/LICENSE.md"
+    "vulkan_headers|${PROJECT_SOURCE_DIR}/third_party/vulkan_headers/LICENSE.md"
     "zstd|${openexr_SOURCE_DIR}/external/zstd/LICENSE"
 )
 # A Debian machine-readable copyright file: Ernie's licence, and where each bundled one is.

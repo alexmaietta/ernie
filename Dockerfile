@@ -2,7 +2,7 @@
 FROM ubuntu:24.04 AS build
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates cmake g++ git ninja-build \
+    && apt-get install -y --no-install-recommends ca-certificates cmake g++ git ninja-build python3-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .

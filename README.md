@@ -54,7 +54,6 @@ Its key features are aimed at planetary robotics and sensing:
     - A viewer with your own panels and debug drawing, and C++ and Python APIs on Linux, Windows and macOS
     - OpenUSD import, renderer backends for Newton Viewer, IsaacLab and Chrono::Sensor, and TerrainGen built on the viewer
 
-
 For a more detailed overview of the features, see our [documentation](https://alexmaietta.github.io/ernie/).
 
 Future work:
@@ -69,10 +68,11 @@ Future work:
 - A real-time ray-tracing renderer alongside the rasterizer
 - Integrations into Newton Viewer, Chrono Sensor, and IsaacLab
 - Benchmark against RTX, Cycles, Newton Warp Raytrace, Madrona both in speed, throughput, and image quality
+- Validation with real-world sensors and scenes.
 
 ## Installation
 
-The Python package is on PyPI as `ernie-renderer` (Python 3.12 or later, with a Vulkan 1.3 driver). It bundles everything else, the viewer and the native `ernie` program included:
+The Python package is on PyPI as `ernie-renderer` (Python 3.10 or later, with a Vulkan 1.3 driver). It bundles everything else, the viewer and the native `ernie` program included:
 
 ```sh
 pip install ernie-renderer
@@ -100,10 +100,10 @@ docker run --rm --gpus all -v "$PWD:/out" ghcr.io/alexmaietta/ernie --demo demo_
 
 ### Build from source
 
-Ernie needs CMake 3.24+, a C++20 compiler and a Vulkan 1.3 driver; it fetches its other dependencies (see [third_party/README.md](third_party/README.md)).
+Ernie needs CMake 3.24+, a C++20 compiler, Python 3.10+ with its development headers (or `-DERNIE_BUILD_PYTHON=OFF`) and a Vulkan 1.3 driver. Small dependencies are vendored; Slang and OpenEXR are fetched on first configure (see [third_party/README.md](third_party/README.md)).
 
 ```sh
-cmake -S . -B build -DERNIE_BUILD_TESTS=ON -DERNIE_INSTALL=ON -DERNIE_BUILD_PYTHON=ON -DERNIE_BUILD_APP=ON
+cmake -S . -B build -DERNIE_BUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build -j4              # C++, GPU and Python tests
 build/bin/ernie                         # the viewer
