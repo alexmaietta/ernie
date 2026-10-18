@@ -9,9 +9,11 @@ add_library(
     storage.cpp
     view.cpp
     xform.cpp
+    schemas/camera.cpp
     schemas/collection.cpp
     schemas/geom.cpp
     schemas/instancer.cpp
+    schemas/lux.cpp
     schemas/mesh.cpp
     schemas/registry.cpp
     schemas/shade.cpp
