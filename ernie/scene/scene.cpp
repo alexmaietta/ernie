@@ -169,12 +169,16 @@ void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
     store_.Set(prim, token, std::move(array));
 }
 
-const Tensor* Scene::Read(PrimId prim, std::string_view attribute) const {
+template <typename T> const T* Scene::Authored(PrimId prim, std::string_view attribute) const {
     const Column* column = AuthoredColumn(prim, attribute);
-    if (column == nullptr || column->values->Type() != ColumnType::Tensor) {
+    if (column == nullptr || column->values->Type() != kColumnType<T>) {
         return nullptr;
     }
-    return &store_.Read<Tensor>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
+    return &store_.Read<T>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
+}
+
+const Tensor* Scene::Read(PrimId prim, std::string_view attribute) const {
+    return Authored<Tensor>(prim, attribute);
 }
 
 std::optional<Value> Scene::Get(PrimId prim, std::string_view attribute) const {
@@ -277,11 +281,17 @@ void Scene::AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visib
         bounds.Extend(extent->Transformed(world));
         return;
     }
+    bool loaded = false;
     store_.Paths().ForEachChild(path, [&](PathId child) {
         if (store_.Find(child)) {
+            loaded = true;
             AddTo(bounds, child, world, visibleOnly);
         }
     });
+    // A model whose subtree isn't loaded is bounded by its hint.
+    if (!loaded) {
+        bounds.Extend(ExtentsHint(prim, !visibleOnly).Transformed(world));
+    }
 }
 
 PrimId Scene::Require(const Path& path) const {
@@ -400,15 +410,24 @@ std::vector<std::string> Scene::AppliedApis(PrimId prim) const {
 }
 
 bool Scene::LeavesOutOfBounds(PrimId prim) const {
-    const auto token = [&](std::string_view attribute) -> std::optional<Token> {
-        const Column* column = AuthoredColumn(prim, attribute);
-        return column ? std::optional(store_.Read<Token>(store_.PrimBucket(prim),
-                                                         column->attribute)[store_.PrimRow(prim)])
-                      : std::nullopt;
-    };
+    const Token* visibility = Authored<Token>(prim, Imageable::kVisibility);
     // Purpose is inherited, so a subtree under another purpose is left out whole.
-    const std::optional<Token> purpose = token(Imageable::kPurpose);
-    return token(Imageable::kVisibility) == invisible_ || (purpose && *purpose != defaultPurpose_);
+    const Token* purpose = Authored<Token>(prim, Imageable::kPurpose);
+    return (visibility && *visibility == invisible_) || (purpose && *purpose != defaultPurpose_);
+}
+
+Box Scene::ExtentsHint(PrimId prim, bool allPurposes) const {
+    const auto* hint = Authored<std::vector<float>>(prim, GeomModelAPI::kExtentsHint);
+    if (hint == nullptr) {
+        return {};
+    }
+    // Six floats per purpose, the default purpose first.
+    const std::size_t floats = allPurposes ? hint->size() : std::min<std::size_t>(6, hint->size());
+    Box box;
+    for (std::size_t i = 0; i + 6 <= floats; i += 6) {
+        box.Extend(AuthoredExtent(std::span(*hint).subspan(i, 6)));
+    }
+    return box;
 }
 
 const Column* Scene::AuthoredColumn(PrimId prim, std::string_view attribute) const {

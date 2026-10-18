@@ -62,6 +62,25 @@ TEST(Mesh, ExtentsBoundPointsAndPointCloudsTheirWidths) {
     EXPECT_EQ(scene.Extent(cloud.Id())->max, glm::dvec3(10.5, 0.5, 0.5)) << "one width for all";
 }
 
+TEST(Curves, ExtentsBoundControlPointsGrownByTheWidestWidth) {
+    Scene scene;
+    BasisCurves hair = BasisCurves::Define(scene, "/Hair");
+    EXPECT_EQ(hair.GetType(), "cubic") << "USD's fallback";
+    hair.SetCurveVertexCounts(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4}, {1}));
+    hair.SetPoints(Floats({0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 1}, {4, 3}));
+    hair.SetWidths(Floats({0.2f, 0.4f}, {2}));
+    const Box box = *scene.Extent(hair.Id());
+    EXPECT_NEAR(box.min.x, -0.2, 1e-6) << "varying widths grow by the widest";
+    EXPECT_NEAR(box.max.z, 1.2, 1e-6);
+
+    NurbsCurves nurbs = NurbsCurves::Define(scene, "/Nurbs");
+    nurbs.SetPoints(Floats({0, 0, 0, 1, 1, 1}, {2, 3}));
+    EXPECT_EQ(scene.Extent(nurbs.Id())->max, glm::dvec3(1.0)) << "no widths";
+    EXPECT_THROW(HermiteCurves::Define(scene, "/Hermite").SetTangents(Floats({1, 0}, {1, 2})),
+                 std::invalid_argument)
+        << "tangents are threes";
+}
+
 TEST(Mesh, PointsTheHostCannotReadFallBackToTheAuthoredExtent) {
     Scene scene;
     Mesh mesh = Mesh::Define(scene, "/Tri");

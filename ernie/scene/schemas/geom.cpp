@@ -60,6 +60,8 @@ ERNIE_DEFINE_SCHEMA(Xform, Concrete, kDescendantsExtent, ERNIE_NO_ATTRIBUTES,
                     .openNamespaces = {"*"})
 ERNIE_DEFINE_SCHEMA(Scope, Concrete, kDescendantsExtent, ERNIE_NO_ATTRIBUTES,
                     .openNamespaces = {"*"})
+ERNIE_DEFINE_SCHEMA(GeomModelAPI, SingleApply, kInheritExtent, ERNIE_MODEL_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(GeomSubset, Concrete, kNoExtent, ERNIE_SUBSET_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Cube, Concrete, ComputedExtent(CentredExtent<CubeHalves>),
                     ERNIE_CUBE_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Sphere, Concrete, ComputedExtent(CentredExtent<SphereHalves>),

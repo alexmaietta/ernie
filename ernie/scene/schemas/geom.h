@@ -10,6 +10,7 @@
 #include "ernie/scene/view.h"
 
 #include <array>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,6 +52,47 @@
       "The winding of its front faces.", .group = "Geometry",                                      \
       .options = {"rightHanded", "leftHanded"}, .dirty = Dirty::Topology)
 
+#define ERNIE_CARD_TEXTURE(X, Name, usdName)                                                       \
+    X(std::string, Name, usdName, "", "The image on the card facing this way.", .group = "Model",  \
+      .asset = true, .dirty = Dirty::Params)
+
+#define ERNIE_MODEL_API_ATTRIBUTES(X)                                                              \
+    X(std::string, DrawMode, "model:drawMode", "inherited",                                        \
+      "Draws the subtree as itself, or as a stand-in: its origin axes, its bounds or cards.",      \
+      .group = "Model", .options = {"origin", "bounds", "cards", "default", "inherited"},          \
+      .dirty = Dirty::Visibility)                                                                  \
+    X(bool, ApplyDrawMode, "model:applyDrawMode", false,                                           \
+      "Whether this prim's draw mode replaces its subtree.", .group = "Model",                     \
+      .dirty = Dirty::Visibility)                                                                  \
+    X(glm::dvec3, DrawModeColor, "model:drawModeColor", glm::dvec3(0.18),                          \
+      "Linear RGB of the stand-in.", .group = "Model", .lower = AtLeast(0.0), .color = true,       \
+      .dirty = Dirty::Params)                                                                      \
+    X(std::string, CardGeometry, "model:cardGeometry", "cross",                                    \
+      "Cards through the centre, on the bounds' faces, or as the textures place them.",            \
+      .group = "Model", .options = {"cross", "box", "fromTexture"}, .dirty = Dirty::Params)        \
+    X(std::string, CardVisibility, "model:cardVisibility", "inherited",                            \
+      "Every textured card, or only one per axis.", .group = "Model",                              \
+      .options = {"full", "simple", "inherited"}, .dirty = Dirty::Params)                          \
+    ERNIE_CARD_TEXTURE(X, CardTextureXPos, "model:cardTextureXPos")                                \
+    ERNIE_CARD_TEXTURE(X, CardTextureYPos, "model:cardTextureYPos")                                \
+    ERNIE_CARD_TEXTURE(X, CardTextureZPos, "model:cardTextureZPos")                                \
+    ERNIE_CARD_TEXTURE(X, CardTextureXNeg, "model:cardTextureXNeg")                                \
+    ERNIE_CARD_TEXTURE(X, CardTextureYNeg, "model:cardTextureYNeg")                                \
+    ERNIE_CARD_TEXTURE(X, CardTextureZNeg, "model:cardTextureZNeg")                                \
+    X(std::vector<float>, ExtentsHint, "extentsHint", std::vector<float>{},                        \
+      "The subtree's local bounds per purpose (default, render, proxy, guide), six floats each, "  \
+      "read while it isn't loaded.", .group = "Model")
+
+#define ERNIE_SUBSET_ATTRIBUTES(X)                                                                 \
+    X(std::string, ElementType, "elementType", "face", "What its indices count.",                  \
+      .group = "Subset", .options = {"face", "point", "edge", "segment", "tetrahedron"},           \
+      .dirty = Dirty::Topology)                                                                    \
+    X(Tensor, Indices, "indices", Tensor(), "The elements in the subset.", .group = "Subset",      \
+      .integer = true, .dirty = Dirty::Topology)                                                   \
+    X(std::string, FamilyName, "familyName", "",                                                   \
+      "The family of subsets it is one of, as materialBind for per-face materials.",               \
+      .group = "Subset", .dirty = Dirty::Topology)
+
 #define ERNIE_SHAPE_LENGTH .group = "Shape", .lower = AtLeast(0.0), .finite = true
 
 #define ERNIE_AXIS_ATTRIBUTE(X)                                                                    \
@@ -86,7 +128,7 @@ namespace ernie {
 
 /// @return A Boundable's authored `extent` (min x, y, z, max x, y, z), which extent functions
 /// read while the data they bound isn't on the host; empty when unset.
-inline Box AuthoredExtent(const std::vector<float>& extent) {
+inline Box AuthoredExtent(std::span<const float> extent) {
     if (extent.size() != 6) {
         return {};
     }
@@ -110,6 +152,11 @@ ERNIE_SCHEMA(Gprim, Boundable, ERNIE_GPRIM_ATTRIBUTES,
 ERNIE_CONCRETE_SCHEMA(Xform, Xformable, ERNIE_NO_ATTRIBUTES, "A transform grouping its children.");
 ERNIE_CONCRETE_SCHEMA(Scope, Imageable, ERNIE_NO_ATTRIBUTES,
                       "A grouping without a transform of its own.");
+ERNIE_API_SCHEMA(GeomModelAPI, ERNIE_MODEL_API_ATTRIBUTES,
+                 "A model's stand-ins and the bounds hint used while its subtree isn't loaded.");
+ERNIE_CONCRETE_SCHEMA(GeomSubset, SchemaView, ERNIE_SUBSET_ATTRIBUTES,
+                      "Some faces, points, edges, segments or tetrahedra of its parent, to bind a "
+                      "material to or select.");
 ERNIE_CONCRETE_SCHEMA(Cube, Gprim, ERNIE_CUBE_ATTRIBUTES,
                       "A box centred on its origin, size along each axis.");
 ERNIE_CONCRETE_SCHEMA(Sphere, Gprim, ERNIE_SPHERE_ATTRIBUTES, "A sphere centred on its origin.");

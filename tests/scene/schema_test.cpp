@@ -101,6 +101,34 @@ TEST(Extent, WorldBoundsGatherVisibleDescendantsThroughTheirTransforms) {
     EXPECT_TRUE(scene.WorldBounds("/World/Hidden").Empty());
 }
 
+TEST(Extent, ModelsWithoutLoadedDescendantsAreBoundedByTheirHint) {
+    Scene scene;
+    Xform::Define(scene, "/World");
+    SetXform(scene, "/World", {.translate = glm::dvec3(10.0, 0.0, 0.0)});
+    Xform::Define(scene, "/World/Rover");
+    GeomModelAPI::Apply(scene, "/World/Rover")
+        .SetExtentsHint({-1, -1, 0, 1, 1, 2, -5, -5, -5, 5, 5, 5});
+    ExpectBox(scene.WorldBounds("/World"), {9.0, -1.0, 0.0}, {11.0, 1.0, 2.0});
+    SCOPED_TRACE("bounds in the parent take every purpose's box");
+    ExpectBox(scene.BoundsInParent(*scene.Find("/World/Rover")), glm::dvec3(-5.0), glm::dvec3(5.0));
+    Sphere::Define(scene, "/World/Rover/Body").SetRadius(0.5);
+    SCOPED_TRACE("loaded descendants replace the hint");
+    ExpectBox(scene.WorldBounds("/World"), {9.5, -0.5, -0.5}, {10.5, 0.5, 0.5});
+    Sphere(scene, "/World/Rover/Body").SetVisibility("invisible");
+    EXPECT_TRUE(scene.WorldBounds("/World").Empty()) << "hidden, not unloaded";
+}
+
+TEST(Extent, SubsetsAreNotBounded) {
+    Scene scene;
+    Cube::Define(scene, "/Box");
+    GeomSubset subset = GeomSubset::Define(scene, "/Box/Top");
+    subset.SetIndices(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4}, {1}))
+        .SetFamilyName("materialBind");
+    EXPECT_EQ(subset.GetElementType(), "face");
+    EXPECT_FALSE(scene.Extent(subset.Id()));
+    ExpectBox(scene.WorldBounds("/Box"), glm::dvec3(-1.0), glm::dvec3(1.0));
+}
+
 TEST(Extent, ResettingTheStackDropsAncestorsFromWorldBounds) {
     Scene scene;
     Xform::Define(scene, "/World");

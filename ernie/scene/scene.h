@@ -126,6 +126,8 @@ class Scene {
     std::vector<ApiName> AllApis(const SchemaDef* schema, std::span<const Token> applied) const;
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
+    /// @return The attribute's value when the prim authors it as a `T`, or null.
+    template <typename T> const T* Authored(PrimId prim, std::string_view attribute) const;
     const AttributeDef* Declared(BucketId bucket, AttributeId attribute) const;
     /// @return Whether the prim's type or an applied API schema leaves the attribute's namespace
     /// open; any attribute for a prim without a type.
@@ -133,6 +135,8 @@ class Scene {
     ColumnType TypeForUndeclared(PrimId prim, std::string_view attribute, const Value& value) const;
     /// @return Whether the prim and its subtree are invisible or of a purpose bounds leave out.
     bool LeavesOutOfBounds(PrimId prim) const;
+    /// @return GeomModelAPI's extentsHint: the default purpose's box, or with `allPurposes`, all.
+    Box ExtentsHint(PrimId prim, bool allPurposes) const;
     /// Adds a subtree's extents under `parent`'s transform; with `visibleOnly`, only its visible
     /// default-purpose prims'.
     void AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const;

@@ -3,14 +3,16 @@
 /// @brief Point-based geometry's registry entries and extents, as UsdGeom computes them.
 #include "ernie/scene/schemas/mesh.h"
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 
 namespace ernie {
 namespace {
 
-/// @return The box of a CPU tensor's points, each grown by half its width (one per point, one for
-/// all, or none); none for an empty tensor or one on a device.
+/// @return The box of a CPU tensor's points, each grown by half its width when there is one per
+/// point, else by half the widest (as UsdGeomCurves does); none for an empty tensor or one on a
+/// device.
 std::optional<Box> BoundPoints(const Tensor& points, const Tensor& widths) {
     if (points.Empty() || IsGpu(points.Location().kind) ||
         (!widths.Empty() && IsGpu(widths.Location().kind))) {
@@ -20,10 +22,9 @@ std::optional<Box> BoundPoints(const Tensor& points, const Tensor& widths) {
     const std::vector<float> diameters =
         widths.Empty() ? std::vector<float>{} : CopyFloats(widths, "widths");
     const auto count = static_cast<std::size_t>(xyz.Elements() / 3);
+    const double widest = diameters.empty() ? 0.0 : *std::ranges::max_element(diameters);
     const auto half = [&](std::size_t i) {
-        return diameters.size() == count ? 0.5 * diameters[i]
-               : diameters.size() == 1   ? 0.5 * diameters[0]
-                                         : 0.0;
+        return 0.5 * (diameters.size() == count ? diameters[i] : widest);
     };
     Box box;
     const auto extend = [&]<typename T>(const T* data) {
@@ -40,7 +41,8 @@ std::optional<Box> BoundPoints(const Tensor& points, const Tensor& widths) {
     return box;
 }
 
-/// Meshes from their points; point clouds grown by their widths.
+/// Meshes from their points; point clouds and curves grown by their widths. Curves are bounded by
+/// their control points, which hold every basis but catmullRom and Hermite closely, as in USD.
 template <bool kWidths>
 void PointBasedExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto points = rows.Column<Tensor>(PointBased::kPoints);
@@ -58,5 +60,10 @@ ERNIE_DEFINE_SCHEMA(PointBased, Abstract, kInheritExtent, ERNIE_POINT_BASED_ATTR
 ERNIE_DEFINE_SCHEMA(Mesh, Concrete, ComputedExtent(PointBasedExtent<false>), ERNIE_MESH_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Points, Concrete, ComputedExtent(PointBasedExtent<true>),
                     ERNIE_POINTS_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Curves, Abstract, ComputedExtent(PointBasedExtent<true>),
+                    ERNIE_CURVES_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(BasisCurves, Concrete, kInheritExtent, ERNIE_BASIS_CURVES_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(NurbsCurves, Concrete, kInheritExtent, ERNIE_NURBS_CURVES_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(HermiteCurves, Concrete, kInheritExtent, ERNIE_HERMITE_CURVES_ATTRIBUTES)
 
 }  // namespace ernie

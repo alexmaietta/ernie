@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file mesh.h
-/// @brief UsdGeom's point-based geometry: meshes and point clouds.
+/// @brief UsdGeom's point-based geometry: meshes, point clouds and curves.
 ///
 /// References:
-/// - Pixar, UsdGeomMesh and UsdGeomPoints, https://openusd.org/release/api/usd_geom_page_front.html
+/// - Pixar, UsdGeomMesh, UsdGeomPoints and UsdGeomCurves,
+///   https://openusd.org/release/api/usd_geom_page_front.html
 #pragma once
 
 #include "ernie/scene/schemas/geom.h"
@@ -54,11 +55,40 @@
       "The sharpness of each crease, or of each crease edge.", .group = "Subdivision",             \
       .dirty = Dirty::Topology)
 
+#define ERNIE_WIDTHS_ATTRIBUTE(X, text)                                                            \
+    X(Tensor, Widths, "widths", Tensor(), text, .group = "Geometry", .dirty = Dirty::Points)
+
 #define ERNIE_POINTS_ATTRIBUTES(X)                                                                 \
-    X(Tensor, Widths, "widths", Tensor(), "Diameters in metres: one per point, or one for all.",   \
-      .group = "Geometry", .dirty = Dirty::Points)                                                 \
+    ERNIE_WIDTHS_ATTRIBUTE(X, "Diameters in metres: one per point, or one for all.")               \
     X(Tensor, Ids, "ids", Tensor(), "int64 ids that follow points across time samples.",           \
       .group = "Geometry", .integer = true, .dirty = Dirty::Topology)
+
+#define ERNIE_CURVES_ATTRIBUTES(X)                                                                 \
+    ERNIE_MESH_INDICES(X, CurveVertexCounts, "curveVertexCounts",                                  \
+                       "The number of points of each curve.")                                      \
+    ERNIE_WIDTHS_ATTRIBUTE(X, "Diameters in metres: per point, per segment end, or one for all.")
+
+#define ERNIE_BASIS_CURVES_ATTRIBUTES(X)                                                           \
+    X(std::string, Type, "type", "cubic", "Linear segments, or cubic ones by the basis.",          \
+      .group = "Topology", .options = {"linear", "cubic"}, .dirty = Dirty::Topology)               \
+    X(std::string, Basis, "basis", "bezier", "The cubic basis.", .group = "Topology",              \
+      .options = {"bezier", "bspline", "catmullRom"}, .dirty = Dirty::Topology)                    \
+    X(std::string, Wrap, "wrap", "nonperiodic",                                                    \
+      "Open curves, closed ones, or open ones through their end points.", .group = "Topology",     \
+      .options = {"nonperiodic", "periodic", "pinned"}, .dirty = Dirty::Topology)
+
+#define ERNIE_NURBS_CURVES_ATTRIBUTES(X)                                                           \
+    ERNIE_MESH_INDICES(X, Order, "order", "The order (degree + 1) of each curve.")                 \
+    X(Tensor, Knots, "knots", Tensor(), "Each curve's knots, curveVertexCount + order of them.",   \
+      .group = "Topology", .dirty = Dirty::Topology)                                               \
+    X(Tensor, Ranges, "ranges", Tensor(), "(n, 2) parametric range drawn of each curve.",          \
+      .group = "Topology", .components = 2, .dirty = Dirty::Topology)                              \
+    X(Tensor, PointWeights, "pointWeights", Tensor(), "Rational weights, one per point.",          \
+      .group = "Geometry", .dirty = Dirty::Points)
+
+#define ERNIE_HERMITE_CURVES_ATTRIBUTES(X)                                                         \
+    X(Tensor, Tangents, "tangents", Tensor(), "(n, 3) tangent of each point.",                     \
+      .group = "Geometry", .components = 3, .dirty = Dirty::Points)
 // clang-format on
 
 namespace ernie {
@@ -68,5 +98,13 @@ ERNIE_CONCRETE_SCHEMA(Mesh, PointBased, ERNIE_MESH_ATTRIBUTES,
                       "A polygon mesh, or the control mesh of a subdivision surface.");
 ERNIE_CONCRETE_SCHEMA(Points, PointBased, ERNIE_POINTS_ATTRIBUTES,
                       "A point cloud of spheres, each its own width.");
+ERNIE_SCHEMA(Curves, PointBased, ERNIE_CURVES_ATTRIBUTES,
+             "Batched curves, each a run of points, swept by its widths.");
+ERNIE_CONCRETE_SCHEMA(BasisCurves, Curves, ERNIE_BASIS_CURVES_ATTRIBUTES,
+                      "Linear or cubic curves: hair, fur, cables and wires.");
+ERNIE_CONCRETE_SCHEMA(NurbsCurves, Curves, ERNIE_NURBS_CURVES_ATTRIBUTES,
+                      "Rational B-spline curves of any order.");
+ERNIE_CONCRETE_SCHEMA(HermiteCurves, Curves, ERNIE_HERMITE_CURVES_ATTRIBUTES,
+                      "Cubic curves through their points with a tangent at each.");
 
 }  // namespace ernie
