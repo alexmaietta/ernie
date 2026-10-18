@@ -3,9 +3,11 @@
 /// @brief Float RGBA images: loading, EXR output, sRGB and mips.
 #pragma once
 
+#include "ernie/export.h"
+
 #include "ernie/util/tensor.h"
 
-#include <glm/glm.hpp>
+#include "ernie/util/glm.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -41,14 +43,14 @@ inline constexpr float kMinNormalZ = 0.05f;
 /// @brief Packs a slope deviation into [0, 1) for 8-bit storage.
 /// @param sigma The deviation, 0 or more.
 /// @return sigma / (1 + sigma), finest near 0.
-float EncodeSlopeDeviation(float sigma);
+ERNIE_API float EncodeSlopeDeviation(float sigma);
 /// @brief Inverts `EncodeSlopeDeviation`.
 /// @param encoded The stored value.
 /// @return The slope deviation.
-float DecodeSlopeDeviation(float encoded);
+ERNIE_API float DecodeSlopeDeviation(float encoded);
 
 /// @brief An RGBA image of linear floats, rows top to bottom.
-struct Image {
+struct ERNIE_API Image {
     /// Width, in pixels.
     std::uint32_t width = 0;
     /// Height, in pixels.
@@ -86,12 +88,12 @@ struct Image {
 /// @return The image.
 /// @throws std::runtime_error If the file cannot be read or decoded,
 ///         or is not .png, .jpg, .jpeg or .exr.
-Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding);
+ERNIE_API Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding);
 
 /// @brief Tests for a .png, .jpg or .jpeg extension, in any case.
 /// @param path The file.
 /// @return Whether it is a PNG or JPEG, read by stb.
-bool IsPngOrJpeg(const std::filesystem::path& path);
+ERNIE_API bool IsPngOrJpeg(const std::filesystem::path& path);
 
 /// @brief Writes a CPU tensor as a ZIP-compressed OpenEXR file.
 /// Channels are float32, or uint32 for uint32 data such as ids;
@@ -102,16 +104,16 @@ bool IsPngOrJpeg(const std::filesystem::path& path);
 ///              bottom.
 /// @throws std::invalid_argument For another rank or type.
 /// @throws std::runtime_error If the file cannot be written.
-void WriteExr(const std::filesystem::path& path, const Tensor& image);
+ERNIE_API void WriteExr(const std::filesystem::path& path, const Tensor& image);
 
 /// @brief Decodes one sRGB channel to linear (IEC 61966-2-1).
 /// @param value The encoded value in [0, 1].
 /// @return The linear value.
-float SrgbToLinear(float value);
+ERNIE_API float SrgbToLinear(float value);
 /// @brief Encodes one linear channel to sRGB (IEC 61966-2-1).
 /// @param value The linear value in [0, 1].
 /// @return The encoded value.
-float LinearToSrgb(float value);
+ERNIE_API float LinearToSrgb(float value);
 
 /// @brief Builds the mip chain down to 1 x 1.
 /// Level n is max(1, floor(size / 2^n)) per side, as WebGPU expects;
@@ -124,13 +126,13 @@ float LinearToSrgb(float value);
 /// - M. Toksvig, "Mipmapping Normal Maps", Journal of Graphics Tools
 ///   10(3), 2005.
 /// - M. Olano and D. Baker, "LEAN Mapping", I3D 2010.
-std::vector<Image> MipChain(const Image& image, MipFilter filter);
+ERNIE_API std::vector<Image> MipChain(const Image& image, MipFilter filter);
 
 /// @brief Quantises to 8-bit RGBA.
 /// @param image    The image.
 /// @param encoding `Srgb` encodes rgb as sRGB; alpha stays linear.
 /// @return Four bytes per pixel.
-std::vector<std::uint8_t> ToRgba8(const Image& image, ImageEncoding encoding);
+ERNIE_API std::vector<std::uint8_t> ToRgba8(const Image& image, ImageEncoding encoding);
 
 /// @brief A texture tensor as an image.
 /// @details Grey replicates into rgb and a missing alpha reads as 1.
@@ -139,6 +141,6 @@ std::vector<std::uint8_t> ToRgba8(const Image& image, ImageEncoding encoding);
 /// @param encoding How uint8 colour is encoded: sRGB or linear.
 /// @return The image.
 /// @throws std::invalid_argument For another kind of tensor.
-Image ImageFromTensor(const Tensor& tensor, ImageEncoding encoding);
+ERNIE_API Image ImageFromTensor(const Tensor& tensor, ImageEncoding encoding);
 
 }  // namespace ernie

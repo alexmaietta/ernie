@@ -3,7 +3,7 @@
 /// @brief A small FIFO thread pool for background jobs.
 #pragma once
 
-#include "ernie/util/profile.h"
+#include "ernie/util/profiler.h"
 
 #include <algorithm>
 #include <condition_variable>

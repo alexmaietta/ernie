@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/@ernie_pc_to_prefix@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+
+Name: Ernie
+Description: @PROJECT_DESCRIPTION@
+Version: @ERNIE_VERSION@
+URL: @PROJECT_HOMEPAGE_URL@
+Cflags: -I${includedir} -I${includedir}/ernie/third_party/glm -I${includedir}/ernie/third_party/dlpack
+Libs: -L${libdir} -lernie

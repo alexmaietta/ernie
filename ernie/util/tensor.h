@@ -3,6 +3,8 @@
 /// @brief Strided tensors, Ernie's end of DLPack.
 #pragma once
 
+#include "ernie/export.h"
+
 #include <dlpack/dlpack.h>
 
 #include <algorithm>
@@ -23,7 +25,7 @@ enum class DType : std::uint8_t { UInt8, UInt16, UInt32, Int32, Int64, Float16, 
 /// @brief The size of an element type.
 /// @param type The type.
 /// @return Bytes per element.
-std::size_t ByteSize(DType type);
+ERNIE_API std::size_t ByteSize(DType type);
 
 /// @brief Where a tensor's memory lives: host, CUDA or ROCm (HIP).
 enum class DeviceKind : std::uint8_t { Cpu, Cuda, Rocm };
@@ -52,7 +54,7 @@ struct Device {
 ///
 /// References:
 /// - DLPack, https://dmlc.github.io/dlpack/latest/
-class Tensor {
+class ERNIE_API Tensor {
   public:
     Tensor() = default;
 
@@ -229,7 +231,7 @@ template <typename T> T* Tensor::As() const {
 /// @param what   What it holds, for errors.
 /// @return Its elements in row-major order.
 /// @throws std::invalid_argument If it is elsewhere or not float.
-std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what);
+ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what);
 
 /// @brief Copies a CPU array of vectors out as floats.
 /// @param tensor     A flat or (n, `components`) float tensor.
@@ -237,13 +239,14 @@ std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what);
 /// @param what       What it holds, for errors.
 /// @return Its elements in row-major order.
 /// @throws std::invalid_argument If its shape or type is wrong.
-std::vector<float> CopyFloats(const Tensor& tensor, std::size_t components, std::string_view what);
+ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::size_t components,
+                                        std::string_view what);
 
 /// @brief Copies a CPU tensor of any shape out as integers.
 /// @param tensor An int32, int64 or uint32 tensor on the CPU.
 /// @param what   What it holds, for errors.
 /// @return Its elements in row-major order.
 /// @throws std::invalid_argument If it is elsewhere or not integer.
-std::vector<std::int64_t> CopyInts(const Tensor& tensor, std::string_view what);
+ERNIE_API std::vector<std::int64_t> CopyInts(const Tensor& tensor, std::string_view what);
 
 }  // namespace ernie

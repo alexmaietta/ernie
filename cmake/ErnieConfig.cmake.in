@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# find_package(Ernie): the shared library and its public headers, as Ernie::ernie.
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/ErnieTargets.cmake")
+
+# Public headers use glm: the consumer's own when it has one, else the copy installed with Ernie.
+# Either way one glm reaches each translation unit; ernie/util/glm.h checks its layout.
+find_package(glm CONFIG QUIET)
+if(TARGET glm::glm)
+    target_link_libraries(Ernie::ernie INTERFACE glm::glm)
+else()
+    set_property(
+        TARGET Ernie::ernie
+        APPEND
+        PROPERTY INTERFACE_INCLUDE_DIRECTORIES "@PACKAGE_ERNIE_THIRD_PARTY_INCLUDEDIR@/glm"
+    )
+endif()
+# DLPack, a single versioned C header, always comes from Ernie.
+set_property(
+    TARGET Ernie::ernie
+    APPEND
+    PROPERTY INTERFACE_INCLUDE_DIRECTORIES "@PACKAGE_ERNIE_THIRD_PARTY_INCLUDEDIR@/dlpack"
+)
+
+check_required_components(Ernie)

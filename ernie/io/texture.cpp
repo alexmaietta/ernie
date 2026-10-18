@@ -7,7 +7,7 @@
 #include "ernie/util/bytes.h"
 #include "ernie/util/disk_cache.h"
 #include "ernie/util/parallel.h"
-#include "ernie/util/profile.h"
+#include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <basisu_transcoder.h>

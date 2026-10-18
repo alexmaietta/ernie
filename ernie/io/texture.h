@@ -4,11 +4,13 @@
 /// block-compressed DDS files, and a disk cache of baked textures.
 #pragma once
 
+#include "ernie/export.h"
+
 #include "ernie/io/image.h"
 #include "ernie/io/raster.h"
-#include "ernie/util/mapped_file.h"
+#include "ernie/util/file.h"
 
-#include <glm/glm.hpp>
+#include "ernie/util/glm.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -71,27 +73,27 @@ struct TextureFormatInfo {
 /// @brief Describes a texture format.
 /// @param format The format.
 /// @return Its block size, bytes, channels and sRGB flag.
-TextureFormatInfo FormatInfo(TextureFormat format);
+ERNIE_API TextureFormatInfo FormatInfo(TextureFormat format);
 
 /// @brief Switches sRGB decoding on or off where a format has both variants (RGBA8, BGRA8, BC1,
 /// BC2, BC3, BC7).
 /// @param format The format.
 /// @param srgb   Whether to decode from sRGB.
 /// @return The variant, or `format` unchanged.
-TextureFormat WithSrgb(TextureFormat format, bool srgb);
+ERNIE_API TextureFormat WithSrgb(TextureFormat format, bool srgb);
 
 /// @brief Bytes of an image in whole blocks.
 /// @param format The format.
 /// @param width  Width, in texels.
 /// @param height Height, in texels.
 /// @return The size in bytes.
-std::size_t ImageBytes(TextureFormat format, std::uint32_t width, std::uint32_t height);
+ERNIE_API std::size_t ImageBytes(TextureFormat format, std::uint32_t width, std::uint32_t height);
 
 /// @brief Mips of a full chain, down to 1 x 1.
 /// @param width  Width of mip 0, in texels.
 /// @param height Height of mip 0, in texels.
 /// @return The number of mips.
-std::uint32_t MipCount(std::uint32_t width, std::uint32_t height);
+ERNIE_API std::uint32_t MipCount(std::uint32_t width, std::uint32_t height);
 
 /// @brief A side of a mip.
 /// @param side The side at mip 0, in texels.
@@ -106,7 +108,7 @@ constexpr std::uint32_t MipSide(std::uint32_t side, std::uint32_t mip) {
 
 /// @brief A texture as a DDS or KTX2 file stores it, not decoded.
 /// Each layer holds `mips` levels, halving down from full size; a cube map's six faces are layers.
-struct TextureData {
+struct ERNIE_API TextureData {
     /// The texel format.
     TextureFormat format = TextureFormat::Rgba8;
     /// Width of mip 0, in texels.
@@ -144,7 +146,7 @@ struct TextureData {
 /// @brief Tests for a .dds or .ktx2 extension, in any case.
 /// @param path The file.
 /// @return Whether `LoadTextureFile` reads it.
-bool IsTextureFile(const std::filesystem::path& path);
+ERNIE_API bool IsTextureFile(const std::filesystem::path& path);
 
 /// @brief Reads a DDS or KTX2 file as stored, by extension.
 /// The file is mapped and read in place, so texels load from disk only as used; supercompressed
@@ -163,23 +165,23 @@ bool IsTextureFile(const std::filesystem::path& path);
 /// - Khronos, "KTX File Format Specification", version 2.0.
 ///   https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html
 /// - Binomial, "Basis Universal" (the transcoder). https://github.com/BinomialLLC/basis_universal
-TextureData LoadTextureFile(const std::filesystem::path& path);
+ERNIE_API TextureData LoadTextureFile(const std::filesystem::path& path);
 
 /// @brief Parses a DDS file's contents (`LoadTextureFile`).
 /// @param file The bytes.
 /// @return The texture, owning its texels.
-TextureData ReadDds(std::span<const std::byte> file);
+ERNIE_API TextureData ReadDds(std::span<const std::byte> file);
 
 /// @brief Parses a KTX2 file's contents (`LoadTextureFile`).
 /// @param file The bytes.
 /// @return The texture, owning its texels.
-TextureData ReadKtx2(std::span<const std::byte> file);
+ERNIE_API TextureData ReadKtx2(std::span<const std::byte> file);
 
 /// @brief Writes a DDS file with the DX10 header (`ReadDds` reads it back).
 /// @param path    The file.
 /// @param texture Every layer's mips.
 /// @throws std::runtime_error If the file cannot be written.
-void WriteDdsFile(const std::filesystem::path& path, const TextureData& texture);
+ERNIE_API void WriteDdsFile(const std::filesystem::path& path, const TextureData& texture);
 
 /// @brief Decodes BC blocks for devices that cannot sample them.
 /// BC1/BC3/BC7 become RGBA8 (sRGB kept), BC4 R8 and BC5 RG8, every layer and mip.
@@ -190,7 +192,7 @@ void WriteDdsFile(const std::filesystem::path& path, const TextureData& texture)
 /// References:
 /// - R. Geldreich, "bc7enc_rdo" (rgbcx's BC1 to BC5 decoders, bc7decomp's BC7), MIT or public
 ///   domain. https://github.com/richgel999/bc7enc_rdo
-TextureData DecodeBlocks(const TextureData& texture);
+ERNIE_API TextureData DecodeBlocks(const TextureData& texture);
 
 // ----------------------------------------------------------------------------------------------
 // Baking
@@ -208,7 +210,7 @@ enum class TextureRole {
 
 /// @brief Encodes RGBA8 images into BC blocks off the CPU.
 /// Bakes use it for the formats it handles (`GpuBlockEncoder`), the CPU encoders for the rest.
-class BlockEncoder {
+class ERNIE_API BlockEncoder {
   public:
     virtual ~BlockEncoder() = default;
 
@@ -250,13 +252,14 @@ struct BakeOptions {
 /// @param encoder  Used where it handles `format`; else all CPU threads.
 /// @return The texture.
 /// @throws std::invalid_argument For an unsupported format, or mips that do not halve.
-TextureData EncodeTexture(std::span<const Image> mips, TextureFormat format, ImageEncoding encoding,
-                          int quality = 1, BlockEncoder* encoder = nullptr);
+ERNIE_API TextureData EncodeTexture(std::span<const Image> mips, TextureFormat format,
+                                    ImageEncoding encoding, int quality = 1,
+                                    BlockEncoder* encoder = nullptr);
 
 /// @brief Reads an 8-bit PNG or JPEG's size from its header.
 /// @param file The image.
 /// @return Width and height; none for other or unreadable files.
-std::optional<glm::uvec2> Rgba8ImageSize(const std::filesystem::path& file);
+ERNIE_API std::optional<glm::uvec2> Rgba8ImageSize(const std::filesystem::path& file);
 
 /// @brief Decodes an 8-bit PNG or JPEG and mips it in 8 bits.
 /// For images too large for floats (a 21600 x 10800 Earth is 3.7 GB as floats, 1.2 GB as RGBA8
@@ -265,7 +268,8 @@ std::optional<glm::uvec2> Rgba8ImageSize(const std::filesystem::path& file);
 /// @param srgb Whether rgb is averaged as linear light.
 /// @return RGBA8 levels down to 1 x 1, full size first.
 /// @throws std::runtime_error If it cannot be read or is not an 8-bit PNG or JPEG.
-std::vector<std::vector<std::uint8_t>> LoadRgba8Mips(const std::filesystem::path& file, bool srgb);
+ERNIE_API std::vector<std::vector<std::uint8_t>> LoadRgba8Mips(const std::filesystem::path& file,
+                                                               bool srgb);
 
 /// @brief Bakes an image into a mipped DDS texture.
 /// Mips are filtered by role, then compressed: what virtual textures need, at a quarter to an
@@ -281,15 +285,16 @@ std::vector<std::vector<std::uint8_t>> LoadRgba8Mips(const std::filesystem::path
 ///
 /// References:
 /// - R. Geldreich, "bc7enc_rdo" (bc7enc and rgbcx). https://github.com/richgel999/bc7enc_rdo
-TextureData BakeTexture(const std::filesystem::path& input, const std::filesystem::path& output,
-                        const BakeOptions& options = {});
+ERNIE_API TextureData BakeTexture(const std::filesystem::path& input,
+                                  const std::filesystem::path& output,
+                                  const BakeOptions& options = {});
 
 /// @brief Bakes a colour or data raster into DDS a band at a time.
 /// For images larger than memory, JPEG's limit or one file, and to spread a bake over frames. A
 /// worker reads 1024-row bands and mips them exactly; `Step` encodes ready work on the caller's
 /// thread. At most about 256 MB of band mips wait. Samples are 8- or 16-bit (high byte kept); 1
 /// channel is grey, 2 grey and alpha, 3 RGB.
-class RasterBake {
+class ERNIE_API RasterBake {
   public:
     /// @brief Starts a bake and writes the file's header.
     /// @param source  The raster.
@@ -339,8 +344,9 @@ class RasterBake {
 /// @throws std::invalid_argument For tiles not filling whole rows or of different sizes, or normal
 ///         maps.
 /// @throws std::runtime_error If a tile cannot be read or the output written.
-TextureData BakeMosaic(std::span<const std::filesystem::path> tiles, std::uint32_t columns,
-                       const std::filesystem::path& output, const BakeOptions& options = {});
+ERNIE_API TextureData BakeMosaic(std::span<const std::filesystem::path> tiles,
+                                 std::uint32_t columns, const std::filesystem::path& output,
+                                 const BakeOptions& options = {});
 
 // ----------------------------------------------------------------------------------------------
 // Cache
@@ -348,7 +354,7 @@ TextureData BakeMosaic(std::span<const std::filesystem::path> tiles, std::uint32
 /// @brief Keeps prepared textures between runs as DDS files.
 /// A texture is decoded, mipped and encoded once until its file or read settings change. Least
 /// recently used entries go past the capacity. Any thread may read; I/O failures count as misses.
-class TextureCache {
+class ERNIE_API TextureCache {
   public:
     /// @brief The default folder, from `ERNIE_TEXTURE_CACHE` (empty or "0" for none) or
     /// `<user cache>/ernie/textures`.

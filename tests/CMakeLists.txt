@@ -9,18 +9,16 @@ ernie_add_test_suite(
         util/file_test.cpp
         util/linear_algebra_test.cpp
         util/log_test.cpp
-        util/mapped_file_test.cpp
         util/math_test.cpp
         util/noise_test.cpp
         util/parallel_test.cpp
-        util/profile_report_test.cpp
         util/profiler_test.cpp
         util/random_test.cpp
         util/tensor_test.cpp
         util/text_test.cpp
         util/version_test.cpp
         util/worker_pool_test.cpp
-    LIBRARIES ernie_util ernie_json
+    LIBRARIES ernie_static ernie_json
 )
 ernie_add_test_suite(
     physics
@@ -32,14 +30,14 @@ ernie_add_test_suite(
         physics/scattering_test.cpp
         physics/solar_test.cpp
         physics/spectrum_test.cpp
-    LIBRARIES ernie_physics
+    LIBRARIES ernie_static
 )
 # Monte Carlo and Mie checks against analytic results, slower than unit tests.
 ernie_add_test_suite(
     physics_accuracy
     LABEL accuracy
     SOURCES physics/cloud_test.cpp
-    LIBRARIES ernie_physics
+    LIBRARIES ernie_static
 )
 ernie_add_test_suite(
     io
@@ -49,9 +47,9 @@ ernie_add_test_suite(
         io/nanovdb_test.cpp
         io/raster_test.cpp
         io/texture_test.cpp
-    LIBRARIES ernie_io ernie_stb ernie_openexr ernie_zstd
+    LIBRARIES ernie_static ernie_stb ernie_openexr ernie_zstd
 )
-ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)
+ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_static)
 
 if(TARGET _ernie)
     # The interpreter tests run with; CI passes the one on its PATH.

@@ -5,7 +5,7 @@
 
 #include "ernie/physics/constants.h"
 #include "ernie/util/parallel.h"
-#include "ernie/util/profile.h"
+#include "ernie/util/profiler.h"
 
 #include <algorithm>
 #include <cmath>

@@ -3,7 +3,9 @@
 /// @brief IES LM-63 photometric profiles of luminaires.
 #pragma once
 
-#include <glm/glm.hpp>
+#include "ernie/export.h"
+
+#include "ernie/util/glm.h"
 
 #include <filesystem>
 #include <string_view>
@@ -33,7 +35,7 @@ enum class IesType {
 /// @brief How a lamp's output changes as its luminaire tilts.
 /// From TILT=INCLUDE or a tilt file; for lamps sensitive to burning
 /// position, such as metal halide.
-struct IesTilt {
+struct ERNIE_API IesTilt {
     /// Lamp position: 1 vertical, 2 horizontal along x (0 degree
     /// plane), 3 horizontal along y (90 degree plane); 0 for none.
     int geometry = 0;
@@ -72,7 +74,7 @@ struct IesTilt {
 /// - G. Ward, Radiance ies2rad, source.cal and tilt.cal (type B
 ///   coordinates and tilt angles),
 ///   https://github.com/NREL/Radiance/tree/master/src/cv
-struct IesProfile {
+struct ERNIE_API IesProfile {
     /// The photometric type.
     IesType type = IesType::C;
     /// Vertical angles, in degrees, increasing.
@@ -108,12 +110,12 @@ struct IesProfile {
 /// @throws std::invalid_argument If the text is not LM-63, has an
 ///         unknown type, or has angles out of order.
 /// @throws std::runtime_error If a tilt file cannot be read.
-IesProfile ParseIes(std::string_view text, const std::filesystem::path& directory = {});
+ERNIE_API IesProfile ParseIes(std::string_view text, const std::filesystem::path& directory = {});
 
 /// @brief Reads and parses an IES file; tilt files resolve beside it.
 /// @param path The file.
 /// @return The profile.
 /// @throws std::runtime_error If it cannot be read.
-IesProfile ReadIes(const std::filesystem::path& path);
+ERNIE_API IesProfile ReadIes(const std::filesystem::path& path);
 
 }  // namespace ernie

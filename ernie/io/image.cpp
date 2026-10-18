@@ -3,7 +3,7 @@
 /// @brief Image loading, EXR writing, sRGB conversion and mip chains.
 #include "ernie/io/image.h"
 
-#include "ernie/util/profile.h"
+#include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <ImfChannelList.h>

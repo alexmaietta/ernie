@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_library(
     ernie_physics
-    STATIC
+    OBJECT
     astronomy.cpp
     atmosphere.cpp
     cloud.cpp

@@ -8,6 +8,7 @@ set(GLM_BUILD_INSTALL OFF)
 
 ernie_fetch(glm URL https://github.com/g-truc/glm/archive/refs/tags/${ERNIE_DEP_VERSION_glm}.tar.gz)
 
+# Headers only; Ernie's own glm configuration is in ernie_build_options, so it never reaches
+# consumers.
 add_library(ernie_glm INTERFACE)
 target_include_directories(ernie_glm SYSTEM INTERFACE "${glm_SOURCE_DIR}")
-target_compile_definitions(ernie_glm INTERFACE GLM_FORCE_DEPTH_ZERO_TO_ONE)

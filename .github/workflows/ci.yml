@@ -95,6 +95,18 @@ jobs:
           -DERNIE_TEST_PYTHON=python
       - name: Build
         run: cmake --build --preset ci --parallel 4
+      # The installed library used as end users use it: its headers compile alone and a program
+      # links and runs against it (QA-072). Windows finds ernie.dll on the PATH.
+      - name: Install and build a consumer
+        shell: bash
+        run: |
+          prefix="$RUNNER_TEMP/ernie"
+          cmake --install build/ci --prefix "$prefix" --component runtime
+          cmake --install build/ci --prefix "$prefix" --component dev
+          cmake -S tests/consumer -B build/consumer -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_PREFIX_PATH=$prefix"
+          cmake --build build/consumer
+          PATH="$prefix/bin:$PATH" ctest --test-dir build/consumer --output-on-failure
       # The build tree without objects, for this platform's test job; tar keeps file modes.
       - name: Pack the build tree
         shell: bash
@@ -334,11 +346,16 @@ jobs:
         run: |
           dnf install -y -q rpm-build
           command -v ninja >/dev/null || pipx install -q ninja
+      # One build; each format installs the library where its distributions look for it, as the
+      # build image (RHEL's lib64) is not where Debian and Ubuntu look.
       - name: Build
         run: |
           cmake --preset package
           cmake --build --preset package --parallel 4
-          cd build/package && cpack -G "DEB;RPM;TGZ"
+          cd build/package
+          cmake -DCMAKE_INSTALL_LIBDIR=lib/$(uname -m)-linux-gnu . && cpack -G DEB
+          cmake -DCMAKE_INSTALL_LIBDIR=lib64 . && cpack -G RPM
+          cmake -DCMAKE_INSTALL_LIBDIR=lib . && cpack -G TGZ
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-linux-${{ matrix.arch }}
@@ -360,6 +377,8 @@ jobs:
         image: ["ubuntu:22.04", "ubuntu:24.04", "debian:12", "rockylinux/rockylinux:9"]
     container: ${{ matrix.image }}
     steps:
+      # The consumer project; checked out first, as checkout clears the workspace.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: packages-linux-${{ matrix.arch }}
@@ -367,10 +386,16 @@ jobs:
         if: ${{ !startsWith(matrix.image, 'rockylinux') }}
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ./*.deb mesa-vulkan-drivers
+          apt-get install -y --no-install-recommends ./*.deb mesa-vulkan-drivers cmake g++ make
       - name: Install
         if: ${{ startsWith(matrix.image, 'rockylinux') }}
-        run: dnf install -y ./*.rpm
+        run: dnf install -y ./*.rpm cmake gcc-c++ make
+      # The -dev package used as end users use it, with the distribution's own compiler and CMake.
+      - name: Build a consumer
+        run: |
+          cmake -S tests/consumer -B /tmp/consumer -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/consumer
+          ctest --test-dir /tmp/consumer --output-on-failure
       # Rocky 9 has no lavapipe for aarch64, so there the program is only run, not given a device.
       - name: Install lavapipe
         if: ${{ startsWith(matrix.image, 'rockylinux') && matrix.arch == 'x86_64' }}

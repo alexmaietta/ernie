@@ -10,6 +10,7 @@ project(
     VERSION 0.2.0
     DESCRIPTION
         "Efficient Renderer for Natural and Interplanetary Environments: a spectral Vulkan ray tracer"
+    HOMEPAGE_URL "https://github.com/alexmaietta/ernie"
     LANGUAGES C CXX
 )
 
@@ -24,6 +25,10 @@ option(ERNIE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(ERNIE_ASSERTS "Keep assertions in optimised builds" OFF)
 option(ERNIE_TRACY "Send profiling zones to the Tracy profiler too" OFF)
 option(ERNIE_COVERAGE "Instrument Ernie for code coverage (GCC or Clang)" OFF)
+option(ERNIE_INSTALL "Install libernie for C++ consumers" ${PROJECT_IS_TOP_LEVEL})
+
+set(CMAKE_INSTALL_DOCDIR "share/doc/ernie" CACHE PATH "Documentation and licences")
+include(GNUInstallDirs)
 
 get_property(ernie_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(PROJECT_IS_TOP_LEVEL AND NOT ernie_multi_config AND NOT CMAKE_BUILD_TYPE)
@@ -36,9 +41,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
-if(ERNIE_BUILD_PYTHON)
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-endif()
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+# Every object goes into the shared library too, and only its public API leaves it: symbols are
+# hidden unless marked ERNIE_API, including those of the dependencies built here.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 include(cmake/ErnieFetch.cmake)
 include(cmake/third_party/glm.cmake)
@@ -53,6 +62,10 @@ include(cmake/third_party/volk.cmake)
 add_subdirectory(third_party)
 
 add_library(ernie_build_options INTERFACE)
+# All of Ernie's own code is built as the shared library's (ernie_EXPORTS), so ERNIE_API exports
+# there and is harmless in the static library. glm's configuration stays inside Ernie: it changes
+# no layout, but consumers' own glm calls must not see it.
+target_compile_definitions(ernie_build_options INTERFACE ernie_EXPORTS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 if(MSVC)
     target_compile_options(ernie_build_options INTERFACE /W4 /permissive- /Zc:__cplusplus /utf-8)
     # The CRT's "unsafe function" deprecations (getenv, fopen) would fail warnings-as-errors builds.
@@ -89,6 +102,9 @@ if(ERNIE_COVERAGE)
 endif()
 
 add_subdirectory(ernie)
+if(ERNIE_INSTALL)
+    include(cmake/ErnieInstall.cmake)
+endif()
 
 if(ERNIE_BUILD_TESTS)
     enable_testing()

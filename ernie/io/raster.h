@@ -4,10 +4,12 @@
 /// them, planetary DEMs and the local heightfields drawn of them.
 #pragma once
 
-#include "ernie/util/mapped_file.h"
+#include "ernie/export.h"
+
+#include "ernie/util/file.h"
 #include "ernie/util/tensor.h"
 
-#include <glm/glm.hpp>
+#include "ernie/util/glm.h"
 
 #include <array>
 #include <cmath>
@@ -39,13 +41,13 @@ enum class GridSampleType {
 /// @brief The size of a sample type.
 /// @param type The type.
 /// @return Bytes per sample.
-std::uint32_t ByteSize(GridSampleType type);
+ERNIE_API std::uint32_t ByteSize(GridSampleType type);
 
 /// @brief Decodes one sample in host byte order.
 /// @param sample The sample's bytes.
 /// @param type   How it is stored.
 /// @return Its value.
-double DecodeSample(const std::byte* sample, GridSampleType type);
+ERNIE_API double DecodeSample(const std::byte* sample, GridSampleType type);
 
 /// @brief Where an equirectangular raster lies.
 struct LatLongGrid {
@@ -66,7 +68,7 @@ struct GridRect {
 /// @brief A raster image read a rectangle at a time.
 /// Lets images larger than memory be baked, resampled and streamed in parts. Read by one thread at
 /// a time.
-class GridSource {
+class ERNIE_API GridSource {
   public:
     virtual ~GridSource() = default;
 
@@ -133,7 +135,7 @@ class GridSource {
 /// @brief A grid of like tiles read as one raster.
 /// For global mosaics too large for one file, such as Blue Marble's eight 21600 x 21600 tiles.
 /// Parts are tiles, decoded one at a time; the grid is the first tile's, spread over the rest.
-class MosaicRaster : public GridSource {
+class ERNIE_API MosaicRaster : public GridSource {
   public:
     /// @brief Opens the tiles.
     /// @param tiles   The tile files, row by row, top to bottom.
@@ -188,7 +190,7 @@ class MosaicRaster : public GridSource {
 /// @return The mosaic.
 /// @throws std::runtime_error If it cannot be read.
 /// @throws std::invalid_argument For rows of different lengths, or as `MosaicRaster`.
-std::unique_ptr<MosaicRaster> OpenMosaic(const std::filesystem::path& path);
+ERNIE_API std::unique_ptr<MosaicRaster> OpenMosaic(const std::filesystem::path& path);
 
 /// @brief Opens a raster by extension.
 /// TIFF/GeoTIFF and PDS3 (.img with .lbl, or the .lbl) read in place; 8/16-bit PNG and JPEG decode
@@ -196,7 +198,7 @@ std::unique_ptr<MosaicRaster> OpenMosaic(const std::filesystem::path& path);
 /// @param path The file.
 /// @return The raster.
 /// @throws std::runtime_error If it cannot be read.
-std::unique_ptr<GridSource> OpenRaster(const std::filesystem::path& path);
+ERNIE_API std::unique_ptr<GridSource> OpenRaster(const std::filesystem::path& path);
 
 // ----------------------------------------------------------------------------------------------
 // Grid views
@@ -239,13 +241,13 @@ struct GridView {
 /// @param minSide The fewest cells allowed along each side.
 /// @throws std::invalid_argument If it has no data, too few cells, a row stride below its width, a
 ///         non-finite origin, or a cell size that is not positive and finite.
-void CheckGridView(const GridView& view, const std::string& what, std::size_t minSide);
+ERNIE_API void CheckGridView(const GridView& view, const std::string& what, std::size_t minSide);
 
 // ----------------------------------------------------------------------------------------------
 // PDS3
 
 /// @brief A PDS3 label's keywords, in the order the label gives them.
-struct Pds3Label {
+struct ERNIE_API Pds3Label {
     /// @brief One `KEY = value` line.
     struct Keyword {
         /// The OBJECTs holding it, outermost first, each followed by a dot (`IMAGE.`); empty at the
@@ -284,7 +286,7 @@ struct Pds3Label {
 /// @brief A PDS3 value's text without its units and outer quotes, as `Pds3Label::Get` gives it.
 /// @param value The value as written; a sequence keeps its units.
 /// @return Its text.
-std::string CleanPds3Value(std::string_view value);
+ERNIE_API std::string CleanPds3Value(std::string_view value);
 
 /// @brief Parses a PDS3 label's text up to its END line.
 /// @param text The label: `KEY = value` lines, OBJECT and END_OBJECT nesting, comments (`/* */`)
@@ -294,7 +296,7 @@ std::string CleanPds3Value(std::string_view value);
 /// References:
 /// - NASA PDS, "Planetary Data System Standards Reference" 3.8, 2009 (the label's syntax,
 ///   chapter 12).
-Pds3Label ParsePds3Label(std::string_view text);
+ERNIE_API Pds3Label ParsePds3Label(std::string_view text);
 
 /// @brief A PDS3 image read in place from its mapped file.
 /// Supports one band of 8/16/32-bit integers or floats in either byte order, SCALING_FACTOR,
@@ -305,7 +307,7 @@ Pds3Label ParsePds3Label(std::string_view text);
 /// - NASA PDS, "Planetary Data System Standards Reference" 3.8, 2009 (the label's syntax, chapter
 ///   12; IMAGE objects, appendix A.21; IMAGE_MAP_PROJECTION, appendix A.22).
 /// - LOLA team, "LRO LOLA Gridded Data Record" (LDEM_*.LBL).
-class PdsImage : public GridSource {
+class ERNIE_API PdsImage : public GridSource {
   public:
     /// @brief Opens an image.
     /// @param path The label or data file; the label's ^IMAGE names the data beside it.
@@ -380,7 +382,7 @@ class PdsImage : public GridSource {
 /// https://www.awaresystems.be/imaging/tiff/bigtiff.html
 /// - OGC, "GeoTIFF Standard" 1.1, 2019 (ModelPixelScale, ModelTiepoint); GDAL's GDAL_NODATA tag
 ///   (42113).
-class TiffImage : public GridSource {
+class ERNIE_API TiffImage : public GridSource {
   public:
     /// @brief Opens an image and reads its layout.
     /// @param path The file.
@@ -476,7 +478,7 @@ class TiffImage : public GridSource {
 /// meridians and that times cos(standardParallel) along the parallels. Sample s of line l is
 /// centred at latitude maxLatitude - (l + 0.5) / ppd and east longitude
 /// westLongitude + (s + 0.5) / (ppd cos(standardParallel)).
-struct CylindricalDem {
+struct ERNIE_API CylindricalDem {
     std::uint32_t lines = 0;
     std::uint32_t samples = 0;
     double pixelsPerDegree = 1.0;
@@ -503,7 +505,7 @@ struct CylindricalDem {
 /// @return The DEM.
 /// @throws std::runtime_error If a file cannot be read.
 /// @throws std::invalid_argument For another projection or a label it cannot follow.
-CylindricalDem ReadCylindricalDem(const std::filesystem::path& labelPath);
+ERNIE_API CylindricalDem ReadCylindricalDem(const std::filesystem::path& labelPath);
 
 /// @brief A planet's radius on a polar stereographic grid (spherical, true at the pole), as
 /// LOLA's polar LDEM products hold it.
@@ -512,7 +514,7 @@ CylindricalDem ReadCylindricalDem(const std::filesystem::path& labelPath);
 /// (north) and longitude lon from the centre longitude lies at x = rho sin(lon) and y =
 /// rho cos(lon) (south) or -rho cos(lon) (north), the cell centre at line
 /// lineProjectionOffset - y / mapScale and sample sampleProjectionOffset + x / mapScale.
-struct PolarStereographicDem {
+struct ERNIE_API PolarStereographicDem {
     std::uint32_t lines = 0;
     std::uint32_t samples = 0;
     double mapScale = 1.0;  ///< Metres a pixel.
@@ -541,7 +543,7 @@ struct PolarStereographicDem {
 /// @return The DEM.
 /// @throws std::invalid_argument As `ReadCylindricalDem`, and for a projection not centred on a
 ///         pole.
-PolarStereographicDem ReadPolarStereographicDem(const std::filesystem::path& labelPath);
+ERNIE_API PolarStereographicDem ReadPolarStereographicDem(const std::filesystem::path& labelPath);
 
 /// @brief A heightfield of a DEM about one point, in a local frame there: x east, y north and z
 /// up, its origin on the reference sphere at the point.
@@ -564,11 +566,11 @@ struct LocalTerrain {
 /// @param cellSize     Metres between cells; positive.
 /// @return The `cells` x `cells` heightfield.
 /// @throws std::invalid_argument For fewer than 2 cells or a non-positive cell size.
-LocalTerrain MakeLocalTerrain(const CylindricalDem& dem, double latitudeDeg, double longitudeDeg,
-                              std::uint32_t cells, double cellSize);
+ERNIE_API LocalTerrain MakeLocalTerrain(const CylindricalDem& dem, double latitudeDeg,
+                                        double longitudeDeg, std::uint32_t cells, double cellSize);
 /// @copydoc MakeLocalTerrain(const CylindricalDem&, double, double, std::uint32_t, double)
-LocalTerrain MakeLocalTerrain(const PolarStereographicDem& dem, double latitudeDeg,
-                              double longitudeDeg, std::uint32_t cells, double cellSize);
+ERNIE_API LocalTerrain MakeLocalTerrain(const PolarStereographicDem& dem, double latitudeDeg,
+                                        double longitudeDeg, std::uint32_t cells, double cellSize);
 
 /// @brief Makes a heightfield as `MakeLocalTerrain` does, taking `fallback`'s heights wherever
 /// `dem` has none: a high-resolution DTM inside a regional DEM. Both share `dem`'s reference
@@ -580,14 +582,14 @@ LocalTerrain MakeLocalTerrain(const PolarStereographicDem& dem, double latitudeD
 /// @param cells        Cells along each side, at least 2.
 /// @param cellSize     Metres between cells; positive.
 /// @return The heightfield.
-LocalTerrain MakeLocalTerrain(const CylindricalDem& dem, const CylindricalDem& fallback,
-                              double latitudeDeg, double longitudeDeg, std::uint32_t cells,
-                              double cellSize);
+ERNIE_API LocalTerrain MakeLocalTerrain(const CylindricalDem& dem, const CylindricalDem& fallback,
+                                        double latitudeDeg, double longitudeDeg,
+                                        std::uint32_t cells, double cellSize);
 
 /// @brief The body-fixed unit vector of a planetocentric latitude and east longitude.
 /// @param latitudeDeg  The latitude.
 /// @param longitudeDeg The east longitude.
 /// @return The direction.
-glm::dvec3 BodyDirection(double latitudeDeg, double longitudeDeg);
+ERNIE_API glm::dvec3 BodyDirection(double latitudeDeg, double longitudeDeg);
 
 }  // namespace ernie

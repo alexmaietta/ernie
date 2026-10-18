@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_library(
     ernie_io
-    STATIC
+    OBJECT
     ies.cpp
     image.cpp
     nanovdb.cpp

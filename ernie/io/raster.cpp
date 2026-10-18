@@ -8,7 +8,7 @@
 
 #include "ernie/util/bytes.h"
 #include "ernie/util/file.h"
-#include "ernie/util/profile.h"
+#include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <stb_image.h>

@@ -4,7 +4,7 @@
 #include "ernie/io/nanovdb.h"
 
 #include "ernie/util/bytes.h"
-#include "ernie/util/mapped_file.h"
+#include "ernie/util/file.h"
 
 #define PNANOVDB_C
 #include <PNanoVDB.h>

@@ -10,6 +10,8 @@
 ///   messages.
 #pragma once
 
+#include "ernie/export.h"
+
 #include <string_view>
 
 namespace ernie::log {
@@ -25,16 +27,16 @@ enum class Verbosity {
 };
 
 /// @return The current verbosity.
-Verbosity GetVerbosity();
+ERNIE_API Verbosity GetVerbosity();
 /// @brief Sets the verbosity; before the banner, it applies to it.
 /// @param verbosity The new level.
-void SetVerbosity(Verbosity verbosity);
+ERNIE_API void SetVerbosity(Verbosity verbosity);
 
 /// @brief Prints `message` and a newline unless quiet.
 /// @param message The text.
-void Info(std::string_view message);
+ERNIE_API void Info(std::string_view message);
 /// @brief Prints `message` and a newline when verbose.
 /// @param message The text.
-void Detail(std::string_view message);
+ERNIE_API void Detail(std::string_view message);
 
 }  // namespace ernie::log
