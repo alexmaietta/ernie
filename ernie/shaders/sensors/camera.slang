@@ -7,8 +7,10 @@ import bindless;
 import ray_tracer;
 import spectrum;
 
-/// No output: an image index or address left out.
+/// No colour image: its bindless index left out.
 static const uint kNoImage = 0xffffffff;
+/// The light a surface facing away from the eye still gets, of what one facing it gets.
+static const float kAmbient = 0.15;
 /// What a pixel that sees nothing gets in `instances`.
 static const uint kNoInstance = 0xffffffff;
 
@@ -45,7 +47,7 @@ struct Parameters {
 /// @return The light a pixel sees: the surface's albedo lit from the eye.
 Spectrum Shade(Spectrum albedo, float3 normal, float3 direction) {
     float lit = abs(dot(normal, direction));
-    return albedo.Scaled(0.15 + 0.85 * lit);
+    return albedo.Scaled(lerp(kAmbient, 1.0, lit));
 }
 
 [shader("compute")]

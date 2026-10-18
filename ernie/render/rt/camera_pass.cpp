@@ -10,7 +10,6 @@
 #include "ernie/shaders/spectral/spectrum.h"
 #include "ernie/util/math.h"
 
-#include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -25,7 +24,7 @@ constexpr std::uint32_t kNoImage = 0xffffffff;
 
 /// A view as camera.slang's `View` reads it.
 struct ViewRecord {
-    glm::vec4 rows[3];
+    std::array<glm::vec4, 3> rows;
     glm::vec2 halfExtent;
     glm::uvec2 size;
     glm::vec3 background;
@@ -51,19 +50,17 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
 
 /// @return A view's record, its output addresses left for the pass to fill in once the graph has
 /// placed them.
-ViewRecord Record(const PinholeView& view, const CameraOutputs& outputs, const glm::dvec3& origin) {
+ViewRecord ToViewRecord(const PinholeView& view, const CameraOutputs& outputs,
+                        const glm::dvec3& origin) {
     // Relative to the origin in double, then rounded: values near the camera stay small.
     const glm::dmat4 relative = glm::translate(glm::dmat4(1.0), -origin) * view.cameraToWorld;
     const double tangent = std::tan(0.5 * view.verticalFov);
     const double aspect = static_cast<double>(view.size.x) / static_cast<double>(view.size.y);
-    ViewRecord record{.halfExtent = glm::vec2(tangent * aspect, tangent),
-                      .size = view.size,
-                      .background = outputs.background,
-                      .colour = outputs.colour ? outputs.colourIndex.value : kNoImage};
-    for (int r = 0; r < 3; ++r) {
-        record.rows[r] = glm::vec4(glm::row(relative, r));
-    }
-    return record;
+    return {.rows = ToAffineRows(relative),
+            .halfExtent = glm::vec2(tangent * aspect, tangent),
+            .size = view.size,
+            .background = outputs.background,
+            .colour = outputs.colour ? outputs.colourIndex.value : kNoImage};
 }
 
 }  // namespace
@@ -89,7 +86,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
     std::vector<ViewRecord> records;
     glm::uvec2 largest{0};
     for (const CameraView& view : views) {
-        records.push_back(Record(view.view, view.outputs, scene->origin));
+        records.push_back(ToViewRecord(view.view, view.outputs, scene->origin));
         largest = glm::max(largest, view.view.size);
     }
     graph::Buffer staged = graph.Create(records.size() * sizeof(ViewRecord), "camera views");

@@ -88,10 +88,21 @@ BottomBuild BottomLevels::Build(GeometryId id, bool refit, std::vector<TriangleG
 
 void BottomLevels::AddBuilds(graph::Graph& graph) {
     ERNIE_ZONE("Prepare the bottom levels");
-    // Compacted sizes that have come back: each level moves into a structure of its size.
-    std::vector<
-        std::pair<std::shared_ptr<AccelerationStructure>, std::shared_ptr<AccelerationStructure>>>
-        compactions;
+    Moves moves = TakeCompactedSizes();
+    FrameBuilds builds = PlanBuilds();
+    Compaction compaction = StartCompactionQuery(builds.built);
+    AddAddressUpload(graph);
+    if (!builds.builds.empty() || !moves.empty()) {
+        AddBuildPass(graph, std::move(builds), std::move(moves), compaction);
+    }
+    if (!compaction.geometries.empty()) {
+        compactions_.push_back(std::move(compaction));
+    }
+}
+
+BottomLevels::Moves BottomLevels::TakeCompactedSizes() {
+    // Each level whose compacted size came back moves into a structure of that size.
+    Moves moves;
     std::erase_if(compactions_, [&](Compaction& compaction) {
         const std::optional<std::vector<std::uint64_t>> sizes = compaction.query->Sizes();
         if (!sizes) {
@@ -110,21 +121,20 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
                 pool_, sizesCompacted, level.structure->Name() + " compacted");
             ++totals_.compacted;
             totals_.saved += level.structure->Sizes().storage - sizesCompacted.storage;
-            compactions.emplace_back(level.structure, compacted);
+            moves.emplace_back(level.structure, compacted);
             level.structure = compacted;
             SetAddress(compaction.geometries[i], compacted->Address());
         }
         return true;
     });
+    return moves;
+}
 
-    // This frame's builds, under the scratch budget.
-    std::vector<TriangleGeometry> triangles;
-    std::vector<BoxGeometry> boxes;
-    triangles.reserve(pending_.size());
-    boxes.reserve(pending_.size());
-    std::vector<BottomBuild> builds;
-    std::vector<GeometryId> built;
-    std::uint64_t scratch = 0;
+BottomLevels::FrameBuilds BottomLevels::PlanBuilds() {
+    FrameBuilds frame;
+    // Builds point into these, so they hold every geometry without growing.
+    frame.triangles.reserve(pending_.size());
+    frame.boxes.reserve(pending_.size());
     std::vector<Work> later;
     for (const Work& work : pending_) {
         const Geometry& geometry = geometry_.Get(work.geometry);
@@ -143,7 +153,7 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
                                                 ? Sizes(context_, input.triangles, flags)
                                                 : Sizes(context_, input.boxes, flags);
             // Over the budget, the level keeps tracing as it was until a later frame.
-            if (!builds.empty() && scratch + sizes.buildScratch > scratchBudget_) {
+            if (!frame.builds.empty() && frame.scratch + sizes.buildScratch > scratchBudget_) {
                 later.push_back(work);
                 continue;
             }
@@ -155,16 +165,19 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
             ++level.refits;
         }
         ++(work.refit ? totals_.refitted : totals_.built);
-        const BottomBuild build = Build(work.geometry, work.refit, triangles, boxes);
-        scratch +=
+        const BottomBuild build = Build(work.geometry, work.refit, frame.triangles, frame.boxes);
+        frame.scratch +=
             work.refit ? build.target->Sizes().updateScratch : build.target->Sizes().buildScratch;
-        builds.push_back(build);
-        built.push_back(work.geometry);
+        frame.builds.push_back(build);
+        frame.built.push_back(work.geometry);
         SetAddress(work.geometry, level.structure->Address());
     }
     pending_ = std::move(later);
+    return frame;
+}
 
-    // Static levels built now have their compacted sizes read back for a later frame.
+BottomLevels::Compaction BottomLevels::StartCompactionQuery(const std::vector<GeometryId>& built) {
+    // Static levels have their compacted sizes read back for a later frame.
     Compaction compaction;
     for (const GeometryId geometry : built) {
         Level& level = levels_[geometry];
@@ -174,30 +187,33 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
             compaction.structures.push_back(level.structure);
         }
     }
-    CompactionQuery* query = nullptr;
     if (!compaction.geometries.empty()) {
         compaction.query = std::make_unique<CompactionQuery>(
             context_, static_cast<std::uint32_t>(compaction.geometries.size()));
-        query = compaction.query.get();
     }
+    return compaction;
+}
 
-    if (!dirtyAddresses_.empty()) {
-        addresses_->Resize(hostAddresses_.size(), context_.Main());
-        StageRows(uploader_, *addresses_, hostAddresses_, dirtyAddresses_);
-        dirtyAddresses_.clear();
-        graph::Buffer addresses = graph.Import(*addresses_);
-        graph::AddUploadPass(graph, "Upload bottom-level addresses", uploader_,
-                             std::span(&addresses, 1));
-    }
-    if (builds.empty() && compactions.empty()) {
+void BottomLevels::AddAddressUpload(graph::Graph& graph) {
+    if (dirtyAddresses_.empty()) {
         return;
     }
+    addresses_->Resize(hostAddresses_.size(), context_.Main());
+    StageRows(uploader_, *addresses_, hostAddresses_, dirtyAddresses_);
+    dirtyAddresses_.clear();
+    graph::Buffer addresses = graph.Import(*addresses_);
+    graph::AddUploadPass(graph, "Upload bottom-level addresses", uploader_,
+                         std::span(&addresses, 1));
+}
 
+void BottomLevels::AddBuildPass(graph::Graph& graph, FrameBuilds frame, Moves moves,
+                                const Compaction& compaction) {
     graph::Acceleration levels = graph.Import(pool_);
     std::vector<graph::Buffer> inputs = geometry_.Import(graph);
     graph::Buffer scratchBuffer =
-        scratch > 0 ? graph.Create(ScratchBytes(builds, {}), "bottom-level scratch")
-                    : graph::Buffer{};
+        frame.scratch > 0 ? graph.Create(ScratchBytes(frame.builds, {}), "bottom-level scratch")
+                          : graph::Buffer{};
+    CompactionQuery* query = compaction.query.get();
     std::vector<const AccelerationStructure*> queried(compaction.structures.size());
     std::ranges::transform(compaction.structures, queried.begin(),
                            [](const auto& structure) { return structure.get(); });
@@ -213,17 +229,16 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
             pass.Read(levels, graph::Use::BuildInput);
             levels = pass.Build(levels);
         },
-        [builds = std::move(builds), triangles = std::move(triangles), boxes = std::move(boxes),
-         compactions = std::move(compactions), queried, query,
+        [frame = std::move(frame), moves = std::move(moves), queried, query,
          scratchBuffer](graph::PassContext& pass) {
-            for (const auto& [source, compacted] : compactions) {
+            for (const auto& [source, compacted] : moves) {
                 RecordCompaction(pass.commands, *source, *compacted);
                 // The copy reads the source: it goes once this frame's work is done.
                 pass.Keep(source);
             }
-            if (!builds.empty()) {
+            if (!frame.builds.empty()) {
                 const graph::BufferSlice space = pass.Get(scratchBuffer);
-                RecordBuilds(pass.commands, builds, {}, {space.buffer, space.offset});
+                RecordBuilds(pass.commands, frame.builds, {}, {space.buffer, space.offset});
             }
             if (query != nullptr) {
                 // Sizes are written once the builds are done.
@@ -234,9 +249,6 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
                 query->Record(pass.commands, queried);
             }
         });
-    if (!compaction.geometries.empty()) {
-        compactions_.push_back(std::move(compaction));
-    }
 }
 
 }  // namespace ernie

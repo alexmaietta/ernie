@@ -92,7 +92,7 @@ public DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
     return c;
 }
 
-/// Six float4 a transform: its high rows, then its low rows.
+/// Each transform as six float4: its three high rows, then its three low rows.
 public DoubleAffine LoadDouble(float4* matrices, uint index) {
     DoubleAffine m;
     for (uint r = 0; r < 3; ++r) {

@@ -39,6 +39,15 @@ class TopLevels {
     }
 
   private:
+    /// Remakes the top level when `count` instances outgrow it or use under a quarter of it.
+    void EnsureCapacity(std::uint32_t count);
+    /// Adds the pass writing each instance's record from its world and shape transforms.
+    void AddWritePass(graph::Graph& graph, const TransformGraph& transforms,
+                      const InstanceTable& instances, const BottomLevels& bottoms,
+                      graph::Buffer& records) const;
+    graph::Acceleration AddBuildPass(graph::Graph& graph, const BottomLevels& bottoms,
+                                     graph::Buffer records, std::uint32_t count) const;
+
     DeviceContext& context_;
     ComputeKernel writer_;
     AccelerationPool pool_;

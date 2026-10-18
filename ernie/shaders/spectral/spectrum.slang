@@ -43,11 +43,11 @@ public struct Banded<let N : int> {
     }
 }
 
-/// RGB mode: three bands of linear sRGB.
-public typealias Rgb = Banded<3>;
-/// The spectrum this kernel carries light in: RGB mode, as Minimal uses by default.
-public typealias Spectrum = Rgb;
+/// The bands this kernel carries light in: RGB mode's three, as Minimal uses by default.
 public static const int kBands = 3;
+/// RGB mode: three bands of linear sRGB.
+public typealias Rgb = Banded<kBands>;
+public typealias Spectrum = Rgb;
 
 /// @return The spectrum of an authored linear sRGB colour; in RGB mode, the colour itself.
 public Spectrum Uplift(float3 colour) {

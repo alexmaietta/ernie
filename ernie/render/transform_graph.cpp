@@ -66,7 +66,7 @@ bool TakesFloats(XformOpKind kind, std::int64_t floats) {
 }
 
 /// @return The floats a row of a float column holds.
-std::int64_t Floats(const DeviceColumn& column) {
+std::int64_t CountFloats(const DeviceColumn& column) {
     return static_cast<std::int64_t>(column.RowBytes() / sizeof(float));
 }
 
@@ -104,7 +104,7 @@ void TransformGraph::Bind(BucketId bucket, std::string_view attribute, const Dev
     }
     const PrimStore& store = scene_.Store();
     const std::optional<Token> token = store.Tokens().Find(attribute);
-    if (column.Type() != DType::Float32 || !TakesFloats(*kind, Floats(column)) ||
+    if (column.Type() != DType::Float32 || !TakesFloats(*kind, CountFloats(column)) ||
         column.Rows() != store.GetBucket(bucket).Rows() || !token) {
         throw std::invalid_argument(column.Name() + " does not hold the bucket's " +
                                     std::string(attribute) + " rows");
@@ -379,7 +379,7 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
         built.onDevice = true;
         fold();
         const DeviceColumn& column = *bound->column;
-        const auto floats = static_cast<std::uint32_t>(Floats(column));
+        const auto floats = static_cast<std::uint32_t>(CountFloats(column));
         push({.kind = OpKind(op.kind),
               .flags = (op.invert ? kInvertFlag : 0u) | floats << kFloatsShift,
               .source = bound->address + row * column.RowBytes()});

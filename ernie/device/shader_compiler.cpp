@@ -36,6 +36,14 @@ struct ShaderCompiler::Session {
             throw std::invalid_argument("Compiling no shader modules");
         }
         const std::lock_guard lock(mutex);
+        const Slang::ComPtr<slang::ISession> session = CreateSession(format, profile);
+        slang::IModule* last = LoadModules(*session, modules);
+        return Link(*session, *last, modules.back().name, std::string(entryPoint));
+    }
+
+  private:
+    /// @return A session compiling for the target, the global session started the first time.
+    Slang::ComPtr<slang::ISession> CreateSession(SlangCompileTarget format, const char* profile) {
         if (!global && SLANG_FAILED(slang::createGlobalSession(global.writeRef()))) {
             throw std::runtime_error("Cannot start the Slang shader compiler");
         }
@@ -53,36 +61,45 @@ struct ShaderCompiler::Session {
         if (SLANG_FAILED(global->createSession(description, session.writeRef()))) {
             throw std::runtime_error("Cannot create a Slang session");
         }
+        return session;
+    }
 
+    /// @return The last module, each loaded after the modules it imports.
+    static slang::IModule* LoadModules(slang::ISession& session,
+                                       std::span<const ShaderModule> modules) {
         slang::IModule* last = nullptr;
         for (const ShaderModule& module : modules) {
             Slang::ComPtr<slang::IBlob> diagnostics;
             const std::string path = module.name + ".slang";
-            last = session->loadModuleFromSourceString(
+            last = session.loadModuleFromSourceString(
                 module.name.c_str(), path.c_str(), module.source.c_str(), diagnostics.writeRef());
             if (last == nullptr) {
                 throw std::invalid_argument("Shader module " + module.name +
                                             " failed to compile:\n" + Text(diagnostics));
             }
         }
-        const std::string entry(entryPoint);
+        return last;
+    }
+
+    /// @return The code of `module`'s entry point, linked with what it imports.
+    static Slang::ComPtr<slang::IBlob> Link(slang::ISession& session, slang::IModule& module,
+                                            const std::string& name, const std::string& entry) {
         Slang::ComPtr<slang::IEntryPoint> found;
-        if (SLANG_FAILED(last->findEntryPointByName(entry.c_str(), found.writeRef()))) {
-            throw std::invalid_argument("Shader module " + modules.back().name +
-                                        " has no entry point " + entry);
+        if (SLANG_FAILED(module.findEntryPointByName(entry.c_str(), found.writeRef()))) {
+            throw std::invalid_argument("Shader module " + name + " has no entry point " + entry);
         }
-        std::array<slang::IComponentType*, 2> parts{last, found};
+        std::array<slang::IComponentType*, 2> parts{&module, found};
         Slang::ComPtr<slang::IComponentType> program;
         Slang::ComPtr<slang::IComponentType> linked;
         Slang::ComPtr<slang::IBlob> code;
         Slang::ComPtr<slang::IBlob> diagnostics;
         const bool failed =
-            SLANG_FAILED(session->createCompositeComponentType(
+            SLANG_FAILED(session.createCompositeComponentType(
                 parts.data(), parts.size(), program.writeRef(), diagnostics.writeRef())) ||
             SLANG_FAILED(program->link(linked.writeRef(), diagnostics.writeRef())) ||
             SLANG_FAILED(linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()));
         if (failed) {
-            throw std::invalid_argument("Entry point " + entry + " of " + modules.back().name +
+            throw std::invalid_argument("Entry point " + entry + " of " + name +
                                         " failed to compile:\n" + Text(diagnostics));
         }
         return code;

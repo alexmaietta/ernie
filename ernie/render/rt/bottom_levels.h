@@ -83,12 +83,33 @@ class BottomLevels {
         std::vector<std::shared_ptr<AccelerationStructure>> structures;
     };
 
+    /// Levels moving into compacted copies: each source, then its copy.
+    using Moves = std::vector<
+        std::pair<std::shared_ptr<AccelerationStructure>, std::shared_ptr<AccelerationStructure>>>;
+    /// A frame's builds and refits, and the geometry they read.
+    struct FrameBuilds {
+        std::vector<TriangleGeometry> triangles;
+        std::vector<BoxGeometry> boxes;
+        std::vector<BottomBuild> builds;
+        std::vector<GeometryId> built;
+        std::uint64_t scratch = 0;
+    };
+
     Level& At(GeometryId geometry);
     void Queue(GeometryId geometry, bool refit);
     void SetAddress(GeometryId geometry, std::uint64_t address);
     /// @return The triangles or box a geometry's level is built over.
     BottomBuild Build(GeometryId geometry, bool refit, std::vector<TriangleGeometry>& triangles,
                       std::vector<BoxGeometry>& boxes) const;
+    /// @return The moves of levels whose compacted sizes have come back.
+    Moves TakeCompactedSizes();
+    /// @return The pending builds that fit the scratch budget; the rest wait for a later frame.
+    FrameBuilds PlanBuilds();
+    /// @return The query reading back the compacted sizes of the static levels just built.
+    Compaction StartCompactionQuery(const std::vector<GeometryId>& built);
+    void AddAddressUpload(graph::Graph& graph);
+    void AddBuildPass(graph::Graph& graph, FrameBuilds builds, Moves moves,
+                      const Compaction& compaction);
 
     DeviceContext& context_;
     const GeometryPool& geometry_;

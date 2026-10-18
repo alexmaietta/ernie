@@ -77,6 +77,12 @@ class Viewer {
     /// @brief Sizes the viewport's image to the dock space's central node and draws it there,
     /// behind the panels.
     void ShowViewport();
+    /// @brief Makes the viewport's image `pixels` in size, in the UI and the heap.
+    void ResizeViewport(glm::uvec2 pixels);
+    /// @brief Adds the pass filling the viewport: traced, or the theme's colour without ray
+    /// queries.
+    /// @return The viewport, filled.
+    graph::Image AddViewportPass(graph::Graph& graph);
     /// @brief Adds the frame's own passes: rendering the viewport, then the UI over the target.
     void AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target);
 

@@ -13,16 +13,6 @@ namespace {
 
 constexpr std::uint32_t kNoRow = std::numeric_limits<std::uint32_t>::max();
 
-InstanceTable::Shape RowMajor(const glm::dmat4& m) {
-    InstanceTable::Shape rows{};
-    for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 4; ++c) {
-            rows[static_cast<std::size_t>(r * 4 + c)] = static_cast<float>(m[c][r]);
-        }
-    }
-    return rows;
-}
-
 }  // namespace
 
 InstanceTable::InstanceTable(DeviceContext& context, Arenas& arenas)
@@ -48,7 +38,7 @@ void InstanceTable::Set(std::uint32_t row, const PrimGeometry& placed) {
     prims_[row] = placed.prim;
     hostNodes_[row] = placed.prim.slot;
     hostGeometries_[row] = placed.geometry;
-    hostShapes_[row] = RowMajor(placed.shape);
+    hostShapes_[row] = ToAffineRows(placed.shape);
     hostColours_[row] = placed.colour;
     rows_[placed.prim.slot] = row;
     dirty_.push_back(row);

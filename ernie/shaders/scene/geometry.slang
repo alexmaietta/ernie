@@ -21,7 +21,7 @@ public struct GeometryRecord {
     public uint* indices;
 };
 
-/// @return A triangle's corners, in the geometry's frame.
+/// Writes a triangle's corners, in the geometry's frame, to `corners`.
 public void Corners(GeometryRecord record, uint triangle, out float3 corners[3]) {
     uint* at = record.indices + 3 * triangle;
     for (uint i = 0; i < 3; ++i) {

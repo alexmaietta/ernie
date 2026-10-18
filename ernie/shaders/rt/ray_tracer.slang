@@ -29,7 +29,6 @@ public struct Hit {
     public float2 barycentrics;
     /// An implicit shape's outward normal, in its own frame.
     public float3 objectNormal;
-    public float3x4 objectToWorld;
     public float3x4 worldToObject;
 };
 
@@ -59,7 +58,6 @@ public struct RayTracer {
                 hit.barycentrics = query.CommittedTriangleBarycentrics();
             }
             hit.objectNormal = nearest.normal;
-            hit.objectToWorld = query.CommittedObjectToWorld3x4();
             hit.worldToObject = query.CommittedWorldToObject3x4();
         }
         return hit;

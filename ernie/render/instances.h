@@ -8,6 +8,7 @@
 #include "ernie/device/staging.h"
 #include "ernie/graph/graph.h"
 #include "ernie/render/geometry.h"
+#include "ernie/util/glm.h"
 
 #include <array>
 #include <cstdint>
@@ -23,7 +24,7 @@ namespace ernie {
 /// is found with `Row`.
 class InstanceTable {
   public:
-    using Shape = std::array<float, 12>;
+    using Shape = std::array<glm::vec4, 3>;
 
     /// @param arenas Where the columns live.
     InstanceTable(DeviceContext& context, Arenas& arenas);

@@ -122,7 +122,7 @@ bool Capsule(float3 o, float3 d, float halfLength, float tMin, inout ShapeHit hi
 }
 
 /// The unit square in z = 0, facing +z.
-bool Square(float3 o, float3 d, float tMin, inout ShapeHit hit) {
+bool Plane(float3 o, float3 d, float tMin, inout ShapeHit hit) {
     float t = -o.z / d.z;
     float2 at = o.xy + t * d.xy;
     return all(abs(at) <= 1) && Take(t, float3(0, 0, 1), tMin, hit);
@@ -151,7 +151,7 @@ public bool IntersectShape(uint kind, float halfLength, float3 o, float3 d, floa
         return Capsule(o, d, halfLength, tMin, hit);
     }
     if (kind == kPlane) {
-        return Square(o, d, tMin, hit);
+        return Plane(o, d, tMin, hit);
     }
     return false;
 }

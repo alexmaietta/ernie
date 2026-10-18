@@ -8,6 +8,7 @@
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <vector>
 
@@ -27,7 +28,7 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
 }
 
 /// @return The capacity for `count` instances: doubling, and at least 64.
-std::uint32_t Capacity(std::uint32_t count) {
+std::uint32_t RoundUpCapacity(std::uint32_t count) {
     return std::max<std::uint32_t>(64, std::bit_ceil(count));
 }
 
@@ -43,44 +44,55 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
                                         const BottomLevels& bottoms) {
     ERNIE_ZONE("Prepare the top level");
     const std::uint32_t count = instances.Count();
+    EnsureCapacity(count);
+    graph::Buffer records = graph.Create(
+        std::max<std::uint64_t>(count, 1) * sizeof(AccelerationInstance), "instance records");
+    if (count > 0) {
+        AddWritePass(graph, transforms, instances, bottoms, records);
+    }
+    return AddBuildPass(graph, bottoms, records, count);
+}
+
+void TopLevels::EnsureCapacity(std::uint32_t count) {
     const std::uint32_t capacity = top_ ? top_->Sizes().primitives[0] : 0;
     if (!top_ || count > capacity || (capacity > 64 && count < capacity / 4)) {
         // Frames in flight keep the old one: destroying it retires it.
         top_ = std::make_unique<AccelerationStructure>(
-            pool_, Sizes(context_, Capacity(count), kRebuilt), "scene");
+            pool_, Sizes(context_, RoundUpCapacity(count), kRebuilt), "scene");
     }
+}
+
+void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transforms,
+                             const InstanceTable& instances, const BottomLevels& bottoms,
+                             graph::Buffer& records) const {
+    // In `WriteParameters`' order.
+    const std::array reads{graph.Import(transforms.Worlds()), graph.Import(instances.Nodes()),
+                           graph.Import(instances.Geometries()), graph.Import(instances.Shapes()),
+                           graph.Import(bottoms.Addresses())};
+    const std::uint32_t count = instances.Count();
+    graph.Add(
+        "Write instances", graph::Kind::Compute,
+        [&](graph::PassBuilder& pass) {
+            for (const graph::Buffer& read : reads) {
+                pass.ReadAddress(read);
+            }
+            records = pass.WriteAddress(records, graph::Use::StorageWrite);
+        },
+        [this, reads, records, count](graph::PassContext& pass) {
+            const auto address = [&](std::size_t read) { return pass.Get(reads[read]).Address(); };
+            writer_.Dispatch(pass.commands, {DivideRoundUp(count, 64u), 1, 1},
+                             WriteParameters{address(0), address(1), address(2), address(3),
+                                             address(4), pass.Get(records).Address(), count, 0});
+        });
+}
+
+graph::Acceleration TopLevels::AddBuildPass(graph::Graph& graph, const BottomLevels& bottoms,
+                                            graph::Buffer records, std::uint32_t count) const {
     graph::Acceleration top = graph.Import(*top_);
     const graph::Acceleration levels = graph.Import(bottoms.Pool());
-    graph::Buffer records = graph.Create(
-        std::max<std::uint64_t>(count, 1) * sizeof(AccelerationInstance), "instance records");
     const TopBuild build{.target = top_.get(), .count = count};
     graph::Buffer scratch =
         graph.Create(ScratchBytes({}, std::span(&build, 1)), "top-level scratch");
-
-    if (count > 0) {
-        const graph::Buffer worlds = graph.Import(transforms.Worlds());
-        const graph::Buffer nodes = graph.Import(instances.Nodes());
-        const graph::Buffer geometries = graph.Import(instances.Geometries());
-        const graph::Buffer shapes = graph.Import(instances.Shapes());
-        const graph::Buffer addresses = graph.Import(bottoms.Addresses());
-        graph.Add(
-            "Write instances", graph::Kind::Compute,
-            [&](graph::PassBuilder& pass) {
-                for (const graph::Buffer& read : {worlds, nodes, geometries, shapes, addresses}) {
-                    pass.ReadAddress(read);
-                }
-                records = pass.WriteAddress(records, graph::Use::StorageWrite);
-            },
-            [this, worlds, nodes, geometries, shapes, addresses, records,
-             count](graph::PassContext& pass) {
-                writer_.Dispatch(
-                    pass.commands, {DivideRoundUp(count, 64u), 1, 1},
-                    WriteParameters{pass.Get(worlds).Address(), pass.Get(nodes).Address(),
-                                    pass.Get(geometries).Address(), pass.Get(shapes).Address(),
-                                    pass.Get(addresses).Address(), pass.Get(records).Address(),
-                                    count, 0});
-            });
-    }
     graph.Add(
         "Build the top level", graph::Kind::Build,
         [&](graph::PassBuilder& pass) {

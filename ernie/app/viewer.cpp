@@ -186,31 +186,35 @@ void Viewer::ShowViewport() {
     const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
     const glm::uvec2 pixels(std::max(1.0f, size.x * scale.x), std::max(1.0f, size.y * scale.y));
     if (!viewport_ || glm::uvec2(viewport_->Description().extent) != pixels) {
-        ERNIE_ZONE("Resize the viewport");
-        // Frames in flight may still sample the old image.
-        context_->Main().Last().Wait();
-        if (viewport_) {
-            renderer_->RemoveTexture(viewportTexture_);
-            if (heap_) {
-                heap_->RemoveStorageImage(viewportImage_);
-            }
-        }
-        viewport_ = std::make_unique<DeviceImage>(
-            *context_,
-            ImageDescription{.format = ImageFormat::Rgba8Unorm,
-                             .extent = {pixels, 1},
-                             .usage = ImageUsage::Sampled | ImageUsage::Storage},
-            "Viewport");
-        viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
-        if (heap_) {
-            viewportImage_ = heap_->AddStorageImage(*viewport_);
-        }
+        ResizeViewport(pixels);
     }
     ImGui::GetBackgroundDrawList()->AddImage(viewportTexture_, position,
                                              {position.x + size.x, position.y + size.y});
 }
 
-void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target) {
+void Viewer::ResizeViewport(glm::uvec2 pixels) {
+    ERNIE_ZONE("Resize the viewport");
+    // Frames in flight may still sample the old image.
+    context_->Main().Last().Wait();
+    if (viewport_) {
+        renderer_->RemoveTexture(viewportTexture_);
+        if (heap_) {
+            heap_->RemoveStorageImage(viewportImage_);
+        }
+    }
+    viewport_ = std::make_unique<DeviceImage>(
+        *context_,
+        ImageDescription{.format = ImageFormat::Rgba8Unorm,
+                         .extent = {pixels, 1},
+                         .usage = ImageUsage::Sampled | ImageUsage::Storage},
+        "Viewport");
+    viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
+    if (heap_) {
+        viewportImage_ = heap_->AddStorageImage(*viewport_);
+    }
+}
+
+graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
     graph::Image viewport = graph.Import(*viewport_, "viewport");
     if (camera_) {
         const OrbitCamera& orbit = shell_->Camera();
@@ -222,20 +226,24 @@ void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget&
                       .verticalFov = orbit.verticalFov,
                       .size = glm::uvec2(viewport_->Description().extent)},
                      outputs);
-        viewport = *outputs.colour;
-    } else {
-        graph.Add(
-            "Viewport", graph::Kind::Copy,
-            [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
-            [this, viewport](graph::PassContext& pass) {
-                const glm::vec4 colour = shell_->GetTheme().viewport;
-                const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
-                const VkImageSubresourceRange all{
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
-                vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(),
-                                     pass.Layout(viewport), &clear, 1, &all);
-            });
+        return *outputs.colour;
     }
+    graph.Add(
+        "Viewport", graph::Kind::Copy,
+        [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
+        [this, viewport](graph::PassContext& pass) {
+            const glm::vec4 colour = shell_->GetTheme().viewport;
+            const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
+            const VkImageSubresourceRange all{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
+            vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(), pass.Layout(viewport),
+                                 &clear, 1, &all);
+        });
+    return viewport;
+}
+
+void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target) {
+    const graph::Image viewport = AddViewportPass(graph);
     graph.Add(
         "UI", graph::Kind::Raster,
         [&](graph::PassBuilder& pass) {

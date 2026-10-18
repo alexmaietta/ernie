@@ -22,7 +22,7 @@ namespace {
 /// Metres from a ground plane's centre to its edges: far past any horizon a camera near it sees.
 constexpr double kGroundHalfWidth = 1e5;
 
-std::optional<GeometryKind> KindHeld(const Scene& scene, PrimId prim) {
+std::optional<GeometryKind> FindGeometryKind(const Scene& scene, PrimId prim) {
     const SchemaDef* schema = scene.Schema(prim);
     const std::array<std::pair<const SchemaDef*, GeometryKind>, 8> kinds{{
         {&Mesh::Definition(), GeometryKind::Triangles},
@@ -42,7 +42,7 @@ std::optional<GeometryKind> KindHeld(const Scene& scene, PrimId prim) {
     return std::nullopt;
 }
 
-double Number(const Scene& scene, PrimId prim, std::string_view attribute) {
+double RequireNumber(const Scene& scene, PrimId prim, std::string_view attribute) {
     const std::optional<Value> value = scene.GetOrFallback(prim, attribute);
     const std::optional<double> number = value ? ToNumber(*value) : std::nullopt;
     if (!number) {
@@ -88,25 +88,26 @@ glm::dmat4 ShapeTransform(const Scene& scene, PrimId prim, GeometryKind kind) {
     };
     switch (kind) {
     case GeometryKind::Sphere:
-        return scaled(glm::dvec3(Number(scene, prim, Sphere::kRadius)));
+        return scaled(glm::dvec3(RequireNumber(scene, prim, Sphere::kRadius)));
     case GeometryKind::Cube:
-        return scaled(glm::dvec3(0.5 * Number(scene, prim, Cube::kSize)));
+        return scaled(glm::dvec3(0.5 * RequireNumber(scene, prim, Cube::kSize)));
     case GeometryKind::Cylinder:
     case GeometryKind::Cone: {
-        const double radius = Number(scene, prim, Cylinder::kRadius);
+        const double radius = RequireNumber(scene, prim, Cylinder::kRadius);
         return AxisTurn(scene, prim) *
-               scaled({radius, radius, 0.5 * Number(scene, prim, Cylinder::kHeight)});
+               scaled({radius, radius, 0.5 * RequireNumber(scene, prim, Cylinder::kHeight)});
     }
     case GeometryKind::Capsule:
-        return AxisTurn(scene, prim) * scaled(glm::dvec3(Number(scene, prim, Capsule::kRadius)));
+        return AxisTurn(scene, prim) *
+               scaled(glm::dvec3(RequireNumber(scene, prim, Capsule::kRadius)));
     case GeometryKind::Plane: {
         if (IsA(scene.Schema(prim), GroundPlane::Definition())) {
             return scaled({kGroundHalfWidth, kGroundHalfWidth, 1.0});
         }
         // Width along x, or z for an X normal; length along y, or z for a Y normal: under the
         // cyclic turn, the unit square's x carries the length unless the normal is z.
-        const double width = 0.5 * Number(scene, prim, Plane::kWidth);
-        const double length = 0.5 * Number(scene, prim, Plane::kLength);
+        const double width = 0.5 * RequireNumber(scene, prim, Plane::kWidth);
+        const double length = 0.5 * RequireNumber(scene, prim, Plane::kLength);
         const glm::dmat4 turn = AxisTurn(scene, prim);
         const bool normalZ = turn[2][2] == 1.0;
         return turn *
@@ -118,8 +119,8 @@ glm::dmat4 ShapeTransform(const Scene& scene, PrimId prim, GeometryKind kind) {
     return glm::dmat4(1.0);
 }
 
-/// @return Whether a changed attribute reshapes a gprim, moves a mesh's points, or remakes its
-/// topology.
+/// What a changed attribute does to a gprim: reshapes it, moves a mesh's points, remakes its
+/// topology, or recolours it.
 struct Touched {
     bool shape = false;
     bool points = false;
@@ -131,7 +132,7 @@ struct Touched {
     }
 };
 
-Touched Classify(std::string_view attribute) {
+Touched ClassifyAttribute(std::string_view attribute) {
     if (attribute == Gprim::kDisplayColor) {
         return {.colour = true};
     }
@@ -257,7 +258,7 @@ void GeometryPool::UploadMesh(PrimId prim, GeometryId id, bool topology, Changes
 }
 
 void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& changes) {
-    const std::optional<GeometryKind> kind = KindHeld(scene_, prim);
+    const std::optional<GeometryKind> kind = FindGeometryKind(scene_, prim);
     if (!kind) {
         return;
     }
@@ -273,9 +274,9 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
             UploadMesh(prim, next.geometry, topology || !known, changes);
         }
     } else if (*kind == GeometryKind::Capsule) {
-        const double radius = Number(scene_, prim, Capsule::kRadius);
+        const double radius = RequireNumber(scene_, prim, Capsule::kRadius);
         const auto halfLength =
-            static_cast<float>(0.5 * Number(scene_, prim, Capsule::kHeight) / radius);
+            static_cast<float>(0.5 * RequireNumber(scene_, prim, Capsule::kHeight) / radius);
         next.geometry = known ? placed->geometry
                               : Allocate({.kind = GeometryKind::Capsule,
                                           .box = arenas_.Allocate(6 * sizeof(float))});
@@ -332,7 +333,7 @@ GeometryPool::Changes GeometryPool::Update() {
     }
     // Values the host authored: shapes, points, topology and colours.
     for (const ChangeSet::Values& values : changeSet.values) {
-        const Touched touched = Classify(store.Tokens().Text(values.attribute));
+        const Touched touched = ClassifyAttribute(store.Tokens().Text(values.attribute));
         if (!touched.Any()) {
             continue;
         }
