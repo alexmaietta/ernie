@@ -182,7 +182,6 @@ void DeviceContext::Retire(std::function<void()> release) {
 }
 
 void DeviceContext::Collect() {
-    ERNIE_ZONE("Collect");
     if (profiler_) {
         profiler_->Collect();
     }

@@ -2,11 +2,12 @@
 /// @file profiler.h
 /// @brief Ernie's in-process CPU and GPU zone profiler, its zone macros, and averaged reports.
 ///
-/// Records `ERNIE_ZONE` and `ERNIE_GPU_ZONE` frame by frame for the Profiler panel, and with
-/// -DERNIE_TRACY=ON for Tracy too. Off until `SetEnabled`; a zone then costs one atomic load. CPU
-/// zones belong to the frame they end in; GPU zones to the frame that recorded their commands.
-/// Reports average frames into zone trees, modelled on Omniverse Kit's profiler window, and export
-/// text, JSON and Chrome traces. GPU zones are in device/profile.h.
+/// Records `ERNIE_ZONE` frame by frame for the Profiler panel, and with -DERNIE_TRACY=ON for
+/// Tracy too; `ERNIE_GPU_ZONE` reaches Tracy only, until `AddGpuZone` has a GPU timer feeding it.
+/// Off until `SetEnabled`; a zone then costs one atomic load. CPU zones belong to the frame they
+/// end in; GPU zones to the frame that recorded their commands. Reports average frames into zone
+/// trees, modelled on Omniverse Kit's profiler window, and export text, JSON and Chrome traces. GPU
+/// zones are in device/profile.h.
 ///
 ///     // The rest of the scope, one per scope; a string literal.
 ///     ERNIE_ZONE("Sync");

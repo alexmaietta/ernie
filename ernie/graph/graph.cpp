@@ -46,7 +46,7 @@ bool Reads(Use use) {
            use == Use::DepthReadWrite;
 }
 
-ImageUsage ImageUsageFor(Use use) {
+ImageUsage NeededUsage(Use use) {
     switch (use) {
     case Use::Sampled:
         return ImageUsage::Sampled;
@@ -215,17 +215,19 @@ std::uint32_t Graph::NewPass(std::string_view name, Kind kind) {
     if (compiled_) {
         throw std::logic_error("Passes cannot be added after Compile");
     }
-    passes_.push_back({.name = std::string(name), .kind = kind, .scopes = scopes_});
+    passes_.push_back({.name = std::string(name), .kind = kind, .scope = scope_});
     return static_cast<std::uint32_t>(passes_.size() - 1);
 }
 
-Graph::Zone::~Zone() {
-    graph_.scopes_.pop_back();
+Graph::ScopeGuard::~ScopeGuard() {
+    graph_.scope_ = graph_.scopes_[graph_.scope_].parent;
 }
 
-Graph::Zone Graph::Scope(std::string_view name) {
-    scopes_.emplace_back(name);
-    return Zone(*this);
+Graph::ScopeGuard Graph::Scope(std::string_view name) {
+    const std::uint32_t depth = scope_ == kNoScope ? 0 : scopes_[scope_].depth + 1;
+    scopes_.push_back({.name = std::string(name), .parent = scope_, .depth = depth});
+    scope_ = static_cast<std::uint32_t>(scopes_.size() - 1);
+    return ScopeGuard(*this);
 }
 
 std::vector<std::uint32_t> Graph::LivePasses() const {
@@ -263,7 +265,7 @@ void Graph::Lease(const std::vector<std::uint32_t>& live) {
     for (const std::uint32_t p : live) {
         for (const DependencyAccess& access : passes_[p].accesses) {
             used[access.resource] = true;
-            usage[access.resource] = usage[access.resource] | ImageUsageFor(access.use);
+            usage[access.resource] = usage[access.resource] | NeededUsage(access.use);
         }
     }
     for (std::size_t i = 0; i < resources_.size(); ++i) {
@@ -379,20 +381,21 @@ void Graph::Record(VkCommandBuffer commands, const Dependency& dependency) const
     vkCmdPipelineBarrier2(commands, &info);
 }
 
-void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order) const {
+void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order, std::uint32_t depth) const {
     const Pass& pass = passes_[live_[order]];
+    // Scopes open outermost first, each zone living on the stack of the call nested in it.
+    std::uint32_t scope = pass.scope;
+    while (scope != kNoScope && scopes_[scope].depth > depth) {
+        scope = scopes_[scope].parent;
+    }
+    if (scope != kNoScope && scopes_[scope].depth == depth) {
+        ERNIE_GPU_ZONE(context_, commands, scopes_[scope].name.c_str());
+        RecordPass(commands, order, depth + 1);
+        return;
+    }
     ERNIE_ZONE("Record a pass");
     ERNIE_ZONE_TEXT(pass.name);
-    // A label and a GPU zone for each scope, then the pass, closed innermost first.
-    std::vector<std::unique_ptr<GpuZone>> zones;
-    const auto open = [&](const std::string& name) {
-        context_.BeginLabel(commands, name);
-        zones.push_back(std::make_unique<GpuZone>(context_, commands, name));
-    };
-    for (const std::string& scope : pass.scopes) {
-        open(scope);
-    }
-    open(pass.name);
+    ERNIE_GPU_ZONE(context_, commands, pass.name.c_str());
     Record(commands, dependencies_.passes[order]);
     if (fullBarriers_) {
         ernie::Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
@@ -402,10 +405,6 @@ void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order) const {
     context.commands = commands;
     if (pass.run) {
         pass.run(context);
-    }
-    while (!zones.empty()) {
-        zones.pop_back();
-        context_.EndLabel(commands);
     }
 }
 

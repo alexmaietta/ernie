@@ -43,7 +43,7 @@ class Instance {
               std::string_view name) const;
     /// @brief Opens a named region of commands for captures and validation messages, when
     /// validating; otherwise does nothing.
-    void BeginLabel(VkCommandBuffer commands, std::string_view name) const;
+    void BeginLabel(VkCommandBuffer commands, const char* name) const;
     void EndLabel(VkCommandBuffer commands) const;
 
   private:

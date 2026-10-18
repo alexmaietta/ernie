@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file profile.h
-/// @brief GPU profiling zones: timestamps around commands, shown in Tracy beside the CPU zones
-/// with -DERNIE_TRACY=ON. Nothing is recorded in other builds, or on devices without
-/// `DeviceCapabilities::calibratedTimestamps`.
+/// @brief GPU profiling zones: a debug label and timestamps around commands, the timestamps shown
+/// in Tracy beside the CPU zones with -DERNIE_TRACY=ON. No timestamps are recorded in other
+/// builds, or on devices without `DeviceCapabilities::calibratedTimestamps`.
 ///
 ///     // The rest of the scope's commands; the name may be built at run time.
-///     ERNIE_GPU_ZONE(context, commands, pass.name);
+///     ERNIE_GPU_ZONE(context, commands, pass.name.c_str());
 ///
 /// References:
 /// - B. Taudul, "Tracy Profiler", its Vulkan GPU zones (TracyVulkan.hpp), host calibrated.
@@ -15,8 +15,9 @@
 #include "ernie/device/vulkan.h"
 #include "ernie/util/profiler.h"
 
+#include <cstddef>
 #include <memory>
-#include <string_view>
+#include <mutex>
 
 namespace ernie {
 
@@ -33,7 +34,7 @@ class GpuProfiler {
     GpuProfiler(const GpuProfiler&) = delete;
     GpuProfiler& operator=(const GpuProfiler&) = delete;
 
-    /// @brief Reads the timestamps of finished zones.
+    /// @brief Reads the timestamps of finished zones, unless another thread is reading them.
     void Collect();
     /// @return Tracy's Vulkan context.
     void* Tracy() const {
@@ -43,19 +44,23 @@ class GpuProfiler {
   private:
     explicit GpuProfiler(void* tracy) : tracy_(tracy) {}
     void* tracy_;
+    std::mutex collecting_;
 };
 
-/// @brief Timestamps around the rest of the scope's commands, as one GPU zone.
+/// @brief A debug label and timestamps around the rest of the scope's commands.
 class GpuZone {
   public:
-    GpuZone(const DeviceContext& context, VkCommandBuffer commands, std::string_view name);
+    GpuZone(const DeviceContext& context, VkCommandBuffer commands, const char* name);
     ~GpuZone();
     GpuZone(const GpuZone&) = delete;
     GpuZone& operator=(const GpuZone&) = delete;
 
   private:
-    /// Tracy's zone, when recording.
-    std::unique_ptr<void, void (*)(void*)> zone_;
+    const DeviceContext& context_;
+    VkCommandBuffer commands_;
+    /// Tracy's zone, built in place when recording.
+    alignas(std::max_align_t) std::byte zone_[32];
+    bool timed_ = false;
 };
 
 }  // namespace ernie

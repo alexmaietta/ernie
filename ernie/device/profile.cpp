@@ -9,6 +9,7 @@
 #include <tracy/TracyVulkan.hpp>
 
 #include <cstring>
+#include <new>
 #endif
 
 namespace ernie {
@@ -38,30 +39,40 @@ GpuProfiler::~GpuProfiler() {
 
 void GpuProfiler::Collect() {
 #if ERNIE_TRACY
-    static_cast<tracy::VkCtx*>(tracy_)->Collect(VK_NULL_HANDLE);
+    // Tracy's context collects from one thread at a time; a busy one is collecting already.
+    const std::unique_lock lock(collecting_, std::try_to_lock);
+    if (lock.owns_lock()) {
+        static_cast<tracy::VkCtx*>(tracy_)->Collect(VK_NULL_HANDLE);
+    }
 #endif
 }
 
-GpuZone::GpuZone(const DeviceContext& context, VkCommandBuffer commands, std::string_view name)
-    : zone_(nullptr, [](void*) {}) {
+GpuZone::GpuZone(const DeviceContext& context, VkCommandBuffer commands, const char* name)
+    : context_(context), commands_(commands) {
+    context.BeginLabel(commands, name);
 #if ERNIE_TRACY
+    static_assert(sizeof(tracy::VkCtxScope) <= sizeof(zone_) &&
+                  alignof(tracy::VkCtxScope) <= alignof(std::max_align_t));
     GpuProfiler* profiler = context.Profiler();
     if (profiler == nullptr) {
         return;
     }
     // A transient zone: its name is copied, so it may be built at run time.
     static constexpr char kFunction[] = "GpuZone";
-    zone_ = {new tracy::VkCtxScope(static_cast<tracy::VkCtx*>(profiler->Tracy()), __LINE__,
-                                   __FILE__, std::strlen(__FILE__), kFunction,
-                                   sizeof(kFunction) - 1, name.data(), name.size(), commands, true),
-             [](void* zone) { delete static_cast<tracy::VkCtxScope*>(zone); }};
-#else
-    static_cast<void>(context);
-    static_cast<void>(commands);
-    static_cast<void>(name);
+    new (zone_) tracy::VkCtxScope(static_cast<tracy::VkCtx*>(profiler->Tracy()), __LINE__, __FILE__,
+                                  std::strlen(__FILE__), kFunction, sizeof(kFunction) - 1, name,
+                                  std::strlen(name), commands, true);
+    timed_ = true;
 #endif
 }
 
-GpuZone::~GpuZone() = default;
+GpuZone::~GpuZone() {
+#if ERNIE_TRACY
+    if (timed_) {
+        std::launder(reinterpret_cast<tracy::VkCtxScope*>(zone_))->~VkCtxScope();
+    }
+#endif
+    context_.EndLabel(commands_);
+}
 
 }  // namespace ernie

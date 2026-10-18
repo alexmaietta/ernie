@@ -196,6 +196,24 @@ TEST_F(FrameGraph, PoolsTransientImagesAcrossGraphs) {
     EXPECT_EQ(pool_->Images(), 0u);
 }
 
+TEST_F(FrameGraph, RecordsPassesInNestedScopes) {
+    const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);
+    Graph graph(*context_, *pool_);
+    Buffer doubled = graph.Create(kCount * 4, "doubled");
+    Buffer result = graph.Import(values, "values");
+    {
+        const Graph::ScopeGuard frame = graph.Scope("Frame");
+        {
+            const Graph::ScopeGuard shade = graph.Scope("Shade");
+            AddAffine(graph, "Double", {}, doubled, 2, 0);
+        }
+        AddAffine(graph, "Add one", doubled, result, 1, 1);
+    }
+    const std::vector<std::uint32_t> read =
+        Read(*context_, values, graph.Execute(context_->Main()));
+    EXPECT_EQ(read[10], 21u);
+}
+
 TEST_F(FrameGraph, ReportsReadsOfWhatNothingWrote) {
     const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);
     Graph graph(*context_, *pool_);

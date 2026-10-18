@@ -173,20 +173,20 @@ class Graph {
         passes_.back().run = std::forward<Run>(run);
     }
 
-    /// @brief A named group of the passes added while it lives, labelled as one region.
-    class [[nodiscard]] Zone {
+    /// @brief A named group of the passes added while it lives, labelled and timed as one region.
+    class [[nodiscard]] ScopeGuard {
       public:
-        ~Zone();
-        Zone(const Zone&) = delete;
-        Zone& operator=(const Zone&) = delete;
+        ~ScopeGuard();
+        ScopeGuard(const ScopeGuard&) = delete;
+        ScopeGuard& operator=(const ScopeGuard&) = delete;
 
       private:
         friend class Graph;
-        explicit Zone(Graph& graph) : graph_(graph) {}
+        explicit ScopeGuard(Graph& graph) : graph_(graph) {}
         Graph& graph_;
     };
-    /// @brief Opens a scope for the passes added until the zone is destroyed; scopes nest.
-    Zone Scope(std::string_view name);
+    /// @brief Opens a scope for the passes added until the guard is destroyed; scopes nest.
+    ScopeGuard Scope(std::string_view name);
 
     /// @return Handles that passes share by type.
     Blackboard& Board() {
@@ -226,6 +226,8 @@ class Graph {
     friend class PassBuilder;
     friend class PassContext;
 
+    static constexpr std::uint32_t kNoScope = ~0u;
+
     struct Resource {
         std::string name;
         bool image = false;
@@ -244,9 +246,14 @@ class Graph {
         Kind kind = Kind::Compute;
         std::vector<DependencyAccess> accesses;
         std::function<void(PassContext&)> run;
-        /// The scopes it was added in, outermost first.
-        std::vector<std::string> scopes;
+        /// The innermost scope it was added in.
+        std::uint32_t scope = kNoScope;
         bool neverCull = false;
+    };
+    struct ScopeNode {
+        std::string name;
+        std::uint32_t parent = kNoScope;
+        std::uint32_t depth = 0;
     };
 
     std::uint32_t NewPass(std::string_view name, Kind kind);
@@ -255,14 +262,16 @@ class Graph {
     void Lease(const std::vector<std::uint32_t>& live);
     void ReleaseLeases();
     void Record(VkCommandBuffer commands, const Dependency& dependency) const;
-    /// Records a pass with its labels and barriers.
-    void RecordPass(VkCommandBuffer commands, std::uint32_t order) const;
+    /// Records a pass with its barriers, inside a GPU zone for itself and each scope from
+    /// `depth` in.
+    void RecordPass(VkCommandBuffer commands, std::uint32_t order, std::uint32_t depth = 0) const;
 
     DeviceContext& context_;
     TransientPool& pool_;
     std::vector<Resource> resources_;
     std::vector<Pass> passes_;
-    std::vector<std::string> scopes_;
+    std::vector<ScopeNode> scopes_;
+    std::uint32_t scope_ = kNoScope;
     Blackboard board_;
     /// The passes kept, in order, and their dependencies.
     std::vector<std::uint32_t> live_;

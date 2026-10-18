@@ -138,14 +138,12 @@ void Instance::Name(VkDevice device, VkObjectType type, std::uint64_t handle,
     setName_(device, &info);
 }
 
-void Instance::BeginLabel(VkCommandBuffer commands, std::string_view name) const {
-    if (beginLabel_ == nullptr) {
-        return;
+void Instance::BeginLabel(VkCommandBuffer commands, const char* name) const {
+    if (beginLabel_ != nullptr) {
+        const VkDebugUtilsLabelEXT label{.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+                                         .pLabelName = name};
+        beginLabel_(commands, &label);
     }
-    const std::string text(name);
-    const VkDebugUtilsLabelEXT label{.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-                                     .pLabelName = text.c_str()};
-    beginLabel_(commands, &label);
 }
 
 void Instance::EndLabel(VkCommandBuffer commands) const {

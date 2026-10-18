@@ -105,7 +105,7 @@ class DeviceContext {
     void Name(VkObjectType type, std::uint64_t handle, std::string_view name) const;
     /// @brief Opens and closes a named region of commands, as a capture or validation message
     /// shows it.
-    void BeginLabel(VkCommandBuffer commands, std::string_view name) const {
+    void BeginLabel(VkCommandBuffer commands, const char* name) const {
         instance_.BeginLabel(commands, name);
     }
     void EndLabel(VkCommandBuffer commands) const {
