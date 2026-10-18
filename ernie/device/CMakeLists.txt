@@ -5,6 +5,7 @@ add_library(
     arena.cpp
     bindless.cpp
     buffer.cpp
+    column.cpp
     context.cpp
     image.cpp
     instance.cpp

@@ -81,6 +81,7 @@ ernie_add_test_suite(
     SOURCES
         device/arena_test.cpp
         device/bindless_test.cpp
+        device/column_test.cpp
         device/context_test.cpp
         device/kernel_test.cpp
         device/vulkan_devices_test.cpp

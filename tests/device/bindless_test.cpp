@@ -67,19 +67,6 @@ struct SampleParameters {
     std::uint32_t texture, sampler, width, height;
 };
 
-/// Orders one dispatch's writes before the next's reads.
-void ComputeBarrier(VkCommandBuffer commands) {
-    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-                                   .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                   .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-                                   .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                   .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT};
-    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                                      .memoryBarrierCount = 1,
-                                      .pMemoryBarriers = &barrier};
-    vkCmdPipelineBarrier2(commands, &dependency);
-}
-
 TEST(BindlessHeap, KernelsPaintAndSampleImagesByIndex) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;

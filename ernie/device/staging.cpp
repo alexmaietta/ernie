@@ -43,6 +43,7 @@ void Uploader::Write(const Buffer& destination, std::uint64_t offset,
     if (bytes.empty()) {
         return;
     }
+    context_.CountUpload(bytes.size());
     if (!destination.Mapped().empty()) {
         std::memcpy(destination.Mapped().data() + offset, bytes.data(), bytes.size());
         destination.Flush(offset, bytes.size());
@@ -101,6 +102,7 @@ Readback::Readback(DeviceContext& context, Queue& queue, const Buffer& source, s
     if (offset > source.Size() || size > source.Size() - offset) {
         throw std::out_of_range("Reading past the end of a buffer");
     }
+    context.CountReadback(size);
     ticket_ = queue.Submit(
         [&](VkCommandBuffer commands) {
             MemoryBarrier(commands, true);

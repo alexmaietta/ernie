@@ -72,4 +72,17 @@ void ComputeKernel::Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
     vkCmdDispatch(commands, groups.x, groups.y, groups.z);
 }
 
+void ComputeBarrier(VkCommandBuffer commands) {
+    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                                   .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                   .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+                                   .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                   .dstAccessMask =
+                                       VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT};
+    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                                      .memoryBarrierCount = 1,
+                                      .pMemoryBarriers = &barrier};
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
 }  // namespace ernie

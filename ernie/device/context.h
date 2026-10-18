@@ -8,6 +8,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/device/vulkan.h"
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -23,6 +24,13 @@ struct DeviceContextOptions {
     /// The device to use: its UUID in hex, or part of its name; empty for the best scoring one.
     std::string device;
     std::vector<std::string> instanceExtensions;
+};
+
+/// @brief Bytes moved between the host and the device through staging.
+struct HostTransfers {
+    std::uint64_t uploaded = 0;
+    std::uint64_t readBack = 0;
+    bool operator==(const HostTransfers&) const = default;
 };
 
 /// @brief One device. Nothing is global: two contexts in a process, on one device or two, keep
@@ -74,6 +82,18 @@ class DeviceContext {
     /// @brief Waits for every queue, then frees everything retired.
     void WaitIdle();
 
+    /// @return The bytes uploaded and read back since the context was created, so a step can be
+    /// checked to move no bulk data through the host.
+    HostTransfers Transfers() const {
+        return {uploaded_.load(), readBack_.load()};
+    }
+    void CountUpload(std::uint64_t bytes) {
+        uploaded_ += bytes;
+    }
+    void CountReadback(std::uint64_t bytes) {
+        readBack_ += bytes;
+    }
+
     /// @brief Names a Vulkan object for validation messages, captures and crash reports.
     void Name(VkObjectType type, std::uint64_t handle, std::string_view name) const;
     /// @return The validation layer's messages since the last call; empty without validation.
@@ -112,6 +132,8 @@ class DeviceContext {
     Queue* transfer_ = nullptr;
     std::mutex retiredMutex_;
     std::vector<Retired> retired_;
+    std::atomic<std::uint64_t> uploaded_ = 0;
+    std::atomic<std::uint64_t> readBack_ = 0;
 };
 
 }  // namespace ernie

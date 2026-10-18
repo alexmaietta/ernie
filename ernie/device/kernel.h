@@ -54,4 +54,8 @@ class ComputeKernel {
     VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 
+/// @brief Records a barrier ordering earlier dispatches' writes before later dispatches' reads
+/// and writes. The frame graph places these between passes; this is for work recorded by hand.
+void ComputeBarrier(VkCommandBuffer commands);
+
 }  // namespace ernie
