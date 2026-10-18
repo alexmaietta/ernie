@@ -12,9 +12,7 @@ namespace {
 VkBufferCreateInfo BufferInfo(std::uint64_t size, VkBufferUsageFlags usage) {
     return {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = size,
-            .usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            .usage = usage | kBufferUsage,
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
 }
 

@@ -6,11 +6,13 @@
 #pragma once
 
 #include "ernie/device/device.h"
+#include "ernie/util/log.h"
 
 #include <vk_mem_alloc.h>
 #include <volk.h>
 
 #include <array>
+#include <concepts>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -18,8 +20,29 @@
 
 namespace ernie {
 
+/// The usage every buffer takes, so shaders reach it by address and copies need no extra flags.
+constexpr VkBufferUsageFlags kBufferUsage =
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
 /// @throws DeviceError naming `what` unless `result` succeeded.
 void CheckVk(VkResult result, std::string_view what);
+/// @brief As above, describing what failed only when it did, for calls on hot paths.
+template <std::invocable Describe> void CheckVk(VkResult result, Describe&& describe) {
+    if (result < VK_SUCCESS) {
+        CheckVk(result, std::string(describe()));
+    }
+}
+
+/// @brief Runs teardown work, logging what it throws: destructors must not throw, and on device
+/// loss every wait does.
+template <typename Teardown> void Quietly(Teardown&& teardown) noexcept {
+    try {
+        teardown();
+    } catch (const std::exception& error) {
+        log::Info(std::string("Ignored in teardown: ") + error.what());
+    }
+}
 
 /// @brief Records a global memory barrier: `src` work and writes before `dst` work and accesses.
 /// The frame graph places barriers between passes; this is for work recorded by hand.

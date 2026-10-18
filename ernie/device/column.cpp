@@ -3,9 +3,13 @@
 /// @brief Allocating device columns and growing them by device copies.
 #include "ernie/device/column.h"
 
+#include "ernie/util/on_failure.h"
+
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <numeric>
+#include <utility>
 
 namespace ernie {
 
@@ -21,19 +25,24 @@ DeviceColumn::~DeviceColumn() {
 }
 
 BufferRange DeviceColumn::Allocate(std::uint64_t rows) {
+    if (rowBytes_ != 0 && rows > std::numeric_limits<std::uint64_t>::max() / rowBytes_) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          std::to_string(rows) + " rows of " + name_ + " overflow");
+    }
     // Arenas hand out no empty ranges.
     return arenas_.Allocate(std::max<std::uint64_t>(rowBytes_ * rows, 1));
 }
 
 Ticket DeviceColumn::Resize(std::uint64_t rows, Queue& queue, std::span<const Ticket> waits) {
-    const std::uint64_t kept = rowBytes_ * std::min(rows, rows_);
-    rows_ = rows;
     if (rows <= capacity_) {
+        rows_ = rows;
         return {};
     }
-    const BufferRange old = range_;
-    capacity_ = std::max(rows, 2 * capacity_);
-    range_ = Allocate(capacity_);
+    // Nothing changes until the new range holds the rows, so a failure leaves the column whole.
+    const std::uint64_t capacity = std::max(rows, 2 * capacity_);
+    const BufferRange grown = Allocate(capacity);
+    const OnFailure freeGrown([&] { arenas_.Free(grown); });
+    const std::uint64_t kept = rowBytes_ * rows_;
     Ticket ticket;
     if (kept > 0) {
         ticket = queue.Submit(
@@ -43,15 +52,17 @@ Ticket DeviceColumn::Resize(std::uint64_t rows, Queue& queue, std::span<const Ti
                 Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                         VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_COPY_BIT,
                         VK_ACCESS_2_TRANSFER_READ_BIT);
-                const VkBufferCopy region{old.offset, range_.offset, kept};
-                vkCmdCopyBuffer(commands, arenas_.Storage(old).Handle(),
-                                arenas_.Storage(range_).Handle(), 1, &region);
+                const VkBufferCopy region{range_.offset, grown.offset, kept};
+                vkCmdCopyBuffer(commands, arenas_.Storage(range_).Handle(),
+                                arenas_.Storage(grown).Handle(), 1, &region);
                 Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
                         VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, any);
             },
             waits);
     }
-    arenas_.Free(old);
+    arenas_.Free(std::exchange(range_, grown));
+    capacity_ = capacity;
+    rows_ = rows;
     return ticket;
 }
 

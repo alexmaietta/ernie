@@ -4,6 +4,7 @@
 #include "ernie/device/instance.h"
 
 #include "ernie/util/algorithm.h"
+#include "ernie/util/on_failure.h"
 
 #include <algorithm>
 #include <array>
@@ -87,6 +88,7 @@ Instance::Instance(const InstanceOptions& options) {
                                         static_cast<std::uint32_t>(extensions.size()),
                                     .ppEnabledExtensionNames = extensions.data()};
     CheckVk(vkCreateInstance(&info, nullptr, &instance_), "Creating a Vulkan 1.3 instance");
+    const OnFailure freeInstance([&] { vkDestroyInstance(instance_, nullptr); });
     // Device functions too, through the loader's dispatch: they then work for every device, where
     // volkLoadDevice would tie the process to one.
     volkLoadInstance(instance_);

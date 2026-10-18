@@ -25,7 +25,7 @@ Uploader::Uploader(DeviceContext& context, Queue& queue, std::uint64_t chunk)
     : context_(context), queue_(queue), chunk_(chunk) {}
 
 Uploader::~Uploader() {
-    Flush();
+    Quietly([this] { Flush(); });
 }
 
 void Uploader::Write(const Buffer& destination, std::uint64_t offset,

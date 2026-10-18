@@ -3,6 +3,8 @@
 /// @brief Allocating images through VMA, their views and samplers.
 #include "ernie/device/image.h"
 
+#include "ernie/util/on_failure.h"
+
 #include <array>
 
 namespace ernie {
@@ -66,9 +68,27 @@ DeviceImage::DeviceImage(DeviceContext& context, const ImageDescription& descrip
         .usage = ToVkUsage(description.usage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
+    const VkPhysicalDeviceImageFormatInfo2 query{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        .format = info.format,
+        .type = info.imageType,
+        .tiling = info.tiling,
+        .usage = info.usage};
+    VkImageFormatProperties2 supported{.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2};
+    const VkImageFormatProperties& limits = supported.imageFormatProperties;
+    if (description.mips == 0 ||
+        vkGetPhysicalDeviceImageFormatProperties2(context.Physical(), &query, &supported) !=
+            VK_SUCCESS ||
+        description.mips > limits.maxMipLevels || description.extent.x > limits.maxExtent.width ||
+        description.extent.y > limits.maxExtent.height ||
+        description.extent.z > limits.maxExtent.depth) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          context.Info().name + " has no such image as " + std::string(name));
+    }
     const VmaAllocationCreateInfo allocation{.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
     CheckVk(vmaCreateImage(context.Allocator(), &info, &allocation, &image_, &allocation_, nullptr),
             "Allocating image " + std::string(name));
+    const OnFailure freeImage([&] { vmaDestroyImage(context.Allocator(), image_, allocation_); });
     const VkImageSubresourceRange all{
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = description.mips, .layerCount = 1};
     const VkImageViewCreateInfo view{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -79,6 +99,7 @@ DeviceImage::DeviceImage(DeviceContext& context, const ImageDescription& descrip
                                      .subresourceRange = all};
     CheckVk(vkCreateImageView(context.Device(), &view, nullptr, &view_),
             "Viewing image " + std::string(name));
+    const OnFailure freeView([&] { vkDestroyImageView(context.Device(), view_, nullptr); });
     context.Name(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<std::uint64_t>(image_), name);
 
     ready_ = context.Main().Submit([&](VkCommandBuffer commands) {

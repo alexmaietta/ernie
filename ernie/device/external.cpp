@@ -16,10 +16,6 @@
 namespace ernie {
 namespace {
 
-constexpr VkBufferUsageFlags kUsage =
-    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-
 void CreateDedicatedBuffer(VmaAllocator allocator, const VkBufferCreateInfo& info,
                            void* allocateNext, VkBuffer& buffer, VmaAllocation& allocation,
                            VmaAllocationInfo& allocated, const std::string& what) {
@@ -57,7 +53,7 @@ ExternalHandle& ExternalHandle::operator=(ExternalHandle&& other) noexcept {
 bool SharesMemory(VkPhysicalDevice physical) {
     const VkPhysicalDeviceExternalBufferInfo buffer{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO,
-        .usage = kUsage,
+        .usage = kBufferUsage,
         .handleType = kExternalMemoryType};
     VkExternalBufferProperties properties{.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
     vkGetPhysicalDeviceExternalBufferProperties(physical, &buffer, &properties);

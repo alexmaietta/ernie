@@ -40,7 +40,7 @@ void Ticket::Wait() const {
                                    .pSemaphores = &semaphore,
                                    .pValues = &value};
     CheckVk(vkWaitSemaphores(timeline->Device(), &wait, std::numeric_limits<std::uint64_t>::max()),
-            "Waiting on " + timeline->Name());
+            [&] { return "Waiting on " + timeline->Name(); });
 }
 
 Timeline::Timeline(VkDevice device, std::string name, bool exportable)
@@ -64,14 +64,15 @@ Timeline::~Timeline() {
 
 std::uint64_t Timeline::Reached() const {
     std::uint64_t reached = 0;
-    CheckVk(vkGetSemaphoreCounterValue(device_, semaphore_, &reached), "Reading " + name_);
+    CheckVk(vkGetSemaphoreCounterValue(device_, semaphore_, &reached),
+            [&] { return "Reading " + name_; });
     return reached;
 }
 
 void Timeline::Signal(std::uint64_t value) const {
     const VkSemaphoreSignalInfo signal{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO, .semaphore = semaphore_, .value = value};
-    CheckVk(vkSignalSemaphore(device_, &signal), "Signalling " + name_);
+    CheckVk(vkSignalSemaphore(device_, &signal), [&] { return "Signalling " + name_; });
 }
 
 ExternalHandle Timeline::Export() const {
@@ -93,7 +94,7 @@ Queue::Queue(VkDevice device, std::uint32_t family, std::string name, bool expor
 }
 
 Queue::~Queue() {
-    Last().Wait();
+    Quietly([this] { Last().Wait(); });
     vkDestroyCommandPool(device_, pool_, nullptr);
 }
 
@@ -137,13 +138,14 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     }
     lock.unlock();
     // Recorded without the lock, so recording may ask this queue for tickets.
-    CheckVk(vkResetCommandBuffer(commands, 0), "Resetting " + name_ + "'s command buffer");
+    CheckVk(vkResetCommandBuffer(commands, 0),
+            [&] { return "Resetting " + name_ + "'s command buffer"; });
     const VkCommandBufferBeginInfo begin{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                                          .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
     try {
-        CheckVk(vkBeginCommandBuffer(commands, &begin), "Recording on " + name_);
+        CheckVk(vkBeginCommandBuffer(commands, &begin), [&] { return "Recording on " + name_; });
         record(commands);
-        CheckVk(vkEndCommandBuffer(commands), "Recording on " + name_);
+        CheckVk(vkEndCommandBuffer(commands), [&] { return "Recording on " + name_; });
     } catch (...) {
         // Nothing was submitted: the command buffer goes back, to be reset on its next use.
         lock.lock();
@@ -167,7 +169,11 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                                .pCommandBufferInfos = &commandInfo,
                                .signalSemaphoreInfoCount = 1,
                                .pSignalSemaphoreInfos = &signal};
-    CheckVk(vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE), "Submitting to " + name_);
+    const VkResult submitted = vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE);
+    if (submitted < VK_SUCCESS) {
+        free_.push_back(commands);
+    }
+    CheckVk(submitted, [&] { return "Submitting to " + name_; });
     submitted_ = value;
     inFlight_.emplace_back(commands, value);
     return timeline_.At(value);

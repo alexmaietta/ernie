@@ -3,6 +3,8 @@
 /// @brief Creating compute pipelines and recording dispatches.
 #include "ernie/device/kernel.h"
 
+#include "ernie/util/on_failure.h"
+
 #include <stdexcept>
 
 namespace ernie {
@@ -16,6 +18,9 @@ ComputeKernel::ComputeKernel(DeviceContext& context, std::span<const std::uint32
         throw DeviceError(DeviceErrorKind::Unsupported,
                           name_ + " passes more bytes per dispatch than the device allows");
     }
+    if (parameterBytes % 4 != 0) {
+        throw std::invalid_argument(name_ + " passes bytes per dispatch in 4-byte words");
+    }
     const VkPushConstantRange range{.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
                                     .size = parameterBytes};
     const VkDescriptorSetLayout heapLayout = heap != nullptr ? heap->Layout() : VK_NULL_HANDLE;
@@ -26,6 +31,7 @@ ComputeKernel::ComputeKernel(DeviceContext& context, std::span<const std::uint32
                                             .pPushConstantRanges = &range};
     CheckVk(vkCreatePipelineLayout(device_, &layout, nullptr, &layout_),
             "Creating " + name_ + "'s layout");
+    const OnFailure freeLayout([&] { vkDestroyPipelineLayout(device_, layout_, nullptr); });
 
     // maintenance5 would take the code inline; a module is portable to every Vulkan 1.3 driver.
     const VkShaderModuleCreateInfo code{.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -73,16 +79,9 @@ void ComputeKernel::Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
 }
 
 void ComputeBarrier(VkCommandBuffer commands) {
-    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-                                   .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                   .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
-                                   .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                                   .dstAccessMask =
-                                       VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT};
-    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                                      .memoryBarrierCount = 1,
-                                      .pMemoryBarriers = &barrier};
-    vkCmdPipelineBarrier2(commands, &dependency);
+    Barrier(commands, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 }
 
 }  // namespace ernie

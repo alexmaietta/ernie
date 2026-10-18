@@ -101,14 +101,6 @@ template <typename Desc> void SetHandle(Desc& desc, const ExternalHandle& handle
 #endif
 }
 
-void Taken(ExternalHandle& handle) {
-#if !defined(_WIN32)
-    handle.Release();
-#else
-    static_cast<void>(handle);
-#endif
-}
-
 bool LoadDriver(CudaDriver& d) {
     if (!d.library.Open({"libcuda.so.1", "libcuda.so", "nvcuda.dll"})) {
         return false;
@@ -133,6 +125,8 @@ bool LoadDriver(CudaDriver& d) {
            l.Load(d.memcpyDtoH, "cuMemcpyDtoH_v2") &&
            l.Load(d.memsetD32Async, "cuMemsetD32Async") &&
            l.Load(d.streamSynchronize, "cuStreamSynchronize") &&
+           l.Load(d.streamCreate, "cuStreamCreate") &&
+           l.Load(d.streamDestroy, "cuStreamDestroy_v2") &&
            l.Load(d.getErrorString, "cuGetErrorString") && d.init(0) == 0;
 }
 
@@ -196,7 +190,7 @@ CudaInterop::~CudaInterop() {
         // may wait on the streams' timelines.
         const Current current(*this);
         driver_.ctxSynchronize();
-        context_.WaitIdle();
+        Quietly([this] { context_.WaitIdle(); });
         for (const auto& [id, mapping] : mappings_) {
             driver_.memFree(mapping.pointer);
             driver_.destroyExternalMemory(mapping.memory);
@@ -226,7 +220,7 @@ CUdeviceptr CudaInterop::Map(const Buffer& buffer) {
     Mapping mapping;
     driver_.Check(driver_.importExternalMemory(&mapping.memory, &memory),
                   "Importing memory into CUDA");
-    Taken(handle);
+    handle.Imported();
     const BufferDesc whole{.offset = 0, .size = buffer.Size(), .flags = 0, .reserved = {}};
     const CUresult mapped =
         driver_.externalMemoryGetMappedBuffer(&mapping.pointer, mapping.memory, &whole);
@@ -251,7 +245,7 @@ CUexternalSemaphore CudaInterop::Import(const Timeline& timeline) {
     CUexternalSemaphore semaphore = nullptr;
     driver_.Check(driver_.importExternalSemaphore(&semaphore, &desc),
                   "Importing " + timeline.Name() + " into CUDA");
-    Taken(handle);
+    handle.Imported();
     semaphores_.emplace(&timeline, semaphore);
     return semaphore;
 }

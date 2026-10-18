@@ -3,6 +3,8 @@
 /// @brief The bindless descriptor set and its slot free lists.
 #include "ernie/device/bindless.h"
 
+#include "ernie/util/on_failure.h"
+
 #include <algorithm>
 #include <array>
 
@@ -21,11 +23,20 @@ BindlessHeap::BindlessHeap(DeviceContext& context) : context_(context) {
     VkPhysicalDeviceProperties2 properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
                                            .pNext = &indexing};
     vkGetPhysicalDeviceProperties2(context.Physical(), &properties);
-    // Generous where the device allows; within what every desktop driver and lavapipe offer.
+    // Generous where the device allows; within what every desktop driver and lavapipe offer. Every
+    // stage sees the bindings, so the per-stage limits bound them too.
     const std::array capacities{
-        std::min(indexing.maxDescriptorSetUpdateAfterBindSampledImages, 65536u),
-        std::min(indexing.maxDescriptorSetUpdateAfterBindStorageImages, 4096u),
-        std::min(indexing.maxDescriptorSetUpdateAfterBindSamplers, 256u)};
+        std::min({indexing.maxDescriptorSetUpdateAfterBindSampledImages,
+                  indexing.maxPerStageDescriptorUpdateAfterBindSampledImages, 65536u}),
+        std::min({indexing.maxDescriptorSetUpdateAfterBindStorageImages,
+                  indexing.maxPerStageDescriptorUpdateAfterBindStorageImages, 4096u}),
+        std::min({indexing.maxDescriptorSetUpdateAfterBindSamplers,
+                  indexing.maxPerStageDescriptorUpdateAfterBindSamplers, 256u})};
+    if (capacities[0] + capacities[1] + capacities[2] >
+        indexing.maxPerStageUpdateAfterBindResources) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          context.Info().name + " binds too few resources per stage");
+    }
 
     std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
     std::array<VkDescriptorPoolSize, 3> sizes{};
@@ -53,6 +64,8 @@ BindlessHeap::BindlessHeap(DeviceContext& context) : context_(context) {
         .pBindings = bindings.data()};
     CheckVk(vkCreateDescriptorSetLayout(context.Device(), &layout, nullptr, &layout_),
             "Creating the bindless layout");
+    const OnFailure freeLayout(
+        [&] { vkDestroyDescriptorSetLayout(context.Device(), layout_, nullptr); });
     const VkDescriptorPoolCreateInfo pool{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                                           .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
                                           .maxSets = 1,
@@ -60,6 +73,7 @@ BindlessHeap::BindlessHeap(DeviceContext& context) : context_(context) {
                                           .pPoolSizes = sizes.data()};
     CheckVk(vkCreateDescriptorPool(context.Device(), &pool, nullptr, &pool_),
             "Creating the bindless pool");
+    const OnFailure freePool([&] { vkDestroyDescriptorPool(context.Device(), pool_, nullptr); });
     const VkDescriptorSetAllocateInfo allocate{.sType =
                                                    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                                                .descriptorPool = pool_,
@@ -71,27 +85,21 @@ BindlessHeap::BindlessHeap(DeviceContext& context) : context_(context) {
 
 BindlessHeap::~BindlessHeap() {
     // Slots freed late write to this heap: they must come back before it goes.
-    context_.WaitIdle();
+    Quietly([this] { context_.WaitIdle(); });
     vkDestroyDescriptorPool(context_.Device(), pool_, nullptr);
     vkDestroyDescriptorSetLayout(context_.Device(), layout_, nullptr);
 }
 
 BindlessIndex BindlessHeap::AddTexture(const DeviceImage& image) {
-    const BindlessIndex index = Take(0);
-    Write(0, index, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
-    return index;
+    return Add(0, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
 }
 
 BindlessIndex BindlessHeap::AddStorageImage(const DeviceImage& image) {
-    const BindlessIndex index = Take(1);
-    Write(1, index, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
-    return index;
+    return Add(1, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
 }
 
 BindlessIndex BindlessHeap::AddSampler(const Sampler& sampler) {
-    const BindlessIndex index = Take(2);
-    Write(2, index, {.sampler = sampler.Handle()});
-    return index;
+    return Add(2, {.sampler = sampler.Handle()});
 }
 
 void BindlessHeap::RemoveTexture(BindlessIndex index) {
@@ -106,31 +114,28 @@ void BindlessHeap::RemoveSampler(BindlessIndex index) {
     Remove(2, index);
 }
 
-BindlessIndex BindlessHeap::Take(std::uint32_t binding) {
+BindlessIndex BindlessHeap::Add(std::uint32_t binding, const VkDescriptorImageInfo& info) {
     const std::lock_guard lock(mutex_);
     Slots& slots = slots_[binding];
+    std::uint32_t index = slots.next;
     if (!slots.free.empty()) {
-        const std::uint32_t index = slots.free.back();
+        index = slots.free.back();
         slots.free.pop_back();
-        return {index};
-    }
-    if (slots.next == slots.capacity) {
+    } else if (slots.next == slots.capacity) {
         throw DeviceError(DeviceErrorKind::OutOfMemory,
                           std::string("The bindless heap holds no more ") + kNames[binding] + "s");
+    } else {
+        ++slots.next;
     }
-    return {slots.next++};
-}
-
-void BindlessHeap::Write(std::uint32_t binding, BindlessIndex index,
-                         const VkDescriptorImageInfo& info) {
     const VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                      .dstSet = set_,
                                      .dstBinding = binding,
-                                     .dstArrayElement = index.value,
+                                     .dstArrayElement = index,
                                      .descriptorCount = 1,
                                      .descriptorType = kTypes[binding],
                                      .pImageInfo = &info};
     vkUpdateDescriptorSets(context_.Device(), 1, &write, 0, nullptr);
+    return {index};
 }
 
 void BindlessHeap::Remove(std::uint32_t binding, BindlessIndex index) {

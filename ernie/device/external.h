@@ -46,7 +46,14 @@ class ExternalHandle {
     explicit operator bool() const {
         return value_ != kNone;
     }
-    /// @brief Gives up the handle without closing it, as when an import takes ownership.
+    /// @brief Marks the handle imported: an import takes file descriptors, not NT handles, which
+    /// stay the importer's to close.
+    void Imported() {
+#if !defined(_WIN32)
+        Release();
+#endif
+    }
+    /// @brief Gives up the handle without closing it.
     std::intptr_t Release() {
         const std::intptr_t value = value_;
         value_ = kNone;

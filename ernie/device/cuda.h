@@ -55,6 +55,8 @@ struct CudaDriver {
     CUresult (*memcpyDtoH)(void*, CUdeviceptr, std::size_t) = nullptr;
     CUresult (*memsetD32Async)(CUdeviceptr, unsigned int, std::size_t, CUstream) = nullptr;
     CUresult (*streamSynchronize)(CUstream) = nullptr;
+    CUresult (*streamCreate)(CUstream*, unsigned int) = nullptr;
+    CUresult (*streamDestroy)(CUstream) = nullptr;
     CUresult (*getErrorString)(CUresult, const char**) = nullptr;
 
     /// @return The driver, loaded and initialized once per process; null when there is none.

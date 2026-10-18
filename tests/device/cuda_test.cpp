@@ -64,6 +64,42 @@ TEST(CudaInterop, CudaWritesAColumnInPlaceThatErnieReads) {
     ExpectClean(*context);
 }
 
+TEST(CudaInterop, EachStreamSignalsItsOwnTimeline) {
+    ERNIE_CONTEXT(context);
+    ERNIE_CUDA(cuda, context);
+    const CudaDriver& driver = cuda->Driver();
+    const CudaInterop::Current current(*cuda);
+    Arenas arenas(*context, MemoryUse::Shared, "shared", 1 << 16);
+    const DeviceColumn a(arenas, "a", DType::Float32, {}, 256);
+    const DeviceColumn b(arenas, "b", DType::Float32, {}, 256);
+    CUstream first = nullptr;
+    CUstream second = nullptr;
+    driver.Check(driver.streamCreate(&first, 0), "Creating a stream");
+    driver.Check(driver.streamCreate(&second, 0), "Creating a stream");
+
+    const auto write = [&](const DeviceColumn& column, float value, CUstream stream) {
+        driver.Check(driver.memsetD32Async(reinterpret_cast<CUdeviceptr>(cuda->View(column).Data()),
+                                           std::bit_cast<unsigned int>(value), 256, stream),
+                     "Writing in CUDA");
+        return cuda->Signal(stream);
+    };
+    const Ticket wroteA = write(a, 1.0f, first);
+    const Ticket wroteB = write(b, 2.0f, second);
+    EXPECT_NE(wroteA.timeline, wroteB.timeline) << "a ticket names its stream's timeline";
+    const Ticket againA = write(a, 3.0f, first);
+    EXPECT_EQ(againA.timeline, wroteA.timeline);
+    EXPECT_GT(againA.value, wroteA.value) << "a stream's values only increase";
+
+    EXPECT_EQ(Read(*context, b, wroteB), std::vector<float>(256, 2.0f));
+    EXPECT_EQ(Read(*context, a, againA), std::vector<float>(256, 3.0f));
+    driver.streamSynchronize(first);
+    driver.streamSynchronize(second);
+    context->WaitIdle();
+    driver.streamDestroy(first);
+    driver.streamDestroy(second);
+    ExpectClean(*context);
+}
+
 TEST(CudaInterop, CudaReadsWhatErnieWroteOnceItsTicketIsReached) {
     ERNIE_CONTEXT(context);
     ERNIE_CUDA(cuda, context);

@@ -4,6 +4,7 @@
 #include "ernie/device/context.h"
 
 #include "ernie/util/algorithm.h"
+#include "ernie/util/on_failure.h"
 #include "ernie/util/text.h"
 
 #include <algorithm>
@@ -111,6 +112,7 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
         .ppEnabledExtensionNames = extensions.data()};
     CheckVk(vkCreateDevice(physical_.handle, &info, nullptr, &device_),
             "Creating the device on " + physical_.info.name);
+    const OnFailure freeDevice([&] { vkDestroyDevice(device_, nullptr); });
 
     const VmaVulkanFunctions functions{.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
                                        .vkGetDeviceProcAddr = vkGetDeviceProcAddr};
@@ -124,6 +126,10 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
         allocator.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
     }
     CheckVk(vmaCreateAllocator(&allocator, &allocator_), "Creating the memory allocator");
+    const OnFailure freeAllocator([&] {
+        queues_.clear();
+        vmaDestroyAllocator(allocator_);
+    });
 
     const std::array names{"main", "compute", "transfer"};
     const std::array wanted{families.main, families.compute, families.transfer};
@@ -145,7 +151,7 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
 }
 
 DeviceContext::~DeviceContext() {
-    WaitIdle();
+    Quietly([this] { WaitIdle(); });
     queues_.clear();
     vmaDestroyAllocator(allocator_);
     vkDestroyDevice(device_, nullptr);

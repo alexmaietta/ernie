@@ -100,5 +100,14 @@ TEST(ComputeKernel, FillsAnArenaRangeThroughItsAddress) {
     ExpectClean(*context);
 }
 
+TEST(ComputeKernel, ParametersComeInWholeWords) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    const std::vector<std::uint32_t> spirv = compiler.Spirv(std::span(&kFill, 1), "main");
+    EXPECT_THROW(ComputeKernel(*context, spirv, "fill", 6), std::invalid_argument);
+    EXPECT_THROW(ComputeKernel(*context, spirv, "fill", 4096), DeviceError);
+    ExpectClean(*context);
+}
+
 }  // namespace
 }  // namespace ernie

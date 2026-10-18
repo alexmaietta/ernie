@@ -21,7 +21,7 @@ Arenas::Arenas(DeviceContext& context, MemoryUse use, std::string_view name,
       arenaSize_(std::min(arenaSize, context.MaxBufferSize())) {}
 
 Arenas::~Arenas() {
-    context_.WaitIdle();
+    Quietly([this] { context_.WaitIdle(); });
 }
 
 BufferRange Arenas::Allocate(std::uint64_t size, std::uint64_t alignment) {

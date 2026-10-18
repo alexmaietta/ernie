@@ -58,8 +58,9 @@ class BindlessHeap {
         std::vector<std::uint32_t> free;
     };
 
-    BindlessIndex Take(std::uint32_t binding);
-    void Write(std::uint32_t binding, BindlessIndex index, const VkDescriptorImageInfo& info);
+    /// Takes a slot of `binding` and writes its descriptor, under the lock: the set's updates
+    /// need it to themselves.
+    BindlessIndex Add(std::uint32_t binding, const VkDescriptorImageInfo& info);
     void Remove(std::uint32_t binding, BindlessIndex index);
 
     DeviceContext& context_;
