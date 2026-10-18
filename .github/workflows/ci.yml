@@ -70,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: [ubuntu-24.04, windows-2025, macos-26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -107,10 +107,13 @@ jobs:
             "-DCMAKE_PREFIX_PATH=$prefix"
           cmake --build build/consumer
           PATH="$prefix/bin:$PATH" ctest --test-dir build/consumer --output-on-failure
-      # The build tree without objects, for this platform's test job; tar keeps file modes.
+      # The build tree without objects, and the Slang runtime its programs load from the fetched
+      # release, for this platform's test job; tar keeps file modes.
       - name: Pack the build tree
         shell: bash
-        run: tar --exclude='*.o' --exclude='*.obj' -cf build-ci.tar build/ci
+        run: |
+          tar --exclude='*.o' --exclude='*.obj' -cf build-ci.tar build/ci \
+            $(ls -d .deps/slang-src/lib*/libslang* 2>/dev/null)
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-${{ matrix.os }}
@@ -126,7 +129,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: [ubuntu-24.04, windows-2025, macos-26]
     env:
       ERNIE_TEST_REQUIRE_VULKAN: "1"
     steps:
@@ -288,7 +291,7 @@ jobs:
           - { platform: linux-x86_64, runner: ubuntu-24.04 }
           - { platform: linux-aarch64, runner: ubuntu-24.04-arm }
           - { platform: windows-amd64, runner: windows-2025 }
-          - { platform: macos-arm64, runner: macos-15 }
+          - { platform: macos-arm64, runner: macos-26 }
     env:
       CIBW_BUILD: ${{ matrix.python }}-*
     steps:
@@ -357,15 +360,18 @@ jobs:
           dnf install -y -q rpm-build
           command -v ninja >/dev/null || pipx install -q ninja
       # One build; each format installs the library where its distributions look for it, as the
-      # build image (RHEL's lib64) is not where Debian and Ubuntu look.
+      # build image (RHEL's lib64) is not where Debian and Ubuntu look. The program relinks for
+      # each, as the path to the library is in its RPATH.
       - name: Build
         run: |
           cmake --preset package
-          cmake --build --preset package --parallel 4
           cd build/package
-          cmake "-DCMAKE_INSTALL_LIBDIR=lib/$(uname -m)-linux-gnu" . && cpack -G DEB
-          cmake -DCMAKE_INSTALL_LIBDIR=lib64 . && cpack -G RPM
-          cmake -DCMAKE_INSTALL_LIBDIR=lib . && cpack -G TGZ
+          for libdir in "lib/$(uname -m)-linux-gnu DEB" "lib64 RPM" "lib TGZ"; do
+            set -- $libdir
+            cmake "-DCMAKE_INSTALL_LIBDIR=$1" .
+            cmake --build . --parallel 4
+            cpack -G "$2"
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages-linux-${{ matrix.arch }}

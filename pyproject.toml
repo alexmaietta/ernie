@@ -72,7 +72,8 @@ repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
-environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
+# Slang's prebuilt runtime targets macOS 26.
+environment = { MACOSX_DEPLOYMENT_TARGET = "26.0" }
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
