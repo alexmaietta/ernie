@@ -128,7 +128,8 @@ TEST(Shell, QuitsOnControlQ) {
     Shell shell(scene, nullptr);
     frames.Draw(shell);
     ImGuiIO& io = ImGui::GetIO();
-    io.AddKeyEvent(ImGuiMod_Ctrl, true);
+    // On macOS shortcuts' Ctrl is the Command key, so Cmd+Q quits there.
+    io.AddKeyEvent(io.ConfigMacOSXBehaviors ? ImGuiMod_Super : ImGuiMod_Ctrl, true);
     io.AddKeyEvent(ImGuiKey_Q, true);
     frames.Draw(shell);
     EXPECT_FALSE(shell.Open());
