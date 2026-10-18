@@ -1322,14 +1322,18 @@ void Shell::BuildLayout() {
         }
     }
     ImGui::DockBuilderFinish(kDockSpace);
-    // A dock opens on its last tab; the bottom one opens on the Log instead.
+    // A dock opens on the last window docked into it; the bottom one opens on the Log instead.
     const Panel* log = FindPanel("Log");
-    const auto bottom = docks_.find(Dock::Bottom);
-    if (log != nullptr && log->Visible() && log->DefaultDock() == Dock::Bottom &&
-        bottom != docks_.end()) {
-        // A window's tab id, as ImGuiWindow's constructor makes it.
-        ImGui::DockBuilderGetNode(bottom->second)->SelectedTabId =
-            ImHashStr("#TAB", 0, ImHashStr(log->Title().c_str()));
+    selectLog_ = log != nullptr && log->Visible() && log->DefaultDock() == Dock::Bottom &&
+                 docks_.contains(Dock::Bottom);
+}
+
+void Shell::SelectLogTab() {
+    // A dock shows the focused window's tab, and ImGui focuses each window as it is made: once
+    // every panel has been, the Log takes the focus.
+    if (selectLog_ && ImGui::FindWindowByName("Log") != nullptr) {
+        ImGui::SetWindowFocus("Log");
+        selectLog_ = false;
     }
 }
 
@@ -1354,6 +1358,7 @@ void Shell::DrawPanels() {
         ImGui::End();
         panel->SetVisible(keep);
     }
+    SelectLogTab();
 }
 
 void Shell::Navigate() {

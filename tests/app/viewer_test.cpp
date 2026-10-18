@@ -10,6 +10,9 @@
 
 #include <gtest/gtest.h>
 
+#include <imgui.h>
+#include <imgui_internal.h>
+
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -82,6 +85,22 @@ TEST(Viewer, ShowsTheFramesViewportImageOffscreen) {
 }
 
 #if ERNIE_VIEWER_WINDOW
+TEST(Viewer, OpensOnTheLogTab) {
+    const Scene scene;
+    ViewerOptions options{.size = {640, 480}, .offscreen = true, .frames = 5};
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    viewer->Run();
+    const ImGuiWindow* log = ImGui::FindWindowByName("Log");
+    ASSERT_NE(log, nullptr);
+    EXPECT_TRUE(log->DockTabIsVisible) << "the bottom dock shows the Log";
+    for (const char* other : {"Info", "Devices", "Profiler"}) {
+        EXPECT_FALSE(ImGui::FindWindowByName(other)->DockTabIsVisible) << other;
+    }
+}
+
 TEST(Viewer, PresentsToAWindow) {
     if (!app::Window::Available()) {
         GTEST_SKIP() << "No display";

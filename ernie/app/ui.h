@@ -377,6 +377,7 @@ class Shell {
     void DrawDockSpace();
     void BuildLayout();
     void DrawPanels();
+    void SelectLogTab();
     void Navigate();
     void DrawHud();
     void Apply();
@@ -393,6 +394,8 @@ class Shell {
     /// The default layout's nodes; empty until it is built.
     std::map<Dock, ImGuiID> docks_;
     bool layoutBuilt_ = false;
+    /// Whether the bottom dock still has to open on the Log, once its tab bar exists.
+    bool selectLog_ = false;
     /// Whether a mouse drag that started over the viewport moves the camera.
     bool dragging_ = false;
     /// The heads-up display's lines, refreshed a few times a second so they stay readable.
