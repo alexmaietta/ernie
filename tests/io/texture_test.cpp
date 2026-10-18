@@ -6,6 +6,8 @@
 
 #include "ernie/util/bytes.h"
 
+#include "tests/common.h"
+
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 #include <stb_image_write.h>
@@ -155,8 +157,7 @@ TEST(TextureFile, MipsHalveDownToOneTexel) {
 }
 
 TEST(TextureFile, EveryFormatRoundTripsThroughDds) {
-    const std::filesystem::path path =
-        std::filesystem::path(testing::TempDir()) / "ernie_texture_round_trip.dds";
+    const std::filesystem::path path = test::TempPath("ernie_texture_round_trip.dds");
     for (std::uint32_t value = 0; value <= static_cast<std::uint32_t>(TextureFormat::Bc7Srgb);
          ++value) {
         TextureData texture;
@@ -292,7 +293,7 @@ TEST(TextureFile, Ktx2TranscodesBasisUniversalToBc) {
     // Fixtures encoded by Basis Universal's tool (fixtures/ktx2):
     // colour to BC7 with every mip, normal maps' x and y to BC5.
     const auto load = [](const char* name) {
-        return LoadTextureFile(std::filesystem::path(ERNIE_TEST_FIXTURES) / "ktx2" / name);
+        return LoadTextureFile(test::FixturePath("ktx2") / name);
     };
     for (const char* name : {"quadrants_etc1s.ktx2", "quadrants_uastc_zstd.ktx2"}) {
         const TextureData colour = load(name);
@@ -331,8 +332,7 @@ TEST(TextureFile, Ktx2RejectsWhatItCannotRead) {
 }
 
 TEST(TextureFile, LoadsFilesByExtension) {
-    const std::filesystem::path dir =
-        std::filesystem::path(::testing::TempDir()) / "ernie_texture_file_test";
+    const std::filesystem::path dir = test::TempPath("ernie_texture_file_test");
     std::filesystem::create_directories(dir);
     const auto write = [&](const std::string& name, const Bytes& bytes) {
         std::ofstream(dir / name, std::ios::binary)
@@ -361,8 +361,8 @@ TEST(TextureFile, LoadsFilesByExtension) {
     EXPECT_EQ(Copy(ktx2.Mip(0, 0)), level0);
     EXPECT_EQ(Copy(ktx2.Mip(0, 1)), level1);
     // Transcoded Basis Universal texels are decoded into memory.
-    const TextureData basis = LoadTextureFile(std::filesystem::path(ERNIE_TEST_FIXTURES) / "ktx2" /
-                                              "quadrants_uastc_zstd.ktx2");
+    const TextureData basis =
+        LoadTextureFile(test::FixturePath("ktx2") / "quadrants_uastc_zstd.ktx2");
     EXPECT_EQ(basis.mapping, nullptr);
     EXPECT_FALSE(basis.bytes.empty());
     // Errors name the file.
@@ -384,9 +384,9 @@ namespace {
 class TextureBake : public testing::Test {
   protected:
     void SetUp() override {
-        dir_ = std::filesystem::path(::testing::TempDir()) /
-               ("ernie_texture_bake_" +
-                std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()));
+        dir_ = test::TempPath(
+            "ernie_texture_bake_" +
+            std::string(testing::UnitTest::GetInstance()->current_test_info()->name()));
         std::filesystem::create_directories(dir_);
     }
 

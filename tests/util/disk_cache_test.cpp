@@ -3,6 +3,8 @@
 /// @brief Tests of cache folders and cache keys.
 #include "ernie/util/disk_cache.h"
 
+#include "tests/common.h"
+
 #include <gtest/gtest.h>
 
 #include <cstdlib>
@@ -50,8 +52,7 @@ TEST(DiskCache, TheVariableNamesOrDisablesTheFolder) {
 }
 
 TEST(DiskCache, CachedFloatsRoundTripAndRejectTheWrongSize) {
-    const std::filesystem::path path =
-        std::filesystem::path(testing::TempDir()) / "ernie_cache" / "floats.bin";
+    const std::filesystem::path path = test::TempPath("ernie_cache") / "floats.bin";
     std::filesystem::remove(path);
     EXPECT_FALSE(ReadCachedFloats(path, 3).has_value());
     const std::vector<float> values{1.5f, -2.0f, 3.25f};

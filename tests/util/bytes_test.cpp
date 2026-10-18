@@ -39,6 +39,22 @@ TEST(Bytes, FourCcPutsTheFirstCharacterLowest) {
     EXPECT_EQ(std::memcmp(&code, "DX10", 4), 0);
 }
 
+TEST(Bytes, BitSetsSetRangesAcrossWordsAndClearWhenShrunk) {
+    BitSet bits;
+    bits.Resize(130);
+    EXPECT_EQ(bits.Words().size(), 3u);
+    bits.SetRange(60, 129);
+    EXPECT_FALSE(bits.Test(59));
+    EXPECT_TRUE(bits.Test(60) && bits.Test(64) && bits.Test(128));
+    EXPECT_FALSE(bits.Test(129));
+    bits.Set(64, false);
+    EXPECT_FALSE(bits.Test(64));
+    bits.Resize(100);
+    bits.Resize(130);
+    EXPECT_FALSE(bits.Test(110)) << "bits past a shrink come back clear";
+    EXPECT_TRUE(bits.Test(99));
+}
+
 TEST(Bytes, SwapByteOrderReversesEachValue) {
     std::array<std::byte, 5> bytes{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4},
                                    std::byte{5}};

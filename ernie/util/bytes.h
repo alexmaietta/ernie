@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file bytes.h
-/// @brief Typed loads from raw bytes and byte-order swaps, for reading binary formats.
+/// @brief Typed loads from raw bytes, byte-order swaps for reading binary formats, and bit sets.
 #pragma once
 
 #include <algorithm>
@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace ernie {
 
@@ -64,6 +65,55 @@ constexpr std::uint32_t FourCc(const char (&code)[5]) {
 constexpr bool NeedsByteSwap(bool bigEndian, std::size_t width) {
     return width > 1 && bigEndian != (std::endian::native == std::endian::big);
 }
+
+/// @brief A resizable set of bits in 64-bit words, such as a flag per row.
+class BitSet {
+  public:
+    static constexpr std::size_t kWordBits = 64;
+
+    /// @return The words `bits` bits take.
+    static constexpr std::size_t WordCount(std::size_t bits) {
+        return (bits + kWordBits - 1) / kWordBits;
+    }
+
+    std::size_t Size() const {
+        return size_;
+    }
+    /// @brief Grows with clear bits, or drops the bits past `bits`.
+    void Resize(std::size_t bits) {
+        words_.resize(WordCount(bits), 0);
+        size_ = bits;
+        if (const std::size_t tail = bits % kWordBits; tail != 0) {
+            words_.back() &= (std::uint64_t{1} << tail) - 1;
+        }
+    }
+    bool Test(std::size_t bit) const {
+        return (words_[bit / kWordBits] >> (bit % kWordBits) & 1u) != 0;
+    }
+    void Set(std::size_t bit, bool value = true) {
+        const std::uint64_t mask = std::uint64_t{1} << (bit % kWordBits);
+        std::uint64_t& word = words_[bit / kWordBits];
+        word = value ? word | mask : word & ~mask;
+    }
+    /// @brief Sets bits [begin, end), a word at a time.
+    void SetRange(std::size_t begin, std::size_t end) {
+        for (std::size_t bit = begin; bit < end;) {
+            const std::size_t offset = bit % kWordBits;
+            const std::size_t span = std::min(end - bit, kWordBits - offset);
+            const std::uint64_t ones =
+                span == kWordBits ? ~std::uint64_t{0} : (std::uint64_t{1} << span) - 1;
+            words_[bit / kWordBits] |= ones << offset;
+            bit += span;
+        }
+    }
+    std::span<const std::uint64_t> Words() const {
+        return words_;
+    }
+
+  private:
+    std::vector<std::uint64_t> words_;
+    std::size_t size_ = 0;
+};
 
 /// @brief Reverses the bytes of each `width`-byte value in place, between byte orders.
 /// @param data  The values, packed.

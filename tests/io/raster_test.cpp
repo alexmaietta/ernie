@@ -5,6 +5,8 @@
 
 #include "ernie/util/bytes.h"
 
+#include "tests/common.h"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -22,16 +24,8 @@ namespace {
 
 namespace fs = std::filesystem;
 
-fs::path Temp(const std::string& name) {
-    return fs::path(testing::TempDir()) / name;
-}
-
 fs::path Fixture(const std::string& name) {
-    return fs::path(ERNIE_TEST_FIXTURES) / "tiff" / name;
-}
-
-void WriteText(const fs::path& path, const std::string& text) {
-    std::ofstream(path, std::ios::binary) << text;
+    return test::FixturePath("tiff") / name;
 }
 
 /// Sample `i` of `bytes` as T.
@@ -105,7 +99,7 @@ TEST(PdsImage, DetachedLabelOfLolaHeights) {
     // A 6 x 4 grid as LOLA's LDEM files hold it: little-endian int16 100x - 300y in a .img,
     // scaled by 0.5 about a 1737.4 km sphere, described by a .lbl in capitals beside it, the whole
     // Moon from 0 degrees east; -32768 missing.
-    const fs::path data = Temp("ldem_test.img");
+    const fs::path data = test::TempPath("ldem_test.img");
     {
         std::ofstream file(data, std::ios::binary);
         for (int y = 0; y < 4; ++y) {
@@ -115,25 +109,26 @@ TEST(PdsImage, DetachedLabelOfLolaHeights) {
             }
         }
     }
-    WriteText(Temp("LDEM_TEST.LBL"), "PDS_VERSION_ID = \"PDS3\"\n"
-                                     "/* A comment */\n"
-                                     "DESCRIPTION = \"Heights, over\n  two lines\"\n"
-                                     "RECORD_BYTES = 12\n"
-                                     "^IMAGE = \"LDEM_TEST.IMG\"\n"
-                                     "OBJECT = IMAGE\n"
-                                     "  LINES = 4\n  LINE_SAMPLES = 6\n"
-                                     "  SAMPLE_TYPE = LSB_INTEGER\n  SAMPLE_BITS = 16\n"
-                                     "  SCALING_FACTOR = 0.5\n  OFFSET = 1737400.\n"
-                                     "  MISSING_CONSTANT = -32768\n"
-                                     "END_OBJECT = IMAGE\n"
-                                     "OBJECT = IMAGE_MAP_PROJECTION\n"
-                                     "  MAP_PROJECTION_TYPE = \"SIMPLE CYLINDRICAL\"\n"
-                                     "  MAP_RESOLUTION = 0.0166666666666666667 <pix/deg>\n"
-                                     "  CENTER_LATITUDE = 0 <deg>\n"
-                                     "  MAXIMUM_LATITUDE = 90 <deg>\n"
-                                     "  WESTERNMOST_LONGITUDE = 0 <deg>\n"
-                                     "END_OBJECT = IMAGE_MAP_PROJECTION\n"
-                                     "END\n");
+    test::WriteFile(test::TempPath("LDEM_TEST.LBL"),
+                    "PDS_VERSION_ID = \"PDS3\"\n"
+                    "/* A comment */\n"
+                    "DESCRIPTION = \"Heights, over\n  two lines\"\n"
+                    "RECORD_BYTES = 12\n"
+                    "^IMAGE = \"LDEM_TEST.IMG\"\n"
+                    "OBJECT = IMAGE\n"
+                    "  LINES = 4\n  LINE_SAMPLES = 6\n"
+                    "  SAMPLE_TYPE = LSB_INTEGER\n  SAMPLE_BITS = 16\n"
+                    "  SCALING_FACTOR = 0.5\n  OFFSET = 1737400.\n"
+                    "  MISSING_CONSTANT = -32768\n"
+                    "END_OBJECT = IMAGE\n"
+                    "OBJECT = IMAGE_MAP_PROJECTION\n"
+                    "  MAP_PROJECTION_TYPE = \"SIMPLE CYLINDRICAL\"\n"
+                    "  MAP_RESOLUTION = 0.0166666666666666667 <pix/deg>\n"
+                    "  CENTER_LATITUDE = 0 <deg>\n"
+                    "  MAXIMUM_LATITUDE = 90 <deg>\n"
+                    "  WESTERNMOST_LONGITUDE = 0 <deg>\n"
+                    "END_OBJECT = IMAGE_MAP_PROJECTION\n"
+                    "END\n");
     const PdsImage image(data);
     EXPECT_EQ(image.Width(), 6u);
     EXPECT_EQ(image.Height(), 4u);
@@ -177,8 +172,8 @@ TEST(PdsImage, AttachedLabelOfBigEndianFloats) {
             }
         }
     }
-    WriteText(Temp("attached.img"), bytes);
-    const PdsImage image(Temp("attached.img"));
+    test::WriteFile(test::TempPath("attached.img"), bytes);
+    const PdsImage image(test::TempPath("attached.img"));
     EXPECT_EQ(image.Type(), GridSampleType::Float32);
     const std::vector<std::byte> all = image.ReadAll();
     for (std::size_t i = 0; i < 6; ++i) {
@@ -308,20 +303,20 @@ TEST(Raster, OpensByExtension) {
     ASSERT_TRUE(geo->Grid().has_value());
     EXPECT_DOUBLE_EQ(geo->Grid()->west, -180.0);
     EXPECT_DOUBLE_EQ(geo->Grid()->north, 90.0);
-    const auto png = OpenRaster(fs::path(ERNIE_TEST_FIXTURES) / "images" / "grey16.png");
+    const auto png = OpenRaster(test::FixturePath("images/grey16.png"));
     EXPECT_EQ(png->Type(), GridSampleType::UInt16);
-    EXPECT_THROW(OpenRaster(Temp("nothing.xyz")), std::runtime_error);
+    EXPECT_THROW(OpenRaster(test::TempPath("nothing.xyz")), std::runtime_error);
 }
 
 TEST(Raster, MosaicsReadAcrossTheirTiles) {
     // Two copies of the RGB fixture side by side: a rectangle over the seam reads from both.
-    const fs::path directory = Temp("mosaic");
+    const fs::path directory = test::TempPath("mosaic");
     fs::create_directories(directory);
     fs::copy_file(Fixture("rgb_lzw_predictor2.tif"), directory / "a.tif",
                   fs::copy_options::overwrite_existing);
     fs::copy_file(Fixture("rgb_tiled_deflate.tif"), directory / "b.tif",
                   fs::copy_options::overwrite_existing);
-    WriteText(directory / "moon.mosaic", "# west to east\na.tif b.tif\n");
+    test::WriteFile(directory / "moon.mosaic", "# west to east\na.tif b.tif\n");
     const auto mosaic = OpenRaster(directory / "moon.mosaic");
     EXPECT_EQ(mosaic->Width(), 2 * kWidth);
     EXPECT_EQ(mosaic->Height(), kHeight);
@@ -330,7 +325,7 @@ TEST(Raster, MosaicsReadAcrossTheirTiles) {
     for (std::uint32_t i = 0; i < 4; ++i) {
         EXPECT_EQ(At<std::uint8_t>(part, i * 3), ((kWidth - 2 + i) % kWidth * 7) % 256) << i;
     }
-    WriteText(directory / "ragged.mosaic", "a.tif b.tif\na.tif\n");
+    test::WriteFile(directory / "ragged.mosaic", "a.tif b.tif\na.tif\n");
     EXPECT_THROW(OpenRaster(directory / "ragged.mosaic"), std::invalid_argument);
 }
 
@@ -351,7 +346,7 @@ constexpr double kMoonRadius = 1737400.0;
 /// `projection` (the IMAGE_MAP_PROJECTION object's lines). Returns the label's path.
 fs::path WriteDem(const std::string& name, const std::vector<double>& heights, int lines,
                   int samples, const char* projection = kCylindrical) {
-    const fs::path directory = Temp("dem_" + name);
+    const fs::path directory = test::TempPath("dem_" + name);
     fs::create_directories(directory);
     std::ofstream image(directory / "TEST_DEM.IMG", std::ios::binary);
     for (const double height : heights) {
@@ -403,30 +398,30 @@ TEST(CylindricalDem, ReadsLolasLdemLabelsAndSamplesBetweenCells) {
 TEST(CylindricalDem, ReadsNacDtmsTrueAtTheirParallelWithNullCells) {
     // A 2 x 4 grid of 32-bit reals, as LROC's NAC DTMs hold theirs: 4 pixels a degree along the
     // meridians, true at 60 S so 2 along the parallels, its last sample PDS's null.
-    const fs::path directory = Temp("dem_dtm");
+    const fs::path directory = test::TempPath("dem_dtm");
     fs::create_directories(directory);
     {
         std::ofstream image(directory / "DTM.IMG", std::ios::binary);
         const float values[8] = {1.0f, 2.0f, 3.0f, -3.4028227e38f, 5.0f, 6.0f, 7.0f, 8.0f};
         image.write(reinterpret_cast<const char*>(values), sizeof(values));
     }
-    WriteText(directory / "DTM.LBL", "PDS_VERSION_ID = PDS3\n"
-                                     "^IMAGE = \"DTM.IMG\"\n"
-                                     "OBJECT = IMAGE\n"
-                                     "  LINES = 2\n"
-                                     "  LINE_SAMPLES = 4\n"
-                                     "  SAMPLE_TYPE = PC_REAL\n"
-                                     "  SAMPLE_BITS = 32\n"
-                                     "END_OBJECT = IMAGE\n"
-                                     "OBJECT = IMAGE_MAP_PROJECTION\n"
-                                     "  MAP_PROJECTION_TYPE = \"EQUIRECTANGULAR\"\n"
-                                     "  A_AXIS_RADIUS = 1737.4 <KM>\n"
-                                     "  CENTER_LATITUDE = -60.0 <DEG>\n"
-                                     "  MAP_RESOLUTION = 4 <PIX/DEG>\n"
-                                     "  MAXIMUM_LATITUDE = -59.5 <DEG>\n"
-                                     "  WESTERNMOST_LONGITUDE = 10.0 <DEG>\n"
-                                     "END_OBJECT = IMAGE_MAP_PROJECTION\n"
-                                     "END\n");
+    test::WriteFile(directory / "DTM.LBL", "PDS_VERSION_ID = PDS3\n"
+                                           "^IMAGE = \"DTM.IMG\"\n"
+                                           "OBJECT = IMAGE\n"
+                                           "  LINES = 2\n"
+                                           "  LINE_SAMPLES = 4\n"
+                                           "  SAMPLE_TYPE = PC_REAL\n"
+                                           "  SAMPLE_BITS = 32\n"
+                                           "END_OBJECT = IMAGE\n"
+                                           "OBJECT = IMAGE_MAP_PROJECTION\n"
+                                           "  MAP_PROJECTION_TYPE = \"EQUIRECTANGULAR\"\n"
+                                           "  A_AXIS_RADIUS = 1737.4 <KM>\n"
+                                           "  CENTER_LATITUDE = -60.0 <DEG>\n"
+                                           "  MAP_RESOLUTION = 4 <PIX/DEG>\n"
+                                           "  MAXIMUM_LATITUDE = -59.5 <DEG>\n"
+                                           "  WESTERNMOST_LONGITUDE = 10.0 <DEG>\n"
+                                           "END_OBJECT = IMAGE_MAP_PROJECTION\n"
+                                           "END\n");
     const CylindricalDem dtm = ReadCylindricalDem(directory / "DTM.LBL");
     EXPECT_DOUBLE_EQ(dtm.standardParallelDeg, -60.0);
     EXPECT_EQ(dtm.referenceRadius, kMoonRadius) << "the projection's A axis, in km";

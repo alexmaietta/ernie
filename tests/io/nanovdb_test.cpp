@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/io/nanovdb.h"
+#include "ernie/util/file.h"
+
+#include "tests/common.h"
 
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -15,22 +18,19 @@
 namespace ernie {
 namespace {
 
-// tools/volume_fixtures.py: 16^3 ones in 0.1 m voxels from
-// (-0.75, -0.75, -0.75) m, as Warp's Volume.save_to_nvdb writes them.
+// fixtures/volumes/make_nvdb.py: 16^3 ones in 0.1 m voxels from (-0.75, -0.75, -0.75) m, as
+// Warp's Volume.save_to_nvdb writes them.
 std::filesystem::path Cube() {
-    return std::filesystem::path(ERNIE_TEST_FIXTURES) / "volumes" / "cube.nvdb";
+    return test::FixturePath("volumes/cube.nvdb");
 }
 
 std::vector<char> Bytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    const std::string text = ReadTextFile(path);
+    return {text.begin(), text.end()};
 }
 
 std::filesystem::path Write(const std::string& name, const std::vector<char>& bytes) {
-    const std::filesystem::path path = std::filesystem::path(testing::TempDir()) / name;
-    std::ofstream(path, std::ios::binary)
-        .write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-    return path;
+    return test::WriteFile(test::TempPath(name), {bytes.data(), bytes.size()});
 }
 
 TEST(NanoVdb, ReadsWarpsFile) {
@@ -172,8 +172,7 @@ TEST(NanoVdb, FindsGridsByNameAndIndex) {
 
 TEST(NanoVdb, RejectsOtherAndCompressedFiles) {
     EXPECT_THROW(ReadNanoVdb(Write("not.nvdb", std::vector<char>(64, 'x'))), std::runtime_error);
-    EXPECT_THROW(ReadNanoVdb(std::filesystem::path(testing::TempDir()) / "missing.nvdb"),
-                 std::runtime_error);
+    EXPECT_THROW(ReadNanoVdb(test::TempPath("missing.nvdb")), std::runtime_error);
 
     // The segment header's codec (bytes 14-15): 1 is zip.
     std::vector<char> bytes = Bytes(Cube());

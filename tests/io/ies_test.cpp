@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/io/ies.h"
 
+#include "tests/common.h"
+
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
 
@@ -189,8 +191,8 @@ TEST(Ies, RejectsWhatItCannotRead) {
 }
 
 TEST(Ies, ReadsAQuadrantFileWithItsTiltFileBesideIt) {
-    const ernie::IesProfile profile = ernie::ReadIes(std::filesystem::path(ERNIE_TEST_FIXTURES) /
-                                                     "ies" / "downlight_quadrant.ies");
+    const ernie::IesProfile profile =
+        ernie::ReadIes(ernie::test::FixturePath("ies/downlight_quadrant.ies"));
     EXPECT_EQ(profile.type, ernie::IesType::C);
     EXPECT_NEAR(profile.Sample(0.0, 0.0), 500.0, 1e-9) << "ballast factor 0.5";
     EXPECT_NEAR(profile.Sample(45.0, 45.0), 350.0, 1e-9);
@@ -206,8 +208,8 @@ TEST(Ies, ReadsAQuadrantFileWithItsTiltFileBesideIt) {
 }
 
 TEST(Ies, ReadsACommaSeparatedTypeBFileWithItsTiltIncluded) {
-    const ernie::IesProfile profile = ernie::ReadIes(std::filesystem::path(ERNIE_TEST_FIXTURES) /
-                                                     "ies" / "floodlight_type_b.ies");
+    const ernie::IesProfile profile =
+        ernie::ReadIes(ernie::test::FixturePath("ies/floodlight_type_b.ies"));
     EXPECT_EQ(profile.type, ernie::IesType::B);
     EXPECT_NEAR(profile.Sample(0.0, 0.0), 1200.0, 1e-9) << "candela multiplier 2";
     EXPECT_NEAR(profile.Sample(10.0, 0.0), 1000.0, 1e-9);

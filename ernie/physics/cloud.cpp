@@ -491,8 +491,7 @@ CloudTransportTable SimulateCloudTransport(const DropletPhaseTable& phase,
     ParallelFor(shape.lightCosines * shape.thicknesses, [&](std::size_t job) {
         const std::size_t light = job % shape.lightCosines;
         const std::size_t thickness = shape.thicknesses - 1 - job / shape.lightCosines;
-        const std::uint64_t seed =
-            options.seed * 0x100000001b3ull + static_cast<std::uint64_t>(job) * 0x9e3779b9ull;
+        const std::uint64_t seed = HashCombine(options.seed, job);
         const SlabTallies tallies =
             SimulateSlab(shape, sampler, light, thickness, options.photons, seed);
         StoreSlab(tallies, light, thickness, options.photons, table);

@@ -7,6 +7,7 @@ ernie_add_test_suite(
         util/bytes_test.cpp
         util/disk_cache_test.cpp
         util/file_test.cpp
+        util/hash_index_test.cpp
         util/linear_algebra_test.cpp
         util/log_test.cpp
         util/math_test.cpp
@@ -48,6 +49,11 @@ ernie_add_test_suite(
         io/raster_test.cpp
         io/texture_test.cpp
     LIBRARIES ernie_static ernie_stb ernie_openexr ernie_zstd
+)
+ernie_add_test_suite(
+    scene
+    SOURCES scene/path_test.cpp scene/storage_test.cpp scene/storage_budget_test.cpp
+    LIBRARIES ernie_static
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_static)
 

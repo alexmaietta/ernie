@@ -96,7 +96,7 @@ jobs:
       - name: Build
         run: cmake --build --preset ci --parallel 4
       # The installed library used as end users use it: its headers compile alone and a program
-      # links and runs against it (QA-072). Windows finds ernie.dll on the PATH.
+      # links and runs against it. Windows finds ernie.dll on the PATH.
       - name: Install and build a consumer
         shell: bash
         run: |

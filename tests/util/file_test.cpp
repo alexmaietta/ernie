@@ -3,6 +3,8 @@
 /// @brief Tests of whole-file reads, file lookups and mapped files.
 #include "ernie/util/file.h"
 
+#include "tests/common.h"
+
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -16,7 +18,7 @@ namespace {
 namespace fs = std::filesystem;
 
 TEST(File, ReadTextFileReadsEveryByteAndReportsMissingFiles) {
-    const fs::path path = fs::path(testing::TempDir()) / "ernie_file_test.txt";
+    const fs::path path = test::TempPath("ernie_file_test.txt");
     const std::string text("a\r\nb\0c", 6);
     std::ofstream(path, std::ios::binary) << text;
     EXPECT_EQ(ReadTextFile(path), text);
@@ -25,7 +27,7 @@ TEST(File, ReadTextFileReadsEveryByteAndReportsMissingFiles) {
 }
 
 TEST(File, FindFileAnyCaseMatchesNamesInOtherCases) {
-    const fs::path directory = fs::path(testing::TempDir()) / "ernie_file_test_case";
+    const fs::path directory = test::TempPath("ernie_file_test_case");
     fs::create_directories(directory);
     std::ofstream(directory / "ldem_4.img") << "x";
     // The same file, though case-insensitive file systems (Windows, macOS) find it by the name as
@@ -37,14 +39,8 @@ TEST(File, FindFileAnyCaseMatchesNamesInOtherCases) {
     fs::remove_all(directory);
 }
 
-fs::path WriteFile(const std::string& name, const std::string& contents) {
-    const fs::path path = fs::path(testing::TempDir()) / name;
-    std::ofstream(path, std::ios::binary) << contents;
-    return path;
-}
-
 TEST(MappedFile, ExposesTheFilesBytes) {
-    const MappedFile file(WriteFile("ernie_mapped.bin", "spectral"));
+    const MappedFile file(test::WriteFile(test::TempPath("ernie_mapped.bin"), "spectral"));
     const auto bytes = file.Bytes();
     ASSERT_EQ(bytes.size(), 8u);
     EXPECT_EQ(static_cast<char>(bytes[0]), 's');
@@ -52,13 +48,13 @@ TEST(MappedFile, ExposesTheFilesBytes) {
 }
 
 TEST(MappedFile, MapsAnEmptyFile) {
-    const MappedFile file(WriteFile("ernie_mapped_empty.bin", ""));
+    const MappedFile file(test::WriteFile(test::TempPath("ernie_mapped_empty.bin"), ""));
     EXPECT_TRUE(file.Bytes().empty());
 }
 
 TEST(MappedFile, AMappedFileCanBeDeletedAndItsViewStays) {
     // As caches evict entries that live textures still map, on every platform.
-    const fs::path path = WriteFile("ernie_mapped_deleted.bin", "spectral");
+    const fs::path path = test::WriteFile(test::TempPath("ernie_mapped_deleted.bin"), "spectral");
     const MappedFile file(path);
     EXPECT_TRUE(fs::remove(path));
     EXPECT_FALSE(fs::exists(path));
@@ -66,8 +62,7 @@ TEST(MappedFile, AMappedFileCanBeDeletedAndItsViewStays) {
 }
 
 TEST(MappedFile, ThrowsForAMissingFile) {
-    EXPECT_THROW(MappedFile(fs::path(testing::TempDir()) / "ernie_missing.bin"),
-                 std::runtime_error);
+    EXPECT_THROW(MappedFile(test::TempPath("ernie_missing.bin")), std::runtime_error);
 }
 
 }  // namespace

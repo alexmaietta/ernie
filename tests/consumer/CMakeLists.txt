@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# A project using an installed Ernie, as end users do: built in CI against `cmake --install` and
-# the -dev packages.
 cmake_minimum_required(VERSION 3.21)
 project(ErnieConsumer LANGUAGES CXX)
 
 find_package(Ernie 0.2 REQUIRED)
 
-# Each installed public header compiles alone (API-008), found where the package says its headers
-# are: the include directory holding ernie/export.h.
 get_target_property(include_dirs Ernie::ernie INTERFACE_INCLUDE_DIRECTORIES)
 foreach(directory ${include_dirs})
     if(EXISTS "${directory}/ernie/export.h")

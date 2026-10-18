@@ -54,12 +54,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(ernie PRIVATE "LINKER:--exclude-libs,ALL")
 endif()
 
-# The same objects as one static library, for in-tree programs and tests, which may also reach
-# internal APIs, and for the Python module, which carries everything itself.
 add_library(ernie_static STATIC)
 target_link_libraries(ernie_static PUBLIC ${ernie_layers})
-# Its objects export the API (ERNIE_API), so on Windows every program linking it would also write
-# an import library; the ernie program's would collide with libernie's own ernie.lib and ernie.exp.
 target_link_options(ernie_static INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:/NOIMPLIB;/NOEXP>")
 
 if(ERNIE_BUILD_APP)

@@ -23,6 +23,15 @@ TEST(Text, CaseConversionChangesLettersOnly) {
     EXPECT_EQ(ToLower("DTM.LBL"), "dtm.lbl");
 }
 
+TEST(Text, IdentifiersAreAsciiLettersDigitsAndUnderscores) {
+    static_assert(IsIdentifier("Wheel_FL2") && IsIdentifier("_x"));
+    EXPECT_FALSE(IsIdentifier(""));
+    EXPECT_FALSE(IsIdentifier("2nd"));
+    EXPECT_FALSE(IsIdentifier("a-b"));
+    EXPECT_FALSE(IsIdentifier("inputs:color")) << "a namespaced name is several identifiers";
+    EXPECT_FALSE(IsIdentifier("\xc3\xa9")) << "ASCII only";
+}
+
 TEST(Text, NumberReaderReadsBlankAndCommaSeparatedNumbers) {
     NumberReader numbers("1, 2.5\n-3e2 ,4\t7 1.5", "Test file");
     EXPECT_EQ(numbers.Next(), 1.0);

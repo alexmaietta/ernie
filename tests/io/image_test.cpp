@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "ernie/io/image.h"
 
+#include "tests/common.h"
+
 #include <ImfRgbaFile.h>
 #include <glm/glm.hpp>
 #include <gtest/gtest.h>
@@ -174,8 +176,7 @@ TEST_F(ImageFiles, LoadsEightBitPngWithEitherEncoding) {
 
 TEST_F(ImageFiles, LoadsSixteenBitPng) {
     const Image image =
-        LoadImageFile(std::filesystem::path(ERNIE_TEST_FIXTURES) / "images" / "grey16.png",
-                      ImageEncoding::Linear);
+        LoadImageFile(ernie::test::FixturePath("images/grey16.png"), ImageEncoding::Linear);
     ASSERT_EQ(image.width, 2u);
     EXPECT_FLOAT_EQ(image.At(0, 0).r, 0.0f);
     EXPECT_FLOAT_EQ(image.At(1, 0).b, 1.0f);
@@ -282,7 +283,7 @@ TEST_F(ImageFiles, WritesExrOfIdsAndRejectsOtherShapes) {
 }
 
 TEST_F(ImageFiles, ReadsExrFixturesOfOtherWriters) {
-    const std::filesystem::path exr = std::filesystem::path(ERNIE_TEST_FIXTURES) / "exr";
+    const std::filesystem::path exr = ernie::test::FixturePath("exr");
     const Image window = LoadImageFile(exr / "rgba_half_window.exr", ImageEncoding::Linear);
     ASSERT_EQ(window.width, 5u) << "the data window, not the display window";
     ASSERT_EQ(window.height, 3u);

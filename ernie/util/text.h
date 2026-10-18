@@ -46,6 +46,21 @@ inline std::string ToLower(std::string_view text) {
     return lower;
 }
 
+/// @brief Tests for an ASCII identifier: a letter or underscore, then letters, digits and
+/// underscores, whatever the locale. USD prim names and attribute name parts are identifiers.
+/// @param text The text.
+/// @return Whether it is one.
+constexpr bool IsIdentifier(std::string_view text) {
+    const auto letter = [](char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+    };
+    if (text.empty() || !letter(text.front())) {
+        return false;
+    }
+    return std::all_of(text.begin(), text.end(),
+                       [&](char c) { return letter(c) || (c >= '0' && c <= '9'); });
+}
+
 /// @brief Reads numbers separated by blanks, line breaks or commas, in turn.
 class NumberReader {
   public:

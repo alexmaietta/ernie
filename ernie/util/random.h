@@ -93,6 +93,23 @@ inline constexpr float SampleUniform(const SampleKey& key, std::uint32_t dimensi
     return static_cast<float>(SampleBits(key, dimension) >> 8u) * (1.0f / 16777216.0f);
 }
 
+/// @brief SplitMix64's finaliser: every input bit affects every output bit.
+/// @param z The bits.
+/// @return Them mixed.
+inline constexpr std::uint64_t Mix64(std::uint64_t z) {
+    z = (z ^ (z >> 30u)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27u)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31u);
+}
+
+/// @brief Folds a value into a hash, as for keys of several fields.
+/// @param seed  The hash so far.
+/// @param value The next field.
+/// @return The combined hash.
+inline constexpr std::uint64_t HashCombine(std::uint64_t seed, std::uint64_t value) {
+    return Mix64(seed + 0x9e3779b97f4a7c15ull + value);
+}
+
 /// A sequential generator for host-side Monte Carlo work such as baking tables: SplitMix64, with
 /// full double precision. Use `SampleBits` instead for anything the GPU must reproduce.
 ///
@@ -107,10 +124,7 @@ class SplitMix64 {
     /// @brief Draws the next 64 random bits.
     /// @return The bits.
     constexpr std::uint64_t NextBits() {
-        std::uint64_t z = (state_ += 0x9e3779b97f4a7c15ull);
-        z = (z ^ (z >> 30u)) * 0xbf58476d1ce4e5b9ull;
-        z = (z ^ (z >> 27u)) * 0x94d049bb133111ebull;
-        return z ^ (z >> 31u);
+        return Mix64(state_ += 0x9e3779b97f4a7c15ull);
     }
 
     /// @brief Draws a uniform number.
