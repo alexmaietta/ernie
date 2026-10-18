@@ -545,10 +545,11 @@ TEST_F(TextureBake, MosaicsBakeAsTheirJoinedImage) {
 }
 
 TEST_F(TextureBake, RasterBakesMatchWholeBakesBandByBand) {
-    // 600 x 2100: bands of 1024, 1024 and 52 rows, their mips 0 to 8
+    // 300 x 2100: bands of 1024, 1024 and 52 rows, their mips 0 to 8
     // made band by band (the last band's ending at mip 5), the rest
-    // joined; a bake a few rows of blocks a step is the same.
-    const auto input = Png("tall.png", 600, 2100, [](int x, int y) {
+    // joined; a bake a few rows of blocks a step is the same. Narrow, as
+    // bands split rows and BC7 encoding is what takes the time.
+    const auto input = Png("tall.png", 300, 2100, [](int x, int y) {
         return glm::u8vec4(x * 7, y * 3, (x * y) & 0xff, 255 - y % 7);
     });
     for (const TextureFormat format : {TextureFormat::Rgba8, TextureFormat::Bc7}) {
@@ -563,9 +564,9 @@ TEST_F(TextureBake, RasterBakesMatchWholeBakesBandByBand) {
                 ++steps;
             }
             EXPECT_EQ(bake.Encoded(), bake.Total());
-            // 1.68 million texels in all.
+            // 0.84 million texels in all.
             if (texels < bake.Total()) {
-                EXPECT_GE(steps, 80);
+                EXPECT_GE(steps, 40);
             }
             const TextureData banded = LoadTextureFile(dir_ / "banded.dds");
             ASSERT_EQ(banded.mips, whole.mips);
