@@ -1,14 +1,37 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file transform_local.slang
-/// @brief The transform graph's local transforms: each programmed node's ops evaluated in
-/// double-float, bound ops read in place from the columns CUDA, Warp or kernels write.
+/// @file transform.slang
+/// @brief The transform graph on the device: programs of ops evaluated into local transforms,
+/// composed level by level into worlds relative to the render origin, all in double-float, and
+/// the worlds read back as floats by the kernels that place things.
+///
+///     import transform;
+///     Affine world = LoadWorld(parameters.worlds, slot);
 import affine;
 import double_float;
-import transform_ops;
+
+/// A program's op kinds, as `TransformGraph::DeviceOp` encodes them; a test holds these to the
+/// C++ constants. A folded constant, then each `XformOpKind` after it.
+public static const uint kConstant = 0;
+public static const uint kTranslate = 1;
+public static const uint kScale = 2;
+public static const uint kRotateX = 3;
+public static const uint kRotateXYZ = 6;
+public static const uint kOrient = 12;
+
+/// `DeviceOp::flags`: bit 0 inverts; bits 8 to 15 count the floats the op reads.
+public static const uint kInvert = 1;
+public static const uint kFloatsShift = 8;
+
+public static const uint kMaxOps = 8;
+/// No slot: a root's parent.
+public static const uint kNone = 0xffffffff;
+
+/// A slot's world transform relative to the render origin, as float rows.
+public Affine LoadWorld(float4* worlds, uint slot) {
+    return Round(LoadDouble(worlds, slot));
+}
 
 struct Op { uint kind; uint flags; float* source; float4 hi[3]; float4 lo[3]; };
-struct Parameters { uint* slots; Op* programs; uint* lengths; float4* locals; uint count; };
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
 static const uint3 kAxes[6] = { uint3(0, 1, 2), uint3(0, 2, 1), uint3(1, 0, 2),
                                 uint3(1, 2, 0), uint3(2, 0, 1), uint3(2, 1, 0) };
@@ -97,10 +120,12 @@ DoubleAffine OpDoubleMatrix(Op op) {
     return m;
 }
 
+struct LocalParameters { uint* slots; Op* programs; uint* lengths; float4* locals; uint count; };
+
 /// One thread a programmed node, its program at its place in the list.
 [shader("compute")]
 [numthreads(64, 1, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
+void Local(uint3 id : SV_DispatchThreadID, uniform LocalParameters parameters) {
     uint at = id.x;
     if (at >= parameters.count) {
         return;
@@ -110,4 +135,20 @@ void main(uint3 id : SV_DispatchThreadID) {
         local = Mul(local, OpDoubleMatrix(parameters.programs[at * kMaxOps + k]));
     }
     StoreDouble(parameters.locals, parameters.slots[at], local);
+}
+
+struct ComposeParameters { uint* slots; uint* parents; float4* locals; float4* worlds; uint count; };
+
+/// One level of the graph: each node's world from its parent's and its local.
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void Compose(uint3 id : SV_DispatchThreadID, uniform ComposeParameters parameters) {
+    if (id.x >= parameters.count) {
+        return;
+    }
+    uint slot = parameters.slots[id.x];
+    uint parent = parameters.parents[slot];
+    DoubleAffine local = LoadDouble(parameters.locals, slot);
+    StoreDouble(parameters.worlds, slot,
+                parent == kNone ? local : Mul(LoadDouble(parameters.worlds, parent), local));
 }

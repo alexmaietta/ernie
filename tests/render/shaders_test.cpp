@@ -8,7 +8,6 @@
 #include "ernie/render/rt/ray_tracer.h"
 #include "ernie/render/transform_graph.h"
 #include "ernie/shaders/scene/geometry.h"
-#include "ernie/shaders/scene/transform_ops.h"
 
 #include "tests/device/common.h"
 
@@ -23,7 +22,7 @@ namespace {
 /// Writes each value the C++ side mirrors, in the order `kExpected` lists them.
 const ShaderModule kShared{"shared", R"(
 import geometry;
-import transform_ops;
+import transform;
 struct Parameters { uint* values; };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
@@ -67,7 +66,9 @@ const std::vector<std::uint32_t> kExpected{
 TEST(Shaders, ConstantsAndLayoutsMatchTheirCppMirrors) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;
-    const std::vector<ShaderModule> modules{shaders::kGeometry, shaders::kTransformOps, kShared};
+    std::vector<ShaderModule> modules(TransformGraph::WorldModules().begin(),
+                                      TransformGraph::WorldModules().end());
+    modules.insert(modules.end(), {shaders::kGeometry, kShared});
     const ComputeKernel shared(*context, compiler.Spirv(modules, "main"), "shared",
                                sizeof(VkDeviceAddress));
     Arenas arenas(*context, MemoryUse::Device, "values", 1 << 12);
@@ -79,7 +80,7 @@ TEST(Shaders, ConstantsAndLayoutsMatchTheirCppMirrors) {
                       std::span(&written, 1));
     std::vector<std::uint32_t> values(kExpected.size());
     std::memcpy(values.data(), readback.Bytes().data(), range.size);
-    EXPECT_EQ(values, kExpected) << "geometry.slang and transform_ops.slang against their C++";
+    EXPECT_EQ(values, kExpected) << "geometry.slang and transform.slang against their C++";
     test::ExpectClean(*context);
 }
 

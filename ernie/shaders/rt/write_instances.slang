@@ -2,7 +2,7 @@
 /// @file write_instances.slang
 /// @brief The top level's instance records from the transform graph's worlds, one thread a row.
 import affine;
-import world;
+import transform;
 
 /// VkAccelerationStructureInstanceKHR.
 struct Instance { float4 rows[3]; uint indexAndMask; uint offsetAndFlags; uint64_t bottom; };

@@ -8,10 +8,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/shaders/math/affine.h"
 #include "ernie/shaders/math/double_float.h"
-#include "ernie/shaders/scene/transform_compose.h"
-#include "ernie/shaders/scene/transform_local.h"
-#include "ernie/shaders/scene/transform_ops.h"
-#include "ernie/shaders/scene/world.h"
+#include "ernie/shaders/scene/transform.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -32,12 +29,6 @@ struct ComposeParameters {
     std::uint32_t count, pad;
 };
 static_assert(sizeof(TransformGraph::DeviceOp) == 112);
-
-std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler, const ShaderModule& kernel) {
-    const std::array modules{shaders::kAffine, shaders::kDoubleFloat, shaders::kTransformOps,
-                             kernel};
-    return compiler.Spirv(modules, "main");
-}
 
 /// @return A transform's top three rows, each value split exactly into a high and a low float.
 TransformGraph::SplitRows Split(const glm::dmat4& m) {
@@ -87,9 +78,9 @@ glm::uvec3 Groups(std::size_t threads) {
 TransformGraph::TransformGraph(DeviceContext& context, Arenas& arenas, const Scene& scene,
                                const ShaderCompiler& compiler)
     : context_(context), arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
-      local_(context, Compile(compiler, shaders::kTransformLocal), "local transforms",
+      local_(context, compiler.Spirv(WorldModules(), "Local"), "local transforms",
              sizeof(LocalParameters)),
-      compose_(context, Compile(compiler, shaders::kTransformCompose), "world transforms",
+      compose_(context, compiler.Spirv(WorldModules(), "Compose"), "world transforms",
                sizeof(ComposeParameters)) {
     const auto column = [&](std::string_view name, DType type, std::vector<std::int64_t> element) {
         return std::make_unique<DeviceColumn>(arenas, name, type, std::move(element), 0);
@@ -139,7 +130,7 @@ void TransformGraph::SetOrigin(const glm::dvec3& origin) {
 }
 
 std::span<const ShaderModule> TransformGraph::WorldModules() {
-    static const std::array modules{shaders::kAffine, shaders::kDoubleFloat, shaders::kWorld};
+    static const std::array modules{shaders::kAffine, shaders::kDoubleFloat, shaders::kTransform};
     return modules;
 }
 

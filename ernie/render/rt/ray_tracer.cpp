@@ -6,6 +6,7 @@
 #include "ernie/shaders/rt/ray_tracer.h"
 #include "ernie/shaders/scene/geometry.h"
 #include "ernie/shaders/scene/shapes.h"
+#include "ernie/util/profiler.h"
 
 #include <array>
 
@@ -22,6 +23,8 @@ std::span<const ShaderModule> RayTracer::Modules() {
 
 void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& changes,
                          const TransformGraph& transforms, const InstanceTable& instances) {
+    ERNIE_ZONE("Update the ray tracer");
+    const graph::Graph::ScopeGuard scope = graph.Scope("Ray tracer");
     bottoms_.Apply(changes);
     bottoms_.AddBuilds(graph);
     const graph::Acceleration top = tops_.AddBuild(graph, transforms, instances, bottoms_);

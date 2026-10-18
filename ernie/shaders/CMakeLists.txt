@@ -7,8 +7,5 @@ ernie_add_shaders(
     rt/write_instances.slang
     scene/geometry.slang
     scene/shapes.slang
-    scene/transform_compose.slang
-    scene/transform_local.slang
-    scene/transform_ops.slang
-    scene/world.slang
+    scene/transform.slang
 )
