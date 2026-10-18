@@ -995,23 +995,38 @@ std::pair<ImVec2, ImVec2> Shell::Viewport() const {
 }
 
 void Shell::Draw() {
-    ERNIE_ZONE("Viewer UI");
+    ERNIE_ZONE("Draw the UI");
     menu_.quit = menu_.resetLayout = menu_.frame = menu_.clearSelection = false;
-    DrawMenuBar();
-    DrawDockSpace();
+    {
+        ERNIE_ZONE("Draw the menus");
+        DrawMenuBar();
+    }
+    {
+        ERNIE_ZONE("Lay out the docks");
+        DrawDockSpace();
+    }
     DrawPanels();
-    DrawControlsWindow(menu_.controlsShown);
-    DrawAboutWindow(menu_.aboutShown, device_ != nullptr ? device_->Info().name : "");
-    if (menu_.demoShown) {
-        ImGui::ShowDemoWindow(&menu_.demoShown);
+    {
+        ERNIE_ZONE("Draw the help windows");
+        DrawControlsWindow(menu_.controlsShown);
+        DrawAboutWindow(menu_.aboutShown, device_ != nullptr ? device_->Info().name : "");
+        if (menu_.demoShown) {
+            ImGui::ShowDemoWindow(&menu_.demoShown);
+        }
     }
     const ImGuiIO& io = ImGui::GetIO();
     if (!io.WantTextInput) {
         menu_.quit |= io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false);
         menu_.frame |= !io.KeyCtrl && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_F, false);
     }
-    Navigate();
-    DrawHud();
+    {
+        ERNIE_ZONE("Move the camera");
+        Navigate();
+    }
+    {
+        ERNIE_ZONE("Draw the HUD");
+        DrawHud();
+    }
     Apply();
 }
 
@@ -1094,7 +1109,10 @@ void Shell::BuildLayout() {
 }
 
 void Shell::DrawPanels() {
+    ERNIE_ZONE("Draw the panels");
     for (const std::unique_ptr<Panel>& panel : panels_) {
+        ERNIE_ZONE("Draw a panel");
+        ERNIE_ZONE_TEXT(panel->Title());
         if (!panel->Visible()) {
             panel->Undrawn();
             continue;
@@ -1393,6 +1411,7 @@ WindowPresenter::~WindowPresenter() {
 }
 
 void WindowPresenter::CreateSwapchain(glm::uvec2 extent) {
+    ERNIE_ZONE("Create the swapchain");
     VkSurfaceCapabilitiesKHR capabilities{};
     CheckVk(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context_.Physical(), surface_, &capabilities),
             "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
@@ -1471,11 +1490,13 @@ std::optional<FrameTarget> WindowPresenter::Acquire() {
     }
     const glm::uvec2 extent(extent_.width, extent_.height);
     if (stale_ || size != extent) {
+        ERNIE_ZONE("Resize the swapchain");
         context_.Main().Last().Wait();
         DestroyViews();
         CreateSwapchain(size);
         stale_ = false;
     }
+    ERNIE_ZONE("Wait for a swapchain image");
     std::uint32_t index = 0;
     const VkResult result = vkAcquireNextImageKHR(context_.Device(), swapchain_,
                                                   std::numeric_limits<std::uint64_t>::max(),
@@ -1500,7 +1521,10 @@ void WindowPresenter::Present(Ticket drawn) {
     if (!acquired_) {
         return;
     }
-    drawn.Wait();
+    {
+        ERNIE_ZONE("Wait for the frame to draw");
+        drawn.Wait();
+    }
     const VkPresentInfoKHR info{.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                                 .swapchainCount = 1,
                                 .pSwapchains = &swapchain_,

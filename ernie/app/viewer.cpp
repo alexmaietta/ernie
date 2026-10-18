@@ -23,12 +23,18 @@ template <typename MakeContext>
 std::unique_ptr<Presenter> MakePresenter(const ViewerOptions& options, MakeContext&& makeContext) {
     if (options.offscreen) {
         DeviceContext& context = makeContext(std::vector<std::string>());
+        ERNIE_ZONE("Create the offscreen image");
         return std::make_unique<OffscreenPresenter>(context, options.size);
     }
 #if ERNIE_VIEWER_WINDOW
-    auto window = std::make_unique<Window>(options.title, options.size);
+    std::unique_ptr<Window> window;
+    {
+        ERNIE_ZONE("Open the window");
+        window = std::make_unique<Window>(options.title, options.size);
+    }
     ApplyTheme(options.shell.theme, window->ContentScale());
     DeviceContext& context = makeContext(Window::InstanceExtensions());
+    ERNIE_ZONE("Set up presenting to the window");
     return std::make_unique<WindowPresenter>(context, std::move(window), options.vsync);
 #else
     throw std::runtime_error(
@@ -67,6 +73,7 @@ Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
         throw std::invalid_argument("The viewer needs a positive size");
     }
     presenter_ = MakePresenter(options, [&](std::vector<std::string> extensions) -> DeviceContext& {
+        ERNIE_ZONE("Create the device");
         context_ = std::make_unique<DeviceContext>(
             DeviceContextOptions{.validation = options.validation,
                                  .device = options.device,
@@ -88,35 +95,58 @@ void Viewer::Run() {
 }
 
 bool Viewer::Step() {
-    presenter_->PollEvents();
+    profiler::BeginFrame();
+    ERNIE_FRAME_MARK("Viewer frame");
+    {
+        ERNIE_ZONE("Poll events");
+        presenter_->PollEvents();
+    }
     if (presenter_->CloseRequested() || !shell_->Open()) {
         return false;
     }
-    profiler::BeginFrame();
     const auto now = std::chrono::steady_clock::now();
     const double delta = std::chrono::duration<double>(now - last_).count();
     last_ = now;
 
-    presenter_->BeginUiFrame(delta);
-    renderer_->NewFrame();
-    ImGui::NewFrame();
+    {
+        ERNIE_ZONE("Begin the UI frame");
+        presenter_->BeginUiFrame(delta);
+        renderer_->NewFrame();
+        ImGui::NewFrame();
+    }
     shell_->Draw();
-    ImGui::Render();
+    {
+        ERNIE_ZONE("Build the UI's draw data");
+        ImGui::Render();
+    }
 
-    if (const std::optional<FrameTarget> target = presenter_->Acquire()) {
-        ERNIE_ZONE("Viewer draw");
+    std::optional<FrameTarget> target;
+    {
+        ERNIE_ZONE("Acquire an image");
+        target = presenter_->Acquire();
+    }
+    if (target) {
         ImDrawData& data = *ImGui::GetDrawData();
-        // The backend cycles a vertex buffer per image, which the frame that last drew with it
-        // must have finished with.
-        while (inFlight_.size() >= presenter_->ImageCount()) {
-            inFlight_.front().Wait();
-            inFlight_.pop_front();
+        {
+            // The backend cycles a vertex buffer per image, which the frame that last drew with
+            // it must have finished with.
+            ERNIE_ZONE("Wait for a frame in flight");
+            while (inFlight_.size() >= presenter_->ImageCount()) {
+                inFlight_.front().Wait();
+                inFlight_.pop_front();
+            }
         }
         renderer_->UpdateTextures(data);
-        const Ticket drawn = context_->Main().Submit([&](VkCommandBuffer commands) {
-            renderer_->Record(commands, data, *target, shell_->GetTheme().viewport);
-        });
+        Ticket drawn;
+        {
+            ERNIE_ZONE("Submit the UI");
+            drawn = context_->Main().Submit([&](VkCommandBuffer commands) {
+                ERNIE_ZONE("Record the UI");
+                renderer_->Record(commands, data, *target, shell_->GetTheme().viewport);
+            });
+        }
         inFlight_.push_back(drawn);
+        ERNIE_ZONE("Present");
         presenter_->Present(drawn);
     }
     context_->Collect();
@@ -170,10 +200,13 @@ ViewCommand ParseViewCommand(std::span<const std::string_view> arguments) {
 
 int RunView(const ViewCommand& command) {
     Scene scene;
-    if (command.scene) {
-        LoadSceneFile(scene, *command.scene);
+    {
+        ERNIE_ZONE("Load the scene");
+        if (command.scene) {
+            LoadSceneFile(scene, *command.scene);
+        }
+        scene.Update();
     }
-    scene.Update();
     Viewer viewer(scene, command.viewer);
     if (command.scene) {
         viewer.GetShell().Log().Info("Opened " + command.scene->string());

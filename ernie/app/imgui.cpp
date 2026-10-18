@@ -3,6 +3,8 @@
 /// @brief Creating the ImGui context, setting up its Vulkan backend and recording its draws.
 #include "ernie/app/imgui.h"
 
+#include "ernie/util/profiler.h"
+
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 
@@ -33,6 +35,7 @@ void Transition(VkCommandBuffer commands, VkImage image, VkImageLayout from, VkI
 }  // namespace
 
 ImGuiSession::ImGuiSession(const Theme& theme) {
+    ERNIE_ZONE("Set up ImGui");
     IMGUI_CHECKVERSION();
     context_ = ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -50,6 +53,7 @@ ImGuiSession::~ImGuiSession() {
 
 ImGuiRenderer::ImGuiRenderer(DeviceContext& context, VkFormat format, std::uint32_t imageCount)
     : context_(context) {
+    ERNIE_ZONE("Set up ImGui's Vulkan backend");
     ImGui_ImplVulkan_InitInfo info{};
     info.ApiVersion = VK_API_VERSION_1_3;
     info.Instance = context.Instance();
@@ -87,6 +91,8 @@ void ImGuiRenderer::UpdateTextures(ImDrawData& data) {
     }
     for (ImTextureData* texture : *data.Textures) {
         if (texture->Status != ImTextureStatus_OK) {
+            // The font atlas, on the first frame and when it grows.
+            ERNIE_ZONE("Upload a UI texture");
             ImGui_ImplVulkan_UpdateTexture(texture);
         }
     }
