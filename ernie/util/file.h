@@ -19,7 +19,7 @@ namespace ernie {
 /// @throws std::runtime_error If it cannot be read.
 ERNIE_API std::string ReadTextFile(const std::filesystem::path& path);
 
-/// @brief Writes text to a file, replacing it.
+/// @brief Writes text to a file, replacing it, and makes the directories it goes in.
 /// @throws std::runtime_error If it cannot be written.
 ERNIE_API void WriteTextFile(const std::filesystem::path& path, std::string_view text);
 
