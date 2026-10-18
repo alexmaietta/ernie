@@ -10,7 +10,9 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace ernie {
 
@@ -46,14 +48,20 @@ glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim);
 /// @return Whether the prim's transform ignores its ancestors' (`!resetXformStack!`).
 bool ResetsXformStack(const Scene& scene, PrimId prim);
 
-/// @brief A local transform around its pose: `before * translate * orient * after`, so a pose
-/// written elsewhere, on the device, composes with the ops the host authors.
-struct PoseOps {
-    glm::dmat4 before{1.0};
-    glm::dmat4 after{1.0};
+/// @brief One op of a prim's transform: its attribute, its type (`translate`, `rotateXYZ`,
+/// `orient` ...) and whether the order inverts it.
+struct XformOp {
+    std::string attribute;
+    std::string type;
+    bool invert = false;
+    bool operator==(const XformOp&) const = default;
 };
-/// @return The ops around the prim's pose when its `xformOpOrder` lists `xformOp:translate`
-/// right before `xformOp:orient`, neither inverted; none otherwise.
-std::optional<PoseOps> SplitAroundPose(const Scene& scene, PrimId prim);
+/// @return The prim's ops, outermost first, as `ComposeXformOps` multiplies them: those of
+/// `xformOpOrder` without its reset token, or without an order `xformOp:transform` alone.
+/// @throws std::invalid_argument for an entry that is no xformOp.
+std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim);
+/// @return One op's matrix, inverted if the order says so; identity when it has no value.
+/// @throws std::invalid_argument for an op Ernie does not know or a value of the wrong kind.
+glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op);
 
 }  // namespace ernie

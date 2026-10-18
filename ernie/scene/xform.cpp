@@ -205,16 +205,9 @@ void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
 }
 
 glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim) {
-    const Path path = scene.PrimPath(prim);
-    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
-    if (!order) {
-        return OpMatrix(scene, prim, ParseOp(path, tokens::kTransform));
-    }
     glm::dmat4 local(1.0);
-    for (const std::string& entry : *order) {
-        if (entry != tokens::kResetXformStack) {
-            local = local * OpMatrix(scene, prim, ParseOp(path, entry));
-        }
+    for (const XformOp& op : XformOpsInOrder(scene, prim)) {
+        local = local * XformOpMatrix(scene, prim, op);
     }
     return local;
 }
@@ -224,27 +217,23 @@ bool ResetsXformStack(const Scene& scene, PrimId prim) {
     return order && !order->empty() && order->front() == tokens::kResetXformStack;
 }
 
-std::optional<PoseOps> SplitAroundPose(const Scene& scene, PrimId prim) {
-    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
-    if (!order) {
-        return std::nullopt;
-    }
-    const auto pose = std::ranges::adjacent_find(*order, [](const auto& a, const auto& b) {
-        return a == tokens::kTranslate && b == tokens::kOrient;
-    });
-    if (pose == order->end()) {
-        return std::nullopt;
-    }
+std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim) {
     const Path path = scene.PrimPath(prim);
-    PoseOps ops;
-    for (auto entry = order->begin(); entry != order->end(); ++entry) {
-        if (*entry == tokens::kResetXformStack || entry == pose || entry == pose + 1) {
-            continue;
+    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
+    const std::vector<std::string> entries =
+        order ? *order : std::vector<std::string>{std::string(tokens::kTransform)};
+    std::vector<XformOp> ops;
+    for (const std::string& entry : entries) {
+        if (entry != tokens::kResetXformStack) {
+            const OpEntry op = ParseOp(path, entry);
+            ops.push_back({std::string(op.attribute), std::string(op.type), op.invert});
         }
-        glm::dmat4& side = entry < pose ? ops.before : ops.after;
-        side = side * OpMatrix(scene, prim, ParseOp(path, *entry));
     }
     return ops;
+}
+
+glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op) {
+    return OpMatrix(scene, prim, {op.attribute, op.type, op.invert});
 }
 
 }  // namespace ernie

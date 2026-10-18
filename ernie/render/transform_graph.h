@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file transform_graph.h
-/// @brief World transforms composed on the device: every prim a node, ordered by depth, so one
-/// small kernel per level of the hierarchy composes its nodes from their parents'. Poses written
-/// in place by CUDA, Warp or kernels become world transforms without the host.
+/// @brief World transforms composed on the device: each prim a node at its id's slot, one small
+/// kernel per level of the hierarchy composing its nodes from their parents', and transform ops
+/// written in place by CUDA, Warp or kernels evaluated on the device without the host.
 #pragma once
 
 #include "ernie/device/column.h"
@@ -17,26 +17,42 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace ernie {
 
-/// @brief The scene's transform hierarchy on the device. Each prim is a node with its parent's
-/// node (none at a root or `!resetXformStack!`) and a local transform; worlds are composed level
-/// by level, as 3x4 row-major matrices (VkTransformMatrixKHR's layout).
+/// @brief The scene's transform hierarchy on the device. A prim's node is its id's slot, so the
+/// stable id finds its transform with no table: `Worlds` holds a 3x4 row-major matrix a slot
+/// (VkTransformMatrixKHR's layout). Each node keeps its parent's slot, none at a root or under
+/// `!resetXformStack!`.
 ///
-/// Local transforms come from the host, uploaded only when their ops are authored, except in
-/// buckets whose poses are bound: there `before * translate * orient * after` is composed on the
-/// device from the bucket's `xformOp:translate` and `xformOp:orient` device columns, as written
-/// in place each step, with `before` and `after` the ops around them that the host authors.
+/// Local transforms are the host's, uploaded when their ops are authored, unless a prim's op order
+/// uses an attribute bound to a device column (`Bind`). Then the prim's ops become a short program
+/// the device evaluates each update: the bound ops read their rows in place, as CUDA, Warp or
+/// kernels wrote them, and runs of the host's other ops are folded into one matrix each.
 ///
-/// Structural changes rebuild the graph on the host, at a cost in prims; per-step work is on the
-/// device and costs no host transfers.
+/// Updates follow the scene's changes and cost what changed: added and removed prims are found by
+/// replaying the buckets' row logs, and a prim defined between a prim and its descendants takes
+/// them over by walking only that subtree.
 class TransformGraph {
   public:
     static constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
+    /// The most ops a program holds: device ops and the folded host ops between them.
+    static constexpr std::uint32_t kMaxOps = 8;
     /// A transform's top three rows, as the device keeps them.
     using Rows12 = std::array<float, 12>;
+    /// One op of a program, as the device reads it.
+    struct DeviceOp {
+        std::uint32_t kind = 0;
+        /// Bit 0 inverts; bits 8 to 15 count the floats the op reads.
+        std::uint32_t flags = 0;
+        VkDeviceAddress source = 0;
+        Rows12 constant{};
+        bool operator==(const DeviceOp&) const = default;
+    };
+    using Program = std::array<DeviceOp, kMaxOps>;
 
     TransformGraph(DeviceContext& context, Arenas& arenas, const Scene& scene,
                    const ShaderCompiler& compiler);
@@ -44,27 +60,24 @@ class TransformGraph {
     TransformGraph(const TransformGraph&) = delete;
     TransformGraph& operator=(const TransformGraph&) = delete;
 
-    /// @brief Composes the bucket's local transforms from its pose columns: `translate` with three
-    /// floats a row and `orient` with four (x, y, z, w), as `SceneColumns` keeps them. Prims whose
-    /// `xformOpOrder` has no `xformOp:translate` right before `xformOp:orient` keep their host
-    /// transforms.
-    /// @throws std::invalid_argument unless the columns have the bucket's rows and those shapes.
-    void BindPoses(BucketId bucket, const DeviceColumn& translate, const DeviceColumn& orient);
+    /// @brief Evaluates the bucket's `attribute` op on the device from `column`, a row a prim as
+    /// `SceneColumns` keeps it: translate and Euler rotations read three floats, scale one or
+    /// three, rotateX, rotateY and rotateZ one angle in degrees, orient four (x, y, z, w) and
+    /// transform sixteen (column-major).
+    /// @throws std::invalid_argument when `attribute` is no transform op, the column does not hold
+    /// the bucket's rows of floats in the op's shape, or the attribute is bound already.
+    void Bind(BucketId bucket, std::string_view attribute, const DeviceColumn& column);
     /// @brief Follows the scene's changes since the last update and composes every world
-    /// transform, after `waits`: the tickets of the pose columns' writers and their sync.
+    /// transform, after `waits`: the tickets of the bound columns' writers and their sync.
     /// @return The ticket passes wait on before reading `Worlds`.
+    /// @throws std::invalid_argument when a prim's program needs more than `kMaxOps` ops.
     Ticket Update(std::span<const Ticket> waits = {});
 
-    /// @return Each node's world transform, three float4 rows a node.
+    /// @return Each slot's world transform, three float4 rows a slot.
     const DeviceColumn& Worlds() const {
         return *worlds_;
     }
-    /// @return The node of each prim id slot, `kNone` for free slots: the table writers and passes
-    /// use to find a prim's transform from its stable id.
-    const DeviceColumn& SlotNodes() const {
-        return *slotNodes_;
-    }
-    /// @return The prim's node, or none when it is not in the graph yet.
+    /// @return The prim's node, its slot, or none when it is not in the graph yet.
     std::optional<std::uint32_t> Node(PrimId prim) const;
     /// @return The number of levels, each one dispatch.
     std::size_t Levels() const {
@@ -72,49 +85,89 @@ class TransformGraph {
     }
 
   private:
-    struct Poses {
+    struct Binding {
         BucketId bucket = 0;
-        const DeviceColumn* translate = nullptr;
-        const DeviceColumn* orient = nullptr;
-        /// The node of each bucket row, `kNone` for rows composed on the host.
-        std::unique_ptr<DeviceColumn> nodes;
+        AttributeId attribute = 0;
+        const DeviceColumn* column = nullptr;
+        /// The column's address its programs point into; a column that moves rewrites them.
+        VkDeviceAddress address = 0;
     };
-    struct Level {
-        std::uint32_t first = 0;
-        std::uint32_t count = 0;
+    struct NodeState {
+        PrimId prim;
+        bool live = false;
+        std::uint32_t parent = kNone;
+        std::uint32_t level = 0;
+        /// Where the node is in its level's list, and in the programmed list.
+        std::uint32_t position = kNone;
+        std::uint32_t programPosition = kNone;
+        std::vector<std::uint32_t> children;
+    };
+    /// Slots in a device list, kept dense by swap-removal, its changed entries uploaded in runs.
+    struct SlotList {
+        std::vector<std::uint32_t> slots;
+        std::unique_ptr<DeviceColumn> device;
+        std::vector<std::uint32_t> dirty;
+    };
+    /// Slots of a slot array changed since its last upload, each once.
+    struct DirtySlots {
+        std::vector<std::uint32_t> slots;
+        std::vector<bool> marked;
+        void Mark(std::uint32_t slot) {
+            if (slot >= marked.size()) {
+                marked.resize(slot + 1, false);
+            }
+            if (!marked[slot]) {
+                marked[slot] = true;
+                slots.push_back(slot);
+            }
+        }
     };
 
-    void Rebuild();
-    /// Uploads a node's host-authored transforms: its local, or the ops around its pose.
-    void UploadLocal(PrimId prim, std::uint32_t node, const Poses* poses);
-    const Poses* FindPoses(BucketId bucket) const;
-    /// Uploads a node's rows of `column` unless they are what was uploaded last.
-    void Write(DeviceColumn& column, std::vector<Rows12>& uploaded, std::uint32_t node,
-               const Rows12& rows);
+    void Replay(const ChangeSet& changes);
+    void AddNode(PrimId prim);
+    void RemoveNode(std::uint32_t slot);
+    /// Hangs a node under `parent` at the level below it, its subtree following.
+    void Attach(std::uint32_t slot, std::uint32_t parent);
+    void Detach(std::uint32_t slot);
+    void SetLevel(std::uint32_t slot, std::uint32_t level);
+    /// @return The slot of the prim's nearest ancestor prim, none at a root or a stack reset.
+    std::uint32_t ParentSlot(PrimId prim) const;
+    /// Hands descendants whose nearest ancestor prim is now `slot`'s over to it.
+    void AdoptDescendants(std::uint32_t slot);
+    /// Recomposes a node's local transform or program from its ops.
+    void Refresh(std::uint32_t slot);
+    void EnsureSlots(std::uint32_t slots);
+    std::uint32_t Insert(SlotList& list, std::uint32_t slot);
+    /// @return The slot moved into `position`, or none when it was the last.
+    std::uint32_t Erase(SlotList& list, std::uint32_t position);
+    void UploadDirty();
 
     DeviceContext& context_;
     Arenas& arenas_;
     const Scene& scene_;
     Uploader uploader_;
-    ComputeKernel pose_;
+    ComputeKernel local_;
     ComputeKernel compose_;
     std::uint64_t cursor_ = 0;
-    bool built_ = false;
-    std::vector<Poses> poses_;
-    std::vector<Level> levels_;
-    /// Host copies of the slot table and each node's prim.
-    std::vector<std::uint32_t> slotNode_;
-    std::vector<PrimId> nodePrim_;
-    /// What the host last uploaded of each node's transforms.
-    std::vector<Rows12> uploadedLocals_;
-    std::vector<Rows12> uploadedBefore_;
-    std::vector<Rows12> uploadedAfter_;
-    std::unique_ptr<DeviceColumn> parents_;
-    std::unique_ptr<DeviceColumn> locals_;
-    std::unique_ptr<DeviceColumn> before_;
-    std::unique_ptr<DeviceColumn> after_;
+    std::vector<Binding> bindings_;
+    /// Each bucket's prims by row as the graph last saw them, to replay row logs on.
+    std::vector<std::vector<PrimId>> rows_;
+    std::vector<NodeState> nodes_;
+    std::vector<SlotList> levels_;
+    SlotList programmed_;
+    // Host copies of the slot arrays, and the slots changed since the last upload.
+    std::vector<std::uint32_t> parents_;
+    std::vector<Rows12> locals_;
+    std::vector<Program> programs_;
+    std::vector<std::uint32_t> lengths_;
+    DirtySlots dirtyParents_;
+    DirtySlots dirtyLocals_;
+    DirtySlots dirtyPrograms_;
+    std::unique_ptr<DeviceColumn> parentColumn_;
+    std::unique_ptr<DeviceColumn> localColumn_;
+    std::unique_ptr<DeviceColumn> programColumn_;
+    std::unique_ptr<DeviceColumn> lengthColumn_;
     std::unique_ptr<DeviceColumn> worlds_;
-    std::unique_ptr<DeviceColumn> slotNodes_;
 };
 
 }  // namespace ernie
