@@ -258,6 +258,12 @@ struct ChangeSet {
 /// scanning unchanged buckets, columns or chunks.
 class ERNIE_API PrimStore {
   public:
+    PrimStore() = default;
+    PrimStore(const PrimStore&) = delete;
+    PrimStore& operator=(const PrimStore&) = delete;
+    PrimStore(PrimStore&&) = default;
+    PrimStore& operator=(PrimStore&&) = default;
+
     PathTable& Paths() {
         return paths_;
     }
