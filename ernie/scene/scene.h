@@ -6,7 +6,6 @@
 #include "ernie/geometry/bounds.h"
 #include "ernie/scene/extent_cache.h"
 #include "ernie/scene/schema.h"
-#include "ernie/scene/stage.h"
 #include "ernie/scene/storage.h"
 #include "ernie/scene/value.h"
 
@@ -98,17 +97,6 @@ class Scene {
     /// point instancer places at each instance.
     Box BoundsInParent(PrimId prim) const;
 
-    const Stage& GetStage() const {
-        return stage_;
-    }
-    /// @brief Replaces the stage metadata, advancing `StageVersion` when it differs.
-    /// @throws std::invalid_argument if `Validate` rejects it.
-    void SetStage(Stage stage);
-    /// @return A count of the stage metadata's changes, which renderers compare to their last.
-    std::uint64_t StageVersion() const {
-        return stageVersion_;
-    }
-
     PrimStore& Store() {
         return store_;
     }
@@ -154,8 +142,6 @@ class Scene {
     void AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const;
 
     PrimStore store_;
-    Stage stage_;
-    std::uint64_t stageVersion_ = 0;
     Token invisible_ = 0;
     Token defaultPurpose_ = 0;
     std::vector<BucketSchema> buckets_;
