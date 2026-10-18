@@ -193,6 +193,14 @@ std::optional<Value> Scene::Get(PrimId prim, AttributeId attribute) const {
     return CellValue(prim, AuthoredColumn(prim, attribute));
 }
 
+std::optional<Value> Scene::GetOrFallback(PrimId prim, std::string_view attribute) const {
+    if (std::optional<Value> value = Get(prim, attribute)) {
+        return value;
+    }
+    const AttributeDef* declared = Declaration(prim, attribute);
+    return declared != nullptr ? std::optional<Value>(declared->fallback) : std::nullopt;
+}
+
 std::optional<Value> Scene::GetResolved(PrimId prim, std::string_view attribute) const {
     const std::optional<Token> token = store_.Tokens().Find(ResolvedName(attribute));
     return CellValue(prim,

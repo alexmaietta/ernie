@@ -104,7 +104,7 @@ ernie_add_test_suite(
 ernie_add_test_suite(
     render
     LABEL gpu
-    SOURCES render/scene_columns_test.cpp render/transform_graph_test.cpp
+    SOURCES render/geometry_test.cpp render/scene_columns_test.cpp render/transform_graph_test.cpp
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
 ernie_add_test_suite(

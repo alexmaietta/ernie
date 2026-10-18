@@ -73,6 +73,8 @@ class Scene {
     std::optional<Value> Get(PrimId prim, std::string_view attribute) const;
     /// @brief `Get` by the attribute's token, for readers that look it up once.
     std::optional<Value> Get(PrimId prim, AttributeId attribute) const;
+    /// @return The authored value, else the fallback its schema declares; none when neither.
+    std::optional<Value> GetOrFallback(PrimId prim, std::string_view attribute) const;
     std::optional<Value> Get(const Path& path, std::string_view attribute) const;
     /// @return An inherited attribute's value as of the last `Update`: the prim's own or its
     /// nearest authoring ancestor's (where "inherited" isn't authoring), else the fallback; none
