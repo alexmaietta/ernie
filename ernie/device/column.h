@@ -5,6 +5,8 @@
 #pragma once
 
 #include "ernie/device/arena.h"
+#include "ernie/device/staging.h"
+#include "ernie/util/algorithm.h"
 #include "ernie/util/tensor.h"
 
 #include <cstdint>
@@ -103,5 +105,16 @@ class DeviceColumn {
     std::uint64_t capacity_;
     BufferRange range_;
 };
+
+/// @brief Stages `rows` of a host mirror into the same rows of `column`. The rows are sorted and
+/// made unique in place, and those past the mirror's end dropped; the caller clears them.
+template <typename T>
+void StageRows(Uploader& uploader, const DeviceColumn& column, const std::vector<T>& host,
+               std::vector<std::uint32_t>& rows) {
+    SortUnique(rows);
+    std::erase_if(rows, [&](std::uint32_t row) { return row >= host.size(); });
+    uploader.WriteRows(column.Storage(), column.Range().offset, column.RowBytes(),
+                       std::as_bytes(std::span(host)), rows);
+}
 
 }  // namespace ernie

@@ -173,8 +173,9 @@ class Graph {
     /// resource. The image outlives `Execute`'s work.
     /// @return The handle of its latest version.
     Image Import(DeviceImage& image, std::string_view name);
-    /// @brief Uses a column's rows, as kernels, CUDA or Warp write them.
-    Buffer Import(const DeviceColumn& column, std::string_view name);
+    /// @brief Uses a column's rows, as kernels, CUDA or Warp write them, under `name` or the
+    /// column's own.
+    Buffer Import(const DeviceColumn& column, std::string_view name = {});
     /// @brief Uses a range of a buffer owned outside the graph.
     Buffer Import(const ernie::Buffer& buffer, std::uint64_t offset, std::uint64_t size,
                   std::string_view name);
@@ -321,5 +322,11 @@ class Graph {
     bool fullBarriers_ = false;
     bool flushEachPass_ = false;
 };
+
+/// @brief Adds a copy pass recording what `uploader` staged into `targets`, which later passes then
+/// see written; invalid handles among them are skipped. The staging buffers live until the graph's
+/// work is done. Nothing is added when nothing is staged.
+void AddUploadPass(Graph& graph, std::string_view name, Uploader& uploader,
+                   std::span<Buffer> targets);
 
 }  // namespace ernie::graph

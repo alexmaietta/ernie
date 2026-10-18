@@ -353,8 +353,7 @@ void GeometryPool::AddUploads(graph::Graph& graph) {
     if (!dirtyRecords_.empty()) {
         hostRecords_.resize(geometries_.size());
         records_->Resize(geometries_.size(), context_.Main());
-        std::ranges::sort(dirtyRecords_);
-        dirtyRecords_.erase(std::ranges::unique(dirtyRecords_).begin(), dirtyRecords_.end());
+        SortUnique(dirtyRecords_);
         const auto address = [&](const BufferRange& range) {
             return range.size > 0 ? arenas_.Address(range) : std::uint64_t{0};
         };
@@ -367,26 +366,13 @@ void GeometryPool::AddUploads(graph::Graph& graph) {
                                 .vertices = address(geometry.vertices),
                                 .indices = address(geometry.indices)};
         }
-        uploader_.WriteRows(records_->Storage(), records_->Range().offset, sizeof(GeometryRecord),
-                            std::as_bytes(std::span(hostRecords_)), dirtyRecords_);
+        StageRows(uploader_, *records_, hostRecords_, dirtyRecords_);
         dirtyRecords_.clear();
     }
-    if (!uploader_.Staged()) {
-        return;
+    if (uploader_.Staged()) {
+        std::vector<graph::Buffer> buffers = Import(graph);
+        graph::AddUploadPass(graph, "Upload geometry", uploader_, buffers);
     }
-    std::vector<graph::Buffer> buffers = Import(graph);
-    graph.Add(
-        "Upload geometry", graph::Kind::Copy,
-        [&](graph::PassBuilder& pass) {
-            for (graph::Buffer& buffer : buffers) {
-                buffer = pass.Write(buffer, graph::Use::CopyDst);
-            }
-        },
-        [this](graph::PassContext& pass) {
-            for (std::shared_ptr<const Buffer>& staging : uploader_.Record(pass.commands)) {
-                pass.Keep(std::move(staging));
-            }
-        });
 }
 
 std::vector<graph::Buffer> GeometryPool::Import(graph::Graph& graph) const {

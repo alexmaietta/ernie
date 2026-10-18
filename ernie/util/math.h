@@ -94,4 +94,9 @@ T Interpolate(std::span<const double> xs, std::span<const T> values, double x) {
     return values[i] + (values[i + 1] - values[i]) * t;
 }
 
+/// @return How many groups of `size` cover `count`, as workgroups cover threads.
+template <typename T> constexpr T DivideRoundUp(T count, T size) {
+    return (count + size - 1) / size;
+}
+
 }  // namespace ernie

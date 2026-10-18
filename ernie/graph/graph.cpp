@@ -230,7 +230,8 @@ Image Graph::Import(DeviceImage& image, std::string_view name) {
 }
 
 Buffer Graph::Import(const DeviceColumn& column, std::string_view name) {
-    return Import(column.Storage(), column.Range().offset, column.Bytes(), name);
+    return Import(column.Storage(), column.Range().offset, column.Bytes(),
+                  name.empty() ? column.Name() : name);
 }
 
 Acceleration Graph::Import(const AccelerationStructure& structure) {
@@ -560,6 +561,27 @@ std::string Graph::Dot() const {
     }
     dot << "}\n";
     return dot.str();
+}
+
+void AddUploadPass(Graph& graph, std::string_view name, Uploader& uploader,
+                   std::span<Buffer> targets) {
+    if (!uploader.Staged()) {
+        return;
+    }
+    graph.Add(
+        name, Kind::Copy,
+        [&](PassBuilder& pass) {
+            for (Buffer& target : targets) {
+                if (target.Valid()) {
+                    target = pass.Write(target, Use::CopyDst);
+                }
+            }
+        },
+        [&uploader](PassContext& pass) {
+            for (std::shared_ptr<const ernie::Buffer>& staging : uploader.Record(pass.commands)) {
+                pass.Keep(std::move(staging));
+            }
+        });
 }
 
 }  // namespace ernie::graph

@@ -183,23 +183,11 @@ void BottomLevels::AddBuilds(graph::Graph& graph) {
 
     if (!dirtyAddresses_.empty()) {
         addresses_->Resize(hostAddresses_.size(), context_.Main());
-        std::ranges::sort(dirtyAddresses_);
-        dirtyAddresses_.erase(std::ranges::unique(dirtyAddresses_).begin(), dirtyAddresses_.end());
-        uploader_.WriteRows(addresses_->Storage(), addresses_->Range().offset,
-                            sizeof(std::uint64_t), std::as_bytes(std::span(hostAddresses_)),
-                            dirtyAddresses_);
+        StageRows(uploader_, *addresses_, hostAddresses_, dirtyAddresses_);
         dirtyAddresses_.clear();
-        graph::Buffer addresses = graph.Import(*addresses_, addresses_->Name());
-        graph.Add(
-            "Upload bottom-level addresses", graph::Kind::Copy,
-            [&](graph::PassBuilder& pass) {
-                addresses = pass.Write(addresses, graph::Use::CopyDst);
-            },
-            [this](graph::PassContext& pass) {
-                for (std::shared_ptr<const Buffer>& staging : uploader_.Record(pass.commands)) {
-                    pass.Keep(std::move(staging));
-                }
-            });
+        graph::Buffer addresses = graph.Import(*addresses_);
+        graph::AddUploadPass(graph, "Upload bottom-level addresses", uploader_,
+                             std::span(&addresses, 1));
     }
     if (builds.empty() && compactions.empty()) {
         return;

@@ -106,36 +106,14 @@ void InstanceTable::AddUploads(graph::Graph& graph) {
     for (DeviceColumn* column : {nodes_.get(), geometries_.get(), shapes_.get(), colours_.get()}) {
         column->Resize(rows, context_.Main());
     }
-    std::ranges::sort(dirty_);
-    dirty_.erase(std::ranges::unique(dirty_).begin(), dirty_.end());
-    std::erase_if(dirty_, [&](std::uint32_t row) { return row >= rows; });
-    if (dirty_.empty()) {
-        return;
-    }
-    const auto upload = [&](const DeviceColumn& column, const auto& host) {
-        uploader_.WriteRows(column.Storage(), column.Range().offset, column.RowBytes(),
-                            std::as_bytes(std::span(host)), dirty_);
-    };
-    upload(*nodes_, hostNodes_);
-    upload(*geometries_, hostGeometries_);
-    upload(*shapes_, hostShapes_);
-    upload(*colours_, hostColours_);
+    StageRows(uploader_, *nodes_, hostNodes_, dirty_);
+    StageRows(uploader_, *geometries_, hostGeometries_, dirty_);
+    StageRows(uploader_, *shapes_, hostShapes_, dirty_);
+    StageRows(uploader_, *colours_, hostColours_, dirty_);
     dirty_.clear();
-    std::array columns{
-        graph.Import(*nodes_, nodes_->Name()), graph.Import(*geometries_, geometries_->Name()),
-        graph.Import(*shapes_, shapes_->Name()), graph.Import(*colours_, colours_->Name())};
-    graph.Add(
-        "Upload instances", graph::Kind::Copy,
-        [&](graph::PassBuilder& pass) {
-            for (graph::Buffer& column : columns) {
-                column = pass.Write(column, graph::Use::CopyDst);
-            }
-        },
-        [this](graph::PassContext& pass) {
-            for (std::shared_ptr<const Buffer>& staging : uploader_.Record(pass.commands)) {
-                pass.Keep(std::move(staging));
-            }
-        });
+    std::array columns{graph.Import(*nodes_), graph.Import(*geometries_), graph.Import(*shapes_),
+                       graph.Import(*colours_)};
+    graph::AddUploadPass(graph, "Upload instances", uploader_, columns);
 }
 
 }  // namespace ernie

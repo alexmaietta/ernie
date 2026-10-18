@@ -8,6 +8,7 @@
 #include "ernie/shaders/device/bindless.h"
 #include "ernie/shaders/sensors/camera.h"
 #include "ernie/shaders/spectral/spectrum.h"
+#include "ernie/util/math.h"
 
 #include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -144,9 +145,10 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
                     VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
             parameters.views = slice.Address();
             parameters.count = static_cast<std::uint32_t>(records.size());
-            kernel_.Dispatch(pass.commands,
-                             {(largest.x + 7) / 8, (largest.y + 7) / 8, parameters.count},
-                             parameters);
+            kernel_.Dispatch(
+                pass.commands,
+                {DivideRoundUp(largest.x, 8u), DivideRoundUp(largest.y, 8u), parameters.count},
+                parameters);
         });
 }
 

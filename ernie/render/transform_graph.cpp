@@ -9,6 +9,7 @@
 #include "ernie/shaders/math/affine.h"
 #include "ernie/shaders/math/double_float.h"
 #include "ernie/shaders/scene/transform.h"
+#include "ernie/util/math.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -70,7 +71,7 @@ std::int64_t Floats(const DeviceColumn& column) {
 }
 
 glm::uvec3 Groups(std::size_t threads) {
-    return {static_cast<std::uint32_t>((threads + 63) / 64), 1, 1};
+    return {static_cast<std::uint32_t>(DivideRoundUp<std::size_t>(threads, 64)), 1, 1};
 }
 
 }  // namespace
@@ -481,31 +482,23 @@ void TransformGraph::RefreshAuthored(const ChangeSet& changes) {
 }
 
 void TransformGraph::UploadDirty() {
-    // Changed rows of a host array, each once; the rows are left for reuse.
-    const auto upload = [&](const DeviceColumn& column, const auto& host,
-                            std::vector<std::uint32_t>& rows) {
-        std::ranges::sort(rows);
-        rows.erase(std::ranges::unique(rows).begin(), rows.end());
-        std::erase_if(rows, [&](std::uint32_t row) { return row >= host.size(); });
-        uploader_.WriteRows(column.Storage(), column.Range().offset, column.RowBytes(),
-                            std::as_bytes(std::span(host)), rows);
-    };
     const auto uploadMarked = [&](DirtySlots& dirty, const DeviceColumn& column, const auto& host) {
         for (const std::uint32_t slot : dirty.slots) {
             dirty.marked[slot] = false;
         }
-        upload(column, host, dirty.slots);
+        StageRows(uploader_, column, host, dirty.slots);
         dirty.slots.clear();
     };
     uploadMarked(dirtyParents_, *parentColumn_, parents_);
     uploadMarked(dirtyLocals_, *localColumn_, locals_);
     programColumn_->Resize(programs_.size(), context_.Main());
     lengthColumn_->Resize(lengths_.size(), context_.Main());
-    upload(*lengthColumn_, lengths_, dirtyPrograms_.slots);
+    // A program's length changes with it: both upload from the same rows.
+    StageRows(uploader_, *lengthColumn_, lengths_, dirtyPrograms_.slots);
     uploadMarked(dirtyPrograms_, *programColumn_, programs_);
     const auto uploadList = [&](SlotList& list) {
         list.device->Resize(list.slots.size(), context_.Main());
-        upload(*list.device, list.slots, list.dirty);
+        StageRows(uploader_, *list.device, list.slots, list.dirty);
         list.dirty.clear();
     };
     uploadList(programmed_);
@@ -553,70 +546,74 @@ Ticket TransformGraph::Update(std::span<const Ticket> waits) {
         after);
 }
 
+/// The columns an update uploads come first in `uploaded`, in this order, then each level's slots.
+struct TransformGraph::GraphColumns {
+    enum Uploaded : std::size_t { kParents, kLocals, kPrograms, kLengths, kProgrammed, kLevels };
+    std::vector<graph::Buffer> uploaded;
+    graph::Buffer worlds;
+    std::vector<graph::Buffer> bound;
+
+    graph::Buffer& Level(std::size_t level) {
+        return uploaded[kLevels + level];
+    }
+};
+
 void TransformGraph::AddUpdate(graph::Graph& graph) {
     ERNIE_ZONE("Update transforms");
     Prepare();
     if (nodes_.empty()) {
         return;
     }
-    using graph::Use;
+    GraphColumns columns = ImportColumns(graph);
+    const graph::Graph::ScopeGuard scope = graph.Scope("Transforms");
+    graph::AddUploadPass(graph, "Upload transforms", uploader_, columns.uploaded);
+    AddLocalPass(graph, columns);
+    AddLevelPasses(graph, columns);
+}
+
+TransformGraph::GraphColumns TransformGraph::ImportColumns(graph::Graph& graph) const {
     // Empty columns hold nothing to read or write: their handles stay invalid.
     const auto import = [&](const DeviceColumn& column) {
-        return column.Rows() == 0 ? graph::Buffer{} : graph.Import(column, column.Name());
+        return column.Rows() == 0 ? graph::Buffer{} : graph.Import(column);
     };
-    graph::Buffer parents = import(*parentColumn_);
-    graph::Buffer locals = import(*localColumn_);
-    graph::Buffer programs = import(*programColumn_);
-    graph::Buffer lengths = import(*lengthColumn_);
-    graph::Buffer worlds = import(*worlds_);
-    graph::Buffer programmed = import(*programmed_.device);
-    std::vector<graph::Buffer> levels;
+    GraphColumns columns;
+    for (const DeviceColumn* column :
+         {parentColumn_.get(), localColumn_.get(), programColumn_.get(), lengthColumn_.get(),
+          programmed_.device.get()}) {
+        columns.uploaded.push_back(import(*column));
+    }
     for (const SlotList& level : levels_) {
-        levels.push_back(import(*level.device));
+        columns.uploaded.push_back(import(*level.device));
     }
-    std::vector<graph::Buffer> bound;
+    columns.worlds = import(*worlds_);
     for (const Binding& binding : bindings_) {
-        bound.push_back(import(*binding.column));
+        columns.bound.push_back(import(*binding.column));
     }
-    const graph::Graph::ScopeGuard scope = graph.Scope("Transforms");
-    if (uploader_.Staged()) {
-        graph.Add(
-            "Upload transforms", graph::Kind::Copy,
-            [&](graph::PassBuilder& pass) {
-                const auto write = [&](graph::Buffer& column) {
-                    if (column.Valid()) {
-                        column = pass.Write(column, Use::CopyDst);
-                    }
-                };
-                for (graph::Buffer* column :
-                     {&parents, &locals, &programs, &lengths, &programmed}) {
-                    write(*column);
-                }
-                for (graph::Buffer& level : levels) {
-                    write(level);
-                }
-            },
-            [this](graph::PassContext& pass) {
-                for (std::shared_ptr<const Buffer>& staging : uploader_.Record(pass.commands)) {
-                    pass.Keep(std::move(staging));
-                }
-            });
+    return columns;
+}
+
+void TransformGraph::AddLocalPass(graph::Graph& graph, GraphColumns& columns) const {
+    if (programmed_.slots.empty()) {
+        return;
     }
-    if (!programmed_.slots.empty()) {
-        graph.Add(
-            "Local transforms", graph::Kind::Compute,
-            [&](graph::PassBuilder& pass) {
-                for (const graph::Buffer& read : {programmed, programs, lengths}) {
-                    pass.ReadAddress(read);
-                }
-                // Bound columns are read in place, after the passes that write them.
-                for (const graph::Buffer& column : bound) {
-                    pass.ReadAddress(column);
-                }
-                locals = pass.WriteAddress(locals);
-            },
-            [this](graph::PassContext& pass) { DispatchLocals(pass.commands); });
-    }
+    std::vector<graph::Buffer>& uploaded = columns.uploaded;
+    graph.Add(
+        "Local transforms", graph::Kind::Compute,
+        [&](graph::PassBuilder& pass) {
+            for (const std::size_t read :
+                 {GraphColumns::kProgrammed, GraphColumns::kPrograms, GraphColumns::kLengths}) {
+                pass.ReadAddress(uploaded[read]);
+            }
+            // Bound columns are read in place, after the passes that write them.
+            for (const graph::Buffer& column : columns.bound) {
+                pass.ReadAddress(column);
+            }
+            uploaded[GraphColumns::kLocals] = pass.WriteAddress(uploaded[GraphColumns::kLocals]);
+        },
+        [this](graph::PassContext& pass) { DispatchLocals(pass.commands); });
+}
+
+void TransformGraph::AddLevelPasses(graph::Graph& graph, GraphColumns& columns) const {
     for (std::size_t l = 0; l < levels_.size(); ++l) {
         if (levels_[l].slots.empty()) {
             continue;
@@ -625,10 +622,12 @@ void TransformGraph::AddUpdate(graph::Graph& graph) {
         graph.Add(
             "World transforms", graph::Kind::Compute,
             [&](graph::PassBuilder& pass) {
-                for (const graph::Buffer& read : {levels[l], parents, locals}) {
+                for (const graph::Buffer& read :
+                     {columns.Level(l), columns.uploaded[GraphColumns::kParents],
+                      columns.uploaded[GraphColumns::kLocals]}) {
                     pass.ReadAddress(read);
                 }
-                worlds = pass.WriteAddress(worlds);
+                columns.worlds = pass.WriteAddress(columns.worlds);
             },
             [this, &level = levels_[l]](graph::PassContext& pass) {
                 DispatchLevel(pass.commands, level);

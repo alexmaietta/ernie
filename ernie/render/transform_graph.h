@@ -208,6 +208,11 @@ class TransformGraph {
     void Prepare();
     void DispatchLocals(VkCommandBuffer commands) const;
     void DispatchLevel(VkCommandBuffer commands, const SlotList& level) const;
+    /// The graph's handles of what an update reads and writes.
+    struct GraphColumns;
+    GraphColumns ImportColumns(graph::Graph& graph) const;
+    void AddLocalPass(graph::Graph& graph, GraphColumns& columns) const;
+    void AddLevelPasses(graph::Graph& graph, GraphColumns& columns) const;
 
     DeviceContext& context_;
     Arenas& arenas_;

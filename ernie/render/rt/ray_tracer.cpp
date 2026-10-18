@@ -33,9 +33,9 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
     graph.Board().Put(TraceScene{
         .parameters = {.scene = tops_.Structure()->Address(), .records = records.Address()},
         .top = top,
-        .records = graph.Import(records, records.Name()),
+        .records = graph.Import(records),
         .instances = instances.Count(),
-        .colours = graph.Import(colours, colours.Name()),
+        .colours = graph.Import(colours),
         .colourAddress = colours.Address(),
         .origin = transforms.Origin()});
 }

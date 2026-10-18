@@ -4,6 +4,7 @@
 #include "ernie/render/rt/top_levels.h"
 
 #include "ernie/shaders/rt/write_instances.h"
+#include "ernie/util/math.h"
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
@@ -57,14 +58,11 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
         graph.Create(ScratchBytes({}, std::span(&build, 1)), "top-level scratch");
 
     if (count > 0) {
-        const auto import = [&](const DeviceColumn& column) {
-            return graph.Import(column, column.Name());
-        };
-        const graph::Buffer worlds = import(transforms.Worlds());
-        const graph::Buffer nodes = import(instances.Nodes());
-        const graph::Buffer geometries = import(instances.Geometries());
-        const graph::Buffer shapes = import(instances.Shapes());
-        const graph::Buffer addresses = import(bottoms.Addresses());
+        const graph::Buffer worlds = graph.Import(transforms.Worlds());
+        const graph::Buffer nodes = graph.Import(instances.Nodes());
+        const graph::Buffer geometries = graph.Import(instances.Geometries());
+        const graph::Buffer shapes = graph.Import(instances.Shapes());
+        const graph::Buffer addresses = graph.Import(bottoms.Addresses());
         graph.Add(
             "Write instances", graph::Kind::Compute,
             [&](graph::PassBuilder& pass) {
@@ -76,7 +74,7 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
             [this, worlds, nodes, geometries, shapes, addresses, records,
              count](graph::PassContext& pass) {
                 writer_.Dispatch(
-                    pass.commands, {(count + 63) / 64, 1, 1},
+                    pass.commands, {DivideRoundUp(count, 64u), 1, 1},
                     WriteParameters{pass.Get(worlds).Address(), pass.Get(nodes).Address(),
                                     pass.Get(geometries).Address(), pass.Get(shapes).Address(),
                                     pass.Get(addresses).Address(), pass.Get(records).Address(),

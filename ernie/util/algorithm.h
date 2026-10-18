@@ -3,6 +3,7 @@
 /// @brief Small range helpers.
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <ranges>
 #include <type_traits>
@@ -21,6 +22,12 @@ template <std::ranges::input_range R, typename F> auto Map(const R& range, F&& t
         out.push_back(std::invoke(transform, element));
     }
     return out;
+}
+
+/// @brief Sorts `values` and drops repeats, as a set of indices to visit in order.
+template <typename T> void SortUnique(std::vector<T>& values) {
+    std::ranges::sort(values);
+    values.erase(std::ranges::unique(values).begin(), values.end());
 }
 
 }  // namespace ernie
