@@ -81,8 +81,8 @@ TEST(Json, ValidScenesHaveNoProblems) {
 TEST(Json, ValidationReportsEveryProblemOfABrokenScene) {
     ExpectGolden(Messages(ValidateScene(Fixture("invalid/problems.json"))),
                  "invalid/problems.expected");
-    EXPECT_NE(Messages(ValidateScene("{")).find("Not JSON"), std::string::npos);
-    EXPECT_NE(Messages(ValidateScene(R"({"World": {}})")).find("\"prims\""), std::string::npos);
+    EXPECT_TRUE(test::Contains(Messages(ValidateScene("{")), "Not JSON"));
+    EXPECT_TRUE(test::Contains(Messages(ValidateScene(R"({"World": {}})")), "\"prims\""));
 }
 
 TEST(Json, LoadingStopsAtTheFirstProblem) {

@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file inherit_test.cpp
-/// @brief Tests of inherited attributes resolving from the nearest authoring ancestor.
+/// @brief Tests of what edits reach beyond their prim: inherited attributes resolving from the
+/// nearest authoring ancestor, and relationship targets reaching their holders.
 #include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schemas/instancer.h"
 #include "ernie/scene/schemas/shade.h"
+#include "ernie/util/algorithm.h"
+
+#include "tests/common.h"
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace ernie {
 namespace {
@@ -23,19 +30,20 @@ int World(const Scene& scene, const char* path) {
 /// @return Whether the last update changed `attribute`'s resolved value of the prim at `path`.
 bool Changed(const Scene& scene, std::uint64_t cursor, const char* path,
              std::string_view attribute) {
+    const PrimStore& store = scene.Store();
     const PrimId prim = *scene.Find(path);
-    const Token resolved = *scene.Store().Tokens().Find(ResolvedName(attribute));
-    for (const ChangeSet::Values& values : scene.Store().ChangesSince(cursor).values) {
-        if (values.bucket == scene.Store().PrimBucket(prim) && values.attribute == resolved) {
-            for (const RowRange range : values.rows) {
-                const std::uint32_t row = scene.Store().PrimRow(prim);
-                if (range.begin <= row && row < range.end) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+    return test::ValueChanged(store.ChangesSince(cursor), store.PrimBucket(prim),
+                              *store.Tokens().Find(ResolvedName(attribute)), store.PrimRow(prim));
+}
+
+using Paths = std::vector<std::string>;
+
+/// @return The paths of the prims holding a relationship to `target`, sorted.
+Paths Holders(const Scene& scene, const char* target) {
+    Paths paths = Map(scene.Holders(Path(target)),
+                      [&](PrimId prim) { return scene.PrimPath(prim).String(); });
+    std::ranges::sort(paths);
+    return paths;
 }
 
 TEST(Inherit, ValuesComeFromTheNearestAuthoringAncestor) {
@@ -123,6 +131,40 @@ TEST(Inherit, ResolvedValuesCannotBeAuthored) {
         *scene.Store().Tokens().Find(ResolvedName(MaterialBindingAPI::kMaterialBinding)),
         {}};
     EXPECT_EQ(scene.Classify(change), Dirty::Material) << "dirty as the attribute is";
+}
+
+TEST(Holders, TargetsReachThePrimsHoldingThem) {
+    Scene scene;
+    Sphere::Define(scene, "/Protos/Ball");
+    Cube::Define(scene, "/Protos/Box");
+    PointInstancer::Define(scene, "/Rocks")
+        .SetPrototypes({Path("/Protos/Ball"), Path("/Protos/Box")});
+    PointInstancer::Define(scene, "/Pebbles").SetPrototypes({Path("/Protos/Ball")});
+    scene.Update();
+    EXPECT_EQ(Holders(scene, "/Protos/Ball"), (Paths{"/Pebbles", "/Rocks"}));
+    EXPECT_EQ(Holders(scene, "/Protos/Box"), (Paths{"/Rocks"}));
+    EXPECT_TRUE(Holders(scene, "/Nowhere").empty());
+
+    PointInstancer(scene, "/Rocks").SetPrototypes({Path("/Protos/Box")});
+    scene.Remove("/Pebbles");
+    scene.Update();
+    EXPECT_EQ(Holders(scene, "/Protos/Ball"), Paths{}) << "retargeted and removed holders drop";
+    EXPECT_EQ(Holders(scene, "/Protos/Box"), (Paths{"/Rocks"}));
+}
+
+TEST(Holders, AMaterialReachesEveryPrimBoundToItThroughInheritance) {
+    Scene scene;
+    Material::Define(scene, "/Looks/Basalt");
+    Xform::Define(scene, "/World");
+    MaterialBindingAPI::Apply(scene, "/World").SetMaterialBinding(Path("/Looks/Basalt"));
+    Sphere::Define(scene, "/World/Rock");
+    Cube::Define(scene, "/World/Boulder");
+    scene.Update();
+    EXPECT_EQ(Holders(scene, "/Looks/Basalt"), (Paths{"/World", "/World/Boulder", "/World/Rock"}));
+
+    scene.RemoveApi(*scene.Find("/World"), "MaterialBindingAPI");
+    scene.Update();
+    EXPECT_EQ(Holders(scene, "/Looks/Basalt"), Paths{}) << "unbound, though the slots live on";
 }
 
 }  // namespace

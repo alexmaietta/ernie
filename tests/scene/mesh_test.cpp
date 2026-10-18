@@ -2,7 +2,8 @@
 /// @file mesh_test.cpp
 /// @brief Tests of point-based schemas, array attributes and their extents.
 #include "ernie/scene/schemas/mesh.h"
-#include "ernie/scene/tokens.h"
+
+#include "tests/common.h"
 
 #include <gtest/gtest.h>
 
@@ -12,9 +13,8 @@
 namespace ernie {
 namespace {
 
-Tensor Floats(std::vector<float> values, std::vector<std::int64_t> shape) {
-    return Tensor::Copy<float>(values, std::move(shape));
-}
+using test::Floats;
+using test::Ints;
 
 Tensor Triangle() {
     return Floats({0, 0, 0, 2, 0, 0, 0, 3, -1}, {3, 3});
@@ -28,7 +28,7 @@ TEST(Mesh, ArraysAreSharedAndCheckedForTypeAndShape) {
     mesh.SetPoints(points);
     EXPECT_EQ(mesh.GetPoints().Data(), points.Data()) << "shared, not copied";
     EXPECT_NE(scene.Read(mesh.Id(), PointBased::kPoints), nullptr);
-    mesh.SetFaceVertexCounts(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{3}, {1}));
+    mesh.SetFaceVertexCounts(Ints({3}));
 
     EXPECT_THROW(mesh.SetPoints(Floats({0, 0, 0, 1}, {2, 2})), std::invalid_argument)
         << "points are threes";
@@ -68,7 +68,7 @@ TEST(Curves, ExtentsBoundControlPointsGrownByTheWidestWidth) {
     Scene scene;
     BasisCurves hair = BasisCurves::Define(scene, "/Hair");
     EXPECT_EQ(hair.GetType(), "cubic") << "USD's fallback";
-    hair.SetCurveVertexCounts(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4}, {1}));
+    hair.SetCurveVertexCounts(Ints({4}));
     hair.SetPoints(Floats({0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 1}, {4, 3}));
     hair.SetWidths(Floats({0.2f, 0.4f}, {2}));
     const Box box = *scene.Extent(hair.Id());

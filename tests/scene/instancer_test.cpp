@@ -15,10 +15,7 @@ namespace ernie {
 namespace {
 
 using test::BoxNear;
-
-Tensor Floats(std::vector<float> values, std::vector<std::int64_t> shape) {
-    return Tensor::Copy<float>(values, std::move(shape));
-}
+using test::Floats;
 
 /// A ball (radius 1) and a cube (size 2, moved 3 m up by its own transform), hidden as
 /// prototypes usually are, under an instancer with two instances.
@@ -28,7 +25,7 @@ PointInstancer TwoInstances(Scene& scene) {
     Cube::Define(scene, "/World/Rocks/Protos/Box").SetVisibility("invisible");
     SetXform(scene, "/World/Rocks/Protos/Box", {.translate = glm::dvec3(0.0, 0.0, 3.0)});
     instancer.SetPrototypes({Path("/World/Rocks/Protos/Ball"), Path("/World/Rocks/Protos/Box")})
-        .SetProtoIndices(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{0, 1}, {2}))
+        .SetProtoIndices(test::Ints({0, 1}))
         .SetPositions(Floats({0, 0, 0, 10, 0, 0}, {2, 3}));
     return instancer;
 }

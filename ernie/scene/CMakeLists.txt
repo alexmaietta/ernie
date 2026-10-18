@@ -19,7 +19,6 @@ add_library(
     view.cpp
     xform.cpp
     schemas/camera.cpp
-    schemas/collection.cpp
     schemas/geom.cpp
     schemas/instancer.cpp
     schemas/laser.cpp

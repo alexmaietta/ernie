@@ -7,6 +7,8 @@
 #include "ernie/scene/schemas/geom.h"
 #include "ernie/scene/tokens.h"
 
+#include "tests/common.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <gtest/gtest.h>
@@ -461,9 +463,7 @@ TEST(Xform, BadOpsNameThePrimAndOp) {
         }
         return std::string("no error");
     };
-    const auto mentions = [](const std::string& text, std::string_view part) {
-        return text.find(part) != std::string::npos;
-    };
+    const auto mentions = test::Contains;
 
     const std::string unknown = message([](Rock& rock) {
         rock.Set("xformOp:shear", glm::dvec3(1, 0, 0));

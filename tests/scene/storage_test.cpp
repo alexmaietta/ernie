@@ -3,6 +3,8 @@
 /// @brief Tests of the columnar prim store: buckets, rows, values and change sets.
 #include "ernie/scene/storage.h"
 
+#include "tests/common.h"
+
 #include <gtest/gtest.h>
 
 #include <stdexcept>
@@ -87,14 +89,8 @@ TEST(PrimStore, AMovedRowIsReportedChangedAtItsNewPlace) {
     s.store.Set(prims[99], s.radius, 5.0);
     s.store.Remove(prims[3]);
     ASSERT_EQ(s.store.PrimRow(prims[99]), 3u);
-    const ChangeSet changes = s.store.ChangesSince(cursor);
-    bool reported = false;
-    for (const ChangeSet::Values& values : changes.values) {
-        for (const RowRange range : values.rows) {
-            reported |= values.attribute == s.radius && range.begin <= 3 && 3 < range.end;
-        }
-    }
-    EXPECT_TRUE(reported) << "the edit made at row 99 now lives at row 3";
+    EXPECT_TRUE(test::ValueChanged(s.store.ChangesSince(cursor), s.bucket, s.radius, 3))
+        << "the edit made at row 99 now lives at row 3";
 }
 
 TEST(PrimStore, UnauthoredRowsHoldTheFallbackForWholeColumnReads) {

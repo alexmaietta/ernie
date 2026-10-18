@@ -244,6 +244,21 @@ inline bool IsA(const SchemaDef* schema, const SchemaDef& base) {
     return schema != nullptr && schema->IsA(base);
 }
 
+/// @brief Schemas of one family, as USD groups them in modules, documented on one reference page.
+struct SchemaFamily {
+    /// The page's file name, without `.md`.
+    std::string_view name;
+    std::string_view title;
+    /// The USD module its schemas mirror, as `UsdGeom`, and its documentation; empty for none.
+    std::string_view usdModule;
+    std::string_view usdUrl;
+    /// The schemas mirroring USD's, then Ernie's own.
+    std::vector<const SchemaDef*> usd;
+    std::vector<const SchemaDef*> ernie;
+};
+
+/// @return The registry, by family: every schema is in one.
+std::span<const SchemaFamily> SchemaFamilies();
 /// @return Every registered schema, bases before the types deriving from them.
 std::span<const SchemaDef* const> Schemas();
 /// @return The schema named `name`, or null.

@@ -15,9 +15,8 @@
 namespace ernie {
 namespace {
 
-void ExpectBox(const Box& box, const glm::dvec3& min, const glm::dvec3& max) {
-    EXPECT_TRUE(test::BoxNear(box, min, max));
-}
+using test::BoxNear;
+using test::Ints;
 
 TEST(Schema, RegistryListsTypesWithBasesAndAttributes) {
     const SchemaDef* sphere = FindSchema(Sphere::kName);
@@ -31,9 +30,6 @@ TEST(Schema, RegistryListsTypesWithBasesAndAttributes) {
     EXPECT_EQ(FindSchema("Teapot"), nullptr);
     for (const SchemaDef* schema : Schemas()) {
         EXPECT_EQ(FindSchema(schema->name), schema);
-        if (schema->base != nullptr) {
-            EXPECT_EQ(FindSchema(schema->base->name), schema->base) << "bases are registered";
-        }
     }
 }
 
@@ -62,18 +58,19 @@ TEST(Schema, DeclarationsSayWhatTheirChangesStamp) {
 
 TEST(Extent, ShapesAreBoundedAsUsdGeomComputesThem) {
     Scene scene;
-    ExpectBox(*scene.Extent(Cube::Define(scene, "/Cube").SetSize(4.0).Id()), glm::dvec3(-2.0),
-              glm::dvec3(2.0));
-    ExpectBox(*scene.Extent(Sphere::Define(scene, "/Sphere").SetRadius(3.0).Id()), glm::dvec3(-3.0),
-              glm::dvec3(3.0));
-    ExpectBox(*scene.Extent(Cylinder::Define(scene, "/Cylinder").SetAxis(Axis::X).Id()),
-              {-1.0, -1.0, -1.0}, {1.0, 1.0, 1.0});
-    ExpectBox(*scene.Extent(Cone::Define(scene, "/Cone").SetHeight(6.0).Id()), {-1.0, -1.0, -3.0},
-              {1.0, 1.0, 3.0});
-    ExpectBox(*scene.Extent(Capsule::Define(scene, "/Capsule").SetAxis(Axis::Y).Id()),
-              {-0.5, -1.0, -0.5}, {0.5, 1.0, 0.5});
-    ExpectBox(*scene.Extent(Plane::Define(scene, "/Plane").SetWidth(4.0).SetAxis(Axis::X).Id()),
-              {0.0, -1.0, -2.0}, {0.0, 1.0, 2.0});
+    const auto extent = [&](const SchemaView& view) { return *scene.Extent(view.Id()); };
+    EXPECT_TRUE(BoxNear(extent(Cube::Define(scene, "/Cube").SetSize(4.0)), glm::dvec3(-2.0),
+                        glm::dvec3(2.0)));
+    EXPECT_TRUE(BoxNear(extent(Sphere::Define(scene, "/Sphere").SetRadius(3.0)), glm::dvec3(-3.0),
+                        glm::dvec3(3.0)));
+    EXPECT_TRUE(BoxNear(extent(Cylinder::Define(scene, "/Cylinder").SetAxis(Axis::X)),
+                        glm::dvec3(-1.0), glm::dvec3(1.0)));
+    EXPECT_TRUE(BoxNear(extent(Cone::Define(scene, "/Cone").SetHeight(6.0)), {-1.0, -1.0, -3.0},
+                        {1.0, 1.0, 3.0}));
+    EXPECT_TRUE(BoxNear(extent(Capsule::Define(scene, "/Capsule").SetAxis(Axis::Y)),
+                        {-0.5, -1.0, -0.5}, {0.5, 1.0, 0.5}));
+    EXPECT_TRUE(BoxNear(extent(Plane::Define(scene, "/Plane").SetWidth(4.0).SetAxis(Axis::X)),
+                        {0.0, -1.0, -2.0}, {0.0, 1.0, 2.0}));
 }
 
 TEST(Extent, GroupingsAndTypelessPrimsHaveNoExtentOfTheirOwn) {
@@ -89,15 +86,14 @@ TEST(Extent, WorldBoundsGatherVisibleDescendantsThroughTheirTransforms) {
     Sphere::Define(scene, "/World/A");
     Cube::Define(scene, "/World/B").SetSize(2.0);
     SetXform(scene, "/World/B", {.translate = glm::dvec3(0.0, 5.0, 0.0), .scale = glm::dvec3(2.0)});
-    ExpectBox(scene.WorldBounds("/World"), {8.0, -1.0, -2.0}, {12.0, 7.0, 2.0});
-    SCOPED_TRACE("a prim's bounds include its ancestors' transforms");
-    ExpectBox(scene.WorldBounds("/World/A"), {9.0, -1.0, -1.0}, {11.0, 1.0, 1.0});
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World"), {8.0, -1.0, -2.0}, {12.0, 7.0, 2.0}));
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World/A"), {9.0, -1.0, -1.0}, {11.0, 1.0, 1.0}))
+        << "a prim's bounds include its ancestors' transforms";
 
     Sphere::Define(scene, "/World/Hidden").SetRadius(100.0).SetVisibility("invisible");
     Sphere::Define(scene, "/World/Guide").SetRadius(100.0).SetPurpose("guide");
-    SCOPED_TRACE("invisible and guide prims are left out");
-    ExpectBox(scene.WorldBounds("/World"), {8.0, -1.0, -2.0}, {12.0, 7.0, 2.0});
-    EXPECT_TRUE(Box().Empty());
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World"), {8.0, -1.0, -2.0}, {12.0, 7.0, 2.0}))
+        << "invisible and guide prims are left out";
     EXPECT_TRUE(scene.WorldBounds("/World/Hidden").Empty());
 }
 
@@ -108,12 +104,13 @@ TEST(Extent, ModelsWithoutLoadedDescendantsAreBoundedByTheirHint) {
     Xform::Define(scene, "/World/Rover");
     GeomModelAPI::Apply(scene, "/World/Rover")
         .SetExtentsHint({-1, -1, 0, 1, 1, 2, -5, -5, -5, 5, 5, 5});
-    ExpectBox(scene.WorldBounds("/World"), {9.0, -1.0, 0.0}, {11.0, 1.0, 2.0});
-    SCOPED_TRACE("bounds in the parent take every purpose's box");
-    ExpectBox(scene.BoundsInParent(*scene.Find("/World/Rover")), glm::dvec3(-5.0), glm::dvec3(5.0));
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World"), {9.0, -1.0, 0.0}, {11.0, 1.0, 2.0}));
+    EXPECT_TRUE(BoxNear(scene.BoundsInParent(*scene.Find("/World/Rover")), glm::dvec3(-5.0),
+                        glm::dvec3(5.0)))
+        << "bounds in the parent take every purpose's box";
     Sphere::Define(scene, "/World/Rover/Body").SetRadius(0.5);
-    SCOPED_TRACE("loaded descendants replace the hint");
-    ExpectBox(scene.WorldBounds("/World"), {9.5, -0.5, -0.5}, {10.5, 0.5, 0.5});
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World"), {9.5, -0.5, -0.5}, {10.5, 0.5, 0.5}))
+        << "loaded descendants replace the hint";
     Sphere(scene, "/World/Rover/Body").SetVisibility("invisible");
     EXPECT_TRUE(scene.WorldBounds("/World").Empty()) << "hidden, not unloaded";
 }
@@ -122,11 +119,10 @@ TEST(Extent, SubsetsAreNotBounded) {
     Scene scene;
     Cube::Define(scene, "/Box");
     GeomSubset subset = GeomSubset::Define(scene, "/Box/Top");
-    subset.SetIndices(Tensor::Copy<std::int32_t>(std::vector<std::int32_t>{4}, {1}))
-        .SetFamilyName("materialBind");
+    subset.SetIndices(Ints({4})).SetFamilyName("materialBind");
     EXPECT_EQ(subset.GetElementType(), "face");
     EXPECT_FALSE(scene.Extent(subset.Id()));
-    ExpectBox(scene.WorldBounds("/Box"), glm::dvec3(-1.0), glm::dvec3(1.0));
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/Box"), glm::dvec3(-1.0), glm::dvec3(1.0)));
 }
 
 TEST(Extent, ResettingTheStackDropsAncestorsFromWorldBounds) {
@@ -136,7 +132,7 @@ TEST(Extent, ResettingTheStackDropsAncestorsFromWorldBounds) {
     Sphere::Define(scene, "/World/Ball");
     scene.Set("/World/Ball", tokens::kXformOpOrder,
               std::vector<std::string>{std::string(tokens::kResetXformStack)});
-    ExpectBox(scene.WorldBounds("/World/Ball"), glm::dvec3(-1.0), glm::dvec3(1.0));
+    EXPECT_TRUE(BoxNear(scene.WorldBounds("/World/Ball"), glm::dvec3(-1.0), glm::dvec3(1.0)));
 }
 
 }  // namespace

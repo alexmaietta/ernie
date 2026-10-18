@@ -14,20 +14,17 @@ namespace ernie {
 namespace {
 
 using test::BoxNear;
+using test::Floats;
 
 constexpr double kMoonRadius = 1737.4e3;
 constexpr double kEarthRadius = 6371.0e3;
-
-Tensor Heights(std::vector<float> values, std::vector<std::int64_t> shape) {
-    return Tensor::Copy<float>(values, std::move(shape));
-}
 
 TEST(Planet, ABodysTerrainReachesItsHighestHeight) {
     Scene scene;
     Sphere::Define(scene, "/Moon").SetRadius(kMoonRadius);
     Terrain::Define(scene, "/Moon/Terrain")
         .SetBody(Path("/Moon"))
-        .SetHeights(Heights({-500, 0, 250, 1000}, {2, 2}))
+        .SetHeights(Floats({-500, 0, 250, 1000}, {2, 2}))
         .SetExaggeration(2.0);
     EXPECT_TRUE(BoxNear(*scene.Extent(*scene.Find("/Moon/Terrain")),
                         glm::dvec3(-kMoonRadius - 2000.0), glm::dvec3(kMoonRadius + 2000.0), 1e-6));
@@ -36,7 +33,7 @@ TEST(Planet, ABodysTerrainReachesItsHighestHeight) {
 TEST(Planet, AFlatTerrainCoversItsFootprintAndHeightRange) {
     Scene scene;
     const Terrain site = Terrain::Define(scene, "/Site")
-                             .SetHeights(Heights({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, {3, 4}))
+                             .SetHeights(Floats({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, {3, 4}))
                              .SetOrigin({10.0, 20.0})
                              .SetCellSize(2.0);
     EXPECT_TRUE(BoxNear(*scene.Extent(site.Id()), {10.0, 16.0, 0.0}, {16.0, 20.0, 11.0}))

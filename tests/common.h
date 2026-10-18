@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file common.h
-/// @brief Helpers shared by the tests: temporary and fixture paths, small files and box checks.
+/// @brief Helpers shared by the tests: temporary and fixture paths, small files and tensors, and
+/// checks of boxes, text and changes.
 #pragma once
 
 #include "ernie/geometry/bounds.h"
+#include "ernie/scene/storage.h"
+#include "ernie/util/file.h"
+#include "ernie/util/tensor.h"
 
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace ernie::test {
 
@@ -29,9 +34,37 @@ inline std::filesystem::path FixturePath(const std::filesystem::path& relative) 
 /// @brief Writes bytes to a file, replacing it.
 /// @return The path.
 inline std::filesystem::path WriteFile(const std::filesystem::path& path, std::string_view bytes) {
-    std::ofstream(path, std::ios::binary)
-        .write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    WriteTextFile(path, bytes);
     return path;
+}
+
+/// @return A float32 CPU tensor of `values` in `shape`.
+inline Tensor Floats(const std::vector<float>& values, std::vector<std::int64_t> shape) {
+    return Tensor::Copy<float>(values, std::move(shape));
+}
+
+/// @return A flat int32 CPU tensor of `values`.
+inline Tensor Ints(const std::vector<std::int32_t>& values) {
+    return Tensor::Copy<std::int32_t>(values, {static_cast<std::int64_t>(values.size())});
+}
+
+inline bool Contains(std::string_view text, std::string_view part) {
+    return text.find(part) != std::string_view::npos;
+}
+
+/// @return Whether `changes` report the value of `attribute` changed at the bucket's row.
+inline bool ValueChanged(const ChangeSet& changes, BucketId bucket, AttributeId attribute,
+                         std::uint32_t row) {
+    for (const ChangeSet::Values& values : changes.values) {
+        if (values.bucket == bucket && values.attribute == attribute) {
+            for (const RowRange range : values.rows) {
+                if (range.begin <= row && row < range.end) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 /// @return Success when each of the box's corners is within `tolerance` of the expected ones;

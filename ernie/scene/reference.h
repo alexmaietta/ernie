@@ -14,21 +14,6 @@
 
 namespace ernie {
 
-/// @brief Schemas documented together on one reference page.
-struct SchemaFamily {
-    /// The page's file name, without `.md`.
-    std::string_view name;
-    std::string_view title;
-    /// The USD module its schemas mirror, as `UsdGeom`, and its documentation; empty for none.
-    std::string_view usdModule;
-    std::string_view usdUrl;
-    /// The schemas mirroring USD's, then Ernie's own.
-    std::vector<std::string_view> usd;
-    std::vector<std::string_view> ernie;
-};
-
-/// @return The reference families; every registered schema is in exactly one.
-std::span<const SchemaFamily> SchemaFamilies();
 /// @return The family of a schema, or null for an unlisted one.
 const SchemaFamily* FindFamily(std::string_view schema);
 /// @return Whether a schema is Ernie's own rather than one mirroring USD.

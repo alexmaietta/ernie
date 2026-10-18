@@ -346,70 +346,12 @@ std::string SchemaSection(const SchemaDef& schema, const SchemaFamily& family) {
 
 }  // namespace
 
-std::span<const SchemaFamily> SchemaFamilies() {
-    static const std::vector<SchemaFamily> kFamilies{
-        {"geometry",
-         "Geometry",
-         "UsdGeom",
-         "https://openusd.org/release/api/usd_geom_page_front.html",
-         {"Imageable",    "Xformable",   "Boundable",     "Gprim",         "Xform",    "Scope",
-          "GeomModelAPI", "GeomSubset",  "Cube",          "Sphere",        "Cylinder", "Cone",
-          "Capsule",      "Plane",       "PointBased",    "Mesh",          "Points",   "Curves",
-          "BasisCurves",  "NurbsCurves", "HermiteCurves", "PointInstancer"},
-         {}},
-        {"volumes",
-         "Volumes",
-         "UsdVol",
-         "https://openusd.org/release/api/usd_vol_page_front.html",
-         {"Volume", "FieldBase", "FieldAsset", "OpenVDBAsset"},
-         {"NanoVDBField", "DenseField"}},
-        {"cameras",
-         "Cameras and lenses",
-         "UsdGeom",
-         "https://openusd.org/release/api/class_usd_geom_camera.html",
-         {"Camera"},
-         {"ErnieLensAPI", "ErniePolarizerAPI", "ErnieSensorAPI"}},
-        {"lights",
-         "Lights",
-         "UsdLux",
-         "https://openusd.org/release/api/usd_lux_page_front.html",
-         {"LightAPI", "BoundableLightBase", "NonboundableLightBase", "DistantLight", "DiskLight",
-          "RectLight", "SphereLight", "CylinderLight", "DomeLight", "PortalLight", "MeshLightAPI",
-          "VolumeLightAPI", "ShapingAPI", "ShadowAPI"},
-         {"PhotometricAreaLightAPI", "PhotometricDistantLightAPI", "PhotometricDomeLightAPI",
-          "PhysicalLightIlluminantAPI", "LaserLight"}},
-        {"materials",
-         "Materials",
-         "UsdShade",
-         "https://openusd.org/release/api/usd_shade_page_front.html",
-         {"MaterialBindingAPI", "NodeGraph", "Material", "Shader"},
-         {}},
-        {"render",
-         "Render settings",
-         "UsdRender",
-         "https://openusd.org/release/api/usd_render_page_front.html",
-         {"RenderSettingsBase", "RenderSettings", "RenderProduct", "RenderVar", "RenderPass"},
-         {}},
-        {"planetary",
-         "Planetary",
-         "",
-         "",
-         {},
-         {"Terrain", "Atmosphere", "StarField", "GroundPlane"}},
-        {"collections",
-         "Collections",
-         "Usd",
-         "https://openusd.org/release/api/class_usd_collection_a_p_i.html",
-         {"CollectionAPI"},
-         {}},
-    };
-    return kFamilies;
-}
-
 const SchemaFamily* FindFamily(std::string_view schema) {
+    const auto in = [&](const std::vector<const SchemaDef*>& schemas) {
+        return std::ranges::find(schemas, schema, &SchemaDef::name) != schemas.end();
+    };
     for (const SchemaFamily& family : SchemaFamilies()) {
-        if (std::ranges::find(family.usd, schema) != family.usd.end() ||
-            std::ranges::find(family.ernie, schema) != family.ernie.end()) {
+        if (in(family.usd) || in(family.ernie)) {
             return &family;
         }
     }
@@ -418,7 +360,8 @@ const SchemaFamily* FindFamily(std::string_view schema) {
 
 bool IsErnieSchema(std::string_view schema) {
     const SchemaFamily* family = FindFamily(schema);
-    return family != nullptr && std::ranges::find(family->ernie, schema) != family->ernie.end();
+    return family != nullptr &&
+           std::ranges::find(family->ernie, schema, &SchemaDef::name) != family->ernie.end();
 }
 
 std::string SceneJsonSchema() {
@@ -449,9 +392,9 @@ std::string SceneJsonSchema() {
 std::string ReferencePage(const SchemaFamily& family) {
     std::string out = "# " + std::string(family.title) + "\n\n" +
                       "Generated from the schema registry by `ernie schema --markdown`.\n\n";
-    for (const auto* names : {&family.usd, &family.ernie}) {
-        for (const std::string_view name : *names) {
-            out += SchemaSection(*FindSchema(name), family);
+    for (const auto* schemas : {&family.usd, &family.ernie}) {
+        for (const SchemaDef* schema : *schemas) {
+            out += SchemaSection(*schema, family);
         }
     }
     return out;
