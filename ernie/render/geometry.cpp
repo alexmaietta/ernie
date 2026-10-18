@@ -123,8 +123,15 @@ Touched Classify(std::string_view attribute) {
 }  // namespace
 
 GeometryPool::GeometryPool(DeviceContext& context, Arenas& arenas, const Scene& scene)
-    : arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
-      unitShapes_(static_cast<std::size_t>(GeometryKind::Plane) + 1) {}
+    : context_(context), arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
+      unitShapes_(static_cast<std::size_t>(GeometryKind::Plane) + 1),
+      records_(std::make_unique<DeviceColumn>(
+          arenas, "geometry records", DType::UInt32,
+          std::vector<std::int64_t>{sizeof(GeometryRecord) / sizeof(std::uint32_t)}, 0)) {}
+
+void GeometryPool::Touch(GeometryId geometry) {
+    dirtyRecords_.push_back(geometry);
+}
 
 std::optional<PrimGeometry> GeometryPool::Find(PrimId prim) const {
     if (prim.slot >= prims_.size() || !prims_[prim.slot] || !(prims_[prim.slot]->prim == prim)) {
@@ -134,14 +141,17 @@ std::optional<PrimGeometry> GeometryPool::Find(PrimId prim) const {
 }
 
 GeometryId GeometryPool::Allocate(const Geometry& geometry) {
+    GeometryId id = 0;
     if (!unused_.empty()) {
-        const GeometryId id = unused_.back();
+        id = unused_.back();
         unused_.pop_back();
         geometries_[id] = geometry;
-        return id;
+    } else {
+        id = static_cast<GeometryId>(geometries_.size());
+        geometries_.push_back(geometry);
     }
-    geometries_.push_back(geometry);
-    return static_cast<GeometryId>(geometries_.size() - 1);
+    Touch(id);
+    return id;
 }
 
 void GeometryPool::Free(GeometryId id, Changes& changes) {
@@ -153,6 +163,7 @@ void GeometryPool::Free(GeometryId id, Changes& changes) {
     }
     geometry = {};
     unused_.push_back(id);
+    Touch(id);
     changes.freed.push_back(id);
 }
 
@@ -204,6 +215,7 @@ void GeometryPool::UploadMesh(PrimId prim, GeometryId id, bool topology, Changes
             uploader_.Write(arenas_.Storage(geometry.indices), geometry.indices.offset,
                             std::span<const std::uint32_t>(triangles));
         }
+        Touch(id);
         changes.rebuilt.push_back(id);
     } else {
         changes.refitted.push_back(id);
@@ -240,6 +252,7 @@ void GeometryPool::Place(PrimId prim, bool topology, Changes& changes) {
             geometry.halfLength = halfLength;
             UploadBox(geometry, glm::vec3(-1, -1, -1 - halfLength),
                       glm::vec3(1, 1, 1 + halfLength));
+            Touch(next.geometry);
             changes.rebuilt.push_back(next.geometry);
         }
     } else {
@@ -303,6 +316,27 @@ GeometryPool::Changes GeometryPool::Update() {
 }
 
 void GeometryPool::AddUploads(graph::Graph& graph) {
+    if (!dirtyRecords_.empty()) {
+        hostRecords_.resize(geometries_.size());
+        records_->Resize(geometries_.size(), context_.Main());
+        std::ranges::sort(dirtyRecords_);
+        dirtyRecords_.erase(std::ranges::unique(dirtyRecords_).begin(), dirtyRecords_.end());
+        const auto address = [&](const BufferRange& range) {
+            return range.size > 0 ? arenas_.Address(range) : std::uint64_t{0};
+        };
+        for (const std::uint32_t id : dirtyRecords_) {
+            const Geometry& geometry = geometries_[id];
+            hostRecords_[id] = {.kind = static_cast<std::uint32_t>(geometry.kind),
+                                .halfLength = geometry.halfLength,
+                                .vertexCount = geometry.vertexCount,
+                                .triangleCount = geometry.triangleCount,
+                                .vertices = address(geometry.vertices),
+                                .indices = address(geometry.indices)};
+        }
+        uploader_.WriteRows(records_->Storage(), records_->Range().offset, sizeof(GeometryRecord),
+                            std::as_bytes(std::span(hostRecords_)), dirtyRecords_);
+        dirtyRecords_.clear();
+    }
     if (!uploader_.Staged()) {
         return;
     }

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ernie/device/arena.h"
+#include "ernie/device/column.h"
 #include "ernie/device/staging.h"
 #include "ernie/graph/graph.h"
 #include "ernie/render/prim_rows.h"
@@ -38,6 +39,20 @@ struct Geometry {
     /// A capsule's segment half-length over its radius.
     float halfLength = 0.0f;
 };
+
+/// @brief A geometry as kernels read it from `GeometryPool::Records`, by geometry id: an instance's
+/// custom index.
+struct GeometryRecord {
+    /// A `GeometryKind`.
+    std::uint32_t kind = 0;
+    float halfLength = 0.0f;
+    std::uint32_t vertexCount = 0;
+    std::uint32_t triangleCount = 0;
+    /// Triangles' float x, y, z positions and their uint32 indices, by device address.
+    std::uint64_t vertices = 0;
+    std::uint64_t indices = 0;
+};
+static_assert(sizeof(GeometryRecord) == 32);
 
 /// @brief What a prim draws: its geometry, and the transform from the geometry's frame to the
 /// prim's, which sizes and turns a unit shape.
@@ -88,6 +103,10 @@ class GeometryPool {
     }
     /// @brief Imports every buffer geometry lives in, for passes that read it.
     std::vector<graph::Buffer> Import(graph::Graph& graph) const;
+    /// @return Each geometry's `GeometryRecord`, by geometry id, in the buffers `Import` imports.
+    const DeviceColumn& Records() const {
+        return *records_;
+    }
 
   private:
     /// Places a prim: its geometry, built or shared, and its shape transform.
@@ -100,7 +119,10 @@ class GeometryPool {
     void UploadBox(const Geometry& geometry, const glm::vec3& low, const glm::vec3& high);
     /// Uploads a mesh's points, and its triangles when `topology`; a refit when only points move.
     void UploadMesh(PrimId prim, GeometryId geometry, bool topology, Changes& changes);
+    /// Marks a geometry's record for the next upload.
+    void Touch(GeometryId geometry);
 
+    DeviceContext& context_;
     Arenas& arenas_;
     const Scene& scene_;
     Uploader uploader_;
@@ -111,6 +133,10 @@ class GeometryPool {
     /// What each prim draws, by its id's slot.
     std::vector<std::optional<PrimGeometry>> prims_;
     std::vector<std::optional<GeometryId>> unitShapes_;
+    /// The records' host copies, and the geometries whose records changed.
+    std::vector<GeometryRecord> hostRecords_;
+    std::vector<std::uint32_t> dirtyRecords_;
+    std::unique_ptr<DeviceColumn> records_;
 };
 
 }  // namespace ernie
