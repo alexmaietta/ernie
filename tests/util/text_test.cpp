@@ -32,6 +32,12 @@ TEST(Text, IdentifiersAreAsciiLettersDigitsAndUnderscores) {
     EXPECT_FALSE(IsIdentifier("\xc3\xa9")) << "ASCII only";
 }
 
+TEST(Text, NumbersBecomeShortText) {
+    EXPECT_EQ(ToText(170.0), "170");
+    EXPECT_EQ(ToText(0.01), "0.01");
+    EXPECT_EQ(ToText(-2.5), "-2.5");
+}
+
 TEST(Text, NumberReaderReadsBlankAndCommaSeparatedNumbers) {
     NumberReader numbers("1, 2.5\n-3e2 ,4\t7 1.5", "Test file");
     EXPECT_EQ(numbers.Next(), 1.0);

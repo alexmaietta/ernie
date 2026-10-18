@@ -4,6 +4,7 @@ include("${PROJECT_SOURCE_DIR}/cmake/ErnieTesting.cmake")
 ernie_add_test_suite(
     util
     SOURCES
+        util/algorithm_test.cpp
         util/bytes_test.cpp
         util/disk_cache_test.cpp
         util/file_test.cpp
@@ -21,6 +22,7 @@ ernie_add_test_suite(
         util/worker_pool_test.cpp
     LIBRARIES ernie_static ernie_json
 )
+ernie_add_test_suite(geometry SOURCES geometry/bounds_test.cpp LIBRARIES ernie_static)
 ernie_add_test_suite(
     physics
     SOURCES
@@ -52,7 +54,12 @@ ernie_add_test_suite(
 )
 ernie_add_test_suite(
     scene
-    SOURCES scene/path_test.cpp scene/storage_test.cpp
+    SOURCES
+        scene/path_test.cpp
+        scene/scene_test.cpp
+        scene/schema_test.cpp
+        scene/storage_test.cpp
+        scene/xform_test.cpp
     LIBRARIES ernie_static
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_static)

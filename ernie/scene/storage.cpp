@@ -98,7 +98,7 @@ PrimId PrimStore::AddSlot(PathId path, BucketId bucket, std::uint32_t row) {
 
 PrimId PrimStore::Define(PathId path, BucketId bucket) {
     if (const std::optional<PrimId> existing = Find(path)) {
-        if (BucketOf(*existing) != bucket) {
+        if (PrimBucket(*existing) != bucket) {
             throw std::invalid_argument("Prim " + paths_.ToPath(path).String() +
                                         " already exists with another type");
         }

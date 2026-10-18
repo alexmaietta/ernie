@@ -1,0 +1,124 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/// @file schema.cpp
+/// @brief Schema lookups and value validation.
+#include "ernie/scene/schema.h"
+
+#include "ernie/scene/convert.h"
+#include "ernie/util/text.h"
+
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+#include <string>
+
+namespace ernie {
+namespace {
+
+/// What the bounds take: "above 0 and below 170", "from 0 to 1", "finite and 1 or more".
+std::string RangeText(const AttributeMeta& meta) {
+    const std::optional<Bound>& lower = meta.lower;
+    const std::optional<Bound>& upper = meta.upper;
+    std::string text;
+    if (lower && upper && !lower->exclusive && !upper->exclusive) {
+        text = "from " + ToText(lower->value) + " to " + ToText(upper->value);
+    } else {
+        if (lower) {
+            text = lower->exclusive ? "above " + ToText(lower->value)
+                                    : ToText(lower->value) + " or more";
+        }
+        if (upper) {
+            text += (text.empty() ? "" : " and ") + (upper->exclusive
+                                                         ? "below " + ToText(upper->value)
+                                                         : ToText(upper->value) + " or less");
+        }
+    }
+    if (meta.finite) {
+        text = text.empty() ? "finite" : "finite and " + text;
+    }
+    return text;
+}
+
+bool Fits(const AttributeMeta& meta, double number) {
+    // Written to fail for NaN.
+    return (!meta.finite || std::isfinite(number)) &&
+           (!meta.lower ||
+            (meta.lower->exclusive ? number > meta.lower->value : number >= meta.lower->value)) &&
+           (!meta.upper ||
+            (meta.upper->exclusive ? number < meta.upper->value : number <= meta.upper->value));
+}
+
+/// @return Why `value` doesn't fit the attribute, or empty when it does.
+std::string Problem(const AttributeDef& def, const Value& value) {
+    const std::vector<double> numbers = ToNumbers(value);
+    for (const double number : numbers) {
+        if (!Fits(def.meta, number)) {
+            return "must be " + RangeText(def.meta) +
+                   (numbers.size() > 1 ? " in each component" : "") + ", not " + ToText(number);
+        }
+    }
+    const std::vector<std::string_view>& options = def.meta.options;
+    if (const auto* token = value.Get<std::string>();
+        token && !options.empty() && std::ranges::find(options, *token) == options.end()) {
+        std::string list;
+        for (const std::string_view option : options) {
+            list += (list.empty() ? "" : ", ") + std::string(option);
+        }
+        return "must be one of " + list + ", not " + *token;
+    }
+    return {};
+}
+
+}  // namespace
+
+bool SchemaDef::IsA(const SchemaDef& other) const {
+    return FirstInLineage([&](const SchemaDef& type) { return &type == &other; }) != nullptr;
+}
+
+bool SchemaDef::IsOpen(std::string_view attribute) const {
+    return FirstInLineage([&](const SchemaDef& type) {
+               return std::ranges::any_of(type.openNamespaces, [&](std::string_view space) {
+                   return space == "*" || attribute.starts_with(space);
+               });
+           }) != nullptr;
+}
+
+const AttributeDef* SchemaDef::Find(std::string_view attribute) const {
+    const AttributeDef* found = nullptr;
+    FirstInLineage([&](const SchemaDef& type) {
+        const auto def = std::ranges::find(type.attributes, attribute, &AttributeDef::name);
+        found = def != type.attributes.end() ? &*def : nullptr;
+        return found != nullptr;
+    });
+    return found;
+}
+
+std::vector<const AttributeDef*> SchemaDef::AllAttributes() const {
+    std::vector<const AttributeDef*> all =
+        base != nullptr ? base->AllAttributes() : std::vector<const AttributeDef*>{};
+    for (const AttributeDef& def : attributes) {
+        all.push_back(&def);
+    }
+    return all;
+}
+
+ExtentRule SchemaDef::Extent() const {
+    const SchemaDef* ruled = FirstInLineage(
+        [](const SchemaDef& type) { return type.extent.kind != ExtentRule::Kind::Inherit; });
+    return ruled != nullptr ? ruled->extent : kInheritExtent;
+}
+
+const SchemaDef* FindSchema(std::string_view name) {
+    const std::span<const SchemaDef* const> schemas = Schemas();
+    const auto found = std::ranges::find_if(
+        schemas, [&](const SchemaDef* schema) { return schema->name == name; });
+    return found != schemas.end() ? *found : nullptr;
+}
+
+void Validate(const AttributeDef& def, const Value& value, const Path& path) {
+    if (const std::string problem = Problem(def, value); !problem.empty()) {
+        throw std::invalid_argument("'" + path.String() + "': '" + std::string(def.name) + "' " +
+                                    problem);
+    }
+}
+
+}  // namespace ernie

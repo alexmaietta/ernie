@@ -113,6 +113,13 @@ class PathTable {
     PathId NextSibling(PathId id) const {
         return nodes_[id].nextSibling;
     }
+    /// Calls `visit(child)` for each child of `id`, in the order they were added.
+    template <typename Visit> void ForEachChild(PathId id, const Visit& visit) const {
+        for (PathId child = nodes_[id].firstChild; child != kNoPath;
+             child = nodes_[child].nextSibling) {
+            visit(child);
+        }
+    }
     /// @return Whether `id` is `ancestor` or lies below it.
     bool HasPrefix(PathId id, PathId ancestor) const;
 

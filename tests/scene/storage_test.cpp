@@ -34,13 +34,13 @@ TEST(PrimStore, DefinesFindsAndRemovesPrims) {
     EXPECT_EQ(s.store.PrimCount(), 2u);
     EXPECT_EQ(s.store.Find(s.store.Paths().Intern("/World/B")), b);
     EXPECT_EQ(s.Define("/World/A"), a) << "defining again in the same bucket returns the prim";
-    EXPECT_EQ(s.store.RowOf(b), 1u);
+    EXPECT_EQ(s.store.PrimRow(b), 1u);
 
     s.store.Remove(a);
     EXPECT_FALSE(s.store.Alive(a));
-    EXPECT_EQ(s.store.RowOf(b), 0u) << "the last row moves into the removed one's place";
+    EXPECT_EQ(s.store.PrimRow(b), 0u) << "the last row moves into the removed one's place";
     EXPECT_FALSE(s.store.Find(s.store.Paths().Intern("/World/A")));
-    EXPECT_THROW(s.store.RowOf(a), std::invalid_argument);
+    EXPECT_THROW(s.store.PrimRow(a), std::invalid_argument);
 
     const PrimId c = s.Define("/World/C");
     EXPECT_EQ(c.slot, a.slot) << "slots are reused";
@@ -63,10 +63,10 @@ TEST(PrimStore, MovingToAnotherBucketKeepsTheIdAndSharedAuthoredValues) {
 
     s.store.Move(a, cylinders);
     EXPECT_TRUE(s.store.Alive(a));
-    EXPECT_EQ(s.store.BucketOf(a), cylinders);
+    EXPECT_EQ(s.store.PrimBucket(a), cylinders);
     EXPECT_EQ(*s.store.Get<double>(a, s.radius), 3.0) << "both buckets have radius";
     EXPECT_EQ(s.store.Get<double>(a, height), nullptr) << "unauthored in its new bucket";
-    EXPECT_EQ(s.store.RowOf(b), 0u) << "the old bucket's last row filled the gap";
+    EXPECT_EQ(s.store.PrimRow(b), 0u) << "the old bucket's last row filled the gap";
 
     const ChangeSet changes = s.store.ChangesSince(cursor);
     ASSERT_EQ(changes.rows.size(), 3u) << "removed and moved in one bucket, added in the other";
@@ -112,7 +112,7 @@ TEST(PrimStore, RemovingMovesTheLastRowsValuesAndAuthoredBits) {
     const PrimId c = s.Define("/C");
     s.store.Set(c, s.radius, 3.0);
     s.store.Remove(a);
-    EXPECT_EQ(s.store.RowOf(c), 0u);
+    EXPECT_EQ(s.store.PrimRow(c), 0u);
     EXPECT_EQ(*s.store.Get<double>(c, s.radius), 3.0);
     EXPECT_EQ(s.store.Read<double>(s.bucket, s.radius).size(), 2u);
 }
@@ -128,7 +128,7 @@ TEST(PrimStore, BucketsKeyOnTypeAndSortedApiSchemas) {
     const PrimId prim = store.Define(store.Paths().Intern("/L"), a);
     EXPECT_THROW(store.Define(store.Paths().Intern("/L"), store.AddBucket({light, {}}, {})),
                  std::invalid_argument);
-    EXPECT_EQ(store.BucketOf(prim), a);
+    EXPECT_EQ(store.PrimBucket(prim), a);
 }
 
 TEST(PrimStore, ChangeSetsReportOnlyWhatChangedSinceTheCursor) {

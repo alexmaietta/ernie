@@ -18,6 +18,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -60,37 +61,61 @@ struct Target {
     bool operator==(const Target&) const = default;
 };
 
-template <typename T> struct ColumnTypeOf;
+template <typename T>
+inline constexpr ColumnType kColumnType = [] {
+    static_assert(sizeof(T) == 0, "Not a column element type");
+    return ColumnType::Bool;
+}();
+template <> inline constexpr ColumnType kColumnType<std::uint8_t> = ColumnType::Bool;
+template <> inline constexpr ColumnType kColumnType<std::int32_t> = ColumnType::Int;
+template <> inline constexpr ColumnType kColumnType<double> = ColumnType::Double;
+template <> inline constexpr ColumnType kColumnType<glm::dvec2> = ColumnType::Vec2;
+template <> inline constexpr ColumnType kColumnType<glm::dvec3> = ColumnType::Vec3;
+template <> inline constexpr ColumnType kColumnType<glm::dvec4> = ColumnType::Vec4;
+template <> inline constexpr ColumnType kColumnType<glm::dquat> = ColumnType::Quat;
+template <> inline constexpr ColumnType kColumnType<glm::dmat4> = ColumnType::Matrix;
+template <> inline constexpr ColumnType kColumnType<Token> = ColumnType::TokenValue;
 template <>
-struct ColumnTypeOf<std::uint8_t> : std::integral_constant<ColumnType, ColumnType::Bool> {};
-template <>
-struct ColumnTypeOf<std::int32_t> : std::integral_constant<ColumnType, ColumnType::Int> {};
-template <> struct ColumnTypeOf<double> : std::integral_constant<ColumnType, ColumnType::Double> {};
-template <>
-struct ColumnTypeOf<glm::dvec2> : std::integral_constant<ColumnType, ColumnType::Vec2> {};
-template <>
-struct ColumnTypeOf<glm::dvec3> : std::integral_constant<ColumnType, ColumnType::Vec3> {};
-template <>
-struct ColumnTypeOf<glm::dvec4> : std::integral_constant<ColumnType, ColumnType::Vec4> {};
-template <>
-struct ColumnTypeOf<glm::dquat> : std::integral_constant<ColumnType, ColumnType::Quat> {};
-template <>
-struct ColumnTypeOf<glm::dmat4> : std::integral_constant<ColumnType, ColumnType::Matrix> {};
-template <>
-struct ColumnTypeOf<Token> : std::integral_constant<ColumnType, ColumnType::TokenValue> {};
-template <>
-struct ColumnTypeOf<std::vector<Target>>
-    : std::integral_constant<ColumnType, ColumnType::Relationships> {};
-template <>
-struct ColumnTypeOf<std::vector<float>>
-    : std::integral_constant<ColumnType, ColumnType::FloatArray> {};
-template <>
-struct ColumnTypeOf<std::vector<Token>>
-    : std::integral_constant<ColumnType, ColumnType::TokenArray> {};
-template <> struct ColumnTypeOf<Tensor> : std::integral_constant<ColumnType, ColumnType::Tensor> {};
+inline constexpr ColumnType kColumnType<std::vector<Target>> = ColumnType::Relationships;
+template <> inline constexpr ColumnType kColumnType<std::vector<float>> = ColumnType::FloatArray;
+template <> inline constexpr ColumnType kColumnType<std::vector<Token>> = ColumnType::TokenArray;
+template <> inline constexpr ColumnType kColumnType<Tensor> = ColumnType::Tensor;
+template <> inline constexpr ColumnType kColumnType<Target> = ColumnType::Relationship;
 
-template <>
-struct ColumnTypeOf<Target> : std::integral_constant<ColumnType, ColumnType::Relationship> {};
+/// @brief Calls `visit(std::type_identity<T>{})` with the element type `T` of a column type.
+template <typename Visit> decltype(auto) WithColumnType(ColumnType type, Visit&& visit) {
+    switch (type) {
+    case ColumnType::Bool:
+        return visit(std::type_identity<std::uint8_t>{});
+    case ColumnType::Int:
+        return visit(std::type_identity<std::int32_t>{});
+    case ColumnType::Double:
+        return visit(std::type_identity<double>{});
+    case ColumnType::Vec2:
+        return visit(std::type_identity<glm::dvec2>{});
+    case ColumnType::Vec3:
+        return visit(std::type_identity<glm::dvec3>{});
+    case ColumnType::Vec4:
+        return visit(std::type_identity<glm::dvec4>{});
+    case ColumnType::Quat:
+        return visit(std::type_identity<glm::dquat>{});
+    case ColumnType::Matrix:
+        return visit(std::type_identity<glm::dmat4>{});
+    case ColumnType::TokenValue:
+        return visit(std::type_identity<Token>{});
+    case ColumnType::Relationship:
+        return visit(std::type_identity<Target>{});
+    case ColumnType::Relationships:
+        return visit(std::type_identity<std::vector<Target>>{});
+    case ColumnType::FloatArray:
+        return visit(std::type_identity<std::vector<float>>{});
+    case ColumnType::TokenArray:
+        return visit(std::type_identity<std::vector<Token>>{});
+    case ColumnType::Tensor:
+        break;
+    }
+    return visit(std::type_identity<Tensor>{});
+}
 
 /// Rows a version chunk covers: one word of the authored bits.
 inline constexpr std::uint32_t kChunkRows = BitSet::kWordBits;
@@ -117,7 +142,7 @@ template <typename T> class TypedColumn final : public ColumnValues {
     explicit TypedColumn(T fallback) : fallback_(std::move(fallback)) {}
 
     ColumnType Type() const override {
-        return ColumnTypeOf<T>::value;
+        return kColumnType<T>;
     }
     std::unique_ptr<ColumnValues> Clone() const override {
         return std::make_unique<TypedColumn<T>>(fallback_);
@@ -277,6 +302,9 @@ class PrimStore {
     TokenTable& Tokens() {
         return paths_.Names();
     }
+    const TokenTable& Tokens() const {
+        return paths_.Names();
+    }
 
     /// @return The bucket of `key`, made with `layout`'s columns if new.
     BucketId AddBucket(const BucketKey& key, std::span<const ColumnLayout> layout);
@@ -301,13 +329,13 @@ class PrimStore {
 
     bool Alive(PrimId prim) const;
     std::optional<PrimId> Find(PathId path) const;
-    PathId PathOf(PrimId prim) const {
+    PathId PrimPath(PrimId prim) const {
         return Slot(prim).path;
     }
-    BucketId BucketOf(PrimId prim) const {
+    BucketId PrimBucket(PrimId prim) const {
         return Slot(prim).bucket;
     }
-    std::uint32_t RowOf(PrimId prim) const {
+    std::uint32_t PrimRow(PrimId prim) const {
         return Slot(prim).row;
     }
     std::size_t PrimCount() const {
@@ -317,7 +345,7 @@ class PrimStore {
     /// @brief Authors an attribute of a prim, adding a column of `T` to its bucket if it has none.
     template <typename T> void Set(PrimId prim, AttributeId attribute, T value) {
         const SlotData& slot = Slot(prim);
-        Column& column = ColumnOf<T>(slot.bucket, attribute, true);
+        Column& column = FindOrAddColumn<T>(slot.bucket, attribute);
         Values<T>(column)[slot.row] = std::move(value);
         Stamp(slot.bucket, column, slot.row, slot.row + 1, Next());
     }
@@ -336,7 +364,7 @@ class PrimStore {
     /// @brief Writes a whole column at once: every row authored, one change of all rows.
     /// @return The values to fill, valid until the next structural change.
     template <typename T> std::span<T> Write(BucketId bucket, AttributeId attribute) {
-        Column& column = ColumnOf<T>(bucket, attribute, true);
+        Column& column = FindOrAddColumn<T>(bucket, attribute);
         const std::uint32_t rows = buckets_[bucket]->Rows();
         Stamp(bucket, column, 0, rows, Next());
         return Values<T>(column);
@@ -380,14 +408,11 @@ class PrimStore {
                std::uint64_t version);
     Column& AddColumn(Bucket& bucket, AttributeId attribute, std::unique_ptr<ColumnValues> values);
 
-    template <typename T> Column& ColumnOf(BucketId bucket, AttributeId attribute, bool add) {
+    template <typename T> Column& FindOrAddColumn(BucketId bucket, AttributeId attribute) {
         Bucket& b = *buckets_[bucket];
         const auto found = b.columnIndex.find(attribute);
         if (found != b.columnIndex.end()) {
             return b.columns[found->second];
-        }
-        if (!add) {
-            throw std::out_of_range("The bucket has no such column");
         }
         return AddColumn(b, attribute, std::make_unique<TypedColumn<T>>(T{}));
     }
@@ -398,7 +423,7 @@ class PrimStore {
         return static_cast<const TypedColumn<T>&>(Check<T>(column)).Values();
     }
     template <typename T> static const ColumnValues& Check(const Column& column) {
-        if (column.values->Type() != ColumnTypeOf<T>::value) {
+        if (column.values->Type() != kColumnType<T>) {
             throw std::invalid_argument("The column holds another type");
         }
         return *column.values;

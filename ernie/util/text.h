@@ -46,6 +46,13 @@ inline std::string ToLower(std::string_view text) {
     return lower;
 }
 
+/// @return `number` as short text: "170" or "0.01", not "170.000000".
+inline std::string ToText(double number) {
+    std::ostringstream text;
+    text << number;
+    return text.str();
+}
+
 /// @brief Tests for an ASCII identifier: a letter or underscore, then letters, digits and
 /// underscores, whatever the locale. USD prim names and attribute name parts are identifiers.
 /// @param text The text.

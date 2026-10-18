@@ -2,11 +2,11 @@
 /// @file vulkan_devices.cpp
 /// @brief Lists Vulkan devices through a short-lived instance.
 #include "ernie/device/vulkan_devices.h"
+#include "ernie/util/algorithm.h"
 
 #include <volk.h>
 
 #include <algorithm>
-#include <iterator>
 #include <stdexcept>
 #include <string_view>
 
@@ -107,10 +107,7 @@ std::vector<VulkanDeviceInfo> ListVulkanDevices() {
     std::vector<VkPhysicalDevice> devices(count);
     vkEnumeratePhysicalDevices(instance.Get(), &count, devices.data());
 
-    std::vector<VulkanDeviceInfo> infos;
-    infos.reserve(devices.size());
-    std::ranges::transform(devices, std::back_inserter(infos), ReadDeviceInfo);
-    return infos;
+    return Map(devices, ReadDeviceInfo);
 }
 
 const char* ToString(VulkanDeviceType type) {
