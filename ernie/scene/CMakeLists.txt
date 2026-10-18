@@ -6,6 +6,7 @@ add_library(
     path.cpp
     schema.cpp
     scene.cpp
+    stage.cpp
     storage.cpp
     view.cpp
     xform.cpp

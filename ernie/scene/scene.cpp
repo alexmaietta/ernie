@@ -252,6 +252,14 @@ std::optional<Box> Scene::Extent(PrimId prim) const {
     return extent;
 }
 
+void Scene::SetStage(Stage stage) {
+    Validate(stage);
+    if (stage != stage_) {
+        stage_ = std::move(stage);
+        ++stageVersion_;
+    }
+}
+
 Box Scene::WorldBounds(const Path& path) const {
     const PrimId prim = Require(path);
     const PathId id = store_.PrimPath(prim);

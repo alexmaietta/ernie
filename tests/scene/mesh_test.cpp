@@ -41,6 +41,8 @@ TEST(Mesh, ArraysAreSharedAndCheckedForTypeAndShape) {
     scene.Write(mesh.Id(), "primvars:st", Floats({0, 0, 1, 0, 0, 1}, {3, 2}));
     EXPECT_NE(scene.Read(mesh.Id(), "primvars:st"), nullptr) << "primvars take any name";
     EXPECT_EQ(mesh.GetSubdivisionScheme(), "catmullClark") << "USD's fallback";
+    EXPECT_EQ(mesh.GetSubdivisionRefineLevel(), 1);
+    EXPECT_THROW(mesh.SetSubdivisionRefineLevel(9), std::invalid_argument);
 }
 
 TEST(Mesh, ExtentsBoundPointsAndPointCloudsTheirWidths) {

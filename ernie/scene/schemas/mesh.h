@@ -53,7 +53,11 @@
     ERNIE_MESH_INDICES(X, CreaseLengths, "creaseLengths", "The number of points of each crease.") \
     X(Tensor, CreaseSharpnesses, "creaseSharpnesses", Tensor(),                                    \
       "The sharpness of each crease, or of each crease edge.", .group = "Subdivision",             \
-      .dirty = Dirty::Topology)
+      .dirty = Dirty::Topology)                                                                    \
+    X(int, SubdivisionRefineLevel, "ernie:subdivision:refineLevel", 1,                             \
+      "Uniform refinement of the surface: 2^level segments along each control edge.",              \
+      .label = "Refine level", .group = "Subdivision", .lower = AtLeast(0.0),                      \
+      .upper = AtMost(8.0), .dirty = Dirty::Topology)
 
 #define ERNIE_WIDTHS_ATTRIBUTE(X, text)                                                            \
     X(Tensor, Widths, "widths", Tensor(), text, .group = "Geometry", .dirty = Dirty::Points)

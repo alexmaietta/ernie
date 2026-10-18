@@ -29,6 +29,19 @@ TEST(Scene, DefinesPrimsWithTypelessAncestors) {
     EXPECT_THROW(scene.Define("/World/A", "Gprim"), std::invalid_argument) << "abstract";
 }
 
+TEST(Scene, StageMetadataIsCheckedAndVersioned) {
+    Scene scene;
+    EXPECT_EQ(scene.GetStage().upAxis, UpAxis::Z) << "Ernie's fallbacks: z up, metres";
+    EXPECT_EQ(scene.GetStage().metersPerUnit, 1.0);
+    scene.SetStage({.upAxis = UpAxis::Y, .metersPerUnit = 0.01, .defaultPrim = "World"});
+    EXPECT_EQ(scene.StageVersion(), 1u);
+    scene.SetStage(scene.GetStage());
+    EXPECT_EQ(scene.StageVersion(), 1u) << "unchanged";
+    EXPECT_THROW(scene.SetStage({.metersPerUnit = 0.0}), std::invalid_argument);
+    EXPECT_THROW(scene.SetStage({.defaultPrim = "/World"}), std::invalid_argument);
+    EXPECT_EQ(scene.GetStage().defaultPrim, "World") << "kept after a rejected change";
+}
+
 TEST(Scene, RedefiningWithAnotherTypeKeepsWhatBothDeclare) {
     Scene scene;
     const PrimId prim = scene.Define("/Shape", Sphere::kName);
