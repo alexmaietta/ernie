@@ -146,7 +146,7 @@ TEST(Camera, ErnieApiSchemasAddLensPolarizerAndSensor) {
     Camera camera = Camera::Define(scene, "/Camera");
     EXPECT_THROW(ErnieSensorAPI(scene, "/Camera"), std::invalid_argument) << "not applied";
     ErnieSensorAPI sensor = ErnieSensorAPI::Apply(scene, "/Camera");
-    EXPECT_EQ(sensor.GetSensorAdcBits(), 12);
+    EXPECT_EQ(sensor.GetSensorBitDepth(), 12);
     EXPECT_EQ(sensor.GetSpectralRange(), glm::dvec2(380.0, 780.0)) << "what the sensor sees";
     sensor.SetSensorType("mono");
     EXPECT_THROW(sensor.SetSensorType("film"), std::invalid_argument);

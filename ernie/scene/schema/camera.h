@@ -131,10 +131,11 @@
       "Electrons, standard deviation of each pixel's offset.", .group = "Sensor",                  \
       .lower = AtLeast(0.0))                                                                       \
     X(double, SensorElectronsPerDn, "ernie:sensor:electronsPerDn", 0.0,                            \
-      "At ISO 100; 0 for the full well over the ADC range.", .group = "Sensor",                    \
+      "At ISO 100; 0 for the full well over the bit depth's range.", .group = "Sensor",            \
       .lower = AtLeast(0.0))                                                                       \
-    X(int, SensorAdcBits, "ernie:sensor:adcBits", 12, "The ADC's bits.", .group = "Sensor",        \
-      .lower = AtLeast(1.0), .upper = AtMost(32.0))                                                \
+    X(int, SensorBitDepth, "ernie:sensor:bitDepth", 12,                                            \
+      "Bits of each digital number the sensor's ADC makes, such as 8, 12 or 16.",                  \
+      .group = "Sensor", .lower = AtLeast(1.0), .upper = AtMost(32.0))                             \
     X(double, SensorBlackLevel, "ernie:sensor:blackLevel", 0.0, "DN added to every pixel.",        \
       .group = "Sensor", .lower = AtLeast(0.0))                                                    \
     X(double, SensorPixelPitch, "ernie:sensor:pixelPitch", 5.0,                                    \

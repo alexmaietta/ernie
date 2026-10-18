@@ -76,7 +76,14 @@
       "The vars it holds, in order.", .group = "Product")
 
 #define ERNIE_RENDER_VAR_ATTRIBUTES(X)                                                             \
-    X(std::string, DataType, "dataType", "color3f", "Each pixel's value type.", .group = "Var")    \
+    X(std::string, DataType, "dataType", "color3f",                                                \
+      "Each pixel's value type, as the output is written: an integer type holds a sensor's "      \
+      "digital numbers of its bit depth. uint16 is Ernie's, for depths of 9 to 16 bits, which "   \
+      "USD's types have no type for.",                                                             \
+      .group = "Var",                                                                              \
+      .options = {"color3f", "color4f", "float", "float2", "float3", "float4", "half", "half3",    \
+                  "half4", "normal3f", "point3f", "vector3f", "uchar", "uint16", "uint", "int",   \
+                  "int64"})                                                                        \
     X(std::string, SourceName, "sourceName", "",                                                   \
       "What it holds: an Ernie output (LdrColor, depth, normal...), a primvar or an LPE.",         \
       .group = "Var")                                                                              \

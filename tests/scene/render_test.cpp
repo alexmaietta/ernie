@@ -21,6 +21,14 @@ TEST(Render, SettingsProductsAndVarsHaveUsdsFallbacks) {
     EXPECT_EQ(RenderProduct::Define(scene, "/Render/Camera").GetProductType(), "raster");
 }
 
+TEST(Render, VarsTakeTheValueTypesErnieWrites) {
+    Scene scene;
+    RenderVar raw = RenderVar::Define(scene, "/Render/Vars/Raw");
+    EXPECT_EQ(raw.SetDataType("uint16").GetDataType(), "uint16")
+        << "a 12-bit sensor's digital numbers";
+    EXPECT_THROW(raw.SetDataType("short"), std::invalid_argument);
+}
+
 TEST(Render, ErnieSettingsLetEachProductPickItsTier) {
     Scene scene;
     RenderSettings settings = RenderSettings::Define(scene, "/Render/Settings");
