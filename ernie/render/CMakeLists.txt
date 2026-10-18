@@ -2,6 +2,7 @@
 add_library(
     ernie_render
     OBJECT
+    camera_pass.cpp
     device_scene.cpp
     geometry.cpp
     instances.cpp

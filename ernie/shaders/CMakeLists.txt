@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ernie_add_shaders(
     ernie_shaders
+    device/bindless.slang
     math/affine.slang
     math/double_float.slang
     rt/ray_tracer.slang
@@ -8,4 +9,5 @@ ernie_add_shaders(
     scene/geometry.slang
     scene/shapes.slang
     scene/transform.slang
+    sensors/camera.slang
 )

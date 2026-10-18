@@ -17,6 +17,8 @@
 #include "ernie/render/rt/top_levels.h"
 #include "ernie/render/transform_graph.h"
 
+#include <glm/vec3.hpp>
+
 #include <cstdint>
 #include <span>
 
@@ -37,6 +39,8 @@ struct TraceScene {
     graph::Acceleration top;
     graph::Buffer records;
     std::uint32_t instances = 0;
+    /// The render origin the structures are relative to: rays start from points less it.
+    glm::dvec3 origin{0.0};
 
     /// @brief Declares a pass's reads of everything tracing touches.
     void Read(graph::PassBuilder& pass) const {

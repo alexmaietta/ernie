@@ -33,7 +33,8 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
         .parameters = {.scene = tops_.Structure()->Address(), .records = records.Address()},
         .top = top,
         .records = graph.Import(records, records.Name()),
-        .instances = instances.Count()});
+        .instances = instances.Count(),
+        .origin = transforms.Origin()});
 }
 
 }  // namespace ernie

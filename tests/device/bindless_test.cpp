@@ -7,6 +7,7 @@
 #include "ernie/device/kernel.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/staging.h"
+#include "ernie/shaders/device/bindless.h"
 
 #include "tests/device/common.h"
 
@@ -22,11 +23,7 @@ namespace {
 
 using test::ExpectClean;
 
-const ShaderModule kBindless{"bindless", R"(
-[[vk::binding(0, 0)]] public Texture2D textures[];
-[[vk::binding(1, 0)]] public RWTexture2D<float4> images[];
-[[vk::binding(2, 0)]] public SamplerState samplers[];
-)"};
+using shaders::kBindless;
 
 const ShaderModule kPaint{"paint", R"(
 import bindless;

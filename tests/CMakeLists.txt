@@ -106,6 +106,7 @@ ernie_add_test_suite(
     LABEL gpu
     SOURCES
         render/acceleration_scene_test.cpp
+        render/camera_pass_test.cpp
         render/device_scene_test.cpp
         render/geometry_test.cpp
         render/ray_tracer_test.cpp
