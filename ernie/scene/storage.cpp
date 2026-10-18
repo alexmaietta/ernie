@@ -198,6 +198,10 @@ void PrimStore::DropRow(const SlotData& slot) {
         column.values->SwapRemove(row);
         column.authored.Set(row, column.authored.Test(last));
         column.Resize(last);
+        if (row != last) {
+            // The moved row's values change at its new place, where readers look.
+            Touch(slot.bucket, column, row, row + 1, version);
+        }
     }
 }
 
@@ -210,8 +214,8 @@ void PrimStore::Clear(PrimId prim, AttributeId attribute) {
     }
     Column& column = b.columns[found->second];
     column.values->Reset(slot.row);
-    Stamp(slot.bucket, column, slot.row, slot.row + 1, Next());
     column.authored.Set(slot.row, false);
+    Touch(slot.bucket, column, slot.row, slot.row + 1, Next());
 }
 
 void PrimStore::Log(Bucket& bucket, StructuralChange change) {
@@ -225,10 +229,15 @@ void PrimStore::Log(Bucket& bucket, StructuralChange change) {
 
 void PrimStore::Stamp(BucketId bucket, Column& column, std::uint32_t begin, std::uint32_t end,
                       std::uint64_t version) {
+    column.authored.SetRange(begin, end);
+    Touch(bucket, column, begin, end, version);
+}
+
+void PrimStore::Touch(BucketId bucket, Column& column, std::uint32_t begin, std::uint32_t end,
+                      std::uint64_t version) {
     if (begin == end) {
         return;
     }
-    column.authored.SetRange(begin, end);
     std::fill(column.chunkVersions.begin() + begin / kChunkRows,
               column.chunkVersions.begin() + (end - 1) / kChunkRows + 1, version);
     column.version = version;

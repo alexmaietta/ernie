@@ -77,6 +77,26 @@ TEST(PrimStore, MovingToAnotherBucketKeepsTheIdAndSharedAuthoredValues) {
     EXPECT_EQ(changes.rows[2].change.kind, StructuralChange::Kind::Added);
 }
 
+TEST(PrimStore, AMovedRowIsReportedChangedAtItsNewPlace) {
+    Spheres s;
+    std::vector<PrimId> prims;
+    for (int i = 0; i < 100; ++i) {
+        prims.push_back(s.Define("/P" + std::to_string(i)));
+    }
+    const std::uint64_t cursor = s.store.Version();
+    s.store.Set(prims[99], s.radius, 5.0);
+    s.store.Remove(prims[3]);
+    ASSERT_EQ(s.store.PrimRow(prims[99]), 3u);
+    const ChangeSet changes = s.store.ChangesSince(cursor);
+    bool reported = false;
+    for (const ChangeSet::Values& values : changes.values) {
+        for (const RowRange range : values.rows) {
+            reported |= values.attribute == s.radius && range.begin <= 3 && 3 < range.end;
+        }
+    }
+    EXPECT_TRUE(reported) << "the edit made at row 99 now lives at row 3";
+}
+
 TEST(PrimStore, UnauthoredRowsHoldTheFallbackForWholeColumnReads) {
     Spheres s;
     const PrimId a = s.Define("/A");

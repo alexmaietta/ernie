@@ -55,6 +55,23 @@ TEST(Bytes, BitSetsSetRangesAcrossWordsAndClearWhenShrunk) {
     EXPECT_TRUE(bits.Test(99));
 }
 
+TEST(Bytes, BitSetRunsSpanWordsAndClearingEmptiesThem) {
+    BitSet bits;
+    bits.Resize(200);
+    bits.SetRange(3, 5);
+    bits.SetRange(60, 140);
+    bits.Set(199);
+    std::vector<std::pair<std::size_t, std::size_t>> runs;
+    bits.ForEachRun([&](std::size_t begin, std::size_t end) { runs.emplace_back(begin, end); });
+    EXPECT_EQ(runs,
+              (std::vector<std::pair<std::size_t, std::size_t>>{{3, 5}, {60, 140}, {199, 200}}));
+    bits.Clear();
+    runs.clear();
+    bits.ForEachRun([&](std::size_t begin, std::size_t end) { runs.emplace_back(begin, end); });
+    EXPECT_TRUE(runs.empty());
+    EXPECT_EQ(bits.Size(), 200u);
+}
+
 TEST(Bytes, SwapByteOrderReversesEachValue) {
     std::array<std::byte, 5> bytes{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{4},
                                    std::byte{5}};

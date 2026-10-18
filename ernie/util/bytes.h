@@ -109,6 +109,32 @@ class BitSet {
     std::span<const std::uint64_t> Words() const {
         return words_;
     }
+    void Clear() {
+        std::ranges::fill(words_, 0);
+    }
+    /// @brief Calls `visit(begin, end)` for each run of set bits, skipping clear words.
+    template <typename Visit> void ForEachRun(const Visit& visit) const {
+        for (std::size_t bit = 0; bit < size_;) {
+            const std::uint64_t word = words_[bit / kWordBits] >> (bit % kWordBits);
+            if (word == 0) {
+                bit += kWordBits - bit % kWordBits;
+                continue;
+            }
+            bit += static_cast<std::size_t>(std::countr_zero(word));
+            std::size_t end = bit;
+            while (end < size_) {
+                const std::size_t offset = end % kWordBits;
+                const auto ones =
+                    static_cast<std::size_t>(std::countr_one(words_[end / kWordBits] >> offset));
+                end += ones;
+                if (offset + ones < kWordBits) {
+                    break;  // The run ends inside this word.
+                }
+            }
+            visit(bit, std::min(end, size_));
+            bit = end;
+        }
+    }
 
   private:
     std::vector<std::uint64_t> words_;

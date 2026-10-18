@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ernie/geometry/bounds.h"
+#include "ernie/scene/extent_cache.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/storage.h"
 #include "ernie/scene/value.h"
@@ -83,7 +84,12 @@ class Scene {
     glm::dmat4 LocalTransform(PrimId prim) const;
     glm::dmat4 WorldTransform(PrimId prim) const;
     /// @return The prim's extent in its own space; none when it isn't computed from attributes.
+    /// Cached since `UpdateExtents` when its bucket hasn't changed, computed otherwise.
     std::optional<Box> Extent(PrimId prim) const;
+    /// @brief Recomputes the cached extents of the rows that changed since the last update.
+    void UpdateExtents() {
+        extents_.Update(store_);
+    }
     /// @return The world box of the prim and its visible descendants of the default purpose.
     Box WorldBounds(const Path& path) const;
 
@@ -124,6 +130,7 @@ class Scene {
     Token invisible_ = 0;
     Token defaultPurpose_ = 0;
     std::vector<BucketSchema> buckets_;
+    ExtentCache extents_;
 };
 
 }  // namespace ernie

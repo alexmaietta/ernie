@@ -409,6 +409,9 @@ class PrimStore {
     /// Marks rows [begin, end) authored and changed at `version`.
     void Stamp(BucketId bucket, Column& column, std::uint32_t begin, std::uint32_t end,
                std::uint64_t version);
+    /// Marks rows [begin, end) changed at `version`.
+    void Touch(BucketId bucket, Column& column, std::uint32_t begin, std::uint32_t end,
+               std::uint64_t version);
     Column& AddColumn(Bucket& bucket, AttributeId attribute, std::unique_ptr<ColumnValues> values);
 
     template <typename T> Column& FindOrAddColumn(BucketId bucket, AttributeId attribute) {
