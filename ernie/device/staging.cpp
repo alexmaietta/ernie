@@ -10,8 +10,6 @@
 namespace ernie {
 namespace {
 
-constexpr VkAccessFlags2 kAny = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-
 /// Orders copies after earlier work that reads or writes what they touch.
 void BeforeCopies(VkCommandBuffer commands) {
     Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
@@ -55,6 +53,21 @@ void Uploader::Write(const Buffer& destination, std::uint64_t offset,
     pending_ += bytes.size();
 }
 
+void Uploader::WriteRows(const Buffer& destination, std::uint64_t offset, std::uint64_t rowBytes,
+                         std::span<const std::byte> host, std::span<const std::uint32_t> rows) {
+    for (std::size_t first = 0; first < rows.size();) {
+        std::size_t last = first + 1;
+        while (last < rows.size() && rows[last] == rows[last - 1] + 1) {
+            ++last;
+        }
+        const std::uint64_t begin = rows[first];
+        const std::uint64_t count = rows[last - 1] + 1 - begin;
+        Write(destination, offset + begin * rowBytes,
+              host.subspan(begin * rowBytes, count * rowBytes));
+        first = last;
+    }
+}
+
 Ticket Uploader::Flush(std::span<const Ticket> waits) {
     // Staging of earlier flushes goes once its copies are done.
     context_.Collect();
@@ -79,7 +92,7 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
                 first = last;
             }
             Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAny);
+                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAnyAccess);
         },
         waits);
     for (std::shared_ptr<Buffer>& staging : staging_) {

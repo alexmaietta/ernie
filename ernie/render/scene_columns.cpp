@@ -111,7 +111,8 @@ const DeviceColumn& SceneColumns::Bind(BucketId bucket, std::string_view attribu
                 std::make_unique<DeviceColumn>(arenas_, attribute, host.element.type,
                                                host.element.shape, host.rows),
                 DeviceBytes(*host.column->values, 0, host.rows)});
-    Upload(binding, 0, host.rows);
+    uploader_.Write(binding.column->Storage(), binding.column->Range().offset,
+                    std::span<const std::byte>(binding.shadow));
     return *binding.column;
 }
 
@@ -149,23 +150,93 @@ const SceneColumns::Binding* SceneColumns::FindBinding(BucketId bucket,
     return nullptr;
 }
 
-void SceneColumns::Upload(const Binding& binding, std::uint32_t begin, std::uint32_t end) {
-    if (begin == end) {
-        return;
-    }
+void SceneColumns::Upload(const Binding& binding, std::span<const std::uint32_t> rows) {
     const DeviceColumn& device = *binding.column;
-    const std::uint64_t rowBytes = device.RowBytes();
-    uploader_.Write(device.Storage(), device.Range().offset + begin * rowBytes,
-                    std::span<const std::byte>(binding.shadow)
-                        .subspan(begin * rowBytes, (end - begin) * rowBytes));
+    uploader_.WriteRows(device.Storage(), device.Range().offset, device.RowBytes(), binding.shadow,
+                        rows);
 }
 
-void SceneColumns::UploadRows(Binding& binding, std::span<const std::uint32_t> rows) {
-    std::size_t first = 0;
-    for (std::size_t i = 1; i <= rows.size(); ++i) {
-        if (i == rows.size() || rows[i] != rows[i - 1] + 1) {
-            Upload(binding, rows[first], rows[i - 1] + 1);
-            first = i;
+SceneColumns::Origins SceneColumns::RowOrigins(const ChangeSet& changes, BucketId bucket) {
+    Origins origins;
+    for (const ChangeSet::Rows& entry : changes.rows) {
+        if (entry.bucket != bucket) {
+            continue;
+        }
+        const StructuralChange& change = entry.change;
+        switch (change.kind) {
+        case StructuralChange::Kind::Added:
+            for (std::uint32_t row = change.row; row < change.row + change.count; ++row) {
+                origins[row] = kFromHost;
+            }
+            break;
+        case StructuralChange::Kind::Removed:
+            // Unless it was the last, a Moved change brings the last row here next.
+            origins.erase(change.row);
+            break;
+        case StructuralChange::Kind::Moved:
+            origins[change.row] = Origin(origins, change.from);
+            origins.erase(change.from);
+            break;
+        case StructuralChange::Kind::Reset:
+            origins.clear();
+            for (std::uint32_t row = 0; row < change.count; ++row) {
+                origins[row] = kFromHost;
+            }
+            break;
+        }
+    }
+    return origins;
+}
+
+std::uint32_t SceneColumns::Origin(const Origins& origins, std::uint32_t row) {
+    const auto found = origins.find(row);
+    return found == origins.end() ? row : found->second;
+}
+
+std::vector<VkBufferCopy> SceneColumns::MoveRows(Binding& binding, const Origins& origins,
+                                                 std::uint32_t rows,
+                                                 std::vector<std::uint32_t>& hostRows) {
+    const std::uint64_t rowBytes = binding.column->RowBytes();
+    std::vector<VkBufferCopy> copies;
+    binding.shadow.resize(std::max<std::uint64_t>(binding.shadow.size(), rows * rowBytes));
+    for (const auto& [row, source] : origins) {
+        if (row >= rows) {
+            continue;
+        }
+        if (source == kFromHost) {
+            hostRows.push_back(row);
+        } else if (source != row) {
+            // Every source is a row removed or past the end, never another copy's target.
+            copies.push_back({source * rowBytes, row * rowBytes, rowBytes});
+            std::memcpy(binding.shadow.data() + row * rowBytes,
+                        binding.shadow.data() + source * rowBytes, rowBytes);
+        }
+    }
+    binding.shadow.resize(rows * rowBytes);
+    return copies;
+}
+
+void SceneColumns::FindAuthoredRows(const ChangeSet& changes, const Binding& binding,
+                                    const Origins& origins, std::uint32_t rows,
+                                    std::vector<std::uint32_t>& hostRows) const {
+    // Changes come by chunk, so rows the device wrote are compared with what the host last gave,
+    // not taken on trust.
+    const ColumnValues& host =
+        *scene_.Store().GetBucket(binding.bucket).Find(binding.attribute)->values;
+    const std::uint64_t rowBytes = binding.column->RowBytes();
+    for (const ChangeSet::Values& values : changes.values) {
+        if (values.bucket != binding.bucket || values.attribute != binding.attribute) {
+            continue;
+        }
+        for (const RowRange& range : values.rows) {
+            for (std::uint32_t row = range.begin; row < std::min(range.end, rows); ++row) {
+                if (Origin(origins, row) != kFromHost &&
+                    !std::ranges::equal(DeviceBytes(host, row, row + 1),
+                                        std::span<const std::byte>(binding.shadow)
+                                            .subspan(row * rowBytes, rowBytes))) {
+                    hostRows.push_back(row);
+                }
+            }
         }
     }
 }
@@ -180,115 +251,39 @@ Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
     for (Binding& binding : bindings_) {
         const ChangeSet changes = store.ChangesSince(binding.cursor);
         binding.cursor = changes.version;
-        DeviceColumn& column = *binding.column;
-        const std::uint64_t rowBytes = column.RowBytes();
-        // Where each changed row's values come from; rows not in it stay where they are.
-        std::unordered_map<std::uint32_t, std::uint32_t> origin;
-        const auto from = [&](std::uint32_t row) {
-            const auto found = origin.find(row);
-            return found == origin.end() ? row : found->second;
-        };
-        for (const ChangeSet::Rows& entry : changes.rows) {
-            if (entry.bucket != binding.bucket) {
-                continue;
-            }
-            const StructuralChange& change = entry.change;
-            switch (change.kind) {
-            case StructuralChange::Kind::Added:
-                for (std::uint32_t row = change.row; row < change.row + change.count; ++row) {
-                    origin[row] = kFromHost;
-                }
-                break;
-            case StructuralChange::Kind::Removed:
-                // Unless it was the last, a Moved change brings the last row here next.
-                origin.erase(change.row);
-                break;
-            case StructuralChange::Kind::Moved:
-                origin[change.row] = from(change.from);
-                origin.erase(change.from);
-                break;
-            case StructuralChange::Kind::Reset:
-                origin.clear();
-                for (std::uint32_t row = 0; row < change.count; ++row) {
-                    origin[row] = kFromHost;
-                }
-                break;
-            }
-        }
+        const Origins origins = RowOrigins(changes, binding.bucket);
         const std::uint32_t rows = store.GetBucket(binding.bucket).Rows();
-        std::vector<VkBufferCopy> copies;
         std::vector<std::uint32_t> hostRows;
-        binding.shadow.resize(std::max<std::uint64_t>(binding.shadow.size(), rows * rowBytes));
-        for (const auto& [row, source] : origin) {
-            if (row >= rows) {
-                continue;
-            }
-            if (source == kFromHost) {
-                hostRows.push_back(row);
-            } else if (source != row) {
-                // Every source is a row removed or past the end, never another copy's target.
-                copies.push_back({source * rowBytes, row * rowBytes, rowBytes});
-                std::memcpy(binding.shadow.data() + row * rowBytes,
-                            binding.shadow.data() + source * rowBytes, rowBytes);
-            }
-        }
-        binding.shadow.resize(rows * rowBytes);
-        if (!copies.empty()) {
-            moves.emplace_back(&column, std::move(copies));
-        }
+        moves.emplace_back(binding.column.get(), MoveRows(binding, origins, rows, hostRows));
+        DeviceColumn& column = *binding.column;
         if (rows > column.Rows()) {
             after.push_back(column.Resize(rows, context_.Main(), after));
         } else {
             column.Resize(rows, context_.Main());
         }
-
-        // Values authored on the host: rows that differ from what the host last gave. Changes
-        // come by chunk, so rows the device wrote are compared, not taken on trust.
-        const ColumnValues& host = *store.GetBucket(binding.bucket).Find(binding.attribute)->values;
-        for (const ChangeSet::Values& values : changes.values) {
-            if (values.bucket != binding.bucket || values.attribute != binding.attribute) {
-                continue;
-            }
-            for (const RowRange& range : values.rows) {
-                for (std::uint32_t row = range.begin; row < std::min(range.end, rows); ++row) {
-                    if (from(row) != kFromHost &&
-                        !std::ranges::equal(DeviceBytes(host, row, row + 1),
-                                            std::span<const std::byte>(binding.shadow)
-                                                .subspan(row * rowBytes, rowBytes))) {
-                        hostRows.push_back(row);
-                    }
-                }
-            }
-        }
+        FindAuthoredRows(changes, binding, origins, rows, hostRows);
         std::ranges::sort(hostRows);
+        const ColumnValues& host = *store.GetBucket(binding.bucket).Find(binding.attribute)->values;
         for (const std::uint32_t row : hostRows) {
             const std::vector<std::byte> bytes = DeviceBytes(host, row, row + 1);
-            std::memcpy(binding.shadow.data() + row * rowBytes, bytes.data(), rowBytes);
+            std::ranges::copy(bytes, binding.shadow.begin() +
+                                         static_cast<std::ptrdiff_t>(row * column.RowBytes()));
         }
-        UploadRows(binding, hostRows);
+        Upload(binding, hostRows);
     }
-
+    std::erase_if(moves, [](const auto& move) { return move.second.empty(); });
     Ticket moved;
     if (!moves.empty()) {
-        // The sources are rows no copy writes: every move reads a row past the end or one that
-        // was removed, so one batch of regions per column is safe.
         moved = context_.Main().Submit(
             [&](VkCommandBuffer commands) {
-                const VkAccessFlags2 any =
-                    VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-                Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, any,
-                        VK_PIPELINE_STAGE_2_COPY_BIT, any);
                 for (auto& [column, regions] : moves) {
                     for (VkBufferCopy& region : regions) {
                         region.srcOffset += column->Range().offset;
                         region.dstOffset += column->Range().offset;
                     }
-                    vkCmdCopyBuffer(commands, column->Storage().Handle(),
-                                    column->Storage().Handle(),
-                                    static_cast<std::uint32_t>(regions.size()), regions.data());
+                    CopyBuffer(commands, column->Storage().Handle(), column->Storage().Handle(),
+                               regions);
                 }
-                Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, any);
             },
             after);
     }

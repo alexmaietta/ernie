@@ -95,6 +95,27 @@ struct CudaDriver {
     void Check(CUresult result, std::string_view what) const;
 };
 
+/// @brief Exportable allocations by address, as `CudaDriver::AllocateShareable` makes them, for
+/// whoever hands out addresses and takes them back: Ernie's interop, and PyTorch's allocator hook.
+class ShareableAllocations {
+  public:
+    explicit ShareableAllocations(const CudaDriver& driver) : driver_(driver) {}
+    ShareableAllocations(const ShareableAllocations&) = delete;
+    ShareableAllocations& operator=(const ShareableAllocations&) = delete;
+
+    /// @return The allocation's address, or 0 on failure. Needs a current context.
+    CUdeviceptr Allocate(int ordinal, std::size_t bytes);
+    /// @brief Frees what `Allocate` returned; other addresses are left alone.
+    void Free(CUdeviceptr pointer);
+    /// @brief Frees every allocation left.
+    void FreeAll();
+
+  private:
+    const CudaDriver& driver_;
+    std::mutex mutex_;
+    std::unordered_map<CUdeviceptr, CudaDriver::Shareable> live_;
+};
+
 /// @brief The CUDA device paired with a context's device by UUID. Columns in
 /// `MemoryUse::Shared` arenas are viewed as CUDA tensors in place; each arena is mapped once.
 /// Streams are CUDA streams (`torch.cuda.current_stream().cuda_stream`, `wp.get_stream()`), 0
@@ -134,7 +155,7 @@ class CudaInterop {
     Ticket Assign(const DeviceColumn& column, const Tensor& tensor, CUstream stream);
     /// @brief A device column over a CUDA tensor's own memory, in place, when that memory is
     /// exportable: allocated through CUDA's virtual memory management with shareable handles, as
-    /// `CudaAllocate` and PyTorch's expandable segments allocate. Ordinary `cudaMalloc` memory is
+    /// `Allocate` and PyTorch's expandable segments allocate. Ordinary `cudaMalloc` memory is
     /// not; assign such tensors to an Ernie column instead.
     /// @return The column, shaped (rows, element...) as the tensor is and holding it alive; null
     /// when its memory cannot be shared.
@@ -172,6 +193,8 @@ class CudaInterop {
     };
 
     CudaInterop(DeviceContext& context, const CudaDriver& driver, CUdevice device, int ordinal);
+    /// @throws std::invalid_argument unless `tensor` is a contiguous tensor on this device.
+    void CheckOnDevice(const Tensor& tensor, std::string_view what) const;
     CUdeviceptr Map(const Buffer& buffer);
     /// Imports one of the context's timelines into CUDA, once. Takes `mutex_`'s lock as held.
     CUexternalSemaphore Import(const Timeline& timeline);
@@ -186,7 +209,7 @@ class CudaInterop {
     std::unordered_map<std::uint64_t, Mapping> mappings_;
     std::unordered_map<const Timeline*, CUexternalSemaphore> semaphores_;
     std::unordered_map<CUstream, StreamTimeline> streams_;
-    std::unordered_map<CUdeviceptr, CudaDriver::Shareable> allocations_;
+    ShareableAllocations allocations_;
 };
 
 }  // namespace ernie

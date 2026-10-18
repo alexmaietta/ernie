@@ -4,6 +4,7 @@
 #include "ernie/device/queue.h"
 
 #include "ernie/util/algorithm.h"
+#include "ernie/util/on_failure.h"
 
 #include <limits>
 
@@ -50,12 +51,8 @@ Timeline::Timeline(VkDevice device, std::string name, bool exportable)
 Timeline::Timeline(VkDevice device, std::string name, ExternalHandle handle)
     : device_(device), name_(std::move(name)), exportable_(false),
       semaphore_(CreateTimeline(device_, name_, false)) {
-    try {
-        ImportSemaphore(device_, semaphore_, handle, name_);
-    } catch (...) {
-        vkDestroySemaphore(device_, semaphore_, nullptr);
-        throw;
-    }
+    const OnFailure destroy([this] { vkDestroySemaphore(device_, semaphore_, nullptr); });
+    ImportSemaphore(device_, semaphore_, handle, name_);
 }
 
 Timeline::~Timeline() {

@@ -54,7 +54,7 @@ public Affine Mul(Affine a, Affine b) {
 }
 )"};
 
-// The op kinds a program holds, as the local kernel reads them.
+// The op kinds a program holds; the local kernel names the same values.
 enum Kind : std::uint32_t {
     kConstant,
     kTranslate,
@@ -67,6 +67,8 @@ enum Kind : std::uint32_t {
     kTransform,
 };
 constexpr std::uint32_t kInvert = 1;
+constexpr std::uint32_t kFloatsShift = 8;
+static_assert(kOrient == 12, "the local kernel's kinds");
 
 const ShaderModule kLocal{"local", R"(
 import affine;
@@ -110,29 +112,39 @@ Affine Inverse(Affine m) {
     return result;
 }
 
+// The op kinds and flags, as the C++ `Kind` names them.
+static const uint kConstant = 0;
+static const uint kTranslate = 1;
+static const uint kScale = 2;
+static const uint kRotateX = 3;
+static const uint kRotateXYZ = 6;
+static const uint kOrient = 12;
+static const uint kInvert = 1;
+static const uint kFloatsShift = 8;
+
 Affine OpMatrix(Op op) {
     Affine m = Identity();
     float* v = op.source;
-    uint count = (op.flags >> 8) & 0xff;
-    if (op.kind == 0) {
+    uint floats = (op.flags >> kFloatsShift) & 0xff;
+    if (op.kind == kConstant) {
         m.rows = op.constant;
-    } else if (op.kind == 1) {
+    } else if (op.kind == kTranslate) {
         m.rows[0].w = v[0];
         m.rows[1].w = v[1];
         m.rows[2].w = v[2];
-    } else if (op.kind == 2) {
-        float3 s = count == 1 ? float3(v[0]) : float3(v[0], v[1], v[2]);
+    } else if (op.kind == kScale) {
+        float3 s = floats == 1 ? float3(v[0]) : float3(v[0], v[1], v[2]);
         m.rows[0].x = s.x;
         m.rows[1].y = s.y;
         m.rows[2].z = s.z;
-    } else if (op.kind <= 5) {
-        m = Turn(op.kind - 3, v[0]);
-    } else if (op.kind <= 11) {
+    } else if (op.kind < kRotateXYZ) {
+        m = Turn(op.kind - kRotateX, v[0]);
+    } else if (op.kind < kOrient) {
         // The order's first axis turns first: R = Rk * Rj * Ri, each by its own axis' angle.
-        uint3 axes = kAxes[op.kind - 6];
+        uint3 axes = kAxes[op.kind - kRotateXYZ];
         m = Mul(Mul(Turn(axes.z, v[axes.z]), Turn(axes.y, v[axes.y])),
                 Turn(axes.x, v[axes.x]));
-    } else if (op.kind == 12) {
+    } else if (op.kind == kOrient) {
         float4 q = normalize(float4(v[0], v[1], v[2], v[3]));
         m.rows[0] = float4(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y - q.z * q.w),
                            2 * (q.x * q.z + q.y * q.w), 0);
@@ -146,7 +158,7 @@ Affine OpMatrix(Op op) {
             m.rows[r] = float4(v[r], v[4 + r], v[8 + r], v[12 + r]);
         }
     }
-    return (op.flags & 1) != 0 ? Inverse(m) : m;
+    return (op.flags & kInvert) != 0 ? Inverse(m) : m;
 }
 
 [shader("compute")]
@@ -198,7 +210,7 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler, const ShaderM
     return compiler.Spirv(modules, "main");
 }
 
-TransformGraph::Rows12 Rows(const glm::dmat4& m) {
+TransformGraph::Rows12 TopRows(const glm::dmat4& m) {
     TransformGraph::Rows12 rows{};
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
@@ -208,7 +220,7 @@ TransformGraph::Rows12 Rows(const glm::dmat4& m) {
     return rows;
 }
 
-const TransformGraph::Rows12 kIdentity = Rows(glm::dmat4(1.0));
+const TransformGraph::Rows12 kIdentity = TopRows(glm::dmat4(1.0));
 
 /// @return The device op kind of an op type, and the floats it may read from a column.
 std::pair<std::uint32_t, std::vector<std::int64_t>> OpLayout(std::string_view type) {
@@ -244,12 +256,9 @@ std::string_view OpType(std::string_view attribute) {
     return type.substr(0, type.find(':'));
 }
 
+/// @return The floats a row of a float column holds.
 std::int64_t Floats(const DeviceColumn& column) {
-    std::int64_t floats = 1;
-    for (const std::int64_t extent : column.Element()) {
-        floats *= extent;
-    }
-    return floats;
+    return static_cast<std::int64_t>(column.RowBytes() / sizeof(float));
 }
 
 glm::uvec3 Groups(std::size_t threads) {
@@ -282,8 +291,7 @@ TransformGraph::TransformGraph(DeviceContext& context, Arenas& arenas, const Sce
 TransformGraph::~TransformGraph() = default;
 
 void TransformGraph::Bind(BucketId bucket, std::string_view attribute, const DeviceColumn& column) {
-    const auto [kind, floats] = OpLayout(OpType(attribute));
-    static_cast<void>(kind);
+    const std::vector<std::int64_t> floats = OpLayout(OpType(attribute)).second;
     const PrimStore& store = scene_.Store();
     const std::optional<Token> token = store.Tokens().Find(attribute);
     if (column.Type() != DType::Float32 ||
@@ -292,9 +300,7 @@ void TransformGraph::Bind(BucketId bucket, std::string_view attribute, const Dev
         throw std::invalid_argument(column.Name() + " does not hold the bucket's " +
                                     std::string(attribute) + " rows");
     }
-    if (std::ranges::any_of(bindings_, [&](const Binding& bound) {
-            return bound.bucket == bucket && bound.attribute == *token;
-        })) {
+    if (FindBinding(bucket, *token) != nullptr) {
         throw std::invalid_argument(std::string(attribute) + " is bound already");
     }
     bindings_.push_back({bucket, *token, &column, column.Address()});
@@ -339,15 +345,25 @@ std::uint32_t TransformGraph::Insert(SlotList& list, std::uint32_t slot) {
     return position;
 }
 
-std::uint32_t TransformGraph::Erase(SlotList& list, std::uint32_t position) {
+void TransformGraph::Unlist(SlotList& list, std::uint32_t NodeState::* position,
+                            std::uint32_t slot) {
+    const std::uint32_t at = std::exchange(nodes_[slot].*position, kNone);
     const std::uint32_t last = list.slots.back();
     list.slots.pop_back();
-    if (position == list.slots.size()) {
-        return kNone;
+    if (at != list.slots.size()) {
+        // The last slot moves into the gap.
+        list.slots[at] = last;
+        list.dirty.push_back(at);
+        nodes_[last].*position = at;
     }
-    list.slots[position] = last;
-    list.dirty.push_back(position);
-    return last;
+}
+
+const TransformGraph::Binding* TransformGraph::FindBinding(BucketId bucket,
+                                                           AttributeId attribute) const {
+    const auto found = std::ranges::find_if(bindings_, [&](const Binding& binding) {
+        return binding.bucket == bucket && binding.attribute == attribute;
+    });
+    return found == bindings_.end() ? nullptr : &*found;
 }
 
 std::uint32_t TransformGraph::ParentSlot(PrimId prim) const {
@@ -373,10 +389,7 @@ void TransformGraph::SetLevel(std::uint32_t slot, std::uint32_t level) {
         if (node.level == level) {
             return;
         }
-        const std::uint32_t moved = Erase(levels_[node.level], node.position);
-        if (moved != kNone) {
-            nodes_[moved].position = node.position;
-        }
+        Unlist(levels_[node.level], &NodeState::position, slot);
     }
     while (levels_.size() <= level) {
         levels_.push_back({{},
@@ -446,17 +459,9 @@ void TransformGraph::RemoveNode(std::uint32_t slot) {
     NodeState& node = nodes_[slot];
     node.live = false;
     Detach(slot);
-    const std::uint32_t moved = Erase(levels_[node.level], node.position);
-    if (moved != kNone) {
-        nodes_[moved].position = node.position;
-    }
-    node.position = kNone;
+    Unlist(levels_[node.level], &NodeState::position, slot);
     if (node.programPosition != kNone) {
-        const std::uint32_t shifted = Erase(programmed_, node.programPosition);
-        if (shifted != kNone) {
-            nodes_[shifted].programPosition = node.programPosition;
-        }
-        node.programPosition = kNone;
+        Unlist(programmed_, &NodeState::programPosition, slot);
     }
     // Children the scene keeps hang from the nearest ancestor left.
     const std::vector<std::uint32_t> orphans = std::move(node.children);
@@ -469,71 +474,67 @@ void TransformGraph::RemoveNode(std::uint32_t slot) {
     }
 }
 
-void TransformGraph::Refresh(std::uint32_t slot) {
+TransformGraph::Built TransformGraph::BuildProgram(PrimId prim) const {
     const PrimStore& store = scene_.Store();
-    const PrimId prim = nodes_[slot].prim;
     const BucketId bucket = store.PrimBucket(prim);
     const std::uint32_t row = store.PrimRow(prim);
     const std::vector<XformOp> ops = IsA(scene_.Schema(prim), Xformable::Definition())
                                          ? XformOpsInOrder(scene_, prim)
                                          : std::vector<XformOp>{};
-    Program program{};
-    std::uint32_t length = 0;
-    bool onDevice = false;
+    Built built;
     glm::dmat4 folded(1.0);
     const auto push = [&](const DeviceOp& op) {
-        if (length == kMaxOps) {
+        if (built.length == kMaxOps) {
             throw std::invalid_argument("'" + scene_.PrimPath(prim).String() + "' has more than " +
                                         std::to_string(kMaxOps) + " ops for the device");
         }
-        program[length++] = op;
+        built.program[built.length++] = op;
     };
-    const auto flush = [&] {
-        if (folded != glm::dmat4(1.0)) {
-            push({.kind = kConstant, .constant = Rows(folded)});
+    // Runs of the host's ops become one matrix each.
+    const auto fold = [&] {
+        if (folded != glm::dmat4(1.0) && built.onDevice) {
+            push({.kind = kConstant, .constant = TopRows(folded)});
             folded = glm::dmat4(1.0);
         }
     };
     for (const XformOp& op : ops) {
         const std::optional<Token> token = store.Tokens().Find(op.attribute);
-        const auto bound = std::ranges::find_if(bindings_, [&](const Binding& binding) {
-            return binding.bucket == bucket && token && binding.attribute == *token;
-        });
-        if (bound == bindings_.end()) {
+        const Binding* bound = token ? FindBinding(bucket, *token) : nullptr;
+        if (bound == nullptr) {
             folded = folded * XformOpMatrix(scene_, prim, op);
             continue;
         }
-        flush();
+        built.onDevice = true;
+        fold();
         const DeviceColumn& column = *bound->column;
         const auto floats = static_cast<std::uint32_t>(Floats(column));
         push({.kind = OpLayout(op.type).first,
-              .flags = (op.invert ? kInvert : 0u) | floats << 8,
+              .flags = (op.invert ? kInvert : 0u) | floats << kFloatsShift,
               .source = column.Address() + row * column.RowBytes()});
-        onDevice = true;
     }
+    fold();
+    built.local = TopRows(folded);
+    return built;
+}
 
+void TransformGraph::Refresh(std::uint32_t slot) {
+    const Built built = BuildProgram(nodes_[slot].prim);
     NodeState& node = nodes_[slot];
-    if (!onDevice) {
-        const Rows12 local = Rows(folded);
-        if (locals_[slot] != local) {
-            locals_[slot] = local;
+    if (!built.onDevice) {
+        if (locals_[slot] != built.local) {
+            locals_[slot] = built.local;
             dirtyLocals_.Mark(slot);
         }
         if (node.programPosition != kNone) {
-            const std::uint32_t shifted = Erase(programmed_, node.programPosition);
-            if (shifted != kNone) {
-                nodes_[shifted].programPosition = node.programPosition;
-            }
-            node.programPosition = kNone;
+            Unlist(programmed_, &NodeState::programPosition, slot);
             // The device's last local stands until the upload replaces it.
             dirtyLocals_.Mark(slot);
         }
         return;
     }
-    flush();
-    if (programs_[slot] != program || lengths_[slot] != length) {
-        programs_[slot] = program;
-        lengths_[slot] = length;
+    if (programs_[slot] != built.program || lengths_[slot] != built.length) {
+        programs_[slot] = built.program;
+        lengths_[slot] = built.length;
         dirtyPrograms_.Mark(slot);
     }
     if (node.programPosition == kNone) {
@@ -614,23 +615,14 @@ void TransformGraph::Replay(const ChangeSet& changes) {
 }
 
 void TransformGraph::UploadDirty() {
-    // Changed rows of a host array go up a run of consecutive rows at a time.
+    // Changed rows of a host array, each once.
     const auto upload = [&](const DeviceColumn& column, const auto& host,
                             std::vector<std::uint32_t> rows) {
         std::ranges::sort(rows);
         rows.erase(std::ranges::unique(rows).begin(), rows.end());
         std::erase_if(rows, [&](std::uint32_t row) { return row >= host.size(); });
-        for (std::size_t first = 0; first < rows.size();) {
-            std::size_t last = first + 1;
-            while (last < rows.size() && rows[last] == rows[last - 1] + 1) {
-                ++last;
-            }
-            const std::uint32_t begin = rows[first];
-            const std::uint32_t end = rows[last - 1] + 1;
-            uploader_.Write(column.Storage(), column.Range().offset + begin * column.RowBytes(),
-                            std::as_bytes(std::span(host).subspan(begin, end - begin)));
-            first = last;
-        }
+        uploader_.WriteRows(column.Storage(), column.Range().offset, column.RowBytes(),
+                            std::as_bytes(std::span(host)), rows);
     };
     const auto uploadSlots = [&](DirtySlots& dirty, const DeviceColumn& column, const auto& host) {
         upload(column, host, dirty.slots);

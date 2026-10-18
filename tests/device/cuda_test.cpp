@@ -6,33 +6,19 @@
 #include "ernie/device/cuda.h"
 #include "ernie/device/staging.h"
 
+#include "tests/device/columns.h"
 #include "tests/device/common.h"
 
 #include <gtest/gtest.h>
 
 #include <bit>
-#include <cstring>
 #include <vector>
 
 namespace ernie {
 namespace {
 
 using test::ExpectClean;
-
-/// Declares the CUDA interop `interop` of `context`, skipping the test without one.
-#define ERNIE_CUDA(interop, context)                                                               \
-    const std::unique_ptr<CudaInterop> interop = CudaInterop::Create(*(context));                  \
-    if (!interop) {                                                                                \
-        GTEST_SKIP() << "No CUDA device pairs with " << (context)->Info().name;                    \
-    }
-
-std::vector<float> Read(DeviceContext& context, const DeviceColumn& column, const Ticket& after) {
-    Readback readback(context, context.Main(), column.Storage(), column.Range().offset,
-                      column.Bytes(), std::span(&after, 1));
-    std::vector<float> values(column.Bytes() / sizeof(float));
-    std::memcpy(values.data(), readback.Bytes().data(), column.Bytes());
-    return values;
-}
+using test::ReadFloats;
 
 TEST(CudaInterop, CudaWritesAColumnInPlaceThatErnieReads) {
     ERNIE_CONTEXT(context);
@@ -58,7 +44,7 @@ TEST(CudaInterop, CudaWritesAColumnInPlaceThatErnieReads) {
                                        std::bit_cast<unsigned int>(1.5f), 3000, nullptr),
                  "Writing in CUDA");
     const Ticket written = cuda->Signal(nullptr);
-    EXPECT_EQ(Read(*context, points, written), std::vector<float>(3000, 1.5f));
+    EXPECT_EQ(ReadFloats(*context, points, written), std::vector<float>(3000, 1.5f));
     EXPECT_EQ(context->Transfers().copied, before.copied) << "written in place";
     context->WaitIdle();
     ExpectClean(*context);
@@ -90,8 +76,8 @@ TEST(CudaInterop, EachStreamSignalsItsOwnTimeline) {
     EXPECT_EQ(againA.timeline, wroteA.timeline);
     EXPECT_GT(againA.value, wroteA.value) << "a stream's values only increase";
 
-    EXPECT_EQ(Read(*context, b, wroteB), std::vector<float>(256, 2.0f));
-    EXPECT_EQ(Read(*context, a, againA), std::vector<float>(256, 3.0f));
+    EXPECT_EQ(ReadFloats(*context, b, wroteB), std::vector<float>(256, 2.0f));
+    EXPECT_EQ(ReadFloats(*context, a, againA), std::vector<float>(256, 3.0f));
     driver.streamSynchronize(first);
     driver.streamSynchronize(second);
     context->WaitIdle();
@@ -144,7 +130,7 @@ TEST(CudaInterop, AssigningItsOwnViewCopiesNothingAndAnyOtherTensorCopiesOnce) {
     const Tensor tensor(reinterpret_cast<void*>(foreign), DType::Float32, {100, 8}, {},
                         Device{DeviceKind::Cuda, cuda->Ordinal()});
     const Ticket copied = cuda->Assign(poses, tensor, nullptr);
-    EXPECT_EQ(Read(*context, poses, copied), std::vector<float>(800, 2.0f));
+    EXPECT_EQ(ReadFloats(*context, poses, copied), std::vector<float>(800, 2.0f));
     EXPECT_EQ(context->Transfers().copied - before.copied, bytes) << "one copy, counted";
     EXPECT_EQ(context->Transfers().uploaded, before.uploaded) << "never through the host";
     driver.Check(driver.streamSynchronize(nullptr), "Synchronizing");
@@ -183,7 +169,7 @@ TEST(CudaInterop, ExportableCudaMemoryIsSharedInPlace) {
                                        (worlds - 2) * 8, nullptr),
                  "Writing in CUDA");
     const Ticket written = cuda->Signal(nullptr);
-    EXPECT_EQ(Read(*context, *column, written), std::vector<float>((worlds - 2) * 8, 4.0f));
+    EXPECT_EQ(ReadFloats(*context, *column, written), std::vector<float>((worlds - 2) * 8, 4.0f));
     EXPECT_EQ(context->Transfers().copied, before.copied) << "Ernie read CUDA's own memory";
 
     CUdeviceptr plain = 0;

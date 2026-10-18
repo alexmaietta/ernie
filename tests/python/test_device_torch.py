@@ -9,23 +9,15 @@ import textwrap
 
 import pytest
 
-import ernie
-
 np = pytest.importorskip("numpy")
 torch = pytest.importorskip("torch")
 
 
 @pytest.fixture(scope="module")
-def context():
+def context(cuda_context):
     if not torch.cuda.is_available():
         pytest.skip("No CUDA device for PyTorch")
-    try:
-        context = ernie.DeviceContext()
-    except RuntimeError as error:
-        pytest.skip(str(error))
-    if context.cuda_ordinal is None:
-        pytest.skip(f"No CUDA device pairs with {context.name}")
-    return context
+    return cuda_context
 
 
 def test_pytorch_writes_a_column_in_place(context):

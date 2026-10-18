@@ -33,6 +33,11 @@ class Uploader {
     void Write(const Buffer& destination, std::uint64_t offset, std::span<const T> values) {
         Write(destination, offset, std::as_bytes(values));
     }
+    /// @brief Writes some rows of `host`, rows of `rowBytes` laid out as the destination's from
+    /// `offset`, a run of consecutive rows at a time.
+    /// @param rows The rows to write, ascending and each once.
+    void WriteRows(const Buffer& destination, std::uint64_t offset, std::uint64_t rowBytes,
+                   std::span<const std::byte> host, std::span<const std::uint32_t> rows);
     /// @return The staged bytes waiting for `Flush`; flush when it grows past a limit.
     std::uint64_t Pending() const {
         return pending_;

@@ -55,6 +55,12 @@ class DeviceColumn {
     std::uint64_t Rows() const {
         return rows_;
     }
+    /// @return The rows, then the element's shape: the column as a tensor sees it.
+    std::vector<std::int64_t> Shape() const {
+        std::vector<std::int64_t> shape{static_cast<std::int64_t>(rows_)};
+        shape.insert(shape.end(), element_.begin(), element_.end());
+        return shape;
+    }
     /// @return The rows' bytes; the range may hold more, for growth.
     std::uint64_t Bytes() const {
         return rows_ * rowBytes_;

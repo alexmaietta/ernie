@@ -5,12 +5,12 @@
 #include "ernie/device/column.h"
 #include "ernie/device/staging.h"
 
+#include "tests/device/columns.h"
 #include "tests/device/common.h"
 #include "tests/device/pose_step.h"
 
 #include <gtest/gtest.h>
 
-#include <cstring>
 #include <numeric>
 #include <vector>
 
@@ -18,15 +18,7 @@ namespace ernie {
 namespace {
 
 using test::ExpectClean;
-
-std::vector<float> Read(DeviceContext& context, const DeviceColumn& column, std::uint64_t rows,
-                        std::span<const Ticket> waits) {
-    Readback readback(context, context.Main(), column.Storage(), column.Range().offset,
-                      rows * column.RowBytes(), waits);
-    std::vector<float> values(rows * column.RowBytes() / sizeof(float));
-    std::memcpy(values.data(), readback.Bytes().data(), values.size() * sizeof(float));
-    return values;
-}
+using test::ReadFloats;
 
 TEST(DeviceColumn, RowsKeepTheirShapeAndValuesAcrossResizes) {
     ERNIE_CONTEXT(context);
@@ -42,16 +34,16 @@ TEST(DeviceColumn, RowsKeepTheirShapeAndValuesAcrossResizes) {
     const Ticket grown = column.Resize(101, context->Main(), std::span(&written, 1));
     EXPECT_EQ(column.Rows(), 101u);
     EXPECT_EQ(column.Capacity(), 200u) << "the capacity doubles";
-    EXPECT_EQ(Read(*context, column, 100, std::span(&grown, 1)), points);
+    EXPECT_EQ(ReadFloats(*context, column, grown, 100), points);
     const VkDeviceAddress address = column.Address();
     EXPECT_EQ(column.Resize(200, context->Main()), Ticket()) << "nothing to copy within capacity";
     EXPECT_EQ(column.Address(), address);
     const Ticket large = column.Resize(5000, context->Main());
     EXPECT_EQ(column.Capacity(), 5000u);
-    EXPECT_EQ(Read(*context, column, 100, std::span(&large, 1)), points);
+    EXPECT_EQ(ReadFloats(*context, column, large, 100), points);
     column.Resize(10, context->Main());
     EXPECT_EQ(column.Bytes(), 120u);
-    EXPECT_EQ(Read(*context, column, 10, {}),
+    EXPECT_EQ(ReadFloats(*context, column),
               std::vector<float>(points.begin(), points.begin() + 30));
     ExpectClean(*context);
 }
@@ -70,7 +62,7 @@ TEST(DeviceColumn, StepsOfManyPosesMoveNoBulkBytesThroughTheHost) {
     stepped.Wait();
     EXPECT_EQ(context->Transfers(), before) << "the steps stay on the device";
 
-    const std::vector<float> transforms = Read(*context, poses.Transforms(), instances, {});
+    const std::vector<float> transforms = ReadFloats(*context, poses.Transforms());
     EXPECT_EQ(context->Transfers().readBack - before.readBack, instances * 48u)
         << "only the explicit readback is counted";
     for (std::uint32_t instance : {0u, 1u, 127u, 128u, 9999u, instances - 1}) {

@@ -77,16 +77,9 @@ Ticket DeviceColumn::Resize(std::uint64_t rows, Queue& queue, std::span<const Ti
     if (kept > 0) {
         ticket = queue.Submit(
             [&](VkCommandBuffer commands) {
-                const VkAccessFlags2 any =
-                    VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-                Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                        VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_COPY_BIT,
-                        VK_ACCESS_2_TRANSFER_READ_BIT);
                 const VkBufferCopy region{range_.offset, grown.offset, kept};
-                vkCmdCopyBuffer(commands, arenas_->Storage(range_).Handle(),
-                                arenas_->Storage(grown).Handle(), 1, &region);
-                Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, any);
+                CopyBuffer(commands, arenas_->Storage(range_).Handle(),
+                           arenas_->Storage(grown).Handle(), std::span(&region, 1));
             },
             waits);
     }

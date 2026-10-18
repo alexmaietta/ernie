@@ -218,7 +218,7 @@ std::unique_ptr<CudaInterop> CudaInterop::Create(DeviceContext& context) {
 
 CudaInterop::CudaInterop(DeviceContext& context, const CudaDriver& driver, CUdevice device,
                          int ordinal)
-    : context_(context), driver_(driver), device_(device), ordinal_(ordinal) {
+    : context_(context), driver_(driver), device_(device), ordinal_(ordinal), allocations_(driver) {
     // The primary context, which PyTorch, Warp and the runtime API share.
     driver_.Check(driver_.primaryCtxRetain(&cuda_, device_), "Retaining the CUDA context");
 }
@@ -234,13 +234,11 @@ CudaInterop::~CudaInterop() {
             driver_.memFree(mapping.pointer);
             driver_.destroyExternalMemory(mapping.memory);
         }
-        // Streams' timelines among them.
+        // The context's queue timelines and the streams' own.
         for (const auto& [timeline, semaphore] : semaphores_) {
             driver_.destroyExternalSemaphore(semaphore);
         }
-        for (const auto& [pointer, allocation] : allocations_) {
-            driver_.FreeShareable(allocation);
-        }
+        allocations_.FreeAll();
     }
     driver_.primaryCtxRelease(device_);
 }
@@ -294,10 +292,16 @@ CUexternalSemaphore CudaInterop::Import(const Timeline& timeline) {
 
 Tensor CudaInterop::View(const DeviceColumn& column) {
     const CUdeviceptr base = Map(column.Storage());
-    std::vector<std::int64_t> shape{static_cast<std::int64_t>(column.Rows())};
-    shape.insert(shape.end(), column.Element().begin(), column.Element().end());
     return Tensor(reinterpret_cast<void*>(base + column.Range().offset), column.Type(),
-                  std::move(shape), {}, Device{DeviceKind::Cuda, ordinal_});
+                  column.Shape(), {}, Device{DeviceKind::Cuda, ordinal_});
+}
+
+void CudaInterop::CheckOnDevice(const Tensor& tensor, std::string_view what) const {
+    if (tensor.Location() != Device{DeviceKind::Cuda, ordinal_} || !tensor.IsContiguous() ||
+        tensor.Rank() == 0) {
+        throw std::invalid_argument(
+            std::string(what) + " takes a contiguous tensor on cuda:" + std::to_string(ordinal_));
+    }
 }
 
 void CudaInterop::Wait(CUstream stream, const Ticket& ticket) {
@@ -334,12 +338,10 @@ Ticket CudaInterop::Signal(CUstream stream) {
 }
 
 Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUstream stream) {
-    const std::uint64_t bytes = column.Rows() * column.RowBytes();
-    if (tensor.Location() != Device{DeviceKind::Cuda, ordinal_} || !tensor.IsContiguous() ||
-        static_cast<std::uint64_t>(tensor.Elements()) * ByteSize(tensor.Type()) != bytes) {
-        throw std::invalid_argument(
-            "Assigning " + column.Name() +
-            " takes a contiguous tensor of its size on cuda:" + std::to_string(ordinal_));
+    const std::uint64_t bytes = column.Bytes();
+    CheckOnDevice(tensor, "Assigning " + column.Name());
+    if (tensor.Bytes() != bytes) {
+        throw std::invalid_argument("Assigning " + column.Name() + " takes a tensor of its size");
     }
     const CUdeviceptr rows = Map(column.Storage()) + column.Range().offset;
     const auto source = reinterpret_cast<CUdeviceptr>(tensor.Data());
@@ -357,15 +359,9 @@ Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUs
 }
 
 std::unique_ptr<DeviceColumn> CudaInterop::Wrap(const Tensor& tensor, std::string_view name) {
-    if (tensor.Location() != Device{DeviceKind::Cuda, ordinal_} || !tensor.IsContiguous() ||
-        tensor.Rank() == 0) {
-        throw std::invalid_argument(
-            "Wrapping " + std::string(name) +
-            " takes a contiguous tensor on cuda:" + std::to_string(ordinal_));
-    }
+    CheckOnDevice(tensor, "Wrapping " + std::string(name));
     const auto pointer = reinterpret_cast<CUdeviceptr>(tensor.Data());
-    const std::uint64_t bytes =
-        static_cast<std::uint64_t>(tensor.Elements()) * ByteSize(tensor.Type());
+    const std::uint64_t bytes = tensor.Bytes();
     const Current current(*this);
     // Only virtual memory allocations have handles, and only those asked to be shareable export.
     CUmemGenericAllocationHandle allocation = 0;
@@ -438,31 +434,47 @@ void CudaDriver::FreeShareable(const Shareable& allocation) const {
     memRelease(allocation.handle);
 }
 
-CUdeviceptr CudaInterop::Allocate(std::size_t bytes) {
-    const Current current(*this);
+CUdeviceptr ShareableAllocations::Allocate(int ordinal, std::size_t bytes) {
     const std::optional<CudaDriver::Shareable> allocation =
-        driver_.AllocateShareable(ordinal_, bytes);
+        driver_.AllocateShareable(ordinal, bytes);
     if (!allocation) {
         return 0;
     }
     const std::lock_guard lock(mutex_);
-    allocations_.emplace(allocation->pointer, *allocation);
+    live_.emplace(allocation->pointer, *allocation);
     return allocation->pointer;
 }
 
-void CudaInterop::Free(CUdeviceptr pointer) {
+void ShareableAllocations::Free(CUdeviceptr pointer) {
     CudaDriver::Shareable allocation;
     {
         const std::lock_guard lock(mutex_);
-        const auto found = allocations_.find(pointer);
-        if (found == allocations_.end()) {
+        const auto found = live_.find(pointer);
+        if (found == live_.end()) {
             return;
         }
         allocation = found->second;
-        allocations_.erase(found);
+        live_.erase(found);
     }
-    const Current current(*this);
     driver_.FreeShareable(allocation);
+}
+
+void ShareableAllocations::FreeAll() {
+    const std::lock_guard lock(mutex_);
+    for (const auto& [pointer, allocation] : live_) {
+        driver_.FreeShareable(allocation);
+    }
+    live_.clear();
+}
+
+CUdeviceptr CudaInterop::Allocate(std::size_t bytes) {
+    const Current current(*this);
+    return allocations_.Allocate(ordinal_, bytes);
+}
+
+void CudaInterop::Free(CUdeviceptr pointer) {
+    const Current current(*this);
+    allocations_.Free(pointer);
 }
 
 }  // namespace ernie

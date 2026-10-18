@@ -138,8 +138,17 @@ class TransformGraph {
     void Refresh(std::uint32_t slot);
     void EnsureSlots(std::uint32_t slots);
     std::uint32_t Insert(SlotList& list, std::uint32_t slot);
-    /// @return The slot moved into `position`, or none when it was the last.
-    std::uint32_t Erase(SlotList& list, std::uint32_t position);
+    /// Takes a slot out of a list it is in at its `position` member, swap-removing.
+    void Unlist(SlotList& list, std::uint32_t NodeState::* position, std::uint32_t slot);
+    const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
+    /// A prim's transform as the host composes it, or as the program the device evaluates.
+    struct Built {
+        bool onDevice = false;
+        Rows12 local{};
+        Program program{};
+        std::uint32_t length = 0;
+    };
+    Built BuildProgram(PrimId prim) const;
     void UploadDirty();
 
     DeviceContext& context_;

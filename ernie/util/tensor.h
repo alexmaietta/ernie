@@ -144,6 +144,10 @@ class ERNIE_API Tensor {
 
     /// @return The number of elements.
     std::int64_t Elements() const;
+    /// @return The elements' bytes.
+    std::uint64_t Bytes() const {
+        return static_cast<std::uint64_t>(Elements()) * ByteSize(type_);
+    }
 
     /// @brief Views one entry along the first dimension.
     /// @param index The entry.

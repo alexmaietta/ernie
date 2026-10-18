@@ -14,6 +14,7 @@
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -43,6 +44,13 @@ template <typename Teardown> void Quietly(Teardown&& teardown) noexcept {
         log::Info(std::string("Ignored in teardown: ") + error.what());
     }
 }
+
+constexpr VkAccessFlags2 kAnyAccess = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+/// @brief Records copies of `regions` between buffers, ordered after earlier work on them and
+/// before later work.
+void CopyBuffer(VkCommandBuffer commands, VkBuffer source, VkBuffer destination,
+                std::span<const VkBufferCopy> regions);
 
 /// @brief Records a global memory barrier: `src` work and writes before `dst` work and accesses.
 /// The frame graph places barriers between passes; this is for work recorded by hand.

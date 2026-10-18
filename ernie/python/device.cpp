@@ -16,11 +16,9 @@
 
 #include <array>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 
 namespace nb = nanobind;
@@ -151,10 +149,16 @@ struct Context {
         }
         return *cuda;
     }
+    Arenas& Shared() const {
+        if (!shared) {
+            throw nb::buffer_error((context->Info().name + " cannot share memory").c_str());
+        }
+        return *shared;
+    }
 };
 
 /// Takes a tensor from any DLPack producer, its data ready on `stream`.
-Tensor TensorFrom(const nb::object& source, const nb::object& given) {
+Tensor TakeTensor(const nb::object& source, const nb::object& given) {
     // A stream handle of 0, as PyTorch gives its default stream, is spelled 1 in DLPack.
     const nb::object stream =
         !given.is_none() && nb::cast<std::intptr_t>(given) == 0 ? nb::int_(1) : given;
@@ -184,19 +188,6 @@ struct Column {
            std::optional<Tensor> tensor = std::nullopt)
         : owner(context), column(std::move(device)), wrapped(std::move(tensor)) {}
 
-    static ernie::Arenas& SharedArenas(Context& context) {
-        if (!context.shared) {
-            throw nb::buffer_error((context.context->Info().name + " cannot share memory").c_str());
-        }
-        return *context.shared;
-    }
-
-    std::vector<std::int64_t> Shape() const {
-        std::vector<std::int64_t> shape{static_cast<std::int64_t>(column->Rows())};
-        shape.insert(shape.end(), column->Element().begin(), column->Element().end());
-        return shape;
-    }
-
     nb::object Dlpack(const nb::object& stream, const nb::object& maxVersion) {
         CudaInterop& cuda = owner.Cuda();
         // -1 asks for no synchronization.
@@ -212,7 +203,7 @@ struct Column {
     }
 
     void Assign(const nb::object& source, const nb::object& stream) {
-        written = owner.Cuda().Assign(*column, TensorFrom(source, stream), ToStream(stream));
+        written = owner.Cuda().Assign(*column, TakeTensor(source, stream), ToStream(stream));
     }
 
     nb::bytes Read() {
@@ -223,16 +214,13 @@ struct Column {
     }
 };
 
-/// The allocations `ernie_cuda_malloc` made, by address: PyTorch's allocator hook is
-/// process-wide, so this is too.
-struct Allocations {
-    std::mutex mutex;
-    std::unordered_map<CUdeviceptr, CudaDriver::Shareable> live;
-};
-
-Allocations& LiveAllocations() {
-    static Allocations allocations;
-    return allocations;
+/// @return The allocations `ernie_cuda_malloc` made, or none without a CUDA driver: PyTorch's
+/// allocator hook is process-wide, so they are too.
+ShareableAllocations* TorchAllocations() {
+    static const std::unique_ptr<ShareableAllocations> allocations =
+        CudaDriver::Get() != nullptr ? std::make_unique<ShareableAllocations>(*CudaDriver::Get())
+                                     : nullptr;
+    return allocations.get();
 }
 
 }  // namespace
@@ -269,7 +257,7 @@ void BindDevice(nb::module_& module) {
                 }
                 return new Column(self,
                                   std::make_unique<DeviceColumn>(
-                                      Column::SharedArenas(self), name, ParseType(dtype),
+                                      self.Shared(), name, ParseType(dtype),
                                       std::vector<std::int64_t>(shape.begin() + 1, shape.end()),
                                       static_cast<std::uint64_t>(shape.front())));
             },
@@ -280,7 +268,7 @@ void BindDevice(nb::module_& module) {
             [](Context& self, const nb::object& tensor, const std::string& name,
                const nb::object& stream) {
                 CudaInterop& cuda = self.Cuda();
-                Tensor source = TensorFrom(tensor, stream);
+                Tensor source = TakeTensor(tensor, stream);
                 std::unique_ptr<DeviceColumn> column = cuda.Wrap(source, name);
                 if (!column) {
                     throw nb::buffer_error(
@@ -298,7 +286,7 @@ void BindDevice(nb::module_& module) {
     nb::class_<Column>(module, "DeviceColumn",
                        "Rows on the device that CUDA, PyTorch and Warp read and write in place.")
         .def_prop_ro("name", [](const Column& self) { return self.column->Name(); })
-        .def_prop_ro("shape", &Column::Shape)
+        .def_prop_ro("shape", [](const Column& self) { return self.column->Shape(); })
         .def_prop_ro("dtype", [](const Column& self) { return TypeName(self.column->Type()); })
         .def(
             "__dlpack__",
@@ -341,34 +329,15 @@ void BindDevice(nb::module_& module) {
 /// `DeviceContext.wrap` shares in place (`ernie.cuda_allocator()` installs it).
 ERNIE_ALLOCATOR void* ernie_cuda_malloc(std::size_t size, int device, void* stream) {
     static_cast<void>(stream);
-    const ernie::CudaDriver* driver = ernie::CudaDriver::Get();
-    const std::optional<ernie::CudaDriver::Shareable> allocation =
-        driver ? driver->AllocateShareable(device, size) : std::nullopt;
-    if (!allocation) {
-        return nullptr;
-    }
-    ernie::python::Allocations& allocations = ernie::python::LiveAllocations();
-    const std::lock_guard lock(allocations.mutex);
-    allocations.live.emplace(allocation->pointer, *allocation);
-    return reinterpret_cast<void*>(allocation->pointer);
+    ernie::ShareableAllocations* allocations = ernie::python::TorchAllocations();
+    return allocations != nullptr ? reinterpret_cast<void*>(allocations->Allocate(device, size))
+                                  : nullptr;
 }
 
 ERNIE_ALLOCATOR void ernie_cuda_free(void* pointer, std::size_t size, int device, void* stream) {
     static_cast<void>(size);
     static_cast<void>(device);
-    const ernie::CudaDriver* driver = ernie::CudaDriver::Get();
-    ernie::python::Allocations& allocations = ernie::python::LiveAllocations();
-    ernie::CudaDriver::Shareable allocation;
-    {
-        const std::lock_guard lock(allocations.mutex);
-        const auto found = allocations.live.find(reinterpret_cast<ernie::CUdeviceptr>(pointer));
-        if (found == allocations.live.end()) {
-            return;
-        }
-        allocation = found->second;
-        allocations.live.erase(found);
-    }
     // Work enqueued on the stream may still use the memory: unmapping waits for none.
-    driver->streamSynchronize(static_cast<ernie::CUstream>(stream));
-    driver->FreeShareable(allocation);
+    ernie::CudaDriver::Get()->streamSynchronize(static_cast<ernie::CUstream>(stream));
+    ernie::python::TorchAllocations()->Free(reinterpret_cast<ernie::CUdeviceptr>(pointer));
 }

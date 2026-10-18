@@ -3,22 +3,14 @@
 
 import pytest
 
-import ernie
-
 np = pytest.importorskip("numpy")
 wp = pytest.importorskip("warp")
 
 
 @pytest.fixture(scope="module")
-def context():
-    try:
-        context = ernie.DeviceContext()
-    except RuntimeError as error:
-        pytest.skip(str(error))
-    if context.cuda_ordinal is None:
-        pytest.skip(f"No CUDA device pairs with {context.name}")
+def context(cuda_context):
     wp.init()
-    return context
+    return cuda_context
 
 
 @pytest.fixture

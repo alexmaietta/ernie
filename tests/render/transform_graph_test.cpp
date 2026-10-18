@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file transform_graph_test.cpp
 /// @brief Tests of the transform graph: world transforms composed level by level on the device
-/// match the scene's, poses written on the device compose with the ops the host authors, and
-/// structural changes rebuild the graph and its slot table.
+/// match the scene's, ops written on the device compose with the ops the host authors, and
+/// structural changes cost what they change.
 #include "ernie/render/scene_columns.h"
 #include "ernie/render/transform_graph.h"
 #include "ernie/scene/xform.h"
 
+#include "tests/device/columns.h"
 #include "tests/device/common.h"
 
 #include <gtest/gtest.h>
 
 #include <glm/gtc/quaternion.hpp>
 
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -21,14 +21,7 @@ namespace ernie {
 namespace {
 
 using test::ExpectClean;
-
-std::vector<float> Read(DeviceContext& context, const DeviceColumn& column, const Ticket& after) {
-    Readback readback(context, context.Main(), column.Storage(), column.Range().offset,
-                      column.Bytes(), std::span(&after, 1));
-    std::vector<float> values(column.Bytes() / sizeof(float));
-    std::memcpy(values.data(), readback.Bytes().data(), column.Bytes());
-    return values;
-}
+using test::ReadFloats;
 
 /// Expects a node's world transform to be `expected`'s top three rows.
 void ExpectWorld(const std::vector<float>& worlds, std::uint32_t node, const glm::dmat4& expected) {
@@ -63,7 +56,7 @@ TEST(TransformGraph, ComposesTheScenesHierarchyLevelByLevel) {
     TransformGraph graph(*context, arenas, scene, compiler);
     const Ticket composed = graph.Update();
     EXPECT_EQ(graph.Levels(), 4u) << "World, Arm and Free, Hand, Tip";
-    const std::vector<float> worlds = Read(*context, graph.Worlds(), composed);
+    const std::vector<float> worlds = ReadFloats(*context, graph.Worlds(), composed);
     for (const char* path :
          {"/World", "/World/Arm", "/World/Arm/Hand", "/World/Arm/Hand/Tip", "/World/Free"}) {
         const PrimId prim = *scene.Find(path);
@@ -73,7 +66,7 @@ TEST(TransformGraph, ComposesTheScenesHierarchyLevelByLevel) {
     // An authored edit uploads only its node, and its descendants follow on the device.
     const Transfers before = context->Transfers();
     SetXform(scene, "/World", {.translate = glm::dvec3(0, 0, 10)});
-    const std::vector<float> moved = Read(*context, graph.Worlds(), graph.Update());
+    const std::vector<float> moved = ReadFloats(*context, graph.Worlds(), graph.Update());
     EXPECT_EQ(context->Transfers().uploaded - before.uploaded, 48u) << "one node's local";
     const PrimId tip = *scene.Find("/World/Arm/Hand/Tip");
     ExpectWorld(moved, *graph.Node(tip), scene.WorldTransform(tip));
@@ -124,7 +117,7 @@ TEST(TransformGraph, ComposesPosesWrittenOnTheDevice) {
     const Transfers before = context->Transfers();
     const Ticket synced = columns.Sync(std::span(&simulated, 1));
     const std::vector<float> worlds =
-        Read(*context, graph.Worlds(), graph.Update(std::span(&synced, 1)));
+        ReadFloats(*context, graph.Worlds(), graph.Update(std::span(&synced, 1)));
     EXPECT_EQ(context->Transfers().uploaded, before.uploaded) << "a step costs no uploads";
     for (const int i : {0, 1, 63}) {
         const glm::dmat4 expected = glm::translate(glm::dmat4(1.0), glm::dvec3(10.0 * i, 0, 0)) *
@@ -160,7 +153,7 @@ TEST(TransformGraph, FollowsPrimsComingAndGoingAtWhatTheyCost) {
         << "a change costs what it changes, not the scene";
     EXPECT_FALSE(graph.Node(gone));
     EXPECT_EQ(graph.Node(added), added.slot) << "a prim's node is its stable id's slot";
-    const std::vector<float> worlds = Read(*context, graph.Worlds(), followed);
+    const std::vector<float> worlds = ReadFloats(*context, graph.Worlds(), followed);
     for (const char* path : {"/Ball_0", "/Ball_2", "/Ball_999", "/Ball_9999"}) {
         const PrimId prim = *scene.Find(path);
         ExpectWorld(worlds, *graph.Node(prim), scene.WorldTransform(prim));
@@ -186,7 +179,7 @@ TEST(TransformGraph, ARetypedAncestorKeepsItsDescendants) {
     // hanging from the robot meanwhile and from the arm again after.
     scene.Define("/Robot/Arm", "Xform");
     SetXform(scene, "/Robot/Arm", {.translate = glm::dvec3(0, 5, 0)});
-    const std::vector<float> worlds = Read(*context, graph.Worlds(), graph.Update());
+    const std::vector<float> worlds = ReadFloats(*context, graph.Worlds(), graph.Update());
     EXPECT_EQ(graph.Levels(), 3u);
     for (const char* path : {"/Robot/Arm", "/Robot/Arm/Hand"}) {
         const PrimId prim = *scene.Find(path);
@@ -233,7 +226,7 @@ TEST(TransformGraph, AnyOpOrderComposesOnTheDevice) {
     const Ticket simulated = simulation.Flush();
     const Ticket synced = columns.Sync(std::span(&simulated, 1));
     const std::vector<float> worlds =
-        Read(*context, graph.Worlds(), graph.Update(std::span(&synced, 1)));
+        ReadFloats(*context, graph.Worlds(), graph.Update(std::span(&synced, 1)));
 
     const glm::dmat4 expected = glm::translate(glm::dmat4(1.0), glm::dvec3(0, 0, 2)) *
                                 glm::dmat4(EulerRotation(degrees, RotationOrder::ZYX)) *

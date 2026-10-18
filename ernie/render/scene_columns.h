@@ -15,6 +15,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace ernie {
@@ -81,10 +82,21 @@ class SceneColumns {
     /// @throws std::invalid_argument when the bucket has no such column, or it has no device
     /// element.
     Host HostColumn(BucketId bucket, std::string_view attribute) const;
-    /// Uploads rows [begin, end) of the binding's shadow.
-    void Upload(const Binding& binding, std::uint32_t begin, std::uint32_t end);
-    /// Uploads sorted rows, a run at a time.
-    void UploadRows(Binding& binding, std::span<const std::uint32_t> rows);
+    /// Where each row changed since a cursor has its values from: a row before, or the host.
+    using Origins = std::unordered_map<std::uint32_t, std::uint32_t>;
+
+    static Origins RowOrigins(const ChangeSet& changes, BucketId bucket);
+    /// @return The row `row`'s values come from; rows that did not change keep their own.
+    static std::uint32_t Origin(const Origins& origins, std::uint32_t row);
+    /// @return The device copies that move the kept rows to their new places, moving the shadow
+    /// alike; rows new from the host are added to `hostRows`.
+    std::vector<VkBufferCopy> MoveRows(Binding& binding, const Origins& origins, std::uint32_t rows,
+                                       std::vector<std::uint32_t>& hostRows);
+    /// Adds the rows whose host values were authored anew to `hostRows`.
+    void FindAuthoredRows(const ChangeSet& changes, const Binding& binding, const Origins& origins,
+                          std::uint32_t rows, std::vector<std::uint32_t>& hostRows) const;
+    /// Uploads the binding's shadow at sorted `rows`.
+    void Upload(const Binding& binding, std::span<const std::uint32_t> rows);
     const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
 
     DeviceContext& context_;

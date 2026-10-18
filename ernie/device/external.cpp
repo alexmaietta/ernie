@@ -17,6 +17,25 @@
 namespace ernie {
 namespace {
 
+#if defined(_WIN32)
+using MemoryImport = VkImportMemoryWin32HandleInfoKHR;
+#else
+using MemoryImport = VkImportMemoryFdInfoKHR;
+#endif
+
+/// The allocation info importing the memory behind `handle`.
+MemoryImport ImportInfo(const ExternalHandle& handle) {
+#if defined(_WIN32)
+    return {.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
+            .handleType = kExternalMemoryType,
+            .handle = reinterpret_cast<HANDLE>(handle.Get())};
+#else
+    return {.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
+            .handleType = kExternalMemoryType,
+            .fd = static_cast<int>(handle.Get())};
+#endif
+}
+
 void CreateDedicatedBuffer(VmaAllocator allocator, const VkBufferCreateInfo& info,
                            void* allocateNext, VkBuffer& buffer, VmaAllocation& allocation,
                            VmaAllocationInfo& allocated, const std::string& what) {
@@ -91,21 +110,10 @@ void CreateExportableBuffer(VmaAllocator allocator, const VkBufferCreateInfo& in
 void CreateImportedBuffer(VmaAllocator allocator, const VkBufferCreateInfo& info,
                           ExternalHandle& handle, VkBuffer& buffer, VmaAllocation& allocation,
                           VmaAllocationInfo& allocated) {
-    const std::string what = "Importing " + std::to_string(info.size) + " bytes";
-#if defined(_WIN32)
-    VkImportMemoryWin32HandleInfoKHR imported{
-        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
-        .handleType = kExternalMemoryType,
-        .handle = reinterpret_cast<HANDLE>(handle.Get())};
-    CreateDedicatedBuffer(allocator, info, &imported, buffer, allocation, allocated, what);
-#else
-    VkImportMemoryFdInfoKHR imported{.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
-                                     .handleType = kExternalMemoryType,
-                                     .fd = static_cast<int>(handle.Get())};
-    CreateDedicatedBuffer(allocator, info, &imported, buffer, allocation, allocated, what);
-    // The memory owns the descriptor now.
-    handle.Release();
-#endif
+    MemoryImport imported = ImportInfo(handle);
+    CreateDedicatedBuffer(allocator, info, &imported, buffer, allocation, allocated,
+                          "Importing " + std::to_string(info.size) + " bytes");
+    handle.Imported();
 }
 
 void CreateImportedBuffer(VkDevice device, VkPhysicalDevice physical,
@@ -132,16 +140,7 @@ void CreateImportedBuffer(VkDevice device, VkPhysicalDevice physical,
     if (type == types.memoryTypeCount) {
         throw DeviceError(DeviceErrorKind::Unsupported, what + ": no device-local memory fits");
     }
-#if defined(_WIN32)
-    const VkImportMemoryWin32HandleInfoKHR imported{
-        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
-        .handleType = kExternalMemoryType,
-        .handle = reinterpret_cast<HANDLE>(handle.Get())};
-#else
-    const VkImportMemoryFdInfoKHR imported{.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
-                                           .handleType = kExternalMemoryType,
-                                           .fd = static_cast<int>(handle.Get())};
-#endif
+    const MemoryImport imported = ImportInfo(handle);
     const VkMemoryAllocateFlagsInfo flags{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
                                           .pNext = &imported,
                                           .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT};
