@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file local.slang
+/// @file transform_local.slang
 /// @brief The transform graph's local transforms: each programmed node's ops evaluated in
 /// double-float, bound ops read in place from the columns CUDA, Warp or kernels write.
 import affine;
 import double_float;
-// The op kinds and program layout, generated from transform_graph.cpp's constants.
-import ops;
+import transform_ops;
 
 struct Op { uint kind; uint flags; float* source; float4 hi[3]; float4 lo[3]; };
 struct Parameters { uint* slots; Op* programs; uint* lengths; float4* locals; uint count; };

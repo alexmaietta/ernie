@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file top_levels.cpp
 /// @brief Writing instance records on the device and building the top level over them.
-#include "ernie/render/top_levels.h"
+#include "ernie/render/rt/top_levels.h"
 
-#include "ernie/render/shaders/write_instances.h"
+#include "ernie/shaders/rt/write_instances.h"
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
@@ -37,8 +37,9 @@ TopLevels::TopLevels(DeviceContext& context, const ShaderCompiler& compiler)
                                  std::uint32_t{sizeof(WriteParameters)}),
       pool_(context, "top levels") {}
 
-void TopLevels::AddBuild(graph::Graph& graph, const TransformGraph& transforms,
-                         const InstanceTable& instances, const BottomLevels& bottoms) {
+graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGraph& transforms,
+                                        const InstanceTable& instances,
+                                        const BottomLevels& bottoms) {
     ERNIE_ZONE("Prepare the top level");
     const std::uint32_t count = instances.Count();
     const std::uint32_t capacity = top_ ? top_->Sizes().primitives[0] : 0;
@@ -101,7 +102,7 @@ void TopLevels::AddBuild(graph::Graph& graph, const TransformGraph& transforms,
             const graph::BufferSlice space = pass.Get(scratch);
             RecordBuilds(pass.commands, {}, std::span(&recorded, 1), {space.buffer, space.offset});
         });
-    graph.Board().Put(SceneStructure{.top = top, .address = top_->Address(), .instances = count});
+    return top;
 }
 
 }  // namespace ernie

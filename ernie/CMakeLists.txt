@@ -28,6 +28,7 @@ add_subdirectory(io)
 add_subdirectory(scene)
 add_subdirectory(device)
 add_subdirectory(graph)
+add_subdirectory(shaders)
 add_subdirectory(render)
 
 set(ernie_layers

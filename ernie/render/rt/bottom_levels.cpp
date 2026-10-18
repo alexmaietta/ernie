@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file bottom_levels.cpp
 /// @brief Building, refitting and compacting each geometry's bottom level as frame-graph passes.
-#include "ernie/render/bottom_levels.h"
+#include "ernie/render/rt/bottom_levels.h"
 
 #include "ernie/util/profiler.h"
 

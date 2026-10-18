@@ -4,8 +4,7 @@
 /// direction need not be unit length. The sphere's roots follow Haines et al., "Precision
 /// Improvements for Ray/Sphere Intersection", Ray Tracing Gems ch. 7, 2019: the discriminant from
 /// the ray's closest approach, and the smaller root from the larger by Vieta's formula.
-// The geometry kinds, generated from GeometryKind in ray_tracer.cpp.
-import geometry_kinds;
+import geometry;
 
 /// The nearest hit along a ray, and the shape's outward normal there in its own frame.
 public struct ShapeHit {

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file compose.slang
+/// @file transform_compose.slang
 /// @brief One level of the transform graph: each node's world from its parent's and its local, in
 /// double-float.
 import affine;
 import double_float;
-// The op kinds and program layout, generated from transform_graph.cpp's constants.
-import ops;
+import transform_ops;
 
 struct Parameters { uint* slots; uint* parents; float4* locals; float4* worlds; uint count; };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;

@@ -19,9 +19,9 @@ namespace {
 using test::ExpectClean;
 
 /// Traces a ray down -z from (x, y, 100) for each (x, y), writing the hit distance or -1.
-/// Procedural candidates are unit spheres, as the scenes here hold no other shape.
 const ShaderModule kTrace{"trace", R"(
-struct Parameters { uint64_t scene; float2* rays; float* hits; uint count; };
+import ray_tracer;
+struct Parameters { TracerParameters tracer; float2* rays; float* hits; uint count; };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
 [shader("compute")]
@@ -30,39 +30,15 @@ void main(uint3 id : SV_DispatchThreadID) {
     if (id.x >= parameters.count) {
         return;
     }
-    RayDesc ray;
-    ray.Origin = float3(parameters.rays[id.x], 100);
-    ray.Direction = float3(0, 0, -1);
-    ray.TMin = 0;
-    ray.TMax = 1e30;
-    RayQuery<RAY_FLAG_NONE> query;
-    query.TraceRayInline(RaytracingAccelerationStructure(parameters.scene), RAY_FLAG_NONE, 0xff,
-                         ray);
-    while (query.Proceed()) {
-        if (query.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE) {
-            float3x4 toObject = query.CandidateWorldToObject3x4();
-            float3 origin = mul(toObject, float4(query.WorldRayOrigin(), 1));
-            float3 direction = mul(toObject, float4(query.WorldRayDirection(), 0));
-            // Object-space distance along an unnormalised direction is world distance.
-            float a = dot(direction, direction);
-            float b = dot(origin, direction);
-            float c = dot(origin, origin) - 1;
-            float discriminant = b * b - a * c;
-            if (discriminant >= 0) {
-                float t = (-b - sqrt(discriminant)) / a;
-                if (t >= 0 && t < query.CommittedRayT()) {
-                    query.CommitProceduralPrimitiveHit(t);
-                }
-            }
-        }
-    }
-    parameters.hits[id.x] =
-        query.CommittedStatus() == COMMITTED_NOTHING ? -1 : query.CommittedRayT();
+    RayDesc ray = { float3(parameters.rays[id.x], 100), 0, float3(0, 0, -1), 1e30 };
+    Hit hit = RayTracer(parameters.tracer).TraceClosest(ray, 0xff);
+    parameters.hits[id.x] = hit.found ? hit.t : -1;
 }
 )"};
 
 struct TraceParameters {
-    VkDeviceAddress scene, rays, hits;
+    TracerParameters tracer;
+    VkDeviceAddress rays, hits;
     std::uint32_t count, pad;
 };
 
@@ -77,8 +53,9 @@ class AccelerationScene : public ::testing::Test {
             GTEST_SKIP() << context_->Info().name << " has no ray queries";
         }
         const ShaderCompiler compiler;
-        trace_ = std::make_unique<ComputeKernel>(*context_,
-                                                 compiler.Spirv(std::span(&kTrace, 1), "main"),
+        std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
+        modules.push_back(kTrace);
+        trace_ = std::make_unique<ComputeKernel>(*context_, compiler.Spirv(modules, "main"),
                                                  "trace", std::uint32_t{sizeof(TraceParameters)});
         arenas_ = std::make_unique<Arenas>(*context_, MemoryUse::Device, "scene", 1 << 20);
         rays_ = std::make_unique<DeviceColumn>(*arenas_, "rays", DType::Float32,
@@ -119,19 +96,19 @@ class AccelerationScene : public ::testing::Test {
         const auto count = static_cast<std::uint32_t>(rays.size());
         const Ticket done = device_->Execute(
             [&](graph::Graph& graph) {
-                const SceneStructure& structure = graph.Board().Get<SceneStructure>();
+                const TraceScene& scene = graph.Board().Get<TraceScene>();
                 const graph::Buffer from = graph.Import(*rays_, "rays");
                 graph::Buffer to = graph.Import(*hits_, "hits");
                 graph.Add(
                     "Trace", graph::Kind::Compute,
                     [&](graph::PassBuilder& pass) {
-                        pass.Read(structure.top);
+                        scene.Read(pass);
                         pass.ReadAddress(from);
                         to = pass.WriteAddress(to, graph::Use::StorageWrite);
                     },
-                    [this, from, to, count, address = structure.address](graph::PassContext& pass) {
+                    [this, from, to, count, tracer = scene.parameters](graph::PassContext& pass) {
                         trace_->Dispatch(pass.commands, {1, 1, 1},
-                                         TraceParameters{address, pass.Get(from).Address(),
+                                         TraceParameters{tracer, pass.Get(from).Address(),
                                                          pass.Get(to).Address(), count, 0});
                     });
             },
@@ -158,7 +135,7 @@ TEST_F(AccelerationScene, TracesMeshesAndSpheresWhereTheSceneHasThem) {
     EXPECT_NEAR(hits[1], 94.0f, 1e-4f) << "the ball's top, exactly round";
     EXPECT_EQ(hits[2], -1.0f) << "beyond the ground";
     EXPECT_EQ(device_->Instances().Count(), 2u);
-    EXPECT_EQ(device_->Bottoms()->Pending(), 0u);
+    EXPECT_EQ(device_->Tracer()->Bottoms().Pending(), 0u);
 }
 
 TEST_F(AccelerationScene, FollowsPrimsMovingComingAndGoing) {
@@ -167,7 +144,7 @@ TEST_F(AccelerationScene, FollowsPrimsMovingComingAndGoing) {
     for (int frame = 0; frame < 3; ++frame) {
         EXPECT_NEAR(Frame({{0, 0}})[0], 100.0f, 1e-4f) << "frame " << frame;
     }
-    const BottomLevels::Statistics& totals = device_->Bottoms()->Totals();
+    const BottomLevels::Statistics& totals = device_->Tracer()->Bottoms().Totals();
     EXPECT_EQ(totals.built, 2u) << "the ground and the unit sphere, once each";
     EXPECT_EQ(totals.compacted, 2u) << "both, a frame or more after their builds";
     SetXform(scene_, "/Props/Ball", {.translate = glm::dvec3(-4, 0, 4)});

@@ -14,11 +14,10 @@
 
 #include "ernie/device/shader_compiler.h"
 #include "ernie/graph/graph.h"
-#include "ernie/render/bottom_levels.h"
 #include "ernie/render/geometry.h"
 #include "ernie/render/instances.h"
+#include "ernie/render/rt/ray_tracer.h"
 #include "ernie/render/scene_columns.h"
-#include "ernie/render/top_levels.h"
 #include "ernie/render/transform_graph.h"
 
 #include <functional>
@@ -30,8 +29,7 @@ namespace ernie {
 /// @brief A scene on a device and the graph each frame runs: the columns bound on the device
 /// follow the scene, world transforms compose from them, the geometry and its acceleration
 /// structures follow, and then the frame's own passes run, finding what to trace as a
-/// `SceneStructure` on the graph's blackboard. Devices without ray queries get no acceleration
-/// structures yet.
+/// `TraceScene` on the graph's blackboard. Devices without ray queries get no ray tracer yet.
 class DeviceScene {
   public:
     /// @param arenas Where the device columns live; `MemoryUse::Shared` to share them with CUDA.
@@ -52,9 +50,9 @@ class DeviceScene {
     InstanceTable& Instances() {
         return instances_;
     }
-    /// @return The bottom levels, or null on devices without ray queries.
-    BottomLevels* Bottoms() {
-        return bottoms_.get();
+    /// @return The ray tracer, or null on devices without ray queries.
+    RayTracer* Tracer() {
+        return tracer_.get();
     }
     /// @return Where the frames' transients come from.
     graph::TransientPool& Pool() {
@@ -76,8 +74,7 @@ class DeviceScene {
     TransformGraph transforms_;
     GeometryPool geometry_;
     InstanceTable instances_;
-    std::unique_ptr<BottomLevels> bottoms_;
-    std::unique_ptr<TopLevels> tops_;
+    std::unique_ptr<RayTracer> tracer_;
 };
 
 }  // namespace ernie

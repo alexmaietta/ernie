@@ -4,13 +4,14 @@
 /// composing it on the device.
 #include "ernie/render/transform_graph.h"
 
-#include "ernie/render/shaders/affine.h"
-#include "ernie/render/shaders/compose.h"
-#include "ernie/render/shaders/double_float.h"
-#include "ernie/render/shaders/local.h"
-#include "ernie/render/shaders/world.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
+#include "ernie/shaders/math/affine.h"
+#include "ernie/shaders/math/double_float.h"
+#include "ernie/shaders/scene/transform_compose.h"
+#include "ernie/shaders/scene/transform_local.h"
+#include "ernie/shaders/scene/transform_ops.h"
+#include "ernie/shaders/scene/world.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -21,35 +22,6 @@
 
 namespace ernie {
 namespace {
-
-// A program's op kinds: a folded constant, then each `XformOpKind` after it.
-constexpr std::uint32_t kConstant = 0;
-constexpr std::uint32_t kInvert = 1;
-constexpr std::uint32_t kFloatsShift = 8;
-
-constexpr std::uint32_t ProgramKind(XformOpKind kind) {
-    return 1 + static_cast<std::uint32_t>(kind);
-}
-
-/// The op kinds and the program layout, from the constants above, for the kernels to import.
-ShaderModule OpConstants() {
-    std::string source;
-    const auto constant = [&](const char* name, std::uint32_t value) {
-        source +=
-            std::string("public static const uint ") + name + " = " + std::to_string(value) + ";\n";
-    };
-    constant("kConstant", kConstant);
-    constant("kTranslate", ProgramKind(XformOpKind::Translate));
-    constant("kScale", ProgramKind(XformOpKind::Scale));
-    constant("kRotateX", ProgramKind(XformOpKind::RotateX));
-    constant("kRotateXYZ", ProgramKind(XformOpKind::RotateXYZ));
-    constant("kOrient", ProgramKind(XformOpKind::Orient));
-    constant("kInvert", kInvert);
-    constant("kFloatsShift", kFloatsShift);
-    constant("kMaxOps", TransformGraph::kMaxOps);
-    constant("kNone", TransformGraph::kNone);
-    return {"ops", std::move(source)};
-}
 
 struct LocalParameters {
     VkDeviceAddress slots, programs, lengths, locals;
@@ -62,7 +34,8 @@ struct ComposeParameters {
 static_assert(sizeof(TransformGraph::DeviceOp) == 112);
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler, const ShaderModule& kernel) {
-    const std::array modules{shaders::kAffine, shaders::kDoubleFloat, OpConstants(), kernel};
+    const std::array modules{shaders::kAffine, shaders::kDoubleFloat, shaders::kTransformOps,
+                             kernel};
     return compiler.Spirv(modules, "main");
 }
 
@@ -114,9 +87,9 @@ glm::uvec3 Groups(std::size_t threads) {
 TransformGraph::TransformGraph(DeviceContext& context, Arenas& arenas, const Scene& scene,
                                const ShaderCompiler& compiler)
     : context_(context), arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
-      local_(context, Compile(compiler, shaders::kLocal), "local transforms",
+      local_(context, Compile(compiler, shaders::kTransformLocal), "local transforms",
              sizeof(LocalParameters)),
-      compose_(context, Compile(compiler, shaders::kCompose), "world transforms",
+      compose_(context, Compile(compiler, shaders::kTransformCompose), "world transforms",
                sizeof(ComposeParameters)) {
     const auto column = [&](std::string_view name, DType type, std::vector<std::int64_t> element) {
         return std::make_unique<DeviceColumn>(arenas, name, type, std::move(element), 0);
@@ -401,7 +374,7 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
     // Runs of the host's ops become one matrix each.
     const auto fold = [&] {
         if (folded != glm::dmat4(1.0) && built.onDevice) {
-            push({.kind = kConstant, .constant = Split(folded)});
+            push({.kind = kConstantOp, .constant = Split(folded)});
             folded = glm::dmat4(1.0);
         }
     };
@@ -415,8 +388,8 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
         fold();
         const DeviceColumn& column = *bound->column;
         const auto floats = static_cast<std::uint32_t>(Floats(column));
-        push({.kind = ProgramKind(op.kind),
-              .flags = (op.invert ? kInvert : 0u) | floats << kFloatsShift,
+        push({.kind = OpKind(op.kind),
+              .flags = (op.invert ? kInvertFlag : 0u) | floats << kFloatsShift,
               .source = bound->address + row * column.RowBytes()});
     }
     fold();

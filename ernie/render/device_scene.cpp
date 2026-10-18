@@ -11,8 +11,7 @@ DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& sc
       transforms_(context, arenas, scene, compiler), geometry_(context, arenas, scene),
       instances_(context, arenas) {
     if (context.Capabilities().rayQuery) {
-        bottoms_ = std::make_unique<BottomLevels>(context, arenas, geometry_);
-        tops_ = std::make_unique<TopLevels>(context, compiler);
+        tracer_ = std::make_unique<RayTracer>(context, arenas, compiler, geometry_);
     }
 }
 
@@ -26,10 +25,8 @@ Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,
     instances_.Apply(changes);
     geometry_.AddUploads(graph);
     instances_.AddUploads(graph);
-    if (bottoms_) {
-        bottoms_->Apply(changes);
-        bottoms_->AddBuilds(graph);
-        tops_->AddBuild(graph, transforms_, instances_, *bottoms_);
+    if (tracer_) {
+        tracer_->AddBuild(graph, changes, transforms_, instances_);
     }
     if (passes) {
         passes(graph);

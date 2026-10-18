@@ -63,6 +63,14 @@ class TransformGraph {
         bool operator==(const DeviceOp&) const = default;
     };
     using Program = std::array<DeviceOp, kMaxOps>;
+    /// A `DeviceOp::kind`: a folded constant, then each `XformOpKind` after it.
+    static constexpr std::uint32_t kConstantOp = 0;
+    static constexpr std::uint32_t OpKind(XformOpKind kind) {
+        return 1 + static_cast<std::uint32_t>(kind);
+    }
+    /// `DeviceOp::flags`' inverting bit, and where its float count starts.
+    static constexpr std::uint32_t kInvertFlag = 1;
+    static constexpr std::uint32_t kFloatsShift = 8;
 
     TransformGraph(DeviceContext& context, Arenas& arenas, const Scene& scene,
                    const ShaderCompiler& compiler);

@@ -8,23 +8,13 @@
 #include "ernie/device/kernel.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/graph/graph.h"
-#include "ernie/render/bottom_levels.h"
 #include "ernie/render/instances.h"
+#include "ernie/render/rt/bottom_levels.h"
 #include "ernie/render/transform_graph.h"
 
-#include <cstdint>
 #include <memory>
 
 namespace ernie {
-
-/// @brief What a frame's passes trace, left on the graph's blackboard by `TopLevels::AddBuild`.
-struct SceneStructure {
-    /// The top level, for passes to read with `Use::Trace`.
-    graph::Acceleration top;
-    /// Its address, as kernels trace it: `RaytracingAccelerationStructure(address)`.
-    std::uint64_t address = 0;
-    std::uint32_t instances = 0;
-};
 
 /// @brief The scene's top level, rebuilt every frame: a kernel writes each instance's record from
 /// its world transform, its shape transform and its geometry's bottom level, and the build follows.
@@ -38,10 +28,10 @@ class TopLevels {
     TopLevels& operator=(const TopLevels&) = delete;
 
     /// @brief Adds the passes that write the instances and build the top level, after the
-    /// transforms, the instance uploads and the bottom levels' builds, and puts a
-    /// `SceneStructure` on the graph's blackboard.
-    void AddBuild(graph::Graph& graph, const TransformGraph& transforms,
-                  const InstanceTable& instances, const BottomLevels& bottoms);
+    /// transforms, the instance uploads and the bottom levels' builds.
+    /// @return The top level built, for passes to read with `Use::Trace`.
+    graph::Acceleration AddBuild(graph::Graph& graph, const TransformGraph& transforms,
+                                 const InstanceTable& instances, const BottomLevels& bottoms);
 
     /// @return The top level as last built, or null before the first build.
     const AccelerationStructure* Structure() const {
