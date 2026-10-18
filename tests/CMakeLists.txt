@@ -102,6 +102,15 @@ ernie_add_test_suite(
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
 
+if(TARGET ernie_viewer)
+    ernie_add_test_suite(
+        app
+        SOURCES app/orbit_camera_test.cpp app/shell_test.cpp app/view_test.cpp
+        LIBRARIES ernie_viewer
+    )
+    ernie_add_test_suite(app_gpu LABEL gpu SOURCES app/viewer_test.cpp LIBRARIES ernie_viewer)
+endif()
+
 if(TARGET _ernie)
     # The interpreter tests run with; CI passes the one on its PATH.
     set(ERNIE_TEST_PYTHON

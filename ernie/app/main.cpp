@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file main.cpp
-/// @brief The ernie program.
+/// @brief The ernie program: the viewer, and the schema and scene tools.
+#include "ernie/app/view.h"
 #include "ernie/device/device.h"
 #include "ernie/scene/reference.h"
 #include "ernie/util/file.h"
 #include "ernie/util/version.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -17,9 +21,11 @@ namespace {
 namespace fs = std::filesystem;
 
 void PrintUsage() {
-    std::puts("Usage: ernie [--version] [--devices] [--help]\n"
-              "       ernie schema [--json-schema FILE] [--markdown DIR] [--usda DIR]\n"
-              "       ernie validate SCENE.json...");
+    std::printf("Usage: %.*s\n"
+                "       ernie --version | --devices | --help\n"
+                "       ernie schema [--json-schema FILE] [--markdown DIR] [--usda DIR]\n"
+                "       ernie validate SCENE.json...\n",
+                static_cast<int>(ernie::app::ViewUsage().size()), ernie::app::ViewUsage().data());
 }
 
 int PrintDevices() {
@@ -31,13 +37,6 @@ int PrintDevices() {
     return 0;
 }
 
-void Write(const fs::path& path, std::string_view text) {
-    if (path.has_parent_path()) {
-        fs::create_directories(path.parent_path());
-    }
-    ernie::WriteTextFile(path, text);
-}
-
 /// Writes the views of the schema registry that `arguments` ask for.
 int Schema(const std::vector<std::string_view>& arguments) {
     if (arguments.empty() || arguments.size() % 2 != 0) {
@@ -47,15 +46,16 @@ int Schema(const std::vector<std::string_view>& arguments) {
     for (std::size_t i = 0; i < arguments.size(); i += 2) {
         const fs::path out(arguments[i + 1]);
         if (arguments[i] == "--json-schema") {
-            Write(out, ernie::SceneJsonSchema());
+            ernie::WriteTextFile(out, ernie::SceneJsonSchema());
         } else if (arguments[i] == "--markdown") {
             for (const ernie::SchemaFamily& family : ernie::SchemaFamilies()) {
-                Write(out / (std::string(family.name) + ".md"), ernie::ReferencePage(family));
+                ernie::WriteTextFile(out / (std::string(family.name) + ".md"),
+                                     ernie::ReferencePage(family));
             }
         } else if (arguments[i] == "--usda") {
             const ernie::UsdSchemaPlugin plugin = ernie::ErnieUsdSchemaPlugin();
-            Write(out / "generatedSchema.usda", plugin.generatedSchema);
-            Write(out / "plugInfo.json", plugin.plugInfo);
+            ernie::WriteTextFile(out / "generatedSchema.usda", plugin.generatedSchema);
+            ernie::WriteTextFile(out / "plugInfo.json", plugin.plugInfo);
         } else {
             PrintUsage();
             return 2;
@@ -82,28 +82,46 @@ int Validate(const std::vector<std::string_view>& files) {
     return status;
 }
 
+/// Opens the viewer; only `ernie`, `ernie view` and a scene file or viewer options get here.
+int View(const std::vector<std::string_view>& arguments) {
+    ernie::app::ViewCommand command;
+    try {
+        command = ernie::app::ParseViewCommand(arguments);
+    } catch (const std::invalid_argument& error) {
+        std::fprintf(stderr, "ernie: %s\n", error.what());
+        PrintUsage();
+        return 2;
+    }
+    return ernie::app::RunView(command);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
-    const std::string_view option = argc > 1 ? argv[1] : "--help";
-    const std::vector<std::string_view> rest(argv + std::min(argc, 2), argv + argc);
+    const std::vector<std::string_view> arguments(argv + std::min(argc, 1), argv + argc);
+    const std::string_view command = arguments.empty() ? "" : arguments.front();
+    const std::vector<std::string_view> rest(arguments.begin() + (arguments.empty() ? 0 : 1),
+                                             arguments.end());
     try {
-        if (option == "--version") {
+        if (command == "--version") {
             std::printf("ernie %.*s\n", static_cast<int>(ernie::Version().size()),
                         ernie::Version().data());
             return 0;
         }
-        if (option == "--devices") {
+        if (command == "--help") {
+            PrintUsage();
+            return 0;
+        }
+        if (command == "--devices") {
             return PrintDevices();
         }
-        if (option == "schema") {
+        if (command == "schema") {
             return Schema(rest);
         }
-        if (option == "validate") {
+        if (command == "validate") {
             return Validate(rest);
         }
-        PrintUsage();
-        return option == "--help" ? 0 : 2;
+        return View(command == "view" ? rest : arguments);
     } catch (const std::exception& error) {
         std::fprintf(stderr, "ernie: %s\n", error.what());
         return 1;
