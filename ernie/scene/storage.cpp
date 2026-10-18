@@ -148,7 +148,7 @@ std::uint32_t PrimStore::AddRows(BucketId bucket, std::uint32_t count) {
 }
 
 void PrimStore::Remove(PrimId prim) {
-    SlotData& slot = const_cast<SlotData&>(Slot(prim));
+    SlotData& slot = Slot(prim);
     DropRow(slot);
     pathSlots_[slot.path] = kNoSlot;
     slot.alive = false;
@@ -157,7 +157,7 @@ void PrimStore::Remove(PrimId prim) {
 }
 
 void PrimStore::Move(PrimId prim, BucketId bucket) {
-    SlotData& slot = const_cast<SlotData&>(Slot(prim));
+    SlotData& slot = Slot(prim);
     if (slot.bucket == bucket) {
         return;
     }
@@ -167,14 +167,11 @@ void PrimStore::Move(PrimId prim, BucketId bucket) {
     to.prims[row] = prim;
     const std::uint64_t version = Next();
     for (const Column& source : from.columns) {
-        const auto found = to.columnIndex.find(source.attribute);
-        if (found == to.columnIndex.end() || !source.authored.Test(slot.row)) {
-            continue;
-        }
-        Column& column = to.columns[found->second];
-        if (column.values->Type() == source.values->Type()) {
-            column.values->CopyRow(row, *source.values, slot.row);
-            Stamp(bucket, column, row, row + 1, version);
+        Column* column = to.Find(source.attribute);
+        if (column != nullptr && source.authored.Test(slot.row) &&
+            column->values->Type() == source.values->Type()) {
+            column->values->CopyRow(row, *source.values, slot.row);
+            Stamp(bucket, *column, row, row + 1, version);
         }
     }
     DropRow(slot);
@@ -207,15 +204,13 @@ void PrimStore::DropRow(const SlotData& slot) {
 
 void PrimStore::Clear(PrimId prim, AttributeId attribute) {
     const SlotData& slot = Slot(prim);
-    Bucket& b = *buckets_[slot.bucket];
-    const auto found = b.columnIndex.find(attribute);
-    if (found == b.columnIndex.end() || !b.columns[found->second].authored.Test(slot.row)) {
+    Column* column = buckets_[slot.bucket]->Find(attribute);
+    if (column == nullptr || !column->authored.Test(slot.row)) {
         return;
     }
-    Column& column = b.columns[found->second];
-    column.values->Reset(slot.row);
-    column.authored.Set(slot.row, false);
-    Touch(slot.bucket, column, slot.row, slot.row + 1, Next());
+    column->values->Reset(slot.row);
+    column->authored.Set(slot.row, false);
+    Touch(slot.bucket, *column, slot.row, slot.row + 1, Next());
 }
 
 void PrimStore::Log(Bucket& bucket, StructuralChange change) {
@@ -252,23 +247,29 @@ ChangeSet PrimStore::ChangesSince(std::uint64_t cursor) const {
         if (bucket.version <= cursor) {
             continue;
         }
-        if (cursor < bucket.logStart) {
-            changes.resets.push_back(id);
-            continue;
-        }
-        const auto newer = std::upper_bound(
-            bucket.log.begin(), bucket.log.end(), cursor,
-            [](std::uint64_t at, const StructuralChange& change) { return at < change.version; });
-        for (auto change = newer; change != bucket.log.end(); ++change) {
-            changes.rows.push_back({id, *change});
+        // A reader too far behind to replay the log gets the bucket afresh: every row new and
+        // every value changed.
+        const bool reset = cursor < bucket.logStart;
+        if (reset) {
+            changes.rows.push_back(
+                {id, {bucket.version, StructuralChange::Kind::Reset, 0, bucket.Rows(), 0}});
+        } else {
+            const auto newer =
+                std::upper_bound(bucket.log.begin(), bucket.log.end(), cursor,
+                                 [](std::uint64_t at, const StructuralChange& change) {
+                                     return at < change.version;
+                                 });
+            for (auto change = newer; change != bucket.log.end(); ++change) {
+                changes.rows.push_back({id, *change});
+            }
         }
         for (const Column& column : bucket.columns) {
-            if (column.version <= cursor) {
+            if (column.version <= cursor && !reset) {
                 continue;
             }
             ChangeSet::Values values{id, column.attribute, {}};
             for (std::uint32_t chunk = 0; chunk < column.chunkVersions.size(); ++chunk) {
-                if (column.chunkVersions[chunk] <= cursor) {
+                if (column.chunkVersions[chunk] <= cursor && !reset) {
                     continue;
                 }
                 const std::uint32_t begin = chunk * kChunkRows;

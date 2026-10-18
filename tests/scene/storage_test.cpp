@@ -19,8 +19,8 @@ struct Spheres {
     AttributeId color = store.Tokens().Intern("color");
     BucketId bucket = store.AddBucket(
         {store.Tokens().Intern("Sphere"), {}},
-        std::vector<ColumnLayout>{ColumnLayout::Of<double>(radius, 1.0),
-                                  ColumnLayout::Of<glm::dvec3>(color, glm::dvec3(0.5))});
+        std::vector<ColumnLayout>{ColumnLayout::Make<double>(radius, 1.0),
+                                  ColumnLayout::Make<glm::dvec3>(color, glm::dvec3(0.5))});
 
     PrimId Define(const std::string& path) {
         return store.Define(store.Paths().Intern(Path(path)), bucket);
@@ -53,8 +53,8 @@ TEST(PrimStore, MovingToAnotherBucketKeepsTheIdAndSharedAuthoredValues) {
     const AttributeId height = s.store.Tokens().Intern("height");
     const BucketId cylinders =
         s.store.AddBucket({s.store.Tokens().Intern("Cylinder"), {}},
-                          std::vector<ColumnLayout>{ColumnLayout::Of<double>(s.radius, 1.0),
-                                                    ColumnLayout::Of<double>(height, 2.0)});
+                          std::vector<ColumnLayout>{ColumnLayout::Make<double>(s.radius, 1.0),
+                                                    ColumnLayout::Make<double>(height, 2.0)});
     const PrimId a = s.Define("/A");
     const PrimId b = s.Define("/B");
     s.store.Set(a, s.radius, 3.0);
@@ -196,9 +196,12 @@ TEST(PrimStore, ReadersTooFarBehindResyncTheBucket) {
     for (int i = 0; i < 70'000; ++i) {
         s.store.Remove(s.store.Define(path, s.bucket));
     }
+    s.store.Define(path, s.bucket);
     const ChangeSet changes = s.store.ChangesSince(0);
-    EXPECT_EQ(changes.resets, std::vector<BucketId>{s.bucket});
-    EXPECT_TRUE(changes.rows.empty());
+    ASSERT_EQ(changes.rows.size(), 1u) << "the bucket afresh, not its log";
+    EXPECT_EQ(changes.rows[0].change.kind, StructuralChange::Kind::Reset);
+    EXPECT_EQ(changes.rows[0].change.count, 1u);
+    EXPECT_FALSE(changes.values.empty()) << "every column's rows changed";
     EXPECT_FALSE(s.store.ChangesSince(s.store.Version() - 2).rows.empty()) << "recent changes stay";
 }
 

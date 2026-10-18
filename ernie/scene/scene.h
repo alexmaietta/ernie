@@ -171,11 +171,8 @@ class Scene {
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
     /// @return The attribute's value when the prim authors it as a `T`, or null.
     template <typename T> const T* Authored(PrimId prim, std::string_view attribute) const {
-        const Column* column = AuthoredColumn(prim, attribute);
-        if (column == nullptr || column->values->Type() != kColumnType<T>) {
-            return nullptr;
-        }
-        return &store_.Read<T>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
+        const std::optional<Token> token = store_.Tokens().Find(attribute);
+        return token ? store_.Get<T>(prim, *token) : nullptr;
     }
     std::optional<Value> CellValue(PrimId prim, const Column* column) const;
     /// Checks a value against the attribute and authors it; with `checked`, converts it there
@@ -191,23 +188,12 @@ class Scene {
 
     /// Resolves every inherited attribute for the subtrees changed since the last resolve.
     void Resolve();
-    /// @return The paths of the prims whose subtrees resolve `attribute` again: those added, reset
-    /// or with it changed.
-    BitSet ResolveRoots(const ChangeSet& changes, AttributeId attribute) const;
-    /// @return What `attribute` resolves to from the prim's own value: null when it doesn't
-    /// author it, or authors "inherited".
-    template <typename T> const T* Inheritable(PrimId prim, AttributeId attribute) const;
-    /// @return The value `path` inherits from its ancestors.
-    template <typename T> T Above(PathId path, AttributeId attribute, const T& fallback) const;
-    /// Resolves `attribute` over the subtree at `root`, descending past a prim only while its
-    /// resolved value changes or it is one of `roots`, which it clears as it reaches them.
-    template <typename T>
-    void ResolveSubtree(PathId root, AttributeId attribute, AttributeId resolved, const T& fallback,
-                        BitSet& roots);
     const AttributeDef* Declared(BucketId bucket, AttributeId attribute) const;
     /// @return Whether the prim's type or an applied API schema leaves the attribute's namespace
     /// open; any attribute for a prim without a type.
     bool TakesUndeclared(PrimId prim, std::string_view attribute) const;
+    /// @throws std::invalid_argument unless the prim takes the undeclared attribute.
+    void RequireUndeclared(PrimId prim, std::string_view attribute) const;
     ColumnType TypeForUndeclared(PrimId prim, std::string_view attribute, const Value& value) const;
     /// @return Whether the prim and its subtree are invisible or of a purpose bounds leave out.
     bool LeavesOutOfBounds(PrimId prim) const;

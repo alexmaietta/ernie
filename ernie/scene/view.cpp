@@ -24,7 +24,7 @@ PrimId Check(const Scene& scene, const Path& path, const SchemaDef& schema,
         return prim;
     }
     const SchemaDef* type = scene.Schema(prim);
-    if (type == nullptr || !type->IsA(schema)) {
+    if (!IsA(type, schema)) {
         const std::string_view name = type != nullptr ? type->name : "a prim without a type";
         throw std::invalid_argument("'" + path.String() + "' is " + std::string(name) + ", not a " +
                                     std::string(schema.name));

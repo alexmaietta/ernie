@@ -25,7 +25,7 @@ struct Robots {
         transform = store->Tokens().Intern("xformOp:transform");
         bucket = store->AddBucket(
             {store->Tokens().Intern("Xform"), {}},
-            std::vector<ColumnLayout>{ColumnLayout::Of<glm::dmat4>(transform, glm::dmat4(1.0))});
+            std::vector<ColumnLayout>{ColumnLayout::Make<glm::dmat4>(transform, glm::dmat4(1.0))});
         prims.clear();
     }
 

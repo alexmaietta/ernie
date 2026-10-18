@@ -239,6 +239,11 @@ struct SchemaDef {
     }
 };
 
+/// @return Whether `schema` is `base` or derives from it; false for no schema.
+inline bool IsA(const SchemaDef* schema, const SchemaDef& base) {
+    return schema != nullptr && schema->IsA(base);
+}
+
 /// @return Every registered schema, bases before the types deriving from them.
 std::span<const SchemaDef* const> Schemas();
 /// @return The schema named `name`, or null.

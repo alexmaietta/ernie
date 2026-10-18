@@ -29,8 +29,6 @@ class HolderIndex {
     }
 
     void Index(PrimId prim, AttributeId attribute, std::vector<PathId> targets);
-    /// @return Whether the prim is alive and its relationship still targets `target`.
-    static bool Holds(const PrimStore& store, PrimId prim, AttributeId attribute, PathId target);
 
     /// Each target's holding cells, with the generation of the prim that wrote them.
     std::unordered_map<PathId, std::unordered_map<Cell, std::uint32_t>> holders_;

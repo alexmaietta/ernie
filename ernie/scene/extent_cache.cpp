@@ -14,28 +14,20 @@ void ExtentCache::Track(BucketId bucket, ExtentFunction compute) {
 
 void ExtentCache::Update(const PrimStore& store) {
     const ChangeSet changes = store.ChangesSince(cursor_);
-    const auto tracked = [&](BucketId bucket) {
-        return bucket < buckets_.size() && buckets_[bucket].compute != nullptr;
-    };
-    for (const BucketId bucket : changes.resets) {
-        if (tracked(bucket)) {
-            Resize(buckets_[bucket], 0);
-        }
-    }
     for (const ChangeSet::Rows& rows : changes.rows) {
-        if (tracked(rows.bucket)) {
+        if (Tracked(rows.bucket)) {
             Replay(buckets_[rows.bucket], rows.change);
         }
     }
     for (const ChangeSet::Values& values : changes.values) {
-        if (tracked(values.bucket)) {
+        if (Tracked(values.bucket)) {
             for (const RowRange range : values.rows) {
                 buckets_[values.bucket].stale.SetRange(range.begin, range.end);
             }
         }
     }
     for (BucketId bucket = 0; bucket < buckets_.size(); ++bucket) {
-        if (tracked(bucket) && store.GetBucket(bucket).version > cursor_) {
+        if (Tracked(bucket) && store.GetBucket(bucket).version > cursor_) {
             Refresh(buckets_[bucket], store, bucket);
         }
     }
@@ -44,16 +36,23 @@ void ExtentCache::Update(const PrimStore& store) {
 
 std::optional<Box> ExtentCache::Find(const PrimStore& store, BucketId bucket,
                                      std::uint32_t row) const {
-    if (bucket >= buckets_.size() || buckets_[bucket].compute == nullptr ||
-        store.GetBucket(bucket).version > cursor_ || row >= buckets_[bucket].boxes.size()) {
+    if (!Tracked(bucket) || store.GetBucket(bucket).version > cursor_ ||
+        row >= buckets_[bucket].boxes.size()) {
         return std::nullopt;
     }
     return buckets_[bucket].boxes[row];
 }
 
+bool ExtentCache::Tracked(BucketId bucket) const {
+    return bucket < buckets_.size() && buckets_[bucket].compute != nullptr;
+}
+
 void ExtentCache::Replay(Entry& entry, const StructuralChange& change) {
     using Kind = StructuralChange::Kind;
-    if (change.kind == Kind::Added) {
+    if (change.kind == Kind::Reset) {
+        Resize(entry, 0);
+    }
+    if (change.kind == Kind::Added || change.kind == Kind::Reset) {
         Resize(entry, change.row + change.count);
         entry.stale.SetRange(change.row, change.row + change.count);
     } else if (change.kind == Kind::Moved) {
@@ -72,12 +71,6 @@ void ExtentCache::Resize(Entry& entry, std::uint32_t rows) {
 }
 
 void ExtentCache::Refresh(Entry& entry, const PrimStore& store, BucketId bucket) {
-    const std::uint32_t rows = store.GetBucket(bucket).Rows();
-    if (entry.boxes.size() != rows) {
-        // Too far behind to replay (a reset): recompute the bucket whole.
-        Resize(entry, rows);
-        entry.stale.SetRange(0, rows);
-    }
     const ExtentRows columns{store, bucket};
     entry.stale.ForEachRun([&](std::size_t begin, std::size_t end) {
         entry.compute(columns, {static_cast<std::uint32_t>(begin), static_cast<std::uint32_t>(end)},

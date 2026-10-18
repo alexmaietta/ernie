@@ -22,9 +22,9 @@ ColumnLayout MakeLayout(PathTable& paths, const AttributeDef& def, std::string_v
     const AttributeId attribute = paths.Names().Intern(name);
     return WithColumnType(def.type, [&]<typename T>(std::type_identity<T>) {
         if constexpr (std::is_same_v<T, Tensor>) {
-            return ColumnLayout::Of<T>(attribute);
+            return ColumnLayout::Make<T>(attribute);
         } else {
-            return ColumnLayout::Of<T>(attribute, ToElement<T>(paths, fallback).value_or(T{}));
+            return ColumnLayout::Make<T>(attribute, ToElement<T>(paths, fallback).value_or(T{}));
         }
     });
 }
@@ -126,8 +126,7 @@ std::vector<Path> Scene::Prims(std::string_view type) const {
     }
     std::vector<Path> prims;
     for (BucketId bucket = 0; bucket < buckets_.size(); ++bucket) {
-        const SchemaDef* schema = buckets_[bucket].schema;
-        if (base == nullptr || (schema != nullptr && schema->IsA(*base))) {
+        if (base == nullptr || IsA(buckets_[bucket].schema, *base)) {
             for (const PrimId prim : store_.GetBucket(bucket).prims) {
                 prims.push_back(PrimPath(prim));
             }
@@ -174,14 +173,10 @@ void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
 }
 
 void Scene::CheckArray(PrimId prim, std::string_view attribute, const Tensor& array) const {
-    const std::optional<Token> token = store_.Tokens().Find(attribute);
-    const AttributeDef* def = token ? Declared(store_.PrimBucket(prim), *token) : nullptr;
-    if (def == nullptr && !TakesUndeclared(prim, attribute)) {
-        throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
-                                    std::string(attribute) + "'");
-    }
-    if (def != nullptr) {
+    if (const AttributeDef* def = Declaration(prim, attribute)) {
         ValidateArray(*def, attribute, array, PrimPath(prim));
+    } else {
+        RequireUndeclared(prim, attribute);
     }
 }
 
@@ -238,9 +233,8 @@ std::vector<std::string> Scene::Attributes(const Path& path) const {
 }
 
 glm::dmat4 Scene::LocalTransform(PrimId prim) const {
-    const SchemaDef* schema = Schema(prim);
-    const bool xformable = schema != nullptr && schema->IsA(Xformable::Definition());
-    return xformable ? ComposeXformOps(*this, prim) : glm::dmat4(1.0);
+    return IsA(Schema(prim), Xformable::Definition()) ? ComposeXformOps(*this, prim)
+                                                      : glm::dmat4(1.0);
 }
 
 glm::dmat4 Scene::WorldTransform(PrimId prim) const {
@@ -356,7 +350,7 @@ BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis
     for (const ApiName& api : allApis) {
         add(*api.schema, api);
     }
-    if (schema != nullptr && schema->IsA(Imageable::Definition())) {
+    if (IsA(schema, Imageable::Definition())) {
         for (const AttributeDef* def : InheritedAttributes()) {
             layout.push_back(MakeLayout(paths, *def, ResolvedName(def->name), def->fallback));
         }
@@ -386,7 +380,7 @@ void Scene::ApplyApi(PrimId prim, std::string_view api) {
     const std::vector<std::string_view>& allowed = parsed.schema->appliesTo;
     const SchemaDef* type = Schema(prim);
     if (!allowed.empty() && std::ranges::none_of(allowed, [&](std::string_view name) {
-            return type != nullptr && type->IsA(*FindSchema(name));
+            return IsA(type, *FindSchema(name));
         })) {
         throw std::invalid_argument(std::string(api) + " applies only to " +
                                     std::string(allowed.front()) + " prims, not " +
@@ -501,12 +495,16 @@ bool Scene::TakesUndeclared(PrimId prim, std::string_view attribute) const {
                                [&](const ApiName& api) { return api.schema->IsOpen(attribute); });
 }
 
-ColumnType Scene::TypeForUndeclared(PrimId prim, std::string_view attribute,
-                                    const Value& value) const {
+void Scene::RequireUndeclared(PrimId prim, std::string_view attribute) const {
     if (!TakesUndeclared(prim, attribute)) {
         throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
                                     std::string(attribute) + "'");
     }
+}
+
+ColumnType Scene::TypeForUndeclared(PrimId prim, std::string_view attribute,
+                                    const Value& value) const {
+    RequireUndeclared(prim, attribute);
     const Token token = *store_.Tokens().Find(attribute);
     if (const Column* column = store_.GetBucket(store_.PrimBucket(prim)).Find(token)) {
         return column->values->Type();

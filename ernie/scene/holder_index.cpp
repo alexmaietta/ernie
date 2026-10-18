@@ -3,6 +3,8 @@
 /// @brief Re-indexing changed relationship cells, and finding a target's live holders.
 #include "ernie/scene/holder_index.h"
 
+#include "ernie/util/algorithm.h"
+
 #include <algorithm>
 #include <unordered_set>
 
@@ -16,16 +18,26 @@ bool IsRelationship(ColumnType type) {
 /// @return The targets of a relationship cell, without the unset one.
 std::vector<PathId> Targets(const PrimStore& store, BucketId bucket, const Column& column,
                             std::uint32_t row) {
-    std::vector<PathId> targets;
-    if (column.values->Type() == ColumnType::Relationship) {
-        targets.push_back(store.Read<Target>(bucket, column.attribute)[row].path);
-    } else {
-        for (const Target target : store.Read<std::vector<Target>>(bucket, column.attribute)[row]) {
-            targets.push_back(target.path);
-        }
-    }
+    std::vector<PathId> targets =
+        column.values->Type() == ColumnType::Relationship
+            ? std::vector<PathId>{store.Read<Target>(bucket, column.attribute)[row].path}
+            : Map(store.Read<std::vector<Target>>(bucket, column.attribute)[row], &Target::path);
     std::erase(targets, kNoPath);
     return targets;
+}
+
+/// @return Whether the prim is alive and its relationship still targets `target`.
+bool Holds(const PrimStore& store, PrimId prim, AttributeId attribute, PathId target) {
+    if (!store.Alive(prim)) {
+        return false;
+    }
+    const BucketId bucket = store.PrimBucket(prim);
+    const Column* column = store.GetBucket(bucket).Find(attribute);
+    if (column == nullptr || !IsRelationship(column->values->Type())) {
+        return false;
+    }
+    const std::vector<PathId> targets = Targets(store, bucket, *column, store.PrimRow(prim));
+    return std::ranges::find(targets, target) != targets.end();
 }
 
 }  // namespace
@@ -39,19 +51,9 @@ void HolderIndex::Update(const PrimStore& store) {
             continue;
         }
         for (const RowRange range : values.rows) {
-            for (std::uint32_t row = range.begin; row < std::min(range.end, bucket.Rows()); ++row) {
+            for (std::uint32_t row = range.begin; row < range.end; ++row) {
                 Index(bucket.prims[row], values.attribute,
                       Targets(store, values.bucket, column, row));
-            }
-        }
-    }
-    // A bucket too far behind to replay reports every row of every column, as a fresh one does.
-    for (const BucketId id : changes.resets) {
-        const Bucket& bucket = store.GetBucket(id);
-        for (const Column& column : bucket.columns) {
-            for (std::uint32_t row = 0;
-                 IsRelationship(column.values->Type()) && row < bucket.Rows(); ++row) {
-                Index(bucket.prims[row], column.attribute, Targets(store, id, column, row));
             }
         }
     }
@@ -93,19 +95,6 @@ std::vector<PrimId> HolderIndex::Find(const PrimStore& store, PathId target) con
         }
     }
     return found;
-}
-
-bool HolderIndex::Holds(const PrimStore& store, PrimId prim, AttributeId attribute, PathId target) {
-    if (!store.Alive(prim)) {
-        return false;
-    }
-    const BucketId bucket = store.PrimBucket(prim);
-    const Column* column = store.GetBucket(bucket).Find(attribute);
-    if (column == nullptr || !IsRelationship(column->values->Type())) {
-        return false;
-    }
-    const std::vector<PathId> targets = Targets(store, bucket, *column, store.PrimRow(prim));
-    return std::ranges::find(targets, target) != targets.end();
 }
 
 }  // namespace ernie

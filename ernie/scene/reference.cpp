@@ -317,14 +317,15 @@ std::string SchemaSection(const SchemaDef& schema, const SchemaFamily& family) {
     }
     out += facts + "\n\n";
     if (!schema.attributes.empty()) {
-        out += "| Attribute | Type | Fallback | Values | Source | Description |\n"
+        out += "| Attribute | Type | Description | Fallback | Values | Source |\n"
                "|---|---|---|---|---|---|\n";
+        const std::string usd =
+            "[" + std::string(family.usdModule) + "](" + std::string(family.usdUrl) + ")";
         for (const AttributeDef& def : schema.attributes) {
             const bool ernie = IsErnieSchema(schema.name) || def.name.starts_with("ernie:");
             out += "| `" + std::string(def.name) + "` | " + TypeText(def) + " | " +
-                   Code(JsonFallback(schema, def)) + " | " + ValuesText(def.meta) + " | " +
-                   std::string(ernie ? "Ernie" : family.usdModule) + " | " + Cell(def.meta.doc) +
-                   " |\n";
+                   Cell(def.meta.doc) + " | " + Code(JsonFallback(schema, def)) + " | " +
+                   ValuesText(def.meta) + " | " + (ernie ? std::string("Ernie") : usd) + " |\n";
         }
         out += "\n";
     }
@@ -446,16 +447,8 @@ std::string SceneJsonSchema() {
 }
 
 std::string ReferencePage(const SchemaFamily& family) {
-    std::string out = "# " + std::string(family.title) + "\n\n";
-    if (!family.usd.empty()) {
-        out += "These mirror [" + std::string(family.usdModule) + "](" +
-               std::string(family.usdUrl) +
-               ") one to one: the same names, attributes, types, fallbacks and allowed tokens.";
-        out += family.ernie.empty() ? "\n\n" : " Ernie's own schemas follow them.\n\n";
-    } else {
-        out += "Ernie's own schemas.\n\n";
-    }
-    out += "Generated from the schema registry by `ernie schema --markdown`.\n\n";
+    std::string out = "# " + std::string(family.title) + "\n\n" +
+                      "Generated from the schema registry by `ernie schema --markdown`.\n\n";
     for (const auto* names : {&family.usd, &family.ernie}) {
         for (const std::string_view name : *names) {
             out += SchemaSection(*FindSchema(name), family);

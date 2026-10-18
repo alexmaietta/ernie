@@ -32,6 +32,7 @@ class ExtentCache {
         BitSet stale;
     };
 
+    bool Tracked(BucketId bucket) const;
     static void Replay(Entry& entry, const StructuralChange& change);
     static void Resize(Entry& entry, std::uint32_t rows);
     static void Refresh(Entry& entry, const PrimStore& store, BucketId bucket);

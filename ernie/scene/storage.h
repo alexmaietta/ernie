@@ -11,6 +11,8 @@
 
 #include <glm/gtc/quaternion.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <limits>
@@ -18,8 +20,10 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace ernie {
@@ -61,60 +65,34 @@ struct Target {
     bool operator==(const Target&) const = default;
 };
 
+/// The element type of each column type, in `ColumnType`'s order.
+using ColumnElements =
+    std::tuple<std::uint8_t, std::int32_t, double, glm::dvec2, glm::dvec3, glm::dvec4, glm::dquat,
+               glm::dmat4, Token, Target, std::vector<Target>, std::vector<float>,
+               std::vector<Token>, Tensor>;
+static_assert(std::tuple_size_v<ColumnElements> ==
+              static_cast<std::size_t>(ColumnType::Tensor) + 1);
+
+/// The column type of element type `T`.
 template <typename T>
-inline constexpr ColumnType kColumnType = [] {
-    static_assert(sizeof(T) == 0, "Not a column element type");
-    return ColumnType::Bool;
-}();
-template <> inline constexpr ColumnType kColumnType<std::uint8_t> = ColumnType::Bool;
-template <> inline constexpr ColumnType kColumnType<std::int32_t> = ColumnType::Int;
-template <> inline constexpr ColumnType kColumnType<double> = ColumnType::Double;
-template <> inline constexpr ColumnType kColumnType<glm::dvec2> = ColumnType::Vec2;
-template <> inline constexpr ColumnType kColumnType<glm::dvec3> = ColumnType::Vec3;
-template <> inline constexpr ColumnType kColumnType<glm::dvec4> = ColumnType::Vec4;
-template <> inline constexpr ColumnType kColumnType<glm::dquat> = ColumnType::Quat;
-template <> inline constexpr ColumnType kColumnType<glm::dmat4> = ColumnType::Matrix;
-template <> inline constexpr ColumnType kColumnType<Token> = ColumnType::TokenValue;
-template <>
-inline constexpr ColumnType kColumnType<std::vector<Target>> = ColumnType::Relationships;
-template <> inline constexpr ColumnType kColumnType<std::vector<float>> = ColumnType::FloatArray;
-template <> inline constexpr ColumnType kColumnType<std::vector<Token>> = ColumnType::TokenArray;
-template <> inline constexpr ColumnType kColumnType<Tensor> = ColumnType::Tensor;
-template <> inline constexpr ColumnType kColumnType<Target> = ColumnType::Relationship;
+inline constexpr ColumnType kColumnType =
+    []<typename... Ts>(std::type_identity<std::tuple<Ts...>>) {
+        constexpr std::array matches{std::is_same_v<T, Ts>...};
+        constexpr auto index =
+            static_cast<std::size_t>(std::ranges::find(matches, true) - matches.begin());
+        static_assert(index < matches.size(), "Not a column element type");
+        return static_cast<ColumnType>(index);
+    }(std::type_identity<ColumnElements>{});
 
 /// @brief Calls `visit(std::type_identity<T>{})` with the element type `T` of a column type.
-template <typename Visit> decltype(auto) WithColumnType(ColumnType type, Visit&& visit) {
-    switch (type) {
-    case ColumnType::Bool:
-        return visit(std::type_identity<std::uint8_t>{});
-    case ColumnType::Int:
-        return visit(std::type_identity<std::int32_t>{});
-    case ColumnType::Double:
-        return visit(std::type_identity<double>{});
-    case ColumnType::Vec2:
-        return visit(std::type_identity<glm::dvec2>{});
-    case ColumnType::Vec3:
-        return visit(std::type_identity<glm::dvec3>{});
-    case ColumnType::Vec4:
-        return visit(std::type_identity<glm::dvec4>{});
-    case ColumnType::Quat:
-        return visit(std::type_identity<glm::dquat>{});
-    case ColumnType::Matrix:
-        return visit(std::type_identity<glm::dmat4>{});
-    case ColumnType::TokenValue:
-        return visit(std::type_identity<Token>{});
-    case ColumnType::Relationship:
-        return visit(std::type_identity<Target>{});
-    case ColumnType::Relationships:
-        return visit(std::type_identity<std::vector<Target>>{});
-    case ColumnType::FloatArray:
-        return visit(std::type_identity<std::vector<float>>{});
-    case ColumnType::TokenArray:
-        return visit(std::type_identity<std::vector<Token>>{});
-    case ColumnType::Tensor:
-        break;
+template <std::size_t I = 0, typename Visit>
+decltype(auto) WithColumnType(ColumnType type, Visit&& visit) {
+    if constexpr (I + 1 < std::tuple_size_v<ColumnElements>) {
+        if (static_cast<std::size_t>(type) != I) {
+            return WithColumnType<I + 1>(type, std::forward<Visit>(visit));
+        }
     }
-    return visit(std::type_identity<Tensor>{});
+    return visit(std::type_identity<std::tuple_element_t<I, ColumnElements>>{});
 }
 
 /// Rows a version chunk covers: one word of the authored bits.
@@ -169,9 +147,6 @@ template <typename T> class TypedColumn final : public ColumnValues {
     const std::vector<T>& Values() const {
         return values_;
     }
-    const T& Fallback() const {
-        return fallback_;
-    }
 
   private:
     std::vector<T> values_;
@@ -184,7 +159,7 @@ struct ColumnLayout {
     std::shared_ptr<const ColumnValues> prototype;
 
     /// @return A column of `T` whose unauthored rows hold `fallback`.
-    template <typename T> static ColumnLayout Of(AttributeId attribute, T fallback = {}) {
+    template <typename T> static ColumnLayout Make(AttributeId attribute, T fallback = {}) {
         return {attribute, std::make_shared<TypedColumn<T>>(std::move(fallback))};
     }
 };
@@ -208,6 +183,8 @@ struct StructuralChange {
         Removed,
         /// The prim at `from` moved to `row` (the last row, into a removed one's place).
         Moved,
+        /// The bucket's `count` rows, all new to a reader too far behind to replay its log.
+        Reset,
     };
     std::uint64_t version = 0;
     Kind kind = Kind::Added;
@@ -253,6 +230,9 @@ struct Bucket {
         const auto found = columnIndex.find(attribute);
         return found == columnIndex.end() ? nullptr : &columns[found->second];
     }
+    Column* Find(AttributeId attribute) {
+        return const_cast<Column*>(std::as_const(*this).Find(attribute));
+    }
 };
 
 /// @brief Rows [begin, end) of a column, changed.
@@ -275,8 +255,6 @@ struct ChangeSet {
         AttributeId attribute = 0;
         std::vector<RowRange> rows;
     };
-    /// Buckets whose changes are too old to replay: resync them whole.
-    std::vector<BucketId> resets;
     /// Row changes in order.
     std::vector<Rows> rows;
     /// Changed values, by column.
@@ -314,9 +292,6 @@ class PrimStore {
     const Bucket& GetBucket(BucketId bucket) const {
         return *buckets_[bucket];
     }
-    std::size_t BucketCount() const {
-        return buckets_.size();
-    }
 
     /// @brief Defines a prim at `path` in `bucket`, its attributes at their fallbacks.
     /// @return The prim; the existing one if `path` already has one in `bucket`.
@@ -352,11 +327,12 @@ class PrimStore {
         Values<T>(column)[slot.row] = std::move(value);
         Stamp(slot.bucket, column, slot.row, slot.row + 1, Next());
     }
-    /// @return The authored value, or null if unauthored.
+    /// @return The authored value, or null if unauthored or of another type.
     template <typename T> const T* Get(PrimId prim, AttributeId attribute) const {
         const SlotData& slot = Slot(prim);
         const Column* column = buckets_[slot.bucket]->Find(attribute);
-        if (column == nullptr || !column->authored.Test(slot.row)) {
+        if (column == nullptr || !column->authored.Test(slot.row) ||
+            column->values->Type() != kColumnType<T>) {
             return nullptr;
         }
         return &Values<T>(*column)[slot.row];
@@ -366,18 +342,12 @@ class PrimStore {
     /// @return Whether it changed; false too when the bucket has no such column.
     template <typename T> bool Derive(PrimId prim, AttributeId attribute, const T& value) {
         const SlotData& slot = Slot(prim);
-        Bucket& bucket = *buckets_[slot.bucket];
-        const auto found = bucket.columnIndex.find(attribute);
-        if (found == bucket.columnIndex.end()) {
+        Column* column = buckets_[slot.bucket]->Find(attribute);
+        if (column == nullptr || Values<T>(*column)[slot.row] == value) {
             return false;
         }
-        Column& column = bucket.columns[found->second];
-        T& cell = Values<T>(column)[slot.row];
-        if (cell == value) {
-            return false;
-        }
-        cell = value;
-        Touch(slot.bucket, column, slot.row, slot.row + 1, Next());
+        Values<T>(*column)[slot.row] = value;
+        Touch(slot.bucket, *column, slot.row, slot.row + 1, Next());
         return true;
     }
     /// @brief Unauthors an attribute, putting its fallback back.
@@ -419,6 +389,9 @@ class PrimStore {
         return ++version_;
     }
     const SlotData& Slot(PrimId prim) const;
+    SlotData& Slot(PrimId prim) {
+        return const_cast<SlotData&>(std::as_const(*this).Slot(prim));
+    }
     PrimId AddSlot(PathId path, BucketId bucket, std::uint32_t row);
     /// Appends `count` rows at their fallbacks to a bucket, logged as one change.
     std::uint32_t AddRows(BucketId bucket, std::uint32_t count);
@@ -435,26 +408,19 @@ class PrimStore {
 
     template <typename T> Column& FindOrAddColumn(BucketId bucket, AttributeId attribute) {
         Bucket& b = *buckets_[bucket];
-        const auto found = b.columnIndex.find(attribute);
-        if (found != b.columnIndex.end()) {
-            return b.columns[found->second];
-        }
-        return AddColumn(b, attribute, std::make_unique<TypedColumn<T>>(T{}));
+        Column* found = b.Find(attribute);
+        return found != nullptr ? *found
+                                : AddColumn(b, attribute, std::make_unique<TypedColumn<T>>(T{}));
     }
-    template <typename T> static std::vector<T>& Values(Column& column) {
-        return static_cast<TypedColumn<T>&>(Check<T>(column)).Values();
-    }
+    /// @throws std::invalid_argument if the column holds another type.
     template <typename T> static const std::vector<T>& Values(const Column& column) {
-        return static_cast<const TypedColumn<T>&>(Check<T>(column)).Values();
-    }
-    template <typename T> static const ColumnValues& Check(const Column& column) {
         if (column.values->Type() != kColumnType<T>) {
             throw std::invalid_argument("The column holds another type");
         }
-        return *column.values;
+        return static_cast<const TypedColumn<T>&>(*column.values).Values();
     }
-    template <typename T> static ColumnValues& Check(Column& column) {
-        return const_cast<ColumnValues&>(Check<T>(static_cast<const Column&>(column)));
+    template <typename T> static std::vector<T>& Values(Column& column) {
+        return const_cast<std::vector<T>&>(Values<T>(std::as_const(column)));
     }
 
     PathTable paths_;
