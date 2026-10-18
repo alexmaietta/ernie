@@ -75,9 +75,9 @@ class GpuZone {
   private:
     const DeviceContext& context_;
     VkCommandBuffer commands_;
-    /// Tracy's zone, built in place when recording.
-    alignas(std::max_align_t) std::byte zone_[32];
-    bool tracy_ = false;
+    /// Tracy's zone, built in place when recording; unused in builds without Tracy.
+    [[maybe_unused]] alignas(std::max_align_t) std::byte zone_[32];
+    [[maybe_unused]] bool tracy_ = false;
     std::uint32_t timed_ = GpuProfiler::kUntimed;
 };
 
