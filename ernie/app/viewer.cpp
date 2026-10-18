@@ -97,7 +97,12 @@ Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
         ERNIE_ZONE("Set up the device scene");
         arenas_ = std::make_unique<Arenas>(*context_, MemoryUse::Device, "scene columns",
                                            std::uint64_t{16} << 20);
-        deviceScene_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene, ShaderCompiler());
+        const ShaderCompiler compiler;
+        deviceScene_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene, compiler);
+        if (deviceScene_->Tracer() != nullptr) {
+            heap_ = std::make_unique<BindlessHeap>(*context_);
+            camera_ = std::make_unique<CameraPass>(*context_, compiler, *heap_);
+        }
         sampler_ = std::make_unique<Sampler>(
             *context_, SamplerDescription{.filter = Filter::Nearest, .address = Address::Clamp},
             "viewport");
@@ -185,6 +190,9 @@ void Viewer::ShowViewport() {
         context_->Main().Last().Wait();
         if (viewport_) {
             renderer_->RemoveTexture(viewportTexture_);
+            if (heap_) {
+                heap_->RemoveStorageImage(viewportImage_);
+            }
         }
         viewport_ = std::make_unique<DeviceImage>(
             *context_,
@@ -193,6 +201,9 @@ void Viewer::ShowViewport() {
                              .usage = ImageUsage::Sampled | ImageUsage::Storage},
             "Viewport");
         viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
+        if (heap_) {
+            viewportImage_ = heap_->AddStorageImage(*viewport_);
+        }
     }
     ImGui::GetBackgroundDrawList()->AddImage(viewportTexture_, position,
                                              {position.x + size.x, position.y + size.y});
@@ -200,18 +211,30 @@ void Viewer::ShowViewport() {
 
 void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target) {
     graph::Image viewport = graph.Import(*viewport_, "viewport");
-    // Until a renderer draws it, the viewport is the theme's colour.
-    graph.Add(
-        "Viewport", graph::Kind::Copy,
-        [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
-        [this, viewport](graph::PassContext& pass) {
-            const glm::vec4 colour = shell_->GetTheme().viewport;
-            const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
-            const VkImageSubresourceRange all{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
-            vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(), pass.Layout(viewport),
-                                 &clear, 1, &all);
-        });
+    if (camera_) {
+        const OrbitCamera& orbit = shell_->Camera();
+        CameraOutputs outputs{.colour = viewport,
+                              .colourIndex = viewportImage_,
+                              .background = glm::vec3(shell_->GetTheme().viewport)};
+        camera_->Add(graph,
+                     {.cameraToWorld = orbit.Transform(),
+                      .verticalFov = orbit.verticalFov,
+                      .size = glm::uvec2(viewport_->Description().extent)},
+                     outputs);
+        viewport = *outputs.colour;
+    } else {
+        graph.Add(
+            "Viewport", graph::Kind::Copy,
+            [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
+            [this, viewport](graph::PassContext& pass) {
+                const glm::vec4 colour = shell_->GetTheme().viewport;
+                const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
+                const VkImageSubresourceRange all{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
+                vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(),
+                                     pass.Layout(viewport), &clear, 1, &all);
+            });
+    }
     graph.Add(
         "UI", graph::Kind::Raster,
         [&](graph::PassBuilder& pass) {

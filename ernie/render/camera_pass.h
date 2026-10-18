@@ -14,6 +14,7 @@
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -37,6 +38,8 @@ struct CameraOutputs {
     /// A storage image of the view's size, and its slot in the pass's heap.
     std::optional<graph::Image> colour;
     BindlessIndex colourIndex;
+    /// What `colour` shows where nothing is hit, as it is stored.
+    glm::vec3 background{0.0f};
     /// A float a pixel, row by row: the hit distance in metres, infinity where nothing is hit.
     std::optional<graph::Buffer> distances;
     /// Three floats a pixel: the world normal, zero where nothing is hit.

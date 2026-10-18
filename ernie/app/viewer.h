@@ -6,6 +6,8 @@
 
 #include "ernie/app/imgui_backend.h"
 #include "ernie/app/ui.h"
+#include "ernie/device/bindless.h"
+#include "ernie/render/camera_pass.h"
 #include "ernie/render/device_scene.h"
 
 #include <glm/vec2.hpp>
@@ -39,9 +41,9 @@ struct ViewerOptions {
     ShellOptions shell;
 };
 
-/// @brief The viewer on a scene. Each frame takes input, draws the shell's UI, clears the frame
-/// to the theme's viewport colour, draws the UI over it and presents it. Drive it on the thread
-/// that made it.
+/// @brief The viewer on a scene. Each frame takes input, draws the shell's UI, traces the orbit
+/// camera into the viewport (or clears it to the theme's colour on devices without ray queries),
+/// draws the UI over it and presents it. Drive it on the thread that made it.
 class Viewer {
   public:
     /// @param scene Read by the panels; must outlive the viewer.
@@ -87,10 +89,14 @@ class Viewer {
     std::unique_ptr<Shell> shell_;
     std::unique_ptr<Arenas> arenas_;
     std::unique_ptr<DeviceScene> deviceScene_;
-    /// The image the viewport is rendered into, and the UI's texture of it.
+    /// The heap and pass tracing the viewport; null without ray queries.
+    std::unique_ptr<BindlessHeap> heap_;
+    std::unique_ptr<CameraPass> camera_;
+    /// The image the viewport is rendered into, the UI's texture of it, and its storage slot.
     std::unique_ptr<Sampler> sampler_;
     std::unique_ptr<DeviceImage> viewport_;
     ImTextureID viewportTexture_ = 0;
+    BindlessIndex viewportImage_;
     /// The frames the device may still be drawing, oldest first.
     std::deque<Ticket> inFlight_;
     std::uint64_t frames_ = 0;

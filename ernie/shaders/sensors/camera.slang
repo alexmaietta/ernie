@@ -18,9 +18,10 @@ struct Parameters {
     /// The view's half extents at unit distance: tan(fov / 2) times the aspect, and tan(fov / 2).
     float2 halfExtent;
     uint2 size;
+    /// What the colour image shows where nothing is hit, as stored.
+    float3 background;
     /// The colour image's bindless index, or `kNoImage`.
     uint colour;
-    uint pad;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
     /// z, and the instance row; each 0 for no output.
     float* distances;
@@ -29,11 +30,8 @@ struct Parameters {
 };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
-/// A plain look: grey surfaces lit from the eye, over a sky that darkens to the horizon.
-float3 Shade(Hit hit, float3 normal, float3 direction) {
-    if (!hit.found) {
-        return lerp(float3(0.35, 0.38, 0.42), float3(0.55, 0.65, 0.8), saturate(direction.z));
-    }
+/// A plain look: grey surfaces lit from the eye.
+float3 Shade(float3 normal, float3 direction) {
     float lit = abs(dot(normal, direction));
     return float3(0.8) * (0.15 + 0.85 * lit);
 }
@@ -60,8 +58,11 @@ void main(uint3 id : SV_DispatchThreadID) {
 
     uint at = pixel.y * parameters.size.x + pixel.x;
     if (parameters.colour != kNoImage) {
-        // The viewport's image is UNORM: encode for display as sRGB roughly would.
-        float3 colour = pow(Shade(hit, normal, ray.Direction), 1 / 2.2);
+        // The image is UNORM: encode for display roughly as sRGB would.
+        float3 colour = parameters.background;
+        if (hit.found) {
+            colour = pow(Shade(normal, ray.Direction), 1 / 2.2);
+        }
         images[NonUniformResourceIndex(parameters.colour)][pixel] = float4(colour, 1);
     }
     if (parameters.distances != nullptr) {

@@ -84,6 +84,29 @@ TEST(Viewer, ShowsTheFramesViewportImageOffscreen) {
     test::ExpectClean(viewer->Context());
 }
 
+TEST(Viewer, TracesTheSceneIntoTheViewport) {
+    Scene scene;
+    const PrimId ball = scene.Define("/Ball", "Sphere");
+    scene.Set(ball, "radius", 2.0);
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 3, .validation = true};
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    if (!viewer->Context().Capabilities().rayQuery) {
+        GTEST_SKIP() << viewer->Context().Info().name << " has no ray queries";
+    }
+    viewer->Run();
+    const auto [origin, size] = viewer->GetShell().Viewport();
+    // The orbit camera looks at the origin, where the ball is, from 10 m.
+    const glm::uvec2 middle(static_cast<std::uint32_t>(origin.x + 0.5f * size.x),
+                            static_cast<std::uint32_t>(origin.y + 0.5f * size.y));
+    const std::array<std::uint8_t, 4> texel = ReadTexel(*viewer, middle);
+    const glm::vec4 clear = viewer->GetShell().GetTheme().viewport;
+    EXPECT_GT(texel[0], std::round(clear.r * 255.0f) + 40) << "the lit ball, not the background";
+    test::ExpectClean(viewer->Context());
+}
+
 #if ERNIE_VIEWER_WINDOW
 TEST(Viewer, OpensOnTheLogTab) {
     const Scene scene;

@@ -24,10 +24,11 @@ struct CameraParameters {
     glm::vec4 rows[3];
     glm::vec2 halfExtent;
     glm::uvec2 size;
-    std::uint32_t colour, pad;
+    glm::vec3 background;
+    std::uint32_t colour;
     VkDeviceAddress distances, normals, instances;
 };
-static_assert(sizeof(CameraParameters) == 112);
+static_assert(sizeof(CameraParameters) == 120);
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
@@ -52,6 +53,7 @@ void CameraPass::Add(graph::Graph& graph, const PinholeView& view, CameraOutputs
         glm::translate(glm::dmat4(1.0), -scene->origin) * view.cameraToWorld;
     CameraParameters parameters{.tracer = scene->parameters,
                                 .size = view.size,
+                                .background = outputs.background,
                                 .colour = outputs.colour ? outputs.colourIndex.value : kNoImage};
     for (int r = 0; r < 3; ++r) {
         parameters.rows[r] = glm::vec4(glm::row(relative, r));
