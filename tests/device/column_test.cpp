@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file column_test.cpp
-/// @brief Tests of device columns: growth by device copies, and an RL step that keeps its poses
-/// on the device and moves no bulk bytes through the host.
+/// @brief Tests of device columns: growth by device copies, and a step of many poses that stays on
+/// the device and moves no bulk bytes through the host.
 #include "ernie/device/column.h"
 #include "ernie/device/staging.h"
 
 #include "tests/device/common.h"
-#include "tests/device/rl_step.h"
+#include "tests/device/pose_step.h"
 
 #include <gtest/gtest.h>
 
@@ -56,27 +56,27 @@ TEST(DeviceColumn, RowsKeepTheirShapeAndValuesAcrossResizes) {
     ExpectClean(*context);
 }
 
-TEST(DeviceColumn, AnRlStepMovesNoBulkBytesThroughTheHost) {
+TEST(DeviceColumn, StepsOfManyPosesMoveNoBulkBytesThroughTheHost) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;
-    const std::uint32_t worlds = 16'384;
-    test::RlStep rl(*context, compiler, worlds);
+    const std::uint32_t instances = 16'384;
+    test::PoseStep poses(*context, compiler, instances);
 
     const Transfers before = context->Transfers();
     Ticket stepped;
     for (std::uint32_t step = 1; step <= 10; ++step) {
-        stepped = rl.Step(step);
+        stepped = poses.Step(step);
     }
     stepped.Wait();
     EXPECT_EQ(context->Transfers(), before) << "the steps stay on the device";
 
-    const std::vector<float> transforms = Read(*context, rl.Transforms(), worlds, {});
-    EXPECT_EQ(context->Transfers().readBack - before.readBack, worlds * 48u)
+    const std::vector<float> transforms = Read(*context, poses.Transforms(), instances, {});
+    EXPECT_EQ(context->Transfers().readBack - before.readBack, instances * 48u)
         << "only the explicit readback is counted";
-    for (std::uint32_t world : {0u, 1u, 127u, 128u, 9999u, worlds - 1}) {
-        const std::array<float, 12> expected = test::RlStep::Expected(world, 10);
+    for (std::uint32_t instance : {0u, 1u, 127u, 128u, 9999u, instances - 1}) {
+        const std::array<float, 12> expected = test::PoseStep::Expected(instance, 10);
         for (std::size_t i = 0; i < 12; ++i) {
-            ASSERT_NEAR(transforms[world * 12u + i], expected[i], 1e-5) << world << ", " << i;
+            ASSERT_NEAR(transforms[instance * 12u + i], expected[i], 1e-5) << instance << ", " << i;
         }
     }
     ExpectClean(*context);
