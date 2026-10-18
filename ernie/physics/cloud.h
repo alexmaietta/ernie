@@ -4,8 +4,8 @@
 /// textures cloud layers are carved from.
 #pragma once
 
-#include "ernie/core/math.h"
 #include "ernie/physics/spectrum.h"
+#include "ernie/util/math.h"
 
 #include <cstddef>
 #include <cstdint>

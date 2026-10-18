@@ -2,22 +2,25 @@
 include("${PROJECT_SOURCE_DIR}/cmake/ErnieTesting.cmake")
 
 ernie_add_test_suite(
-    core
+    util
     SOURCES
-        core/disk_cache_test.cpp
-        core/linear_algebra_test.cpp
-        core/log_test.cpp
-        core/mapped_file_test.cpp
-        core/math_test.cpp
-        core/noise_test.cpp
-        core/parallel_test.cpp
-        core/profile_report_test.cpp
-        core/profiler_test.cpp
-        core/random_test.cpp
-        core/tensor_test.cpp
-        core/version_test.cpp
-        core/worker_pool_test.cpp
-    LIBRARIES ernie_core ernie_json
+        util/bytes_test.cpp
+        util/disk_cache_test.cpp
+        util/file_test.cpp
+        util/linear_algebra_test.cpp
+        util/log_test.cpp
+        util/mapped_file_test.cpp
+        util/math_test.cpp
+        util/noise_test.cpp
+        util/parallel_test.cpp
+        util/profile_report_test.cpp
+        util/profiler_test.cpp
+        util/random_test.cpp
+        util/tensor_test.cpp
+        util/text_test.cpp
+        util/version_test.cpp
+        util/worker_pool_test.cpp
+    LIBRARIES ernie_util ernie_json
 )
 ernie_add_test_suite(
     physics
@@ -37,6 +40,11 @@ ernie_add_test_suite(
     LABEL accuracy
     SOURCES physics/cloud_test.cpp
     LIBRARIES ernie_physics
+)
+ernie_add_test_suite(
+    io
+    SOURCES io/ies_test.cpp io/image_test.cpp io/raster_test.cpp
+    LIBRARIES ernie_io ernie_stb ernie_openexr
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)
 

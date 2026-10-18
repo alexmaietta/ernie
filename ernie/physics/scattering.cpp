@@ -3,7 +3,7 @@
 /// @brief Rayleigh and Mie scattering, refractivities and ozone.
 #include "ernie/physics/scattering.h"
 
-#include "ernie/core/math.h"
+#include "ernie/util/math.h"
 
 #include <algorithm>
 #include <array>

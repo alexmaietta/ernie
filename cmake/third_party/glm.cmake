@@ -9,9 +9,7 @@ set(GLM_BUILD_INSTALL OFF)
 include(FetchContent)
 FetchContent_Declare(
     glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG ${ERNIE_DEP_VERSION_glm}
-    GIT_SHALLOW TRUE
+    URL https://github.com/g-truc/glm/archive/refs/tags/${ERNIE_DEP_VERSION_glm}.tar.gz
 )
 FetchContent_MakeAvailable(glm)
 

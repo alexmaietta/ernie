@@ -3,8 +3,8 @@
 /// @brief Spectra, black bodies, colour matching and RGB upsampling.
 #include "ernie/physics/spectrum.h"
 
-#include "ernie/core/linear_algebra.h"
-#include "ernie/core/math.h"
+#include "ernie/util/linear_algebra.h"
+#include "ernie/util/math.h"
 
 #include <algorithm>
 #include <array>

@@ -1,0 +1,14 @@
+IESNA:LM-63-2002
+[TEST] fixture
+[MANUFAC] none
+[LUMCAT] DL-4
+[LUMINAIRE] Downlight, quadrant symmetric
+[LAMP] metal halide, base up
+TILT=lamp.tilt
+1 -1 1.0 5 3 1 2 0.2 0.2 0.1
+0.5 1.0 70
+0 22.5 45 67.5 90
+0 45 90
+1000 950 800 400 0
+900 850 700 350 0
+800 750 600 300 0

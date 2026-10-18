@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file main.cpp
 /// @brief The ernie program.
-#include "ernie/core/version.h"
 #include "ernie/device/vulkan_devices.h"
+#include "ernie/util/version.h"
 
 #include <cstdio>
 #include <exception>

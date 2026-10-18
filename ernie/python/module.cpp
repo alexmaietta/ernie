@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file module.cpp
 /// @brief The _ernie Python extension module.
-#include "ernie/core/version.h"
 #include "ernie/device/vulkan_devices.h"
+#include "ernie/util/version.h"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>

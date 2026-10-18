@@ -1,0 +1,16 @@
+IESNA:LM-63-1995
+[TEST] fixture
+[LUMINAIRE] Floodlight, symmetric about its vertical plane
+TILT=INCLUDE
+2
+3
+0,45,90
+1.0,0.9,0.75
+1 -1 2.0 3 3 2 1 1.0 1.0 0.5
+1.0 1.0 150
+0,10,20
+-20,0,20
+500,400,100
+600,
+500,200
+500 400 100

@@ -3,9 +3,9 @@
 /// @brief 1-D regolith heat conduction and diurnal tables.
 #include "ernie/physics/regolith.h"
 
-#include "ernie/core/parallel.h"
-#include "ernie/core/profile.h"
 #include "ernie/physics/constants.h"
+#include "ernie/util/parallel.h"
+#include "ernie/util/profile.h"
 
 #include <algorithm>
 #include <cmath>

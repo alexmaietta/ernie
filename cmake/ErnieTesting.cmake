@@ -25,6 +25,10 @@ function(ernie_add_test_suite name)
     set(target ernie_tests_${name})
     add_executable(${target} ${ARG_SOURCES})
     target_link_libraries(${target} PRIVATE ${ARG_LIBRARIES} GTest::gtest_main ernie_build_options)
+    target_compile_definitions(
+        ${target}
+        PRIVATE ERNIE_TEST_FIXTURES="${PROJECT_SOURCE_DIR}/ernie/test/fixtures"
+    )
     gtest_discover_tests(
         ${target}
         TEST_PREFIX "ernie.${name}."

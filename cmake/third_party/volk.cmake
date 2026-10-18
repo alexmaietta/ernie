@@ -5,9 +5,7 @@ mark_as_advanced(ERNIE_DEP_VERSION_volk)
 include(FetchContent)
 FetchContent_Declare(
     volk
-    GIT_REPOSITORY https://github.com/zeux/volk.git
-    GIT_TAG ${ERNIE_DEP_VERSION_volk}
-    GIT_SHALLOW TRUE
+    URL https://github.com/zeux/volk/archive/refs/tags/${ERNIE_DEP_VERSION_volk}.tar.gz
     SOURCE_SUBDIR no-build
 )
 FetchContent_MakeAvailable(volk)

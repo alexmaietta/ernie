@@ -9,9 +9,8 @@ mark_as_advanced(ERNIE_DEP_VERSION_vulkan_headers)
 include(FetchContent)
 FetchContent_Declare(
     vulkan_headers
-    GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
-    GIT_TAG ${ERNIE_DEP_VERSION_vulkan_headers}
-    GIT_SHALLOW TRUE
+    URL
+        https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/${ERNIE_DEP_VERSION_vulkan_headers}.tar.gz
     SOURCE_SUBDIR no-build
 )
 FetchContent_MakeAvailable(vulkan_headers)

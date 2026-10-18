@@ -15,9 +15,7 @@ set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
 include(FetchContent)
 FetchContent_Declare(
     tracy
-    GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-    GIT_TAG ${ERNIE_DEP_VERSION_tracy}
-    GIT_SHALLOW TRUE
+    URL https://github.com/wolfpld/tracy/archive/refs/tags/${ERNIE_DEP_VERSION_tracy}.tar.gz
 )
 FetchContent_MakeAvailable(tracy)
 set_target_properties(

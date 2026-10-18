@@ -11,4 +11,4 @@ add_library(
     solar.cpp
     spectrum.cpp
 )
-target_link_libraries(ernie_physics PUBLIC ernie_core PRIVATE ernie_build_options)
+target_link_libraries(ernie_physics PUBLIC ernie_util PRIVATE ernie_build_options)

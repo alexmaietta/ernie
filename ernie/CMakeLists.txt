@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # One target per layer; a layer links only the layers below it.
-add_subdirectory(core)
+add_subdirectory(util)
 add_subdirectory(physics)
 add_subdirectory(io)
 add_subdirectory(scene)

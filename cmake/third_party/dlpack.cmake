@@ -5,9 +5,7 @@ mark_as_advanced(ERNIE_DEP_VERSION_dlpack)
 include(FetchContent)
 FetchContent_Declare(
     dlpack
-    GIT_REPOSITORY https://github.com/dmlc/dlpack.git
-    GIT_TAG ${ERNIE_DEP_VERSION_dlpack}
-    GIT_SHALLOW TRUE
+    URL https://github.com/dmlc/dlpack/archive/refs/tags/${ERNIE_DEP_VERSION_dlpack}.tar.gz
     SOURCE_SUBDIR no-build
 )
 FetchContent_MakeAvailable(dlpack)

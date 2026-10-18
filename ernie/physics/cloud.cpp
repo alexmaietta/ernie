@@ -7,12 +7,12 @@
 // cloud.h.
 #include "ernie/physics/cloud.h"
 
-#include "ernie/core/disk_cache.h"
-#include "ernie/core/math.h"
-#include "ernie/core/noise.h"
-#include "ernie/core/parallel.h"
-#include "ernie/core/random.h"
 #include "ernie/physics/scattering.h"
+#include "ernie/util/disk_cache.h"
+#include "ernie/util/math.h"
+#include "ernie/util/noise.h"
+#include "ernie/util/parallel.h"
+#include "ernie/util/random.h"
 
 #include <glm/glm.hpp>
 
