@@ -89,7 +89,8 @@ class Geometries : public ::testing::Test {
 
 TEST_F(Geometries, MeshesBecomeTrianglesAndShapesShareUnitGeometry) {
     const GeometryPool::Changes changes = Update();
-    EXPECT_EQ(changes.placed.size(), 5u);
+    EXPECT_EQ(changes.placed.size(), 5u) << "each prim once";
+    EXPECT_TRUE(changes.refitted.empty()) << "a new mesh's own values are no edit";
     const PrimGeometry quad = *geometry_->Find(mesh_);
     const Geometry& triangles = geometry_->Get(quad.geometry);
     EXPECT_EQ(triangles.kind, GeometryKind::Triangles);

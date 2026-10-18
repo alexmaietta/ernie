@@ -123,7 +123,7 @@ Touched Classify(std::string_view attribute) {
 }  // namespace
 
 GeometryPool::GeometryPool(DeviceContext& context, Arenas& arenas, const Scene& scene)
-    : context_(context), arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
+    : arenas_(arenas), scene_(scene), uploader_(context, context.Main()),
       unitShapes_(static_cast<std::size_t>(GeometryKind::Plane) + 1) {}
 
 std::optional<PrimGeometry> GeometryPool::Find(PrimId prim) const {
@@ -276,6 +276,13 @@ GeometryPool::Changes GeometryPool::Update() {
     for (const PrimId prim : followed.added) {
         Place(prim, true, changes);
     }
+    // Prims just added were placed from all their values: none of them is an edit.
+    std::vector<bool> fresh(prims_.size(), false);
+    for (const PrimId prim : followed.added) {
+        if (prim.slot < fresh.size()) {
+            fresh[prim.slot] = true;
+        }
+    }
     // Values the host authored: shapes, points and topology.
     for (const ChangeSet::Values& values : changeSet.values) {
         const Touched touched = Classify(store.Tokens().Text(values.attribute));
@@ -285,8 +292,9 @@ GeometryPool::Changes GeometryPool::Update() {
         const Bucket& bucket = store.GetBucket(values.bucket);
         for (const RowRange& range : values.rows) {
             for (std::uint32_t row = range.begin; row < std::min(range.end, bucket.Rows()); ++row) {
-                if (Find(bucket.prims[row])) {
-                    Place(bucket.prims[row], touched.topology, changes);
+                const PrimId prim = bucket.prims[row];
+                if (Find(prim) && !fresh[prim.slot]) {
+                    Place(prim, touched.topology, changes);
                 }
             }
         }

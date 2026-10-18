@@ -2,10 +2,13 @@
 add_library(
     ernie_render
     OBJECT
+    bottom_levels.cpp
     device_scene.cpp
     geometry.cpp
+    instances.cpp
     prim_rows.cpp
     scene_columns.cpp
+    top_levels.cpp
     transform_graph.cpp
 )
 target_link_libraries(

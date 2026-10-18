@@ -101,7 +101,6 @@ class GeometryPool {
     /// Uploads a mesh's points, and its triangles when `topology`; a refit when only points move.
     void UploadMesh(PrimId prim, GeometryId geometry, bool topology, Changes& changes);
 
-    DeviceContext& context_;
     Arenas& arenas_;
     const Scene& scene_;
     Uploader uploader_;

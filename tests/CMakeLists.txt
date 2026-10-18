@@ -105,6 +105,7 @@ ernie_add_test_suite(
     render
     LABEL gpu
     SOURCES
+        render/acceleration_scene_test.cpp
         render/device_scene_test.cpp
         render/geometry_test.cpp
         render/scene_columns_test.cpp
