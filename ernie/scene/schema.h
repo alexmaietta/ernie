@@ -132,9 +132,9 @@ struct ExtentRows {
     }
     /// @return The live prim a relationship targets, or none.
     std::optional<PrimId> Resolve(const Target& target) const;
-    /// @return Another prim's extent brought into a row's own space through the transforms
-    /// between, or none when it has none.
-    std::optional<Box> ExtentInRowSpace(PrimId other, std::uint32_t row) const;
+    /// @return The extent of the prim a relationship targets, brought into a row's own space
+    /// through the transforms between; none when it targets none or that has none.
+    std::optional<Box> TargetExtent(const Target& target, std::uint32_t row) const;
 };
 
 /// Computes the extents of a bucket's rows [begin, end) into `out`, one box each, in each prim's

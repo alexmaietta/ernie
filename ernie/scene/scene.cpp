@@ -521,14 +521,15 @@ std::optional<PrimId> ExtentRows::Resolve(const Target& target) const {
     return target.path != kNoPath ? store.Find(target.path) : std::nullopt;
 }
 
-std::optional<Box> ExtentRows::ExtentInRowSpace(PrimId other, std::uint32_t row) const {
-    const std::optional<Box> extent = scene->Extent(other);
+std::optional<Box> ExtentRows::TargetExtent(const Target& target, std::uint32_t row) const {
+    const std::optional<PrimId> other = Resolve(target);
+    const std::optional<Box> extent = other ? scene->Extent(*other) : std::nullopt;
     if (!extent) {
         return std::nullopt;
     }
     const PrimId own = store.GetBucket(bucket).prims[row];
     return extent->Transformed(glm::inverse(scene->WorldTransform(own)) *
-                               scene->WorldTransform(other));
+                               scene->WorldTransform(*other));
 }
 
 }  // namespace ernie

@@ -63,8 +63,7 @@ Value Interpolate(const Value& a, const Value& b, double alpha) {
 }
 
 std::optional<Tensor> Interpolate(const Tensor& a, const Tensor& b, double alpha) {
-    const bool mixable = !a.Empty() && a.Location().kind == DeviceKind::Cpu &&
-                         b.Location().kind == DeviceKind::Cpu && a.Type() == b.Type() &&
+    const bool mixable = !a.Empty() && a.OnHost() && b.OnHost() && a.Type() == b.Type() &&
                          a.Shape() == b.Shape() &&
                          (a.Type() == DType::Float32 || a.Type() == DType::Float64);
     if (!mixable) {

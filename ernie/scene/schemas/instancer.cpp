@@ -15,16 +15,6 @@
 namespace ernie {
 namespace {
 
-bool OnHost(std::initializer_list<const Tensor*> tensors) {
-    return std::ranges::none_of(tensors, [](const Tensor* t) { return IsGpu(t->Location().kind); });
-}
-
-/// @return A CPU array's floats, none when unset.
-std::vector<float> FloatsOrNone(const Tensor& array, std::size_t components,
-                                std::string_view what) {
-    return array.Empty() ? std::vector<float>{} : CopyFloats(array, components, what);
-}
-
 /// An instance's transform: translate, then rotate, then scale innermost.
 glm::dmat4 InstanceTransform(std::span<const float> position, std::span<const float> rotation,
                              std::span<const float> scale, bool wFirst) {
@@ -81,7 +71,9 @@ void InstancerExtent(const ExtentRows& rows, RowRange range, std::span<Box> out)
     const auto order = rows.Column<Token>(PointInstancer::kQuaternionOrder);
     const auto authored = rows.Column<std::vector<float>>(Boundable::kExtent);
     ComputeRows(range, out, [&](std::uint32_t row) {
-        if (!OnHost({&indices[row], &positions[row], &orientations[row], &scales[row]})) {
+        const bool onHost = indices[row].OnHost() && positions[row].OnHost() &&
+                            orientations[row].OnHost() && scales[row].OnHost();
+        if (!onHost) {
             return AuthoredExtent(authored[row]);
         }
         const Instances instances{
@@ -90,11 +82,10 @@ void InstancerExtent(const ExtentRows& rows, RowRange range, std::span<Box> out)
                                   const std::optional<PrimId> prim = rows.Resolve(target);
                                   return prim ? rows.scene->BoundsInParent(*prim) : Box();
                               }),
-            .indices = indices[row].Empty() ? std::vector<std::int64_t>{}
-                                            : CopyInts(indices[row], "protoIndices"),
-            .positions = FloatsOrNone(positions[row], 3, "positions"),
-            .rotations = FloatsOrNone(orientations[row], 4, "orientations"),
-            .scales = FloatsOrNone(scales[row], 3, "scales"),
+            .indices = CopyInts(indices[row], "protoIndices"),
+            .positions = CopyFloats(positions[row], 3, "positions"),
+            .rotations = CopyFloats(orientations[row], 4, "orientations"),
+            .scales = CopyFloats(scales[row], 3, "scales"),
             .wFirst = rows.Text(order[row]) == "wxyz",
         };
         return instances.Bounds();

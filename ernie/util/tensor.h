@@ -122,6 +122,10 @@ class ERNIE_API Tensor {
     Device Location() const {
         return device_;
     }
+    /// @return Whether its memory is the host's, as an empty tensor's is.
+    bool OnHost() const {
+        return !IsGpu(device_.kind);
+    }
 
     /// @return The extent of each dimension.
     const std::vector<std::int64_t>& Shape() const {
@@ -229,7 +233,7 @@ template <typename T> T* Tensor::As() const {
 /// @brief Copies a CPU tensor of any shape out as floats.
 /// @param tensor A float32 or float64 tensor on the CPU.
 /// @param what   What it holds, for errors.
-/// @return Its elements in row-major order.
+/// @return Its elements in row-major order; none for an empty tensor.
 /// @throws std::invalid_argument If it is elsewhere or not float.
 ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what);
 
@@ -237,7 +241,7 @@ ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::string_view w
 /// @param tensor     A flat or (n, `components`) float tensor.
 /// @param components The vectors' size.
 /// @param what       What it holds, for errors.
-/// @return Its elements in row-major order.
+/// @return Its elements in row-major order; none for an empty tensor.
 /// @throws std::invalid_argument If its shape or type is wrong.
 ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::size_t components,
                                         std::string_view what);
@@ -245,7 +249,7 @@ ERNIE_API std::vector<float> CopyFloats(const Tensor& tensor, std::size_t compon
 /// @brief Copies a CPU tensor of any shape out as integers.
 /// @param tensor An int32, int64 or uint32 tensor on the CPU.
 /// @param what   What it holds, for errors.
-/// @return Its elements in row-major order.
+/// @return Its elements in row-major order; none for an empty tensor.
 /// @throws std::invalid_argument If it is elsewhere or not integer.
 ERNIE_API std::vector<std::int64_t> CopyInts(const Tensor& tensor, std::string_view what);
 

@@ -14,13 +14,11 @@ namespace {
 /// point, else by half the widest (as UsdGeomCurves does); none for an empty tensor or one on a
 /// device.
 std::optional<Box> BoundPoints(const Tensor& points, const Tensor& widths) {
-    if (points.Empty() || IsGpu(points.Location().kind) ||
-        (!widths.Empty() && IsGpu(widths.Location().kind))) {
+    if (points.Empty() || !points.OnHost() || !widths.OnHost()) {
         return std::nullopt;
     }
     const Tensor xyz = points.Contiguous();
-    const std::vector<float> diameters =
-        widths.Empty() ? std::vector<float>{} : CopyFloats(widths, "widths");
+    const std::vector<float> diameters = CopyFloats(widths, "widths");
     const auto count = static_cast<std::size_t>(xyz.Elements() / 3);
     const double widest = diameters.empty() ? 0.0 : *std::ranges::max_element(diameters);
     const auto half = [&](std::size_t i) {

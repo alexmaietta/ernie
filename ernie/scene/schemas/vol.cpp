@@ -46,7 +46,7 @@ void NanoVdbFieldExtent(const ExtentRows& rows, RowRange range, std::span<Box> o
     const auto index = rows.Column<std::int32_t>(NanoVDBField::kFieldIndex);
     ComputeRows(range, out, [&](std::uint32_t row) {
         const Tensor& grids = buffer[row];
-        if (grids.Empty() || IsGpu(grids.Location().kind) || !grids.IsContiguous()) {
+        if (grids.Empty() || !grids.OnHost() || !grids.IsContiguous()) {
             return Box();
         }
         const std::span<const std::uint8_t> bytes(static_cast<const std::uint8_t*>(grids.Data()),
@@ -82,10 +82,8 @@ void VolumeExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
                 !rows.Text(column.attribute).starts_with(tokens::kFieldPrefix)) {
                 continue;
             }
-            const auto field =
-                rows.Resolve(rows.store.Read<Target>(rows.bucket, column.attribute)[row]);
-            if (const std::optional<Box> extent =
-                    field ? rows.ExtentInRowSpace(*field, row) : std::nullopt) {
+            if (const std::optional<Box> extent = rows.TargetExtent(
+                    rows.store.Read<Target>(rows.bucket, column.attribute)[row], row)) {
                 box.Extend(*extent);
             }
         }

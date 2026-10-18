@@ -11,17 +11,9 @@
 namespace ernie {
 namespace {
 
-/// @return The body a row's relationship names, its extent brought into the row's own space; none
-/// when it names none.
-std::optional<Box> BodyInOwnSpace(const ExtentRows& rows, std::string_view relationship,
-                                  std::uint32_t row) {
-    const std::optional<PrimId> body = rows.Resolve(rows.Column<Target>(relationship)[row]);
-    return body ? rows.ExtentInRowSpace(*body, row) : std::nullopt;
-}
-
 /// @return The lowest and highest of a host array's heights; none on a device or when empty.
 std::optional<std::pair<double, double>> HeightRange(const Tensor& heights) {
-    if (heights.Empty() || IsGpu(heights.Location().kind)) {
+    if (heights.Empty() || !heights.OnHost()) {
         return std::nullopt;
     }
     const std::vector<float> values = CopyFloats(heights, "heights");
@@ -43,11 +35,12 @@ void TerrainExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto cell = rows.Column<double>(Terrain::kCellSize);
     const auto exaggeration = rows.Column<double>(Terrain::kExaggeration);
     const auto authored = rows.Column<std::vector<float>>(Boundable::kExtent);
+    const auto bodies = rows.Column<Target>(Terrain::kBody);
     ComputeRows(range, out, [&](std::uint32_t row) {
         const std::optional<std::pair<double, double>> span = HeightRange(heights[row]);
         const double low = span ? span->first * exaggeration[row] : 0.0;
         const double high = span ? span->second * exaggeration[row] : 0.0;
-        if (const std::optional<Box> body = BodyInOwnSpace(rows, Terrain::kBody, row)) {
+        if (const std::optional<Box> body = rows.TargetExtent(bodies[row], row)) {
             return body->Grown(std::max(high, 0.0));
         }
         return span && heights[row].Rank() == 2
@@ -58,8 +51,9 @@ void TerrainExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
 
 void AtmosphereExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto top = rows.Column<double>(Atmosphere::kTop);
+    const auto bodies = rows.Column<Target>(Atmosphere::kBody);
     ComputeRows(range, out, [&](std::uint32_t row) {
-        const std::optional<Box> body = BodyInOwnSpace(rows, Atmosphere::kBody, row);
+        const std::optional<Box> body = rows.TargetExtent(bodies[row], row);
         return body ? body->Grown(top[row]) : Box();
     });
 }

@@ -384,7 +384,7 @@ namespace {
 
 /// @return A CPU tensor as arrays nested by its shape.
 Json WriteTensor(const Tensor& tensor) {
-    if (IsGpu(tensor.Location().kind)) {
+    if (!tensor.OnHost()) {
         throw std::invalid_argument("a GPU tensor cannot be written");
     }
     std::vector<Json> numbers;

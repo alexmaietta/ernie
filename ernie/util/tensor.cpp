@@ -281,7 +281,10 @@ Tensor Tensor::Contiguous() const {
 }
 
 std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what) {
-    if (tensor.Location().kind != DeviceKind::Cpu) {
+    if (tensor.Empty()) {
+        return {};
+    }
+    if (!tensor.OnHost()) {
         throw std::invalid_argument(std::string(what) + " must be a CPU array");
     }
     const Tensor packed = tensor.Contiguous();
@@ -299,6 +302,9 @@ std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what) {
 }
 
 std::vector<float> CopyFloats(const Tensor& tensor, std::size_t components, std::string_view what) {
+    if (tensor.Empty()) {
+        return {};
+    }
     const bool shaped =
         tensor.Rank() == 2 && tensor.Shape()[1] == static_cast<std::int64_t>(components);
     if (tensor.Location().kind != DeviceKind::Cpu || !(tensor.Rank() == 1 || shaped) ||
@@ -310,7 +316,10 @@ std::vector<float> CopyFloats(const Tensor& tensor, std::size_t components, std:
 }
 
 std::vector<std::int64_t> CopyInts(const Tensor& tensor, std::string_view what) {
-    if (tensor.Location().kind != DeviceKind::Cpu) {
+    if (tensor.Empty()) {
+        return {};
+    }
+    if (!tensor.OnHost()) {
         throw std::invalid_argument(std::string(what) + " must be a CPU array");
     }
     const Tensor packed = tensor.Contiguous();
