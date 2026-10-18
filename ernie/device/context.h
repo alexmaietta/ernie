@@ -8,6 +8,7 @@
 #include "ernie/device/queue.h"
 #include "ernie/device/vulkan.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,6 +44,10 @@ class DeviceContext {
     const VkPhysicalDeviceLimits& Limits() const {
         return limits_;
     }
+    /// @return The largest buffer a shader can address whole: arenas are no larger.
+    std::uint64_t MaxBufferSize() const {
+        return maxBufferSize_;
+    }
 
     /// The queue for graphics and compute work.
     Queue& Main() const {
@@ -61,6 +66,9 @@ class DeviceContext {
 
     /// @brief Keeps `object` alive until every queue's work submitted so far is done.
     void Retire(std::shared_ptr<const void> object);
+    /// @brief Runs `release` once every queue's work submitted so far is done: how memory the GPU
+    /// may still read is given back.
+    void Retire(std::function<void()> release);
     /// @brief Frees retired objects whose work is done.
     void Collect();
     /// @brief Waits for every queue, then frees everything retired.
@@ -88,13 +96,14 @@ class DeviceContext {
 
   private:
     struct Retired {
-        std::shared_ptr<const void> object;
+        std::function<void()> release;
         std::vector<Ticket> tickets;
     };
 
     ernie::Instance instance_;
     PhysicalDevice physical_;
     VkPhysicalDeviceLimits limits_{};
+    std::uint64_t maxBufferSize_ = 0;
     VkDevice device_ = VK_NULL_HANDLE;
     VmaAllocator allocator_ = VK_NULL_HANDLE;
     std::vector<std::unique_ptr<Queue>> queues_;

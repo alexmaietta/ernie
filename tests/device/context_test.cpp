@@ -2,47 +2,20 @@
 /// @file context_test.cpp
 /// @brief Tests of the device context, queues and tickets, buffers and staging, under validation.
 #include "ernie/device/staging.h"
-#include "ernie/util/algorithm.h"
+
+#include "tests/device/common.h"
 
 #include <gtest/gtest.h>
 
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <numeric>
-#include <string_view>
 #include <vector>
 
 namespace ernie {
 namespace {
 
-/// @return A validating context on `device`, or none when there is no Vulkan and CI does not
-/// require it.
-std::unique_ptr<DeviceContext> MakeContext(std::string_view device = {}) {
-    try {
-        return std::make_unique<DeviceContext>(
-            DeviceContextOptions{.validation = true, .device = std::string(device)});
-    } catch (const DeviceError&) {
-        const char* required = std::getenv("ERNIE_TEST_REQUIRE_VULKAN");
-        if (required != nullptr && std::string_view(required) == "1") {
-            throw;
-        }
-        return nullptr;
-    }
-}
-
-#define ERNIE_CONTEXT(name, ...)                                                                   \
-    const std::unique_ptr<DeviceContext> name = MakeContext(__VA_ARGS__);                          \
-    if (!name) {                                                                                   \
-        GTEST_SKIP() << "No Vulkan device";                                                        \
-    }
-
-/// Fails the test on any validation message.
-void ExpectClean(DeviceContext& context) {
-    for (const std::string& message : context.TakeValidationMessages()) {
-        ADD_FAILURE() << message;
-    }
-}
+using test::ExpectClean;
 
 std::vector<std::uint32_t> Counting(std::size_t count) {
     std::vector<std::uint32_t> values(count);

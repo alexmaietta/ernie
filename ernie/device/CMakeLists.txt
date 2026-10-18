@@ -2,6 +2,7 @@
 add_library(
     ernie_device
     OBJECT
+    arena.cpp
     buffer.cpp
     context.cpp
     instance.cpp

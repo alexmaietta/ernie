@@ -73,9 +73,14 @@ Families FindFamilies(VkPhysicalDevice device) {
 DeviceContext::DeviceContext(const DeviceContextOptions& options)
     : instance_({.validation = options.validation, .extensions = options.instanceExtensions}),
       physical_(Choose(instance_, options.device)) {
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(physical_.handle, &properties);
-    limits_ = properties.limits;
+    VkPhysicalDeviceMaintenance4Properties maintenance4{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES};
+    VkPhysicalDeviceProperties2 properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+                                           .pNext = &maintenance4};
+    vkGetPhysicalDeviceProperties2(physical_.handle, &properties);
+    limits_ = properties.properties.limits;
+    maxBufferSize_ =
+        std::min<std::uint64_t>(maintenance4.maxBufferSize, limits_.maxStorageBufferRange);
 
     const Families families = FindFamilies(physical_.handle);
     std::vector<std::uint32_t> distinct{families.main};
@@ -147,21 +152,34 @@ std::vector<Queue*> DeviceContext::Queues() const {
 }
 
 void DeviceContext::Retire(std::shared_ptr<const void> object) {
-    if (object == nullptr) {
-        return;
+    if (object != nullptr) {
+        Retire([held = std::move(object)]() mutable { held.reset(); });
     }
+}
+
+void DeviceContext::Retire(std::function<void()> release) {
     std::vector<Ticket> tickets = Map(queues_, [](const auto& queue) { return queue->Last(); });
     const std::lock_guard lock(retiredMutex_);
-    retired_.push_back({std::move(object), std::move(tickets)});
+    retired_.push_back({std::move(release), std::move(tickets)});
 }
 
 void DeviceContext::Collect() {
-    const std::lock_guard lock(retiredMutex_);
-    std::erase_if(retired_, [](const Retired& retired) {
-        return std::ranges::all_of(retired.tickets, [](const Ticket& ticket) {
-            return ticket.queue == nullptr || ticket.queue->Done(ticket);
+    std::vector<Retired> done;
+    {
+        const std::lock_guard lock(retiredMutex_);
+        const auto finished = std::ranges::partition(retired_, [](const Retired& retired) {
+            return !std::ranges::all_of(retired.tickets, [](const Ticket& ticket) {
+                return ticket.queue == nullptr || ticket.queue->Done(ticket);
+            });
         });
-    });
+        done.assign(std::make_move_iterator(finished.begin()),
+                    std::make_move_iterator(finished.end()));
+        retired_.erase(finished.begin(), finished.end());
+    }
+    // Released without the lock: a release may retire more.
+    for (Retired& retired : done) {
+        retired.release();
+    }
 }
 
 void DeviceContext::WaitIdle() {
