@@ -3,6 +3,7 @@
 /// @brief Tests of lights' and cameras' schemas and extents.
 #include "ernie/scene/schemas/camera.h"
 #include "ernie/scene/schemas/collection.h"
+#include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/xform.h"
 
@@ -87,6 +88,35 @@ TEST(Lights, ErnieAttributesSitBesideUsdLuxs) {
     EXPECT_EQ(strobe.GetSpectrum().size(), 4u);
     EXPECT_EQ(DistantLight::Define(scene, "/Sun").GetIrradiance(), 1361.0);
     EXPECT_THROW(strobe.SetPolarizationDegree(2.0), std::invalid_argument);
+}
+
+TEST(Lights, OmniversePhotometricSchemasApplyByTheirNames) {
+    Scene scene;
+    SphereLight::Define(scene, "/Lamp");
+    PhotometricAreaLightAPI lamp = PhotometricAreaLightAPI::Apply(scene, "/Lamp");
+    EXPECT_EQ(lamp.GetPhotometricPower(), 1600.0);
+    EXPECT_FALSE(lamp.HasPhotometricPower()) << "unauthored: the light is not photometric";
+    lamp.SetPhotometricPower(800.0);
+    EXPECT_EQ(scene.Get("/Lamp", "photometric:power"), Value(800.0));
+    DistantLight::Define(scene, "/Sun");
+    EXPECT_EQ(PhotometricDistantLightAPI::Apply(scene, "/Sun").GetPhotometricIlluminance(),
+              10000.0);
+    PhysicalLightIlluminantAPI::Apply(scene, "/Sun").SetPhysicalIlluminant("sun");
+    EXPECT_THROW(PhysicalLightIlluminantAPI(scene, "/Sun").SetPhysicalIlluminant("moon"),
+                 std::invalid_argument);
+}
+
+TEST(Lights, LasersAreLightsWithBeamsAndPatterns) {
+    Scene scene;
+    LaserLight laser = LaserLight::Define(scene, "/Projector");
+    EXPECT_EQ(laser.GetPower(), 0.001) << "its own fallback for a light's power";
+    EXPECT_EQ(laser.GetPolarizationDegree(), 0.98) << "a laser diode's 100:1";
+    EXPECT_EQ(SphereLight::Define(scene, "/Lamp").GetPolarizationDegree(), 0.0);
+    EXPECT_TRUE(scene.HasApi(laser.Id(), "CollectionAPI:lightLink"));
+    laser.SetPattern("dots").SetPulseRate(30.0).SetApertureRadius(0.002);
+    EXPECT_THROW(laser.SetPattern("spiral"), std::invalid_argument);
+    EXPECT_TRUE(BoxNear(*scene.Extent(laser.Id()), {-0.002, -0.002, 0.0}, {0.002, 0.002, 0.0}))
+        << "framing a laser frames its emitter";
 }
 
 TEST(Camera, ErnieApiSchemasAddLensPolarizerAndSensor) {

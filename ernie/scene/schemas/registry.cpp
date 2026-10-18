@@ -5,6 +5,7 @@
 #include "ernie/scene/schemas/collection.h"
 #include "ernie/scene/schemas/geom.h"
 #include "ernie/scene/schemas/instancer.h"
+#include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/schemas/mesh.h"
 #include "ernie/scene/schemas/shade.h"
@@ -50,8 +51,13 @@ std::span<const SchemaDef* const> Schemas() {
         &CylinderLight::Definition(),
         &DomeLight::Definition(),
         &PortalLight::Definition(),
+        &LaserLight::Definition(),
         &ShapingAPI::Definition(),
         &ShadowAPI::Definition(),
+        &PhotometricAreaLightAPI::Definition(),
+        &PhotometricDistantLightAPI::Definition(),
+        &PhotometricDomeLightAPI::Definition(),
+        &PhysicalLightIlluminantAPI::Definition(),
         &CollectionAPI::Definition(),
         &MaterialBindingAPI::Definition(),
     };

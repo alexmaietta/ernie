@@ -13,6 +13,7 @@ add_library(
     schemas/collection.cpp
     schemas/geom.cpp
     schemas/instancer.cpp
+    schemas/laser.cpp
     schemas/lux.cpp
     schemas/mesh.cpp
     schemas/registry.cpp

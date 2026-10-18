@@ -80,5 +80,17 @@ ERNIE_DEFINE_SCHEMA(ShapingAPI, "ShapingAPI", nullptr, SingleApply, kInheritExte
                     ERNIE_SHAPING_API_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(ShadowAPI, "ShadowAPI", nullptr, SingleApply, kInheritExtent,
                     "Controls a light's shadows.", ERNIE_SHADOW_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(PhotometricAreaLightAPI, "PhotometricAreaLightAPI", nullptr, SingleApply,
+                    kInheritExtent, "Photometric units for shaped lights: lumens, or lux.",
+                    ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(PhotometricDistantLightAPI, "PhotometricDistantLightAPI", nullptr, SingleApply,
+                    kInheritExtent, "Photometric units for distant lights: lux.",
+                    ERNIE_PHOTOMETRIC_DISTANT_LIGHT_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(PhotometricDomeLightAPI, "PhotometricDomeLightAPI", nullptr, SingleApply,
+                    kInheritExtent, "Photometric units for dome lights: lux.",
+                    ERNIE_PHOTOMETRIC_DOME_LIGHT_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(PhysicalLightIlluminantAPI, "PhysicalLightIlluminantAPI", nullptr, SingleApply,
+                    kInheritExtent, "The shape of a light's spectrum.",
+                    ERNIE_PHYSICAL_LIGHT_ILLUMINANT_API_ATTRIBUTES)
 
 }  // namespace ernie

@@ -125,6 +125,44 @@
     X(bool, ShapingIesNormalize, "inputs:shaping:ies:normalize", false,                            \
       "Keeps the profile from changing the light's power.", .group = "Shaping")
 
+// Omniverse's photometric and illuminant schemas (omni.usd.schema.physical_lighting). Authoring any
+// photometric value puts the light in photometric units, which alone then set its brightness.
+#define ERNIE_PHOTOMETRIC_SWITCH " Authored, it alone sets the light's brightness."
+
+#define ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES(X)                                             \
+    X(double, PhotometricPower, "photometric:power", 1600.0,                                       \
+      "Luminous flux in lumens, whatever the colour or cone." ERNIE_PHOTOMETRIC_SWITCH,           \
+      .group = "Photometric", .lower = AtLeast(0.0), .finite = true)                               \
+    X(double, PhotometricIlluminance, "photometric:illuminance", 0.0,                              \
+      "Lux on a surface facing it on its axis at the distance below, in place of the power when "  \
+      "both are above 0.",                                                                         \
+      .group = "Photometric", .lower = AtLeast(0.0), .finite = true)                               \
+    X(double, PhotometricIlluminanceDistance, "photometric:illuminance:distance", 0.0,             \
+      "Metres at which the illuminance holds; 0 uses the power.", .group = "Photometric",          \
+      .lower = AtLeast(0.0), .finite = true)
+
+#define ERNIE_PHOTOMETRIC_ILLUMINANCE_ATTRIBUTES(X, where)                                         \
+    X(double, PhotometricIlluminance, "photometric:illuminance", 10000.0,                          \
+      "Lux " where "." ERNIE_PHOTOMETRIC_SWITCH, .group = "Photometric", .lower = AtLeast(0.0),    \
+      .finite = true)
+
+#define ERNIE_PHOTOMETRIC_DISTANT_LIGHT_API_ATTRIBUTES(X)                                          \
+    ERNIE_PHOTOMETRIC_ILLUMINANCE_ATTRIBUTES(X, "on a surface facing the light")
+
+#define ERNIE_PHOTOMETRIC_DOME_LIGHT_API_ATTRIBUTES(X)                                             \
+    ERNIE_PHOTOMETRIC_ILLUMINANCE_ATTRIBUTES(X, "on an upward-facing surface under the dome")
+
+#define ERNIE_PHYSICAL_LIGHT_ILLUMINANT_API_ATTRIBUTES(X)                                          \
+    X(std::string, PhysicalIlluminant, "physical:illuminant", "",                                  \
+      "The spectrum's shape: white (flat) or blackbody over 380 to 780 nm, illuminant D at the "   \
+      "colour temperature, custom (the pairs below), or sun (TSIS-1, 115 nm to 200 um); unset, a " \
+      "black body when the temperature is used, else flat.",                                       \
+      .group = "Spectrum", .options = {"white", "blackbody", "illuminant D", "custom", "sun"})      \
+    X(std::vector<float>, PhysicalCustomIlluminant, "physical:customIlluminant",                   \
+      std::vector<float>{},                                                                        \
+      "(nm, value) pairs, wavelengths increasing, of a custom illuminant's shape; 0 outside them.", \
+      .group = "Spectrum")
+
 #define ERNIE_SHADOW_API_ATTRIBUTES(X)                                                             \
     X(bool, ShadowEnable, "inputs:shadow:enable", true, "Whether it casts shadows.",               \
       .group = "Shadow")                                                                           \
@@ -163,6 +201,14 @@ ERNIE_SCHEMA_ACCESSORS(DomeLight, NonboundableLightBase, ERNIE_DOME_LIGHT_ATTRIB
 ERNIE_SCHEMA_ACCESSORS(PortalLight, BoundableLightBase, ERNIE_PORTAL_LIGHT_ATTRIBUTES);
 ERNIE_SCHEMA_ACCESSORS(ShapingAPI, SchemaView, ERNIE_SHAPING_API_ATTRIBUTES);
 ERNIE_SCHEMA_ACCESSORS(ShadowAPI, SchemaView, ERNIE_SHADOW_API_ATTRIBUTES);
+ERNIE_SCHEMA_ACCESSORS(PhotometricAreaLightAPI, SchemaView,
+                       ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES);
+ERNIE_SCHEMA_ACCESSORS(PhotometricDistantLightAPI, SchemaView,
+                       ERNIE_PHOTOMETRIC_DISTANT_LIGHT_API_ATTRIBUTES);
+ERNIE_SCHEMA_ACCESSORS(PhotometricDomeLightAPI, SchemaView,
+                       ERNIE_PHOTOMETRIC_DOME_LIGHT_API_ATTRIBUTES);
+ERNIE_SCHEMA_ACCESSORS(PhysicalLightIlluminantAPI, SchemaView,
+                       ERNIE_PHYSICAL_LIGHT_ILLUMINANT_API_ATTRIBUTES);
 
 /// A light with a shape, bounded by it.
 class BoundableLightBase : public BoundableLightBaseAccessors<BoundableLightBase, Boundable> {
@@ -230,6 +276,30 @@ class ShapingAPI : public ShapingAPIAccessors<ShapingAPI, SchemaView> {
 /// Controls a light's shadows.
 class ShadowAPI : public ShadowAPIAccessors<ShadowAPI, SchemaView> {
     ERNIE_API_SCHEMA_BODY(ShadowAPI)
+};
+
+/// Omniverse's photometric units for shaped lights: lumens, or lux at a distance.
+class PhotometricAreaLightAPI
+    : public PhotometricAreaLightAPIAccessors<PhotometricAreaLightAPI, SchemaView> {
+    ERNIE_API_SCHEMA_BODY(PhotometricAreaLightAPI)
+};
+
+/// Omniverse's photometric units for distant lights: lux on a facing surface.
+class PhotometricDistantLightAPI
+    : public PhotometricDistantLightAPIAccessors<PhotometricDistantLightAPI, SchemaView> {
+    ERNIE_API_SCHEMA_BODY(PhotometricDistantLightAPI)
+};
+
+/// Omniverse's photometric units for dome lights: lux on an upward-facing surface.
+class PhotometricDomeLightAPI
+    : public PhotometricDomeLightAPIAccessors<PhotometricDomeLightAPI, SchemaView> {
+    ERNIE_API_SCHEMA_BODY(PhotometricDomeLightAPI)
+};
+
+/// Omniverse's illuminant: the shape of a light's spectrum.
+class PhysicalLightIlluminantAPI
+    : public PhysicalLightIlluminantAPIAccessors<PhysicalLightIlluminantAPI, SchemaView> {
+    ERNIE_API_SCHEMA_BODY(PhysicalLightIlluminantAPI)
 };
 
 }  // namespace ernie
