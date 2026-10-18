@@ -126,6 +126,9 @@ class AccelerationPool {
     DeviceContext& Context() const {
         return context_;
     }
+    const std::string& Name() const {
+        return name_;
+    }
     /// @return The alignment every build's scratch needs.
     std::uint64_t ScratchAlignment() const {
         return scratchAlignment_;
@@ -137,6 +140,7 @@ class AccelerationPool {
     void Free(AccelerationKind kind, const BufferRange& range);
 
     DeviceContext& context_;
+    std::string name_;
     Arenas arenas_;
     std::uint64_t scratchAlignment_;
     Statistics usage_;

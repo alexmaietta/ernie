@@ -356,6 +356,15 @@ TEST_F(FrameGraph, KeepsStructuresAndBuffersToTheirOwnUses) {
                      [](PassContext&) {}),
                  std::invalid_argument);
     EXPECT_EQ(graph.Import(top).id, scene.id) << "importing it again finds the same resource";
+    // A pool stands for all its structures: builds write it and the top level's build reads it.
+    graph::Acceleration bottoms = graph.Import(structures);
+    EXPECT_EQ(graph.Import(structures).id, bottoms.id);
+    EXPECT_NO_THROW(graph.Add(
+        "Build bottom levels", Kind::Build,
+        [&](PassBuilder& pass) { bottoms = pass.Build(bottoms); }, [](PassContext&) {}));
+    EXPECT_NO_THROW(graph.Add(
+        "Build the top level", Kind::Build,
+        [&](PassBuilder& pass) { pass.Read(bottoms, Use::BuildInput); }, [](PassContext&) {}));
 }
 
 TEST_F(FrameGraph, ReportsReadsOfWhatNothingWrote) {

@@ -17,7 +17,7 @@ constexpr std::uint64_t kStructureAlignment = 256;
 /// The alignment instance arrays need.
 constexpr std::uint64_t kInstanceAlignment = 16;
 
-VkDeviceAddress AddressOf(const BufferView& view) {
+VkDeviceAddress DeviceAddress(const BufferView& view) {
     return view.buffer == nullptr ? 0 : view.buffer->Address() + view.offset;
 }
 
@@ -50,11 +50,11 @@ VkAccelerationStructureGeometryKHR Geometry(const TriangleGeometry& mesh) {
     VkAccelerationStructureGeometryTrianglesDataKHR triangles{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
     triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    triangles.vertexData.deviceAddress = AddressOf(mesh.vertices);
+    triangles.vertexData.deviceAddress = DeviceAddress(mesh.vertices);
     triangles.vertexStride = mesh.stride;
     triangles.maxVertex = mesh.vertexCount - 1;
     triangles.indexType = VK_INDEX_TYPE_UINT32;
-    triangles.indexData.deviceAddress = AddressOf(mesh.indices);
+    triangles.indexData.deviceAddress = DeviceAddress(mesh.indices);
     VkAccelerationStructureGeometryKHR geometry{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
         .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
@@ -66,7 +66,7 @@ VkAccelerationStructureGeometryKHR Geometry(const TriangleGeometry& mesh) {
 VkAccelerationStructureGeometryKHR Geometry(const BoxGeometry& boxes) {
     VkAccelerationStructureGeometryAabbsDataKHR aabbs{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR};
-    aabbs.data.deviceAddress = AddressOf(boxes.boxes);
+    aabbs.data.deviceAddress = DeviceAddress(boxes.boxes);
     aabbs.stride = boxes.stride;
     // Opaque: a candidate is committed by the shader that intersects it exactly.
     VkAccelerationStructureGeometryKHR geometry{
@@ -80,7 +80,7 @@ VkAccelerationStructureGeometryKHR Geometry(const BoxGeometry& boxes) {
 VkAccelerationStructureGeometryKHR Geometry(const BufferView& instances) {
     VkAccelerationStructureGeometryInstancesDataKHR data{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR};
-    data.data.deviceAddress = AddressOf(instances);
+    data.data.deviceAddress = DeviceAddress(instances);
     VkAccelerationStructureGeometryKHR geometry{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
         .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR};
@@ -216,7 +216,7 @@ AccelerationSizes Sizes(const DeviceContext& context, std::uint32_t capacity, Bu
 
 AccelerationPool::AccelerationPool(DeviceContext& context, std::string_view name,
                                    std::uint64_t arenaSize)
-    : context_(context), arenas_(context, MemoryUse::Device, name, arenaSize),
+    : context_(context), name_(name), arenas_(context, MemoryUse::Device, name, arenaSize),
       scratchAlignment_(QueryScratchAlignment(context)) {
     RequireRayQueries(context);
 }
@@ -304,7 +304,7 @@ void RecordBuilds(VkCommandBuffer commands, std::span<const BottomBuild> bottoms
     }
     const AccelerationPool& pool = BuildPool(bottoms, tops);
     const std::uint64_t alignment = pool.ScratchAlignment();
-    VkDeviceAddress next = AlignUp(AddressOf(scratch), alignment);
+    VkDeviceAddress next = AlignUp(DeviceAddress(scratch), alignment);
     std::vector<BottomInput> inputs;
     std::vector<VkAccelerationStructureGeometryKHR> instances;
     inputs.reserve(bottoms.size());
@@ -336,7 +336,7 @@ void RecordBuilds(VkCommandBuffer commands, std::span<const BottomBuild> bottoms
     }
     for (const TopBuild& build : tops) {
         CheckTarget(build.target, AccelerationKind::Top, build.update);
-        if (AddressOf(build.instances) % kInstanceAlignment != 0) {
+        if (DeviceAddress(build.instances) % kInstanceAlignment != 0) {
             throw std::invalid_argument("A top level's instances need 16-byte alignment");
         }
         CheckFits(*build.target, std::span(&build.count, 1));

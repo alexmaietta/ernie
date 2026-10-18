@@ -70,12 +70,12 @@ ImageUsage NeededUsage(Use use) {
 
 std::uint32_t PassBuilder::Declare(std::uint32_t id, std::uint32_t version, Shape shape, Use use,
                                    Layers layers, Reach reach, bool write) {
-    const auto shapeOf = [](const Graph::Resource& resource) {
-        return resource.image                     ? Shape::Image
-               : resource.acceleration != nullptr ? Shape::Acceleration
-                                                  : Shape::Buffer;
+    const auto resourceShape = [](const Graph::Resource& resource) {
+        return resource.image         ? Shape::Image
+               : resource.Structure() ? Shape::Acceleration
+                                      : Shape::Buffer;
     };
-    if (id >= graph_.resources_.size() || shapeOf(graph_.resources_[id]) != shape) {
+    if (id >= graph_.resources_.size() || resourceShape(graph_.resources_[id]) != shape) {
         static constexpr const char* kShapes[] = {"image", "buffer", "acceleration structure"};
         throw std::invalid_argument(std::string("An invalid ") +
                                     kShapes[static_cast<std::size_t>(shape)] + " handle");
@@ -182,7 +182,11 @@ BufferSlice PassContext::Get(Buffer buffer) const {
 
 const AccelerationStructure& PassContext::Get(Acceleration structure) const {
     Check(structure.id);
-    return *graph_.resources_[structure.id].acceleration;
+    const Graph::Resource& resource = graph_.resources_[structure.id];
+    if (resource.acceleration == nullptr) {
+        throw std::logic_error("'" + resource.name + "' is a pool of structures, not one");
+    }
+    return *resource.acceleration;
 }
 
 VkImageLayout PassContext::Layout(Image image) const {
@@ -243,10 +247,22 @@ Acceleration Graph::Import(const AccelerationStructure& structure) {
             0};
 }
 
+Acceleration Graph::Import(const AccelerationPool& pool) {
+    const auto found = std::ranges::find(resources_, &pool, &Resource::structures);
+    if (found != resources_.end()) {
+        return {static_cast<std::uint32_t>(found - resources_.begin()), found->version};
+    }
+    return {AddResource({.name = pool.Name(),
+                         .imported = true,
+                         .structures = &pool,
+                         .origin = Origin::Imported}),
+            0};
+}
+
 Buffer Graph::Import(const ernie::Buffer& buffer, std::uint64_t offset, std::uint64_t size,
                      std::string_view name) {
     const auto found = std::ranges::find_if(resources_, [&](const Resource& resource) {
-        return resource.imported && !resource.image && resource.acceleration == nullptr &&
+        return resource.imported && !resource.image && !resource.Structure() &&
                resource.slice.buffer == &buffer && resource.slice.offset == offset &&
                resource.slice.size == size;
     });
@@ -522,9 +538,9 @@ std::string Graph::Dot() const {
     dot << "digraph FrameGraph {\n  rankdir=LR;\n";
     for (std::size_t r = 0; r < resources_.size(); ++r) {
         const Resource& resource = resources_[r];
-        const char* shape = resource.image                     ? "ellipse"
-                            : resource.acceleration != nullptr ? "hexagon"
-                                                               : "cylinder";
+        const char* shape = resource.image         ? "ellipse"
+                            : resource.Structure() ? "hexagon"
+                                                   : "cylinder";
         dot << "  r" << r << " [shape=" << shape << ", label=\"" << resource.name << "\""
             << (resource.imported ? ", style=bold" : "") << "];\n";
     }

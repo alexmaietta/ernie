@@ -139,7 +139,7 @@ class PassContext {
   public:
     VkCommandBuffer commands = VK_NULL_HANDLE;
 
-    /// @throws std::logic_error unless the pass declared it.
+    /// @throws std::logic_error unless the pass declared it, or for a pool's structure.
     DeviceImage& Get(Image image) const;
     BufferSlice Get(Buffer buffer) const;
     const AccelerationStructure& Get(Acceleration structure) const;
@@ -181,6 +181,10 @@ class Graph {
     /// @brief Uses an acceleration structure owned outside the graph, such as a pooled bottom or
     /// top level; importing it again returns the same resource.
     Acceleration Import(const AccelerationStructure& structure);
+    /// @brief Uses every structure in a pool as one resource, as thousands of bottom levels are
+    /// built by one pass and read by the top level's build: the barriers are the same, at the
+    /// cost of one resource rather than thousands.
+    Acceleration Import(const AccelerationPool& pool);
     /// @brief Declares an image living for one execution; the usage its passes declare is
     /// added to `description`'s.
     Image Create(const ImageDescription& description, std::string_view name);
@@ -262,6 +266,11 @@ class Graph {
         /// A buffer's range, or the memory a structure lives in.
         BufferSlice slice;
         const AccelerationStructure* acceleration = nullptr;
+        /// Every structure of a pool, tracked as one.
+        const AccelerationPool* structures = nullptr;
+        bool Structure() const {
+            return acceleration != nullptr || structures != nullptr;
+        }
         /// A transient's description, or size, and its leased range.
         ImageDescription description;
         std::uint64_t bytes = 0;
