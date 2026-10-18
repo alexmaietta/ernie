@@ -149,6 +149,10 @@ class ERNIE_API Scene {
     const PrimStore& Store() const {
         return store_;
     }
+    /// @return An id no other scene of this process has had, even one at the same address.
+    std::uint64_t Id() const {
+        return id_;
+    }
     std::uint64_t Version() const {
         return store_.Version();
     }
@@ -207,6 +211,7 @@ class ERNIE_API Scene {
     /// default-purpose prims'.
     void AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const;
 
+    std::uint64_t id_;
     PrimStore store_;
     /// The store version inherited attributes were last resolved at.
     std::uint64_t resolved_ = 0;

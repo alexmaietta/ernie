@@ -11,6 +11,7 @@
 #include "ernie/util/profiler.h"
 
 #include <algorithm>
+#include <atomic>
 #include <stdexcept>
 #include <string>
 
@@ -36,10 +37,15 @@ std::string Describe(const Scene& scene, PrimId prim) {
            (type.empty() ? std::string() : " (" + std::string(type) + ")");
 }
 
+std::uint64_t NextSceneId() {
+    static std::atomic<std::uint64_t> next{1};
+    return next++;
+}
+
 }  // namespace
 
 Scene::Scene()
-    : inherited_(store_.Tokens().Intern(tokens::kInherited)),
+    : id_(NextSceneId()), inherited_(store_.Tokens().Intern(tokens::kInherited)),
       invisible_(store_.Tokens().Intern(tokens::kInvisible)),
       defaultPurpose_(store_.Tokens().Intern(tokens::kDefault)) {
     FindOrAddBucket(nullptr, {});

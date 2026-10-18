@@ -24,7 +24,7 @@ namespace {
 
 /// @return The camera a render setting names, as a pinhole view of `size` pixels. The vertical
 /// field of view widens until the aperture's width fits too, as `expandAperture` conforms it.
-PinholeView View(const Scene& scene, const Path& path, glm::uvec2 size) {
+PinholeView ReadPinholeView(const Scene& scene, const Path& path, glm::uvec2 size) {
     const Camera camera(scene, path);
     const double focal = camera.GetFocalLength();
     const double aspect = static_cast<double>(size.x) / static_cast<double>(size.y);
@@ -40,11 +40,13 @@ PinholeView View(const Scene& scene, const Path& path, glm::uvec2 size) {
 
 /// What a renderer keeps on its device.
 struct Renderer::Device {
+    ShaderCompiler compiler;
     std::unique_ptr<DeviceContext> context;
     std::unique_ptr<Arenas> arenas;
     std::unique_ptr<BindlessHeap> heap;
     std::unique_ptr<CameraPass> camera;
-    const Scene* scene = nullptr;
+    /// The scene `deviceScene` follows, by `Scene::Id`: an address can be a new scene's.
+    std::uint64_t sceneId = 0;
     std::unique_ptr<DeviceScene> deviceScene;
     std::unique_ptr<DeviceColumn> ldr;
 };
@@ -60,7 +62,7 @@ Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<De
     device.arenas = std::make_unique<Arenas>(*device.context, MemoryUse::Device, "renderer",
                                              std::uint64_t{16} << 20);
     device.heap = std::make_unique<BindlessHeap>(*device.context);
-    device.camera = std::make_unique<CameraPass>(*device.context, ShaderCompiler(), *device.heap);
+    device.camera = std::make_unique<CameraPass>(*device.context, device.compiler, *device.heap);
     device.ldr = std::make_unique<DeviceColumn>(*device.arenas, "ldr colour", DType::UInt8,
                                                 std::vector<std::int64_t>{4}, 0);
 }
@@ -86,14 +88,14 @@ Tensor Renderer::Render(const Scene& scene) {
     }
     const glm::dvec2 resolution = render.GetResolution();
     const glm::uvec2 size(std::max(1.0, resolution.x), std::max(1.0, resolution.y));
-    const PinholeView view = View(scene, camera, size);
+    const PinholeView view = ReadPinholeView(scene, camera, size);
 
     Device& device = *device_;
-    if (&scene != device.scene) {
+    if (scene.Id() != device.sceneId) {
         device.context->WaitIdle();
         device.deviceScene =
-            std::make_unique<DeviceScene>(*device.context, *device.arenas, scene, ShaderCompiler());
-        device.scene = &scene;
+            std::make_unique<DeviceScene>(*device.context, *device.arenas, scene, device.compiler);
+        device.sceneId = scene.Id();
     }
     const std::size_t pixels = std::size_t{size.x} * size.y;
     device.ldr->Resize(pixels, device.context->Main());

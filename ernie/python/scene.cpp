@@ -37,17 +37,28 @@ namespace nb = nanobind;
 namespace ernie::python {
 namespace {
 
-/// A prim of a scene, as long as it is not removed; the scene outlives it.
+/// A prim of a scene, as long as it is not removed; it keeps its scene alive.
 struct Prim {
     PrimId id;
-    Scene* scene = nullptr;
+    nb::object scene;
+
+    Scene& Owner() const {
+        return nb::cast<Scene&>(scene);
+    }
 };
+
+Prim MakePrim(Scene& scene, PrimId id) {
+    return {id, nb::find(&scene)};
+}
 
 /// A prim, or the path of one.
 using Target = std::variant<Prim, std::string>;
 
 PrimId Resolve(const Scene& scene, const Target& target) {
     if (const Prim* prim = std::get_if<Prim>(&target)) {
+        if (&prim->Owner() != &scene) {
+            throw nb::value_error("The prim is another scene's");
+        }
         if (!scene.Store().Alive(prim->id)) {
             throw nb::value_error("The prim has been removed");
         }
@@ -188,7 +199,7 @@ void SetValue(Scene& scene, PrimId prim, const std::string& attribute, const nb:
 
 using Vector3 = std::array<double, 3>;
 
-glm::dvec3 Vec(const Vector3& v) {
+glm::dvec3 ToDvec3(const Vector3& v) {
     return {v[0], v[1], v[2]};
 }
 
@@ -196,11 +207,30 @@ glm::dvec3 Vec(const Vector3& v) {
 constexpr std::array<std::string_view, 5> kXformKeywords{"translate", "rotate", "rotation_order",
                                                          "orient", "scale"};
 
+/// @return The transform ops `define`'s keywords author, or none when they author no op.
+std::optional<XformOps> TakeXformKeywords(const nb::kwargs& keywords) {
+    const auto keyword = [&](const char* name) {
+        return keywords.contains(name) ? nb::object(keywords[name]) : nb::none();
+    };
+    const nb::object order = keyword("rotation_order");
+    XformOps xform =
+        ReadXformArguments(keyword("translate"), keyword("rotate"),
+                           order.is_none() ? std::string("XYZ") : nb::cast<std::string>(order),
+                           keyword("orient"), keyword("scale"));
+    if (!xform.translate && !xform.rotate && !xform.orient && !xform.scale) {
+        return std::nullopt;
+    }
+    return xform;
+}
+
 }  // namespace
 
 void BindScene(nb::module_& module) {
     nb::class_<Prim>(module, "Prim", "A prim of a scene, valid until it is removed.")
-        .def("__eq__", [](const Prim& self, const Prim& other) { return self.id == other.id; })
+        .def("__eq__",
+             [](const Prim& self, const Prim& other) {
+                 return self.id == other.id && self.scene.is(other.scene);
+             })
         .def("__hash__",
              [](const Prim& self) {
                  return (static_cast<std::uint64_t>(self.id.generation) << 32) | self.id.slot;
@@ -213,10 +243,8 @@ void BindScene(nb::module_& module) {
         .def(
             "set",
             [](const Prim& self, const std::string& attribute, const nb::object& value) {
-                if (!self.scene->Store().Alive(self.id)) {
-                    throw nb::value_error("The prim has been removed");
-                }
-                SetValue(*self.scene, self.id, attribute, value);
+                Scene& scene = self.Owner();
+                SetValue(scene, Resolve(scene, self), attribute, value);
                 return self;
             },
             nb::arg("attribute"), nb::arg("value"),
@@ -248,31 +276,18 @@ void BindScene(nb::module_& module) {
             [](Scene& self, const std::string& path, const std::string& type,
                const nb::kwargs& attributes) {
                 const PrimId prim = self.Define(Path(path), type);
-                const auto keyword = [&](std::string_view name) -> nb::object {
-                    const std::string key(name);
-                    return attributes.contains(key.c_str()) ? nb::object(attributes[key.c_str()])
-                                                            : nb::none();
-                };
-                bool xform = false;
                 for (const auto& [key, value] : attributes) {
                     const std::string name = nb::cast<std::string>(key);
-                    if (std::ranges::find(kXformKeywords, name) != kXformKeywords.end()) {
-                        xform = true;
-                    } else {
+                    if (std::ranges::find(kXformKeywords, name) == kXformKeywords.end()) {
                         SetValue(self, prim, name, value);
                     }
                 }
-                if (xform) {
-                    const nb::object order = keyword("rotation_order");
-                    SetXform(self, Path(path),
-                             ReadXformArguments(keyword("translate"), keyword("rotate"),
-                                                order.is_none() ? std::string("XYZ")
-                                                                : nb::cast<std::string>(order),
-                                                keyword("orient"), keyword("scale")));
+                if (const std::optional<XformOps> xform = TakeXformKeywords(attributes)) {
+                    SetXform(self, Path(path), *xform);
                 }
-                return Prim{prim, &self};
+                return MakePrim(self, prim);
             },
-            nb::arg("path"), nb::arg("type") = "", nb::arg("attributes"), nb::keep_alive<0, 1>(),
+            nb::arg("path"), nb::arg("type") = "", nb::arg("attributes"),
             "Defines a prim of a concrete type, or none, with its missing ancestors. Keywords "
             "author its transform ops (translate, rotate, rotation_order, orient, scale, as "
             "`set_xform`) and attributes by name (radius=2.0), as `set` does.")
@@ -283,9 +298,9 @@ void BindScene(nb::module_& module) {
             "find",
             [](Scene& self, const std::string& path) -> std::optional<Prim> {
                 const std::optional<PrimId> prim = self.Find(Path(path));
-                return prim ? std::optional<Prim>(Prim{*prim, &self}) : std::nullopt;
+                return prim ? std::optional<Prim>(MakePrim(self, *prim)) : std::nullopt;
             },
-            nb::arg("path"), nb::keep_alive<0, 1>(), "The prim at a path, or None.")
+            nb::arg("path"), "The prim at a path, or None.")
         .def("__contains__",
              [](const Scene& self, const std::string& path) { return self.Has(Path(path)); })
         .def(
@@ -448,14 +463,14 @@ void BindScene(nb::module_& module) {
     module.def(
         "look_at_transform",
         [](const Vector3& eye, const Vector3& target, const Vector3& up) {
-            return TransformRows(LookAtTransform(Vec(eye), Vec(target), Vec(up)));
+            return TransformRows(LookAtTransform(ToDvec3(eye), ToDvec3(target), ToDvec3(up)));
         },
         nb::arg("eye"), nb::arg("target"), nb::arg("up") = Vector3{0.0, 0.0, 1.0},
         "A camera's transform at `eye` looking at `target`, as 4 rows: cameras look down -z.");
     module.def(
         "distant_light_transform",
         [](const Vector3& towardLight) {
-            return TransformRows(DistantLightTransform(Vec(towardLight)));
+            return TransformRows(DistantLightTransform(ToDvec3(towardLight)));
         },
         nb::arg("toward_light"),
         "A distant light's transform shining from the direction to its source, as 4 rows.");

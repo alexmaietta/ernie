@@ -98,8 +98,12 @@ std::vector<std::uint32_t> ShaderCompiler::Spirv(std::span<const ShaderModule> m
     ERNIE_ZONE("Compile Slang to SPIR-V");
     const Slang::ComPtr<slang::IBlob> code =
         session_->Compile(modules, entryPoint, SLANG_SPIRV, "spirv_1_6");
-    std::vector<std::uint32_t> words(code->getBufferSize() / 4);
-    std::memcpy(words.data(), code->getBufferPointer(), words.size() * 4);
+    constexpr std::size_t kWord = sizeof(std::uint32_t);
+    if (code->getBufferSize() % kWord != 0) {
+        throw std::runtime_error("Slang's SPIR-V is not whole 32-bit words");
+    }
+    std::vector<std::uint32_t> words(code->getBufferSize() / kWord);
+    std::memcpy(words.data(), code->getBufferPointer(), code->getBufferSize());
     return words;
 }
 

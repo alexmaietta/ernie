@@ -219,10 +219,17 @@ void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
 }
 
 glm::dmat4 LookAtTransform(const glm::dvec3& eye, const glm::dvec3& target, const glm::dvec3& up) {
+    const glm::dvec3 forward = target - eye;
+    if (glm::length(glm::cross(forward, up)) == 0.0) {
+        throw std::invalid_argument("A camera looking at its own eye or along its up vector");
+    }
     return glm::inverse(glm::lookAtRH(eye, target, up));
 }
 
 glm::dmat4 DistantLightTransform(const glm::dvec3& towardLight) {
+    if (glm::length(towardLight) == 0.0) {
+        throw std::invalid_argument("A distant light shining from no direction");
+    }
     const glm::dvec3 z = glm::normalize(towardLight);
     // Any axis not along z completes the frame; the light is the same turned about it.
     const glm::dvec3 helper = std::abs(z.z) < 0.9 ? glm::dvec3(0, 0, 1) : glm::dvec3(1, 0, 0);

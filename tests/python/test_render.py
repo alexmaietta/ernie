@@ -57,6 +57,26 @@ def test_define_authors_transform_ops_and_attributes():
     assert "Sphere" in ernie.PRIM_TYPES and ernie.RenderSettings == "RenderSettings"
 
 
+def test_prims_keep_their_scene_alive():
+    prim = ernie.Scene().define("/Rock", ernie.Sphere).set("radius", 2.0)
+    assert prim.set("radius", 3.0) == prim
+
+
+def test_prims_belong_to_their_own_scene():
+    first, second = ernie.Scene(), ernie.Scene()
+    rock = first.define("/Rock", ernie.Sphere)
+    second.define("/Rock", ernie.Sphere)
+    assert rock != second.find("/Rock")
+    with pytest.raises(ValueError):
+        second.set(rock, "radius", 1.0)
+
+
+def test_define_authors_no_ops_for_a_rotation_order_alone():
+    scene = ernie.Scene()
+    scene.define("/Rock", ernie.Sphere, rotation_order="ZYX")
+    assert scene.get("/Rock", "xformOpOrder") is None
+
+
 def test_transform_helpers_point_cameras_and_lights():
     camera = np.array(ernie.look_at_transform((0, -8, 0), (0, 0, 0)))
     # Cameras look down their -z: here along +y.

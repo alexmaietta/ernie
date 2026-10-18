@@ -8,7 +8,7 @@
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/string.h>
 
-#include <cstring>
+#include <array>
 #include <string>
 
 namespace nb = nanobind;
@@ -29,18 +29,16 @@ void BindRender(nb::module_& module) {
         .def(
             "render",
             [](Renderer& self, const Scene& scene) {
-                const Tensor image = self.Render(scene);
-                const std::vector<std::int64_t>& shape = image.Shape();
-                const std::size_t bytes = static_cast<std::size_t>(shape[0] * shape[1] * shape[2]);
-                auto* copy = new std::uint8_t[bytes];
-                std::memcpy(copy, image.Data(), bytes);
+                // The array owns the rendered tensor, so its bytes are copied once, off the device.
+                auto* image = new Tensor(self.Render(scene));
                 const nb::capsule owner(
-                    copy, [](void* data) noexcept { delete[] static_cast<std::uint8_t*>(data); });
+                    image, [](void* tensor) noexcept { delete static_cast<Tensor*>(tensor); });
+                const std::vector<std::int64_t>& shape = image->Shape();
                 const std::array<std::size_t, 3> dimensions{static_cast<std::size_t>(shape[0]),
                                                             static_cast<std::size_t>(shape[1]),
                                                             static_cast<std::size_t>(shape[2])};
-                return nb::ndarray<nb::numpy, std::uint8_t, nb::ndim<3>>(copy, 3, dimensions.data(),
-                                                                         owner);
+                return nb::ndarray<nb::numpy, std::uint8_t, nb::ndim<3>>(
+                    static_cast<std::uint8_t*>(image->Data()), 3, dimensions.data(), owner);
             },
             nb::arg("scene"),
             "Renders the camera of the scene's first RenderSettings at its resolution: LdrColor "
