@@ -60,6 +60,7 @@ include(cmake/third_party/stb.cmake)
 include(cmake/third_party/tracy.cmake)
 include(cmake/third_party/vulkan_headers.cmake)
 include(cmake/third_party/volk.cmake)
+include(cmake/third_party/vma.cmake)
 add_subdirectory(third_party)
 
 add_library(ernie_build_options INTERFACE)

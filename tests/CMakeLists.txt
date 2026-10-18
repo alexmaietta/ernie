@@ -75,7 +75,12 @@ ernie_add_test_suite(
         scene/xform_test.cpp
     LIBRARIES ernie_static
 )
-ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_static)
+ernie_add_test_suite(
+    device
+    LABEL gpu
+    SOURCES device/context_test.cpp device/vulkan_devices_test.cpp
+    LIBRARIES ernie_static ernie_volk ernie_vma
+)
 
 if(TARGET _ernie)
     # The interpreter tests run with; CI passes the one on its PATH.

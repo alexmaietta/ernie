@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file vulkan_devices_test.cpp
 /// @brief Tests that a Vulkan 1.3 driver is reachable.
-#include "ernie/device/vulkan_devices.h"
+#include "ernie/device/device.h"
 
 #include <gtest/gtest.h>
 

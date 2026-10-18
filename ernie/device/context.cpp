@@ -1,0 +1,178 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/// @file context.cpp
+/// @brief Choosing a device, creating it with its queues and allocator, and retiring objects.
+#include "ernie/device/context.h"
+
+#include "ernie/util/algorithm.h"
+#include "ernie/util/text.h"
+
+#include <algorithm>
+#include <array>
+#include <optional>
+
+namespace ernie {
+namespace {
+
+PhysicalDevice Choose(const Instance& instance, std::string_view wanted) {
+    std::vector<PhysicalDevice> devices = Map(instance.PhysicalDevices(), Probe);
+    std::erase_if(devices, [&](const PhysicalDevice& device) {
+        return !wanted.empty() && device.info.uuid != wanted &&
+               ToLower(device.info.name).find(ToLower(wanted)) == std::string::npos;
+    });
+    const auto best = std::ranges::max_element(devices, {}, &PhysicalDevice::Score);
+    if (best == devices.end()) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          wanted.empty()
+                              ? "No Vulkan device"
+                              : "No Vulkan device matches '" + std::string(wanted) + "'");
+    }
+    if (!best->missing.empty()) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          best->info.name + " lacks " + best->missing + ", which Ernie requires");
+    }
+    return *best;
+}
+
+/// @brief The families the queues come from: main (graphics and compute), compute and transfer.
+struct Families {
+    std::uint32_t main = 0;
+    std::uint32_t compute = 0;
+    std::uint32_t transfer = 0;
+};
+
+/// Prefers a compute-only family for compute and a transfer-only one for uploads, where present.
+Families FindFamilies(VkPhysicalDevice device) {
+    std::uint32_t count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
+    std::vector<VkQueueFamilyProperties> families(count);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &count, families.data());
+    const auto find = [&](VkQueueFlags required,
+                          VkQueueFlags excluded) -> std::optional<std::uint32_t> {
+        for (std::uint32_t i = 0; i < count; ++i) {
+            if ((families[i].queueFlags & required) == required &&
+                (families[i].queueFlags & excluded) == 0 && families[i].queueCount > 0) {
+                return i;
+            }
+        }
+        return std::nullopt;
+    };
+    const std::optional<std::uint32_t> main = find(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, 0);
+    if (!main) {
+        throw DeviceError(DeviceErrorKind::Unsupported,
+                          "No queue family does graphics and compute");
+    }
+    Families result{*main, *main, *main};
+    result.compute = find(VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT).value_or(*main);
+    result.transfer = find(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)
+                          .value_or(result.compute);
+    return result;
+}
+
+}  // namespace
+
+DeviceContext::DeviceContext(const DeviceContextOptions& options)
+    : instance_({.validation = options.validation, .extensions = options.instanceExtensions}),
+      physical_(Choose(instance_, options.device)) {
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(physical_.handle, &properties);
+    limits_ = properties.limits;
+
+    const Families families = FindFamilies(physical_.handle);
+    std::vector<std::uint32_t> distinct{families.main};
+    for (const std::uint32_t family : {families.compute, families.transfer}) {
+        if (std::ranges::find(distinct, family) == distinct.end()) {
+            distinct.push_back(family);
+        }
+    }
+    const float priority = 1.0f;
+    const std::vector<VkDeviceQueueCreateInfo> queueInfos =
+        Map(distinct, [&](std::uint32_t family) {
+            return VkDeviceQueueCreateInfo{.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                           .queueFamilyIndex = family,
+                                           .queueCount = 1,
+                                           .pQueuePriorities = &priority};
+        });
+    const FeatureChain features = physical_.EnabledFeatures();
+    const std::vector<const char*> extensions = physical_.EnabledExtensions();
+    const VkDeviceCreateInfo info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &features.core,
+        .queueCreateInfoCount = static_cast<std::uint32_t>(queueInfos.size()),
+        .pQueueCreateInfos = queueInfos.data(),
+        .enabledExtensionCount = static_cast<std::uint32_t>(extensions.size()),
+        .ppEnabledExtensionNames = extensions.data()};
+    CheckVk(vkCreateDevice(physical_.handle, &info, nullptr, &device_),
+            "Creating the device on " + physical_.info.name);
+
+    const VmaVulkanFunctions functions{.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+                                       .vkGetDeviceProcAddr = vkGetDeviceProcAddr};
+    VmaAllocatorCreateInfo allocator{.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+                                     .physicalDevice = physical_.handle,
+                                     .device = device_,
+                                     .pVulkanFunctions = &functions,
+                                     .instance = instance_.Handle(),
+                                     .vulkanApiVersion = VK_API_VERSION_1_3};
+    if (physical_.info.capabilities.memoryBudget) {
+        allocator.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+    }
+    CheckVk(vmaCreateAllocator(&allocator, &allocator_), "Creating the memory allocator");
+
+    const std::array names{"main", "compute", "transfer"};
+    const std::array wanted{families.main, families.compute, families.transfer};
+    std::array<Queue*, 3> chosen{};
+    for (std::size_t i = 0; i < wanted.size(); ++i) {
+        const auto existing = std::ranges::find(queues_, wanted[i], &Queue::Family);
+        if (existing != queues_.end()) {
+            chosen[i] = existing->get();
+            continue;
+        }
+        queues_.push_back(std::make_unique<Queue>(device_, wanted[i], names[i]));
+        chosen[i] = queues_.back().get();
+        Name(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<std::uint64_t>(chosen[i]->Handle()), names[i]);
+    }
+    main_ = chosen[0];
+    compute_ = chosen[1];
+    transfer_ = chosen[2];
+}
+
+DeviceContext::~DeviceContext() {
+    WaitIdle();
+    queues_.clear();
+    vmaDestroyAllocator(allocator_);
+    vkDestroyDevice(device_, nullptr);
+}
+
+std::vector<Queue*> DeviceContext::Queues() const {
+    return Map(queues_, [](const std::unique_ptr<Queue>& queue) { return queue.get(); });
+}
+
+void DeviceContext::Retire(std::shared_ptr<const void> object) {
+    if (object == nullptr) {
+        return;
+    }
+    std::vector<Ticket> tickets = Map(queues_, [](const auto& queue) { return queue->Last(); });
+    const std::lock_guard lock(retiredMutex_);
+    retired_.push_back({std::move(object), std::move(tickets)});
+}
+
+void DeviceContext::Collect() {
+    const std::lock_guard lock(retiredMutex_);
+    std::erase_if(retired_, [](const Retired& retired) {
+        return std::ranges::all_of(retired.tickets, [](const Ticket& ticket) {
+            return ticket.queue == nullptr || ticket.queue->Done(ticket);
+        });
+    });
+}
+
+void DeviceContext::WaitIdle() {
+    for (const auto& queue : queues_) {
+        queue->Wait(queue->Last());
+    }
+    Collect();
+}
+
+void DeviceContext::Name(VkObjectType type, std::uint64_t handle, std::string_view name) const {
+    instance_.Name(device_, type, handle, name);
+}
+
+}  // namespace ernie

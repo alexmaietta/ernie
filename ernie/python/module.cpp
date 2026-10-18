@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file module.cpp
 /// @brief The _ernie Python extension module.
-#include "ernie/device/vulkan_devices.h"
+#include "ernie/device/device.h"
 #include "ernie/util/version.h"
 
 #include <nanobind/nanobind.h>
@@ -26,7 +26,10 @@ NB_MODULE(_ernie, module) {
         .def_ro("type", &ernie::VulkanDeviceInfo::type)
         .def_ro("api_major", &ernie::VulkanDeviceInfo::apiMajor)
         .def_ro("api_minor", &ernie::VulkanDeviceInfo::apiMinor)
-        .def_ro("ray_query", &ernie::VulkanDeviceInfo::rayQuery);
+        .def_prop_ro("ray_query",
+                     [](const ernie::VulkanDeviceInfo& info) { return info.capabilities.rayQuery; })
+        .def_ro("uuid", &ernie::VulkanDeviceInfo::uuid)
+        .def_ro("supported", &ernie::VulkanDeviceInfo::supported);
 
     module.def("vulkan_devices", &ernie::ListVulkanDevices,
                "Lists the Vulkan devices of the installed drivers.");

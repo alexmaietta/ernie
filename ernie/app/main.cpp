@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file main.cpp
 /// @brief The ernie program.
-#include "ernie/device/vulkan_devices.h"
+#include "ernie/device/device.h"
 #include "ernie/scene/reference.h"
 #include "ernie/util/file.h"
 #include "ernie/util/version.h"
@@ -25,7 +25,8 @@ void PrintUsage() {
 int PrintDevices() {
     for (const ernie::VulkanDeviceInfo& device : ernie::ListVulkanDevices()) {
         std::printf("%s (%s, Vulkan %u.%u%s)\n", device.name.c_str(), ernie::ToString(device.type),
-                    device.apiMajor, device.apiMinor, device.rayQuery ? ", ray queries" : "");
+                    device.apiMajor, device.apiMinor,
+                    device.capabilities.rayQuery ? ", ray queries" : "");
     }
     return 0;
 }

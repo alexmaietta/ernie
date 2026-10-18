@@ -94,6 +94,7 @@ set(ernie_notices
     "openexr|${openexr_SOURCE_DIR}/LICENSE.md"
     "openjph|${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE"
     "stb|${stb_SOURCE_DIR}/LICENSE"
+    "vma|${vma_SOURCE_DIR}/LICENSE.txt"
     "volk|${volk_SOURCE_DIR}/LICENSE.md"
     "vulkan_headers|${vulkan_headers_SOURCE_DIR}/LICENSE.md"
     "zstd|${openexr_SOURCE_DIR}/external/zstd/LICENSE"
