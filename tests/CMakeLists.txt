@@ -24,7 +24,7 @@ ernie_add_test_suite(
 )
 ernie_add_test_suite(
     geometry
-    SOURCES geometry/bounds_test.cpp geometry/triangle_mesh_test.cpp
+    SOURCES geometry/bounds_test.cpp geometry/triangulation_test.cpp
     LIBRARIES ernie_static
 )
 ernie_add_test_suite(
