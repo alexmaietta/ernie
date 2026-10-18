@@ -88,6 +88,6 @@ void InstancerExtent(const ExtentRows& rows, RowRange range, std::span<Box> out)
 ERNIE_DEFINE_SCHEMA(PointInstancer, tokens::kPointInstancer, &Boundable::Definition(), Concrete,
                     ComputedFromOtherPrims(InstancerExtent),
                     "Prototypes placed at instances, bounded by their bounds at each instance.",
-                    ERNIE_POINT_INSTANCER_ATTRIBUTES, tokens::kPrimvarsPrefix)
+                    ERNIE_POINT_INSTANCER_ATTRIBUTES, .openNamespaces = {tokens::kPrimvarsPrefix})
 
 }  // namespace ernie

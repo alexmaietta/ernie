@@ -65,18 +65,20 @@ ERNIE_DEFINE_SCHEMA(Imageable, "Imageable", nullptr, Abstract, kInheritExtent,
                     ERNIE_IMAGEABLE_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Xformable, "Xformable", &Imageable::Definition(), Abstract, kInheritExtent,
                     "What has a transform, composed from its xformOps.", ERNIE_XFORMABLE_ATTRIBUTES,
-                    tokens::kXformOpPrefix)
+                    .openNamespaces = {tokens::kXformOpPrefix})
 ERNIE_DEFINE_SCHEMA(Boundable, "Boundable", &Xformable::Definition(), Abstract, kInheritExtent,
                     "What has an extent in its own space, computed from its attributes.",
                     ERNIE_BOUNDABLE_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Gprim, "Gprim", &Boundable::Definition(), Abstract, kInheritExtent,
                     "Geometry, drawn in a display colour or with a bound material.",
-                    ERNIE_GPRIM_ATTRIBUTES, tokens::kPrimvarsPrefix)
+                    ERNIE_GPRIM_ATTRIBUTES, .openNamespaces = {tokens::kPrimvarsPrefix})
 // Grouping prims are where custom data lives, so they take attributes of any name.
 ERNIE_DEFINE_SCHEMA(Xform, tokens::kXform, &Xformable::Definition(), Concrete, kDescendantsExtent,
-                    "A transform grouping its children.", ERNIE_NO_ATTRIBUTES, "*")
+                    "A transform grouping its children.", ERNIE_NO_ATTRIBUTES,
+                    .openNamespaces = {"*"})
 ERNIE_DEFINE_SCHEMA(Scope, tokens::kScope, &Imageable::Definition(), Concrete, kDescendantsExtent,
-                    "A grouping without a transform of its own.", ERNIE_NO_ATTRIBUTES, "*")
+                    "A grouping without a transform of its own.", ERNIE_NO_ATTRIBUTES,
+                    .openNamespaces = {"*"})
 ERNIE_DEFINE_SCHEMA(Cube, tokens::kCube, &Gprim::Definition(), Concrete, ComputedExtent(CubeExtent),
                     "A box centred on its origin, size along each axis.", ERNIE_CUBE_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Sphere, tokens::kSphere, &Gprim::Definition(), Concrete,

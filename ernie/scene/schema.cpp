@@ -139,6 +139,24 @@ std::vector<const AttributeDef*> SchemaDef::AllAttributes() const {
     return all;
 }
 
+std::vector<std::string_view> SchemaDef::AllBuiltinApis() const {
+    std::vector<std::string_view> all =
+        base != nullptr ? base->AllBuiltinApis() : std::vector<std::string_view>{};
+    all.insert(all.end(), builtinApis.begin(), builtinApis.end());
+    return all;
+}
+
+const Value* SchemaDef::FallbackOverride(std::string_view attribute) const {
+    const Value* found = nullptr;
+    FirstInLineage([&](const SchemaDef& type) {
+        const auto override = std::ranges::find(type.fallbackOverrides, attribute,
+                                                &std::pair<std::string_view, Value>::first);
+        found = override != type.fallbackOverrides.end() ? &override->second : nullptr;
+        return found != nullptr;
+    });
+    return found;
+}
+
 ExtentRule SchemaDef::Extent() const {
     const SchemaDef* ruled = FirstInLineage(
         [](const SchemaDef& type) { return type.extent.kind != ExtentRule::Kind::Inherit; });

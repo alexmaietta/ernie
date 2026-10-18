@@ -106,7 +106,7 @@ Volume& Volume::SetField(std::string_view name, const Path& field) {
 ERNIE_DEFINE_SCHEMA(Volume, tokens::kVolume, &Gprim::Definition(), Concrete,
                     ComputedFromOtherPrims(VolumeExtent),
                     "A volume, bounded by and rendered from the fields it names.",
-                    ERNIE_NO_ATTRIBUTES, tokens::kFieldPrefix)
+                    ERNIE_NO_ATTRIBUTES, .openNamespaces = {tokens::kFieldPrefix})
 ERNIE_DEFINE_SCHEMA(FieldBase, "FieldBase", &Xformable::Definition(), Abstract, kInheritExtent,
                     "A field's frame and grid, which volumes name.", ERNIE_NO_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(FieldAsset, "FieldAsset", &FieldBase::Definition(), Abstract,

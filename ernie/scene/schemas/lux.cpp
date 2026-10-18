@@ -36,14 +36,26 @@ glm::dvec3 CylinderHalf(const ExtentRows& rows, std::uint32_t row) {
 
 }  // namespace
 
+// Every light has LightAPI and its light-linking collections built in: which prims it lights and
+// which cast its shadows, everything unless they say otherwise.
+#define ERNIE_LIGHT_BUILTINS                                                                       \
+    .builtinApis = {"LightAPI", "CollectionAPI:lightLink", "CollectionAPI:shadowLink"},            \
+    .fallbackOverrides = {{"collection:lightLink:includeRoot", true},                              \
+                          {"collection:shadowLink:includeRoot", true}}
+
+ERNIE_DEFINE_SCHEMA(LightAPI, "LightAPI", nullptr, SingleApply, kInheritExtent,
+                    "What every light has: brightness, colour, spectrum, polarization and pulses.",
+                    ERNIE_LIGHT_API_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(BoundableLightBase, "BoundableLightBase", &Boundable::Definition(), Abstract,
-                    kInheritExtent, "A light with a shape, bounded by it.", ERNIE_NO_ATTRIBUTES)
+                    kInheritExtent, "A light with a shape, bounded by it.",
+                    ERNIE_BOUNDABLE_LIGHT_BASE_ATTRIBUTES, ERNIE_LIGHT_BUILTINS)
 ERNIE_DEFINE_SCHEMA(NonboundableLightBase, "NonboundableLightBase", &Xformable::Definition(),
                     Abstract, kUnbounded, "A light at infinity or around everything.",
-                    ERNIE_NO_ATTRIBUTES)
+                    ERNIE_NO_ATTRIBUTES, ERNIE_LIGHT_BUILTINS)
 ERNIE_DEFINE_SCHEMA(DistantLight, "DistantLight", &NonboundableLightBase::Definition(), Concrete,
                     kInheritExtent, "A light from infinitely far along +z, such as the Sun's.",
-                    ERNIE_DISTANT_LIGHT_ATTRIBUTES)
+                    ERNIE_DISTANT_LIGHT_ATTRIBUTES,
+                    .fallbackOverrides = {{"inputs:intensity", 50000.0}})
 ERNIE_DEFINE_SCHEMA(DiskLight, "DiskLight", &BoundableLightBase::Definition(), Concrete,
                     ComputedExtent(CentredExtent<DiskHalf>), "A disk emitting towards -z.",
                     ERNIE_DISK_LIGHT_ATTRIBUTES)

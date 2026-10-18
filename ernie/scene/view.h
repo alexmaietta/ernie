@@ -260,15 +260,18 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
         return Class(scene, path, instance);                                                       \
     }
 
-/// Defines `Class::Definition()`, the schema's registry entry.
-#define ERNIE_DEFINE_SCHEMA(Class, name, base, kind, extentRule, text, OWN_ATTRIBUTES, ...)        \
+/// Defines `Class::Definition()`, the schema's registry entry; the variadic part takes the rest of
+/// its fields by name: `.openNamespaces = {...}`, `.builtinApis = {...}`.
+#define ERNIE_DEFINE_SCHEMA(Class, schemaName, schemaBase, schemaKind, extentRule, text,           \
+                            OWN_ATTRIBUTES, ...)                                                   \
     const ::ernie::SchemaDef& Class::Definition() {                                                \
-        static const ::ernie::SchemaDef definition{name,                                           \
-                                                   base,                                           \
-                                                   ::ernie::SchemaKind::kind,                      \
-                                                   text,                                           \
-                                                   {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DECLARE)},      \
-                                                   {__VA_ARGS__},                                  \
-                                                   extentRule};                                    \
+        static const ::ernie::SchemaDef definition{                                                \
+            .name = schemaName,                                                                    \
+            .base = schemaBase,                                                                    \
+            .kind = ::ernie::SchemaKind::schemaKind,                                               \
+            .doc = text,                                                                           \
+            .attributes = {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DECLARE)},                               \
+            .extent = extentRule,                                                                  \
+            __VA_ARGS__};                                                                          \
         return definition;                                                                         \
     }

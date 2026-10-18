@@ -7,6 +7,6 @@ namespace ernie {
 
 ERNIE_DEFINE_SCHEMA(MaterialBindingAPI, "MaterialBindingAPI", nullptr, SingleApply, kInheritExtent,
                     "Binds a material to a prim and its descendants.",
-                    ERNIE_MATERIAL_BINDING_API_ATTRIBUTES, "material:binding:")
+                    ERNIE_MATERIAL_BINDING_API_ATTRIBUTES, .openNamespaces = {"material:binding:"})
 
 }  // namespace ernie

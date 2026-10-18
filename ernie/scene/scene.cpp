@@ -16,14 +16,15 @@
 namespace ernie {
 namespace {
 
-/// @return A column layout for the attribute `name` holding `def`'s fallback in unauthored rows.
-ColumnLayout MakeLayout(PathTable& paths, const AttributeDef& def, std::string_view name) {
+/// @return A column layout for the attribute `name` holding `fallback` in unauthored rows.
+ColumnLayout MakeLayout(PathTable& paths, const AttributeDef& def, std::string_view name,
+                        const Value& fallback) {
     const AttributeId attribute = paths.Names().Intern(name);
     return WithColumnType(def.type, [&]<typename T>(std::type_identity<T>) {
         if constexpr (std::is_same_v<T, Tensor>) {
             return ColumnLayout::Of<T>(attribute);
         } else {
-            return ColumnLayout::Of<T>(attribute, ToElement<T>(paths, def.fallback).value_or(T{}));
+            return ColumnLayout::Of<T>(attribute, ToElement<T>(paths, fallback).value_or(T{}));
         }
     });
 }
@@ -302,15 +303,16 @@ BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis
     std::vector<ColumnLayout> layout;
     const auto add = [&](const SchemaDef& declaring, const ApiName& api) {
         for (const AttributeDef* def : declaring.AllAttributes()) {
-            layout.push_back(MakeLayout(paths, *def, api.Attribute(def->name)));
+            const std::string name = api.Attribute(def->name);
+            const Value* override = schema != nullptr ? schema->FallbackOverride(name) : nullptr;
+            layout.push_back(MakeLayout(paths, *def, name, override ? *override : def->fallback));
             entry.declared.emplace(layout.back().attribute, def);
         }
     };
     if (schema != nullptr) {
         add(*schema, {});
     }
-    for (const Token token : key.apiSchemas) {
-        const ApiName api = ApiName::Parse(paths.Names().Text(token));
+    for (const ApiName& api : AllApis(schema, key.apiSchemas)) {
         add(*api.schema, api);
     }
     const BucketId bucket = store_.AddBucket(key, layout);
@@ -348,8 +350,20 @@ bool Scene::RemoveApi(PrimId prim, std::string_view api) {
 }
 
 bool Scene::HasApi(PrimId prim, std::string_view api) const {
-    const std::optional<Token> token = store_.Tokens().Find(api);
-    return token && std::ranges::find(Apis(prim), *token) != Apis(prim).end();
+    return std::ranges::any_of(AllApis(Schema(prim), Apis(prim)),
+                               [&](const ApiName& name) { return name.ToString() == api; });
+}
+
+std::vector<ApiName> Scene::AllApis(const SchemaDef* schema, std::span<const Token> applied) const {
+    std::vector<ApiName> apis;
+    for (const std::string_view builtin :
+         schema != nullptr ? schema->AllBuiltinApis() : std::vector<std::string_view>{}) {
+        apis.push_back(ApiName::Parse(builtin));
+    }
+    for (const Token token : applied) {
+        apis.push_back(ApiName::Parse(store_.Tokens().Text(token)));
+    }
+    return apis;
 }
 
 std::vector<std::string> Scene::AppliedApis(PrimId prim) const {
@@ -393,9 +407,8 @@ Dirty Scene::Classify(const ChangeSet::Values& change) const {
 bool Scene::TakesUndeclared(PrimId prim, std::string_view attribute) const {
     const SchemaDef* schema = Schema(prim);
     return schema == nullptr || schema->IsOpen(attribute) ||
-           std::ranges::any_of(Apis(prim), [&](Token api) {
-               return ApiName::Parse(store_.Tokens().Text(api)).schema->IsOpen(attribute);
-           });
+           std::ranges::any_of(AllApis(schema, Apis(prim)),
+                               [&](const ApiName& api) { return api.schema->IsOpen(attribute); });
 }
 
 ColumnType Scene::TypeForUndeclared(PrimId prim, std::string_view attribute,

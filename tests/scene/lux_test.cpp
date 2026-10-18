@@ -2,6 +2,7 @@
 /// @file lux_test.cpp
 /// @brief Tests of lights' and cameras' schemas and extents.
 #include "ernie/scene/schemas/camera.h"
+#include "ernie/scene/schemas/collection.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/xform.h"
 
@@ -61,11 +62,53 @@ TEST(Lights, ShapingAndShadowsAreAppliedApiSchemas) {
     EXPECT_EQ(SphereLight(scene, "/Spot").GetRadius(), 0.5) << "the light's own attributes stay";
 }
 
-TEST(Camera, HasUsdsFallbacksAndNoExtent) {
+TEST(Lights, EveryLightHasLightApiAndItsLinksBuiltIn) {
+    Scene scene;
+    const SphereLight lamp = SphereLight::Define(scene, "/Lamp");
+    EXPECT_TRUE(scene.HasApi(lamp.Id(), "LightAPI"));
+    EXPECT_TRUE(scene.HasApi(lamp.Id(), "CollectionAPI:lightLink"));
+    EXPECT_TRUE(scene.AppliedApis(lamp.Id()).empty()) << "built in, not applied";
+    EXPECT_EQ(LightAPI(scene, "/Lamp").GetIntensity(), 1.0);
+    EXPECT_TRUE(CollectionAPI(scene, "/Lamp", "lightLink").GetIncludeRoot())
+        << "a light lights everything unless linked otherwise";
+    EXPECT_FALSE(CollectionAPI::Apply(scene, "/Lamp", "props").GetIncludeRoot())
+        << "other collections keep CollectionAPI's fallback";
+    EXPECT_EQ(LightAPI(scene, DistantLight::Define(scene, "/Sun").GetPath()).GetIntensity(),
+              50000.0);
+}
+
+TEST(Lights, ErnieAttributesSitBesideUsdLuxs) {
+    Scene scene;
+    SphereLight strobe = SphereLight::Define(scene, "/Strobe");
+    strobe.SetPulseRate(30.0).SetPulseTrigger(PulseTrigger::Exposure).SetPower(100.0);
+    strobe.SetSpectrum({400.0f, 1.0f, 700.0f, 0.5f});
+    EXPECT_EQ(scene.Get(strobe.Id(), "ernie:pulse:trigger"), Value("exposure"));
+    EXPECT_EQ(scene.Get(strobe.Id(), "ernie:power"), Value(100.0));
+    EXPECT_EQ(strobe.GetSpectrum().size(), 4u);
+    EXPECT_EQ(DistantLight::Define(scene, "/Sun").GetIrradiance(), 1361.0);
+    EXPECT_THROW(strobe.SetPolarizationDegree(2.0), std::invalid_argument);
+}
+
+TEST(Camera, ErnieApiSchemasAddLensPolarizerAndSensor) {
+    Scene scene;
+    Camera camera = Camera::Define(scene, "/Camera");
+    EXPECT_THROW(ErnieSensorAPI(scene, "/Camera"), std::invalid_argument) << "not applied";
+    ErnieSensorAPI sensor = ErnieSensorAPI::Apply(scene, "/Camera");
+    EXPECT_EQ(sensor.GetSpectralBands(), 16);
+    sensor.SetSensorType("mono");
+    EXPECT_THROW(sensor.SetSensorType("film"), std::invalid_argument);
+    ErnieLensAPI::Apply(scene, "/Camera").SetLensProjection("fisheye");
+    EXPECT_EQ(ErniePolarizerAPI::Apply(scene, "/Camera").GetPolarizerExtinction(), 1000.0);
+    EXPECT_EQ(camera.GetFocalLength(), 0.05) << "USD's attributes stay";
+    camera.SetShutterRolling(0.5).SetWorld(3);
+    EXPECT_EQ(camera.GetWorld(), 3) << "a batch's views are cameras, each in its world";
+}
+
+TEST(Camera, HasUsdsFallbacksInMetresAndNoExtent) {
     Scene scene;
     const Camera camera = Camera::Define(scene, "/Camera");
-    EXPECT_EQ(camera.GetFocalLength(), 50.0);
-    EXPECT_EQ(camera.GetHorizontalAperture(), 20.955);
+    EXPECT_EQ(camera.GetFocalLength(), 0.05) << "50 mm, whatever the stage's units";
+    EXPECT_EQ(camera.GetHorizontalAperture(), 0.020955);
     EXPECT_EQ(camera.GetClippingRange(), glm::dvec2(1.0, 1000000.0));
     EXPECT_EQ(camera.GetProjection(), "perspective");
     EXPECT_FALSE(scene.Extent(camera.Id()));

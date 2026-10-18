@@ -171,9 +171,14 @@ struct SchemaDef {
     SchemaKind kind = SchemaKind::Concrete;
     std::string_view doc;
     std::vector<AttributeDef> attributes;
+    ExtentRule extent;
     /// Namespaces (`xformOp:`) or `*` whose undeclared attributes the type takes.
     std::vector<std::string_view> openNamespaces;
-    ExtentRule extent;
+    /// API schemas every prim of the type has, as UsdLux's lights have `CollectionAPI:lightLink`.
+    std::vector<std::string_view> builtinApis;
+    /// Fallbacks the type changes for attributes of its bases or built-in schemas, as
+    /// DistantLight's brighter intensity.
+    std::vector<std::pair<std::string_view, Value>> fallbackOverrides;
 
     bool IsA(const SchemaDef& other) const;
     bool IsOpen(std::string_view attribute) const;
@@ -181,6 +186,11 @@ struct SchemaDef {
     const AttributeDef* Find(std::string_view attribute) const;
     /// @return Every attribute, the bases' first.
     std::vector<const AttributeDef*> AllAttributes() const;
+    /// @return The built-in API schemas of the type and its bases.
+    std::vector<std::string_view> AllBuiltinApis() const;
+    /// @return The fallback the type or its nearest base gives an attribute in place of its
+    /// declaration's, or null.
+    const Value* FallbackOverride(std::string_view attribute) const;
     /// @return The rule, the nearest base's when inherited.
     ExtentRule Extent() const;
 
