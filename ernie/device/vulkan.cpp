@@ -35,6 +35,24 @@ const std::array kExtensions{
     Extension{VK_KHR_SWAPCHAIN_EXTENSION_NAME, &DeviceCapabilities::present},
 };
 
+/// @brief Drops capabilities drivers report but get wrong, keyed by driver, all in one place.
+/// Shader-level workarounds live beside the shaders they change; notes on them are here too:
+/// - NVIDIA's compiler crashes on ray-query `CandidateObjectRay*`: procedural intersections take
+///   the candidate's world-to-object matrix instead.
+/// - Vulkan does not promise `fma` rounds once (lavapipe does not): double-float products split
+///   their operands instead.
+void WorkAroundDrivers(VkDriverId driver, DeviceCapabilities& capabilities) {
+#if defined(__APPLE__)
+    // Homebrew's lavapipe crashes or hangs building and tracing acceleration structures.
+    if (driver == VK_DRIVER_ID_MESA_LLVMPIPE) {
+        capabilities.rayQuery = false;
+    }
+#else
+    static_cast<void>(driver);
+    static_cast<void>(capabilities);
+#endif
+}
+
 /// @brief A feature bit Ernie requires: its name, for the error naming it, and where it lives.
 struct RequiredBit {
     const char* name;
@@ -181,7 +199,10 @@ PhysicalDevice Probe(VkPhysicalDevice handle) {
         return std::ranges::find(device.extensions, name) != device.extensions.end();
     };
 
-    VkPhysicalDeviceIDProperties ids{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES};
+    VkPhysicalDeviceDriverProperties driver{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES};
+    VkPhysicalDeviceIDProperties ids{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
+                                     .pNext = &driver};
     VkPhysicalDeviceProperties2 properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
                                            .pNext = &ids};
     vkGetPhysicalDeviceProperties2(handle, &properties);
@@ -236,6 +257,7 @@ PhysicalDevice Probe(VkPhysicalDevice handle) {
     capabilities.shaderInt64 = features.core.features.shaderInt64 == VK_TRUE;
     capabilities.shaderFloat16 = features.v12.shaderFloat16 == VK_TRUE;
     capabilities.sparseResidency = features.core.features.sparseResidencyImage2D == VK_TRUE;
+    WorkAroundDrivers(driver.driverID, capabilities);
     device.info.supported = device.missing.empty();
     return device;
 }

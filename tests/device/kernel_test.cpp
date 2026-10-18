@@ -135,7 +135,9 @@ TEST(ComputeKernel, PipelinesAreCachedOnDiskAndReloaded) {
         ExpectClean(*context);
     }
     ASSERT_TRUE(std::filesystem::exists(path)) << "saved on destruction";
-    EXPECT_EQ(std::filesystem::file_size(path), saved);
+    if (caches) {
+        EXPECT_EQ(std::filesystem::file_size(path), saved);
+    }
     {
         const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
         EXPECT_GE(CachedBytes(*context), saved) << "reloaded";

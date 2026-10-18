@@ -267,13 +267,18 @@ void DeviceContext::SavePipelineCache() const {
     if (pipelineCachePath_.empty()) {
         return;
     }
-    std::size_t size = 0;
-    CheckVk(vkGetPipelineCacheData(device_, pipelineCache_, &size, nullptr),
-            "Sizing the pipeline cache");
-    std::vector<std::byte> bytes(size);
-    CheckVk(vkGetPipelineCacheData(device_, pipelineCache_, &size, bytes.data()),
-            "Reading the pipeline cache");
-    bytes.resize(size);
+    // A cache that grows between sizing and reading reads incomplete: size it again.
+    std::vector<std::byte> bytes;
+    VkResult read = VK_INCOMPLETE;
+    while (read == VK_INCOMPLETE) {
+        std::size_t size = 0;
+        CheckVk(vkGetPipelineCacheData(device_, pipelineCache_, &size, nullptr),
+                "Sizing the pipeline cache");
+        bytes.resize(size);
+        read = vkGetPipelineCacheData(device_, pipelineCache_, &size, bytes.data());
+        CheckVk(read, "Reading the pipeline cache");
+        bytes.resize(size);
+    }
     WriteBinaryFile(pipelineCachePath_, bytes);
 }
 
