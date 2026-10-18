@@ -68,6 +68,36 @@ std::string Problem(const AttributeDef& def, const Value& value) {
     return {};
 }
 
+/// @return Why `array` doesn't fit the tensor attribute, or empty when it does.
+std::string ArrayProblem(const AttributeDef& def, const Tensor& array) {
+    if (def.type != ColumnType::Tensor) {
+        return "takes one value, not an array; set it";
+    }
+    const DType type = array.Type();
+    const bool integer = type == DType::Int32 || type == DType::Int64 || type == DType::UInt32;
+    const bool floating = type == DType::Float32 || type == DType::Float64;
+    if (def.meta.integer ? !integer : !floating) {
+        return def.meta.integer ? "must hold integers" : "must hold float32 or float64 numbers";
+    }
+    const std::int64_t components = def.meta.components;
+    const bool rows =
+        array.Rank() == 2 && array.Shape()[1] == std::max<std::int64_t>(components, 1);
+    const bool flat =
+        array.Rank() == 1 && array.Elements() % std::max<std::int64_t>(components, 1) == 0;
+    if (!rows && !flat) {
+        return components > 1 ? "must be (n, " + std::to_string(components) + ") or flat"
+                              : "must be flat";
+    }
+    return {};
+}
+
+void ThrowIf(const std::string& problem, std::string_view attribute, const Path& path) {
+    if (!problem.empty()) {
+        throw std::invalid_argument("'" + path.String() + "': '" + std::string(attribute) + "' " +
+                                    problem);
+    }
+}
+
 }  // namespace
 
 bool SchemaDef::IsA(const SchemaDef& other) const {
@@ -145,10 +175,12 @@ std::string ApiName::ToString() const {
 
 void Validate(const AttributeDef& def, std::string_view attribute, const Value& value,
               const Path& path) {
-    if (const std::string problem = Problem(def, value); !problem.empty()) {
-        throw std::invalid_argument("'" + path.String() + "': '" + std::string(attribute) + "' " +
-                                    problem);
-    }
+    ThrowIf(Problem(def, value), attribute, path);
+}
+
+void ValidateArray(const AttributeDef& def, std::string_view attribute, const Tensor& array,
+                   const Path& path) {
+    ThrowIf(ArrayProblem(def, array), attribute, path);
 }
 
 }  // namespace ernie

@@ -67,6 +67,12 @@ class Scene {
     /// @return The authored value, or none.
     std::optional<Value> Get(PrimId prim, std::string_view attribute) const;
     std::optional<Value> Get(const Path& path, std::string_view attribute) const;
+    /// @brief Authors an array attribute with a tensor on the host or a device, shared, not copied.
+    /// @throws std::invalid_argument for a non-array attribute, or a tensor of the wrong type or
+    /// shape.
+    void Write(PrimId prim, std::string_view attribute, Tensor array);
+    /// @return The authored array, or null.
+    const Tensor* Read(PrimId prim, std::string_view attribute) const;
     /// @return Whether the attribute was authored.
     bool Clear(PrimId prim, std::string_view attribute);
     bool IsAuthored(PrimId prim, std::string_view attribute) const;

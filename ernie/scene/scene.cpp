@@ -155,6 +155,27 @@ void Scene::Set(const Path& path, std::string_view attribute, const Value& value
     Set(Require(path), attribute, value);
 }
 
+void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
+    const AttributeId token = store_.Tokens().Intern(attribute);
+    const AttributeDef* def = Declared(prim, token);
+    if (def == nullptr && !TakesUndeclared(prim, attribute)) {
+        throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
+                                    std::string(attribute) + "'");
+    }
+    if (def != nullptr) {
+        ValidateArray(*def, attribute, array, PrimPath(prim));
+    }
+    store_.Set(prim, token, std::move(array));
+}
+
+const Tensor* Scene::Read(PrimId prim, std::string_view attribute) const {
+    const Column* column = AuthoredColumn(prim, attribute);
+    if (column == nullptr || column->values->Type() != ColumnType::Tensor) {
+        return nullptr;
+    }
+    return &store_.Read<Tensor>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
+}
+
 std::optional<Value> Scene::Get(PrimId prim, std::string_view attribute) const {
     const Column* column = AuthoredColumn(prim, attribute);
     if (column == nullptr) {

@@ -64,6 +64,10 @@ struct AttributeMeta {
     std::vector<std::string_view> options{};
     bool color = false;
     bool asset = false;
+    /// A tensor of integers rather than floats.
+    bool integer = false;
+    /// A tensor's vector size: (n, components) or flat; 0 for a flat array.
+    std::uint8_t components = 0;
     Dirty dirty = Dirty::Params;
     /// Resolved from the nearest authoring ancestor.
     bool inherited = false;
@@ -190,6 +194,10 @@ struct ApiName {
 /// @throws std::invalid_argument naming the prim, the attribute and the reason.
 void Validate(const AttributeDef& def, std::string_view attribute, const Value& value,
               const Path& path);
+/// @brief Checks an array for a declared tensor attribute: its element type and vector size.
+/// @throws std::invalid_argument naming the prim, the attribute and the reason.
+void ValidateArray(const AttributeDef& def, std::string_view attribute, const Tensor& array,
+                   const Path& path);
 
 /// @brief The tokens of an enum a token attribute takes, in enumerator order.
 template <typename E> struct ChoiceTokens;

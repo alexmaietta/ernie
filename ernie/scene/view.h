@@ -72,6 +72,23 @@ template <typename E> struct AttributeTraits<Choice<E>> {
     }
 };
 
+/// Arrays: read as the authored tensor, an empty one when unauthored, and written by
+/// `Scene::Write`.
+template <> struct AttributeTraits<Tensor> {
+    using Stored = Tensor;
+    using Result = Tensor;
+
+    static Tensor Load(const PathTable&, const Tensor& stored) {
+        return stored;
+    }
+    static Value Save(const Tensor&) {
+        return Value();
+    }
+    static std::vector<std::string_view> Options() {
+        return {};
+    }
+};
+
 /// @brief An attribute declaration from a schema row: its column type, fallback and metadata.
 template <typename T, typename Fallback>
 AttributeDef DeclareAttribute(std::string_view name, const Fallback& fallback, AttributeMeta meta) {
@@ -133,7 +150,11 @@ class SchemaView {
     template <typename T>
     void Write(std::string_view declared, const typename AttributeTraits<T>::Result& value) {
         Named(declared, [&](std::string_view name) {
-            Edit().Set(prim_, name, AttributeTraits<T>::Save(value));
+            if constexpr (std::is_same_v<T, Tensor>) {
+                Edit().Write(prim_, name, value);
+            } else {
+                Edit().Set(prim_, name, AttributeTraits<T>::Save(value));
+            }
         });
     }
     bool Has(std::string_view declared) const {

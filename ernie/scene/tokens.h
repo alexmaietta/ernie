@@ -15,6 +15,8 @@ inline constexpr std::string_view kCylinder = "Cylinder";
 inline constexpr std::string_view kCone = "Cone";
 inline constexpr std::string_view kCapsule = "Capsule";
 inline constexpr std::string_view kPlane = "Plane";
+inline constexpr std::string_view kMesh = "Mesh";
+inline constexpr std::string_view kPoints = "Points";
 
 inline constexpr std::string_view kXformOpPrefix = "xformOp:";
 inline constexpr std::string_view kXformOpOrder = "xformOpOrder";

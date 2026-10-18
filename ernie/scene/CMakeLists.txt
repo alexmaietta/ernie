@@ -10,6 +10,7 @@ add_library(
     xform.cpp
     schemas/collection.cpp
     schemas/geom.cpp
+    schemas/mesh.cpp
     schemas/registry.cpp
     schemas/shade.cpp
 )
