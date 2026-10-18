@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Tests of device columns shared with Warp through DLPack: written in place, never copied."""
 
-import numpy as np
 import pytest
 
 import ernie
 
+np = pytest.importorskip("numpy")
 wp = pytest.importorskip("warp")
 
 
