@@ -246,9 +246,7 @@ struct TraceParameters {
 };
 
 TEST_F(FrameGraph, OrdersBuildsBeforeTheBuildsAndTracesThatReadThem) {
-    if (!context_->Capabilities().rayQuery) {
-        GTEST_SKIP() << context_->Info().name << " has no ray queries";
-    }
+    ERNIE_REQUIRE_RAY_QUERIES(*context_);
     const ComputeKernel trace(*context_, compiler_.Spirv(std::span(&kTrace, 1), "main"), "trace",
                               std::uint32_t{sizeof(TraceParameters)});
     AccelerationPool structures(*context_, "test structures");
@@ -336,9 +334,7 @@ TEST_F(FrameGraph, OrdersBuildsBeforeTheBuildsAndTracesThatReadThem) {
 }
 
 TEST_F(FrameGraph, KeepsStructuresAndBuffersToTheirOwnUses) {
-    if (!context_->Capabilities().rayQuery) {
-        GTEST_SKIP() << context_->Info().name << " has no ray queries";
-    }
+    ERNIE_REQUIRE_RAY_QUERIES(*context_);
     AccelerationPool structures(*context_, "test structures");
     const AccelerationStructure top(structures, Sizes(*context_, 1, kRebuilt), "scene");
     const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);

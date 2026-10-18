@@ -88,9 +88,7 @@ class Acceleration : public ::testing::Test {
         if (!context_) {
             GTEST_SKIP() << "No Vulkan device";
         }
-        if (!context_->Capabilities().rayQuery) {
-            GTEST_SKIP() << context_->Info().name << " has no ray queries";
-        }
+        ERNIE_REQUIRE_RAY_QUERIES(*context_);
         trace_ = std::make_unique<ComputeKernel>(
             *context_, ShaderCompiler().Spirv(std::span(&kTrace, 1), "main"), "trace",
             std::uint32_t{sizeof(TraceParameters)});

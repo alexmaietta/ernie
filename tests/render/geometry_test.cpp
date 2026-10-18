@@ -4,7 +4,7 @@
 /// geometries with their sizes in shape transforms, and edits costing what they change.
 #include "ernie/render/geometry.h"
 
-#include "tests/device/common.h"
+#include "tests/render/common.h"
 
 #include <gtest/gtest.h>
 
@@ -23,13 +23,7 @@ bool Has(const std::vector<GeometryId>& ids, GeometryId id) {
 
 /// A quad of four points and one face.
 void WriteQuad(Scene& scene, PrimId mesh, float z) {
-    const std::vector<float> points{0, 0, z, 1, 0, z, 1, 1, z, 0, 1, z};
-    scene.Write(mesh, "points", Tensor::Copy(std::span<const float>(points), {4, 3}));
-    scene.Write(mesh, "faceVertexCounts",
-                Tensor::Copy(std::span<const std::int32_t>(std::vector<std::int32_t>{4}), {1}));
-    scene.Write(
-        mesh, "faceVertexIndices",
-        Tensor::Copy(std::span<const std::int32_t>(std::vector<std::int32_t>{0, 1, 2, 3}), {4}));
+    test::WriteMesh(scene, mesh, {0, 0, z, 1, 0, z, 1, 1, z, 0, 1, z}, {4}, {0, 1, 2, 3});
 }
 
 class Geometries : public ::testing::Test {

@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <span>
 #include <vector>
@@ -88,6 +89,13 @@ class Readback {
     }
     /// @return The bytes, waiting for the copy if it is not done.
     std::span<const std::byte> Bytes();
+    /// @return The bytes as `T`s, waiting for the copy if it is not done.
+    template <typename T> std::vector<T> Values() {
+        const std::span<const std::byte> bytes = Bytes();
+        std::vector<T> values(bytes.size() / sizeof(T));
+        std::memcpy(values.data(), bytes.data(), values.size() * sizeof(T));
+        return values;
+    }
 
   private:
     DeviceContext& context_;

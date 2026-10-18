@@ -67,3 +67,9 @@ inline constexpr std::string_view kForeignImport = "VUID-VkMemoryAllocateInfo-al
     if (!name) {                                                                                   \
         GTEST_SKIP() << "No Vulkan device";                                                        \
     }
+
+/// Skips the test when `context`'s device has no ray queries, even where Vulkan is required.
+#define ERNIE_REQUIRE_RAY_QUERIES(context)                                                         \
+    if (!(context).Capabilities().rayQuery) {                                                      \
+        GTEST_SKIP() << (context).Info().name << " has no ray queries";                            \
+    }

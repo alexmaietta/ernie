@@ -9,7 +9,7 @@
 #include "ernie/render/transform_graph.h"
 #include "ernie/shaders/scene/geometry.h"
 
-#include "tests/device/common.h"
+#include "tests/render/common.h"
 
 #include <gtest/gtest.h>
 
@@ -84,23 +84,10 @@ TEST(Shaders, ConstantsAndLayoutsMatchTheirCppMirrors) {
     test::ExpectClean(*context);
 }
 
+// Without a device that ray traces, the tests that trace are skipped; this still compiles them.
 TEST(Shaders, TheRayTracerCompilesIntoAKernel) {
     std::vector<ShaderModule> modules(RayTracer::Modules().begin(), RayTracer::Modules().end());
-    modules.push_back({"trace", R"(
-import ray_tracer;
-struct Parameters { TracerParameters tracer; float* depths; };
-[[vk::push_constant]] ConstantBuffer<Parameters> parameters;
-
-[shader("compute")]
-[numthreads(64, 1, 1)]
-void main(uint3 id : SV_DispatchThreadID) {
-    RayTracer tracer = RayTracer(parameters.tracer);
-    RayDesc ray = { float3(id.x, 0, 10), 0, float3(0, 0, -1), 100 };
-    Hit hit = tracer.TraceClosest(ray, 0xff);
-    bool blocked = tracer.TraceAny(ray, 0xff);
-    parameters.depths[id.x] = hit.found && blocked ? tracer.WorldNormal(hit).z * hit.t : -1;
-}
-)"});
+    modules.push_back(test::kTrace);
     const std::vector<std::uint32_t> spirv = ShaderCompiler().Spirv(modules, "main");
     ASSERT_FALSE(spirv.empty());
     EXPECT_EQ(spirv.front(), 0x07230203u);

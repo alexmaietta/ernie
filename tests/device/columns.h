@@ -18,16 +18,22 @@
 
 namespace ernie::test {
 
+/// @return A column's first `rows` rows, all by default, as `T`s, once `after` is reached.
+template <typename T>
+std::vector<T> ReadRows(DeviceContext& context, const DeviceColumn& column,
+                        const Ticket& after = {},
+                        std::uint64_t rows = std::numeric_limits<std::uint64_t>::max()) {
+    const std::uint64_t bytes = std::min(rows, column.Rows()) * column.RowBytes();
+    Readback readback(context, context.Main(), column.Storage(), column.Range().offset, bytes,
+                      std::span(&after, after.timeline ? 1 : 0));
+    return readback.Values<T>();
+}
+
 /// @return A float column's first `rows` rows, all by default, once `after` is reached.
 inline std::vector<float>
 ReadFloats(DeviceContext& context, const DeviceColumn& column, const Ticket& after = {},
            std::uint64_t rows = std::numeric_limits<std::uint64_t>::max()) {
-    const std::uint64_t bytes = std::min(rows, column.Rows()) * column.RowBytes();
-    Readback readback(context, context.Main(), column.Storage(), column.Range().offset, bytes,
-                      std::span(&after, after.timeline ? 1 : 0));
-    std::vector<float> values(bytes / sizeof(float));
-    std::memcpy(values.data(), readback.Bytes().data(), bytes);
-    return values;
+    return ReadRows<float>(context, column, after, rows);
 }
 
 }  // namespace ernie::test
