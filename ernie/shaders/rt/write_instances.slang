@@ -5,10 +5,29 @@ import affine;
 import transform;
 
 /// VkAccelerationStructureInstanceKHR.
-struct Instance { float4 rows[3]; uint indexAndMask; uint offsetAndFlags; uint64_t bottom; };
+struct Instance {
+    /// The instance's transform: the geometry's frame to the scene's.
+    float4 rows[3];
+    /// The custom index (the geometry id) in the low 24 bits, the visibility mask in the high 8.
+    uint indexAndMask;
+    /// The hit-group offset in the low 24 bits, the instance flags in the high 8.
+    uint offsetAndFlags;
+    /// The bottom level's device address.
+    uint64_t bottom;
+};
+
+/// As top_levels.cpp's `WriteParameters`.
 struct Parameters {
-    float4* worlds; uint* nodes; uint* geometries; float4* shapes; uint64_t* bottoms;
-    Instance* instances; uint count;
+    /// The transform graph's worlds, by slot.
+    float4* worlds;
+    /// Each instance row's transform-graph slot, geometry id, and shape transform.
+    uint* nodes;
+    uint* geometries;
+    float4* shapes;
+    /// Each geometry's bottom-level address, 0 until it is built.
+    uint64_t* bottoms;
+    Instance* instances;
+    uint count;
 };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 

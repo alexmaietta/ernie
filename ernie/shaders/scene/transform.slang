@@ -31,7 +31,16 @@ public Affine LoadWorld(float4* worlds, uint slot) {
     return Round(LoadDouble(worlds, slot));
 }
 
-struct Op { uint kind; uint flags; float* source; float4 hi[3]; float4 lo[3]; };
+/// As `TransformGraph::DeviceOp`.
+struct Op {
+    uint kind;
+    uint flags;
+    /// A bound op's row of floats.
+    float* source;
+    /// A folded constant's rows, each value split into a high float and a low one.
+    float4 hi[3];
+    float4 lo[3];
+};
 
 static const uint3 kAxes[6] = { uint3(0, 1, 2), uint3(0, 2, 1), uint3(1, 0, 2),
                                 uint3(1, 2, 0), uint3(2, 0, 1), uint3(2, 1, 0) };
@@ -120,7 +129,16 @@ DoubleAffine OpDoubleMatrix(Op op) {
     return m;
 }
 
-struct LocalParameters { uint* slots; Op* programs; uint* lengths; float4* locals; uint count; };
+/// As transform_graph.cpp's `LocalParameters`.
+struct LocalParameters {
+    /// Each programmed node's slot, program of `kMaxOps` ops and its length.
+    uint* slots;
+    Op* programs;
+    uint* lengths;
+    /// The locals, by slot, in double-float.
+    float4* locals;
+    uint count;
+};
 
 /// One thread a programmed node, its program at its place in the list.
 [shader("compute")]
@@ -137,7 +155,17 @@ void Local(uint3 id : SV_DispatchThreadID, uniform LocalParameters parameters) {
     StoreDouble(parameters.locals, parameters.slots[at], local);
 }
 
-struct ComposeParameters { uint* slots; uint* parents; float4* locals; float4* worlds; uint count; };
+/// As transform_graph.cpp's `ComposeParameters`.
+struct ComposeParameters {
+    /// The level's slots.
+    uint* slots;
+    /// Each slot's parent, or `kNone`.
+    uint* parents;
+    /// The locals and worlds, by slot, in double-float.
+    float4* locals;
+    float4* worlds;
+    uint count;
+};
 
 /// One level of the graph: each node's world from its parent's and its local.
 [shader("compute")]
