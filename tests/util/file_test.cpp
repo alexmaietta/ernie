@@ -28,7 +28,9 @@ TEST(File, FindFileAnyCaseMatchesNamesInOtherCases) {
     const fs::path directory = fs::path(testing::TempDir()) / "ernie_file_test_case";
     fs::create_directories(directory);
     std::ofstream(directory / "ldem_4.img") << "x";
-    EXPECT_EQ(FindFileAnyCase(directory, "LDEM_4.IMG"), directory / "ldem_4.img");
+    // The same file, though case-insensitive file systems (Windows, macOS) find it by the name as
+    // asked.
+    EXPECT_TRUE(fs::equivalent(FindFileAnyCase(directory, "LDEM_4.IMG"), directory / "ldem_4.img"));
     EXPECT_EQ(FindFileAnyCase(directory, "ldem_4.img"), directory / "ldem_4.img");
     EXPECT_EQ(FindFileAnyCase(directory, "missing.lbl"), directory / "missing.lbl");
     EXPECT_EQ(FindFileAnyCase(directory / "absent", "a.lbl"), directory / "absent" / "a.lbl");
