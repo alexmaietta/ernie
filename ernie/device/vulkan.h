@@ -48,8 +48,16 @@ template <typename Teardown> void Quietly(Teardown&& teardown) noexcept {
 
 constexpr VkAccessFlags2 kAnyAccess = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
 
-/// @brief Records copies of `regions` between buffers, ordered after earlier work on them and
-/// before later work.
+/// @brief Regions to copy from one buffer to another.
+struct BufferCopies {
+    VkBuffer source = VK_NULL_HANDLE;
+    VkBuffer destination = VK_NULL_HANDLE;
+    std::span<const VkBufferCopy> regions;
+};
+
+/// @brief Records copies between buffers, ordered after earlier work on them and before later
+/// work by one barrier either side.
+void CopyBuffers(VkCommandBuffer commands, std::span<const BufferCopies> copies);
 void CopyBuffer(VkCommandBuffer commands, VkBuffer source, VkBuffer destination,
                 std::span<const VkBufferCopy> regions);
 

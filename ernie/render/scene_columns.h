@@ -92,9 +92,10 @@ class SceneColumns {
     /// alike; rows new from the host are added to `hostRows`.
     std::vector<VkBufferCopy> MoveRows(Binding& binding, const Origins& origins, std::uint32_t rows,
                                        std::vector<std::uint32_t>& hostRows);
-    /// Adds the rows whose host values were authored anew to `hostRows`.
-    void FindAuthoredRows(const ChangeSet& changes, const Binding& binding, const Origins& origins,
-                          std::uint32_t rows, std::vector<std::uint32_t>& hostRows) const;
+    /// Adds the rows whose host values were authored anew to `hostRows`, taking their values
+    /// into the shadow.
+    void FindAuthoredRows(const ChangeSet& changes, Binding& binding, const Origins& origins,
+                          std::uint32_t rows, std::vector<std::uint32_t>& hostRows);
     /// Uploads the binding's shadow at sorted `rows`.
     void Upload(const Binding& binding, std::span<const std::uint32_t> rows);
     const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
@@ -104,6 +105,8 @@ class SceneColumns {
     const Scene& scene_;
     Uploader uploader_;
     std::vector<Binding> bindings_;
+    /// Authored ranges' device bytes, compared with the shadow.
+    std::vector<std::byte> scratch_;
 };
 
 }  // namespace ernie

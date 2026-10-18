@@ -48,20 +48,40 @@ glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim);
 /// @return Whether the prim's transform ignores its ancestors' (`!resetXformStack!`).
 bool ResetsXformStack(const Scene& scene, PrimId prim);
 
-/// @brief One op of a prim's transform: its attribute, its type (`translate`, `rotateXYZ`,
-/// `orient` ...) and whether the order inverts it.
+/// The transform ops Ernie knows; the Euler rotations in `RotationOrder`'s order.
+enum class XformOpKind : std::uint8_t {
+    Translate,
+    Scale,
+    RotateX,
+    RotateY,
+    RotateZ,
+    RotateXYZ,
+    RotateXZY,
+    RotateYXZ,
+    RotateYZX,
+    RotateZXY,
+    RotateZYX,
+    Orient,
+    Transform,
+};
+
+/// @return The kind of an op attribute, as `xformOp:rotateXYZ:arm` is a `RotateXYZ`; none for an
+/// attribute that is no op Ernie knows.
+std::optional<XformOpKind> ParseXformOpKind(std::string_view attribute);
+
+/// @brief One op of a prim's transform: its attribute, kind and whether the order inverts it.
 struct XformOp {
     std::string attribute;
-    std::string type;
+    XformOpKind kind = XformOpKind::Transform;
     bool invert = false;
     bool operator==(const XformOp&) const = default;
 };
 /// @return The prim's ops, outermost first, as `ComposeXformOps` multiplies them: those of
 /// `xformOpOrder` without its reset token, or without an order `xformOp:transform` alone.
-/// @throws std::invalid_argument for an entry that is no xformOp.
+/// @throws std::invalid_argument for an entry that is no xformOp, or an op Ernie does not know.
 std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim);
 /// @return One op's matrix, inverted if the order says so; identity when it has no value.
-/// @throws std::invalid_argument for an op Ernie does not know or a value of the wrong kind.
+/// @throws std::invalid_argument for a value of the wrong kind.
 glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op);
 
 }  // namespace ernie

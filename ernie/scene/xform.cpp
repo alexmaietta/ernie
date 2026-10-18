@@ -43,103 +43,117 @@ glm::dmat3 AxisRotation(int axis, double degrees) {
     return r;
 }
 
-/// One entry of `xformOpOrder`: its attribute, op type (`translate`, `rotateXYZ`) and inversion.
+/// The op types, as `XformOpKind` orders them.
+constexpr std::array<std::string_view, 13> kOpTypes{
+    "translate", "scale",     "rotateX",   "rotateY",   "rotateZ", "rotateXYZ", "rotateXZY",
+    "rotateYXZ", "rotateYZX", "rotateZXY", "rotateZYX", "orient",  "transform"};
+
+/// One entry of `xformOpOrder`, its attribute viewing the order's text.
 struct OpEntry {
     std::string_view attribute;
-    std::string_view type;
+    XformOpKind kind = XformOpKind::Transform;
     bool invert = false;
 };
 
-OpEntry ParseOp(const Path& path, std::string_view entry) {
+OpEntry ParseOp(const Scene& scene, PrimId prim, std::string_view entry) {
     OpEntry op;
     if (entry.starts_with(tokens::kInvertPrefix)) {
         op.invert = true;
         entry.remove_prefix(tokens::kInvertPrefix.size());
     }
     if (!entry.starts_with(tokens::kXformOpPrefix)) {
-        throw std::invalid_argument("xformOpOrder of '" + path.String() + "' lists '" +
-                                    std::string(entry) + "', which is no xformOp");
+        throw std::invalid_argument("xformOpOrder of '" + scene.PrimPath(prim).String() +
+                                    "' lists '" + std::string(entry) + "', which is no xformOp");
+    }
+    const std::optional<XformOpKind> kind = ParseXformOpKind(entry);
+    if (!kind) {
+        throw std::invalid_argument("'" + scene.PrimPath(prim).String() + "' has transform op " +
+                                    std::string(entry) + ", which Ernie does not know");
     }
     op.attribute = entry;
-    const std::string_view type = entry.substr(tokens::kXformOpPrefix.size());
-    op.type = type.substr(0, type.find(':'));
+    op.kind = *kind;
     return op;
 }
 
-std::optional<RotationOrder> EulerOrder(std::string_view type) {
-    for (std::size_t i = 0; i < kRotateOps.size(); ++i) {
-        if (kRotateOps[i].substr(tokens::kXformOpPrefix.size()) == type) {
-            return static_cast<RotationOrder>(i);
+/// The order's ops, outermost first, without its reset token; `xformOp:transform` without one.
+template <typename Visit> void ForEachOp(const Scene& scene, PrimId prim, Visit visit) {
+    const std::optional<Value> order = scene.Get(prim, tokens::kXformOpOrder);
+    if (!order) {
+        visit(OpEntry{tokens::kTransform, XformOpKind::Transform, false});
+        return;
+    }
+    for (const std::string& entry : *order->Get<std::vector<std::string>>()) {
+        if (entry != tokens::kResetXformStack) {
+            visit(ParseOp(scene, prim, entry));
         }
     }
-    return std::nullopt;
 }
 
-std::invalid_argument BadOp(const Path& path, const OpEntry& op, std::string_view need) {
-    return std::invalid_argument(std::string(op.attribute) + " of '" + path.String() +
-                                 "' must be " + std::string(need));
+std::invalid_argument BadOp(const Scene& scene, PrimId prim, const OpEntry& op,
+                            std::string_view need) {
+    return std::invalid_argument(std::string(op.attribute) + " of '" +
+                                 scene.PrimPath(prim).String() + "' must be " + std::string(need));
 }
 
-glm::dvec3 ToVec3(const Path& path, const OpEntry& op, const Value& value, bool scalar) {
+glm::dvec3 ToVec3(const Scene& scene, PrimId prim, const OpEntry& op, const Value& value,
+                  bool scalar) {
     if (const auto vector = ToVector<3>(value)) {
         return *vector;
     }
     if (const auto number = ToNumber(value); scalar && number) {
         return glm::dvec3(*number);
     }
-    throw BadOp(path, op, scalar ? "three numbers or one" : "three numbers");
+    throw BadOp(scene, prim, op, scalar ? "three numbers or one" : "three numbers");
 }
 
 /// The matrix of one op, inverted if the order says so; identity for an op without a value.
 glm::dmat4 OpMatrix(const Scene& scene, PrimId prim, const OpEntry& op) {
-    const Path path = scene.PrimPath(prim);
-    const std::optional<RotationOrder> euler = EulerOrder(op.type);
-    const bool single = op.type == "rotateX" || op.type == "rotateY" || op.type == "rotateZ";
-    if (!euler && !single && op.type != "translate" && op.type != "scale" && op.type != "orient" &&
-        op.type != "transform") {
-        throw std::invalid_argument("'" + path.String() + "' has transform op " +
-                                    std::string(op.attribute) + ", which Ernie does not know");
-    }
     const std::optional<Value> value = scene.Get(prim, op.attribute);
     if (!value) {
         return glm::dmat4(1.0);
     }
+    const auto kind = static_cast<std::uint8_t>(op.kind);
     glm::dmat4 m(1.0);
-    if (op.type == "translate") {
-        m = glm::translate(m, ToVec3(path, op, *value, false));
-    } else if (op.type == "scale") {
-        m = glm::scale(m, ToVec3(path, op, *value, true));
-    } else if (single) {
+    switch (op.kind) {
+    case XformOpKind::Translate:
+        m = glm::translate(m, ToVec3(scene, prim, op, *value, false));
+        break;
+    case XformOpKind::Scale:
+        m = glm::scale(m, ToVec3(scene, prim, op, *value, true));
+        break;
+    case XformOpKind::RotateX:
+    case XformOpKind::RotateY:
+    case XformOpKind::RotateZ: {
         const std::optional<double> degrees = ToNumber(*value);
         if (!degrees) {
-            throw BadOp(path, op, "one angle in degrees");
+            throw BadOp(scene, prim, op, "one angle in degrees");
         }
-        m = glm::dmat4(AxisRotation(op.type.back() - 'X', *degrees));
-    } else if (euler) {
-        m = glm::dmat4(EulerRotation(ToVec3(path, op, *value, false), *euler));
-    } else if (op.type == "orient") {
+        m = glm::dmat4(
+            AxisRotation(kind - static_cast<std::uint8_t>(XformOpKind::RotateX), *degrees));
+        break;
+    }
+    case XformOpKind::Orient: {
         const auto* q = value->Get<glm::dquat>();
         if (q == nullptr) {
-            throw BadOp(path, op, "a quaternion");
+            throw BadOp(scene, prim, op, "a quaternion");
         }
         m = glm::dmat4(glm::mat3_cast(glm::normalize(*q)));
-    } else {
+        break;
+    }
+    case XformOpKind::Transform: {
         const auto* matrix = value->Get<glm::dmat4>();
         if (matrix == nullptr) {
-            throw BadOp(path, op, "a 4 x 4 matrix");
+            throw BadOp(scene, prim, op, "a 4 x 4 matrix");
         }
         m = *matrix;
+        break;
+    }
+    default:
+        m = glm::dmat4(EulerRotation(
+            ToVec3(scene, prim, op, *value, false),
+            static_cast<RotationOrder>(kind - static_cast<std::uint8_t>(XformOpKind::RotateXYZ))));
     }
     return op.invert ? glm::inverse(m) : m;
-}
-
-/// @return The prim's op order, or none when it has no `xformOpOrder`.
-std::optional<std::vector<std::string>> OpOrder(const Scene& scene, PrimId prim) {
-    const std::optional<Value> order = scene.Get(prim, tokens::kXformOpOrder);
-    if (!order) {
-        return std::nullopt;
-    }
-    return *order->Get<std::vector<std::string>>();
 }
 
 }  // namespace
@@ -206,34 +220,39 @@ void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
 
 glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim) {
     glm::dmat4 local(1.0);
-    for (const XformOp& op : XformOpsInOrder(scene, prim)) {
-        local = local * XformOpMatrix(scene, prim, op);
-    }
+    ForEachOp(scene, prim, [&](const OpEntry& op) { local = local * OpMatrix(scene, prim, op); });
     return local;
 }
 
 bool ResetsXformStack(const Scene& scene, PrimId prim) {
-    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
-    return order && !order->empty() && order->front() == tokens::kResetXformStack;
+    const std::optional<Value> order = scene.Get(prim, tokens::kXformOpOrder);
+    const auto* entries = order ? order->Get<std::vector<std::string>>() : nullptr;
+    return entries != nullptr && !entries->empty() && entries->front() == tokens::kResetXformStack;
+}
+
+std::optional<XformOpKind> ParseXformOpKind(std::string_view attribute) {
+    if (!attribute.starts_with(tokens::kXformOpPrefix)) {
+        return std::nullopt;
+    }
+    std::string_view type = attribute.substr(tokens::kXformOpPrefix.size());
+    type = type.substr(0, type.find(':'));
+    const auto found = std::ranges::find(kOpTypes, type);
+    if (found == kOpTypes.end()) {
+        return std::nullopt;
+    }
+    return static_cast<XformOpKind>(found - kOpTypes.begin());
 }
 
 std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim) {
-    const Path path = scene.PrimPath(prim);
-    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
-    const std::vector<std::string> entries =
-        order ? *order : std::vector<std::string>{std::string(tokens::kTransform)};
     std::vector<XformOp> ops;
-    for (const std::string& entry : entries) {
-        if (entry != tokens::kResetXformStack) {
-            const OpEntry op = ParseOp(path, entry);
-            ops.push_back({std::string(op.attribute), std::string(op.type), op.invert});
-        }
-    }
+    ForEachOp(scene, prim, [&](const OpEntry& op) {
+        ops.push_back({std::string(op.attribute), op.kind, op.invert});
+    });
     return ops;
 }
 
 glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op) {
-    return OpMatrix(scene, prim, {op.attribute, op.type, op.invert});
+    return OpMatrix(scene, prim, {op.attribute, op.kind, op.invert});
 }
 
 }  // namespace ernie

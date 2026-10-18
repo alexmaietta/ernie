@@ -161,6 +161,40 @@ TEST(TransformGraph, FollowsPrimsComingAndGoingAtWhatTheyCost) {
     ExpectClean(*context);
 }
 
+TEST(TransformGraph, FollowsRemovedSubtreesAndNewOrders) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    Scene scene;
+    scene.Define("/World", "Xform");
+    SetXform(scene, "/World", {.translate = glm::dvec3(0, 0, 7)});
+    for (int i = 0; i < 100; ++i) {
+        const std::string env = "/World/Env_" + std::to_string(i);
+        scene.Define(env, "Xform");
+        SetXform(scene, env, {.translate = glm::dvec3(i, 0, 0)});
+        scene.Define(env + "/Body", "Sphere");
+        SetXform(scene, env + "/Body", {.translate = glm::dvec3(0, 1, 0)});
+    }
+    Arenas arenas(*context, MemoryUse::Device, "transforms", 1 << 20);
+    TransformGraph graph(*context, arenas, scene, compiler);
+    graph.Update().Wait();
+
+    // A parent goes with its children in one update; a new order resets another's stack.
+    const PrimId env = *scene.Find("/World/Env_3");
+    const PrimId body = *scene.Find("/World/Env_3/Body");
+    scene.Remove("/World/Env_3");
+    scene.Set(*scene.Find("/World/Env_5"), "xformOpOrder",
+              std::vector<std::string>{"!resetXformStack!", "xformOp:translate"});
+    const std::vector<float> worlds = ReadFloats(*context, graph.Worlds(), graph.Update());
+    EXPECT_FALSE(graph.Node(env));
+    EXPECT_FALSE(graph.Node(body));
+    for (const char* path :
+         {"/World/Env_2/Body", "/World/Env_5", "/World/Env_5/Body", "/World/Env_99/Body"}) {
+        const PrimId prim = *scene.Find(path);
+        ExpectWorld(worlds, *graph.Node(prim), scene.WorldTransform(prim));
+    }
+    ExpectClean(*context);
+}
+
 TEST(TransformGraph, ARetypedAncestorKeepsItsDescendants) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;

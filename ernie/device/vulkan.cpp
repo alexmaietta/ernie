@@ -111,17 +111,26 @@ void Barrier(VkCommandBuffer commands, VkPipelineStageFlags2 srcStage, VkAccessF
     vkCmdPipelineBarrier2(commands, &dependency);
 }
 
-void CopyBuffer(VkCommandBuffer commands, VkBuffer source, VkBuffer destination,
-                std::span<const VkBufferCopy> regions) {
-    if (regions.empty()) {
+void CopyBuffers(VkCommandBuffer commands, std::span<const BufferCopies> copies) {
+    if (std::ranges::all_of(copies, [](const BufferCopies& c) { return c.regions.empty(); })) {
         return;
     }
     Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAnyAccess,
             VK_PIPELINE_STAGE_2_COPY_BIT, kAnyAccess);
-    vkCmdCopyBuffer(commands, source, destination, static_cast<std::uint32_t>(regions.size()),
-                    regions.data());
+    for (const BufferCopies& copy : copies) {
+        if (!copy.regions.empty()) {
+            vkCmdCopyBuffer(commands, copy.source, copy.destination,
+                            static_cast<std::uint32_t>(copy.regions.size()), copy.regions.data());
+        }
+    }
     Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
             VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAnyAccess);
+}
+
+void CopyBuffer(VkCommandBuffer commands, VkBuffer source, VkBuffer destination,
+                std::span<const VkBufferCopy> regions) {
+    const BufferCopies copy{source, destination, regions};
+    CopyBuffers(commands, std::span(&copy, 1));
 }
 
 FeatureChain& FeatureChain::operator=(const FeatureChain& other) {

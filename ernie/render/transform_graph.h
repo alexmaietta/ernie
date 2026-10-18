@@ -10,6 +10,7 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/staging.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/xform.h"
 
 #include <array>
 #include <cstdint>
@@ -92,15 +93,24 @@ class TransformGraph {
         /// The column's address its programs point into; a column that moves rewrites them.
         VkDeviceAddress address = 0;
     };
+    /// An op of a node's order, parsed when the order changes.
+    struct NodeOp {
+        XformOp op;
+        /// Its attribute's token, to find a binding by; none until the attribute is authored.
+        std::optional<Token> attribute;
+    };
     struct NodeState {
         PrimId prim;
         bool live = false;
         std::uint32_t parent = kNone;
         std::uint32_t level = 0;
-        /// Where the node is in its level's list, and in the programmed list.
+        /// Where the node is in its level's list, its parent's children and the programmed list.
         std::uint32_t position = kNone;
+        std::uint32_t siblingPosition = kNone;
         std::uint32_t programPosition = kNone;
         std::vector<std::uint32_t> children;
+        std::vector<NodeOp> ops;
+        bool resets = false;
     };
     /// Slots in a device list, kept dense by swap-removal, its changed entries uploaded in runs.
     struct SlotList {
@@ -124,23 +134,33 @@ class TransformGraph {
     };
 
     void Replay(const ChangeSet& changes);
+    /// Refreshes the nodes whose transform values the host authored, reparenting those whose
+    /// order changed.
+    void RefreshAuthored(const ChangeSet& changes);
     void AddNode(PrimId prim);
     void RemoveNode(std::uint32_t slot);
     /// Hangs a node under `parent` at the level below it, its subtree following.
     void Attach(std::uint32_t slot, std::uint32_t parent);
     void Detach(std::uint32_t slot);
     void SetLevel(std::uint32_t slot, std::uint32_t level);
-    /// @return The slot of the prim's nearest ancestor prim, none at a root or a stack reset.
-    std::uint32_t ParentSlot(PrimId prim) const;
+    /// @return The slot of the node's nearest ancestor prim, none at a root or a stack reset.
+    std::uint32_t ParentSlot(std::uint32_t slot) const;
     /// Hands descendants whose nearest ancestor prim is now `slot`'s over to it.
     void AdoptDescendants(std::uint32_t slot);
+    /// Parses a node's op order.
+    void ParseOps(std::uint32_t slot);
     /// Recomposes a node's local transform or program from its ops.
     void Refresh(std::uint32_t slot);
+    /// Reparses and refreshes every node of a bucket.
+    void RefreshBucket(BucketId bucket);
     void EnsureSlots(std::uint32_t slots);
     std::uint32_t Insert(SlotList& list, std::uint32_t slot);
     /// Takes a slot out of a list it is in at its `position` member, swap-removing.
-    void Unlist(SlotList& list, std::uint32_t NodeState::* position, std::uint32_t slot);
-    const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
+    /// @return Where it was.
+    std::uint32_t Unlist(SlotList& list, std::uint32_t NodeState::* position, std::uint32_t slot);
+    /// Takes a node's program out, the last program moving into its place.
+    void Unprogram(std::uint32_t slot);
+    const Binding* FindBinding(BucketId bucket, std::optional<Token> attribute) const;
     /// A prim's transform as the host composes it, or as the program the device evaluates.
     struct Built {
         bool onDevice = false;
@@ -148,8 +168,9 @@ class TransformGraph {
         Program program{};
         std::uint32_t length = 0;
     };
-    Built BuildProgram(PrimId prim) const;
+    Built BuildProgram(std::uint32_t slot) const;
     void UploadDirty();
+    void RecordDispatches(VkCommandBuffer commands) const;
 
     DeviceContext& context_;
     Arenas& arenas_;
@@ -164,7 +185,8 @@ class TransformGraph {
     std::vector<NodeState> nodes_;
     std::vector<SlotList> levels_;
     SlotList programmed_;
-    // Host copies of the slot arrays, and the slots changed since the last upload.
+    // Host copies of the slot arrays and the programmed list's programs, and the entries changed
+    // since the last upload.
     std::vector<std::uint32_t> parents_;
     std::vector<Rows12> locals_;
     std::vector<Program> programs_;
