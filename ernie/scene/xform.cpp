@@ -224,4 +224,27 @@ bool ResetsXformStack(const Scene& scene, PrimId prim) {
     return order && !order->empty() && order->front() == tokens::kResetXformStack;
 }
 
+std::optional<PoseOps> SplitAroundPose(const Scene& scene, PrimId prim) {
+    const std::optional<std::vector<std::string>> order = OpOrder(scene, prim);
+    if (!order) {
+        return std::nullopt;
+    }
+    const auto pose = std::ranges::adjacent_find(*order, [](const auto& a, const auto& b) {
+        return a == tokens::kTranslate && b == tokens::kOrient;
+    });
+    if (pose == order->end()) {
+        return std::nullopt;
+    }
+    const Path path = scene.PrimPath(prim);
+    PoseOps ops;
+    for (auto entry = order->begin(); entry != order->end(); ++entry) {
+        if (*entry == tokens::kResetXformStack || entry == pose || entry == pose + 1) {
+            continue;
+        }
+        glm::dmat4& side = entry < pose ? ops.before : ops.after;
+        side = side * OpMatrix(scene, prim, ParseOp(path, *entry));
+    }
+    return ops;
+}
+
 }  // namespace ernie

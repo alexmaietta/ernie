@@ -46,4 +46,14 @@ glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim);
 /// @return Whether the prim's transform ignores its ancestors' (`!resetXformStack!`).
 bool ResetsXformStack(const Scene& scene, PrimId prim);
 
+/// @brief A local transform around its pose: `before * translate * orient * after`, so a pose
+/// written elsewhere, on the device, composes with the ops the host authors.
+struct PoseOps {
+    glm::dmat4 before{1.0};
+    glm::dmat4 after{1.0};
+};
+/// @return The ops around the prim's pose when its `xformOpOrder` lists `xformOp:translate`
+/// right before `xformOp:orient`, neither inverted; none otherwise.
+std::optional<PoseOps> SplitAroundPose(const Scene& scene, PrimId prim);
+
 }  // namespace ernie

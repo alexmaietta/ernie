@@ -292,6 +292,9 @@ class PrimStore {
     const Bucket& GetBucket(BucketId bucket) const {
         return *buckets_[bucket];
     }
+    std::size_t BucketCount() const {
+        return buckets_.size();
+    }
 
     /// @brief Defines a prim at `path` in `bucket`, its attributes at their fallbacks.
     /// @return The prim; the existing one if `path` already has one in `bucket`.
