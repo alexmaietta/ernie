@@ -90,6 +90,12 @@ ernie_add_test_suite(
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
 ernie_add_test_suite(
+    graph
+    LABEL gpu
+    SOURCES graph/dependencies_test.cpp graph/graph_test.cpp
+    LIBRARIES ernie_static ernie_volk ernie_vma
+)
+ernie_add_test_suite(
     render
     LABEL gpu
     SOURCES render/scene_columns_test.cpp render/transform_graph_test.cpp

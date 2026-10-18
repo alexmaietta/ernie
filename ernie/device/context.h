@@ -102,6 +102,14 @@ class DeviceContext {
 
     /// @brief Names a Vulkan object for validation messages, captures and crash reports.
     void Name(VkObjectType type, std::uint64_t handle, std::string_view name) const;
+    /// @brief Opens and closes a named region of commands, as a capture or validation message
+    /// shows it.
+    void BeginLabel(VkCommandBuffer commands, std::string_view name) const {
+        instance_.BeginLabel(commands, name);
+    }
+    void EndLabel(VkCommandBuffer commands) const {
+        instance_.EndLabel(commands);
+    }
     /// @return The validation layer's messages since the last call; empty without validation.
     std::vector<std::string> TakeValidationMessages() {
         return instance_.TakeMessages();

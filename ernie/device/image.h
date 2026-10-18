@@ -45,6 +45,7 @@ struct ImageDescription {
     glm::uvec3 extent{1, 1, 1};
     std::uint32_t mips = 1;
     ImageUsage usage = ImageUsage::Sampled;
+    bool operator==(const ImageDescription&) const = default;
 };
 
 /// @brief An image, its memory and a view of it all. Images stay in the general layout, which

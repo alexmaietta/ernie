@@ -41,6 +41,10 @@ class Instance {
     /// @brief Names a device's object, when validating; otherwise does nothing.
     void Name(VkDevice device, VkObjectType type, std::uint64_t handle,
               std::string_view name) const;
+    /// @brief Opens a named region of commands for captures and validation messages, when
+    /// validating; otherwise does nothing.
+    void BeginLabel(VkCommandBuffer commands, std::string_view name) const;
+    void EndLabel(VkCommandBuffer commands) const;
 
   private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL Report(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -54,6 +58,8 @@ class Instance {
     // with validation have these.
     PFN_vkDestroyDebugUtilsMessengerEXT destroyMessenger_ = nullptr;
     PFN_vkSetDebugUtilsObjectNameEXT setName_ = nullptr;
+    PFN_vkCmdBeginDebugUtilsLabelEXT beginLabel_ = nullptr;
+    PFN_vkCmdEndDebugUtilsLabelEXT endLabel_ = nullptr;
     std::mutex mutex_;
     std::vector<std::string> messages_;
 };
