@@ -60,6 +60,7 @@ ImGuiRenderer::ImGuiRenderer(DeviceContext& context, VkFormat format, std::uint3
     info.PhysicalDevice = context.Physical();
     info.Device = context.Device();
     info.QueueFamily = context.Main().Family();
+    // Used only by texture uploads, which borrow the queue (`UpdateTextures`).
     info.Queue = context.Main().Handle();
     info.DescriptorPoolSize = 64;
     info.MinImageCount = imageCount;
@@ -91,9 +92,10 @@ void ImGuiRenderer::UpdateTextures(ImDrawData& data) {
     }
     for (ImTextureData* texture : *data.Textures) {
         if (texture->Status != ImTextureStatus_OK) {
-            // The font atlas, on the first frame and when it grows.
+            // The font atlas, on the first frame and when it grows; the backend submits the
+            // upload and waits for it itself.
             ERNIE_ZONE("Upload a UI texture");
-            ImGui_ImplVulkan_UpdateTexture(texture);
+            context_.Main().Borrow([&](VkQueue) { ImGui_ImplVulkan_UpdateTexture(texture); });
         }
     }
 }

@@ -182,6 +182,17 @@ Ticket Queue::Last() const {
     return submitted_ == 0 ? Ticket() : timeline_.At(submitted_);
 }
 
+VkResult Queue::Present(const VkPresentInfoKHR& info) {
+    // Vulkan leaves a queue's host access for its users to synchronize.
+    const std::lock_guard lock(mutex_);
+    return vkQueuePresentKHR(queue_, &info);
+}
+
+void Queue::Borrow(const std::function<void(VkQueue)>& use) {
+    const std::lock_guard lock(mutex_);
+    use(queue_);
+}
+
 void Queue::Recycle() {
     const std::uint64_t reached = timeline_.Reached();
     std::erase_if(inFlight_, [&](const auto& entry) {

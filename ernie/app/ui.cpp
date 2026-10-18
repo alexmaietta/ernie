@@ -1529,7 +1529,7 @@ void WindowPresenter::Present(Ticket drawn) {
                                 .swapchainCount = 1,
                                 .pSwapchains = &swapchain_,
                                 .pImageIndices = &*acquired_};
-    const VkResult result = vkQueuePresentKHR(context_.Main().Handle(), &info);
+    const VkResult result = context_.Main().Present(info);
     if (!Matches(result) && result != VK_ERROR_OUT_OF_DATE_KHR) {
         CheckVk(result, "vkQueuePresentKHR");
     }

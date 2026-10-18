@@ -92,6 +92,13 @@ class Queue {
                   std::span<const Ticket> waits = {});
     /// @return The ticket of the latest submission: waiting on it waits for all of them.
     Ticket Last() const;
+    /// @brief Presents swapchain images, between submissions from any thread.
+    /// @return What vkQueuePresentKHR returned, as suboptimal and out-of-date swapchains are
+    /// the caller's to handle.
+    VkResult Present(const VkPresentInfoKHR& info);
+    /// @brief Lends the queue's handle to `use`, with no submission or present in between, for
+    /// libraries that submit to it themselves. `use` must not call back into this queue.
+    void Borrow(const std::function<void(VkQueue)>& use);
 
     const ernie::Timeline& Timeline() const {
         return timeline_;

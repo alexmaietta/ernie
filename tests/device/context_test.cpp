@@ -7,9 +7,12 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstring>
 #include <memory>
 #include <numeric>
+#include <thread>
 #include <vector>
 
 namespace ernie {
@@ -44,6 +47,28 @@ TEST(DeviceContext, TicketsOrderSubmissionsAndRecycleCommandBuffers) {
     last.Wait();
     EXPECT_TRUE(last.Done());
     EXPECT_EQ(queue.Last(), last);
+    ExpectClean(*context);
+}
+
+TEST(DeviceContext, ABorrowedQueueTakesNoSubmissionsMeanwhile) {
+    ERNIE_CONTEXT(context);
+    Queue& queue = context->Main();
+    std::atomic<bool> lent = false;
+    std::atomic<bool> submittedDuringLoan = false;
+    std::thread submitter;
+    queue.Borrow([&](VkQueue handle) {
+        EXPECT_EQ(handle, queue.Handle());
+        lent = true;
+        submitter = std::thread([&] {
+            queue.Submit([](VkCommandBuffer) {}).Wait();
+            submittedDuringLoan = lent.load();
+        });
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        EXPECT_EQ(vkQueueWaitIdle(handle), VK_SUCCESS);
+        lent = false;
+    });
+    submitter.join();
+    EXPECT_FALSE(submittedDuringLoan) << "the other thread's submission waited for the loan";
     ExpectClean(*context);
 }
 
