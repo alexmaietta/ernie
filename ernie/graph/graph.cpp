@@ -158,6 +158,10 @@ DeviceContext& PassContext::Context() const {
     return graph_.context_;
 }
 
+void PassContext::Keep(std::shared_ptr<const void> object) const {
+    graph_.kept_.push_back(std::move(object));
+}
+
 Graph::Graph(DeviceContext& context, TransientPool& pool)
     : context_(context), pool_(pool), fullBarriers_(FullBarriersByDefault()) {}
 
@@ -408,7 +412,7 @@ void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order, std::uint3
     }
 }
 
-Ticket Graph::Execute(Queue& queue, std::span<const Ticket> waits) {
+Ticket Graph::Execute(Queue& queue, std::span<const Ticket> waits, BinarySemaphores binary) {
     if (executed_) {
         throw std::logic_error("A frame graph executes once");
     }
@@ -423,9 +427,10 @@ Ticket Graph::Execute(Queue& queue, std::span<const Ticket> waits) {
     }
     Ticket ticket;
     if (flushEachPass_) {
+        // The first submission waits on the binary semaphore; the last signals its own.
         for (std::uint32_t order = 0; order < live_.size(); ++order) {
-            ticket =
-                queue.Submit([&](VkCommandBuffer commands) { RecordPass(commands, order); }, after);
+            ticket = queue.Submit([&](VkCommandBuffer commands) { RecordPass(commands, order); },
+                                  after, {.wait = std::exchange(binary.wait, VK_NULL_HANDLE)});
             ticket.Wait();
         }
     }
@@ -438,8 +443,12 @@ Ticket Graph::Execute(Queue& queue, std::span<const Ticket> waits) {
             }
             Record(commands, dependencies_.after);
         },
-        after);
+        after, binary);
     ReleaseLeases();
+    for (std::shared_ptr<const void>& object : kept_) {
+        context_.Retire(std::move(object));
+    }
+    kept_.clear();
     return ticket;
 }
 

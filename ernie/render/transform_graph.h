@@ -9,6 +9,7 @@
 #include "ernie/device/kernel.h"
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/staging.h"
+#include "ernie/graph/graph.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/xform.h"
 
@@ -73,6 +74,12 @@ class TransformGraph {
     /// @return The ticket passes wait on before reading `Worlds`.
     /// @throws std::invalid_argument when a prim's program needs more than `kMaxOps` ops.
     Ticket Update(std::span<const Ticket> waits = {});
+    /// @brief `Update` as passes of a graph run on the main queue, in a "Transforms" scope: the
+    /// uploads, the programs and one pass a level. Bound columns are imported and read after the
+    /// passes that write them; later passes import `Worlds` to read it. The graph executes before
+    /// the next update.
+    /// @throws std::invalid_argument as `Update`.
+    void AddUpdate(graph::Graph& graph);
 
     /// @return Each slot's world transform, three float4 rows a slot.
     const DeviceColumn& Worlds() const {
@@ -165,7 +172,10 @@ class TransformGraph {
     };
     Built BuildProgram(std::uint32_t slot) const;
     void UploadDirty();
-    void RecordDispatches(VkCommandBuffer commands) const;
+    /// Follows the scene's changes on the host and stages their uploads.
+    void Prepare();
+    void DispatchLocals(VkCommandBuffer commands) const;
+    void DispatchLevel(VkCommandBuffer commands, const SlotList& level) const;
 
     DeviceContext& context_;
     Arenas& arenas_;

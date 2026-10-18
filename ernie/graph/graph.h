@@ -37,6 +37,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -126,6 +127,8 @@ class PassContext {
     /// @return The image's layout during the pass, for attachments.
     VkImageLayout Layout(Image image) const;
     DeviceContext& Context() const;
+    /// @brief Keeps an object, such as the staging a copy reads, until the graph's work is done.
+    void Keep(std::shared_ptr<const void> object) const;
 
   private:
     friend class Graph;
@@ -199,9 +202,10 @@ class Graph {
     void Compile();
     /// @brief Records every kept pass in order with its barriers, submits them on `queue` after
     /// `waits`, and gives transients back to the pool.
+    /// @param binary Semaphores the graph's work waits on and signals, as a swapchain image's.
     /// @return The ticket of the graph's work, which CUDA can wait on too.
     /// @throws GraphError as `Compile`; std::logic_error if executed already.
-    Ticket Execute(Queue& queue, std::span<const Ticket> waits = {});
+    Ticket Execute(Queue& queue, std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
 
     /// @brief Adds a full barrier before every pass; on by default with
     /// ERNIE_GRAPH_FULL_BARRIERS=1.
@@ -273,6 +277,8 @@ class Graph {
     std::vector<ScopeNode> scopes_;
     std::uint32_t scope_ = kNoScope;
     Blackboard board_;
+    /// Objects passes keep, retired once the graph's work is submitted.
+    mutable std::vector<std::shared_ptr<const void>> kept_;
     /// The passes kept, in order, and their dependencies.
     std::vector<std::uint32_t> live_;
     PassDependencies dependencies_;

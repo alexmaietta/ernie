@@ -258,12 +258,74 @@ void SceneColumns::FindAuthoredRows(const ChangeSet& changes, Binding& binding,
 
 Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
     ERNIE_ZONE("Sync scene columns");
+    const std::vector<Ticket> after = Prepare(waits);
+    if (moves_.empty() && !uploader_.Staged()) {
+        return context_.Main().Last();
+    }
+    std::vector<std::shared_ptr<const void>> kept;
+    const Ticket synced = context_.Main().Submit(
+        [&](VkCommandBuffer commands) {
+            Record(commands,
+                   [&](std::shared_ptr<const void> object) { kept.push_back(std::move(object)); });
+        },
+        after);
+    for (std::shared_ptr<const void>& object : kept) {
+        context_.Retire(std::move(object));
+    }
+    return synced;
+}
+
+void SceneColumns::AddSync(graph::Graph& graph) {
+    ERNIE_ZONE("Sync scene columns");
+    // What the host work waits on was submitted to the main queue, before the graph's work.
+    Prepare({});
+    if (moves_.empty() && !uploader_.Staged()) {
+        return;
+    }
+    std::vector<graph::Buffer> columns;
+    for (const Binding& binding : bindings_) {
+        columns.push_back(graph.Import(*binding.column, binding.column->Name()));
+    }
+    graph.Add(
+        "Sync scene columns", graph::Kind::Copy,
+        [&](graph::PassBuilder& pass) {
+            for (graph::Buffer& column : columns) {
+                pass.Read(column, graph::Use::CopySrc);
+                column = pass.Write(column, graph::Use::CopyDst);
+            }
+        },
+        [this](graph::PassContext& pass) {
+            Record(pass.commands,
+                   [&](std::shared_ptr<const void> object) { pass.Keep(std::move(object)); });
+        });
+}
+
+void SceneColumns::Record(VkCommandBuffer commands,
+                          const std::function<void(std::shared_ptr<const void>)>& keep) {
+    if (!moves_.empty()) {
+        std::vector<BufferCopies> copies;
+        for (auto& [column, regions] : moves_) {
+            for (VkBufferCopy& region : regions) {
+                region.srcOffset += column->Range().offset;
+                region.dstOffset += column->Range().offset;
+            }
+            const VkBuffer buffer = column->Storage().Handle();
+            copies.push_back({buffer, buffer, regions});
+        }
+        CopyBuffers(commands, copies);
+        moves_.clear();
+    }
+    for (std::shared_ptr<const Buffer>& staging : uploader_.Record(commands)) {
+        keep(std::move(staging));
+    }
+}
+
+std::vector<Ticket> SceneColumns::Prepare(std::span<const Ticket> waits) {
     const PrimStore& store = scene_.Store();
     std::vector<Ticket> after(waits.begin(), waits.end());
     // Values staged by `Bind` land before any column moves to a larger range.
     after.push_back(uploader_.Flush(waits));
-    // Each binding's row copies, from the rows before the sync to the rows after it.
-    std::vector<std::pair<const DeviceColumn*, std::vector<VkBufferCopy>>> moves;
+    moves_.clear();
     // Bindings mostly share a cursor, and so the changes since it.
     std::optional<ChangeSet> changes;
     std::uint64_t changesCursor = 0;
@@ -278,7 +340,7 @@ Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
         std::vector<std::uint32_t> hostRows;
         std::vector<VkBufferCopy> copies = MoveRows(binding, origins, rows, hostRows);
         if (!copies.empty()) {
-            moves.emplace_back(binding.column.get(), std::move(copies));
+            moves_.emplace_back(binding.column.get(), std::move(copies));
         }
         DeviceColumn& column = *binding.column;
         if (rows > column.Rows()) {
@@ -297,25 +359,7 @@ Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
         std::ranges::sort(hostRows);
         Upload(binding, hostRows);
     }
-    Ticket moved;
-    if (!moves.empty()) {
-        moved = context_.Main().Submit(
-            [&](VkCommandBuffer commands) {
-                std::vector<BufferCopies> copies;
-                for (auto& [column, regions] : moves) {
-                    for (VkBufferCopy& region : regions) {
-                        region.srcOffset += column->Range().offset;
-                        region.dstOffset += column->Range().offset;
-                    }
-                    const VkBuffer buffer = column->Storage().Handle();
-                    copies.push_back({buffer, buffer, regions});
-                }
-                CopyBuffers(commands, copies);
-            },
-            after);
-    }
-    const Ticket uploaded = uploader_.Flush(after);
-    return uploaded.timeline ? uploaded : (moved.timeline ? moved : context_.Main().Last());
+    return after;
 }
 
 }  // namespace ernie

@@ -46,6 +46,14 @@ class Uploader {
     /// on the ticket, sees the bytes.
     /// @return The copies' ticket; a default one when nothing was staged.
     Ticket Flush(std::span<const Ticket> waits = {});
+    /// @brief Records the staged copies into `commands` instead, between barriers, for a pass
+    /// that submits them with other work.
+    /// @return The staging the copies read, to retire once that work is submitted.
+    std::vector<std::shared_ptr<const Buffer>> Record(VkCommandBuffer commands);
+    /// @return Whether copies are staged.
+    bool Staged() const {
+        return !copies_.empty();
+    }
 
   private:
     struct Copy {

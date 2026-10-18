@@ -8,9 +8,11 @@
 
 #include "ernie/device/column.h"
 #include "ernie/device/staging.h"
+#include "ernie/graph/graph.h"
 #include "ernie/scene/scene.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -60,6 +62,9 @@ class SceneColumns {
     /// @brief Follows the scene's changes since the last sync, after `waits`.
     /// @return The ticket passes wait on before reading the columns.
     Ticket Sync(std::span<const Ticket> waits = {});
+    /// @brief Follows the scene's changes as a pass of a graph run on the main queue: rows move
+    /// and host values land before later passes that import the columns read them.
+    void AddSync(graph::Graph& graph);
 
   private:
     struct Binding {
@@ -98,6 +103,13 @@ class SceneColumns {
                           std::uint32_t rows, std::vector<std::uint32_t>& hostRows);
     /// Uploads the binding's shadow at sorted `rows`.
     void Upload(const Binding& binding, std::span<const std::uint32_t> rows);
+    /// Follows the changes on the host: resizes the columns, plans the row moves and stages the
+    /// host's rows.
+    /// @return What the moves and uploads wait on.
+    std::vector<Ticket> Prepare(std::span<const Ticket> waits);
+    /// Records the planned moves, then the staged uploads.
+    void Record(VkCommandBuffer commands,
+                const std::function<void(std::shared_ptr<const void>)>& keep);
     const Binding* FindBinding(BucketId bucket, AttributeId attribute) const;
 
     DeviceContext& context_;
@@ -107,6 +119,8 @@ class SceneColumns {
     std::vector<Binding> bindings_;
     /// Authored ranges' device bytes, compared with the shadow.
     std::vector<std::byte> scratch_;
+    /// Each column's row copies, from the rows before the sync to the rows after it.
+    std::vector<std::pair<const DeviceColumn*, std::vector<VkBufferCopy>>> moves_;
 };
 
 }  // namespace ernie

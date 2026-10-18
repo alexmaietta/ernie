@@ -101,6 +101,12 @@ ernie_add_test_suite(
     SOURCES render/scene_columns_test.cpp render/transform_graph_test.cpp
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
+ernie_add_test_suite(
+    frame
+    LABEL gpu
+    SOURCES frame/frame_test.cpp
+    LIBRARIES ernie_static ernie_volk ernie_vma
+)
 
 if(TARGET ernie_viewer)
     ernie_add_test_suite(

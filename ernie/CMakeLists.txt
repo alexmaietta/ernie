@@ -29,6 +29,7 @@ add_subdirectory(scene)
 add_subdirectory(device)
 add_subdirectory(graph)
 add_subdirectory(render)
+add_subdirectory(frame)
 
 set(ernie_layers
     ernie_util
@@ -39,6 +40,7 @@ set(ernie_layers
     ernie_device
     ernie_graph
     ernie_render
+    ernie_frame
 )
 target_link_libraries(ernie PRIVATE ${ernie_layers} ernie_build_options)
 target_include_directories(

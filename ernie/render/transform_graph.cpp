@@ -714,32 +714,129 @@ void TransformGraph::UploadDirty() {
     }
 }
 
-void TransformGraph::RecordDispatches(VkCommandBuffer commands) const {
-    ERNIE_GPU_ZONE(context_, commands, "Transforms");
-    // After earlier readers of the worlds and writers of the bound columns.
-    ComputeBarrier(commands);
-    if (!programmed_.slots.empty()) {
-        ERNIE_GPU_ZONE(context_, commands, "Local transforms");
-        local_.Dispatch(commands, Groups(programmed_.slots.size()),
-                        LocalParameters{programmed_.device->Address(), programColumn_->Address(),
-                                        lengthColumn_->Address(), localColumn_->Address(),
-                                        static_cast<std::uint32_t>(programmed_.slots.size()), 0});
-    }
-    for (const SlotList& level : levels_) {
-        if (level.slots.empty()) {
-            continue;
-        }
-        ComputeBarrier(commands);
-        ERNIE_GPU_ZONE(context_, commands, "World transforms");
-        compose_.Dispatch(commands, Groups(level.slots.size()),
-                          ComposeParameters{level.device->Address(), parentColumn_->Address(),
-                                            localColumn_->Address(), worlds_->Address(),
-                                            static_cast<std::uint32_t>(level.slots.size()), 0});
-    }
+void TransformGraph::DispatchLocals(VkCommandBuffer commands) const {
+    local_.Dispatch(commands, Groups(programmed_.slots.size()),
+                    LocalParameters{programmed_.device->Address(), programColumn_->Address(),
+                                    lengthColumn_->Address(), localColumn_->Address(),
+                                    static_cast<std::uint32_t>(programmed_.slots.size()), 0});
+}
+
+void TransformGraph::DispatchLevel(VkCommandBuffer commands, const SlotList& level) const {
+    compose_.Dispatch(commands, Groups(level.slots.size()),
+                      ComposeParameters{level.device->Address(), parentColumn_->Address(),
+                                        localColumn_->Address(), worlds_->Address(),
+                                        static_cast<std::uint32_t>(level.slots.size()), 0});
 }
 
 Ticket TransformGraph::Update(std::span<const Ticket> waits) {
     ERNIE_ZONE("Update transforms");
+    Prepare();
+    std::vector<Ticket> after(waits.begin(), waits.end());
+    after.push_back(uploader_.Flush(waits));
+    return context_.Main().Submit(
+        [&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "Transforms");
+            // After earlier readers of the worlds and writers of the bound columns.
+            ComputeBarrier(commands);
+            if (!programmed_.slots.empty()) {
+                ERNIE_GPU_ZONE(context_, commands, "Local transforms");
+                DispatchLocals(commands);
+            }
+            for (const SlotList& level : levels_) {
+                if (!level.slots.empty()) {
+                    ComputeBarrier(commands);
+                    ERNIE_GPU_ZONE(context_, commands, "World transforms");
+                    DispatchLevel(commands, level);
+                }
+            }
+        },
+        after);
+}
+
+void TransformGraph::AddUpdate(graph::Graph& graph) {
+    ERNIE_ZONE("Update transforms");
+    Prepare();
+    if (nodes_.empty()) {
+        return;
+    }
+    using graph::Use;
+    // Empty columns hold nothing to read or write: their handles stay invalid.
+    const auto import = [&](const DeviceColumn& column) {
+        return column.Rows() == 0 ? graph::Buffer{} : graph.Import(column, column.Name());
+    };
+    graph::Buffer parents = import(*parentColumn_);
+    graph::Buffer locals = import(*localColumn_);
+    graph::Buffer programs = import(*programColumn_);
+    graph::Buffer lengths = import(*lengthColumn_);
+    graph::Buffer worlds = import(*worlds_);
+    graph::Buffer programmed = import(*programmed_.device);
+    std::vector<graph::Buffer> levels;
+    for (const SlotList& level : levels_) {
+        levels.push_back(import(*level.device));
+    }
+    std::vector<graph::Buffer> bound;
+    for (const Binding& binding : bindings_) {
+        bound.push_back(import(*binding.column));
+    }
+    const graph::Graph::ScopeGuard scope = graph.Scope("Transforms");
+    if (uploader_.Staged()) {
+        graph.Add(
+            "Upload transforms", graph::Kind::Copy,
+            [&](graph::PassBuilder& pass) {
+                const auto write = [&](graph::Buffer& column) {
+                    if (column.Valid()) {
+                        column = pass.Write(column, Use::CopyDst);
+                    }
+                };
+                for (graph::Buffer* column :
+                     {&parents, &locals, &programs, &lengths, &programmed}) {
+                    write(*column);
+                }
+                for (graph::Buffer& level : levels) {
+                    write(level);
+                }
+            },
+            [this](graph::PassContext& pass) {
+                for (std::shared_ptr<const Buffer>& staging : uploader_.Record(pass.commands)) {
+                    pass.Keep(std::move(staging));
+                }
+            });
+    }
+    if (!programmed_.slots.empty()) {
+        graph.Add(
+            "Local transforms", graph::Kind::Compute,
+            [&](graph::PassBuilder& pass) {
+                for (const graph::Buffer& read : {programmed, programs, lengths}) {
+                    pass.ReadAddress(read);
+                }
+                // Bound columns are read in place, after the passes that write them.
+                for (const graph::Buffer& column : bound) {
+                    pass.ReadAddress(column);
+                }
+                locals = pass.WriteAddress(locals);
+            },
+            [this](graph::PassContext& pass) { DispatchLocals(pass.commands); });
+    }
+    for (std::size_t l = 0; l < levels_.size(); ++l) {
+        if (levels_[l].slots.empty()) {
+            continue;
+        }
+        // Each level reads the worlds the level above wrote.
+        graph.Add(
+            "World transforms", graph::Kind::Compute,
+            [&](graph::PassBuilder& pass) {
+                for (const graph::Buffer& read : {levels[l], parents, locals}) {
+                    pass.ReadAddress(read);
+                }
+                worlds = pass.WriteAddress(worlds);
+            },
+            [this, &level = levels_[l]](graph::PassContext& pass) {
+                DispatchLevel(pass.commands, level);
+            });
+    }
+}
+
+void TransformGraph::Prepare() {
     const PrimStore& store = scene_.Store();
     // A bound column that moved to a larger range moves its programs' sources.
     std::vector<BucketId> moved;
@@ -761,11 +858,6 @@ Ticket TransformGraph::Update(std::span<const Ticket> waits) {
         RefreshBucket(bucket);
     }
     UploadDirty();
-
-    std::vector<Ticket> after(waits.begin(), waits.end());
-    after.push_back(uploader_.Flush(waits));
-    return context_.Main().Submit([&](VkCommandBuffer commands) { RecordDispatches(commands); },
-                                  after);
 }
 
 }  // namespace ernie

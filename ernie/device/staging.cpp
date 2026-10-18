@@ -82,37 +82,45 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
         return {};
     }
     ERNIE_ZONE("Upload");
+    std::vector<std::shared_ptr<const Buffer>> staging;
+    const Ticket ticket =
+        queue_.Submit([&](VkCommandBuffer commands) { staging = Record(commands); }, waits);
+    for (std::shared_ptr<const Buffer>& buffer : staging) {
+        context_.Retire(std::move(buffer));
+    }
+    return ticket;
+}
+
+std::vector<std::shared_ptr<const Buffer>> Uploader::Record(VkCommandBuffer commands) {
+    if (copies_.empty()) {
+        return {};
+    }
     ERNIE_PLOT("Uploaded bytes", pending_);
     FlushStaging();
-    const Ticket ticket = queue_.Submit(
-        [&](VkCommandBuffer commands) {
-            BeforeCopies(commands);
-            // Regions run to the same buffers in one call each.
-            std::size_t first = 0;
-            while (first < copies_.size()) {
-                std::size_t last = first + 1;
-                std::vector<VkBufferCopy> regions{copies_[first].region};
-                while (last < copies_.size() && copies_[last].staging == copies_[first].staging &&
-                       copies_[last].destination == copies_[first].destination) {
-                    regions.push_back(copies_[last++].region);
-                }
-                vkCmdCopyBuffer(commands, staging_[copies_[first].staging]->Handle(),
-                                copies_[first].destination,
-                                static_cast<std::uint32_t>(regions.size()), regions.data());
-                first = last;
-            }
-            Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAnyAccess);
-        },
-        waits);
-    for (std::shared_ptr<Buffer>& staging : staging_) {
-        context_.Retire(std::move(staging));
+    BeforeCopies(commands);
+    // Regions run to the same buffers in one call each.
+    std::vector<VkBufferCopy> regions;
+    std::size_t first = 0;
+    while (first < copies_.size()) {
+        std::size_t last = first + 1;
+        regions.assign(1, copies_[first].region);
+        while (last < copies_.size() && copies_[last].staging == copies_[first].staging &&
+               copies_[last].destination == copies_[first].destination) {
+            regions.push_back(copies_[last++].region);
+        }
+        vkCmdCopyBuffer(commands, staging_[copies_[first].staging]->Handle(),
+                        copies_[first].destination, static_cast<std::uint32_t>(regions.size()),
+                        regions.data());
+        first = last;
     }
+    Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAnyAccess);
+    std::vector<std::shared_ptr<const Buffer>> staging(staging_.begin(), staging_.end());
     staging_.clear();
     copies_.clear();
     used_ = 0;
     pending_ = 0;
-    return ticket;
+    return staging;
 }
 
 Readback::Readback(DeviceContext& context, Queue& queue, const Buffer& source, std::uint64_t offset,
