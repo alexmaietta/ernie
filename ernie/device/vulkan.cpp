@@ -42,8 +42,9 @@ const std::array kExtensions{
 /// - Vulkan does not promise `fma` rounds once (lavapipe does not): double-float products split
 ///   their operands instead.
 void WorkAroundDrivers(VkDriverId driver, DeviceCapabilities& capabilities) {
-#if defined(__APPLE__)
-    // Homebrew's lavapipe crashes or hangs building and tracing acceleration structures.
+#if defined(__aarch64__) || defined(_M_ARM64)
+    // lavapipe on arm64 crashes or hangs building and tracing acceleration structures: Homebrew's
+    // on macOS, and Mesa 24's on Ubuntu 24.04.
     if (driver == VK_DRIVER_ID_MESA_LLVMPIPE) {
         capabilities.rayQuery = false;
     }

@@ -23,17 +23,25 @@ def readme_python():
     return re.search(r"### Python\s+```python\n(.*?)```", section, re.S).group(1)
 
 
-def renderer_or_skip():
+def skip_without_ray_tracing():
+    """Skips the test without a device that ray traces; no Vulkan at all fails where CI requires
+    it."""
     try:
-        return ernie.Renderer(validation=True)
+        devices = [device for device in ernie.vulkan_devices() if device.supported]
     except RuntimeError as error:
+        devices, reason = [], str(error)
+    else:
+        reason = "No Vulkan device"
+    if not devices:
         if os.environ.get("ERNIE_TEST_REQUIRE_VULKAN") == "1":
-            raise
-        pytest.skip(str(error))
+            pytest.fail(reason)
+        pytest.skip(reason)
+    if not any(device.ray_query for device in devices):
+        pytest.skip("No Vulkan device that ray traces")
 
 
 def test_the_readmes_first_render_runs_as_written(monkeypatch, tmp_path):
-    renderer_or_skip()
+    skip_without_ray_tracing()
     monkeypatch.chdir(tmp_path)
 
     exec(compile(readme_python(), str(README), "exec"), {})

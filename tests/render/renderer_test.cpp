@@ -21,16 +21,14 @@
 namespace ernie {
 namespace {
 
-/// @return A renderer, or none without a device that ray traces.
+/// @return A renderer, or none without a device that ray traces; no Vulkan at all fails where CI
+/// requires it.
 std::unique_ptr<Renderer> MakeRenderer() {
-    try {
-        return std::make_unique<Renderer>(RendererOptions{.validation = true});
-    } catch (const DeviceError&) {
-        if (test::VulkanRequired()) {
-            throw;
-        }
+    const std::unique_ptr<DeviceContext> probe = test::MakeContext();
+    if (!probe || !probe->Capabilities().rayQuery) {
         return nullptr;
     }
+    return std::make_unique<Renderer>(RendererOptions{.validation = true});
 }
 
 /// @return The RGBA bytes at a pixel of an image `width` pixels across.
