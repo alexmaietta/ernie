@@ -26,6 +26,7 @@ using CUcontext = struct CUctx_st*;
 using CUstream = struct CUstream_st*;
 using CUexternalMemory = struct CUextMemory_st*;
 using CUexternalSemaphore = struct CUextSemaphore_st*;
+using CUmemGenericAllocationHandle = unsigned long long;
 
 /// @brief The CUDA driver API functions Ernie uses, by their ABI names.
 struct CudaDriver {
@@ -57,10 +58,39 @@ struct CudaDriver {
     CUresult (*streamSynchronize)(CUstream) = nullptr;
     CUresult (*streamCreate)(CUstream*, unsigned int) = nullptr;
     CUresult (*streamDestroy)(CUstream) = nullptr;
+    // Virtual memory management, whose allocations can be exported.
+    CUresult (*memCreate)(CUmemGenericAllocationHandle*, std::size_t, const void*,
+                          unsigned long long) = nullptr;
+    CUresult (*memRelease)(CUmemGenericAllocationHandle) = nullptr;
+    CUresult (*memAddressReserve)(CUdeviceptr*, std::size_t, std::size_t, CUdeviceptr,
+                                  unsigned long long) = nullptr;
+    CUresult (*memAddressFree)(CUdeviceptr, std::size_t) = nullptr;
+    CUresult (*memMap)(CUdeviceptr, std::size_t, std::size_t, CUmemGenericAllocationHandle,
+                       unsigned long long) = nullptr;
+    CUresult (*memUnmap)(CUdeviceptr, std::size_t) = nullptr;
+    CUresult (*memSetAccess)(CUdeviceptr, std::size_t, const void*, std::size_t) = nullptr;
+    CUresult (*memGetAllocationGranularity)(std::size_t*, const void*, int) = nullptr;
+    CUresult (*memRetainAllocationHandle)(CUmemGenericAllocationHandle*, void*) = nullptr;
+    CUresult (*memGetAllocationPropertiesFromHandle)(void*, CUmemGenericAllocationHandle) = nullptr;
+    CUresult (*memExportToShareableHandle)(void*, CUmemGenericAllocationHandle, int,
+                                           unsigned long long) = nullptr;
+    CUresult (*memGetAddressRange)(CUdeviceptr*, std::size_t*, CUdeviceptr) = nullptr;
     CUresult (*getErrorString)(CUresult, const char**) = nullptr;
+
+    /// @brief Exportable device memory, as `AllocateShareable` makes it.
+    struct Shareable {
+        CUdeviceptr pointer = 0;
+        CUmemGenericAllocationHandle handle = 0;
+        std::size_t size = 0;
+    };
 
     /// @return The driver, loaded and initialized once per process; null when there is none.
     static const CudaDriver* Get();
+    /// @brief Allocates at least `bytes` on device `ordinal` through virtual memory management,
+    /// with handles another API imports in place. Needs a current context.
+    /// @return The allocation, or none on failure.
+    std::optional<Shareable> AllocateShareable(int ordinal, std::size_t bytes) const;
+    void FreeShareable(const Shareable& allocation) const;
     /// @throws DeviceError when `result` is an error.
     void Check(CUresult result, std::string_view what) const;
 };
@@ -102,6 +132,18 @@ class CudaInterop {
     /// @throws std::invalid_argument unless `tensor` is a contiguous CUDA tensor on this device
     /// with the column's byte size.
     Ticket Assign(const DeviceColumn& column, const Tensor& tensor, CUstream stream);
+    /// @brief A device column over a CUDA tensor's own memory, in place, when that memory is
+    /// exportable: allocated through CUDA's virtual memory management with shareable handles, as
+    /// `CudaAllocate` and PyTorch's expandable segments allocate. Ordinary `cudaMalloc` memory is
+    /// not; assign such tensors to an Ernie column instead.
+    /// @return The column, shaped (rows, element...) as the tensor is and holding it alive; null
+    /// when its memory cannot be shared.
+    std::unique_ptr<DeviceColumn> Wrap(const Tensor& tensor, std::string_view name);
+    /// @brief Allocates `bytes` of exportable device memory, which `Wrap` shares in place.
+    /// @return Its address, or 0 on failure.
+    CUdeviceptr Allocate(std::size_t bytes);
+    /// @brief Frees what `Allocate` returned.
+    void Free(CUdeviceptr pointer);
 
     /// @brief Makes the device's primary context current on this thread for a scope, for calls
     /// to the driver directly.
@@ -144,6 +186,7 @@ class CudaInterop {
     std::unordered_map<std::uint64_t, Mapping> mappings_;
     std::unordered_map<const Timeline*, CUexternalSemaphore> semaphores_;
     std::unordered_map<CUstream, StreamTimeline> streams_;
+    std::unordered_map<CUdeviceptr, CudaDriver::Shareable> allocations_;
 };
 
 }  // namespace ernie

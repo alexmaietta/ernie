@@ -79,6 +79,12 @@ void CreateExportableBuffer(VmaAllocator allocator, const VkBufferCreateInfo& in
 void CreateImportedBuffer(VmaAllocator allocator, const VkBufferCreateInfo& info,
                           ExternalHandle& handle, VkBuffer& buffer, VmaAllocation& allocation,
                           VmaAllocationInfo& allocated);
+/// @brief Creates a buffer bound to device memory another API allocated, such as CUDA's virtual
+/// memory, which no Vulkan dedicated allocation made, taking `handle` where the platform does.
+/// @param size The size of the shared allocation, which the buffer spans.
+void CreateImportedBuffer(VkDevice device, VkPhysicalDevice physical,
+                          const VkBufferCreateInfo& info, ExternalHandle& handle, VkBuffer& buffer,
+                          VkDeviceMemory& memory);
 ExternalHandle ExportMemory(VkDevice device, VkDeviceMemory memory, std::string_view name);
 
 ExternalHandle ExportSemaphore(VkDevice device, VkSemaphore semaphore, std::string_view name);

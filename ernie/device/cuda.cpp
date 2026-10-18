@@ -4,6 +4,7 @@
 /// timelines into CUDA.
 #include "ernie/device/cuda.h"
 
+#include "ernie/util/on_failure.h"
 #include "ernie/util/text.h"
 
 #include <cstring>
@@ -82,11 +83,39 @@ struct SemaphoreWaitParams {
     unsigned int reserved[16];
 };
 
+// Virtual memory management's layouts, as cuda.h's _v1 structs declare them.
+struct MemoryLocation {
+    int type;
+    int id;
+};
+struct AllocationProperties {
+    int type;
+    int requestedHandleTypes;
+    MemoryLocation location;
+    void* win32HandleMetaData;
+    struct {
+        unsigned char compressionType;
+        unsigned char gpuDirectRDMACapable;
+        unsigned short usage;
+        unsigned char reserved[4];
+    } allocFlags;
+};
+struct AccessDescription {
+    MemoryLocation location;
+    int flags;
+};
+constexpr int kPinned = 1;          // CU_MEM_ALLOCATION_TYPE_PINNED
+constexpr int kOnDevice = 1;        // CU_MEM_LOCATION_TYPE_DEVICE
+constexpr int kReadWrite = 3;       // CU_MEM_ACCESS_FLAGS_PROT_READWRITE
+constexpr int kMinimumGranule = 0;  // CU_MEM_ALLOC_GRANULARITY_MINIMUM
+
 #if defined(_WIN32)
+constexpr int kShareableHandle = 2;   // CU_MEM_HANDLE_TYPE_WIN32
 constexpr int kMemoryHandleType = 2;  // CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32
 constexpr int kSemaphoreHandleType =
     10;  // CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_TIMELINE_SEMAPHORE_WIN32
 #else
+constexpr int kShareableHandle = 1;      // CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
 constexpr int kMemoryHandleType = 1;     // CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD
 constexpr int kSemaphoreHandleType = 9;  // CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_TIMELINE_SEMAPHORE_FD
 #endif
@@ -126,7 +155,17 @@ bool LoadDriver(CudaDriver& d) {
            l.Load(d.memsetD32Async, "cuMemsetD32Async") &&
            l.Load(d.streamSynchronize, "cuStreamSynchronize") &&
            l.Load(d.streamCreate, "cuStreamCreate") &&
-           l.Load(d.streamDestroy, "cuStreamDestroy_v2") &&
+           l.Load(d.streamDestroy, "cuStreamDestroy_v2") && l.Load(d.memCreate, "cuMemCreate") &&
+           l.Load(d.memRelease, "cuMemRelease") &&
+           l.Load(d.memAddressReserve, "cuMemAddressReserve") &&
+           l.Load(d.memAddressFree, "cuMemAddressFree") && l.Load(d.memMap, "cuMemMap") &&
+           l.Load(d.memUnmap, "cuMemUnmap") && l.Load(d.memSetAccess, "cuMemSetAccess") &&
+           l.Load(d.memGetAllocationGranularity, "cuMemGetAllocationGranularity") &&
+           l.Load(d.memRetainAllocationHandle, "cuMemRetainAllocationHandle") &&
+           l.Load(d.memGetAllocationPropertiesFromHandle,
+                  "cuMemGetAllocationPropertiesFromHandle") &&
+           l.Load(d.memExportToShareableHandle, "cuMemExportToShareableHandle") &&
+           l.Load(d.memGetAddressRange, "cuMemGetAddressRange_v2") &&
            l.Load(d.getErrorString, "cuGetErrorString") && d.init(0) == 0;
 }
 
@@ -198,6 +237,9 @@ CudaInterop::~CudaInterop() {
         // Streams' timelines among them.
         for (const auto& [timeline, semaphore] : semaphores_) {
             driver_.destroyExternalSemaphore(semaphore);
+        }
+        for (const auto& [pointer, allocation] : allocations_) {
+            driver_.FreeShareable(allocation);
         }
     }
     driver_.primaryCtxRelease(device_);
@@ -312,6 +354,115 @@ Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUs
         context_.CountCopy(bytes);
     }
     return Signal(stream);
+}
+
+std::unique_ptr<DeviceColumn> CudaInterop::Wrap(const Tensor& tensor, std::string_view name) {
+    if (tensor.Location() != Device{DeviceKind::Cuda, ordinal_} || !tensor.IsContiguous() ||
+        tensor.Rank() == 0) {
+        throw std::invalid_argument(
+            "Wrapping " + std::string(name) +
+            " takes a contiguous tensor on cuda:" + std::to_string(ordinal_));
+    }
+    const auto pointer = reinterpret_cast<CUdeviceptr>(tensor.Data());
+    const std::uint64_t bytes =
+        static_cast<std::uint64_t>(tensor.Elements()) * ByteSize(tensor.Type());
+    const Current current(*this);
+    // Only virtual memory allocations have handles, and only those asked to be shareable export.
+    CUmemGenericAllocationHandle allocation = 0;
+    if (driver_.memRetainAllocationHandle(&allocation, reinterpret_cast<void*>(pointer)) != 0) {
+        return nullptr;
+    }
+    AllocationProperties properties{};
+    CUdeviceptr base = 0;
+    std::size_t size = 0;
+    ExternalHandle exported;
+    if (driver_.memGetAllocationPropertiesFromHandle(&properties, allocation) == 0 &&
+        (properties.requestedHandleTypes & kShareableHandle) != 0 &&
+        driver_.memGetAddressRange(&base, &size, pointer) == 0 && pointer + bytes <= base + size) {
+#if defined(_WIN32)
+        void* handle = nullptr;
+        if (driver_.memExportToShareableHandle(&handle, allocation, kShareableHandle, 0) == 0) {
+            exported = ExternalHandle(reinterpret_cast<std::intptr_t>(handle));
+        }
+#else
+        int handle = -1;
+        if (driver_.memExportToShareableHandle(&handle, allocation, kShareableHandle, 0) == 0) {
+            exported = ExternalHandle(handle);
+        }
+#endif
+    }
+    driver_.memRelease(allocation);
+    if (!exported) {
+        return nullptr;
+    }
+    auto storage = std::make_shared<const Buffer>(context_, std::move(exported), size, name,
+                                                  SharedFrom::OtherApi);
+    std::vector<std::int64_t> element(tensor.Shape().begin() + 1, tensor.Shape().end());
+    return std::make_unique<DeviceColumn>(
+        context_, std::move(storage), pointer - base, name, tensor.Type(), std::move(element),
+        static_cast<std::uint64_t>(tensor.Shape().front()), std::make_shared<const Tensor>(tensor));
+}
+
+std::optional<CudaDriver::Shareable> CudaDriver::AllocateShareable(int ordinal,
+                                                                   std::size_t bytes) const {
+    const AllocationProperties properties{.type = kPinned,
+                                          .requestedHandleTypes = kShareableHandle,
+                                          .location = {kOnDevice, ordinal},
+                                          .win32HandleMetaData = nullptr,
+                                          .allocFlags = {}};
+    std::size_t granule = 0;
+    if (memGetAllocationGranularity(&granule, &properties, kMinimumGranule) != 0) {
+        return std::nullopt;
+    }
+    Shareable allocation;
+    allocation.size = (std::max<std::size_t>(bytes, 1) + granule - 1) / granule * granule;
+    if (memCreate(&allocation.handle, allocation.size, &properties, 0) != 0) {
+        return std::nullopt;
+    }
+    if (memAddressReserve(&allocation.pointer, allocation.size, 0, 0, 0) != 0) {
+        memRelease(allocation.handle);
+        return std::nullopt;
+    }
+    const AccessDescription access{.location = {kOnDevice, ordinal}, .flags = kReadWrite};
+    if (memMap(allocation.pointer, allocation.size, 0, allocation.handle, 0) != 0 ||
+        memSetAccess(allocation.pointer, allocation.size, &access, 1) != 0) {
+        FreeShareable(allocation);
+        return std::nullopt;
+    }
+    return allocation;
+}
+
+void CudaDriver::FreeShareable(const Shareable& allocation) const {
+    memUnmap(allocation.pointer, allocation.size);
+    memAddressFree(allocation.pointer, allocation.size);
+    memRelease(allocation.handle);
+}
+
+CUdeviceptr CudaInterop::Allocate(std::size_t bytes) {
+    const Current current(*this);
+    const std::optional<CudaDriver::Shareable> allocation =
+        driver_.AllocateShareable(ordinal_, bytes);
+    if (!allocation) {
+        return 0;
+    }
+    const std::lock_guard lock(mutex_);
+    allocations_.emplace(allocation->pointer, *allocation);
+    return allocation->pointer;
+}
+
+void CudaInterop::Free(CUdeviceptr pointer) {
+    CudaDriver::Shareable allocation;
+    {
+        const std::lock_guard lock(mutex_);
+        const auto found = allocations_.find(pointer);
+        if (found == allocations_.end()) {
+            return;
+        }
+        allocation = found->second;
+        allocations_.erase(found);
+    }
+    const Current current(*this);
+    driver_.FreeShareable(allocation);
 }
 
 }  // namespace ernie

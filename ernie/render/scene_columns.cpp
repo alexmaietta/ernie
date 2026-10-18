@@ -86,27 +86,50 @@ SceneColumns::SceneColumns(DeviceContext& context, Arenas& arenas, const Scene& 
 
 SceneColumns::~SceneColumns() = default;
 
-const DeviceColumn& SceneColumns::Bind(BucketId bucket, std::string_view attribute) {
+SceneColumns::Host SceneColumns::HostColumn(BucketId bucket, std::string_view attribute) const {
     const PrimStore& store = scene_.Store();
     const std::optional<Token> token = store.Tokens().Find(attribute);
     const Column* column = token ? store.GetBucket(bucket).Find(*token) : nullptr;
     if (column == nullptr) {
         throw std::invalid_argument("The bucket has no column " + std::string(attribute));
     }
-    if (const Binding* bound = FindBinding(bucket, *token)) {
-        return *bound->column;
-    }
     const std::optional<DeviceElement> element = ToDeviceElement(column->values->Type());
     if (!element) {
         throw std::invalid_argument(std::string(attribute) +
                                     " holds values of no fixed size, which stay on the host");
     }
-    const std::uint32_t rows = store.GetBucket(bucket).Rows();
-    Binding& binding = bindings_.emplace_back(Binding{
-        bucket, *token, store.Version(),
-        std::make_unique<DeviceColumn>(arenas_, attribute, element->type, element->shape, rows),
-        DeviceBytes(*column->values, 0, rows)});
-    Upload(binding, 0, rows);
+    return {*token, column, *element, store.GetBucket(bucket).Rows()};
+}
+
+const DeviceColumn& SceneColumns::Bind(BucketId bucket, std::string_view attribute) {
+    const Host host = HostColumn(bucket, attribute);
+    if (const Binding* bound = FindBinding(bucket, host.attribute)) {
+        return *bound->column;
+    }
+    Binding& binding = bindings_.emplace_back(
+        Binding{bucket, host.attribute, scene_.Store().Version(),
+                std::make_unique<DeviceColumn>(arenas_, attribute, host.element.type,
+                                               host.element.shape, host.rows),
+                DeviceBytes(*host.column->values, 0, host.rows)});
+    Upload(binding, 0, host.rows);
+    return *binding.column;
+}
+
+const DeviceColumn& SceneColumns::Bind(BucketId bucket, std::string_view attribute,
+                                       std::unique_ptr<DeviceColumn> column) {
+    const Host host = HostColumn(bucket, attribute);
+    if (FindBinding(bucket, host.attribute) != nullptr) {
+        throw std::invalid_argument(std::string(attribute) + " is bound already");
+    }
+    if (column->Rows() != host.rows || column->Type() != host.element.type ||
+        column->Element() != host.element.shape) {
+        throw std::invalid_argument(column->Name() + " does not hold the bucket's " +
+                                    std::string(attribute) + " rows");
+    }
+    // The device's values stand; the shadow holds the host's, to tell its later edits apart.
+    Binding& binding = bindings_.emplace_back(
+        Binding{bucket, host.attribute, scene_.Store().Version(), std::move(column),
+                DeviceBytes(*host.column->values, 0, host.rows)});
     return *binding.column;
 }
 

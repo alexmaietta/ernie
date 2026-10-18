@@ -53,12 +53,28 @@ Buffer::Buffer(DeviceContext& context, std::uint64_t size, MemoryUse use, std::s
 }
 
 Buffer::Buffer(DeviceContext& context, ExternalHandle handle, std::uint64_t size,
-               std::string_view name)
+               std::string_view name, SharedFrom from)
     : allocator_(context.Allocator()), device_(context.Device()), shared_(true), size_(size) {
     RequireExternal(context);
     VmaAllocationInfo allocated{};
-    CreateImportedBuffer(allocator_, BufferInfo(size, 0), handle, buffer_, allocation_, allocated);
+    if (from == SharedFrom::Vulkan) {
+        CreateImportedBuffer(allocator_, BufferInfo(size, 0), handle, buffer_, allocation_,
+                             allocated);
+    } else {
+        CreateImportedBuffer(device_, context.Physical(), BufferInfo(size, 0), handle, buffer_,
+                             memory_);
+        allocated.size = size;
+    }
     Finish(context, allocated, name);
+}
+
+void Buffer::Destroy() {
+    if (memory_ != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device_, buffer_, nullptr);
+        vkFreeMemory(device_, memory_, nullptr);
+    } else if (buffer_ != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(allocator_, buffer_, allocation_);
+    }
 }
 
 void Buffer::Finish(DeviceContext& context, const VmaAllocationInfo& allocated,
@@ -76,9 +92,7 @@ void Buffer::Finish(DeviceContext& context, const VmaAllocationInfo& allocated,
 }
 
 Buffer::~Buffer() {
-    if (buffer_ != VK_NULL_HANDLE) {
-        vmaDestroyBuffer(allocator_, buffer_, allocation_);
-    }
+    Destroy();
 }
 
 Buffer::Buffer(Buffer&& other) noexcept {
@@ -87,14 +101,13 @@ Buffer::Buffer(Buffer&& other) noexcept {
 
 Buffer& Buffer::operator=(Buffer&& other) noexcept {
     if (this != &other) {
-        if (buffer_ != VK_NULL_HANDLE) {
-            vmaDestroyBuffer(allocator_, buffer_, allocation_);
-        }
+        Destroy();
         allocator_ = std::exchange(other.allocator_, VK_NULL_HANDLE);
         device_ = std::exchange(other.device_, VK_NULL_HANDLE);
         shared_ = std::exchange(other.shared_, false);
         buffer_ = std::exchange(other.buffer_, VK_NULL_HANDLE);
         allocation_ = std::exchange(other.allocation_, VK_NULL_HANDLE);
+        memory_ = std::exchange(other.memory_, VK_NULL_HANDLE);
         size_ = std::exchange(other.size_, 0);
         memorySize_ = std::exchange(other.memorySize_, 0);
         id_ = std::exchange(other.id_, 0);
@@ -116,6 +129,9 @@ void Buffer::Invalidate(std::uint64_t offset, std::uint64_t size) const {
 ExternalHandle Buffer::Export() const {
     if (!shared_) {
         throw DeviceError(DeviceErrorKind::Unsupported, "Only shared buffers can be exported");
+    }
+    if (memory_ != VK_NULL_HANDLE) {
+        return ExportMemory(device_, memory_, "a shared buffer");
     }
     VmaAllocationInfo allocated{};
     vmaGetAllocationInfo(allocator_, allocation_, &allocated);

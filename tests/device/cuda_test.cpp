@@ -157,5 +157,45 @@ TEST(CudaInterop, AssigningItsOwnViewCopiesNothingAndAnyOtherTensorCopiesOnce) {
     ExpectClean(*context);
 }
 
+TEST(CudaInterop, ExportableCudaMemoryIsSharedInPlace) {
+    ERNIE_CONTEXT(context);
+    ERNIE_CUDA(cuda, context);
+    const CudaDriver& driver = cuda->Driver();
+    const CudaInterop::Current current(*cuda);
+    const std::uint32_t worlds = 1000;
+    const CUdeviceptr poses = cuda->Allocate(worlds * 8 * sizeof(float));
+    ASSERT_NE(poses, 0u);
+    const Device gpu{DeviceKind::Cuda, cuda->Ordinal()};
+    // An offset inside the allocation, as a tensor viewing part of a larger one.
+    const Tensor tensor(reinterpret_cast<void*>(poses + 64), DType::Float32, {worlds - 2, 8}, {},
+                        gpu);
+
+    const Transfers before = context->Transfers();
+    const std::unique_ptr<DeviceColumn> column = cuda->Wrap(tensor, "poses");
+    ASSERT_TRUE(column);
+    EXPECT_TRUE(column->Adopted());
+    EXPECT_EQ(column->Rows(), worlds - 2);
+    EXPECT_EQ(column->Element(), (std::vector<std::int64_t>{8}));
+    EXPECT_EQ(column->Range().offset, 64u);
+    EXPECT_THROW(column->Resize(worlds, context->Main()), std::logic_error);
+
+    driver.Check(driver.memsetD32Async(poses + 64, std::bit_cast<unsigned int>(4.0f),
+                                       (worlds - 2) * 8, nullptr),
+                 "Writing in CUDA");
+    const Ticket written = cuda->Signal(nullptr);
+    EXPECT_EQ(Read(*context, *column, written), std::vector<float>((worlds - 2) * 8, 4.0f));
+    EXPECT_EQ(context->Transfers().copied, before.copied) << "Ernie read CUDA's own memory";
+
+    CUdeviceptr plain = 0;
+    driver.Check(driver.memAlloc(&plain, 4096), "Allocating in CUDA");
+    EXPECT_FALSE(cuda->Wrap(Tensor(reinterpret_cast<void*>(plain), DType::Float32, {1024}, {}, gpu),
+                            "plain"))
+        << "cudaMalloc memory cannot be shared";
+    driver.memFree(plain);
+    context->WaitIdle();
+    ExpectClean(*context, {test::kForeignImport});
+    // The column holds its memory until the device is done; the allocation goes after it.
+}
+
 }  // namespace
 }  // namespace ernie

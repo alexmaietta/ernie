@@ -9,6 +9,7 @@
 #endif
 
 #include "ernie/device/external.h"
+#include "ernie/util/on_failure.h"
 
 #include <string>
 #include <utility>
@@ -105,6 +106,53 @@ void CreateImportedBuffer(VmaAllocator allocator, const VkBufferCreateInfo& info
     // The memory owns the descriptor now.
     handle.Release();
 #endif
+}
+
+void CreateImportedBuffer(VkDevice device, VkPhysicalDevice physical,
+                          const VkBufferCreateInfo& info, ExternalHandle& handle, VkBuffer& buffer,
+                          VkDeviceMemory& memory) {
+    const std::string what = "Importing " + std::to_string(info.size) + " bytes";
+    const VkExternalMemoryBufferCreateInfo external{
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
+        .handleTypes = static_cast<VkExternalMemoryHandleTypeFlags>(kExternalMemoryType)};
+    VkBufferCreateInfo shared = info;
+    shared.pNext = &external;
+    CheckVk(vkCreateBuffer(device, &shared, nullptr, &buffer), what);
+    const OnFailure freeBuffer([&] { vkDestroyBuffer(device, buffer, nullptr); });
+    VkMemoryRequirements requirements{};
+    vkGetBufferMemoryRequirements(device, buffer, &requirements);
+    VkPhysicalDeviceMemoryProperties types{};
+    vkGetPhysicalDeviceMemoryProperties(physical, &types);
+    std::uint32_t type = 0;
+    while (type < types.memoryTypeCount &&
+           ((requirements.memoryTypeBits & (1u << type)) == 0 ||
+            (types.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) == 0)) {
+        ++type;
+    }
+    if (type == types.memoryTypeCount) {
+        throw DeviceError(DeviceErrorKind::Unsupported, what + ": no device-local memory fits");
+    }
+#if defined(_WIN32)
+    const VkImportMemoryWin32HandleInfoKHR imported{
+        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
+        .handleType = kExternalMemoryType,
+        .handle = reinterpret_cast<HANDLE>(handle.Get())};
+#else
+    const VkImportMemoryFdInfoKHR imported{.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
+                                           .handleType = kExternalMemoryType,
+                                           .fd = static_cast<int>(handle.Get())};
+#endif
+    const VkMemoryAllocateFlagsInfo flags{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+                                          .pNext = &imported,
+                                          .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT};
+    const VkMemoryAllocateInfo allocate{.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                                        .pNext = &flags,
+                                        .allocationSize = info.size,
+                                        .memoryTypeIndex = type};
+    CheckVk(vkAllocateMemory(device, &allocate, nullptr, &memory), what);
+    handle.Imported();
+    const OnFailure freeMemory([&] { vkFreeMemory(device, memory, nullptr); });
+    CheckVk(vkBindBufferMemory(device, buffer, memory, 0), what);
 }
 
 ExternalHandle ExportMemory(VkDevice device, VkDeviceMemory memory, std::string_view name) {

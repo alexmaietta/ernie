@@ -7,7 +7,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdlib>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -35,12 +37,21 @@ inline std::unique_ptr<DeviceContext> MakeContext(std::string_view device = {}) 
     }
 }
 
-/// Fails the test on any validation message.
-inline void ExpectClean(DeviceContext& context) {
+/// Fails the test on any validation message but those naming one of `ignored`.
+inline void ExpectClean(DeviceContext& context,
+                        std::initializer_list<std::string_view> ignored = {}) {
     for (const std::string& message : context.TakeValidationMessages()) {
-        ADD_FAILURE() << message;
+        if (std::ranges::none_of(ignored, [&](std::string_view id) {
+                return message.find(id) != std::string::npos;
+            })) {
+            ADD_FAILURE() << message;
+        }
     }
 }
+
+/// The layer checks imports of memory another API allocated against what Vulkan exported under
+/// the same file descriptor number, which the OS reuses once a handle is closed.
+inline constexpr std::string_view kForeignImport = "VUID-VkMemoryAllocateInfo-allocationSize-01742";
 
 }  // namespace ernie::test
 

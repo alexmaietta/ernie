@@ -8,6 +8,7 @@
 #include "ernie/util/tensor.h"
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -15,13 +16,21 @@
 
 namespace ernie {
 
-/// @brief Rows of one element shape in one range of device arenas. Kernels, and through export
-/// CUDA, Warp or PyTorch, write rows in place; nothing is mirrored on the host.
+/// @brief Rows of one element shape in device memory: a range of Ernie's arenas, or memory
+/// another API owns and shares in place. Kernels, and through export CUDA, Warp or PyTorch,
+/// write rows in place; nothing is mirrored on the host.
 class DeviceColumn {
   public:
     /// @param element The shape of one row, such as {4, 3} for a transform; empty for a scalar.
     DeviceColumn(Arenas& arenas, std::string_view name, DType type,
                  std::vector<std::int64_t> element, std::uint64_t rows);
+    /// @brief A column over memory it does not own, such as a CUDA tensor imported in place,
+    /// from `offset` in `storage`. It cannot grow; it keeps `owner` alive, and both until the
+    /// device is done with them.
+    DeviceColumn(DeviceContext& context, std::shared_ptr<const Buffer> storage,
+                 std::uint64_t offset, std::string_view name, DType type,
+                 std::vector<std::int64_t> element, std::uint64_t rows,
+                 std::shared_ptr<const void> owner = {});
     ~DeviceColumn();
     DeviceColumn(const DeviceColumn&) = delete;
     DeviceColumn& operator=(const DeviceColumn&) = delete;
@@ -31,6 +40,7 @@ class DeviceColumn {
     /// costs amortized constant time: the rows are copied to a new range on `queue` after
     /// `waits`, and the old one is freed once the copy is done.
     /// @return The copy's ticket; a default one when nothing was copied.
+    /// @throws std::logic_error when a column over another API's memory would grow.
     Ticket Resize(std::uint64_t rows, Queue& queue, std::span<const Ticket> waits = {});
 
     const std::string& Name() const {
@@ -55,22 +65,30 @@ class DeviceColumn {
     std::uint64_t RowBytes() const {
         return rowBytes_;
     }
-    /// @return The rows' range: (arena, offset) on every backend.
+    /// @return Whether the memory is another API's, shared in place.
+    bool Adopted() const {
+        return arenas_ == nullptr;
+    }
+    /// @return The rows' range: (arena, offset) on every backend; for adopted memory, the offset
+    /// in `Storage`.
     const BufferRange& Range() const {
         return range_;
     }
     const Buffer& Storage() const {
-        return arenas_.Storage(range_);
+        return arenas_ != nullptr ? arenas_->Storage(range_) : *storage_;
     }
     /// @return The first row's device address, as Vulkan shaders read it.
     VkDeviceAddress Address() const {
-        return arenas_.Address(range_);
+        return Storage().Address() + range_.offset;
     }
 
   private:
     BufferRange Allocate(std::uint64_t rows);
 
-    Arenas& arenas_;
+    Arenas* arenas_ = nullptr;
+    DeviceContext* context_ = nullptr;
+    std::shared_ptr<const Buffer> storage_;
+    std::shared_ptr<const void> owner_;
     std::string name_;
     DType type_;
     std::vector<std::int64_t> element_;

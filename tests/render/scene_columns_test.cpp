@@ -2,6 +2,7 @@
 /// @file scene_columns_test.cpp
 /// @brief Tests of scene columns on the device: they follow their buckets' swap-removes and
 /// additions without losing what the device wrote, and take what the host authors.
+#include "ernie/device/cuda.h"
 #include "ernie/render/scene_columns.h"
 #include "ernie/scene/schemas/geom.h"
 
@@ -9,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <bit>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -61,6 +63,54 @@ TEST(SceneColumns, FollowTheirBucketKeepingWhatTheDeviceWrote) {
     EXPECT_THROW(columns.Bind(bucket, "nonsense"), std::invalid_argument);
     context->WaitIdle();
     ExpectClean(*context);
+}
+
+TEST(SceneColumns, BindCudaMemoryInPlace) {
+    ERNIE_CONTEXT(context);
+    const std::unique_ptr<CudaInterop> cuda = CudaInterop::Create(*context);
+    if (!cuda) {
+        GTEST_SKIP() << "No CUDA device pairs with " << context->Info().name;
+    }
+    Scene scene;
+    PrimId first;
+    for (int i = 0; i < 1000; ++i) {
+        const PrimId ball = scene.Define("/Ball_" + std::to_string(i), "Sphere");
+        first = i == 0 ? ball : first;
+    }
+    const BucketId bucket = scene.Store().PrimBucket(first);
+
+    // A simulation's state, allocated and written by CUDA.
+    const CudaDriver& driver = cuda->Driver();
+    const CudaInterop::Current current(*cuda);
+    const CUdeviceptr radii = cuda->Allocate(1000 * sizeof(float));
+    driver.Check(driver.memsetD32Async(radii, std::bit_cast<unsigned int>(0.25f), 1000, nullptr),
+                 "Writing in CUDA");
+    const Ticket simulated = cuda->Signal(nullptr);
+    std::unique_ptr<DeviceColumn> wrapped =
+        cuda->Wrap(Tensor(reinterpret_cast<void*>(radii), DType::Float32, {1000}, {},
+                          Device{DeviceKind::Cuda, cuda->Ordinal()}),
+                   "radii");
+    ASSERT_TRUE(wrapped);
+
+    Arenas arenas(*context, MemoryUse::Device, "scene", 1 << 16);
+    SceneColumns columns(*context, arenas, scene);
+    const Transfers before = context->Transfers();
+    const DeviceColumn& bound = columns.Bind(bucket, Sphere::kRadius, std::move(wrapped));
+    EXPECT_TRUE(bound.Adopted());
+    EXPECT_EQ(Read(*context, bound, columns.Sync(std::span(&simulated, 1))),
+              std::vector<float>(1000, 0.25f))
+        << "the simulation's values stand";
+    EXPECT_EQ(context->Transfers().uploaded, before.uploaded) << "nothing went up";
+
+    scene.Set(first, Sphere::kRadius, 2.0);
+    std::vector<float> expected(1000, 0.25f);
+    expected[0] = 2.0f;
+    EXPECT_EQ(Read(*context, bound, columns.Sync()), expected) << "the host's edit lands";
+    EXPECT_EQ(context->Transfers().uploaded - before.uploaded, sizeof(float));
+    EXPECT_EQ(context->Transfers().copied, before.copied);
+    EXPECT_THROW(columns.Bind(bucket, Sphere::kRadius, nullptr), std::invalid_argument);
+    context->WaitIdle();
+    ExpectClean(*context, {test::kForeignImport});
 }
 
 TEST(SceneColumns, ConvertTheScenesDoublesToFloats) {

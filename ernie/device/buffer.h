@@ -26,6 +26,9 @@ enum class MemoryUse : std::uint8_t {
     Shared,
 };
 
+/// @brief Who allocated memory a buffer imports.
+enum class SharedFrom : std::uint8_t { Vulkan, OtherApi };
+
 /// @brief A buffer and its memory. Every buffer takes device-address and transfer usage, so
 /// shaders reach it by address and copies need no extra flags. Destroying one the GPU may still
 /// use is an error: hand it to `DeviceContext::Retire` instead.
@@ -35,11 +38,13 @@ class Buffer {
     /// @throws DeviceError when the memory cannot be allocated.
     Buffer(DeviceContext& context, std::uint64_t size, MemoryUse use, std::string_view name,
            VkBufferUsageFlags usage = 0);
-    /// @brief Imports a shared buffer of `size` bytes that another context exported, taking
-    /// `handle` where the platform does. It is a `MemoryUse::Shared` buffer on this context.
+    /// @brief Imports a shared buffer of `size` bytes, taking `handle` where the platform does.
+    /// It is a `MemoryUse::Shared` buffer on this context.
+    /// @param from Who allocated it: another Vulkan context's `Export`, or another API, such as
+    /// CUDA's virtual memory, whose allocations are not Vulkan's dedicated ones.
     /// @throws DeviceError when the device cannot import it.
-    Buffer(DeviceContext& context, ExternalHandle handle, std::uint64_t size,
-           std::string_view name);
+    Buffer(DeviceContext& context, ExternalHandle handle, std::uint64_t size, std::string_view name,
+           SharedFrom from = SharedFrom::Vulkan);
     ~Buffer();
     Buffer(Buffer&& other) noexcept;
     Buffer& operator=(Buffer&& other) noexcept;
@@ -80,12 +85,15 @@ class Buffer {
 
   private:
     void Finish(DeviceContext& context, const VmaAllocationInfo& allocated, std::string_view name);
+    void Destroy();
 
     VmaAllocator allocator_ = VK_NULL_HANDLE;
     VkDevice device_ = VK_NULL_HANDLE;
     bool shared_ = false;
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
+    /// Memory another API allocated, which VMA does not manage.
+    VkDeviceMemory memory_ = VK_NULL_HANDLE;
     std::uint64_t size_ = 0;
     std::uint64_t memorySize_ = 0;
     std::uint64_t id_ = 0;

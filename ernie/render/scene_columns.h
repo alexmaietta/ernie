@@ -47,6 +47,13 @@ class SceneColumns {
     /// @throws std::invalid_argument when the bucket has no such column, or its type has no
     /// device element.
     const DeviceColumn& Bind(BucketId bucket, std::string_view attribute);
+    /// @brief Puts a bucket's column of `attribute` on the device in `column`, such as a CUDA,
+    /// PyTorch or Warp tensor wrapped in place (`CudaInterop::Wrap`): its values are what the
+    /// device holds, not the scene's, and values the host authors later still overwrite them.
+    /// @throws std::invalid_argument unless `column` has the bucket's rows and the attribute's
+    /// device element, or when the attribute is bound already.
+    const DeviceColumn& Bind(BucketId bucket, std::string_view attribute,
+                             std::unique_ptr<DeviceColumn> column);
     /// @return The bucket's device column of `attribute`, or null when it is not bound.
     const DeviceColumn* Find(BucketId bucket, std::string_view attribute) const;
     /// @brief Follows the scene's changes since the last sync, after `waits`.
@@ -63,6 +70,17 @@ class SceneColumns {
         std::vector<std::byte> shadow;
     };
 
+    /// A bucket's host column of an attribute, and its device element.
+    struct Host {
+        AttributeId attribute = 0;
+        const Column* column = nullptr;
+        DeviceElement element;
+        std::uint32_t rows = 0;
+    };
+
+    /// @throws std::invalid_argument when the bucket has no such column, or it has no device
+    /// element.
+    Host HostColumn(BucketId bucket, std::string_view attribute) const;
     /// Uploads rows [begin, end) of the binding's shadow.
     void Upload(const Binding& binding, std::uint32_t begin, std::uint32_t end);
     /// Uploads sorted rows, a run at a time.
