@@ -33,8 +33,8 @@ struct ViewerOptions {
     std::string device;
     /// The Khronos validation layer, when installed.
     bool validation = false;
-    /// Wait for the display's refresh.
-    bool vsync = true;
+    /// Wait for the display's refresh; off by default, so frames show what they cost.
+    bool vsync = false;
     ShellOptions shell;
 };
 

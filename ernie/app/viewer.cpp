@@ -158,7 +158,7 @@ bool Viewer::Step() {
 
 std::string_view ViewUsage() {
     return "ernie [view] [SCENE.json] [--offscreen] [--frames N] [--size WxH] [--device NAME]\n"
-           "             [--validation] [--no-vsync] [--profile]";
+           "             [--validation] [--vsync] [--profile]";
 }
 
 ViewCommand ParseViewCommand(std::span<const std::string_view> arguments) {
@@ -182,8 +182,8 @@ ViewCommand ParseViewCommand(std::span<const std::string_view> arguments) {
             viewer.device = value();
         } else if (argument == "--validation") {
             viewer.validation = true;
-        } else if (argument == "--no-vsync") {
-            viewer.vsync = false;
+        } else if (argument == "--vsync") {
+            viewer.vsync = true;
         } else if (argument == "--profile") {
             viewer.shell.profile = true;
         } else if (argument.starts_with("-")) {
