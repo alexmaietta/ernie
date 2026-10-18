@@ -103,6 +103,8 @@ class Acceleration : public ::testing::Test {
     }
     void TearDown() override {
         if (context_) {
+            // Its last uploads are flushed before the wait, so none outlives the buffers.
+            uploader_.reset();
             context_->WaitIdle();
             ExpectClean(*context_);
         }
