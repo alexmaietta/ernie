@@ -86,6 +86,7 @@ ernie_add_test_suite(
         device/cuda_test.cpp
         device/external_test.cpp
         device/kernel_test.cpp
+        device/profile_test.cpp
         device/vulkan_devices_test.cpp
     LIBRARIES ernie_static ernie_volk ernie_vma
 )

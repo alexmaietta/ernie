@@ -3,7 +3,8 @@
 /// @brief Ernie's in-process CPU and GPU zone profiler, its zone macros, and averaged reports.
 ///
 /// Records `ERNIE_ZONE` frame by frame for the Profiler panel, and with -DERNIE_TRACY=ON for
-/// Tracy too; `ERNIE_GPU_ZONE` reaches Tracy only, until `AddGpuZone` has a GPU timer feeding it.
+/// Tracy too; `ERNIE_GPU_ZONE` times commands with timestamp queries the device context reads
+/// back into `AddGpuZone`, and reaches Tracy too.
 /// Off until `SetEnabled`; a zone then costs one atomic load. CPU zones belong to the frame they
 /// end in; GPU zones to the frame that recorded their commands. Reports average frames into zone
 /// trees, modelled on Omniverse Kit's profiler window, and export text, JSON and Chrome traces. GPU
@@ -53,8 +54,8 @@ struct Zone {
 };
 
 /// @brief One frame's zones.
-/// CPU times use the steady clock (`Now`); GPU times use the
-/// device's timestamp clock and compare only with each other.
+/// CPU times use the steady clock (`Now`). GPU times are converted to it: calibrated where the
+/// device reads its clock with the host's, else aligned to when the first GPU zone was recorded.
 struct Frame {
     /// The frame's index.
     std::uint64_t index = 0;
