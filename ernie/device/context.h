@@ -26,11 +26,13 @@ struct DeviceContextOptions {
     std::vector<std::string> instanceExtensions;
 };
 
-/// @brief Bytes moved between the host and the device through staging.
-struct HostTransfers {
+/// @brief Bulk bytes moved: between the host and the device through staging, and copied on the
+/// device because another API's memory could not be shared.
+struct Transfers {
     std::uint64_t uploaded = 0;
     std::uint64_t readBack = 0;
-    bool operator==(const HostTransfers&) const = default;
+    std::uint64_t copied = 0;
+    bool operator==(const Transfers&) const = default;
 };
 
 /// @brief One device. Nothing is global: two contexts in a process, on one device or two, keep
@@ -82,16 +84,19 @@ class DeviceContext {
     /// @brief Waits for every queue, then frees everything retired.
     void WaitIdle();
 
-    /// @return The bytes uploaded and read back since the context was created, so a step can be
-    /// checked to move no bulk data through the host.
-    HostTransfers Transfers() const {
-        return {uploaded_.load(), readBack_.load()};
+    /// @return The bulk bytes moved since the context was created, so a step can be checked to
+    /// copy nothing.
+    ernie::Transfers Transfers() const {
+        return {uploaded_.load(), readBack_.load(), copied_.load()};
     }
     void CountUpload(std::uint64_t bytes) {
         uploaded_ += bytes;
     }
     void CountReadback(std::uint64_t bytes) {
         readBack_ += bytes;
+    }
+    void CountCopy(std::uint64_t bytes) {
+        copied_ += bytes;
     }
 
     /// @brief Names a Vulkan object for validation messages, captures and crash reports.
@@ -134,6 +139,7 @@ class DeviceContext {
     std::vector<Retired> retired_;
     std::atomic<std::uint64_t> uploaded_ = 0;
     std::atomic<std::uint64_t> readBack_ = 0;
+    std::atomic<std::uint64_t> copied_ = 0;
 };
 
 }  // namespace ernie

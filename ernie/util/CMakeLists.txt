@@ -4,6 +4,7 @@ add_library(
     OBJECT
     disk_cache.cpp
     file.cpp
+    library.cpp
     log.cpp
     noise.cpp
     profiler.cpp
@@ -21,7 +22,7 @@ target_link_libraries(
     PRIVATE ernie_json ernie_build_options
 )
 find_package(Threads REQUIRED)
-target_link_libraries(ernie_util PUBLIC Threads::Threads)
+target_link_libraries(ernie_util PUBLIC Threads::Threads PRIVATE ${CMAKE_DL_LIBS})
 set_source_files_properties(
     version.cpp
     PROPERTIES

@@ -1,0 +1,306 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/// @file cuda.cpp
+/// @brief Loading the CUDA driver, pairing devices by UUID, and importing Ernie's memory and
+/// timelines into CUDA.
+#include "ernie/device/cuda.h"
+
+#include "ernie/util/text.h"
+
+#include <cstring>
+#include <stdexcept>
+
+namespace ernie {
+namespace {
+
+// The driver API's descriptor layouts, as cuda.h's _v1 structs declare them.
+struct MemoryHandleDesc {
+    int type;
+    union {
+        int fd;
+        struct {
+            void* handle;
+            const void* name;
+        } win32;
+        const void* nvSciBufObject;
+    } handle;
+    unsigned long long size;
+    unsigned int flags;
+    unsigned int reserved[16];
+};
+struct BufferDesc {
+    unsigned long long offset;
+    unsigned long long size;
+    unsigned int flags;
+    unsigned int reserved[16];
+};
+struct SemaphoreHandleDesc {
+    int type;
+    union {
+        int fd;
+        struct {
+            void* handle;
+            const void* name;
+        } win32;
+        const void* nvSciSyncObj;
+    } handle;
+    unsigned int flags;
+    unsigned int reserved[16];
+};
+struct SemaphoreSignalParams {
+    struct {
+        struct {
+            unsigned long long value;
+        } fence;
+        union {
+            void* fence;
+            unsigned long long reserved;
+        } nvSciSync;
+        struct {
+            unsigned long long key;
+        } keyedMutex;
+        unsigned int reserved[12];
+    } params;
+    unsigned int flags;
+    unsigned int reserved[16];
+};
+struct SemaphoreWaitParams {
+    struct {
+        struct {
+            unsigned long long value;
+        } fence;
+        union {
+            void* fence;
+            unsigned long long reserved;
+        } nvSciSync;
+        struct {
+            unsigned long long key;
+            unsigned int timeoutMs;
+        } keyedMutex;
+        unsigned int reserved[10];
+    } params;
+    unsigned int flags;
+    unsigned int reserved[16];
+};
+
+#if defined(_WIN32)
+constexpr int kMemoryHandleType = 2;  // CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32
+constexpr int kSemaphoreHandleType =
+    10;  // CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_TIMELINE_SEMAPHORE_WIN32
+#else
+constexpr int kMemoryHandleType = 1;     // CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD
+constexpr int kSemaphoreHandleType = 9;  // CU_EXTERNAL_SEMAPHORE_HANDLE_TYPE_TIMELINE_SEMAPHORE_FD
+#endif
+constexpr unsigned int kDedicated = 1;  // CUDA_EXTERNAL_MEMORY_DEDICATED
+
+/// Fills a descriptor's handle from an exported one, which CUDA takes where the platform does.
+template <typename Desc> void SetHandle(Desc& desc, const ExternalHandle& handle) {
+#if defined(_WIN32)
+    desc.handle.win32.handle = reinterpret_cast<void*>(handle.Get());
+#else
+    desc.handle.fd = static_cast<int>(handle.Get());
+#endif
+}
+
+void Taken(ExternalHandle& handle) {
+#if !defined(_WIN32)
+    handle.Release();
+#else
+    static_cast<void>(handle);
+#endif
+}
+
+bool LoadDriver(CudaDriver& d) {
+    if (!d.library.Open({"libcuda.so.1", "libcuda.so", "nvcuda.dll"})) {
+        return false;
+    }
+    const SharedLibrary& l = d.library;
+    return l.Load(d.init, "cuInit") && l.Load(d.deviceGetCount, "cuDeviceGetCount") &&
+           l.Load(d.deviceGet, "cuDeviceGet") && l.Load(d.deviceGetUuid, "cuDeviceGetUuid_v2") &&
+           l.Load(d.primaryCtxRetain, "cuDevicePrimaryCtxRetain") &&
+           l.Load(d.primaryCtxRelease, "cuDevicePrimaryCtxRelease_v2") &&
+           l.Load(d.ctxPushCurrent, "cuCtxPushCurrent_v2") &&
+           l.Load(d.ctxPopCurrent, "cuCtxPopCurrent_v2") &&
+           l.Load(d.importExternalMemory, "cuImportExternalMemory") &&
+           l.Load(d.externalMemoryGetMappedBuffer, "cuExternalMemoryGetMappedBuffer") &&
+           l.Load(d.destroyExternalMemory, "cuDestroyExternalMemory") &&
+           l.Load(d.importExternalSemaphore, "cuImportExternalSemaphore") &&
+           l.Load(d.signalExternalSemaphoresAsync, "cuSignalExternalSemaphoresAsync") &&
+           l.Load(d.waitExternalSemaphoresAsync, "cuWaitExternalSemaphoresAsync") &&
+           l.Load(d.destroyExternalSemaphore, "cuDestroyExternalSemaphore") &&
+           l.Load(d.memFree, "cuMemFree_v2") && l.Load(d.memAlloc, "cuMemAlloc_v2") &&
+           l.Load(d.memcpyDtoDAsync, "cuMemcpyDtoDAsync_v2") &&
+           l.Load(d.memcpyDtoH, "cuMemcpyDtoH_v2") &&
+           l.Load(d.memsetD32Async, "cuMemsetD32Async") &&
+           l.Load(d.streamSynchronize, "cuStreamSynchronize") &&
+           l.Load(d.getErrorString, "cuGetErrorString") && d.init(0) == 0;
+}
+
+}  // namespace
+
+const CudaDriver* CudaDriver::Get() {
+    static const std::unique_ptr<CudaDriver> driver = [] {
+        auto loaded = std::make_unique<CudaDriver>();
+        return LoadDriver(*loaded) ? std::move(loaded) : nullptr;
+    }();
+    return driver.get();
+}
+
+void CudaDriver::Check(CUresult result, std::string_view what) const {
+    if (result != 0) {
+        const char* message = nullptr;
+        getErrorString(result, &message);
+        throw DeviceError(DeviceErrorKind::Failed,
+                          std::string(what) + ": " + (message ? message : "CUDA error"));
+    }
+}
+
+CudaInterop::Current::Current(const CudaInterop& interop) : driver_(interop.driver_) {
+    driver_.Check(driver_.ctxPushCurrent(interop.cuda_), "Making the CUDA context current");
+}
+
+CudaInterop::Current::~Current() {
+    CUcontext popped = nullptr;
+    driver_.ctxPopCurrent(&popped);
+}
+
+std::unique_ptr<CudaInterop> CudaInterop::Create(DeviceContext& context) {
+    const CudaDriver* driver = CudaDriver::Get();
+    const DeviceCapabilities& capabilities = context.Capabilities();
+    if (driver == nullptr || !capabilities.externalMemory || !capabilities.externalTimeline) {
+        return nullptr;
+    }
+    int count = 0;
+    driver->Check(driver->deviceGetCount(&count), "Counting CUDA devices");
+    for (int ordinal = 0; ordinal < count; ++ordinal) {
+        CUdevice device = 0;
+        unsigned char uuid[16] = {};
+        if (driver->deviceGet(&device, ordinal) == 0 && driver->deviceGetUuid(uuid, device) == 0 &&
+            Hex(uuid, sizeof(uuid)) == context.Info().uuid) {
+            return std::unique_ptr<CudaInterop>(new CudaInterop(context, *driver, device, ordinal));
+        }
+    }
+    return nullptr;
+}
+
+CudaInterop::CudaInterop(DeviceContext& context, const CudaDriver& driver, CUdevice device,
+                         int ordinal)
+    : context_(context), driver_(driver), device_(device), ordinal_(ordinal),
+      signals_(context.Device(), "CUDA streams", true) {
+    // The primary context, which PyTorch, Warp and the runtime API share.
+    driver_.Check(driver_.primaryCtxRetain(&cuda_, device_), "Retaining the CUDA context");
+    Import(signals_);
+}
+
+CudaInterop::~CudaInterop() {
+    {
+        const Current current(*this);
+        for (const auto& [buffer, mapping] : mappings_) {
+            driver_.memFree(mapping.pointer);
+            driver_.destroyExternalMemory(mapping.memory);
+        }
+        for (const auto& [timeline, semaphore] : semaphores_) {
+            driver_.destroyExternalSemaphore(semaphore);
+        }
+    }
+    driver_.primaryCtxRelease(device_);
+}
+
+CUdeviceptr CudaInterop::Map(const Buffer& buffer) {
+    const std::lock_guard lock(mutex_);
+    const auto found = mappings_.find(buffer.Handle());
+    if (found != mappings_.end()) {
+        return found->second.pointer;
+    }
+    ExternalHandle handle = buffer.Export();
+    MemoryHandleDesc memory{.type = kMemoryHandleType,
+                            .handle = {},
+                            .size = buffer.MemorySize(),
+                            .flags = kDedicated,
+                            .reserved = {}};
+    SetHandle(memory, handle);
+    const Current current(*this);
+    Mapping mapping;
+    driver_.Check(driver_.importExternalMemory(&mapping.memory, &memory),
+                  "Importing memory into CUDA");
+    Taken(handle);
+    const BufferDesc whole{.offset = 0, .size = buffer.Size(), .flags = 0, .reserved = {}};
+    driver_.Check(driver_.externalMemoryGetMappedBuffer(&mapping.pointer, mapping.memory, &whole),
+                  "Mapping memory in CUDA");
+    mappings_.emplace(buffer.Handle(), mapping);
+    return mapping.pointer;
+}
+
+CUexternalSemaphore CudaInterop::Import(const Timeline& timeline) {
+    const auto found = semaphores_.find(&timeline);
+    if (found != semaphores_.end()) {
+        return found->second;
+    }
+    ExternalHandle handle = timeline.Export();
+    SemaphoreHandleDesc desc{
+        .type = kSemaphoreHandleType, .handle = {}, .flags = 0, .reserved = {}};
+    SetHandle(desc, handle);
+    const Current current(*this);
+    CUexternalSemaphore semaphore = nullptr;
+    driver_.Check(driver_.importExternalSemaphore(&semaphore, &desc),
+                  "Importing " + timeline.Name() + " into CUDA");
+    Taken(handle);
+    semaphores_.emplace(&timeline, semaphore);
+    return semaphore;
+}
+
+Tensor CudaInterop::View(const DeviceColumn& column) {
+    const CUdeviceptr base = Map(column.Storage());
+    std::vector<std::int64_t> shape{static_cast<std::int64_t>(column.Rows())};
+    shape.insert(shape.end(), column.Element().begin(), column.Element().end());
+    return Tensor(reinterpret_cast<void*>(base + column.Range().offset), column.Type(),
+                  std::move(shape), {}, Device{DeviceKind::Cuda, ordinal_});
+}
+
+void CudaInterop::Wait(CUstream stream, const Ticket& ticket) {
+    if (ticket.Done()) {
+        return;
+    }
+    SemaphoreWaitParams wait{};
+    wait.params.fence.value = ticket.value;
+    const std::lock_guard lock(mutex_);
+    const CUexternalSemaphore semaphore = Import(*ticket.timeline);
+    const Current current(*this);
+    driver_.Check(driver_.waitExternalSemaphoresAsync(&semaphore, &wait, 1, stream),
+                  "Waiting on " + ticket.timeline->Name() + " in CUDA");
+}
+
+Ticket CudaInterop::Signal(CUstream stream) {
+    const std::lock_guard lock(mutex_);
+    SemaphoreSignalParams signal{};
+    signal.params.fence.value = ++signalled_;
+    const CUexternalSemaphore semaphore = semaphores_.at(&signals_);
+    const Current current(*this);
+    driver_.Check(driver_.signalExternalSemaphoresAsync(&semaphore, &signal, 1, stream),
+                  "Signalling from CUDA");
+    return signals_.At(signalled_);
+}
+
+Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUstream stream) {
+    const std::uint64_t bytes = column.Rows() * column.RowBytes();
+    if (tensor.Location() != Device{DeviceKind::Cuda, ordinal_} || !tensor.IsContiguous() ||
+        static_cast<std::uint64_t>(tensor.Elements()) * ByteSize(tensor.Type()) != bytes) {
+        throw std::invalid_argument(
+            "Assigning " + column.Name() +
+            " takes a contiguous tensor of its size on cuda:" + std::to_string(ordinal_));
+    }
+    const CUdeviceptr rows = Map(column.Storage()) + column.Range().offset;
+    const auto source = reinterpret_cast<CUdeviceptr>(tensor.Data());
+    if (source != rows) {
+        // After Ernie's work that may still read the rows.
+        for (const Queue* queue : context_.Queues()) {
+            Wait(stream, queue->Last());
+        }
+        const Current current(*this);
+        driver_.Check(driver_.memcpyDtoDAsync(rows, source, bytes, stream),
+                      "Copying a tensor into " + column.Name());
+        context_.CountCopy(bytes);
+    }
+    return Signal(stream);
+}
+
+}  // namespace ernie

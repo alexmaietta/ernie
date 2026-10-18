@@ -7,6 +7,7 @@
 #include "ernie/device/external.h"
 #include "ernie/device/instance.h"
 #include "ernie/util/algorithm.h"
+#include "ernie/util/text.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -74,16 +75,6 @@ VulkanDeviceType ToDeviceType(VkPhysicalDeviceType type) {
     default:
         return VulkanDeviceType::Other;
     }
-}
-
-std::string Hex(const std::uint8_t* bytes, std::size_t count) {
-    std::string text;
-    for (std::size_t i = 0; i < count; ++i) {
-        std::array<char, 3> digits{};
-        std::snprintf(digits.data(), digits.size(), "%02x", bytes[i]);
-        text += digits.data();
-    }
-    return text;
 }
 
 }  // namespace

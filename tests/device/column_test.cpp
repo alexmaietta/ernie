@@ -57,7 +57,7 @@ TEST(DeviceColumn, AnRlStepMovesNoBulkBytesThroughTheHost) {
     const std::uint32_t worlds = 16'384;
     test::RlStep rl(*context, compiler, worlds);
 
-    const HostTransfers before = context->Transfers();
+    const Transfers before = context->Transfers();
     Ticket stepped;
     for (std::uint32_t step = 1; step <= 10; ++step) {
         stepped = rl.Step(step);

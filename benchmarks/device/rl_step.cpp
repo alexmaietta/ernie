@@ -27,7 +27,7 @@ const bool kRlStep = Register("device.rl_step.poses_16k", [] {
         ticket.Wait();
     };
     run();
-    const HostTransfers before = context->Transfers();
+    const Transfers before = context->Transfers();
     const double ms = Fastest([] {}, run, 20);
     if (context->Transfers() != before) {
         std::printf("device.rl_step.poses_16k moved bytes through the host\n");

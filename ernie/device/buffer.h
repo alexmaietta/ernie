@@ -69,6 +69,10 @@ class Buffer {
     /// size. Each call returns a new handle.
     /// @throws DeviceError unless the buffer is `MemoryUse::Shared`.
     ExternalHandle Export() const;
+    /// @return The size of the buffer's memory, at least `Size`: what an importer maps.
+    std::uint64_t MemorySize() const {
+        return memorySize_;
+    }
 
   private:
     void Finish(DeviceContext& context, const VmaAllocationInfo& allocated, std::string_view name);
@@ -79,6 +83,7 @@ class Buffer {
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     std::uint64_t size_ = 0;
+    std::uint64_t memorySize_ = 0;
     VkDeviceAddress address_ = 0;
     std::span<std::byte> mapped_;
 };

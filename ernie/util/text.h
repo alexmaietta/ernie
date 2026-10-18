@@ -47,6 +47,17 @@ inline std::string ToLower(std::string_view text) {
     return lower;
 }
 
+/// @return `count` bytes as lower-case hex digits, two per byte.
+inline std::string Hex(const unsigned char* bytes, std::size_t count) {
+    static constexpr char kDigits[] = "0123456789abcdef";
+    std::string text;
+    for (std::size_t i = 0; i < count; ++i) {
+        text += kDigits[bytes[i] >> 4];
+        text += kDigits[bytes[i] & 15];
+    }
+    return text;
+}
+
 /// @return `number` as short text: "170" or "0.01", not "170.000000".
 inline std::string ToText(double number) {
     std::ostringstream text;
