@@ -7,6 +7,8 @@
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <algorithm>
 #include <stdexcept>
 #include <string>
@@ -54,6 +56,134 @@ public Affine Mul(Affine a, Affine b) {
 }
 )"};
 
+// Double-float arithmetic after Dekker (1971) and Hida, Li and Bailey's QD library (2001):
+// error-free sums and Veltkamp-split products, about 48 bits of mantissa from pairs of floats.
+// `precise` keeps every step as written (SPIR-V NoContraction).
+const ShaderModule kDoubleFloat{"double_float", R"(
+import affine;
+
+/// Four values, each the unevaluated sum of a high float and a low one.
+public struct Double4 {
+    public float4 hi;
+    public float4 lo;
+};
+
+Double4 Pair(float4 hi, float4 lo) {
+    Double4 d;
+    d.hi = hi;
+    d.lo = lo;
+    return d;
+}
+
+/// The sum and its rounding error, for any a and b.
+Double4 TwoSum(float4 a, float4 b) {
+    precise float4 s = a + b;
+    precise float4 v = s - a;
+    precise float4 e = (a - (s - v)) + (b - v);
+    return Pair(s, e);
+}
+
+/// The sum renormalised, for |a| >= |b|.
+Double4 QuickTwoSum(float4 a, float4 b) {
+    precise float4 s = a + b;
+    precise float4 e = b - (s - a);
+    return Pair(s, e);
+}
+
+public Double4 Add(Double4 a, Double4 b) {
+    Double4 s = TwoSum(a.hi, b.hi);
+    precise float4 e = s.lo + (a.lo + b.lo);
+    return QuickTwoSum(s.hi, e);
+}
+
+/// Veltkamp's split of each float into two 12-bit halves, whose products are exact.
+void Halves(float4 a, out float4 high, out float4 low) {
+    precise float4 c = 4097.0 * a;
+    precise float4 big = c - a;
+    precise float4 h = c - big;
+    precise float4 l = a - h;
+    high = h;
+    low = l;
+}
+
+/// The product and its rounding error, without fused multiply-adds: Vulkan and WebGPU do not
+/// promise `fma` rounds once.
+Double4 TwoProduct(float4 a, float4 b) {
+    float4 ah, al, bh, bl;
+    Halves(a, ah, al);
+    Halves(b, bh, bl);
+    precise float4 p = a * b;
+    precise float4 e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+    return Pair(p, e);
+}
+
+/// `a` times the double-float scalar `hi + lo`.
+public Double4 Scale(Double4 a, float hi, float lo) {
+    Double4 p = TwoProduct(a.hi, float4(hi));
+    precise float4 e = p.lo + (a.hi * lo + a.lo * hi);
+    return QuickTwoSum(p.hi, e);
+}
+
+/// A 3x4 affine transform's rows in double-float.
+public struct DoubleAffine {
+    public Double4 rows[3];
+};
+
+public DoubleAffine Promote(Affine m) {
+    DoubleAffine d;
+    for (uint r = 0; r < 3; ++r) {
+        d.rows[r] = Pair(m.rows[r], float4(0));
+    }
+    return d;
+}
+
+public DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
+    DoubleAffine c;
+    for (uint r = 0; r < 3; ++r) {
+        Double4 row = a.rows[r];
+        Double4 sum = Pair(float4(0, 0, 0, row.hi.w), float4(0, 0, 0, row.lo.w));
+        sum = Add(sum, Scale(b.rows[0], row.hi.x, row.lo.x));
+        sum = Add(sum, Scale(b.rows[1], row.hi.y, row.lo.y));
+        c.rows[r] = Add(sum, Scale(b.rows[2], row.hi.z, row.lo.z));
+    }
+    return c;
+}
+
+/// Six float4 a transform: its high rows, then its low rows.
+public DoubleAffine LoadDouble(float4* matrices, uint index) {
+    DoubleAffine m;
+    for (uint r = 0; r < 3; ++r) {
+        m.rows[r] = Pair(matrices[6 * index + r], matrices[6 * index + 3 + r]);
+    }
+    return m;
+}
+
+public void StoreDouble(float4* matrices, uint index, DoubleAffine m) {
+    for (uint r = 0; r < 3; ++r) {
+        matrices[6 * index + r] = m.rows[r].hi;
+        matrices[6 * index + 3 + r] = m.rows[r].lo;
+    }
+}
+
+public Affine Round(DoubleAffine m) {
+    Affine f;
+    for (uint r = 0; r < 3; ++r) {
+        f.rows[r] = m.rows[r].hi + m.rows[r].lo;
+    }
+    return f;
+}
+)"};
+
+const ShaderModule kWorld{"world", R"(
+import affine;
+import double_float;
+
+/// A slot's world transform relative to the render origin, as float rows.
+public Affine LoadWorld(float4* worlds, uint slot) {
+    return Round(LoadDouble(worlds, slot));
+}
+)"};
+
 // A program's op kinds: a folded constant, then each `XformOpKind` after it.
 constexpr std::uint32_t kConstant = 0;
 constexpr std::uint32_t kInvert = 1;
@@ -85,8 +215,9 @@ ShaderModule OpConstants() {
 
 const ShaderModule kLocal{"local", R"(
 import affine;
+import double_float;
 import ops;
-struct Op { uint kind; uint flags; float* source; float4 constant[3]; };
+struct Op { uint kind; uint flags; float* source; float4 hi[3]; float4 lo[3]; };
 struct Parameters { uint* slots; Op* programs; uint* lengths; float4* locals; uint count; };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
@@ -126,13 +257,12 @@ Affine Inverse(Affine m) {
     return result;
 }
 
+/// A bound op's matrix from the floats it reads.
 Affine OpMatrix(Op op) {
     Affine m = Identity();
     float* v = op.source;
     uint floats = (op.flags >> kFloatsShift) & 0xff;
-    if (op.kind == kConstant) {
-        m.rows = op.constant;
-    } else if (op.kind == kTranslate) {
+    if (op.kind == kTranslate) {
         m.rows[0].w = v[0];
         m.rows[1].w = v[1];
         m.rows[2].w = v[2];
@@ -165,6 +295,19 @@ Affine OpMatrix(Op op) {
     return (op.flags & kInvert) != 0 ? Inverse(m) : m;
 }
 
+/// An op's matrix: a folded constant exactly as the host split it, a bound op from its floats.
+DoubleAffine OpDoubleMatrix(Op op) {
+    if (op.kind != kConstant) {
+        return Promote(OpMatrix(op));
+    }
+    DoubleAffine m;
+    for (uint r = 0; r < 3; ++r) {
+        m.rows[r].hi = op.hi[r];
+        m.rows[r].lo = op.lo[r];
+    }
+    return m;
+}
+
 /// One thread a programmed node, its program at its place in the list.
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -173,16 +316,17 @@ void main(uint3 id : SV_DispatchThreadID) {
     if (at >= parameters.count) {
         return;
     }
-    Affine local = Identity();
+    DoubleAffine local = Promote(Identity());
     for (uint k = 0; k < parameters.lengths[at]; ++k) {
-        local = Mul(local, OpMatrix(parameters.programs[at * kMaxOps + k]));
+        local = Mul(local, OpDoubleMatrix(parameters.programs[at * kMaxOps + k]));
     }
-    Store(parameters.locals, parameters.slots[at], local);
+    StoreDouble(parameters.locals, parameters.slots[at], local);
 }
 )"};
 
 const ShaderModule kCompose{"compose", R"(
 import affine;
+import double_float;
 import ops;
 struct Parameters { uint* slots; uint* parents; float4* locals; float4* worlds; uint count; };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
@@ -195,9 +339,9 @@ void main(uint3 id : SV_DispatchThreadID) {
     }
     uint slot = parameters.slots[id.x];
     uint parent = parameters.parents[slot];
-    Affine local = Load(parameters.locals, slot);
-    Store(parameters.worlds, slot,
-          parent == kNone ? local : Mul(Load(parameters.worlds, parent), local));
+    DoubleAffine local = LoadDouble(parameters.locals, slot);
+    StoreDouble(parameters.worlds, slot,
+                parent == kNone ? local : Mul(LoadDouble(parameters.worlds, parent), local));
 }
 )"};
 
@@ -209,24 +353,28 @@ struct ComposeParameters {
     VkDeviceAddress slots, parents, locals, worlds;
     std::uint32_t count, pad;
 };
-static_assert(sizeof(TransformGraph::DeviceOp) == 64);
+static_assert(sizeof(TransformGraph::DeviceOp) == 112);
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler, const ShaderModule& kernel) {
-    const std::array modules{kAffine, OpConstants(), kernel};
+    const std::array modules{kAffine, kDoubleFloat, OpConstants(), kernel};
     return compiler.Spirv(modules, "main");
 }
 
-TransformGraph::Rows12 TopRows(const glm::dmat4& m) {
-    TransformGraph::Rows12 rows{};
+/// @return A transform's top three rows, each value split exactly into a high and a low float.
+TransformGraph::SplitRows Split(const glm::dmat4& m) {
+    TransformGraph::SplitRows rows{};
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
-            rows[static_cast<std::size_t>(r * 4 + c)] = static_cast<float>(m[c][r]);
+            const auto at = static_cast<std::size_t>(r * 4 + c);
+            const double value = m[c][r];
+            rows[at] = static_cast<float>(value);
+            rows[12 + at] = static_cast<float>(value - static_cast<double>(rows[at]));
         }
     }
     return rows;
 }
 
-const TransformGraph::Rows12 kIdentity = TopRows(glm::dmat4(1.0));
+const TransformGraph::SplitRows kIdentity = Split(glm::dmat4(1.0));
 
 /// @return Whether a bound column's rows of `floats` floats can hold the op's value.
 bool TakesFloats(XformOpKind kind, std::int64_t floats) {
@@ -271,10 +419,11 @@ TransformGraph::TransformGraph(DeviceContext& context, Arenas& arenas, const Sce
         return std::make_unique<DeviceColumn>(arenas, name, type, std::move(element), 0);
     };
     parentColumn_ = column("parents", DType::UInt32, {});
-    localColumn_ = column("locals", DType::Float32, {3, 4});
-    programColumn_ = column("programs", DType::UInt32, {kMaxOps, 16});
+    localColumn_ = column("locals", DType::Float32, {2, 3, 4});
+    programColumn_ =
+        column("programs", DType::UInt32, {kMaxOps, sizeof(DeviceOp) / sizeof(std::uint32_t)});
     lengthColumn_ = column("program lengths", DType::UInt32, {});
-    worlds_ = column("worlds", DType::Float32, {3, 4});
+    worlds_ = column("worlds", DType::Float32, {2, 3, 4});
     programmed_.device = column("programmed", DType::UInt32, {});
 }
 
@@ -298,6 +447,36 @@ void TransformGraph::Bind(BucketId bucket, std::string_view attribute, const Dev
     bindings_.push_back({bucket, *token, &column, column.Address()});
     // Its prims compose on the device now.
     RefreshBucket(bucket);
+}
+
+void TransformGraph::SetOrigin(const glm::dvec3& origin) {
+    if (origin == origin_) {
+        return;
+    }
+    origin_ = origin;
+    // Level 0 lists the roots.
+    if (!levels_.empty()) {
+        for (const std::uint32_t root : levels_[0].slots) {
+            Refresh(root);
+        }
+    }
+}
+
+std::span<const ShaderModule> TransformGraph::WorldModules() {
+    static const std::array modules{kAffine, kDoubleFloat, kWorld};
+    return modules;
+}
+
+glm::dmat4 TransformGraph::ReadWorld(std::span<const float> worlds, std::uint32_t slot) {
+    const std::span<const float> rows = worlds.subspan(std::size_t{slot} * 24, 24);
+    glm::dmat4 m(1.0);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            const auto at = static_cast<std::size_t>(r * 4 + c);
+            m[c][r] = static_cast<double>(rows[at]) + static_cast<double>(rows[12 + at]);
+        }
+    }
+    return m;
 }
 
 std::optional<std::uint32_t> TransformGraph::Node(PrimId prim) const {
@@ -426,6 +605,14 @@ void TransformGraph::Detach(std::uint32_t slot) {
     siblings.pop_back();
 }
 
+void TransformGraph::Reparent(std::uint32_t slot, std::uint32_t parent) {
+    Detach(slot);
+    Attach(slot, parent);
+    if (nodes_[slot].rooted != (parent == kNone)) {
+        Refresh(slot);
+    }
+}
+
 void TransformGraph::AdoptDescendants(std::uint32_t slot) {
     const PrimStore& store = scene_.Store();
     const PathTable& paths = store.Paths();
@@ -441,8 +628,7 @@ void TransformGraph::AdoptDescendants(std::uint32_t slot) {
         } else if (Node(*prim) && nodes_[prim->slot].parent != slot &&
                    ParentSlot(prim->slot) == slot) {
             // Below it was an ancestor further up; its subtree follows it to the new prim.
-            Detach(prim->slot);
-            Attach(prim->slot, slot);
+            Reparent(prim->slot, slot);
         }
     }
 }
@@ -476,7 +662,7 @@ void TransformGraph::RemoveNode(std::uint32_t slot) {
         nodes_[orphan].parent = kNone;
         nodes_[orphan].siblingPosition = kNone;
         if (nodes_[orphan].live) {
-            Attach(orphan, ParentSlot(orphan));
+            Reparent(orphan, ParentSlot(orphan));
         }
     }
 }
@@ -498,7 +684,9 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
     const BucketId bucket = store.PrimBucket(node.prim);
     const std::uint32_t row = store.PrimRow(node.prim);
     Built built;
-    glm::dmat4 folded(1.0);
+    // A root's local moves it by the origin first, in double, so every world stays near it.
+    glm::dmat4 folded =
+        node.parent == kNone ? glm::translate(glm::dmat4(1.0), -origin_) : glm::dmat4(1.0);
     const auto push = [&](const DeviceOp& op) {
         if (built.length == kMaxOps) {
             throw std::invalid_argument("'" + scene_.PrimPath(node.prim).String() +
@@ -510,7 +698,7 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
     // Runs of the host's ops become one matrix each.
     const auto fold = [&] {
         if (folded != glm::dmat4(1.0) && built.onDevice) {
-            push({.kind = kConstant, .constant = TopRows(folded)});
+            push({.kind = kConstant, .constant = Split(folded)});
             folded = glm::dmat4(1.0);
         }
     };
@@ -529,13 +717,14 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
               .source = bound->address + row * column.RowBytes()});
     }
     fold();
-    built.local = TopRows(folded);
+    built.local = Split(folded);
     return built;
 }
 
 void TransformGraph::Refresh(std::uint32_t slot) {
     const Built built = BuildProgram(slot);
     NodeState& node = nodes_[slot];
+    node.rooted = node.parent == kNone;
     if (!built.onDevice) {
         if (locals_[slot] != built.local) {
             locals_[slot] = built.local;

@@ -27,8 +27,14 @@ namespace ernie {
 
 /// @brief The scene's transform hierarchy on the device. A prim's node is its id's slot, so the
 /// stable id finds its transform with no table: `Worlds` holds a 3x4 row-major matrix a slot
-/// (VkTransformMatrixKHR's layout). Each node keeps its parent's slot, none at a root or under
-/// `!resetXformStack!`.
+/// (VkTransformMatrixKHR's layout) relative to the render origin. Each node keeps its parent's
+/// slot, none at a root or under `!resetXformStack!`.
+///
+/// Worlds are exact to about 48 bits from the Sun to a wheel nut, with no 64-bit floats on the
+/// device: roots subtract the origin on the host in double, so values near the views stay small,
+/// and every level composes in double-float (each value a high float plus a low one), so large
+/// offsets that cancel on the way down lose nothing. Kernels read a world as float rows through
+/// `WorldModules`' `LoadWorld`, rounding only there.
 ///
 /// Local transforms are the host's, uploaded when their ops are authored, unless a prim's op order
 /// uses an attribute bound to a device column (`Bind`). Then the prim's ops become a short program
@@ -43,15 +49,16 @@ class TransformGraph {
     static constexpr std::uint32_t kNone = std::numeric_limits<std::uint32_t>::max();
     /// The most ops a program holds: device ops and the folded host ops between them.
     static constexpr std::uint32_t kMaxOps = 8;
-    /// A transform's top three rows, as the device keeps them.
-    using Rows12 = std::array<float, 12>;
+    /// A transform's top three rows in double-float, as the device keeps them: the high floats'
+    /// twelve, then the low floats' twelve, each value their sum.
+    using SplitRows = std::array<float, 24>;
     /// One op of a program, as the device reads it.
     struct DeviceOp {
         std::uint32_t kind = 0;
         /// Bit 0 inverts; bits 8 to 15 count the floats the op reads.
         std::uint32_t flags = 0;
         VkDeviceAddress source = 0;
-        Rows12 constant{};
+        SplitRows constant{};
         bool operator==(const DeviceOp&) const = default;
     };
     using Program = std::array<DeviceOp, kMaxOps>;
@@ -81,10 +88,22 @@ class TransformGraph {
     /// @throws std::invalid_argument as `Update`.
     void AddUpdate(graph::Graph& graph);
 
-    /// @return Each slot's world transform, three float4 rows a slot.
+    /// @brief Moves the render origin the worlds are relative to. Only roots change: a rebase
+    /// costs their uploads and the next update's composition, never a bottom level's rebuild.
+    void SetOrigin(const glm::dvec3& origin);
+    const glm::dvec3& Origin() const {
+        return origin_;
+    }
+
+    /// @return Each slot's world transform relative to the origin, `SplitRows` a slot.
     const DeviceColumn& Worlds() const {
         return *worlds_;
     }
+    /// @return The Slang modules kernels import to read `Worlds`: `LoadWorld(float4* worlds, uint
+    /// slot)` gives a slot's world as float rows, relative to the origin.
+    static std::span<const ShaderModule> WorldModules();
+    /// @return A slot's world transform relative to the origin, from `Worlds`' floats read back.
+    static glm::dmat4 ReadWorld(std::span<const float> worlds, std::uint32_t slot);
     /// @return The prim's node, its slot, or none when it is not in the graph yet.
     std::optional<std::uint32_t> Node(PrimId prim) const;
     /// @return The number of levels, each one dispatch.
@@ -113,6 +132,8 @@ class TransformGraph {
         /// Its order's ops, parsed when the order changes.
         std::vector<XformOp> ops;
         bool resets = false;
+        /// Whether its local was last built as a root's, relative to the origin.
+        bool rooted = false;
     };
     /// Slots in a device list, kept dense by swap-removal, its changed entries uploaded in runs.
     struct SlotList {
@@ -144,6 +165,8 @@ class TransformGraph {
     /// Hangs a node under `parent` at the level below it, its subtree following.
     void Attach(std::uint32_t slot, std::uint32_t parent);
     void Detach(std::uint32_t slot);
+    /// Moves a node under `parent`, rebuilding its local when it becomes or stops being a root.
+    void Reparent(std::uint32_t slot, std::uint32_t parent);
     void SetLevel(std::uint32_t slot, std::uint32_t level);
     /// @return The slot of the node's nearest ancestor prim, none at a root or a stack reset.
     std::uint32_t ParentSlot(std::uint32_t slot) const;
@@ -166,7 +189,7 @@ class TransformGraph {
     /// A prim's transform as the host composes it, or as the program the device evaluates.
     struct Built {
         bool onDevice = false;
-        Rows12 local{};
+        SplitRows local{};
         Program program{};
         std::uint32_t length = 0;
     };
@@ -184,6 +207,7 @@ class TransformGraph {
     ComputeKernel local_;
     ComputeKernel compose_;
     std::uint64_t cursor_ = 0;
+    glm::dvec3 origin_{0.0};
     std::vector<Binding> bindings_;
     /// Each bucket's prims by row as the graph last saw them, to replay row logs on.
     std::vector<std::vector<PrimId>> rows_;
@@ -193,7 +217,7 @@ class TransformGraph {
     // Host copies of the slot arrays and the programmed list's programs, and the entries changed
     // since the last upload.
     std::vector<std::uint32_t> parents_;
-    std::vector<Rows12> locals_;
+    std::vector<SplitRows> locals_;
     std::vector<Program> programs_;
     std::vector<std::uint32_t> lengths_;
     DirtySlots dirtyParents_;

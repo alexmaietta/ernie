@@ -24,11 +24,12 @@ using test::ExpectClean;
 using test::ReadFloats;
 
 /// Expects a node's world transform to be `expected`'s top three rows.
-void ExpectWorld(const std::vector<float>& worlds, std::uint32_t node, const glm::dmat4& expected) {
+void ExpectWorld(const std::vector<float>& worlds, std::uint32_t node, const glm::dmat4& expected,
+                 double tolerance = 1e-5) {
+    const glm::dmat4 world = TransformGraph::ReadWorld(worlds, node);
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
-            EXPECT_NEAR(worlds[node * 12 + static_cast<std::uint32_t>(r * 4 + c)], expected[c][r],
-                        1e-5)
+            EXPECT_NEAR(world[c][r], expected[c][r], tolerance)
                 << "node " << node << ", row " << r << ", column " << c;
         }
     }
@@ -67,9 +68,68 @@ TEST(TransformGraph, ComposesTheScenesHierarchyLevelByLevel) {
     const Transfers before = context->Transfers();
     SetXform(scene, "/World", {.translate = glm::dvec3(0, 0, 10)});
     const std::vector<float> moved = ReadFloats(*context, graph.Worlds(), graph.Update());
-    EXPECT_EQ(context->Transfers().uploaded - before.uploaded, 48u) << "one node's local";
+    EXPECT_EQ(context->Transfers().uploaded - before.uploaded, 96u) << "one node's local";
     const PrimId tip = *scene.Find("/World/Arm/Hand/Tip");
     ExpectWorld(moved, *graph.Node(tip), scene.WorldTransform(tip));
+    ExpectClean(*context);
+}
+
+TEST(TransformGraph, KeepsSolarSystemScenesPreciseNearTheOrigin) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    Scene scene;
+    // Mars about 1.5 AU out, tilted; a ground tile and a rover on its surface, 3,390 km from its
+    // centre, where float alone puts them a quarter of a metre apart.
+    scene.Define("/Sun", "Xform");
+    scene.Define("/Sun/Mars", "Xform");
+    SetXform(
+        scene, "/Sun/Mars",
+        {.translate = glm::dvec3(2.279e11, 1.3e10, -4.1e9),
+         .orient = glm::angleAxis(glm::radians(25.19), glm::normalize(glm::dvec3(1, 0.3, 0)))});
+    scene.Define("/Sun/Mars/Ground", "Xform");
+    SetXform(scene, "/Sun/Mars/Ground", {.translate = glm::dvec3(3.3895e6, 120.5, -40.25)});
+    scene.Define("/Sun/Mars/Rover", "Xform");
+    SetXform(scene, "/Sun/Mars/Rover",
+             {.translate = glm::dvec3(3.3895e6, 121.0, -40.0), .rotate = glm::dvec3(0, 0, 30)});
+    scene.Define("/Sun/Mars/Rover/Wheel", "Xform");
+    SetXform(scene, "/Sun/Mars/Rover/Wheel", {.translate = glm::dvec3(0.6, 0.3, -0.35)});
+    const auto world = [&](const char* path) { return scene.WorldTransform(*scene.Find(path)); };
+
+    Arenas arenas(*context, MemoryUse::Device, "transforms", 1 << 16);
+    TransformGraph graph(*context, arenas, scene, compiler);
+    const auto expect = [&](const char* label) {
+        const std::vector<float> worlds = ReadFloats(*context, graph.Worlds(), graph.Update());
+        const glm::dmat4 toOrigin = glm::translate(glm::dmat4(1.0), -graph.Origin());
+        for (const char* path : {"/Sun/Mars/Ground", "/Sun/Mars/Rover", "/Sun/Mars/Rover/Wheel"}) {
+            // Shared by everything under Mars: the millimetre double-float keeps of 1.5 AU.
+            ExpectWorld(worlds, *graph.Node(*scene.Find(path)), toOrigin * world(path), 2e-3);
+        }
+        // Between branches under Mars, as a rover rests on its ground: to the micrometre, which
+        // absolute doubles at 1.5 AU (spaced 3e-5 m) cannot check, so in Mars' own frame.
+        const auto translation = [&](const char* path) {
+            return glm::dvec3(TransformGraph::ReadWorld(worlds, *graph.Node(*scene.Find(path)))[3]);
+        };
+        const auto local = [&](const char* path) {
+            return ComposeXformOps(scene, *scene.Find(path));
+        };
+        const glm::dvec3 inMars =
+            glm::dvec3((local("/Sun/Mars/Rover") * local("/Sun/Mars/Rover/Wheel"))[3]) -
+            glm::dvec3(local("/Sun/Mars/Ground")[3]);
+        const glm::dvec3 expected = glm::dmat3(local("/Sun/Mars")) * inMars;
+        const glm::dvec3 found =
+            translation("/Sun/Mars/Rover/Wheel") - translation("/Sun/Mars/Ground");
+        for (int axis = 0; axis < 3; ++axis) {
+            EXPECT_NEAR(found[axis], expected[axis], 1e-6) << label << ", axis " << axis;
+        }
+    };
+    graph.SetOrigin(glm::dvec3(world("/Sun/Mars/Rover")[3]) + glm::dvec3(1, 2, 3));
+    expect("at the rover");
+
+    // A rebase rewrites only the root's local.
+    const Transfers before = context->Transfers();
+    graph.SetOrigin(graph.Origin() + glm::dvec3(5000, -3000, 100));
+    expect("rebased");
+    EXPECT_EQ(context->Transfers().uploaded - before.uploaded, 96u) << "the Sun's local alone";
     ExpectClean(*context);
 }
 
@@ -149,7 +209,7 @@ TEST(TransformGraph, FollowsPrimsComingAndGoingAtWhatTheyCost) {
     const Transfers before = context->Transfers();
     const Ticket followed = graph.Update();
     // The added prim's parent and local, and two entries of its level's list.
-    EXPECT_LE(context->Transfers().uploaded - before.uploaded, 4u + 48u + 2 * 4u)
+    EXPECT_LE(context->Transfers().uploaded - before.uploaded, 4u + 96u + 2 * 4u)
         << "a change costs what it changes, not the scene";
     EXPECT_FALSE(graph.Node(gone));
     EXPECT_EQ(graph.Node(added), added.slot) << "a prim's node is its stable id's slot";

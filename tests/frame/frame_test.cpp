@@ -42,9 +42,9 @@ struct Bodies {
 
 /// Expects a prim's world translation, column 3 of its three rows.
 void ExpectTranslation(const std::vector<float>& worlds, std::uint32_t node, glm::dvec3 expected) {
+    const glm::dmat4 world = TransformGraph::ReadWorld(worlds, node);
     for (int r = 0; r < 3; ++r) {
-        EXPECT_NEAR(worlds[node * 12 + static_cast<std::uint32_t>(r) * 4 + 3], expected[r], 1e-5)
-            << "node " << node << ", row " << r;
+        EXPECT_NEAR(world[3][r], expected[r], 1e-5) << "node " << node << ", row " << r;
     }
 }
 
