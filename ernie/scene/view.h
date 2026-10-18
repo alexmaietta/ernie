@@ -98,26 +98,50 @@ class SchemaView {
         return *schema_;
     }
 
-  protected:
-    SchemaView(const Scene& scene, const Path& path, const SchemaDef& schema);
-    SchemaView(Scene& scene, const Path& path, const SchemaDef& schema);
+    /// The instance name of a multiple-apply API schema's view; empty otherwise.
+    std::string_view Instance() const {
+        return instance_;
+    }
 
-    template <typename T> typename AttributeTraits<T>::Result Read(std::string_view name) const {
-        using Traits = AttributeTraits<T>;
-        const PrimStore& store = scene_->Store();
-        const Token token = *store.Paths().Names().Find(name);
-        const auto column = store.Read<typename Traits::Stored>(store.PrimBucket(prim_), token);
-        return Traits::Load(store.Paths(), column[store.PrimRow(prim_)]);
+  protected:
+    /// @throws std::invalid_argument if the prim is missing, is not of `schema`'s type or lacks
+    /// the applied API schema.
+    SchemaView(const Scene& scene, const Path& path, const SchemaDef& schema,
+               std::string_view instance = {});
+    SchemaView(Scene& scene, const Path& path, const SchemaDef& schema,
+               std::string_view instance = {});
+
+    /// Calls `use` with a declared attribute's name, its instance's for a multiple-apply schema.
+    template <typename Use> decltype(auto) Named(std::string_view declared, const Use& use) const {
+        if (instance_.empty()) {
+            return use(declared);
+        }
+        const std::string name = ApiName{schema_, instance_}.Attribute(declared);
+        return use(std::string_view(name));
+    }
+
+    template <typename T>
+    typename AttributeTraits<T>::Result Read(std::string_view declared) const {
+        return Named(declared, [&](std::string_view name) {
+            using Traits = AttributeTraits<T>;
+            const PrimStore& store = scene_->Store();
+            const Token token = *store.Tokens().Find(name);
+            const auto column = store.Read<typename Traits::Stored>(store.PrimBucket(prim_), token);
+            return Traits::Load(store.Paths(), column[store.PrimRow(prim_)]);
+        });
     }
     template <typename T>
-    void Write(std::string_view name, const typename AttributeTraits<T>::Result& value) {
-        Edit().Set(prim_, name, AttributeTraits<T>::Save(value));
+    void Write(std::string_view declared, const typename AttributeTraits<T>::Result& value) {
+        Named(declared, [&](std::string_view name) {
+            Edit().Set(prim_, name, AttributeTraits<T>::Save(value));
+        });
     }
-    bool Has(std::string_view name) const {
-        return scene_->IsAuthored(prim_, name);
+    bool Has(std::string_view declared) const {
+        return Named(declared,
+                     [&](std::string_view name) { return scene_->IsAuthored(prim_, name); });
     }
-    void Unset(std::string_view name) {
-        Edit().Clear(prim_, name);
+    void Unset(std::string_view declared) {
+        Named(declared, [&](std::string_view name) { Edit().Clear(prim_, name); });
     }
     Scene& Edit() const;
 
@@ -126,6 +150,7 @@ class SchemaView {
     Scene* mutable_ = nullptr;
     PrimId prim_;
     const SchemaDef* schema_ = nullptr;
+    std::string instance_;
 };
 
 /// The root of every generated accessor chain.
@@ -195,6 +220,23 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
     static Class Define(::ernie::Scene& scene, const ::ernie::Path& path) {                        \
         scene.Define(path, Definition().name);                                                     \
         return Class(scene, path);                                                                 \
+    }
+
+/// The constructors, `Apply` and registry entry of an API schema's view; a multiple-apply
+/// schema's take its instance name.
+#define ERNIE_API_SCHEMA_BODY(Class)                                                               \
+  public:                                                                                          \
+    using Self = Class;                                                                            \
+    /** @throws std::invalid_argument if the prim is missing or lacks the API schema. */           \
+    Class(const ::ernie::Scene& scene, const ::ernie::Path& path, std::string_view instance = {})  \
+        : Class##Accessors<Class, ::ernie::SchemaView>(scene, path, Definition(), instance) {}     \
+    Class(::ernie::Scene& scene, const ::ernie::Path& path, std::string_view instance = {})        \
+        : Class##Accessors<Class, ::ernie::SchemaView>(scene, path, Definition(), instance) {}     \
+    static const ::ernie::SchemaDef& Definition();                                                 \
+    static Class Apply(::ernie::Scene& scene, const ::ernie::Path& path,                           \
+                       std::string_view instance = {}) {                                           \
+        scene.ApplyApi(scene.Require(path), ::ernie::ApiName{&Definition(), instance}.ToString()); \
+        return Class(scene, path, instance);                                                       \
     }
 
 /// Defines `Class::Definition()`, the schema's registry entry.

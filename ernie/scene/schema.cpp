@@ -114,9 +114,39 @@ const SchemaDef* FindSchema(std::string_view name) {
     return found != schemas.end() ? *found : nullptr;
 }
 
-void Validate(const AttributeDef& def, const Value& value, const Path& path) {
+ApiName ApiName::Parse(std::string_view api) {
+    const std::size_t colon = api.find(':');
+    const std::string_view name = api.substr(0, colon);
+    const ApiName parsed{FindSchema(name), colon == std::string_view::npos ? std::string_view()
+                                                                           : api.substr(colon + 1)};
+    const bool single = parsed.schema != nullptr && parsed.schema->kind == SchemaKind::SingleApply;
+    const bool multiple =
+        parsed.schema != nullptr && parsed.schema->kind == SchemaKind::MultipleApply;
+    if (!(single && parsed.instance.empty()) && !(multiple && IsIdentifier(parsed.instance))) {
+        throw std::invalid_argument(
+            "'" + std::string(api) + "' is no API schema" +
+            (multiple ? ": a multiple-apply one takes an instance name, as CollectionAPI:lights"
+                      : ""));
+    }
+    return parsed;
+}
+
+std::string ApiName::Attribute(std::string_view declared) const {
+    std::string name(declared);
+    if (const std::size_t at = name.find(kInstanceName); at != std::string::npos) {
+        name.replace(at, kInstanceName.size(), instance);
+    }
+    return name;
+}
+
+std::string ApiName::ToString() const {
+    return std::string(schema->name) + (instance.empty() ? "" : ":" + std::string(instance));
+}
+
+void Validate(const AttributeDef& def, std::string_view attribute, const Value& value,
+              const Path& path) {
     if (const std::string problem = Problem(def, value); !problem.empty()) {
-        throw std::invalid_argument("'" + path.String() + "': '" + std::string(def.name) + "' " +
+        throw std::invalid_argument("'" + path.String() + "': '" + std::string(attribute) + "' " +
                                     problem);
     }
 }

@@ -194,6 +194,8 @@ struct BucketKey {
     Token type = 0;
     std::vector<Token> apiSchemas;
 
+    /// @return The key with its API schemas sorted and without repeats.
+    BucketKey Normalized() const;
     bool operator==(const BucketKey&) const = default;
 };
 
@@ -308,6 +310,7 @@ class PrimStore {
 
     /// @return The bucket of `key`, made with `layout`'s columns if new.
     BucketId AddBucket(const BucketKey& key, std::span<const ColumnLayout> layout);
+    std::optional<BucketId> FindBucket(const BucketKey& key) const;
     const Bucket& GetBucket(BucketId bucket) const {
         return *buckets_[bucket];
     }

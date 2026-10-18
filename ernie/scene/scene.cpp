@@ -7,6 +7,7 @@
 #include "ernie/scene/schemas/geom.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
+#include "ernie/util/algorithm.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -15,9 +16,9 @@
 namespace ernie {
 namespace {
 
-/// @return A column layout holding `fallback` in unauthored rows.
-ColumnLayout MakeLayout(PathTable& paths, const AttributeDef& def) {
-    const AttributeId attribute = paths.Names().Intern(def.name);
+/// @return A column layout for the attribute `name` holding `def`'s fallback in unauthored rows.
+ColumnLayout MakeLayout(PathTable& paths, const AttributeDef& def, std::string_view name) {
+    const AttributeId attribute = paths.Names().Intern(name);
     return WithColumnType(def.type, [&]<typename T>(std::type_identity<T>) {
         if constexpr (std::is_same_v<T, Tensor>) {
             return ColumnLayout::Of<T>(attribute);
@@ -38,7 +39,7 @@ std::string Describe(const Scene& scene, PrimId prim) {
 Scene::Scene()
     : invisible_(store_.Tokens().Intern(tokens::kInvisible)),
       defaultPurpose_(store_.Tokens().Intern(tokens::kDefault)) {
-    BucketFor(nullptr);
+    FindOrAddBucket(nullptr, {});
 }
 
 PrimId Scene::Define(const Path& path, std::string_view type) {
@@ -57,12 +58,11 @@ PrimId Scene::Define(const Path& path, std::string_view type) {
             store_.Define(above, 0);
         }
     }
-    const BucketId bucket = BucketFor(schema);
     if (const std::optional<PrimId> existing = store_.Find(id)) {
-        store_.Move(*existing, bucket);
+        MoveTo(*existing, schema, Apis(*existing));
         return *existing;
     }
-    return store_.Define(id, bucket);
+    return store_.Define(id, FindOrAddBucket(schema, {}));
 }
 
 bool Scene::Remove(const Path& path) {
@@ -138,7 +138,7 @@ void Scene::Set(PrimId prim, std::string_view attribute, const Value& value) {
     const AttributeId token = store_.Tokens().Intern(attribute);
     const AttributeDef* def = Declared(prim, token);
     if (def != nullptr) {
-        Validate(*def, value, PrimPath(prim));
+        Validate(*def, attribute, value, PrimPath(prim));
     }
     const ColumnType type = def != nullptr ? def->type : TypeForUndeclared(prim, attribute, value);
     WithColumnType(type, [&]<typename T>(std::type_identity<T>) {
@@ -258,24 +258,66 @@ PrimId Scene::Require(const Path& path) const {
     return *prim;
 }
 
-BucketId Scene::BucketFor(const SchemaDef* schema) {
-    if (const auto found = bucketBySchema_.find(schema); found != bucketBySchema_.end()) {
-        return found->second;
-    }
+BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis) {
     PathTable& paths = store_.Paths();
+    const BucketKey key{paths.Names().Intern(schema != nullptr ? schema->name : ""),
+                        std::move(apis)};
+    if (const std::optional<BucketId> found = store_.FindBucket(key)) {
+        return *found;
+    }
     BucketSchema entry{schema, {}};
     std::vector<ColumnLayout> layout;
-    for (const AttributeDef* def :
-         schema != nullptr ? schema->AllAttributes() : std::vector<const AttributeDef*>{}) {
-        layout.push_back(MakeLayout(paths, *def));
-        entry.declared.emplace(layout.back().attribute, def);
+    const auto add = [&](const SchemaDef& declaring, const ApiName& api) {
+        for (const AttributeDef* def : declaring.AllAttributes()) {
+            layout.push_back(MakeLayout(paths, *def, api.Attribute(def->name)));
+            entry.declared.emplace(layout.back().attribute, def);
+        }
+    };
+    if (schema != nullptr) {
+        add(*schema, {});
     }
-    const Token type = paths.Names().Intern(schema != nullptr ? schema->name : "");
-    const BucketId bucket = store_.AddBucket({type, {}}, layout);
+    for (const Token token : key.apiSchemas) {
+        const ApiName api = ApiName::Parse(paths.Names().Text(token));
+        add(*api.schema, api);
+    }
+    const BucketId bucket = store_.AddBucket(key, layout);
     buckets_.resize(std::max<std::size_t>(buckets_.size(), bucket + 1));
     buckets_[bucket] = std::move(entry);
-    bucketBySchema_.emplace(schema, bucket);
     return bucket;
+}
+
+void Scene::MoveTo(PrimId prim, const SchemaDef* schema, std::vector<Token> apis) {
+    store_.Move(prim, FindOrAddBucket(schema, std::move(apis)));
+}
+
+const std::vector<Token>& Scene::Apis(PrimId prim) const {
+    return store_.GetBucket(store_.PrimBucket(prim)).key.apiSchemas;
+}
+
+void Scene::ApplyApi(PrimId prim, std::string_view api) {
+    ApiName::Parse(api);
+    std::vector<Token> apis = Apis(prim);
+    apis.push_back(store_.Tokens().Intern(api));
+    MoveTo(prim, Schema(prim), std::move(apis));
+}
+
+bool Scene::RemoveApi(PrimId prim, std::string_view api) {
+    if (!HasApi(prim, api)) {
+        return false;
+    }
+    std::vector<Token> apis = Apis(prim);
+    std::erase(apis, *store_.Tokens().Find(api));
+    MoveTo(prim, Schema(prim), std::move(apis));
+    return true;
+}
+
+bool Scene::HasApi(PrimId prim, std::string_view api) const {
+    const std::optional<Token> token = store_.Tokens().Find(api);
+    return token && std::ranges::find(Apis(prim), *token) != Apis(prim).end();
+}
+
+std::vector<std::string> Scene::AppliedApis(PrimId prim) const {
+    return Map(Apis(prim), [&](Token token) { return std::string(store_.Tokens().Text(token)); });
 }
 
 bool Scene::LeavesOutOfBounds(PrimId prim) const {
@@ -302,10 +344,17 @@ const AttributeDef* Scene::Declared(PrimId prim, AttributeId attribute) const {
     return found != declared.end() ? found->second : nullptr;
 }
 
+bool Scene::TakesUndeclared(PrimId prim, std::string_view attribute) const {
+    const SchemaDef* schema = Schema(prim);
+    return schema == nullptr || schema->IsOpen(attribute) ||
+           std::ranges::any_of(Apis(prim), [&](Token api) {
+               return ApiName::Parse(store_.Tokens().Text(api)).schema->IsOpen(attribute);
+           });
+}
+
 ColumnType Scene::TypeForUndeclared(PrimId prim, std::string_view attribute,
                                     const Value& value) const {
-    const SchemaDef* schema = Schema(prim);
-    if (schema != nullptr && !schema->IsOpen(attribute)) {
+    if (!TakesUndeclared(prim, attribute)) {
         throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
                                     std::string(attribute) + "'");
     }

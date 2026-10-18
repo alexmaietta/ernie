@@ -8,7 +8,9 @@ add_library(
     storage.cpp
     view.cpp
     xform.cpp
+    schemas/collection.cpp
     schemas/geom.cpp
     schemas/registry.cpp
+    schemas/shade.cpp
 )
 target_link_libraries(ernie_scene PUBLIC ernie_physics ernie_io PRIVATE ernie_build_options)

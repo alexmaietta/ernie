@@ -168,10 +168,28 @@ std::span<const SchemaDef* const> Schemas();
 /// @return The schema named `name`, or null.
 const SchemaDef* FindSchema(std::string_view name);
 
+/// What a multiple-apply schema's attribute names hold in place of the instance's name.
+inline constexpr std::string_view kInstanceName = "__INSTANCE_NAME__";
+
+/// @brief An applied API schema: `"MaterialBindingAPI"`, or `"CollectionAPI:lights"`.
+struct ApiName {
+    const SchemaDef* schema = nullptr;
+    std::string_view instance;
+
+    /// @throws std::invalid_argument for an unknown API schema or a missing or extra instance.
+    static ApiName Parse(std::string_view api);
+    /// @return A declared name with the instance's name in place of `kInstanceName`.
+    std::string Attribute(std::string_view declared) const;
+    /// @return The name `Parse` reads.
+    std::string ToString() const;
+};
+
 /// @brief Checks a value against a declared attribute's limits and options; the scene checks its
 /// type as it converts it.
+/// @param attribute The attribute's name, an instance's for a multiple-apply schema's.
 /// @throws std::invalid_argument naming the prim, the attribute and the reason.
-void Validate(const AttributeDef& def, const Value& value, const Path& path);
+void Validate(const AttributeDef& def, std::string_view attribute, const Value& value,
+              const Path& path);
 
 /// @brief The tokens of an enum a token attribute takes, in enumerator order.
 template <typename E> struct ChoiceTokens;

@@ -55,6 +55,7 @@ ernie_add_test_suite(
 ernie_add_test_suite(
     scene
     SOURCES
+        scene/api_test.cpp
         scene/path_test.cpp
         scene/scene_test.cpp
         scene/schema_test.cpp

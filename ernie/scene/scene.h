@@ -47,6 +47,17 @@ class Scene {
     /// @return Every prim whose type is `type` or derives from it; every prim for `""`.
     std::vector<Path> Prims(std::string_view type = {}) const;
 
+    /// @brief Applies an API schema, `"MaterialBindingAPI"`, or an instance of a multiple-apply
+    /// one, `"CollectionAPI:lights"`, adding its attributes at their fallbacks.
+    /// @throws std::invalid_argument for an unknown API schema or a missing or extra instance.
+    void ApplyApi(PrimId prim, std::string_view api);
+    /// @brief Removes an applied API schema with the values of its attributes.
+    /// @return Whether it was applied.
+    bool RemoveApi(PrimId prim, std::string_view api);
+    bool HasApi(PrimId prim, std::string_view api) const;
+    /// @return The applied API schemas, as `ApplyApi` names them.
+    std::vector<std::string> AppliedApis(PrimId prim) const;
+
     /// @brief Authors an attribute: a declared one converted to its type and checked, or an
     /// undeclared one, typed by its first value, in a namespace the type leaves open or on a prim
     /// without a type.
@@ -86,10 +97,17 @@ class Scene {
         std::unordered_map<AttributeId, const AttributeDef*> declared;
     };
 
-    BucketId BucketFor(const SchemaDef* schema);
+    /// @return The bucket of a type and applied API schemas, made if new.
+    BucketId FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis);
+    /// Moves a prim to the bucket of its type and `apis`.
+    void MoveTo(PrimId prim, const SchemaDef* schema, std::vector<Token> apis);
+    const std::vector<Token>& Apis(PrimId prim) const;
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
     const AttributeDef* Declared(PrimId prim, AttributeId attribute) const;
+    /// @return Whether the prim's type or an applied API schema leaves the attribute's namespace
+    /// open; any attribute for a prim without a type.
+    bool TakesUndeclared(PrimId prim, std::string_view attribute) const;
     ColumnType TypeForUndeclared(PrimId prim, std::string_view attribute, const Value& value) const;
     /// @return Whether the prim and its subtree are invisible or of a purpose bounds leave out.
     bool LeavesOutOfBounds(PrimId prim) const;
@@ -100,7 +118,6 @@ class Scene {
     Token invisible_ = 0;
     Token defaultPurpose_ = 0;
     std::vector<BucketSchema> buckets_;
-    std::unordered_map<const SchemaDef*, BucketId> bucketBySchema_;
 };
 
 }  // namespace ernie

@@ -25,11 +25,21 @@ std::size_t PrimStore::KeyHash::operator()(const BucketKey& key) const {
     return static_cast<std::size_t>(hash);
 }
 
+BucketKey BucketKey::Normalized() const {
+    BucketKey sorted = *this;
+    std::ranges::sort(sorted.apiSchemas);
+    const auto [last, end] = std::ranges::unique(sorted.apiSchemas);
+    sorted.apiSchemas.erase(last, end);
+    return sorted;
+}
+
+std::optional<BucketId> PrimStore::FindBucket(const BucketKey& key) const {
+    const auto found = bucketIndex_.find(key.Normalized());
+    return found != bucketIndex_.end() ? std::optional(found->second) : std::nullopt;
+}
+
 BucketId PrimStore::AddBucket(const BucketKey& key, std::span<const ColumnLayout> layout) {
-    BucketKey sorted = key;
-    std::sort(sorted.apiSchemas.begin(), sorted.apiSchemas.end());
-    sorted.apiSchemas.erase(std::unique(sorted.apiSchemas.begin(), sorted.apiSchemas.end()),
-                            sorted.apiSchemas.end());
+    BucketKey sorted = key.Normalized();
     if (const auto found = bucketIndex_.find(sorted); found != bucketIndex_.end()) {
         return found->second;
     }
