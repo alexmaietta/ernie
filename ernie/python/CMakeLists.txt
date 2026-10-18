@@ -4,8 +4,8 @@ include("${PROJECT_SOURCE_DIR}/cmake/third_party/nanobind.cmake")
 # The package is assembled in the build tree, so tests import it with PYTHONPATH=<build>/python.
 set(ernie_package_dir "${PROJECT_BINARY_DIR}/python/ernie")
 
-nanobind_add_module(_ernie STABLE_ABI NB_STATIC module.cpp)
-target_link_libraries(_ernie PRIVATE ernie_static ernie_build_options)
+nanobind_add_module(_ernie STABLE_ABI NB_STATIC module.cpp device.cpp)
+target_link_libraries(_ernie PRIVATE ernie_static ernie_volk ernie_vma ernie_build_options)
 # Third-party headers as system headers, so our warnings do not apply to them.
 target_include_directories(_ernie SYSTEM PRIVATE "${NB_DIR}/include" ${Python_INCLUDE_DIRS})
 # Its file name is its import name, whatever debug postfix a dependency sets (Imath sets "_d").
