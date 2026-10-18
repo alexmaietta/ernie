@@ -36,7 +36,7 @@ struct TraceScene {
     std::uint32_t instances = 0;
     /// Each instance row's albedo, three linear RGB floats, and kernels' handle of them.
     graph::Buffer colours;
-    shaders::Ref<float> colourRef;
+    shaders::BufferRef<float> colourBuffer;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 

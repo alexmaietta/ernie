@@ -8,7 +8,7 @@
 namespace ernie::shaders {
 #else
 import affine;
-import ref;
+import buffer_ref;
 import transform;
 #endif
 
@@ -26,14 +26,14 @@ struct Instance {
 
 struct WriteParameters {
     /// The transform graph's worlds, by slot.
-    Ref<float4> worlds;
+    BufferRef<float4> worlds;
     /// Each instance row's transform-graph slot, geometry id, and shape transform.
-    Ref<uint> nodes;
-    Ref<uint> geometries;
-    Ref<float4> shapes;
+    BufferRef<uint> nodes;
+    BufferRef<uint> geometries;
+    BufferRef<float4> shapes;
     /// Each geometry's bottom-level address, 0 until it is built.
-    Ref<uint64_t> bottoms;
-    Ref<Instance> instances;
+    BufferRef<uint64_t> bottoms;
+    BufferRef<Instance> instances;
     uint count;
 };
 

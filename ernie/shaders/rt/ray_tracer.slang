@@ -15,7 +15,7 @@
 namespace ernie::shaders {
 #else
 import geometry;
-import ref;
+import buffer_ref;
 import shapes;
 #endif
 
@@ -23,7 +23,7 @@ import shapes;
 struct TracerParameters {
     /// The top level's device address.
     uint64_t scene;
-    Ref<GeometryRecord> records;
+    BufferRef<GeometryRecord> records;
 };
 
 #ifdef __cplusplus

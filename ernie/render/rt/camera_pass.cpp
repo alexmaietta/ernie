@@ -36,9 +36,9 @@ std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
 /// placed them.
 /// @return A kernel's handle of an output, or a null one when it is left out.
 template <typename T>
-shaders::Ref<T> RefOrNull(const graph::PassContext& pass,
-                          const std::optional<graph::Buffer>& buffer) {
-    return buffer ? pass.Get(*buffer).Ref<T>() : shaders::Ref<T>{};
+shaders::BufferRef<T> BufferRefOrNull(const graph::PassContext& pass,
+                                      const std::optional<graph::Buffer>& buffer) {
+    return buffer ? pass.Get(*buffer).BufferRef<T>() : shaders::BufferRef<T>{};
 }
 
 View ToView(const PinholeView& view, const CameraOutputs& outputs, const glm::dvec3& origin) {
@@ -107,14 +107,15 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
             }
         },
         [this, staged, largest, records = std::move(records), outputs = std::move(outputs),
-         parameters = CameraParameters{.tracer = scene->parameters, .colours = scene->colourRef}](
+         parameters =
+             CameraParameters{.tracer = scene->parameters, .colours = scene->colourBuffer}](
             graph::PassContext& pass) mutable {
             for (std::size_t i = 0; i < records.size(); ++i) {
-                records[i].distances = RefOrNull<float>(pass, outputs[i].distances);
-                records[i].normals = RefOrNull<float>(pass, outputs[i].normals);
-                records[i].instances = RefOrNull<shaders::uint>(pass, outputs[i].instances);
-                records[i].albedos = RefOrNull<float>(pass, outputs[i].albedos);
-                records[i].ldr = RefOrNull<shaders::uint>(pass, outputs[i].ldr);
+                records[i].distances = BufferRefOrNull<float>(pass, outputs[i].distances);
+                records[i].normals = BufferRefOrNull<float>(pass, outputs[i].normals);
+                records[i].instances = BufferRefOrNull<shaders::uint>(pass, outputs[i].instances);
+                records[i].albedos = BufferRefOrNull<float>(pass, outputs[i].albedos);
+                records[i].ldr = BufferRefOrNull<shaders::uint>(pass, outputs[i].ldr);
             }
             // The records hold the outputs' addresses, known only now, so the pass writes them
             // itself before it reads them.
@@ -127,7 +128,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
             }
             Barrier(pass.commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
                     VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
-            parameters.views = slice.Ref<View>();
+            parameters.views = slice.BufferRef<View>();
             parameters.count = static_cast<std::uint32_t>(records.size());
             kernel_.Dispatch(
                 pass.commands,

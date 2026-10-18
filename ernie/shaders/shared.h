@@ -2,7 +2,7 @@
 /// @file shared.h
 /// @brief What C++ sees of the types shaders share with it. A shader file's shared part, before
 /// its `#ifndef __cplusplus` code, is read by both languages: Slang's scalar types are glm's here,
-/// laid out alike as Slang lays out data reached through `Ref` (packed, scalar alignment).
+/// laid out alike as Slang lays out data reached through `BufferRef` (packed, scalar alignment).
 #pragma once
 
 #include <glm/glm.hpp>
@@ -19,11 +19,11 @@ using float3 = glm::vec3;
 using float4 = glm::vec4;
 using std::uint64_t;
 
-/// @brief A buffer a shader reads or writes `T`s of, as ref.slang's `Ref`: 8 bytes, a device
-/// address on Vulkan (an arena index and offset on WebGPU), 0 for none.
-template <typename T> struct Ref {
+/// @brief A buffer a shader reads or writes `T`s of, as buffer_ref.slang's `BufferRef`: 8 bytes,
+/// a device address on Vulkan (an arena index and offset on WebGPU), 0 for none.
+template <typename T> struct BufferRef {
     std::uint64_t handle = 0;
-    bool operator==(const Ref&) const = default;
+    bool operator==(const BufferRef&) const = default;
 };
 
 }  // namespace ernie::shaders

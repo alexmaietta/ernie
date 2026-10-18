@@ -6,7 +6,7 @@
 #include "ernie/shaders/shared.h"
 namespace ernie::shaders {
 #else
-import ref;
+import buffer_ref;
 #endif
 
 /// The kinds of geometry: triangles, then the unit shapes procedural primitives stand for.
@@ -26,8 +26,8 @@ struct GeometryRecord {
     uint vertexCount;
     uint triangleCount;
     /// Triangles' x, y, z positions and their corners' indices, three a triangle.
-    Ref<float> vertices;
-    Ref<uint> indices;
+    BufferRef<float> vertices;
+    BufferRef<uint> indices;
 };
 
 #ifdef __cplusplus

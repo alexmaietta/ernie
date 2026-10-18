@@ -84,7 +84,7 @@ void TopLevels::AddWritePass(graph::Graph& graph, const TransformGraph& transfor
                                              {address(2)},
                                              {address(3)},
                                              {address(4)},
-                                             pass.Get(records).Ref<shaders::Instance>(),
+                                             pass.Get(records).BufferRef<shaders::Instance>(),
                                              count});
         });
 }

@@ -14,7 +14,7 @@ namespace ernie::shaders {
 #else
 import affine;
 import double_float;
-import ref;
+import buffer_ref;
 #endif
 
 /// A program's op kinds: a folded constant, then each of the host's transform op kinds after it,
@@ -50,7 +50,7 @@ struct Op {
     uint kind;
     uint flags;
     /// A bound op's row of floats.
-    Ref<float> source;
+    BufferRef<float> source;
     /// A folded constant, exactly as the host split it.
     SplitRows constant;
 #ifdef __cplusplus
@@ -60,22 +60,22 @@ struct Op {
 
 struct LocalParameters {
     /// Each programmed node's slot, program of `kMaxOps` ops and its length.
-    Ref<uint> slots;
-    Ref<Op> programs;
-    Ref<uint> lengths;
+    BufferRef<uint> slots;
+    BufferRef<Op> programs;
+    BufferRef<uint> lengths;
     /// The locals, by slot.
-    Ref<float4> locals;
+    BufferRef<float4> locals;
     uint count;
 };
 
 struct ComposeParameters {
     /// The level's slots.
-    Ref<uint> slots;
+    BufferRef<uint> slots;
     /// Each slot's parent, or `kNone`.
-    Ref<uint> parents;
+    BufferRef<uint> parents;
     /// The locals and worlds, by slot.
-    Ref<float4> locals;
-    Ref<float4> worlds;
+    BufferRef<float4> locals;
+    BufferRef<float4> worlds;
     uint count;
 };
 
@@ -84,7 +84,7 @@ struct ComposeParameters {
 #else
 
 /// A slot's world transform relative to the render origin, as float rows.
-Affine LoadWorld(Ref<float4> worlds, uint slot) {
+Affine LoadWorld(BufferRef<float4> worlds, uint slot) {
     return Round(LoadDouble(worlds, slot));
 }
 
@@ -127,7 +127,7 @@ Affine Inverse(Affine m) {
 /// A bound op's matrix from the floats it reads.
 Affine OpMatrix(Op op) {
     Affine m = Identity();
-    Ref<float> v = op.source;
+    BufferRef<float> v = op.source;
     uint floats = (op.flags >> kFloatsShift) & 0xff;
     if (op.kind == kTranslate) {
         m.rows[0].w = v[0];

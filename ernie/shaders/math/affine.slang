@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file affine.slang
 /// @brief 3x4 affine transforms as float rows: identity, loads, stores and products.
-import ref;
+import buffer_ref;
 
 /// A 3x4 affine transform's rows; its fourth row is (0, 0, 0, 1).
 struct Affine {
@@ -17,7 +17,7 @@ Affine Identity() {
 }
 
 /// Each transform as three float4 rows.
-Affine Load(Ref<float4> matrices, uint index) {
+Affine Load(BufferRef<float4> matrices, uint index) {
     Affine m;
     for (uint r = 0; r < 3; ++r) {
         m.rows[r] = matrices[3 * index + r];
@@ -25,7 +25,7 @@ Affine Load(Ref<float4> matrices, uint index) {
     return m;
 }
 
-void Store(Ref<float4> matrices, uint index, Affine m) {
+void Store(BufferRef<float4> matrices, uint index, Affine m) {
     for (uint r = 0; r < 3; ++r) {
         matrices[3 * index + r] = m.rows[r];
     }

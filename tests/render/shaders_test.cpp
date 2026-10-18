@@ -27,12 +27,12 @@ const ShaderModule kSizes{"sizes", R"(
 import camera;
 import geometry;
 import ray_tracer;
-import ref;
+import buffer_ref;
 import transform;
 import write_instances;
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uniform Ref<uint> sizes) {
+void main(uniform BufferRef<uint> sizes) {
     uint values[] = { sizeof(GeometryRecord), sizeof(TracerParameters), sizeof(SplitRows),
                       sizeof(Op), sizeof(LocalParameters), sizeof(ComposeParameters),
                       sizeof(Instance), sizeof(WriteParameters), sizeof(View),
@@ -75,11 +75,12 @@ TEST(Shaders, SharedStructsLayOutAsInCpp) {
     std::vector<ShaderModule> modules = SharedModules();
     modules.push_back(kSizes);
     const ComputeKernel sizes(*context, ShaderCompiler().Spirv(modules, "main"), "sizes",
-                              sizeof(shaders::Ref<std::uint32_t>));
+                              sizeof(shaders::BufferRef<std::uint32_t>));
     Arenas arenas(*context, MemoryUse::Device, "sizes", 1 << 12);
     const BufferRange range = arenas.Allocate(kExpected.size() * sizeof(std::uint32_t));
     const Ticket written = context->Main().Submit([&](VkCommandBuffer commands) {
-        sizes.Dispatch(commands, {1, 1, 1}, shaders::Ref<std::uint32_t>{arenas.Address(range)});
+        sizes.Dispatch(commands, {1, 1, 1},
+                       shaders::BufferRef<std::uint32_t>{arenas.Address(range)});
     });
     Readback readback(*context, context->Main(), arenas.Storage(range), range.offset, range.size,
                       std::span(&written, 1));

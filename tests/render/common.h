@@ -54,9 +54,9 @@ inline constexpr float kDisagree = -2.0f;
 /// Traces each ray, writing its hit distance and world normal, `kMiss`, or `kDisagree`.
 inline const ShaderModule kTrace{"trace", R"(
 import ray_tracer;
-import ref;
+import buffer_ref;
 struct Ray { float4 origin; float4 direction; };
-struct Parameters { TracerParameters tracer; Ref<Ray> rays; Ref<float4> hits; uint count; };
+struct Parameters { TracerParameters tracer; BufferRef<Ray> rays; BufferRef<float4> hits; uint count; };
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -125,8 +125,8 @@ class RayTracingTest : public ::testing::Test {
   private:
     struct TraceParameters {
         TracerParameters tracer;
-        shaders::Ref<Ray> rays;
-        shaders::Ref<glm::vec4> hits;
+        shaders::BufferRef<Ray> rays;
+        shaders::BufferRef<glm::vec4> hits;
         std::uint32_t count;
     };
     std::unique_ptr<ComputeKernel> trace_;
@@ -165,8 +165,8 @@ inline std::vector<glm::vec4> RayTracingTest::Trace(std::span<const Ray> rays) {
                 },
                 [this, from, to, count, tracer = scene.parameters](graph::PassContext& pass) {
                     trace_->Dispatch(pass.commands, {(count + 63) / 64, 1, 1},
-                                     TraceParameters{tracer, pass.Get(from).Ref<Ray>(),
-                                                     pass.Get(to).Ref<glm::vec4>(), count});
+                                     TraceParameters{tracer, pass.Get(from).BufferRef<Ray>(),
+                                                     pass.Get(to).BufferRef<glm::vec4>(), count});
                 });
         },
         std::span(&uploaded, 1));

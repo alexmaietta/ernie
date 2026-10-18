@@ -6,7 +6,7 @@
 
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
-#include "ernie/shaders/device/ref.h"
+#include "ernie/shaders/device/buffer_ref.h"
 #include "ernie/shaders/math/affine.h"
 #include "ernie/shaders/math/double_float.h"
 #include "ernie/shaders/scene/transform.h"
@@ -132,7 +132,7 @@ void TransformGraph::SetOrigin(const glm::dvec3& origin) {
 }
 
 std::span<const ShaderModule> TransformGraph::WorldModules() {
-    static const std::array modules{shaders::kRef, shaders::kAffine, shaders::kDoubleFloat,
+    static const std::array modules{shaders::kBufferRef, shaders::kAffine, shaders::kDoubleFloat,
                                     shaders::kTransform};
     return modules;
 }
@@ -510,19 +510,21 @@ void TransformGraph::UploadDirty() {
 }
 
 void TransformGraph::DispatchLocals(VkCommandBuffer commands) const {
-    local_.Dispatch(
-        commands, Groups(programmed_.slots.size()),
-        LocalParameters{ToRef<shaders::uint>(*programmed_.device), ToRef<DeviceOp>(*programColumn_),
-                        ToRef<shaders::uint>(*lengthColumn_), ToRef<shaders::float4>(*localColumn_),
-                        static_cast<std::uint32_t>(programmed_.slots.size())});
+    local_.Dispatch(commands, Groups(programmed_.slots.size()),
+                    LocalParameters{ToBufferRef<shaders::uint>(*programmed_.device),
+                                    ToBufferRef<DeviceOp>(*programColumn_),
+                                    ToBufferRef<shaders::uint>(*lengthColumn_),
+                                    ToBufferRef<shaders::float4>(*localColumn_),
+                                    static_cast<std::uint32_t>(programmed_.slots.size())});
 }
 
 void TransformGraph::DispatchLevel(VkCommandBuffer commands, const SlotList& level) const {
-    compose_.Dispatch(
-        commands, Groups(level.slots.size()),
-        ComposeParameters{ToRef<shaders::uint>(*level.device), ToRef<shaders::uint>(*parentColumn_),
-                          ToRef<shaders::float4>(*localColumn_), ToRef<shaders::float4>(*worlds_),
-                          static_cast<std::uint32_t>(level.slots.size())});
+    compose_.Dispatch(commands, Groups(level.slots.size()),
+                      ComposeParameters{ToBufferRef<shaders::uint>(*level.device),
+                                        ToBufferRef<shaders::uint>(*parentColumn_),
+                                        ToBufferRef<shaders::float4>(*localColumn_),
+                                        ToBufferRef<shaders::float4>(*worlds_),
+                                        static_cast<std::uint32_t>(level.slots.size())});
 }
 
 Ticket TransformGraph::Update(std::span<const Ticket> waits) {

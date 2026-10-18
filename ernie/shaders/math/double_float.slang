@@ -4,7 +4,7 @@
 /// error-free sums and Veltkamp-split products, about 48 bits of mantissa from pairs of floats.
 /// `precise` keeps every step as written (SPIR-V NoContraction).
 import affine;
-import ref;
+import buffer_ref;
 
 /// Four values, each the unevaluated sum of a high float and a low one.
 struct Double4 {
@@ -94,7 +94,7 @@ DoubleAffine Mul(DoubleAffine a, DoubleAffine b) {
 }
 
 /// Each transform as six float4: its three high rows, then its three low rows.
-DoubleAffine LoadDouble(Ref<float4> matrices, uint index) {
+DoubleAffine LoadDouble(BufferRef<float4> matrices, uint index) {
     DoubleAffine m;
     for (uint r = 0; r < 3; ++r) {
         m.rows[r] = Pair(matrices[6 * index + r], matrices[6 * index + 3 + r]);
@@ -102,7 +102,7 @@ DoubleAffine LoadDouble(Ref<float4> matrices, uint index) {
     return m;
 }
 
-void StoreDouble(Ref<float4> matrices, uint index, DoubleAffine m) {
+void StoreDouble(BufferRef<float4> matrices, uint index, DoubleAffine m) {
     for (uint r = 0; r < 3; ++r) {
         matrices[6 * index + r] = m.rows[r].hi;
         matrices[6 * index + 3 + r] = m.rows[r].lo;

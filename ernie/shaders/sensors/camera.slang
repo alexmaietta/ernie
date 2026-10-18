@@ -11,7 +11,7 @@ namespace ernie::shaders {
 #else
 import bindless;
 import ray_tracer;
-import ref;
+import buffer_ref;
 import spectrum;
 #endif
 
@@ -34,18 +34,18 @@ struct View {
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
     /// z, the instance row, `kBands` albedo bands, and the colour image's RGBA8 bytes; each null
     /// for no output.
-    Ref<float> distances;
-    Ref<float> normals;
-    Ref<uint> instances;
-    Ref<float> albedos;
-    Ref<uint> ldr;
+    BufferRef<float> distances;
+    BufferRef<float> normals;
+    BufferRef<uint> instances;
+    BufferRef<float> albedos;
+    BufferRef<uint> ldr;
 };
 
 struct CameraParameters {
     TracerParameters tracer;
-    Ref<View> views;
+    BufferRef<View> views;
     /// Each instance row's albedo, three linear RGB floats.
-    Ref<float> colours;
+    BufferRef<float> colours;
     uint count;
 };
 

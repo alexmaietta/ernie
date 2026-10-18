@@ -108,7 +108,7 @@ class DeviceColumn {
 };
 
 /// @return A shader's handle of a column's rows as `T`s.
-template <typename T> shaders::Ref<T> ToRef(const DeviceColumn& column) {
+template <typename T> shaders::BufferRef<T> ToBufferRef(const DeviceColumn& column) {
     return {column.Address()};
 }
 
