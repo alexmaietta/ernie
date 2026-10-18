@@ -35,6 +35,7 @@ void Ticket::Wait() const {
     if (timeline == nullptr) {
         return;
     }
+    ERNIE_ZONE("Wait for the GPU");
     const VkSemaphore semaphore = timeline->Handle();
     const VkSemaphoreWaitInfo wait{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
                                    .semaphoreCount = 1,

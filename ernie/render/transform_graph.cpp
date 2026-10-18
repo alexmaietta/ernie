@@ -543,6 +543,7 @@ void TransformGraph::Refresh(std::uint32_t slot) {
 }
 
 void TransformGraph::Replay(const ChangeSet& changes) {
+    ERNIE_ZONE("Follow the hierarchy's changes");
     const PrimStore& store = scene_.Store();
     rows_.resize(store.BucketCount());
     std::vector<PrimId> removed;
@@ -646,6 +647,7 @@ void TransformGraph::UploadDirty() {
 }
 
 Ticket TransformGraph::Update(std::span<const Ticket> waits) {
+    ERNIE_ZONE("Update transforms");
     const PrimStore& store = scene_.Store();
     for (const Binding& binding : bindings_) {
         if (binding.column->Rows() != store.GetBucket(binding.bucket).Rows()) {
@@ -692,9 +694,11 @@ Ticket TransformGraph::Update(std::span<const Ticket> waits) {
     after.push_back(uploader_.Flush(waits));
     return context_.Main().Submit(
         [&](VkCommandBuffer commands) {
+            ERNIE_GPU_ZONE(context_, commands, "Transforms");
             // After earlier readers of the worlds and writers of the bound columns.
             ComputeBarrier(commands);
             if (!programmed_.slots.empty()) {
+                ERNIE_GPU_ZONE(context_, commands, "Local transforms");
                 local_.Dispatch(
                     commands, Groups(programmed_.slots.size()),
                     LocalParameters{programmed_.device->Address(), programColumn_->Address(),
@@ -706,6 +710,7 @@ Ticket TransformGraph::Update(std::span<const Ticket> waits) {
                     continue;
                 }
                 ComputeBarrier(commands);
+                ERNIE_GPU_ZONE(context_, commands, "World transforms");
                 compose_.Dispatch(
                     commands, Groups(level.slots.size()),
                     ComposeParameters{level.device->Address(), parentColumn_->Address(),

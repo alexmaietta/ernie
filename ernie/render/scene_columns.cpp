@@ -242,6 +242,7 @@ void SceneColumns::FindAuthoredRows(const ChangeSet& changes, const Binding& bin
 }
 
 Ticket SceneColumns::Sync(std::span<const Ticket> waits) {
+    ERNIE_ZONE("Sync scene columns");
     const PrimStore& store = scene_.Store();
     std::vector<Ticket> after(waits.begin(), waits.end());
     // Values staged by `Bind` land before any column moves to a larger range.

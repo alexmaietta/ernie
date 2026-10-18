@@ -35,6 +35,8 @@ struct DeviceCapabilities {
     bool memoryBudget = false;
     /// What went wrong on device loss.
     bool deviceFault = false;
+    /// The device's and host's clocks read together, so GPU zones line up with CPU zones.
+    bool calibratedTimestamps = false;
     bool sparseResidency = false;
 };
 

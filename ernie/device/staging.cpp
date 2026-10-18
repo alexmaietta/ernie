@@ -74,6 +74,8 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
     if (copies_.empty()) {
         return {};
     }
+    ERNIE_ZONE("Upload");
+    ERNIE_PLOT("Uploaded bytes", pending_);
     const Ticket ticket = queue_.Submit(
         [&](VkCommandBuffer commands) {
             BeforeCopies(commands);
@@ -132,6 +134,7 @@ Readback::~Readback() {
 }
 
 std::span<const std::byte> Readback::Bytes() {
+    ERNIE_ZONE("Read back");
     ticket_.Wait();
     host_->Invalidate(0, host_->Size());
     return host_->Mapped();

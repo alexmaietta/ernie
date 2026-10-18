@@ -8,6 +8,7 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/algorithm.h"
+#include "ernie/util/profiler.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -230,6 +231,19 @@ std::vector<std::string> Scene::Attributes(const Path& path) const {
         }
     }
     return names;
+}
+
+void Scene::Update() {
+    ERNIE_ZONE("Update the scene");
+    Resolve();
+    {
+        ERNIE_ZONE("Index relationship holders");
+        holders_.Update(store_);
+    }
+    {
+        ERNIE_ZONE("Compute extents");
+        extents_.Update(store_);
+    }
 }
 
 glm::dmat4 Scene::LocalTransform(PrimId prim) const {

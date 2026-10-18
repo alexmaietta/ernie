@@ -4,6 +4,7 @@
 /// columns, for only the subtrees whose authored values or prims changed.
 #include "ernie/scene/convert.h"
 #include "ernie/scene/scene.h"
+#include "ernie/util/profiler.h"
 
 #include <algorithm>
 #include <concepts>
@@ -97,6 +98,7 @@ BitSet Roots(const PrimStore& store, const ChangeSet& changes, AttributeId attri
 }  // namespace
 
 void Scene::Resolve() {
+    ERNIE_ZONE("Resolve inherited attributes");
     const ChangeSet changes = store_.ChangesSince(resolved_);
     for (const AttributeDef* def : InheritedAttributes()) {
         const AttributeId attribute = store_.Tokens().Intern(def->name);

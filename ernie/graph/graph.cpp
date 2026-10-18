@@ -312,6 +312,7 @@ void Graph::Compile() {
     if (compiled_) {
         return;
     }
+    ERNIE_ZONE("Compile the frame graph");
     live_ = LivePasses();
     Lease(live_);
     std::vector<DependencyResource> resources;
@@ -380,10 +381,18 @@ void Graph::Record(VkCommandBuffer commands, const Dependency& dependency) const
 
 void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order) const {
     const Pass& pass = passes_[live_[order]];
+    ERNIE_ZONE("Record a pass");
+    ERNIE_ZONE_TEXT(pass.name);
+    // A label and a GPU zone for each scope, then the pass, closed innermost first.
+    std::vector<std::unique_ptr<GpuZone>> zones;
+    const auto open = [&](const std::string& name) {
+        context_.BeginLabel(commands, name);
+        zones.push_back(std::make_unique<GpuZone>(context_, commands, name));
+    };
     for (const std::string& scope : pass.scopes) {
-        context_.BeginLabel(commands, scope);
+        open(scope);
     }
-    context_.BeginLabel(commands, pass.name);
+    open(pass.name);
     Record(commands, dependencies_.passes[order]);
     if (fullBarriers_) {
         ernie::Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
@@ -394,7 +403,8 @@ void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order) const {
     if (pass.run) {
         pass.run(context);
     }
-    for (std::size_t s = 0; s <= pass.scopes.size(); ++s) {
+    while (!zones.empty()) {
+        zones.pop_back();
         context_.EndLabel(commands);
     }
 }

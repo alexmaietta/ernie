@@ -5,6 +5,7 @@
 
 #include "ernie/util/algorithm.h"
 #include "ernie/util/on_failure.h"
+#include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <algorithm>
@@ -77,6 +78,7 @@ Families FindFamilies(VkPhysicalDevice device) {
 DeviceContext::DeviceContext(const DeviceContextOptions& options)
     : instance_({.validation = options.validation, .extensions = options.instanceExtensions}),
       physical_(Choose(instance_, options.device)) {
+    ERNIE_ZONE("Create device");
     VkPhysicalDeviceMaintenance4Properties maintenance4{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES};
     VkPhysicalDeviceProperties2 properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
@@ -148,10 +150,12 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
     main_ = chosen[0];
     compute_ = chosen[1];
     transfer_ = chosen[2];
+    profiler_ = GpuProfiler::Create(*this);
 }
 
 DeviceContext::~DeviceContext() {
     Quietly([this] { WaitIdle(); });
+    profiler_.reset();
     queues_.clear();
     vmaDestroyAllocator(allocator_);
     vkDestroyDevice(device_, nullptr);
@@ -174,6 +178,10 @@ void DeviceContext::Retire(std::function<void()> release) {
 }
 
 void DeviceContext::Collect() {
+    ERNIE_ZONE("Collect");
+    if (profiler_) {
+        profiler_->Collect();
+    }
     std::vector<Retired> done;
     {
         const std::lock_guard lock(retiredMutex_);

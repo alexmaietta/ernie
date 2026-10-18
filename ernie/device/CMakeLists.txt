@@ -7,6 +7,7 @@ add_library(
     buffer.cpp
     column.cpp
     context.cpp
+    profile.cpp
     cuda.cpp
     external.cpp
     image.cpp

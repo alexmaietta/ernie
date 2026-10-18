@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ernie/device/instance.h"
+#include "ernie/device/profile.h"
 #include "ernie/device/queue.h"
 #include "ernie/device/vulkan.h"
 
@@ -124,6 +125,10 @@ class DeviceContext {
     VkDevice Device() const {
         return device_;
     }
+    /// @return The GPU profiler, or null when GPU zones record nothing.
+    GpuProfiler* Profiler() const {
+        return profiler_.get();
+    }
     VmaAllocator Allocator() const {
         return allocator_;
     }
@@ -140,6 +145,7 @@ class DeviceContext {
     std::uint64_t maxBufferSize_ = 0;
     VkDevice device_ = VK_NULL_HANDLE;
     VmaAllocator allocator_ = VK_NULL_HANDLE;
+    std::unique_ptr<GpuProfiler> profiler_;
     std::vector<std::unique_ptr<Queue>> queues_;
     Queue* main_ = nullptr;
     Queue* compute_ = nullptr;

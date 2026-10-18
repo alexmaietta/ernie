@@ -14,6 +14,8 @@ ComputeKernel::ComputeKernel(DeviceContext& context, std::span<const std::uint32
                              const BindlessHeap* heap, std::string_view entryPoint)
     : device_(context.Device()), name_(name), parameterBytes_(parameterBytes),
       heap_(heap != nullptr ? heap->Set() : VK_NULL_HANDLE) {
+    ERNIE_ZONE("Create compute pipeline");
+    ERNIE_ZONE_TEXT(name_);
     if (parameterBytes > context.Limits().maxPushConstantsSize) {
         throw DeviceError(DeviceErrorKind::Unsupported,
                           name_ + " passes more bytes per dispatch than the device allows");

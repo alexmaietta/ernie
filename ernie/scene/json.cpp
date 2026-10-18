@@ -9,6 +9,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/util/algorithm.h"
 #include "ernie/util/file.h"
+#include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <glm/gtc/matrix_access.hpp>
@@ -507,6 +508,7 @@ Json SceneFile(Json prims) {
 
 void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arrays,
                std::vector<SceneProblem>* problems) {
+    ERNIE_ZONE("Load a scene");
     Json prims;
     if (!Attempt(problems, Path(), "", [&] { prims = ParsePrims(text); })) {
         return;
@@ -531,6 +533,7 @@ void LoadSceneFile(Scene& scene, const std::filesystem::path& path) {
 }
 
 std::string SaveScene(const Scene& scene) {
+    ERNIE_ZONE("Save a scene");
     Json prims = Json::object();
     for (const Path& path : scene.Prims()) {
         prims[path.String()] = WritePrim(scene, path);

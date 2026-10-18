@@ -30,6 +30,8 @@ const std::array kExtensions{
     Extension{kExternalSemaphoreExtension, &DeviceCapabilities::externalTimeline},
     Extension{VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, &DeviceCapabilities::memoryBudget},
     Extension{VK_EXT_DEVICE_FAULT_EXTENSION_NAME, &DeviceCapabilities::deviceFault},
+    Extension{VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
+              &DeviceCapabilities::calibratedTimestamps},
 };
 
 /// @brief A feature bit Ernie requires: its name, for the error naming it, and where it lives.
@@ -207,13 +209,17 @@ PhysicalDevice Probe(VkPhysicalDevice handle) {
                     .externalMemory = true,
                     .externalTimeline = true,
                     .memoryBudget = true,
-                    .deviceFault = true};
+                    .deviceFault = true,
+                    .calibratedTimestamps = true};
     for (const Extension& extension : kExtensions) {
         capabilities.*extension.capability &= has(extension.name);
     }
     capabilities.rayQuery &= features.accelerationStructure.accelerationStructure == VK_TRUE &&
                              features.rayQuery.rayQuery == VK_TRUE;
     capabilities.deviceFault &= features.fault.deviceFault == VK_TRUE;
+    // Timestamp queries reset from the host, so GPU zones need no command buffers of their own.
+    capabilities.calibratedTimestamps &=
+        features.v12.hostQueryReset == VK_TRUE && p.limits.timestampComputeAndGraphics == VK_TRUE;
     capabilities.externalMemory = capabilities.externalMemory && SharesMemory(handle);
     capabilities.externalTimeline = capabilities.externalTimeline && SharesTimelines(handle);
     capabilities.shaderInt64 = features.core.features.shaderInt64 == VK_TRUE;
@@ -250,6 +256,7 @@ FeatureChain PhysicalDevice::EnabledFeatures() const {
     enabled.accelerationStructure.accelerationStructure = bit(capabilities.rayQuery);
     enabled.rayQuery.rayQuery = bit(capabilities.rayQuery);
     enabled.fault.deviceFault = bit(capabilities.deviceFault);
+    enabled.v12.hostQueryReset = bit(capabilities.calibratedTimestamps);
     enabled.Link(capabilities.rayQuery, capabilities.rayQuery, capabilities.deviceFault);
     return enabled;
 }

@@ -6,7 +6,7 @@
 /// -DERNIE_TRACY=ON for Tracy too. Off until `SetEnabled`; a zone then costs one atomic load. CPU
 /// zones belong to the frame they end in; GPU zones to the frame that recorded their commands.
 /// Reports average frames into zone trees, modelled on Omniverse Kit's profiler window, and export
-/// text, JSON and Chrome traces. GPU zones are in device/gpu_profile.h.
+/// text, JSON and Chrome traces. GPU zones are in device/profile.h.
 ///
 ///     // The rest of the scope, one per scope; a string literal.
 ///     ERNIE_ZONE("Sync");

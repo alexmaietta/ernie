@@ -249,6 +249,7 @@ CUdeviceptr CudaInterop::Map(const Buffer& buffer) {
     if (found != mappings_.end()) {
         return found->second.pointer;
     }
+    ERNIE_ZONE("Map memory into CUDA");
     ExternalHandle handle = buffer.Export();
     MemoryHandleDesc memory{.type = kMemoryHandleType,
                             .handle = {},
@@ -359,6 +360,7 @@ Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUs
 }
 
 std::unique_ptr<DeviceColumn> CudaInterop::Wrap(const Tensor& tensor, std::string_view name) {
+    ERNIE_ZONE("Wrap a CUDA tensor");
     CheckOnDevice(tensor, "Wrapping " + std::string(name));
     const auto pointer = reinterpret_cast<CUdeviceptr>(tensor.Data());
     const std::uint64_t bytes = tensor.Bytes();

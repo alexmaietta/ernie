@@ -7,6 +7,7 @@
 
 #include "ernie/device/device.h"
 #include "ernie/util/log.h"
+#include "ernie/util/profiler.h"
 
 #include <vk_mem_alloc.h>
 #include <volk.h>

@@ -3,6 +3,8 @@
 /// @brief Compiling through Slang's API: a session per compile, modules loaded from source.
 #include "ernie/device/shader_compiler.h"
 
+#include "ernie/util/profiler.h"
+
 #include <slang-com-ptr.h>
 #include <slang.h>
 
@@ -93,6 +95,7 @@ ShaderCompiler::~ShaderCompiler() = default;
 
 std::vector<std::uint32_t> ShaderCompiler::Spirv(std::span<const ShaderModule> modules,
                                                  std::string_view entryPoint) const {
+    ERNIE_ZONE("Compile Slang to SPIR-V");
     const Slang::ComPtr<slang::IBlob> code =
         session_->Compile(modules, entryPoint, SLANG_SPIRV, "spirv_1_6");
     std::vector<std::uint32_t> words(code->getBufferSize() / 4);
@@ -102,6 +105,7 @@ std::vector<std::uint32_t> ShaderCompiler::Spirv(std::span<const ShaderModule> m
 
 std::string ShaderCompiler::Wgsl(std::span<const ShaderModule> modules,
                                  std::string_view entryPoint) const {
+    ERNIE_ZONE("Compile Slang to WGSL");
     return Text(session_->Compile(modules, entryPoint, SLANG_WGSL, "wgsl").get());
 }
 

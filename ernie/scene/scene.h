@@ -125,11 +125,7 @@ class Scene {
     /// before renderers pull changes: resolves inherited attributes for the subtrees whose
     /// authored values or prims changed, re-indexes changed relationships, then recomputes the
     /// changed rows' cached extents.
-    void Update() {
-        Resolve();
-        holders_.Update(store_);
-        extents_.Update(store_);
-    }
+    void Update();
     /// @return The prims whose relationships target `target` as of the last `Update`, resolved
     /// material bindings included: what an edit to `target` reaches.
     std::vector<PrimId> Holders(const Path& target) const;
