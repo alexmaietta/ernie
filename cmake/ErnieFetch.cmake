@@ -14,7 +14,7 @@ function(ernie_fetch name)
     cmake_parse_arguments(
         ARG
         ""
-        "URL;GIT_REPOSITORY;GIT_TAG;GIT_SHALLOW;SOURCE_SUBDIR"
+        "URL;URL_HASH;GIT_REPOSITORY;GIT_TAG;GIT_SHALLOW;SOURCE_SUBDIR"
         "GIT_SUBMODULES"
         ${ARGN}
     )

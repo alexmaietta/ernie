@@ -21,5 +21,17 @@ endforeach()
 
 configure_file(ernie/__init__.py "${ernie_package_dir}/__init__.py" COPYONLY)
 
+# Slang's runtime beside the module: found through its rpath, and on Windows where DLLs are looked
+# for; copied into the build tree's package too, for Windows' tests.
+if(APPLE)
+    set_target_properties(_ernie PROPERTIES INSTALL_RPATH "@loader_path")
+else()
+    set_target_properties(_ernie PROPERTIES INSTALL_RPATH "$ORIGIN")
+endif()
+if(WIN32)
+    file(COPY ${ERNIE_SLANG_RUNTIME} DESTINATION "${ernie_package_dir}")
+endif()
+
 install(TARGETS _ernie LIBRARY DESTINATION ernie COMPONENT python)
 install(FILES ernie/__init__.py DESTINATION ernie COMPONENT python)
+install(FILES ${ERNIE_SLANG_RUNTIME} DESTINATION ernie COMPONENT python)

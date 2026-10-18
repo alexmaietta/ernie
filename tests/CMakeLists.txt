@@ -78,7 +78,11 @@ ernie_add_test_suite(
 ernie_add_test_suite(
     device
     LABEL gpu
-    SOURCES device/arena_test.cpp device/context_test.cpp device/vulkan_devices_test.cpp
+    SOURCES
+        device/arena_test.cpp
+        device/context_test.cpp
+        device/kernel_test.cpp
+        device/vulkan_devices_test.cpp
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
 

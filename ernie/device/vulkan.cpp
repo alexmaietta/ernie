@@ -14,8 +14,9 @@ namespace ernie {
 namespace {
 
 #if defined(_WIN32)
-constexpr const char* kExternalMemory = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
-constexpr const char* kExternalSemaphore = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME;
+// Named here: their macros are in vulkan_win32.h, which needs <windows.h>.
+constexpr const char* kExternalMemory = "VK_KHR_external_memory_win32";
+constexpr const char* kExternalSemaphore = "VK_KHR_external_semaphore_win32";
 #else
 constexpr const char* kExternalMemory = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
 constexpr const char* kExternalSemaphore = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;

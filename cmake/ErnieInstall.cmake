@@ -13,6 +13,34 @@ install(
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT dev
 )
 
+# Slang's runtime, private to Ernie in lib/ernie and found through RPATHs, so it never clashes with
+# another Slang on the system; on Windows beside the DLLs, where programs look. Installed as
+# programs, as shared libraries are: RPM lists only what an executable library provides.
+if(APPLE)
+    set(ernie_origin "@loader_path")
+else()
+    set(ernie_origin "$ORIGIN")
+endif()
+set(ernie_private_libdir "${CMAKE_INSTALL_LIBDIR}/ernie")
+set_target_properties(ernie PROPERTIES INSTALL_RPATH "${ernie_origin}/ernie")
+if(TARGET ernie_app)
+    file(
+        RELATIVE_PATH
+        ernie_bin_to_private
+        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+        "${CMAKE_INSTALL_PREFIX}/${ernie_private_libdir}"
+    )
+    set_target_properties(
+        ernie_app
+        PROPERTIES INSTALL_RPATH "${ernie_origin}/${ernie_bin_to_private}"
+    )
+endif()
+if(WIN32)
+    install(FILES ${ERNIE_SLANG_RUNTIME} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT runtime)
+else()
+    install(PROGRAMS ${ERNIE_SLANG_RUNTIME} DESTINATION "${ernie_private_libdir}" COMPONENT runtime)
+endif()
+
 set(ernie_public_headers
     util/glm.h
     util/log.h
@@ -93,6 +121,7 @@ set(ernie_notices
     "nlohmann_json|${nlohmann_json_SOURCE_DIR}/LICENSE.MIT"
     "openexr|${openexr_SOURCE_DIR}/LICENSE.md"
     "openjph|${openexr_SOURCE_DIR}/external/OpenJPH/LICENSE"
+    "slang|${slang_SOURCE_DIR}/LICENSE"
     "stb|${stb_SOURCE_DIR}/LICENSE"
     "vma|${vma_SOURCE_DIR}/LICENSE.txt"
     "volk|${volk_SOURCE_DIR}/LICENSE.md"

@@ -6,12 +6,14 @@ add_library(
     buffer.cpp
     context.cpp
     instance.cpp
+    kernel.cpp
     queue.cpp
+    shader_compiler.cpp
     staging.cpp
     vulkan.cpp
 )
 target_link_libraries(
     ernie_device
     PUBLIC ernie_util
-    PRIVATE ernie_volk ernie_vma ernie_build_options
+    PRIVATE ernie_volk ernie_vma ernie_glm slang::slang ernie_build_options
 )

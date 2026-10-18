@@ -65,6 +65,11 @@ manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"
 test-command = "python -c \"import ernie; print(ernie.__version__)\""
 
+[tool.cibuildwheel.linux]
+# Slang's runtime is in the wheel already, beside the module, with the glslang library it loads by
+# name at run time; auditwheel would rename the compiler and strand that library.
+repair-wheel-command = "auditwheel repair --exclude 'libslang-*' -w {dest_dir} {wheel}"
+
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
 environment = { MACOSX_DEPLOYMENT_TARGET = "14.0" }
