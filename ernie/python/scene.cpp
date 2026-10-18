@@ -83,9 +83,9 @@ Json ToJson(nb::handle value) {
     if (nb::hasattr(value, "__float__")) {
         return nb::cast<double>(value.attr("__float__")());
     }
-    throw nb::type_error(("A scene value cannot be a " +
-                          nb::cast<std::string>(nb::str(value.type().attr("__name__"))))
-                             .c_str());
+    throw nb::type_error(
+        ("A scene value cannot be a " + nb::cast<std::string>(value.type().attr("__name__")))
+            .c_str());
 }
 
 /// @return JSON as Python values: arrays as lists.

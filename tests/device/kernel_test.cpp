@@ -118,6 +118,8 @@ TEST(ComputeKernel, PipelinesAreCachedOnDiskAndReloaded) {
     const std::filesystem::path path = test::TempPath("ernie_kernel_test") / "pipelines.bin";
     std::filesystem::remove_all(path.parent_path());
     std::size_t saved = 0;
+    // Some drivers, as older lavapipe, keep nothing beyond the cache's header.
+    bool caches = false;
     {
         const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
         if (!context) {
@@ -128,7 +130,8 @@ TEST(ComputeKernel, PipelinesAreCachedOnDiskAndReloaded) {
         const ComputeKernel fill(*context, compiler.Spirv(std::span(&kFill, 1), "main"), "fill",
                                  sizeof(FillParameters));
         saved = CachedBytes(*context);
-        EXPECT_GT(saved, empty) << "the pipeline is cached";
+        EXPECT_GE(saved, empty);
+        caches = saved > empty;
         ExpectClean(*context);
     }
     ASSERT_TRUE(std::filesystem::exists(path)) << "saved on destruction";
@@ -144,7 +147,9 @@ TEST(ComputeKernel, PipelinesAreCachedOnDiskAndReloaded) {
     WriteTextFile(path, foreign);
     {
         const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
-        EXPECT_LT(CachedBytes(*context), saved);
+        if (caches) {
+            EXPECT_LT(CachedBytes(*context), saved);
+        }
         ExpectClean(*context);
     }
     std::filesystem::remove_all(path.parent_path());
