@@ -168,6 +168,15 @@ std::unique_ptr<Panel> MakeStagePanel(const Scene& scene, Selection& selection);
 /// Stage panel lists for it. Empty for an empty filter, which lists everything.
 std::unordered_set<Path> StageMatches(const Scene& scene, std::string_view filter);
 
+/// @return The Properties panel: the first selected prim's type, APIs, bounds and authored
+/// attributes, read-only.
+std::unique_ptr<Panel> MakePropertiesPanel(const Scene& scene, const Selection& selection);
+
+/// @return The Info panel: the scene's prims by type and bounds, and the frame time, the device's
+/// memory budget and the bytes it has moved.
+/// @param device The device in use; null for none.
+std::unique_ptr<Panel> MakeInfoPanel(const Scene& scene, const DeviceContext* device);
+
 /// @return The Devices panel: the device in use, or none, and every Vulkan device installed.
 std::unique_ptr<Panel> MakeDevicePanel(const DeviceContext* device);
 

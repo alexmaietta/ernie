@@ -62,16 +62,33 @@ TEST(Shell, DocksItsPanelsAroundTheViewport) {
     Shell shell(scene, nullptr);
     frames.Draw(shell);
     frames.Draw(shell);
-    for (const char* title : {"Stage", "Devices", "Log"}) {
+    for (const char* title : {"Stage", "Properties", "Log", "Info", "Devices", "Profiler"}) {
         EXPECT_TRUE(UiFrames::Drawn(title)) << title;
         EXPECT_NE(ImGui::FindWindowByName(title)->DockNode, nullptr) << title << " is docked";
     }
-    EXPECT_FALSE(UiFrames::Drawn("Profiler")) << "hidden until asked for";
     const auto [origin, size] = shell.Viewport();
     EXPECT_GT(origin.y, 0.0f) << "below the menu bar";
     EXPECT_GT(size.x, 0.5f * 1280.0f) << "the viewport keeps most of the width";
     EXPECT_LT(size.x, 1280.0f);
     EXPECT_LT(size.y, 720.0f);
+}
+
+TEST(Shell, TabsTheLogDevicesAndProfilerAtTheBottomOpeningOnTheLog) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    frames.Draw(shell);
+    frames.Draw(shell);
+    const ImGuiWindow* log = ImGui::FindWindowByName("Log");
+    for (const char* title : {"Info", "Devices", "Profiler"}) {
+        EXPECT_EQ(ImGui::FindWindowByName(title)->DockNode, log->DockNode) << title;
+    }
+    EXPECT_NE(ImGui::FindWindowByName("Properties")->DockNode, log->DockNode);
+    EXPECT_GT(log->Pos.y, shell.Viewport().first.y) << "below the viewport";
+    ASSERT_NE(log->DockNode->TabBar, nullptr);
+    EXPECT_EQ(log->DockNode->TabBar->SelectedTabId, log->TabId);
+    EXPECT_FALSE(ImGui::FindWindowByName("Devices")->DockTabIsVisible);
 }
 
 TEST(Shell, ShowsAndHidesPanels) {
@@ -80,12 +97,28 @@ TEST(Shell, ShowsAndHidesPanels) {
     Build(scene);
     Shell shell(scene, nullptr);
     frames.Draw(shell);
-    shell.FindPanel("Profiler")->SetVisible(true);
+    shell.FindPanel("Profiler")->SetVisible(false);
     shell.FindPanel("Log")->SetVisible(false);
     frames.Draw(shell);
-    EXPECT_TRUE(UiFrames::Drawn("Profiler"));
+    EXPECT_FALSE(UiFrames::Drawn("Profiler"));
     EXPECT_FALSE(UiFrames::Drawn("Log"));
+    EXPECT_TRUE(UiFrames::Drawn("Info"));
     EXPECT_EQ(shell.FindPanel("Nonesuch"), nullptr);
+}
+
+TEST(Shell, ShowsTheSelectedPrimsProperties) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    ASSERT_NE(shell.FindPanel("Properties"), nullptr);
+    ASSERT_NE(shell.FindPanel("Info"), nullptr);
+    frames.Draw(shell);
+    shell.Selected().Set("/World/Rover/Wheel");
+    frames.Draw(shell);
+    shell.Selected().Set("/World/Gone");
+    frames.Draw(shell);
+    EXPECT_TRUE(UiFrames::Drawn("Properties")) << "draws a selection the scene lacks";
 }
 
 TEST(Shell, QuitsOnControlQ) {

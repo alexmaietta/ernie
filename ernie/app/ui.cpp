@@ -16,6 +16,7 @@
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui_internal.h>
 
 #if ERNIE_VIEWER_WINDOW
@@ -30,7 +31,10 @@
 #include <cstdio>
 #include <filesystem>
 #include <limits>
+#include <span>
 #include <stdexcept>
+#include <type_traits>
+#include <variant>
 
 namespace ernie::app {
 
@@ -212,6 +216,211 @@ class StagePanel final : public Panel {
     std::uint64_t version_ = 0;
 };
 
+/// @return The world box around the prims of `paths` the scene has.
+Box WorldBounds(const Scene& scene, const std::vector<Path>& paths) {
+    Box bounds;
+    for (const Path& path : paths) {
+        if (scene.Has(path)) {
+            bounds.Extend(scene.WorldBounds(path));
+        }
+    }
+    return bounds;
+}
+
+std::string VectorText(const glm::dvec3& vector) {
+    std::array<char, 96> text{};
+    std::snprintf(text.data(), text.size(), "%.4g, %.4g, %.4g", vector.x, vector.y, vector.z);
+    return text.data();
+}
+
+std::string BoxText(const Box& box) {
+    return box.Empty() ? "empty" : VectorText(box.min) + " to " + VectorText(box.max) + " m";
+}
+
+std::string_view TypeLabel(std::string_view type) {
+    return type.empty() ? "untyped" : type;
+}
+
+std::string ValueText(const Value& value) {
+    const auto numbers = [](const auto& components) {
+        return Join(components, ", ", [](auto n) { return ToText(static_cast<double>(n)); });
+    };
+    const auto vector = [&]<glm::length_t N, typename T>(const glm::vec<N, T>& v) {
+        return "(" + numbers(std::span(glm::value_ptr(v), static_cast<std::size_t>(N))) + ")";
+    };
+    return std::visit(
+        [&]<typename T>(const T& data) -> std::string {
+            if constexpr (std::is_same_v<T, std::monostate>) {
+                return "none";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return data ? "true" : "false";
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                return ToText(static_cast<double>(data));
+            } else if constexpr (std::is_same_v<T, glm::dmat4>) {
+                return Join(std::array{data[0], data[1], data[2], data[3]}, " ", vector);
+            } else if constexpr (std::is_same_v<T, glm::dquat>) {
+                return vector(glm::dvec4(data.w, data.x, data.y, data.z));
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return data;
+            } else if constexpr (std::is_same_v<T, Path>) {
+                return data.String();
+            } else if constexpr (std::is_same_v<T, std::vector<float>>) {
+                return "[" + numbers(data) + "]";
+            } else if constexpr (std::is_same_v<T, std::vector<Path>>) {
+                return "[" + Join(data, ", ", &Path::String) + "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                return "[" + Join(data, ", ") + "]";
+            } else {
+                return vector(data);
+            }
+        },
+        value.Raw());
+}
+
+std::string AttributeText(const Scene& scene, PrimId prim, const std::string& attribute) {
+    const std::size_t samples = scene.Samples(prim, attribute).size();
+    const std::string sampled = samples > 0 ? ", " + std::to_string(samples) + " samples" : "";
+    if (const Tensor* array = scene.Read(prim, attribute)) {
+        return "array of " + Join(array->Shape(), " x ", [](auto n) { return std::to_string(n); }) +
+               ", " + FormatBytes(array->Bytes()) + (array->OnHost() ? "" : " on a device") +
+               sampled;
+    }
+    const std::optional<Value> value = scene.Get(prim, attribute);
+    return (value ? ValueText(*value) : "none") + sampled;
+}
+
+/// @brief After Omniverse Kit's Property window, read-only: the first selected prim's path, type,
+/// API schemas and bounds, then its authored attributes.
+class PropertiesPanel final : public Panel {
+  public:
+    PropertiesPanel(const Scene& scene, const Selection& selection)
+        : Panel("Properties", Dock::RightLower), scene_(scene), selection_(selection) {}
+
+    void Draw() override {
+        if (selection_.Empty() || !scene_.Has(selection_.Paths().front())) {
+            ImGui::TextDisabled("Select a prim in the Stage.");
+            return;
+        }
+        const Path& path = selection_.Paths().front();
+        const PrimId prim = scene_.Require(path);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputTextWithHint("##search", "Search", search_.data(), search_.size());
+        LabelValue("Path", path.String());
+        LabelValue("Type", TypeLabel(scene_.TypeName(prim)));
+        if (const std::vector<std::string> apis = scene_.AppliedApis(prim); !apis.empty()) {
+            LabelValue("API schemas", Join(apis, ", "));
+        }
+        LabelValue("World bounds", BoxText(scene_.WorldBounds(path)));
+        if (const std::size_t selected = selection_.Paths().size(); selected > 1) {
+            ImGui::TextDisabled("The first of %zu selected.", selected);
+        }
+        constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+                                           ImGuiTableFlags_Resizable |
+                                           ImGuiTableFlags_BordersInnerV;
+        if (!ImGui::BeginTable("##attributes", 2, kFlags)) {
+            return;
+        }
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Attribute");
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+        const std::string wanted = ToLower(search_.data());
+        for (const std::string& attribute : scene_.Attributes(path)) {
+            if (ToLower(attribute).find(wanted) == std::string::npos) {
+                continue;
+            }
+            ImGui::TableNextRow();
+            TableTexts({attribute, AttributeText(scene_, prim, attribute)});
+        }
+        ImGui::EndTable();
+    }
+
+  private:
+    const Scene& scene_;
+    const Selection& selection_;
+    std::array<char, 128> search_{};
+};
+
+/// @brief After Ernie 1's Info panel: the scene's scale and the device's use, in sections side by
+/// side, as the bottom dock is wide and short.
+class InfoPanel final : public Panel {
+  public:
+    InfoPanel(const Scene& scene, const DeviceContext* device)
+        : Panel("Info", Dock::Bottom), scene_(scene), device_(device) {}
+
+    void Draw() override {
+        if (counted_ != scene_.Version()) {
+            Count();
+        }
+        if (!ImGui::BeginTable("##info", 3, ImGuiTableFlags_SizingStretchSame)) {
+            return;
+        }
+        ImGui::TableNextColumn();
+        ImGui::SeparatorText("Scene");
+        LabelValue("Prims", std::to_string(prims_));
+        LabelValue("Bounds", BoxText(bounds_));
+        LabelValue("Size", bounds_.Empty() ? "none" : VectorText(bounds_.max - bounds_.min) + " m");
+        LabelValue("Time code", ToText(scene_.Time()));
+        ImGui::TableNextColumn();
+        ImGui::SeparatorText("Prims by type");
+        for (const auto& [type, count] : types_) {
+            LabelValue(TypeLabel(type), std::to_string(count));
+        }
+        ImGui::TableNextColumn();
+        ImGui::SeparatorText("Device");
+        DrawDevice();
+        ImGui::EndTable();
+    }
+
+  private:
+    void Count() {
+        prims_ = 0;
+        types_.clear();
+        for (const Path& path : scene_.Prims()) {
+            if (!path.IsRoot()) {
+                ++prims_;
+                ++types_[std::string(scene_.TypeName(scene_.Require(path)))];
+            }
+        }
+        bounds_ = WorldBounds(scene_, scene_.Children(Path::Root()));
+        counted_ = scene_.Version();
+    }
+
+    void DrawDevice() const {
+        const float fps = ImGui::GetIO().Framerate;
+        std::array<char, 48> frame{};
+        std::snprintf(frame.data(), frame.size(), "%.2f ms, %.0f fps",
+                      fps > 0.0f ? 1000.0 / fps : 0.0, static_cast<double>(fps));
+        LabelValue("Frame", frame.data());
+        if (device_ == nullptr) {
+            ImGui::TextDisabled("No device in use.");
+            return;
+        }
+        const Transfers moved = device_->Transfers();
+        LabelValue("Uploaded", FormatBytes(moved.uploaded));
+        LabelValue("Read back", FormatBytes(moved.readBack));
+        LabelValue("Copied", FormatBytes(moved.copied));
+        const VkPhysicalDeviceMemoryProperties* memory = nullptr;
+        vmaGetMemoryProperties(device_->Allocator(), &memory);
+        std::array<VmaBudget, VK_MAX_MEMORY_HEAPS> budgets{};
+        vmaGetHeapBudgets(device_->Allocator(), budgets.data());
+        for (std::uint32_t heap = 0; heap < memory->memoryHeapCount; ++heap) {
+            const VkMemoryHeapFlags flags = memory->memoryHeaps[heap].flags;
+            const bool local = (flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0;
+            LabelValue("Heap " + std::to_string(heap) + (local ? ", device" : ", host"),
+                       FormatBytes(budgets[heap].usage) + " of " +
+                           FormatBytes(budgets[heap].budget));
+        }
+    }
+
+    const Scene& scene_;
+    const DeviceContext* device_;
+    std::optional<std::uint64_t> counted_;
+    std::size_t prims_ = 0;
+    std::map<std::string, std::size_t> types_;
+    Box bounds_;
+};
+
 std::string ApiVersion(const VulkanDeviceInfo& device) {
     return std::to_string(device.apiMajor) + "." + std::to_string(device.apiMinor);
 }
@@ -242,20 +451,17 @@ std::string CapabilityNames(const DeviceCapabilities& capabilities) {
 class DevicePanel final : public Panel {
   public:
     explicit DevicePanel(const DeviceContext* device)
-        : Panel("Devices", Dock::RightLower), device_(device) {}
+        : Panel("Devices", Dock::Bottom), device_(device) {}
 
     void Draw() override {
         if (device_ != nullptr) {
             const VulkanDeviceInfo& info = device_->Info();
-            const Transfers moved = device_->Transfers();
             ImGui::SeparatorText("In use");
             LabelValue("Name", info.name);
             LabelValue("Type", ToString(info.type));
             LabelValue("Vulkan", ApiVersion(info));
             LabelValue("UUID", info.uuid);
             LabelValue("Capabilities", CapabilityNames(info.capabilities));
-            LabelValue("Uploaded", FormatBytes(moved.uploaded));
-            LabelValue("Read back", FormatBytes(moved.readBack));
         } else {
             ImGui::TextDisabled("No device in use.");
         }
@@ -323,7 +529,7 @@ double FrameMs(const Frame& frame) {
 class ProfilerPanel final : public Panel {
   public:
     ProfilerPanel(MessageLog& log, bool alwaysRecord)
-        : Panel("Profiler", Dock::Bottom, false), log_(log), alwaysRecord_(alwaysRecord) {}
+        : Panel("Profiler", Dock::Bottom), log_(log), alwaysRecord_(alwaysRecord) {}
 
     void Draw() override {
         profiler::SetCpuEnabled(cpu_ || alwaysRecord_);
@@ -663,6 +869,14 @@ std::unique_ptr<Panel> MakeStagePanel(const Scene& scene, Selection& selection) 
     return std::make_unique<StagePanel>(scene, selection);
 }
 
+std::unique_ptr<Panel> MakePropertiesPanel(const Scene& scene, const Selection& selection) {
+    return std::make_unique<PropertiesPanel>(scene, selection);
+}
+
+std::unique_ptr<Panel> MakeInfoPanel(const Scene& scene, const DeviceContext* device) {
+    return std::make_unique<InfoPanel>(scene, device);
+}
+
 std::unique_ptr<Panel> MakeDevicePanel(const DeviceContext* device) {
     return std::make_unique<DevicePanel>(device);
 }
@@ -971,10 +1185,12 @@ template <typename Items> void Menu(const char* name, Items&& items) {
 
 Shell::Shell(const Scene& scene, const DeviceContext* device, const ShellOptions& options)
     : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks) {
-    // Stage above Devices on the right, Log and Profiler at the bottom.
+    // Stage above Properties on the right; Log, Info, Devices and Profiler tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
-    panels_.push_back(MakeDevicePanel(device));
+    panels_.push_back(MakePropertiesPanel(scene, selection_));
     panels_.push_back(MakeLogPanel(log_, theme_));
+    panels_.push_back(MakeInfoPanel(scene, device));
+    panels_.push_back(MakeDevicePanel(device));
     panels_.push_back(MakeProfilerPanel(log_, options.profile));
     if (options.profile) {
         profiler::SetEnabled(true);
@@ -1106,6 +1322,15 @@ void Shell::BuildLayout() {
         }
     }
     ImGui::DockBuilderFinish(kDockSpace);
+    // A dock opens on its last tab; the bottom one opens on the Log instead.
+    const Panel* log = FindPanel("Log");
+    const auto bottom = docks_.find(Dock::Bottom);
+    if (log != nullptr && log->Visible() && log->DefaultDock() == Dock::Bottom &&
+        bottom != docks_.end()) {
+        // A window's tab id, as ImGuiWindow's constructor makes it.
+        ImGui::DockBuilderGetNode(bottom->second)->SelectedTabId =
+            ImHashStr("#TAB", 0, ImHashStr(log->Title().c_str()));
+    }
 }
 
 void Shell::DrawPanels() {
@@ -1200,15 +1425,9 @@ void Shell::Apply() {
 }
 
 void Shell::Frame() {
-    Box bounds;
     const std::vector<Path> framed =
         selection_.Empty() ? scene_.Children(Path::Root()) : selection_.Paths();
-    for (const Path& path : framed) {
-        if (scene_.Has(path)) {
-            bounds.Extend(scene_.WorldBounds(path));
-        }
-    }
-    camera_.Frame(bounds);
+    camera_.Frame(WorldBounds(scene_, framed));
 }
 
 // Presenters
