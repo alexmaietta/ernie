@@ -75,8 +75,8 @@ class Timeline {
 };
 
 /// @brief A queue of one family. Submissions take a recording function and return a ticket on the
-/// queue's timeline; command buffers are recycled once their tickets complete. One thread submits
-/// at a time (its command pool is not thread-safe); any thread may test or wait on tickets.
+/// queue's timeline; command buffers are recycled once their tickets complete. Any thread may
+/// submit, one recording at a time, and test or wait on tickets.
 class Queue {
   public:
     /// @param exportable Whether its timeline may be shared, for other APIs to wait on its work.
@@ -119,6 +119,8 @@ class Queue {
     VkQueue queue_ = VK_NULL_HANDLE;
     ernie::Timeline timeline_;
     VkCommandPool pool_ = VK_NULL_HANDLE;
+    /// Held while recording and submitting; a recording may still ask for tickets.
+    std::mutex recording_;
     mutable std::mutex mutex_;
     std::uint64_t submitted_ = 0;
     std::vector<std::pair<VkCommandBuffer, std::uint64_t>> inFlight_;

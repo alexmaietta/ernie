@@ -38,6 +38,7 @@ struct CudaDriver {
     CUresult (*primaryCtxRelease)(CUdevice) = nullptr;
     CUresult (*ctxPushCurrent)(CUcontext) = nullptr;
     CUresult (*ctxPopCurrent)(CUcontext*) = nullptr;
+    CUresult (*ctxSynchronize)() = nullptr;
     CUresult (*importExternalMemory)(CUexternalMemory*, const void*) = nullptr;
     CUresult (*externalMemoryGetMappedBuffer)(CUdeviceptr*, CUexternalMemory,
                                               const void*) = nullptr;
@@ -119,8 +120,16 @@ class CudaInterop {
         CUdeviceptr pointer = 0;
     };
 
+    /// A stream's own timeline, which only that stream signals, so its values only increase.
+    struct StreamTimeline {
+        std::unique_ptr<Timeline> timeline;
+        CUexternalSemaphore semaphore = nullptr;
+        std::uint64_t signalled = 0;
+    };
+
     CudaInterop(DeviceContext& context, const CudaDriver& driver, CUdevice device, int ordinal);
     CUdeviceptr Map(const Buffer& buffer);
+    /// Imports one of the context's timelines into CUDA, once. Takes `mutex_`'s lock as held.
     CUexternalSemaphore Import(const Timeline& timeline);
 
     DeviceContext& context_;
@@ -128,12 +137,11 @@ class CudaInterop {
     CUdevice device_;
     int ordinal_;
     CUcontext cuda_ = nullptr;
-    /// Signalled on streams, for Ernie's queues to wait on.
-    Timeline signals_;
-    std::uint64_t signalled_ = 0;
     std::mutex mutex_;
-    std::unordered_map<VkBuffer, Mapping> mappings_;
+    /// Mapped buffers by `Buffer::Id`, which no later buffer reuses.
+    std::unordered_map<std::uint64_t, Mapping> mappings_;
     std::unordered_map<const Timeline*, CUexternalSemaphore> semaphores_;
+    std::unordered_map<CUstream, StreamTimeline> streams_;
 };
 
 }  // namespace ernie

@@ -13,6 +13,9 @@
 namespace ernie {
 namespace {
 
+/// The releases this thread is running, which a `WaitIdle` inside one must not wait for.
+thread_local std::size_t releasingHere = 0;
+
 PhysicalDevice Choose(const Instance& instance, std::string_view wanted) {
     std::vector<PhysicalDevice> devices = Map(instance.PhysicalDevices(), Probe);
     std::erase_if(devices, [&](const PhysicalDevice& device) {
@@ -175,11 +178,17 @@ void DeviceContext::Collect() {
         done.assign(std::make_move_iterator(finished.begin()),
                     std::make_move_iterator(finished.end()));
         retired_.erase(finished.begin(), finished.end());
+        releasing_ += done.size();
     }
     // Released without the lock: a release may retire more.
     for (Retired& retired : done) {
+        ++releasingHere;
         retired.release();
+        --releasingHere;
+        const std::lock_guard lock(retiredMutex_);
+        --releasing_;
     }
+    released_.notify_all();
 }
 
 void DeviceContext::WaitIdle() {
@@ -187,6 +196,9 @@ void DeviceContext::WaitIdle() {
         queue->Last().Wait();
     }
     Collect();
+    // Releases another thread took are done too, so their owners may go.
+    std::unique_lock lock(retiredMutex_);
+    released_.wait(lock, [this] { return releasing_ <= releasingHere; });
 }
 
 void DeviceContext::Name(VkObjectType type, std::uint64_t handle, std::string_view name) const {

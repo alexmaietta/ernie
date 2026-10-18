@@ -44,9 +44,7 @@ class Arenas {
     void Free(const BufferRange& range);
 
     /// @return The buffer of a range's arena: its handle, and its mapping for host-visible uses.
-    const Buffer& Storage(const BufferRange& range) const {
-        return arenas_[range.arena]->buffer;
-    }
+    const Buffer& Storage(const BufferRange& range) const;
     /// @return The range's device address, as shaders read it on Vulkan.
     VkDeviceAddress Address(const BufferRange& range) const {
         return Storage(range).Address() + range.offset;

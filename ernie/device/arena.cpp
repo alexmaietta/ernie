@@ -32,7 +32,6 @@ BufferRange Arenas::Allocate(std::uint64_t size, std::uint64_t alignment) {
     }
     size = std::max<std::uint64_t>(size, 1);
     const VmaVirtualAllocationCreateInfo info{.size = size, .alignment = alignment};
-    const std::lock_guard lock(mutex_);
     const auto take = [&](std::uint32_t index) -> std::optional<BufferRange> {
         Arena& arena = *arenas_[index];
         VmaVirtualAllocation allocation = VK_NULL_HANDLE;
@@ -44,14 +43,40 @@ BufferRange Arenas::Allocate(std::uint64_t size, std::uint64_t alignment) {
         arena.used += size;
         return BufferRange{index, offset, size};
     };
-    for (std::uint32_t index = 0; index < arenas_.size(); ++index) {
-        if (const std::optional<BufferRange> range = take(index)) {
+    const auto takeAny = [&]() -> std::optional<BufferRange> {
+        for (std::uint32_t index = 0; index < arenas_.size(); ++index) {
+            if (const std::optional<BufferRange> range = take(index)) {
+                return range;
+            }
+        }
+        return std::nullopt;
+    };
+    {
+        const std::lock_guard lock(mutex_);
+        if (const std::optional<BufferRange> range = takeAny()) {
             return *range;
         }
     }
-    // A range larger than the arena size gets an arena of its own, room left for its alignment.
-    const std::uint64_t own = size > arenaSize_ ? size + alignment : arenaSize_;
-    return *take(AddArena(std::min(own, context_.MaxBufferSize())));
+    // Ranges freed earlier come back once their work is done; collected without the lock, as
+    // giving them back takes it.
+    context_.Collect();
+    const std::lock_guard lock(mutex_);
+    if (const std::optional<BufferRange> range = takeAny()) {
+        return *range;
+    }
+    // A range larger than the arena size gets an arena of its own.
+    const std::uint64_t own = std::max(size, arenaSize_);
+    if (const std::optional<BufferRange> range = take(AddArena(own))) {
+        return *range;
+    }
+    throw DeviceError(DeviceErrorKind::Failed, "Allocating " + std::to_string(size) + " bytes of " +
+                                                   name_ + " at alignment " +
+                                                   std::to_string(alignment));
+}
+
+const Buffer& Arenas::Storage(const BufferRange& range) const {
+    const std::lock_guard lock(mutex_);
+    return arenas_[range.arena]->buffer;
 }
 
 void Arenas::Free(const BufferRange& range) {

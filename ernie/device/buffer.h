@@ -46,6 +46,10 @@ class Buffer {
     Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
 
+    /// @return An id no other buffer of the process has had, unlike handles, which drivers reuse.
+    std::uint64_t Id() const {
+        return id_;
+    }
     VkBuffer Handle() const {
         return buffer_;
     }
@@ -84,6 +88,7 @@ class Buffer {
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     std::uint64_t size_ = 0;
     std::uint64_t memorySize_ = 0;
+    std::uint64_t id_ = 0;
     VkDeviceAddress address_ = 0;
     std::span<std::byte> mapped_;
 };

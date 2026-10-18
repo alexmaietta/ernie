@@ -120,6 +120,7 @@ bool LoadDriver(CudaDriver& d) {
            l.Load(d.primaryCtxRelease, "cuDevicePrimaryCtxRelease_v2") &&
            l.Load(d.ctxPushCurrent, "cuCtxPushCurrent_v2") &&
            l.Load(d.ctxPopCurrent, "cuCtxPopCurrent_v2") &&
+           l.Load(d.ctxSynchronize, "cuCtxSynchronize") &&
            l.Load(d.importExternalMemory, "cuImportExternalMemory") &&
            l.Load(d.externalMemoryGetMappedBuffer, "cuExternalMemoryGetMappedBuffer") &&
            l.Load(d.destroyExternalMemory, "cuDestroyExternalMemory") &&
@@ -184,20 +185,23 @@ std::unique_ptr<CudaInterop> CudaInterop::Create(DeviceContext& context) {
 
 CudaInterop::CudaInterop(DeviceContext& context, const CudaDriver& driver, CUdevice device,
                          int ordinal)
-    : context_(context), driver_(driver), device_(device), ordinal_(ordinal),
-      signals_(context.Device(), "CUDA streams", true) {
+    : context_(context), driver_(driver), device_(device), ordinal_(ordinal) {
     // The primary context, which PyTorch, Warp and the runtime API share.
     driver_.Check(driver_.primaryCtxRetain(&cuda_, device_), "Retaining the CUDA context");
-    Import(signals_);
 }
 
 CudaInterop::~CudaInterop() {
     {
+        // Neither API may still use what goes: CUDA's streams finish, then Ernie's queues, which
+        // may wait on the streams' timelines.
         const Current current(*this);
-        for (const auto& [buffer, mapping] : mappings_) {
+        driver_.ctxSynchronize();
+        context_.WaitIdle();
+        for (const auto& [id, mapping] : mappings_) {
             driver_.memFree(mapping.pointer);
             driver_.destroyExternalMemory(mapping.memory);
         }
+        // Streams' timelines among them.
         for (const auto& [timeline, semaphore] : semaphores_) {
             driver_.destroyExternalSemaphore(semaphore);
         }
@@ -207,7 +211,7 @@ CudaInterop::~CudaInterop() {
 
 CUdeviceptr CudaInterop::Map(const Buffer& buffer) {
     const std::lock_guard lock(mutex_);
-    const auto found = mappings_.find(buffer.Handle());
+    const auto found = mappings_.find(buffer.Id());
     if (found != mappings_.end()) {
         return found->second.pointer;
     }
@@ -224,9 +228,13 @@ CUdeviceptr CudaInterop::Map(const Buffer& buffer) {
                   "Importing memory into CUDA");
     Taken(handle);
     const BufferDesc whole{.offset = 0, .size = buffer.Size(), .flags = 0, .reserved = {}};
-    driver_.Check(driver_.externalMemoryGetMappedBuffer(&mapping.pointer, mapping.memory, &whole),
-                  "Mapping memory in CUDA");
-    mappings_.emplace(buffer.Handle(), mapping);
+    const CUresult mapped =
+        driver_.externalMemoryGetMappedBuffer(&mapping.pointer, mapping.memory, &whole);
+    if (mapped != 0) {
+        driver_.destroyExternalMemory(mapping.memory);
+        driver_.Check(mapped, "Mapping memory in CUDA");
+    }
+    mappings_.emplace(buffer.Id(), mapping);
     return mapping.pointer;
 }
 
@@ -257,6 +265,10 @@ Tensor CudaInterop::View(const DeviceColumn& column) {
 }
 
 void CudaInterop::Wait(CUstream stream, const Ticket& ticket) {
+    if (ticket.timeline != nullptr && ticket.timeline->Device() != context_.Device()) {
+        throw DeviceError(DeviceErrorKind::Failed,
+                          "CUDA cannot wait on another device's " + ticket.timeline->Name());
+    }
     if (ticket.Done()) {
         return;
     }
@@ -271,13 +283,18 @@ void CudaInterop::Wait(CUstream stream, const Ticket& ticket) {
 
 Ticket CudaInterop::Signal(CUstream stream) {
     const std::lock_guard lock(mutex_);
+    StreamTimeline& timeline = streams_[stream];
+    if (!timeline.timeline) {
+        auto made = std::make_unique<Timeline>(context_.Device(), "a CUDA stream", true);
+        timeline.semaphore = Import(*made);
+        timeline.timeline = std::move(made);
+    }
     SemaphoreSignalParams signal{};
-    signal.params.fence.value = ++signalled_;
-    const CUexternalSemaphore semaphore = semaphores_.at(&signals_);
+    signal.params.fence.value = timeline.signalled + 1;
     const Current current(*this);
-    driver_.Check(driver_.signalExternalSemaphoresAsync(&semaphore, &signal, 1, stream),
+    driver_.Check(driver_.signalExternalSemaphoresAsync(&timeline.semaphore, &signal, 1, stream),
                   "Signalling from CUDA");
-    return signals_.At(signalled_);
+    return timeline.timeline->At(++timeline.signalled);
 }
 
 Ticket CudaInterop::Assign(const DeviceColumn& column, const Tensor& tensor, CUstream stream) {

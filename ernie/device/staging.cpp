@@ -10,20 +10,13 @@
 namespace ernie {
 namespace {
 
-/// Orders the copies after earlier work (`before`) or before later work.
-void MemoryBarrier(VkCommandBuffer commands, bool before) {
-    const VkPipelineStageFlags2 all = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    const VkAccessFlags2 any = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-                                   .srcStageMask = before ? all : VK_PIPELINE_STAGE_2_COPY_BIT,
-                                   .srcAccessMask = before ? VK_ACCESS_2_MEMORY_WRITE_BIT
-                                                           : VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                                   .dstStageMask = before ? VK_PIPELINE_STAGE_2_COPY_BIT : all,
-                                   .dstAccessMask = before ? VK_ACCESS_2_TRANSFER_READ_BIT : any};
-    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                                      .memoryBarrierCount = 1,
-                                      .pMemoryBarriers = &barrier};
-    vkCmdPipelineBarrier2(commands, &dependency);
+constexpr VkAccessFlags2 kAny = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+/// Orders copies after earlier work that reads or writes what they touch.
+void BeforeCopies(VkCommandBuffer commands) {
+    Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT);
 }
 
 }  // namespace
@@ -63,11 +56,14 @@ void Uploader::Write(const Buffer& destination, std::uint64_t offset,
 }
 
 Ticket Uploader::Flush(std::span<const Ticket> waits) {
+    // Staging of earlier flushes goes once its copies are done.
+    context_.Collect();
     if (copies_.empty()) {
         return {};
     }
     const Ticket ticket = queue_.Submit(
         [&](VkCommandBuffer commands) {
+            BeforeCopies(commands);
             // Regions run to the same buffers in one call each.
             std::size_t first = 0;
             while (first < copies_.size()) {
@@ -82,7 +78,8 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
                                 static_cast<std::uint32_t>(regions.size()), regions.data());
                 first = last;
             }
-            MemoryBarrier(commands, false);
+            Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, kAny);
         },
         waits);
     for (std::shared_ptr<Buffer>& staging : staging_) {
@@ -105,12 +102,14 @@ Readback::Readback(DeviceContext& context, Queue& queue, const Buffer& source, s
     context.CountReadback(size);
     ticket_ = queue.Submit(
         [&](VkCommandBuffer commands) {
-            MemoryBarrier(commands, true);
+            BeforeCopies(commands);
             const VkBufferCopy region{offset, 0, size};
             if (size > 0) {
                 vkCmdCopyBuffer(commands, source.Handle(), host_->Handle(), 1, &region);
             }
-            MemoryBarrier(commands, false);
+            // Visible to the host's reads once the ticket is reached.
+            Barrier(commands, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                    VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_HOST_READ_BIT);
         },
         waits);
 }

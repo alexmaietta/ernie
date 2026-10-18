@@ -9,6 +9,7 @@
 #include "ernie/device/vulkan.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -137,6 +138,9 @@ class DeviceContext {
     Queue* transfer_ = nullptr;
     std::mutex retiredMutex_;
     std::vector<Retired> retired_;
+    /// Releases taken by `Collect` and still running.
+    std::size_t releasing_ = 0;
+    std::condition_variable released_;
     std::atomic<std::uint64_t> uploaded_ = 0;
     std::atomic<std::uint64_t> readBack_ = 0;
     std::atomic<std::uint64_t> copied_ = 0;

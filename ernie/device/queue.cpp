@@ -99,6 +99,8 @@ Queue::~Queue() {
 
 Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                      std::span<const Ticket> waits) {
+    // One recording at a time: the command pool is not thread-safe.
+    const std::lock_guard recording(recording_);
     std::vector<VkSemaphoreSubmitInfo> waitInfos;
     for (const Ticket& wait : waits) {
         if (wait.timeline == nullptr) {

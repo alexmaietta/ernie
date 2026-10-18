@@ -3,6 +3,7 @@
 /// @brief Allocating buffers through VMA by their use, and sharing them.
 #include "ernie/device/buffer.h"
 
+#include <atomic>
 #include <utility>
 
 namespace ernie {
@@ -68,6 +69,8 @@ void Buffer::Finish(DeviceContext& context, const VmaAllocationInfo& allocated,
         .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = buffer_};
     address_ = vkGetBufferDeviceAddress(device_, &addressInfo);
     memorySize_ = allocated.size;
+    static std::atomic<std::uint64_t> ids = 0;
+    id_ = ++ids;
     if (allocated.pMappedData != nullptr) {
         mapped_ = {static_cast<std::byte*>(allocated.pMappedData), static_cast<std::size_t>(size_)};
     }
@@ -96,6 +99,7 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
         allocation_ = std::exchange(other.allocation_, VK_NULL_HANDLE);
         size_ = std::exchange(other.size_, 0);
         memorySize_ = std::exchange(other.memorySize_, 0);
+        id_ = std::exchange(other.id_, 0);
         address_ = std::exchange(other.address_, 0);
         mapped_ = std::exchange(other.mapped_, {});
     }
