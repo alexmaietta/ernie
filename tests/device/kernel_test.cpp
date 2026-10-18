@@ -7,12 +7,18 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/staging.h"
 
+#include "ernie/util/file.h"
+
+#include "tests/common.h"
 #include "tests/device/common.h"
 
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <filesystem>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace ernie {
@@ -98,6 +104,50 @@ TEST(ComputeKernel, FillsAnArenaRangeThroughItsAddress) {
         ASSERT_EQ(values[i], 3 * i) << i;
     }
     ExpectClean(*context);
+}
+
+/// @return The bytes in a context's pipeline cache.
+std::size_t CachedBytes(const DeviceContext& context) {
+    std::size_t size = 0;
+    CheckVk(vkGetPipelineCacheData(context.Device(), context.PipelineCache(), &size, nullptr),
+            "Sizing the pipeline cache");
+    return size;
+}
+
+TEST(ComputeKernel, PipelinesAreCachedOnDiskAndReloaded) {
+    const std::filesystem::path path = test::TempPath("ernie_kernel_test") / "pipelines.bin";
+    std::filesystem::remove_all(path.parent_path());
+    std::size_t saved = 0;
+    {
+        const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
+        if (!context) {
+            GTEST_SKIP() << "No Vulkan device";
+        }
+        const ShaderCompiler compiler;
+        const std::size_t empty = CachedBytes(*context);
+        const ComputeKernel fill(*context, compiler.Spirv(std::span(&kFill, 1), "main"), "fill",
+                                 sizeof(FillParameters));
+        saved = CachedBytes(*context);
+        EXPECT_GT(saved, empty) << "the pipeline is cached";
+        ExpectClean(*context);
+    }
+    ASSERT_TRUE(std::filesystem::exists(path)) << "saved on destruction";
+    EXPECT_EQ(std::filesystem::file_size(path), saved);
+    {
+        const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
+        EXPECT_GE(CachedBytes(*context), saved) << "reloaded";
+        ExpectClean(*context);
+    }
+    // Another device's or driver's cache is ignored rather than handed to the driver.
+    std::string foreign = ReadTextFile(path);
+    foreign[16] = static_cast<char>(foreign[16] ^ 0xff);
+    WriteTextFile(path, foreign);
+    {
+        const std::unique_ptr<DeviceContext> context = test::MakeContext({.pipelineCache = path});
+        EXPECT_LT(CachedBytes(*context), saved);
+        ExpectClean(*context);
+    }
+    std::filesystem::remove_all(path.parent_path());
 }
 
 TEST(ComputeKernel, ParametersComeInWholeWords) {

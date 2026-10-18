@@ -35,11 +35,16 @@ std::string ReadTextFile(const fs::path& path) {
 }
 
 void WriteTextFile(const fs::path& path, std::string_view text) {
+    WriteBinaryFile(path, std::as_bytes(std::span(text)));
+}
+
+void WriteBinaryFile(const fs::path& path, std::span<const std::byte> bytes) {
     if (path.has_parent_path()) {
         fs::create_directories(path.parent_path());
     }
     std::ofstream file(path, std::ios::binary);
-    if (!file.write(text.data(), static_cast<std::streamsize>(text.size()))) {
+    if (!file.write(reinterpret_cast<const char*>(bytes.data()),
+                    static_cast<std::streamsize>(bytes.size()))) {
         throw std::runtime_error("Cannot write " + path.string());
     }
 }

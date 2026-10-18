@@ -23,18 +23,24 @@ inline bool VulkanRequired() {
     return value != nullptr && std::string_view(value) == "1";
 }
 
-/// @return A validating context on `device`, or none when there is no Vulkan and it is not
-/// required.
-inline std::unique_ptr<DeviceContext> MakeContext(std::string_view device = {}) {
+/// @return A validating context made with `options`, or none when there is no Vulkan and it is
+/// not required.
+inline std::unique_ptr<DeviceContext> MakeContext(DeviceContextOptions options) {
+    options.validation = true;
     try {
-        return std::make_unique<DeviceContext>(
-            DeviceContextOptions{.validation = true, .device = std::string(device)});
+        return std::make_unique<DeviceContext>(options);
     } catch (const DeviceError&) {
         if (VulkanRequired()) {
             throw;
         }
         return nullptr;
     }
+}
+
+/// @return A validating context on `device`, or none when there is no Vulkan and it is not
+/// required.
+inline std::unique_ptr<DeviceContext> MakeContext(std::string_view device = {}) {
+    return MakeContext(DeviceContextOptions{.device = std::string(device)});
 }
 
 /// Fails the test on any validation message but those naming one of `ignored`.

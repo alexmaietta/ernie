@@ -23,6 +23,10 @@ ERNIE_API std::string ReadTextFile(const std::filesystem::path& path);
 /// @throws std::runtime_error If it cannot be written.
 ERNIE_API void WriteTextFile(const std::filesystem::path& path, std::string_view text);
 
+/// @brief Writes bytes to a file, replacing it, and makes the directories it goes in.
+/// @throws std::runtime_error If it cannot be written.
+ERNIE_API void WriteBinaryFile(const std::filesystem::path& path, std::span<const std::byte> bytes);
+
 /// @brief Finds a file by name in any case, as archives named in capitals often unpack in small
 /// letters.
 /// @param directory The directory to look in.

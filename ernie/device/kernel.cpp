@@ -49,8 +49,8 @@ ComputeKernel::ComputeKernel(DeviceContext& context, std::span<const std::uint32
                   .module = module,
                   .pName = entry.c_str()},
         .layout = layout_};
-    const VkResult result =
-        vkCreateComputePipelines(device_, VK_NULL_HANDLE, 1, &pipeline, nullptr, &pipeline_);
+    const VkResult result = vkCreateComputePipelines(device_, context.PipelineCache(), 1, &pipeline,
+                                                     nullptr, &pipeline_);
     vkDestroyShaderModule(device_, module, nullptr);
     CheckVk(result, "Creating " + name_);
     context.Name(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<std::uint64_t>(pipeline_), name_);

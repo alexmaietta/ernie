@@ -4,13 +4,17 @@
 #include "ernie/device/context.h"
 
 #include "ernie/util/algorithm.h"
+#include "ernie/util/file.h"
 #include "ernie/util/on_failure.h"
 #include "ernie/util/profiler.h"
 #include "ernie/util/text.h"
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <optional>
+#include <span>
+#include <stdexcept>
 
 namespace ernie {
 namespace {
@@ -71,6 +75,35 @@ Families FindFamilies(VkPhysicalDevice device) {
     result.transfer = find(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)
                           .value_or(result.compute);
     return result;
+}
+
+/// @return The cache saved at `path`, when it was saved by the same driver on the same device,
+/// else nothing: a driver may crash on another's data rather than reject it.
+std::vector<std::byte> LoadPipelineCache(const std::filesystem::path& path,
+                                         const VkPhysicalDeviceProperties& properties) {
+    std::error_code missing;
+    if (path.empty() || !std::filesystem::is_regular_file(path, missing)) {
+        return {};
+    }
+    try {
+        const MappedFile file(path);
+        const std::span<const std::byte> bytes = file.Bytes();
+        VkPipelineCacheHeaderVersionOne header{};
+        if (bytes.size() < sizeof(header)) {
+            return {};
+        }
+        std::memcpy(&header, bytes.data(), sizeof(header));
+        if (header.headerSize < sizeof(header) ||
+            header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE ||
+            header.vendorID != properties.vendorID || header.deviceID != properties.deviceID ||
+            std::memcmp(header.pipelineCacheUUID, properties.pipelineCacheUUID, VK_UUID_SIZE) !=
+                0) {
+            return {};
+        }
+        return {bytes.begin(), bytes.end()};
+    } catch (const std::runtime_error&) {
+        return {};
+    }
 }
 
 }  // namespace
@@ -154,11 +187,23 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
     main_ = chosen[0];
     compute_ = chosen[1];
     transfer_ = chosen[2];
+
+    pipelineCachePath_ = options.pipelineCache;
+    const std::vector<std::byte> cached =
+        LoadPipelineCache(pipelineCachePath_, properties.properties);
+    const VkPipelineCacheCreateInfo cache{.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                                          .initialDataSize = cached.size(),
+                                          .pInitialData = cached.data()};
+    CheckVk(vkCreatePipelineCache(device_, &cache, nullptr, &pipelineCache_),
+            "Creating the pipeline cache");
+    const OnFailure freeCache([&] { vkDestroyPipelineCache(device_, pipelineCache_, nullptr); });
     profiler_ = GpuProfiler::Create(*this);
 }
 
 DeviceContext::~DeviceContext() {
     Quietly([this] { WaitIdle(); });
+    Quietly([this] { SavePipelineCache(); });
+    vkDestroyPipelineCache(device_, pipelineCache_, nullptr);
     profiler_.reset();
     queues_.clear();
     vmaDestroyAllocator(allocator_);
@@ -216,6 +261,20 @@ void DeviceContext::WaitIdle() {
     // Releases another thread took are done too, so their owners may go.
     std::unique_lock lock(retiredMutex_);
     released_.wait(lock, [this] { return releasing_ <= releasingHere; });
+}
+
+void DeviceContext::SavePipelineCache() const {
+    if (pipelineCachePath_.empty()) {
+        return;
+    }
+    std::size_t size = 0;
+    CheckVk(vkGetPipelineCacheData(device_, pipelineCache_, &size, nullptr),
+            "Sizing the pipeline cache");
+    std::vector<std::byte> bytes(size);
+    CheckVk(vkGetPipelineCacheData(device_, pipelineCache_, &size, bytes.data()),
+            "Reading the pipeline cache");
+    bytes.resize(size);
+    WriteBinaryFile(pipelineCachePath_, bytes);
 }
 
 void DeviceContext::Name(VkObjectType type, std::uint64_t handle, std::string_view name) const {

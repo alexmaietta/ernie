@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <span>
 #include <stdexcept>
 #include <string>
 
@@ -24,6 +25,17 @@ TEST(File, ReadTextFileReadsEveryByteAndReportsMissingFiles) {
     EXPECT_EQ(ReadTextFile(path), text);
     fs::remove(path);
     EXPECT_THROW(ReadTextFile(path), std::runtime_error);
+}
+
+TEST(File, WriteBinaryFileMakesItsDirectoriesAndReplacesTheFile) {
+    const fs::path directory = test::TempPath("ernie_file_test_binary");
+    const fs::path path = directory / "nested" / "bytes.bin";
+    const std::string text("x\0y\n", 4);
+    WriteBinaryFile(path, std::as_bytes(std::span(text)));
+    EXPECT_EQ(ReadTextFile(path), text);
+    WriteBinaryFile(path, {});
+    EXPECT_EQ(ReadTextFile(path), "");
+    fs::remove_all(directory);
 }
 
 TEST(File, FindFileAnyCaseMatchesNamesInOtherCases) {

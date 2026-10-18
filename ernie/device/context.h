@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -26,6 +27,9 @@ struct DeviceContextOptions {
     /// The device to use: its UUID in hex, or part of its name; empty for the best scoring one.
     std::string device;
     std::vector<std::string> instanceExtensions;
+    /// A file the pipeline cache is loaded from, when it was saved for the same driver and device,
+    /// and saved to on destruction; empty to keep it in memory only.
+    std::filesystem::path pipelineCache;
 };
 
 /// @brief Bulk bytes moved: between the host and the device through staging, and copied on the
@@ -132,6 +136,14 @@ class DeviceContext {
     VmaAllocator Allocator() const {
         return allocator_;
     }
+    /// @return The cache every pipeline on this device is created through.
+    VkPipelineCache PipelineCache() const {
+        return pipelineCache_;
+    }
+    /// @brief Writes the pipeline cache to `DeviceContextOptions::pipelineCache`, as destruction
+    /// does; nothing without one.
+    /// @throws std::runtime_error If the file cannot be written.
+    void SavePipelineCache() const;
 
   private:
     struct Retired {
@@ -145,6 +157,8 @@ class DeviceContext {
     std::uint64_t maxBufferSize_ = 0;
     VkDevice device_ = VK_NULL_HANDLE;
     VmaAllocator allocator_ = VK_NULL_HANDLE;
+    std::filesystem::path pipelineCachePath_;
+    VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
     std::unique_ptr<GpuProfiler> profiler_;
     std::vector<std::unique_ptr<Queue>> queues_;
     Queue* main_ = nullptr;
