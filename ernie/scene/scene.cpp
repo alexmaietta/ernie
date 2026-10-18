@@ -136,7 +136,7 @@ std::vector<Path> Scene::Prims(std::string_view type) const {
 
 void Scene::Set(PrimId prim, std::string_view attribute, const Value& value) {
     const AttributeId token = store_.Tokens().Intern(attribute);
-    const AttributeDef* def = Declared(prim, token);
+    const AttributeDef* def = Declared(store_.PrimBucket(prim), token);
     if (def != nullptr) {
         Validate(*def, attribute, value, PrimPath(prim));
     }
@@ -157,7 +157,7 @@ void Scene::Set(const Path& path, std::string_view attribute, const Value& value
 
 void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
     const AttributeId token = store_.Tokens().Intern(attribute);
-    const AttributeDef* def = Declared(prim, token);
+    const AttributeDef* def = Declared(store_.PrimBucket(prim), token);
     if (def == nullptr && !TakesUndeclared(prim, attribute)) {
         throw std::invalid_argument(Describe(*this, prim) + " has no attribute '" +
                                     std::string(attribute) + "'");
@@ -365,10 +365,20 @@ const Column* Scene::AuthoredColumn(PrimId prim, std::string_view attribute) con
     return column != nullptr && column->authored.Test(store_.PrimRow(prim)) ? column : nullptr;
 }
 
-const AttributeDef* Scene::Declared(PrimId prim, AttributeId attribute) const {
-    const auto& declared = buckets_[store_.PrimBucket(prim)].declared;
+const AttributeDef* Scene::Declared(BucketId bucket, AttributeId attribute) const {
+    const auto& declared = buckets_[bucket].declared;
     const auto found = declared.find(attribute);
     return found != declared.end() ? found->second : nullptr;
+}
+
+Dirty Scene::Classify(const ChangeSet::Values& change) const {
+    if (const AttributeDef* def = Declared(change.bucket, change.attribute)) {
+        return def->meta.dirty;
+    }
+    const std::string_view name = store_.Tokens().Text(change.attribute);
+    return name.starts_with(tokens::kXformOpPrefix)    ? Dirty::Transform
+           : name.starts_with(tokens::kPrimvarsPrefix) ? Dirty::Primvars
+                                                       : Dirty::Params;
 }
 
 bool Scene::TakesUndeclared(PrimId prim, std::string_view attribute) const {

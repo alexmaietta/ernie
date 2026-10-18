@@ -30,6 +30,20 @@ enum class Dirty : std::uint32_t {
     Visibility = 1u << 8,
 };
 
+constexpr Dirty operator|(Dirty a, Dirty b) {
+    return static_cast<Dirty>(static_cast<std::uint32_t>(a) | static_cast<std::uint32_t>(b));
+}
+constexpr Dirty operator&(Dirty a, Dirty b) {
+    return static_cast<Dirty>(static_cast<std::uint32_t>(a) & static_cast<std::uint32_t>(b));
+}
+constexpr Dirty& operator|=(Dirty& a, Dirty b) {
+    return a = a | b;
+}
+/// @return Whether `bits` has any of `flags`.
+constexpr bool Any(Dirty bits, Dirty flags) {
+    return (bits & flags) != Dirty::None;
+}
+
 /// @brief A limit of an attribute's numbers, inclusive or not.
 struct Bound {
     double value = 0.0;

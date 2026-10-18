@@ -71,7 +71,7 @@ ERNIE_DEFINE_SCHEMA(Boundable, "Boundable", &Xformable::Definition(), Abstract, 
                     ERNIE_BOUNDABLE_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(Gprim, "Gprim", &Boundable::Definition(), Abstract, kInheritExtent,
                     "Geometry, drawn in a display colour or with a bound material.",
-                    ERNIE_GPRIM_ATTRIBUTES, "primvars:")
+                    ERNIE_GPRIM_ATTRIBUTES, tokens::kPrimvarsPrefix)
 // Grouping prims are where custom data lives, so they take attributes of any name.
 ERNIE_DEFINE_SCHEMA(Xform, tokens::kXform, &Xformable::Definition(), Concrete, kDescendantsExtent,
                     "A transform grouping its children.", ERNIE_NO_ATTRIBUTES, "*")

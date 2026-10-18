@@ -146,5 +146,24 @@ TEST(Scene, ViewsCheckTypesAndConstness) {
     EXPECT_THROW(ball.SetRadius(2.0), std::logic_error);
 }
 
+TEST(Scene, ChangesAreClassifiedForRenderers) {
+    Scene scene;
+    const PrimId ball = scene.Define("/Ball", tokens::kSphere);
+    const auto classify = [&](std::string_view attribute, const Value& value) {
+        const std::uint64_t cursor = scene.Version();
+        scene.Set(ball, attribute, value);
+        const ChangeSet changes = scene.Store().ChangesSince(cursor);
+        EXPECT_EQ(changes.values.size(), 1u) << attribute;
+        return scene.Classify(changes.values.front());
+    };
+    EXPECT_EQ(classify(Sphere::kRadius, 2.0), Dirty::Params);
+    EXPECT_EQ(classify(Imageable::kVisibility, "invisible"), Dirty::Visibility);
+    EXPECT_EQ(classify(Xformable::kXformOpOrder, std::vector<std::string>{}), Dirty::Transform);
+    EXPECT_EQ(classify(tokens::kTranslate, glm::dvec3(1.0)), Dirty::Transform) << "undeclared op";
+    EXPECT_EQ(classify("primvars:wetness", 0.5), Dirty::Primvars) << "undeclared primvar";
+    EXPECT_TRUE(Any(Dirty::Points | Dirty::Topology, Dirty::Topology));
+    EXPECT_FALSE(Any(Dirty::Points, Dirty::Topology));
+}
+
 }  // namespace
 }  // namespace ernie

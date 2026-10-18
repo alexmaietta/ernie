@@ -102,6 +102,9 @@ class Scene {
     std::uint64_t Version() const {
         return store_.Version();
     }
+    /// @return What a column change means to renderers: the attribute's declared category, or for
+    /// undeclared ones Transform for xformOps, Primvars for primvars and Params for the rest.
+    Dirty Classify(const ChangeSet::Values& change) const;
 
   private:
     struct BucketSchema {
@@ -116,7 +119,7 @@ class Scene {
     const std::vector<Token>& Apis(PrimId prim) const;
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
-    const AttributeDef* Declared(PrimId prim, AttributeId attribute) const;
+    const AttributeDef* Declared(BucketId bucket, AttributeId attribute) const;
     /// @return Whether the prim's type or an applied API schema leaves the attribute's namespace
     /// open; any attribute for a prim without a type.
     bool TakesUndeclared(PrimId prim, std::string_view attribute) const;

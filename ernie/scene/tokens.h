@@ -19,6 +19,7 @@ inline constexpr std::string_view kMesh = "Mesh";
 inline constexpr std::string_view kPoints = "Points";
 
 inline constexpr std::string_view kXformOpPrefix = "xformOp:";
+inline constexpr std::string_view kPrimvarsPrefix = "primvars:";
 inline constexpr std::string_view kXformOpOrder = "xformOpOrder";
 inline constexpr std::string_view kTransform = "xformOp:transform";
 inline constexpr std::string_view kTranslate = "xformOp:translate";
