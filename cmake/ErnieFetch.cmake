@@ -39,3 +39,13 @@ function(ernie_fetch name)
     set(${lower}_SOURCE_DIR "${${lower}_SOURCE_DIR}" PARENT_SCOPE)
     set(${lower}_BINARY_DIR "${${lower}_BINARY_DIR}" PARENT_SCOPE)
 endfunction()
+
+# Builds third-party targets without warnings: their code is not Ernie's to fix.
+function(ernie_quiet_third_party)
+    foreach(target ${ARGN})
+        get_target_property(type ${target} TYPE)
+        if(NOT type STREQUAL "INTERFACE_LIBRARY")
+            target_compile_options(${target} PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
+        endif()
+    endforeach()
+endfunction()

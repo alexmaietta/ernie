@@ -46,22 +46,17 @@ void PointBasedExtent(const ExtentRows& rows, RowRange range, std::span<Box> out
     const auto points = rows.Column<Tensor>(PointBased::kPoints);
     const auto widths = kWidths ? rows.Column<Tensor>(Points::kWidths) : std::span<const Tensor>();
     const auto authored = rows.Column<std::vector<float>>(Boundable::kExtent);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
+    ComputeRows(range, out, [&](std::uint32_t row) {
         const std::optional<Box> box = BoundPoints(points[row], kWidths ? widths[row] : Tensor());
-        out[row - range.begin] = box ? *box : AuthoredExtent(authored[row]);
-    }
+        return box ? *box : AuthoredExtent(authored[row]);
+    });
 }
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(PointBased, "PointBased", &Gprim::Definition(), Abstract, kInheritExtent,
-                    "Geometry from an array of points.", ERNIE_POINT_BASED_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Mesh, tokens::kMesh, &PointBased::Definition(), Concrete,
-                    ComputedExtent(PointBasedExtent<false>),
-                    "A polygon mesh, or the control mesh of a subdivision surface.",
-                    ERNIE_MESH_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Points, tokens::kPoints, &PointBased::Definition(), Concrete,
-                    ComputedExtent(PointBasedExtent<true>),
-                    "A point cloud of spheres, each its own width.", ERNIE_POINTS_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(PointBased, Abstract, kInheritExtent, ERNIE_POINT_BASED_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Mesh, Concrete, ComputedExtent(PointBasedExtent<false>), ERNIE_MESH_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Points, Concrete, ComputedExtent(PointBasedExtent<true>),
+                    ERNIE_POINTS_ATTRIBUTES)
 
 }  // namespace ernie

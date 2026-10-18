@@ -36,11 +36,7 @@ template <> struct ChoiceTokens<ExpansionRule> {
                                                              "expandPrimsAndProperties"};
 };
 
-ERNIE_SCHEMA_ACCESSORS(CollectionAPI, SchemaView, ERNIE_COLLECTION_API_ATTRIBUTES);
-
-/// A named set of prims, as light linking and material collections use them.
-class CollectionAPI : public CollectionAPIAccessors<CollectionAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(CollectionAPI)
-};
+ERNIE_API_SCHEMA(CollectionAPI, ERNIE_COLLECTION_API_ATTRIBUTES,
+                 "A named set of prims, as light linking and material collections use them.");
 
 }  // namespace ernie

@@ -120,33 +120,13 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(Terrain, Gprim, ERNIE_TERRAIN_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Atmosphere, Xformable, ERNIE_ATMOSPHERE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(StarField, NonboundableLightBase, ERNIE_STAR_FIELD_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(GroundPlane, Gprim, ERNIE_GROUND_PLANE_ATTRIBUTES);
-
-/// Heights displacing a body's surface, or a plane.
-class Terrain : public TerrainAccessors<Terrain, Gprim> {
-    ERNIE_SCHEMA_BODY(Terrain, Gprim)
-    ERNIE_SCHEMA_DEFINE(Terrain)
-};
-
-/// The air around a body: its constituents, haze and clouds.
-class Atmosphere : public AtmosphereAccessors<Atmosphere, Xformable> {
-    ERNIE_SCHEMA_BODY(Atmosphere, Xformable)
-    ERNIE_SCHEMA_DEFINE(Atmosphere)
-};
-
-/// The stars, from a catalogue or arrays, at infinity: a light, unbounded.
-class StarField : public StarFieldAccessors<StarField, NonboundableLightBase> {
-    ERNIE_SCHEMA_BODY(StarField, NonboundableLightBase)
-    ERNIE_SCHEMA_DEFINE(StarField)
-};
-
-/// An infinite plane in its xy plane, facing +z.
-class GroundPlane : public GroundPlaneAccessors<GroundPlane, Gprim> {
-    ERNIE_SCHEMA_BODY(GroundPlane, Gprim)
-    ERNIE_SCHEMA_DEFINE(GroundPlane)
-};
+ERNIE_CONCRETE_SCHEMA(Terrain, Gprim, ERNIE_TERRAIN_ATTRIBUTES,
+                      "Heights displacing a body's surface, or a plane.");
+ERNIE_CONCRETE_SCHEMA(Atmosphere, Xformable, ERNIE_ATMOSPHERE_ATTRIBUTES,
+                      "The air around a body: its constituents, haze and clouds.");
+ERNIE_CONCRETE_SCHEMA(StarField, NonboundableLightBase, ERNIE_STAR_FIELD_ATTRIBUTES,
+                      "The stars, from a catalogue or arrays, at infinity: a light, unbounded.");
+ERNIE_CONCRETE_SCHEMA(GroundPlane, Gprim, ERNIE_GROUND_PLANE_ATTRIBUTES,
+                      "An infinite plane in its xy plane, facing +z.");
 
 }  // namespace ernie

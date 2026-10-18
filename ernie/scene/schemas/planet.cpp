@@ -15,16 +15,8 @@ namespace {
 /// when it names none.
 std::optional<Box> BodyInOwnSpace(const ExtentRows& rows, std::string_view relationship,
                                   std::uint32_t row) {
-    const Target target = rows.Column<Target>(relationship)[row];
-    const std::optional<PrimId> body =
-        target.path != kNoPath ? rows.store.Find(target.path) : std::nullopt;
-    const std::optional<Box> extent = body ? rows.scene->Extent(*body) : std::nullopt;
-    if (!extent) {
-        return std::nullopt;
-    }
-    const PrimId own = rows.store.GetBucket(rows.bucket).prims[row];
-    return extent->Transformed(glm::inverse(rows.scene->WorldTransform(own)) *
-                               rows.scene->WorldTransform(*body));
+    const std::optional<PrimId> body = rows.Resolve(rows.Column<Target>(relationship)[row]);
+    return body ? rows.ExtentInRowSpace(*body, row) : std::nullopt;
 }
 
 /// @return The lowest and highest of a host array's heights; none on a device or when empty.
@@ -51,42 +43,34 @@ void TerrainExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto cell = rows.Column<double>(Terrain::kCellSize);
     const auto exaggeration = rows.Column<double>(Terrain::kExaggeration);
     const auto authored = rows.Column<std::vector<float>>(Boundable::kExtent);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
+    ComputeRows(range, out, [&](std::uint32_t row) {
         const std::optional<std::pair<double, double>> span = HeightRange(heights[row]);
         const double low = span ? span->first * exaggeration[row] : 0.0;
         const double high = span ? span->second * exaggeration[row] : 0.0;
-        Box& box = out[row - range.begin];
         if (const std::optional<Box> body = BodyInOwnSpace(rows, Terrain::kBody, row)) {
-            box = body->Grown(std::max(high, 0.0));
-        } else if (span && heights[row].Rank() == 2) {
-            box = PlaneFootprint(heights[row], origin[row], cell[row], low, high);
-        } else {
-            box = AuthoredExtent(authored[row]);
+            return body->Grown(std::max(high, 0.0));
         }
-    }
+        return span && heights[row].Rank() == 2
+                   ? PlaneFootprint(heights[row], origin[row], cell[row], low, high)
+                   : AuthoredExtent(authored[row]);
+    });
 }
 
 void AtmosphereExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto top = rows.Column<double>(Atmosphere::kTop);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
+    ComputeRows(range, out, [&](std::uint32_t row) {
         const std::optional<Box> body = BodyInOwnSpace(rows, Atmosphere::kBody, row);
-        out[row - range.begin] = body ? body->Grown(top[row]) : Box();
-    }
+        return body ? body->Grown(top[row]) : Box();
+    });
 }
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(Terrain, "Terrain", &Gprim::Definition(), Concrete,
-                    ComputedFromOtherPrims(TerrainExtent),
-                    "Heights displacing a body's surface, or a plane.", ERNIE_TERRAIN_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Atmosphere, "Atmosphere", &Xformable::Definition(), Concrete,
-                    ComputedFromOtherPrims(AtmosphereExtent),
-                    "The air around a body: its constituents, haze and clouds.",
+ERNIE_DEFINE_SCHEMA(Terrain, Concrete, ComputedFromOtherPrims(TerrainExtent),
+                    ERNIE_TERRAIN_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Atmosphere, Concrete, ComputedFromOtherPrims(AtmosphereExtent),
                     ERNIE_ATMOSPHERE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(StarField, "StarField", &NonboundableLightBase::Definition(), Concrete,
-                    kInheritExtent, "The stars, from a catalogue or arrays, at infinity.",
-                    ERNIE_STAR_FIELD_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(GroundPlane, "GroundPlane", &Gprim::Definition(), Concrete, kUnbounded,
-                    "An infinite plane in its xy plane, facing +z.", ERNIE_GROUND_PLANE_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(StarField, Concrete, kInheritExtent, ERNIE_STAR_FIELD_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(GroundPlane, Concrete, kUnbounded, ERNIE_GROUND_PLANE_ATTRIBUTES)
 
 }  // namespace ernie

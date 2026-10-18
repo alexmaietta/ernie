@@ -42,6 +42,36 @@ glm::dmat4 InstanceTransform(std::span<const float> position, std::span<const fl
     return m;
 }
 
+/// One row's instances: its prototypes' boxes, each placed at the instances that use it.
+struct Instances {
+    std::vector<Box> prototypes;
+    std::vector<std::int64_t> indices;
+    std::vector<float> positions;
+    std::vector<float> rotations;
+    std::vector<float> scales;
+    bool wFirst = false;
+
+    Box Bounds() const {
+        Box box;
+        for (std::size_t i = 0; i < positions.size() / 3; ++i) {
+            const std::int64_t p = i < indices.size() ? indices[i] : 0;
+            if (p >= 0 && static_cast<std::size_t>(p) < prototypes.size()) {
+                box.Extend(prototypes[static_cast<std::size_t>(p)].Transformed(InstanceTransform(
+                    Part(positions, i, 3), Part(rotations, i, 4), Part(scales, i, 3), wFirst)));
+            }
+        }
+        return box;
+    }
+
+  private:
+    /// @return Instance i's `n` values, or none when the array is unset or too short.
+    static std::span<const float> Part(const std::vector<float>& values, std::size_t i,
+                                       std::size_t n) {
+        return values.size() >= (i + 1) * n ? std::span(values).subspan(i * n, n)
+                                            : std::span<const float>();
+    }
+};
+
 void InstancerExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
     const auto prototypes = rows.Column<std::vector<Target>>(PointInstancer::kPrototypes);
     const auto indices = rows.Column<Tensor>(PointInstancer::kProtoIndices);
@@ -50,44 +80,30 @@ void InstancerExtent(const ExtentRows& rows, RowRange range, std::span<Box> out)
     const auto scales = rows.Column<Tensor>(PointInstancer::kScales);
     const auto order = rows.Column<Token>(PointInstancer::kQuaternionOrder);
     const auto authored = rows.Column<std::vector<float>>(Boundable::kExtent);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
-        Box& box = out[row - range.begin] = Box();
+    ComputeRows(range, out, [&](std::uint32_t row) {
         if (!OnHost({&indices[row], &positions[row], &orientations[row], &scales[row]})) {
-            box = AuthoredExtent(authored[row]);
-            continue;
+            return AuthoredExtent(authored[row]);
         }
-        const std::vector<Box> protoBoxes = Map(prototypes[row], [&](const Target& target) {
-            const std::optional<PrimId> prim = rows.store.Find(target.path);
-            return prim ? rows.scene->BoundsInParent(*prim) : Box();
-        });
-        const std::vector<float> xyz = FloatsOrNone(positions[row], 3, "positions");
-        const std::vector<float> rotations = FloatsOrNone(orientations[row], 4, "orientations");
-        const std::vector<float> scaling = FloatsOrNone(scales[row], 3, "scales");
-        const std::vector<std::int64_t> proto = indices[row].Empty()
-                                                    ? std::vector<std::int64_t>{}
-                                                    : CopyInts(indices[row], "protoIndices");
-        const bool wFirst = rows.Text(order[row]) == "wxyz";
-        const std::size_t count = xyz.size() / 3;
-        for (std::size_t i = 0; i < count; ++i) {
-            const std::int64_t p = i < proto.size() ? proto[i] : 0;
-            if (p < 0 || static_cast<std::size_t>(p) >= protoBoxes.size()) {
-                continue;
-            }
-            const auto part = [&](const std::vector<float>& values, std::size_t n) {
-                return values.size() >= (i + 1) * n ? std::span(values).subspan(i * n, n)
-                                                    : std::span<const float>();
-            };
-            box.Extend(protoBoxes[static_cast<std::size_t>(p)].Transformed(
-                InstanceTransform(part(xyz, 3), part(rotations, 4), part(scaling, 3), wFirst)));
-        }
-    }
+        const Instances instances{
+            .prototypes = Map(prototypes[row],
+                              [&](const Target& target) {
+                                  const std::optional<PrimId> prim = rows.Resolve(target);
+                                  return prim ? rows.scene->BoundsInParent(*prim) : Box();
+                              }),
+            .indices = indices[row].Empty() ? std::vector<std::int64_t>{}
+                                            : CopyInts(indices[row], "protoIndices"),
+            .positions = FloatsOrNone(positions[row], 3, "positions"),
+            .rotations = FloatsOrNone(orientations[row], 4, "orientations"),
+            .scales = FloatsOrNone(scales[row], 3, "scales"),
+            .wFirst = rows.Text(order[row]) == "wxyz",
+        };
+        return instances.Bounds();
+    });
 }
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(PointInstancer, tokens::kPointInstancer, &Boundable::Definition(), Concrete,
-                    ComputedFromOtherPrims(InstancerExtent),
-                    "Prototypes placed at instances, bounded by their bounds at each instance.",
+ERNIE_DEFINE_SCHEMA(PointInstancer, Concrete, ComputedFromOtherPrims(InstancerExtent),
                     ERNIE_POINT_INSTANCER_ATTRIBUTES, .openNamespaces = {tokens::kPrimvarsPrefix})
 
 }  // namespace ernie

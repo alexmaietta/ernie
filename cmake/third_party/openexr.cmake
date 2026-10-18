@@ -50,6 +50,7 @@ foreach(
     OpenEXRConfig
 )
     if(TARGET ${target})
+        ernie_quiet_third_party(${target})
         get_target_property(directories ${target} INTERFACE_INCLUDE_DIRECTORIES)
         if(directories)
             set_property(

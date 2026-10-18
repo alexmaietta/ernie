@@ -97,39 +97,17 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(RenderSettingsBase, SchemaView, ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(RenderProduct, RenderSettingsBase, ERNIE_RENDER_PRODUCT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(RenderVar, SchemaView, ERNIE_RENDER_VAR_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(RenderPass, SchemaView, ERNIE_RENDER_PASS_ATTRIBUTES);
-
-/// What settings and products share: the camera, image and Ernie's settings.
-class RenderSettingsBase : public RenderSettingsBaseAccessors<RenderSettingsBase, SchemaView> {
-    ERNIE_SCHEMA_BODY(RenderSettingsBase, SchemaView)
-};
-
-/// A render's settings and the products it makes.
-class RenderSettings : public RenderSettingsAccessors<RenderSettings, RenderSettingsBase> {
-    ERNIE_SCHEMA_BODY(RenderSettings, RenderSettingsBase)
-    ERNIE_SCHEMA_DEFINE(RenderSettings)
-};
-
-/// One output, an image or a sensor's data, overriding its settings' where it authors them.
-class RenderProduct : public RenderProductAccessors<RenderProduct, RenderSettingsBase> {
-    ERNIE_SCHEMA_BODY(RenderProduct, RenderSettingsBase)
-    ERNIE_SCHEMA_DEFINE(RenderProduct)
-};
-
-/// One channel set of a product: colour, depth, normals, ids or an Ernie output.
-class RenderVar : public RenderVarAccessors<RenderVar, SchemaView> {
-    ERNIE_SCHEMA_BODY(RenderVar, SchemaView)
-    ERNIE_SCHEMA_DEFINE(RenderVar)
-};
-
-/// A render of a pipeline, with the prims and cameras it sees as collections.
-class RenderPass : public RenderPassAccessors<RenderPass, SchemaView> {
-    ERNIE_SCHEMA_BODY(RenderPass, SchemaView)
-    ERNIE_SCHEMA_DEFINE(RenderPass)
-};
+ERNIE_SCHEMA(RenderSettingsBase, SchemaView, ERNIE_RENDER_SETTINGS_BASE_ATTRIBUTES,
+             "What settings and products share: the camera, image and Ernie's settings.");
+ERNIE_CONCRETE_SCHEMA(RenderSettings, RenderSettingsBase, ERNIE_RENDER_SETTINGS_ATTRIBUTES,
+                      "A render's settings and the products it makes.");
+ERNIE_CONCRETE_SCHEMA(RenderProduct, RenderSettingsBase, ERNIE_RENDER_PRODUCT_ATTRIBUTES,
+                      "One output, an image or a sensor's data, overriding its settings' where it "
+                      "authors them.");
+ERNIE_CONCRETE_SCHEMA(RenderVar, SchemaView, ERNIE_RENDER_VAR_ATTRIBUTES,
+                      "One channel set of a product: colour, depth, normals, ids or an Ernie "
+                      "output.");
+ERNIE_CONCRETE_SCHEMA(RenderPass, SchemaView, ERNIE_RENDER_PASS_ATTRIBUTES,
+                      "A render of a pipeline, with the prims and cameras it sees as collections.");
 
 }  // namespace ernie

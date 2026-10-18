@@ -8,20 +8,17 @@
 namespace ernie {
 namespace {
 
-void LaserExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
-    const auto aperture = rows.Column<double>(LaserLight::kApertureRadius);
-    const auto waist = rows.Column<glm::dvec2>(LaserLight::kWaistRadius);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
+auto EmitterHalves(const ExtentRows& rows) {
+    return [aperture = rows.Column<double>(LaserLight::kApertureRadius),
+            waist = rows.Column<glm::dvec2>(LaserLight::kWaistRadius)](std::uint32_t row) {
         const double radius = std::max({aperture[row], waist[row].x, waist[row].y});
-        out[row - range.begin] = Box::Around(glm::dvec3(0.0), {radius, radius, 0.0});
-    }
+        return glm::dvec3(radius, radius, 0.0);
+    };
 }
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(LaserLight, "LaserLight", &BoundableLightBase::Definition(), Concrete,
-                    ComputedExtent(LaserExtent),
-                    "A laser along -z: a Gaussian beam and its pattern.",
+ERNIE_DEFINE_SCHEMA(LaserLight, Concrete, ComputedExtent(CentredExtent<EmitterHalves>),
                     ERNIE_LASER_LIGHT_ATTRIBUTES,
                     .fallbackOverrides = {{"ernie:power", 0.001},
                                           {"ernie:polarization:degree", 0.98}})

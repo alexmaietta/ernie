@@ -53,6 +53,8 @@ std::span<const SchemaDef* const> Schemas() {
         &CylinderLight::Definition(),
         &DomeLight::Definition(),
         &PortalLight::Definition(),
+        &MeshLightAPI::Definition(),
+        &VolumeLightAPI::Definition(),
         &LaserLight::Definition(),
         &Terrain::Definition(),
         &Atmosphere::Definition(),

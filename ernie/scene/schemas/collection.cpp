@@ -5,7 +5,6 @@
 
 namespace ernie {
 
-ERNIE_DEFINE_SCHEMA(CollectionAPI, "CollectionAPI", nullptr, MultipleApply, kInheritExtent,
-                    "A named set of prims.", ERNIE_COLLECTION_API_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(CollectionAPI, MultipleApply, kInheritExtent, ERNIE_COLLECTION_API_ATTRIBUTES)
 
 }  // namespace ernie

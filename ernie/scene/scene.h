@@ -121,7 +121,8 @@ class Scene {
     /// Moves a prim to the bucket of its type and `apis`.
     void MoveTo(PrimId prim, const SchemaDef* schema, std::vector<Token> apis);
     const std::vector<Token>& Apis(PrimId prim) const;
-    /// @return A type's built-in API schemas, then the applied ones.
+    /// @return A type's built-in API schemas, then the applied ones, each with those built into it,
+    /// each once.
     std::vector<ApiName> AllApis(const SchemaDef* schema, std::span<const Token> applied) const;
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;

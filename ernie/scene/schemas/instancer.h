@@ -52,12 +52,7 @@ template <> struct ChoiceTokens<QuaternionOrder> {
     static constexpr std::array<std::string_view, 2> kTokens{"xyzw", "wxyz"};
 };
 
-ERNIE_SCHEMA_ACCESSORS(PointInstancer, Boundable, ERNIE_POINT_INSTANCER_ATTRIBUTES);
-
-/// Prototypes placed at instances, bounded by their bounds at each instance.
-class PointInstancer : public PointInstancerAccessors<PointInstancer, Boundable> {
-    ERNIE_SCHEMA_BODY(PointInstancer, Boundable)
-    ERNIE_SCHEMA_DEFINE(PointInstancer)
-};
+ERNIE_CONCRETE_SCHEMA(PointInstancer, Boundable, ERNIE_POINT_INSTANCER_ATTRIBUTES,
+                      "Prototypes placed at instances, bounded by their bounds at each instance.");
 
 }  // namespace ernie

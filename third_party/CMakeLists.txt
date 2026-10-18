@@ -13,6 +13,7 @@ target_include_directories(
 target_compile_definitions(ernie_basisu PUBLIC BASISD_SUPPORT_KTX2=1 BASISD_SUPPORT_KTX2_ZSTD=1)
 target_link_libraries(ernie_basisu PRIVATE ernie_zstd)
 set_target_properties(ernie_basisu PROPERTIES POSITION_INDEPENDENT_CODE ON)
+ernie_quiet_third_party(ernie_basisu)
 
 # PNanoVDB (Apache-2.0), NanoVDB's portable C and shader reader: the C side reads .nvdb grid
 # headers, and shaders embed the same header to walk grids on the GPU.

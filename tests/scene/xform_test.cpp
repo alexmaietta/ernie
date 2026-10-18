@@ -106,7 +106,7 @@ std::vector<std::string> Order(std::initializer_list<std::string_view> ops) {
 struct Rock {
     Path path{"/World/Rock"};
     Scene scene;
-    PrimId prim = scene.Define(path, tokens::kXform);
+    PrimId prim = scene.Define(path, Xform::kName);
 
     void Set(std::string_view attribute, const Value& value) {
         scene.Set(prim, attribute, value);
@@ -230,14 +230,14 @@ TEST(Xform, APrimWithoutOpsIsAtTheIdentity) {
 TEST(Xform, PrimsThatAreNotXformableDoNotTransform) {
     Scene scene;
     const PrimId typeless = scene.Define("/Typeless", "");
-    const PrimId scope = scene.Define("/Scope", tokens::kScope);
+    const PrimId scope = scene.Define("/Scope", Scope::kName);
     for (const PrimId prim : {typeless, scope}) {
         scene.Set(prim, tokens::kTranslate, glm::dvec3(1, 2, 3));
         scene.Set(prim, tokens::kXformOpOrder, Order({tokens::kTranslate}));
         EXPECT_EQ(scene.LocalTransform(prim), glm::dmat4(1.0)) << scene.PrimPath(prim).String();
     }
     // Ancestors Define adds have no type, so they leave their descendants where they are.
-    const PrimId hand = scene.Define("/Arm/Hand", tokens::kXform);
+    const PrimId hand = scene.Define("/Arm/Hand", Xform::kName);
     SetXform(scene, "/Arm/Hand", {.translate = glm::dvec3(1, 0, 0)});
     EXPECT_EQ(scene.TypeName(scene.Require("/Arm")), "");
     EXPECT_EQ(scene.WorldTransform(hand), scene.LocalTransform(hand));
@@ -417,7 +417,7 @@ TEST(Xform, InvertingAnyOpUndoesIt) {
 TEST(Xform, WorldTransformsComposeOpsDownTheHierarchy) {
     Scene scene;
     for (const char* path : {"/World", "/World/Robot", "/World/Robot/Arm"}) {
-        scene.Define(path, tokens::kXform);
+        scene.Define(path, Xform::kName);
     }
     SetXform(scene, "/World", {.translate = glm::dvec3(100, 0, 0)});
     SetXform(scene, "/World/Robot", {.rotate = glm::dvec3(0, 0, 90)});
@@ -429,7 +429,7 @@ TEST(Xform, ResettingTheStackIgnoresAncestors) {
     Scene scene;
     for (const char* path :
          {"/World", "/World/Robot", "/World/Robot/Arm", "/World/Robot/Arm/Hand"}) {
-        scene.Define(path, tokens::kXform);
+        scene.Define(path, Xform::kName);
     }
     const Path arm("/World/Robot/Arm");
     SetXform(scene, "/World", {.translate = glm::dvec3(100, 0, 0)});

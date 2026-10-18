@@ -13,6 +13,13 @@
 
 /// LightAPI's attributes, which every light has as a built-in API schema.
 #define ERNIE_LIGHT_API_ATTRIBUTES(X)                                                              \
+    X(std::string, ShaderId, "light:shaderId", "", "The light's shader, as renderers name it.",    \
+      .group = "Light")                                                                            \
+    X(std::string, MaterialSyncMode, "light:materialSyncMode", "noMaterialResponse",               \
+      "For geometry that emits: whether its bound material's glow tints the light, is lit "        \
+      "independently, or is ignored.",                                                             \
+      .group = "Light",                                                                            \
+      .options = {"materialGlowTintsLight", "independent", "noMaterialResponse"})                 \
     X(double, Intensity, "inputs:intensity", 1.0, "Brightness, scaled by 2^exposure.",             \
       .group = "Light", .lower = AtLeast(0.0), .finite = true)                                     \
     X(double, Exposure, "inputs:exposure", 0.0, "Stops of brightness, as photographers count them.", \
@@ -187,117 +194,41 @@ template <> struct ChoiceTokens<PulseTrigger> {
 #define ERNIE_BOUNDABLE_LIGHT_VIEW(X)                                                              \
     ERNIE_LIGHT_API_ATTRIBUTES(X) ERNIE_BOUNDABLE_LIGHT_BASE_ATTRIBUTES(X)
 
-ERNIE_SCHEMA_ACCESSORS(LightAPI, SchemaView, ERNIE_LIGHT_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(BoundableLightBase, Boundable, ERNIE_BOUNDABLE_LIGHT_VIEW);
-ERNIE_SCHEMA_ACCESSORS(NonboundableLightBase, Xformable, ERNIE_LIGHT_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(DistantLight, NonboundableLightBase, ERNIE_DISTANT_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(DiskLight, BoundableLightBase, ERNIE_DISK_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(RectLight, BoundableLightBase, ERNIE_RECT_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(SphereLight, BoundableLightBase, ERNIE_SPHERE_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(CylinderLight, BoundableLightBase, ERNIE_CYLINDER_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(DomeLight, NonboundableLightBase, ERNIE_DOME_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(PortalLight, BoundableLightBase, ERNIE_PORTAL_LIGHT_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(ShapingAPI, SchemaView, ERNIE_SHAPING_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(ShadowAPI, SchemaView, ERNIE_SHADOW_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(PhotometricAreaLightAPI, SchemaView,
-                       ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(PhotometricDistantLightAPI, SchemaView,
-                       ERNIE_PHOTOMETRIC_DISTANT_LIGHT_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(PhotometricDomeLightAPI, SchemaView,
-                       ERNIE_PHOTOMETRIC_DOME_LIGHT_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(PhysicalLightIlluminantAPI, SchemaView,
-                       ERNIE_PHYSICAL_LIGHT_ILLUMINANT_API_ATTRIBUTES);
-
-/// A light with a shape, bounded by it.
-class BoundableLightBase : public BoundableLightBaseAccessors<BoundableLightBase, Boundable> {
-    ERNIE_SCHEMA_BODY(BoundableLightBase, Boundable)
-};
-
-/// A light at infinity or around everything, so unbounded.
-class NonboundableLightBase
-    : public NonboundableLightBaseAccessors<NonboundableLightBase, Xformable> {
-    ERNIE_SCHEMA_BODY(NonboundableLightBase, Xformable)
-};
-
-/// A light from infinitely far along +z, such as the Sun's.
-class DistantLight : public DistantLightAccessors<DistantLight, NonboundableLightBase> {
-    ERNIE_SCHEMA_BODY(DistantLight, NonboundableLightBase)
-    ERNIE_SCHEMA_DEFINE(DistantLight)
-};
-
-/// A disk emitting towards -z.
-class DiskLight : public DiskLightAccessors<DiskLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(DiskLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(DiskLight)
-};
-
-/// A rectangle emitting towards -z.
-class RectLight : public RectLightAccessors<RectLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(RectLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(RectLight)
-};
-
-/// A sphere emitting outwards.
-class SphereLight : public SphereLightAccessors<SphereLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(SphereLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(SphereLight)
-};
-
-/// A cylinder along x emitting outwards.
-class CylinderLight : public CylinderLightAccessors<CylinderLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(CylinderLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(CylinderLight)
-};
-
-/// Light from all around, from an environment image.
-class DomeLight : public DomeLightAccessors<DomeLight, NonboundableLightBase> {
-    ERNIE_SCHEMA_BODY(DomeLight, NonboundableLightBase)
-    ERNIE_SCHEMA_DEFINE(DomeLight)
-};
-
-/// A rectangle a dome light's light comes in through, guiding its samples.
-class PortalLight : public PortalLightAccessors<PortalLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(PortalLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(PortalLight)
-};
-
-/// What every light has: brightness, colour, and Ernie's spectrum, polarization and pulses.
-class LightAPI : public LightAPIAccessors<LightAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(LightAPI)
-};
-
-/// Focuses a light, limits it to a cone, or shapes it by an IES profile.
-class ShapingAPI : public ShapingAPIAccessors<ShapingAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(ShapingAPI)
-};
-
-/// Controls a light's shadows.
-class ShadowAPI : public ShadowAPIAccessors<ShadowAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(ShadowAPI)
-};
-
-/// Omniverse's photometric units for shaped lights: lumens, or lux at a distance.
-class PhotometricAreaLightAPI
-    : public PhotometricAreaLightAPIAccessors<PhotometricAreaLightAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(PhotometricAreaLightAPI)
-};
-
-/// Omniverse's photometric units for distant lights: lux on a facing surface.
-class PhotometricDistantLightAPI
-    : public PhotometricDistantLightAPIAccessors<PhotometricDistantLightAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(PhotometricDistantLightAPI)
-};
-
-/// Omniverse's photometric units for dome lights: lux on an upward-facing surface.
-class PhotometricDomeLightAPI
-    : public PhotometricDomeLightAPIAccessors<PhotometricDomeLightAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(PhotometricDomeLightAPI)
-};
-
-/// Omniverse's illuminant: the shape of a light's spectrum.
-class PhysicalLightIlluminantAPI
-    : public PhysicalLightIlluminantAPIAccessors<PhysicalLightIlluminantAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(PhysicalLightIlluminantAPI)
-};
+ERNIE_API_SCHEMA(LightAPI, ERNIE_LIGHT_API_ATTRIBUTES,
+                 "What every light has: brightness, colour, and Ernie's polarization and pulses.");
+ERNIE_SCHEMA(BoundableLightBase, Boundable, ERNIE_BOUNDABLE_LIGHT_VIEW,
+             "A light with a shape, bounded by it.");
+ERNIE_SCHEMA(NonboundableLightBase, Xformable, ERNIE_LIGHT_API_ATTRIBUTES,
+             "A light at infinity or around everything, so unbounded.");
+ERNIE_CONCRETE_SCHEMA(DistantLight, NonboundableLightBase, ERNIE_DISTANT_LIGHT_ATTRIBUTES,
+                      "A light from infinitely far along +z, such as the Sun's.");
+ERNIE_CONCRETE_SCHEMA(DiskLight, BoundableLightBase, ERNIE_DISK_LIGHT_ATTRIBUTES,
+                      "A disk emitting towards -z.");
+ERNIE_CONCRETE_SCHEMA(RectLight, BoundableLightBase, ERNIE_RECT_LIGHT_ATTRIBUTES,
+                      "A rectangle emitting towards -z.");
+ERNIE_CONCRETE_SCHEMA(SphereLight, BoundableLightBase, ERNIE_SPHERE_LIGHT_ATTRIBUTES,
+                      "A sphere emitting outwards.");
+ERNIE_CONCRETE_SCHEMA(CylinderLight, BoundableLightBase, ERNIE_CYLINDER_LIGHT_ATTRIBUTES,
+                      "A cylinder along x emitting outwards.");
+ERNIE_CONCRETE_SCHEMA(DomeLight, NonboundableLightBase, ERNIE_DOME_LIGHT_ATTRIBUTES,
+                      "Light from all around, from an environment image.");
+ERNIE_CONCRETE_SCHEMA(PortalLight, BoundableLightBase, ERNIE_PORTAL_LIGHT_ATTRIBUTES,
+                      "A rectangle a dome light's light comes in through, guiding its samples.");
+ERNIE_API_SCHEMA(MeshLightAPI, ERNIE_NO_ATTRIBUTES,
+                 "Makes a Mesh emit, its bound material's glow tinting the light.");
+ERNIE_API_SCHEMA(VolumeLightAPI, ERNIE_NO_ATTRIBUTES,
+                 "Makes a Volume emit, its bound material's glow tinting the light.");
+ERNIE_API_SCHEMA(ShapingAPI, ERNIE_SHAPING_API_ATTRIBUTES,
+                 "Focuses a light, limits it to a cone, or shapes it by an IES profile.");
+ERNIE_API_SCHEMA(ShadowAPI, ERNIE_SHADOW_API_ATTRIBUTES, "Controls a light's shadows.");
+ERNIE_API_SCHEMA(PhotometricAreaLightAPI, ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES,
+                 "Omniverse's photometric units for shaped lights: lumens, or lux at a distance.");
+ERNIE_API_SCHEMA(PhotometricDistantLightAPI, ERNIE_PHOTOMETRIC_DISTANT_LIGHT_API_ATTRIBUTES,
+                 "Omniverse's photometric units for distant lights: lux on a facing surface.");
+ERNIE_API_SCHEMA(PhotometricDomeLightAPI, ERNIE_PHOTOMETRIC_DOME_LIGHT_API_ATTRIBUTES,
+                 "Omniverse's photometric units for dome lights: lux on an upward-facing "
+                 "surface.");
+ERNIE_API_SCHEMA(PhysicalLightIlluminantAPI, ERNIE_PHYSICAL_LIGHT_ILLUMINANT_API_ATTRIBUTES,
+                 "Omniverse's illuminant: the shape of a light's spectrum.");
 
 }  // namespace ernie

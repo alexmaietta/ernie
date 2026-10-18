@@ -16,26 +16,26 @@ namespace {
 
 TEST(Scene, DefinesPrimsWithTypelessAncestors) {
     Scene scene;
-    const PrimId rock = scene.Define("/World/Rocks/Rock", tokens::kSphere);
-    EXPECT_EQ(scene.TypeName(rock), tokens::kSphere);
+    const PrimId rock = scene.Define("/World/Rocks/Rock", Sphere::kName);
+    EXPECT_EQ(scene.TypeName(rock), Sphere::kName);
     ASSERT_TRUE(scene.Has("/World/Rocks"));
     EXPECT_EQ(scene.TypeName(*scene.Find("/World/Rocks")), "");
     EXPECT_EQ(scene.Schema(*scene.Find("/World")), nullptr);
     EXPECT_EQ(scene.Children("/World"), std::vector<Path>{Path("/World/Rocks")});
     EXPECT_EQ(scene.Children(Path::Root()), std::vector<Path>{Path("/World")});
 
-    EXPECT_THROW(scene.Define(Path::Root(), tokens::kXform), std::invalid_argument);
+    EXPECT_THROW(scene.Define(Path::Root(), Xform::kName), std::invalid_argument);
     EXPECT_THROW(scene.Define("/World/A", "Teapot"), std::invalid_argument);
     EXPECT_THROW(scene.Define("/World/A", "Gprim"), std::invalid_argument) << "abstract";
 }
 
 TEST(Scene, RedefiningWithAnotherTypeKeepsWhatBothDeclare) {
     Scene scene;
-    const PrimId prim = scene.Define("/Shape", tokens::kSphere);
+    const PrimId prim = scene.Define("/Shape", Sphere::kName);
     scene.Set(prim, Sphere::kRadius, 3.0);
     scene.Set(prim, Gprim::kDisplayColor, glm::dvec3(1.0, 0.0, 0.0));
-    EXPECT_EQ(scene.Define("/Shape", tokens::kCylinder), prim);
-    EXPECT_EQ(scene.TypeName(prim), tokens::kCylinder);
+    EXPECT_EQ(scene.Define("/Shape", Cylinder::kName), prim);
+    EXPECT_EQ(scene.TypeName(prim), Cylinder::kName);
     EXPECT_EQ(Cylinder(scene, "/Shape").GetRadius(), 3.0);
     EXPECT_EQ(Cylinder(scene, "/Shape").GetDisplayColor(), glm::dvec3(1.0, 0.0, 0.0));
     EXPECT_FALSE(Cylinder(scene, "/Shape").HasHeight());
@@ -43,8 +43,8 @@ TEST(Scene, RedefiningWithAnotherTypeKeepsWhatBothDeclare) {
 
 TEST(Scene, RemovesASubtree) {
     Scene scene;
-    scene.Define("/World/Rover/Wheel", tokens::kCylinder);
-    scene.Define("/World/Sun", tokens::kSphere);
+    scene.Define("/World/Rover/Wheel", Cylinder::kName);
+    scene.Define("/World/Sun", Sphere::kName);
     EXPECT_TRUE(scene.Remove("/World/Rover"));
     EXPECT_FALSE(scene.Has("/World/Rover"));
     EXPECT_FALSE(scene.Has("/World/Rover/Wheel"));
@@ -52,16 +52,16 @@ TEST(Scene, RemovesASubtree) {
     EXPECT_FALSE(scene.Remove("/World/Rover"));
     EXPECT_THROW(scene.Remove(Path::Root()), std::invalid_argument);
 
-    scene.Define("/World/Rover", tokens::kXform);
+    scene.Define("/World/Rover", Xform::kName);
     EXPECT_TRUE(scene.Children("/World/Rover").empty()) << "the path stays, its prims don't";
 }
 
 TEST(Scene, ListsPrimsOfATypeAndItsDerivedTypes) {
     Scene scene;
-    scene.Define("/B", tokens::kSphere);
-    scene.Define("/A", tokens::kCube);
-    scene.Define("/G", tokens::kXform);
-    EXPECT_EQ(scene.Prims(tokens::kSphere), std::vector<Path>{Path("/B")});
+    scene.Define("/B", Sphere::kName);
+    scene.Define("/A", Cube::kName);
+    scene.Define("/G", Xform::kName);
+    EXPECT_EQ(scene.Prims(Sphere::kName), std::vector<Path>{Path("/B")});
     EXPECT_EQ(scene.Prims("Gprim"), (std::vector<Path>{Path("/A"), Path("/B")}));
     EXPECT_EQ(scene.Prims().size(), 3u);
     EXPECT_THROW(scene.Prims("Teapot"), std::invalid_argument);
@@ -69,7 +69,7 @@ TEST(Scene, ListsPrimsOfATypeAndItsDerivedTypes) {
 
 TEST(Scene, SetsAndGetsValuesByUsdName) {
     Scene scene;
-    const PrimId prim = scene.Define("/Ball", tokens::kSphere);
+    const PrimId prim = scene.Define("/Ball", Sphere::kName);
     EXPECT_FALSE(scene.Get(prim, Sphere::kRadius)) << "unauthored";
     scene.Set(prim, Sphere::kRadius, 2);
     EXPECT_EQ(scene.Get(prim, Sphere::kRadius), Value(2.0)) << "ints widen to doubles";
@@ -87,7 +87,7 @@ TEST(Scene, SetsAndGetsValuesByUsdName) {
 
 TEST(Scene, SettingChecksNamesTypesAndLimits) {
     Scene scene;
-    const PrimId prim = scene.Define("/Ball", tokens::kSphere);
+    const PrimId prim = scene.Define("/Ball", Sphere::kName);
     EXPECT_THROW(scene.Set(prim, "teapot:spout", 1.0), std::invalid_argument);
     EXPECT_THROW(scene.Set(prim, Sphere::kRadius, "big"), std::invalid_argument);
     EXPECT_THROW(scene.Set(prim, Sphere::kRadius, -1.0), std::invalid_argument);
@@ -103,7 +103,7 @@ TEST(Scene, SettingChecksNamesTypesAndLimits) {
 
 TEST(Scene, OpenNamespacesAndTypelessPrimsTakeCustomAttributes) {
     Scene scene;
-    const PrimId group = scene.Define("/World/Group", tokens::kXform);
+    const PrimId group = scene.Define("/World/Group", Xform::kName);
     scene.Set(group, "user:mass", 12.5);
     EXPECT_EQ(scene.Get(group, "user:mass"), Value(12.5));
     EXPECT_THROW(scene.Set(group, "user:mass", "heavy"), std::invalid_argument)
@@ -136,7 +136,7 @@ TEST(Scene, ViewsReadFallbacksAndSetThroughTheScene) {
 
 TEST(Scene, ViewsCheckTypesAndConstness) {
     Scene scene;
-    scene.Define("/Ball", tokens::kSphere);
+    scene.Define("/Ball", Sphere::kName);
     EXPECT_NO_THROW(Gprim(scene, "/Ball"));
     EXPECT_THROW(Cube(scene, "/Ball"), std::invalid_argument);
     EXPECT_THROW(Sphere(scene, "/Missing"), std::invalid_argument);
@@ -148,7 +148,7 @@ TEST(Scene, ViewsCheckTypesAndConstness) {
 
 TEST(Scene, ChangesAreClassifiedForRenderers) {
     Scene scene;
-    const PrimId ball = scene.Define("/Ball", tokens::kSphere);
+    const PrimId ball = scene.Define("/Ball", Sphere::kName);
     const auto classify = [&](std::string_view attribute, const Value& value) {
         const std::uint64_t cursor = scene.Version();
         scene.Set(ball, attribute, value);

@@ -33,36 +33,20 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(MaterialBindingAPI, SchemaView, ERNIE_MATERIAL_BINDING_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(NodeGraph, SchemaView, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Material, NodeGraph, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Shader, SchemaView, ERNIE_SHADER_ATTRIBUTES);
-
-/// Binds a material to a prim; `material:binding:<purpose>` binds one for a purpose.
-class MaterialBindingAPI : public MaterialBindingAPIAccessors<MaterialBindingAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(MaterialBindingAPI)
-};
-
-/// A network of shaders with `inputs:` its users set and `outputs:` connected inside it.
-class NodeGraph : public NodeGraphAccessors<NodeGraph, SchemaView> {
-    ERNIE_SCHEMA_BODY(NodeGraph, SchemaView)
-    ERNIE_SCHEMA_DEFINE(NodeGraph)
-};
-
-/// What prims are drawn with: its terminals `outputs:surface`, `outputs:displacement` and
-/// `outputs:volume`, and Ernie's `outputs:ernie:thermal`, `outputs:ernie:lidar` and
-/// `outputs:ernie:radar`, connect to the shaders that compute them.
-class Material : public MaterialAccessors<Material, NodeGraph> {
-    ERNIE_SCHEMA_BODY(Material, NodeGraph)
-    ERNIE_SCHEMA_DEFINE(Material)
-};
-
-/// One node of a network: a model or a texture, by its `info:id`, with its `inputs:` and
-/// `outputs:`.
-class Shader : public ShaderAccessors<Shader, SchemaView> {
-    ERNIE_SCHEMA_BODY(Shader, SchemaView)
-    ERNIE_SCHEMA_DEFINE(Shader)
-};
+ERNIE_API_SCHEMA(MaterialBindingAPI, ERNIE_MATERIAL_BINDING_API_ATTRIBUTES,
+                 "Binds a material to a prim and its descendants; material:binding:<purpose> "
+                 "binds one for a purpose.");
+ERNIE_CONCRETE_SCHEMA(NodeGraph, SchemaView, ERNIE_NO_ATTRIBUTES,
+                      "A network of shaders with inputs its users set and outputs connected "
+                      "inside it.");
+ERNIE_CONCRETE_SCHEMA(Material, NodeGraph, ERNIE_NO_ATTRIBUTES,
+                      "What prims are drawn with: its terminals outputs:surface, "
+                      "outputs:displacement and outputs:volume, and Ernie's outputs:ernie:thermal, "
+                      "outputs:ernie:lidar and outputs:ernie:radar, connect to the shaders "
+                      "computing them.");
+ERNIE_CONCRETE_SCHEMA(Shader, SchemaView, ERNIE_SHADER_ATTRIBUTES,
+                      "One node of a network, a model or a texture, by its info:id, with its "
+                      "inputs and outputs.");
 
 /// @brief The source of a connection: a shader or graph and one of its outputs.
 struct Connection {

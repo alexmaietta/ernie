@@ -300,19 +300,27 @@ BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis
         return *found;
     }
     BucketSchema entry{schema, {}};
+    const std::vector<ApiName> allApis = AllApis(schema, key.apiSchemas);
+    // The type's fallback overrides win over its API schemas', as USD's do.
+    const auto fallback = [&](const AttributeDef& def, const std::string& name) -> const Value& {
+        const Value* override = schema != nullptr ? schema->FallbackOverride(name) : nullptr;
+        for (auto api = allApis.begin(); override == nullptr && api != allApis.end(); ++api) {
+            override = api->schema->FallbackOverride(name);
+        }
+        return override != nullptr ? *override : def.fallback;
+    };
     std::vector<ColumnLayout> layout;
     const auto add = [&](const SchemaDef& declaring, const ApiName& api) {
         for (const AttributeDef* def : declaring.AllAttributes()) {
             const std::string name = api.Attribute(def->name);
-            const Value* override = schema != nullptr ? schema->FallbackOverride(name) : nullptr;
-            layout.push_back(MakeLayout(paths, *def, name, override ? *override : def->fallback));
+            layout.push_back(MakeLayout(paths, *def, name, fallback(*def, name)));
             entry.declared.emplace(layout.back().attribute, def);
         }
     };
     if (schema != nullptr) {
         add(*schema, {});
     }
-    for (const ApiName& api : AllApis(schema, key.apiSchemas)) {
+    for (const ApiName& api : allApis) {
         add(*api.schema, api);
     }
     const BucketId bucket = store_.AddBucket(key, layout);
@@ -333,7 +341,16 @@ const std::vector<Token>& Scene::Apis(PrimId prim) const {
 }
 
 void Scene::ApplyApi(PrimId prim, std::string_view api) {
-    ApiName::Parse(api);
+    const ApiName parsed = ApiName::Parse(api);
+    const std::vector<std::string_view>& allowed = parsed.schema->appliesTo;
+    const SchemaDef* type = Schema(prim);
+    if (!allowed.empty() && std::ranges::none_of(allowed, [&](std::string_view name) {
+            return type != nullptr && type->IsA(*FindSchema(name));
+        })) {
+        throw std::invalid_argument(std::string(api) + " applies only to " +
+                                    std::string(allowed.front()) + " prims, not " +
+                                    Describe(*this, prim));
+    }
     std::vector<Token> apis = Apis(prim);
     apis.push_back(store_.Tokens().Intern(api));
     MoveTo(prim, Schema(prim), std::move(apis));
@@ -356,12 +373,24 @@ bool Scene::HasApi(PrimId prim, std::string_view api) const {
 
 std::vector<ApiName> Scene::AllApis(const SchemaDef* schema, std::span<const Token> applied) const {
     std::vector<ApiName> apis;
+    // Each API schema once, followed by those built into it (MeshLightAPI's LightAPI, LightAPI's
+    // light-link collections).
+    const auto add = [&](const auto& self, std::string_view name) -> void {
+        const ApiName api = ApiName::Parse(name);
+        if (std::ranges::find(apis, api) != apis.end()) {
+            return;
+        }
+        apis.push_back(api);
+        for (const std::string_view builtin : api.schema->AllBuiltinApis()) {
+            self(self, builtin);
+        }
+    };
     for (const std::string_view builtin :
          schema != nullptr ? schema->AllBuiltinApis() : std::vector<std::string_view>{}) {
-        apis.push_back(ApiName::Parse(builtin));
+        add(add, builtin);
     }
     for (const Token token : applied) {
-        apis.push_back(ApiName::Parse(store_.Tokens().Text(token)));
+        add(add, store_.Tokens().Text(token));
     }
     return apis;
 }
@@ -427,6 +456,20 @@ ColumnType Scene::TypeForUndeclared(PrimId prim, std::string_view attribute,
                                     "' takes no empty value");
     }
     return *type;
+}
+
+std::optional<PrimId> ExtentRows::Resolve(const Target& target) const {
+    return target.path != kNoPath ? store.Find(target.path) : std::nullopt;
+}
+
+std::optional<Box> ExtentRows::ExtentInRowSpace(PrimId other, std::uint32_t row) const {
+    const std::optional<Box> extent = scene->Extent(other);
+    if (!extent) {
+        return std::nullopt;
+    }
+    const PrimId own = store.GetBucket(bucket).prims[row];
+    return extent->Transformed(glm::inverse(scene->WorldTransform(own)) *
+                               scene->WorldTransform(other));
 }
 
 }  // namespace ernie

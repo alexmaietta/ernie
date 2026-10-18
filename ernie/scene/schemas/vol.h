@@ -49,47 +49,24 @@
 namespace ernie {
 
 ERNIE_SCHEMA_ACCESSORS(Volume, Gprim, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(FieldBase, Xformable, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(FieldAsset, FieldBase, ERNIE_FIELD_ASSET_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(OpenVDBAsset, FieldAsset, ERNIE_OPENVDB_ASSET_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(NanoVDBField, FieldBase, ERNIE_NANOVDB_FIELD_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(DenseField, FieldBase, ERNIE_DENSE_FIELD_ATTRIBUTES);
 
-/// A volume, bounded by and rendered from the fields its `field:<name>` relationships name.
 class Volume : public VolumeAccessors<Volume, Gprim> {
-    ERNIE_SCHEMA_BODY(Volume, Gprim)
+    ERNIE_SCHEMA_BODY(Volume, Gprim,
+                      "A volume, bounded by and rendered from the fields its field:<name> "
+                      "relationships name.")
     ERNIE_SCHEMA_DEFINE(Volume)
-  public:
     /// Names a field of the volume, as `field:<name>`.
     Volume& SetField(std::string_view name, const Path& field);
 };
 
-/// A field's frame and grid, which volumes name.
-class FieldBase : public FieldBaseAccessors<FieldBase, Xformable> {
-    ERNIE_SCHEMA_BODY(FieldBase, Xformable)
-};
-
-/// A field read from a file.
-class FieldAsset : public FieldAssetAccessors<FieldAsset, FieldBase> {
-    ERNIE_SCHEMA_BODY(FieldAsset, FieldBase)
-};
-
-/// An OpenVDB grid, read once converted to NanoVDB.
-class OpenVDBAsset : public OpenVDBAssetAccessors<OpenVDBAsset, FieldAsset> {
-    ERNIE_SCHEMA_BODY(OpenVDBAsset, FieldAsset)
-    ERNIE_SCHEMA_DEFINE(OpenVDBAsset)
-};
-
-/// NanoVDB grids in memory, written each step by a simulation.
-class NanoVDBField : public NanoVDBFieldAccessors<NanoVDBField, FieldBase> {
-    ERNIE_SCHEMA_BODY(NanoVDBField, FieldBase)
-    ERNIE_SCHEMA_DEFINE(NanoVDBField)
-};
-
-/// A dense grid of values, as solvers write them.
-class DenseField : public DenseFieldAccessors<DenseField, FieldBase> {
-    ERNIE_SCHEMA_BODY(DenseField, FieldBase)
-    ERNIE_SCHEMA_DEFINE(DenseField)
-};
+ERNIE_SCHEMA(FieldBase, Xformable, ERNIE_NO_ATTRIBUTES,
+             "A field's frame and grid, which volumes name.");
+ERNIE_SCHEMA(FieldAsset, FieldBase, ERNIE_FIELD_ASSET_ATTRIBUTES, "A field read from a file.");
+ERNIE_CONCRETE_SCHEMA(OpenVDBAsset, FieldAsset, ERNIE_OPENVDB_ASSET_ATTRIBUTES,
+                      "An OpenVDB grid, read once converted to NanoVDB.");
+ERNIE_CONCRETE_SCHEMA(NanoVDBField, FieldBase, ERNIE_NANOVDB_FIELD_ATTRIBUTES,
+                      "NanoVDB grids in memory, written each step by a simulation.");
+ERNIE_CONCRETE_SCHEMA(DenseField, FieldBase, ERNIE_DENSE_FIELD_ATTRIBUTES,
+                      "A dense grid of values, as solvers write them.");
 
 }  // namespace ernie

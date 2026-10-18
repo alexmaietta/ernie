@@ -99,85 +99,27 @@ template <> struct ChoiceTokens<Axis> {
     static constexpr std::array<std::string_view, 3> kTokens{"X", "Y", "Z"};
 };
 
-ERNIE_SCHEMA_ACCESSORS(Imageable, SchemaView, ERNIE_IMAGEABLE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Xformable, Imageable, ERNIE_XFORMABLE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Boundable, Xformable, ERNIE_BOUNDABLE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Gprim, Boundable, ERNIE_GPRIM_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Xform, Xformable, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Scope, Imageable, ERNIE_NO_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Cube, Gprim, ERNIE_CUBE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Sphere, Gprim, ERNIE_SPHERE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Cylinder, Gprim, ERNIE_CYLINDER_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Cone, Gprim, ERNIE_CYLINDER_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Capsule, Gprim, ERNIE_CAPSULE_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Plane, Gprim, ERNIE_PLANE_ATTRIBUTES);
-
-/// What every prim has: visibility, purpose and the world it is in.
-class Imageable : public ImageableAccessors<Imageable, SchemaView> {
-    ERNIE_SCHEMA_BODY(Imageable, SchemaView)
-};
-
-/// What has a transform, composed from its xformOps.
-class Xformable : public XformableAccessors<Xformable, Imageable> {
-    ERNIE_SCHEMA_BODY(Xformable, Imageable)
-};
-
-/// What has an extent in its own space, computed from its attributes.
-class Boundable : public BoundableAccessors<Boundable, Xformable> {
-    ERNIE_SCHEMA_BODY(Boundable, Xformable)
-};
-
-/// Geometry, drawn in a display colour or with a bound material.
-class Gprim : public GprimAccessors<Gprim, Boundable> {
-    ERNIE_SCHEMA_BODY(Gprim, Boundable)
-};
-
-/// A transform grouping its children.
-class Xform : public XformAccessors<Xform, Xformable> {
-    ERNIE_SCHEMA_BODY(Xform, Xformable)
-    ERNIE_SCHEMA_DEFINE(Xform)
-};
-
-/// A grouping without a transform of its own.
-class Scope : public ScopeAccessors<Scope, Imageable> {
-    ERNIE_SCHEMA_BODY(Scope, Imageable)
-    ERNIE_SCHEMA_DEFINE(Scope)
-};
-
-/// A box centred on its origin, `size` along each axis.
-class Cube : public CubeAccessors<Cube, Gprim> {
-    ERNIE_SCHEMA_BODY(Cube, Gprim)
-    ERNIE_SCHEMA_DEFINE(Cube)
-};
-
-/// A sphere centred on its origin.
-class Sphere : public SphereAccessors<Sphere, Gprim> {
-    ERNIE_SCHEMA_BODY(Sphere, Gprim)
-    ERNIE_SCHEMA_DEFINE(Sphere)
-};
-
-/// A capped cylinder along its axis.
-class Cylinder : public CylinderAccessors<Cylinder, Gprim> {
-    ERNIE_SCHEMA_BODY(Cylinder, Gprim)
-    ERNIE_SCHEMA_DEFINE(Cylinder)
-};
-
-/// A capped cone along its axis, its apex at +height / 2.
-class Cone : public ConeAccessors<Cone, Gprim> {
-    ERNIE_SCHEMA_BODY(Cone, Gprim)
-    ERNIE_SCHEMA_DEFINE(Cone)
-};
-
-/// A cylinder with hemispherical caps along its axis.
-class Capsule : public CapsuleAccessors<Capsule, Gprim> {
-    ERNIE_SCHEMA_BODY(Capsule, Gprim)
-    ERNIE_SCHEMA_DEFINE(Capsule)
-};
-
-/// A one-sided rectangle facing along its axis.
-class Plane : public PlaneAccessors<Plane, Gprim> {
-    ERNIE_SCHEMA_BODY(Plane, Gprim)
-    ERNIE_SCHEMA_DEFINE(Plane)
-};
+ERNIE_SCHEMA(Imageable, SchemaView, ERNIE_IMAGEABLE_ATTRIBUTES,
+             "What every prim has: visibility, purpose and the world it is in.");
+ERNIE_SCHEMA(Xformable, Imageable, ERNIE_XFORMABLE_ATTRIBUTES,
+             "What has a transform, composed from its xformOps.");
+ERNIE_SCHEMA(Boundable, Xformable, ERNIE_BOUNDABLE_ATTRIBUTES,
+             "What has an extent in its own space, computed from its attributes.");
+ERNIE_SCHEMA(Gprim, Boundable, ERNIE_GPRIM_ATTRIBUTES,
+             "Geometry, drawn in a display colour or with a bound material.");
+ERNIE_CONCRETE_SCHEMA(Xform, Xformable, ERNIE_NO_ATTRIBUTES, "A transform grouping its children.");
+ERNIE_CONCRETE_SCHEMA(Scope, Imageable, ERNIE_NO_ATTRIBUTES,
+                      "A grouping without a transform of its own.");
+ERNIE_CONCRETE_SCHEMA(Cube, Gprim, ERNIE_CUBE_ATTRIBUTES,
+                      "A box centred on its origin, size along each axis.");
+ERNIE_CONCRETE_SCHEMA(Sphere, Gprim, ERNIE_SPHERE_ATTRIBUTES, "A sphere centred on its origin.");
+ERNIE_CONCRETE_SCHEMA(Cylinder, Gprim, ERNIE_CYLINDER_ATTRIBUTES,
+                      "A capped cylinder along its axis.");
+ERNIE_CONCRETE_SCHEMA(Cone, Gprim, ERNIE_CYLINDER_ATTRIBUTES,
+                      "A capped cone along its axis, its apex at +height / 2.");
+ERNIE_CONCRETE_SCHEMA(Capsule, Gprim, ERNIE_CAPSULE_ATTRIBUTES,
+                      "A cylinder with hemispherical caps along its axis.");
+ERNIE_CONCRETE_SCHEMA(Plane, Gprim, ERNIE_PLANE_ATTRIBUTES,
+                      "A one-sided rectangle facing along its axis.");
 
 }  // namespace ernie

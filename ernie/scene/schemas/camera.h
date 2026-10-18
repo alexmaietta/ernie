@@ -151,31 +151,15 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(Camera, Xformable, ERNIE_CAMERA_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(ErnieLensAPI, SchemaView, ERNIE_LENS_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(ErniePolarizerAPI, SchemaView, ERNIE_POLARIZER_API_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(ErnieSensorAPI, SchemaView, ERNIE_SENSOR_API_ATTRIBUTES);
-
-/// A view looking down -z, y up, with a lens and film.
-class Camera : public CameraAccessors<Camera, Xformable> {
-    ERNIE_SCHEMA_BODY(Camera, Xformable)
-    ERNIE_SCHEMA_DEFINE(Camera)
-};
-
-/// A camera's lens beyond USD's: fisheyes, distortion, vignetting and chromatic aberration.
-class ErnieLensAPI : public ErnieLensAPIAccessors<ErnieLensAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(ErnieLensAPI)
-};
-
-/// A polarizer in front of a camera's lens, or a polarization sensor's mosaic.
-class ErniePolarizerAPI : public ErniePolarizerAPIAccessors<ErniePolarizerAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(ErniePolarizerAPI)
-};
-
-/// A camera's sensor: its spectral range, noise, ADC and quantum efficiency; its products set how
-/// finely the range is sampled.
-class ErnieSensorAPI : public ErnieSensorAPIAccessors<ErnieSensorAPI, SchemaView> {
-    ERNIE_API_SCHEMA_BODY(ErnieSensorAPI)
-};
+ERNIE_CONCRETE_SCHEMA(Camera, Xformable, ERNIE_CAMERA_ATTRIBUTES,
+                      "A view looking down -z, y up, with a lens and film.");
+ERNIE_API_SCHEMA(ErnieLensAPI, ERNIE_LENS_API_ATTRIBUTES,
+                 "A camera's lens beyond USD's: fisheyes, distortion, vignetting and chromatic "
+                 "aberration.");
+ERNIE_API_SCHEMA(ErniePolarizerAPI, ERNIE_POLARIZER_API_ATTRIBUTES,
+                 "A polarizer in front of a camera's lens, or a polarization sensor's mosaic.");
+ERNIE_API_SCHEMA(ErnieSensorAPI, ERNIE_SENSOR_API_ATTRIBUTES,
+                 "A camera's sensor: its spectral range, noise, ADC and quantum efficiency; its "
+                 "products set how finely the range is sampled.");
 
 }  // namespace ernie

@@ -127,11 +127,34 @@ struct ExtentRows {
     std::string_view Text(Token token) const {
         return store.Paths().Names().Text(token);
     }
+    /// @return The live prim a relationship targets, or none.
+    std::optional<PrimId> Resolve(const Target& target) const;
+    /// @return Another prim's extent brought into a row's own space through the transforms
+    /// between, or none when it has none.
+    std::optional<Box> ExtentInRowSpace(PrimId other, std::uint32_t row) const;
 };
 
 /// Computes the extents of a bucket's rows [begin, end) into `out`, one box each, in each prim's
 /// own space. Written as a loop over columns, as the GPU kernels are.
 using ExtentFunction = void (*)(const ExtentRows& rows, RowRange range, std::span<Box> out);
+
+/// @brief Fills `out` with `extent(row)` for each row of `range`: the loop every extent function
+/// runs.
+template <typename Extent>
+void ComputeRows(RowRange range, std::span<Box> out, const Extent& extent) {
+    for (std::uint32_t row = range.begin; row < range.end; ++row) {
+        out[row - range.begin] = extent(row);
+    }
+}
+
+/// The extent function of prims centred on their origin. `kHalves(rows)` reads the columns once
+/// and returns each row's half-size by row.
+template <auto kHalves>
+void CentredExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
+    const auto half = kHalves(rows);
+    ComputeRows(range, out,
+                [&](std::uint32_t row) { return Box::Around(glm::dvec3(0.0), half(row)); });
+}
 
 /// @brief How a prim type is bounded, as USD's Boundable and non-Boundable bases divide them.
 struct ExtentRule {
@@ -179,6 +202,8 @@ struct SchemaDef {
     /// Fallbacks the type changes for attributes of its bases or built-in schemas, as
     /// DistantLight's brighter intensity.
     std::vector<std::pair<std::string_view, Value>> fallbackOverrides;
+    /// The prim types an API schema may be applied to, as MeshLightAPI's Mesh; any when empty.
+    std::vector<std::string_view> appliesTo;
 
     bool IsA(const SchemaDef& other) const;
     bool IsOpen(std::string_view attribute) const;
@@ -224,6 +249,7 @@ struct ApiName {
     std::string Attribute(std::string_view declared) const;
     /// @return The name `Parse` reads.
     std::string ToString() const;
+    bool operator==(const ApiName&) const = default;
 };
 
 /// @brief Checks a value against a declared attribute's limits and options; the scene checks its

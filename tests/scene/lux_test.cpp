@@ -5,6 +5,8 @@
 #include "ernie/scene/schemas/collection.h"
 #include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
+#include "ernie/scene/schemas/mesh.h"
+#include "ernie/scene/schemas/vol.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/common.h"
@@ -106,6 +108,25 @@ TEST(Lights, OmniversePhotometricSchemasApplyByTheirNames) {
     PhysicalLightIlluminantAPI::Apply(scene, "/Sun").SetPhysicalIlluminant("sun");
     EXPECT_THROW(PhysicalLightIlluminantAPI(scene, "/Sun").SetPhysicalIlluminant("moon"),
                  std::invalid_argument);
+}
+
+TEST(Lights, MeshesAndVolumesEmitThroughTheirLightApis) {
+    Scene scene;
+    Mesh::Define(scene, "/Panel");
+    MeshLightAPI::Apply(scene, "/Panel");
+    const PrimId panel = *scene.Find("/Panel");
+    EXPECT_TRUE(scene.HasApi(panel, "LightAPI")) << "built into MeshLightAPI";
+    EXPECT_TRUE(scene.HasApi(panel, "CollectionAPI:lightLink")) << "built into LightAPI";
+    EXPECT_EQ(LightAPI(scene, "/Panel").GetMaterialSyncMode(), "materialGlowTintsLight");
+    EXPECT_EQ(LightAPI(scene, "/Panel").GetShaderId(), "MeshLight");
+    EXPECT_EQ(LightAPI(scene, "/Panel").GetIntensity(), 1.0);
+
+    Volume::Define(scene, "/Flame");
+    VolumeLightAPI::Apply(scene, "/Flame");
+    EXPECT_EQ(LightAPI(scene, "/Flame").GetShaderId(), "VolumeLight");
+    EXPECT_THROW(MeshLightAPI::Apply(scene, "/Flame"), std::invalid_argument) << "meshes only";
+    EXPECT_EQ(LightAPI(scene, SphereLight::Define(scene, "/Lamp").GetPath()).GetMaterialSyncMode(),
+              "noMaterialResponse");
 }
 
 TEST(Lights, LasersAreLightsWithBeamsAndPatterns) {

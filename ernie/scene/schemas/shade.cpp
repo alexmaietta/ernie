@@ -19,19 +19,11 @@ std::string ConnectionAttribute(std::string_view input) {
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(MaterialBindingAPI, "MaterialBindingAPI", nullptr, SingleApply, kInheritExtent,
-                    "Binds a material to a prim and its descendants.",
+ERNIE_DEFINE_SCHEMA(MaterialBindingAPI, SingleApply, kInheritExtent,
                     ERNIE_MATERIAL_BINDING_API_ATTRIBUTES, .openNamespaces = {"material:binding:"})
-ERNIE_DEFINE_SCHEMA(NodeGraph, "NodeGraph", nullptr, Concrete, kNoExtent,
-                    "A network of shaders with the inputs its users set.", ERNIE_NO_ATTRIBUTES,
-                    ERNIE_CONNECTABLE)
-ERNIE_DEFINE_SCHEMA(Material, "Material", &NodeGraph::Definition(), Concrete, kInheritExtent,
-                    "What prims are drawn with: its terminals connect to the shaders computing "
-                    "them.",
-                    ERNIE_NO_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Shader, "Shader", nullptr, Concrete, kNoExtent,
-                    "One node of a network, a model or a texture, by its info:id.",
-                    ERNIE_SHADER_ATTRIBUTES, ERNIE_CONNECTABLE)
+ERNIE_DEFINE_SCHEMA(NodeGraph, Concrete, kNoExtent, ERNIE_NO_ATTRIBUTES, ERNIE_CONNECTABLE)
+ERNIE_DEFINE_SCHEMA(Material, Concrete, kInheritExtent, ERNIE_NO_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Shader, Concrete, kNoExtent, ERNIE_SHADER_ATTRIBUTES, ERNIE_CONNECTABLE)
 
 void Connect(Scene& scene, const Path& path, std::string_view input, const Connection& source) {
     scene.Set(path, ConnectionAttribute(input), source.prim.String() + "." + source.output);

@@ -20,7 +20,7 @@ void ExpectBox(const Box& box, const glm::dvec3& min, const glm::dvec3& max) {
 }
 
 TEST(Schema, RegistryListsTypesWithBasesAndAttributes) {
-    const SchemaDef* sphere = FindSchema(tokens::kSphere);
+    const SchemaDef* sphere = FindSchema(Sphere::kName);
     ASSERT_NE(sphere, nullptr);
     EXPECT_TRUE(sphere->IsA(Gprim::Definition()));
     EXPECT_TRUE(sphere->IsA(Imageable::Definition()));

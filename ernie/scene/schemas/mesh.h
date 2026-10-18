@@ -63,25 +63,10 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(PointBased, Gprim, ERNIE_POINT_BASED_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Mesh, PointBased, ERNIE_MESH_ATTRIBUTES);
-ERNIE_SCHEMA_ACCESSORS(Points, PointBased, ERNIE_POINTS_ATTRIBUTES);
-
-/// Geometry from an array of points.
-class PointBased : public PointBasedAccessors<PointBased, Gprim> {
-    ERNIE_SCHEMA_BODY(PointBased, Gprim)
-};
-
-/// A polygon mesh, or the control mesh of a subdivision surface.
-class Mesh : public MeshAccessors<Mesh, PointBased> {
-    ERNIE_SCHEMA_BODY(Mesh, PointBased)
-    ERNIE_SCHEMA_DEFINE(Mesh)
-};
-
-/// A point cloud of spheres, each its own width.
-class Points : public PointsAccessors<Points, PointBased> {
-    ERNIE_SCHEMA_BODY(Points, PointBased)
-    ERNIE_SCHEMA_DEFINE(Points)
-};
+ERNIE_SCHEMA(PointBased, Gprim, ERNIE_POINT_BASED_ATTRIBUTES, "Geometry from an array of points.");
+ERNIE_CONCRETE_SCHEMA(Mesh, PointBased, ERNIE_MESH_ATTRIBUTES,
+                      "A polygon mesh, or the control mesh of a subdivision surface.");
+ERNIE_CONCRETE_SCHEMA(Points, PointBased, ERNIE_POINTS_ATTRIBUTES,
+                      "A point cloud of spheres, each its own width.");
 
 }  // namespace ernie

@@ -83,13 +83,10 @@
 
 namespace ernie {
 
-ERNIE_SCHEMA_ACCESSORS(LaserLight, BoundableLightBase, ERNIE_LASER_LIGHT_ATTRIBUTES);
-
-/// A laser along -z: a Gaussian beam and its pattern. Its power is `ernie:power`, its pulses
-/// LightAPI's, and its extent the emitter, so framing it frames the device.
-class LaserLight : public LaserLightAccessors<LaserLight, BoundableLightBase> {
-    ERNIE_SCHEMA_BODY(LaserLight, BoundableLightBase)
-    ERNIE_SCHEMA_DEFINE(LaserLight)
-};
+ERNIE_CONCRETE_SCHEMA(
+    LaserLight, BoundableLightBase, ERNIE_LASER_LIGHT_ATTRIBUTES,
+    "A laser along -z: a Gaussian beam and its pattern. Its power is ernie:power, "
+    "its pulses LightAPI's, and its extent the emitter, so framing it frames the "
+    "device.");
 
 }  // namespace ernie

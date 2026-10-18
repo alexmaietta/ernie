@@ -6,96 +6,71 @@
 namespace ernie {
 namespace {
 
-/// @return The axis index (0, 1, 2) of each row's `axis` token.
-int AxisIndex(const ExtentRows& rows, std::span<const Token> axes, std::uint32_t row) {
-    return rows.Text(axes[row]).front() - 'X';
+/// @return The axis index (0, 1, 2) of an `axis` token.
+int AxisIndex(const ExtentRows& rows, Token axis) {
+    return rows.Text(axis).front() - 'X';
 }
 
-/// @return A box of `radial` about the axis and `half` along it.
-Box AlongAxis(int axis, double radial, double half) {
-    glm::dvec3 size(radial);
-    size[axis] = half;
-    return Box::Around(glm::dvec3(0.0), size);
+auto CubeHalves(const ExtentRows& rows) {
+    return [size = rows.Column<double>(Cube::kSize)](std::uint32_t row) {
+        return glm::dvec3(0.5 * size[row]);
+    };
 }
 
-void CubeExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
-    const auto size = rows.Column<double>(Cube::kSize);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
-        out[row - range.begin] = Box::Around(glm::dvec3(0.0), glm::dvec3(0.5 * size[row]));
-    }
-}
-
-void SphereExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
-    const auto radius = rows.Column<double>(Sphere::kRadius);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
-        out[row - range.begin] = Box::Around(glm::dvec3(0.0), glm::dvec3(radius[row]));
-    }
+auto SphereHalves(const ExtentRows& rows) {
+    return [radius = rows.Column<double>(Sphere::kRadius)](std::uint32_t row) {
+        return glm::dvec3(radius[row]);
+    };
 }
 
 /// Cylinders, cones and capsules: a radius about the axis; capsules' caps add it along the axis.
-template <bool kCapped>
-void RoundExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
-    const auto radius = rows.Column<double>(Cylinder::kRadius);
-    const auto height = rows.Column<double>(Cylinder::kHeight);
-    const auto axis = rows.Column<Token>(Cylinder::kAxis);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
-        const double half = 0.5 * height[row] + (kCapped ? radius[row] : 0.0);
-        out[row - range.begin] = AlongAxis(AxisIndex(rows, axis, row), radius[row], half);
-    }
+template <bool kCapped> auto RoundHalves(const ExtentRows& rows) {
+    return [&rows, radius = rows.Column<double>(Cylinder::kRadius),
+            height = rows.Column<double>(Cylinder::kHeight),
+            axis = rows.Column<Token>(Cylinder::kAxis)](std::uint32_t row) {
+        glm::dvec3 half(radius[row]);
+        half[AxisIndex(rows, axis[row])] = 0.5 * height[row] + (kCapped ? radius[row] : 0.0);
+        return half;
+    };
 }
 
-void PlaneExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {
-    const auto width = rows.Column<double>(Plane::kWidth);
-    const auto length = rows.Column<double>(Plane::kLength);
-    const auto axis = rows.Column<Token>(Plane::kAxis);
-    for (std::uint32_t row = range.begin; row < range.end; ++row) {
-        const int normal = AxisIndex(rows, axis, row);
+auto PlaneHalves(const ExtentRows& rows) {
+    return [&rows, width = rows.Column<double>(Plane::kWidth),
+            length = rows.Column<double>(Plane::kLength),
+            axis = rows.Column<Token>(Plane::kAxis)](std::uint32_t row) {
+        const int normal = AxisIndex(rows, axis[row]);
         // Width lies along x, or z for an X normal; length along y, or z for a Y normal.
         glm::dvec3 half(0.0);
         half[normal == 0 ? 2 : 0] = 0.5 * width[row];
         half[normal == 1 ? 2 : 1] = 0.5 * length[row];
-        out[row - range.begin] = Box::Around(glm::dvec3(0.0), half);
-    }
+        return half;
+    };
 }
 
 }  // namespace
 
-ERNIE_DEFINE_SCHEMA(Imageable, "Imageable", nullptr, Abstract, kInheritExtent,
-                    "What every prim has: visibility, purpose and the world it is in.",
-                    ERNIE_IMAGEABLE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Xformable, "Xformable", &Imageable::Definition(), Abstract, kInheritExtent,
-                    "What has a transform, composed from its xformOps.", ERNIE_XFORMABLE_ATTRIBUTES,
+ERNIE_DEFINE_SCHEMA(Imageable, Abstract, kInheritExtent, ERNIE_IMAGEABLE_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Xformable, Abstract, kInheritExtent, ERNIE_XFORMABLE_ATTRIBUTES,
                     .openNamespaces = {tokens::kXformOpPrefix})
-ERNIE_DEFINE_SCHEMA(Boundable, "Boundable", &Xformable::Definition(), Abstract, kInheritExtent,
-                    "What has an extent in its own space, computed from its attributes.",
-                    ERNIE_BOUNDABLE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Gprim, "Gprim", &Boundable::Definition(), Abstract, kInheritExtent,
-                    "Geometry, drawn in a display colour or with a bound material.",
-                    ERNIE_GPRIM_ATTRIBUTES, .openNamespaces = {tokens::kPrimvarsPrefix})
+ERNIE_DEFINE_SCHEMA(Boundable, Abstract, kInheritExtent, ERNIE_BOUNDABLE_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Gprim, Abstract, kInheritExtent, ERNIE_GPRIM_ATTRIBUTES,
+                    .openNamespaces = {tokens::kPrimvarsPrefix})
 // Grouping prims are where custom data lives, so they take attributes of any name.
-ERNIE_DEFINE_SCHEMA(Xform, tokens::kXform, &Xformable::Definition(), Concrete, kDescendantsExtent,
-                    "A transform grouping its children.", ERNIE_NO_ATTRIBUTES,
+ERNIE_DEFINE_SCHEMA(Xform, Concrete, kDescendantsExtent, ERNIE_NO_ATTRIBUTES,
                     .openNamespaces = {"*"})
-ERNIE_DEFINE_SCHEMA(Scope, tokens::kScope, &Imageable::Definition(), Concrete, kDescendantsExtent,
-                    "A grouping without a transform of its own.", ERNIE_NO_ATTRIBUTES,
+ERNIE_DEFINE_SCHEMA(Scope, Concrete, kDescendantsExtent, ERNIE_NO_ATTRIBUTES,
                     .openNamespaces = {"*"})
-ERNIE_DEFINE_SCHEMA(Cube, tokens::kCube, &Gprim::Definition(), Concrete, ComputedExtent(CubeExtent),
-                    "A box centred on its origin, size along each axis.", ERNIE_CUBE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Sphere, tokens::kSphere, &Gprim::Definition(), Concrete,
-                    ComputedExtent(SphereExtent), "A sphere centred on its origin.",
+ERNIE_DEFINE_SCHEMA(Cube, Concrete, ComputedExtent(CentredExtent<CubeHalves>),
+                    ERNIE_CUBE_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Sphere, Concrete, ComputedExtent(CentredExtent<SphereHalves>),
                     ERNIE_SPHERE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Cylinder, tokens::kCylinder, &Gprim::Definition(), Concrete,
-                    ComputedExtent(RoundExtent<false>), "A capped cylinder along its axis.",
+ERNIE_DEFINE_SCHEMA(Cylinder, Concrete, ComputedExtent(CentredExtent<RoundHalves<false>>),
                     ERNIE_CYLINDER_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Cone, tokens::kCone, &Gprim::Definition(), Concrete,
-                    ComputedExtent(RoundExtent<false>),
-                    "A capped cone along its axis, its apex at +height / 2.",
+ERNIE_DEFINE_SCHEMA(Cone, Concrete, ComputedExtent(CentredExtent<RoundHalves<false>>),
                     ERNIE_CYLINDER_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Capsule, tokens::kCapsule, &Gprim::Definition(), Concrete,
-                    ComputedExtent(RoundExtent<true>),
-                    "A cylinder with hemispherical caps along its axis.", ERNIE_CAPSULE_ATTRIBUTES)
-ERNIE_DEFINE_SCHEMA(Plane, tokens::kPlane, &Gprim::Definition(), Concrete,
-                    ComputedExtent(PlaneExtent), "A one-sided rectangle facing along its axis.",
+ERNIE_DEFINE_SCHEMA(Capsule, Concrete, ComputedExtent(CentredExtent<RoundHalves<true>>),
+                    ERNIE_CAPSULE_ATTRIBUTES)
+ERNIE_DEFINE_SCHEMA(Plane, Concrete, ComputedExtent(CentredExtent<PlaneHalves>),
                     ERNIE_PLANE_ATTRIBUTES)
 
 }  // namespace ernie

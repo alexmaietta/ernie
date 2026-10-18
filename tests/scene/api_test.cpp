@@ -18,7 +18,7 @@ namespace {
 
 TEST(ApiSchema, ApplyingAddsItsAttributesAtTheirFallbacks) {
     Scene scene;
-    const PrimId ball = scene.Define("/Ball", tokens::kSphere);
+    const PrimId ball = scene.Define("/Ball", Sphere::kName);
     EXPECT_THROW(scene.Set(ball, MaterialBindingAPI::kMaterialBinding, Path("/Looks/Red")),
                  std::invalid_argument)
         << "not applied";
@@ -33,8 +33,8 @@ TEST(ApiSchema, ApplyingAddsItsAttributesAtTheirFallbacks) {
 
 TEST(ApiSchema, PrimsOfOneTypeAndApiSchemasShareABucket) {
     Scene scene;
-    const PrimId a = scene.Define("/A", tokens::kSphere);
-    const PrimId b = scene.Define("/B", tokens::kSphere);
+    const PrimId a = scene.Define("/A", Sphere::kName);
+    const PrimId b = scene.Define("/B", Sphere::kName);
     scene.ApplyApi(a, "MaterialBindingAPI");
     EXPECT_NE(scene.Store().PrimBucket(a), scene.Store().PrimBucket(b));
     scene.ApplyApi(b, "MaterialBindingAPI");
@@ -46,9 +46,9 @@ TEST(ApiSchema, PrimsOfOneTypeAndApiSchemasShareABucket) {
 
 TEST(ApiSchema, RetypingKeepsAppliedSchemasAndRemovingDropsTheirValues) {
     Scene scene;
-    const PrimId prim = scene.Define("/Shape", tokens::kSphere);
+    const PrimId prim = scene.Define("/Shape", Sphere::kName);
     MaterialBindingAPI::Apply(scene, "/Shape").SetMaterialBinding(Path("/Looks/Red"));
-    scene.Define("/Shape", tokens::kCube);
+    scene.Define("/Shape", Cube::kName);
     EXPECT_EQ(MaterialBindingAPI(scene, "/Shape").GetMaterialBinding(), Path("/Looks/Red"));
 
     EXPECT_TRUE(scene.RemoveApi(prim, "MaterialBindingAPI"));
@@ -59,7 +59,7 @@ TEST(ApiSchema, RetypingKeepsAppliedSchemasAndRemovingDropsTheirValues) {
 
 TEST(ApiSchema, MultipleApplySchemasNameTheirAttributesByInstance) {
     Scene scene;
-    const PrimId world = scene.Define("/World", tokens::kXform);
+    const PrimId world = scene.Define("/World", Xform::kName);
     CollectionAPI lights = CollectionAPI::Apply(scene, "/World", "lights");
     CollectionAPI::Apply(scene, "/World", "rocks").SetIncludes({Path("/World/Rocks")});
     lights.SetIncludes({Path("/World/Sun"), Path("/World/Lamp")})
@@ -78,7 +78,7 @@ TEST(ApiSchema, MultipleApplySchemasNameTheirAttributesByInstance) {
 
 TEST(ApiSchema, NamesMustBeKnownWithTheRightInstances) {
     Scene scene;
-    const PrimId prim = scene.Define("/A", tokens::kXform);
+    const PrimId prim = scene.Define("/A", Xform::kName);
     EXPECT_THROW(scene.ApplyApi(prim, "TeapotAPI"), std::invalid_argument);
     EXPECT_THROW(scene.ApplyApi(prim, "CollectionAPI"), std::invalid_argument) << "no instance";
     EXPECT_THROW(scene.ApplyApi(prim, "CollectionAPI:two words"), std::invalid_argument);

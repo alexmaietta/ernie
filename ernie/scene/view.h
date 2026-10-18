@@ -216,16 +216,24 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
         OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_ACCESSORS)                                                  \
     }
 
-/// The constructors and registry entry of a schema view class.
-#define ERNIE_SCHEMA_BODY(Class, Base)                                                             \
+/// What every schema view class has: its type name, its documentation (the schema reference's) and
+/// the base its registry entry derives from.
+#define ERNIE_SCHEMA_NAMES(Class, Base, text)                                                      \
   public:                                                                                          \
     using Self = Class;                                                                            \
+    using SchemaBase = Base;                                                                       \
+    static constexpr std::string_view kName = #Class;                                              \
+    static constexpr std::string_view kDoc = text;                                                 \
+    static const ::ernie::SchemaDef& Definition();
+
+/// The constructors of a typed schema view class.
+#define ERNIE_SCHEMA_BODY(Class, Base, text)                                                       \
+    ERNIE_SCHEMA_NAMES(Class, Base, text)                                                          \
     /** @throws std::invalid_argument if the prim does not exist or is not a `Class`. */           \
     Class(const ::ernie::Scene& scene, const ::ernie::Path& path)                                  \
         : Class##Accessors<Class, Base>(scene, path, Definition()) {}                              \
     Class(::ernie::Scene& scene, const ::ernie::Path& path)                                        \
         : Class##Accessors<Class, Base>(scene, path, Definition()) {}                              \
-    static const ::ernie::SchemaDef& Definition();                                                 \
                                                                                                    \
   protected:                                                                                       \
     Class(const ::ernie::Scene& scene, const ::ernie::Path& path,                                  \
@@ -243,33 +251,61 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
         return Class(scene, path);                                                                 \
     }
 
-/// The constructors, `Apply` and registry entry of an API schema's view; a multiple-apply
-/// schema's take its instance name.
-#define ERNIE_API_SCHEMA_BODY(Class)                                                               \
-  public:                                                                                          \
-    using Self = Class;                                                                            \
+/// The constructors and `Apply` of an API schema's view; a multiple-apply schema's take its
+/// instance name.
+#define ERNIE_API_SCHEMA_BODY(Class, text)                                                         \
+    ERNIE_SCHEMA_NAMES(Class, ::ernie::SchemaView, text)                                           \
     /** @throws std::invalid_argument if the prim is missing or lacks the API schema. */           \
     Class(const ::ernie::Scene& scene, const ::ernie::Path& path, std::string_view instance = {})  \
         : Class##Accessors<Class, ::ernie::SchemaView>(scene, path, Definition(), instance) {}     \
     Class(::ernie::Scene& scene, const ::ernie::Path& path, std::string_view instance = {})        \
         : Class##Accessors<Class, ::ernie::SchemaView>(scene, path, Definition(), instance) {}     \
-    static const ::ernie::SchemaDef& Definition();                                                 \
     static Class Apply(::ernie::Scene& scene, const ::ernie::Path& path,                           \
                        std::string_view instance = {}) {                                           \
         scene.ApplyApi(scene.Require(path), ::ernie::ApiName{&Definition(), instance}.ToString()); \
         return Class(scene, path, instance);                                                       \
     }
 
-/// Defines `Class::Definition()`, the schema's registry entry; the variadic part takes the rest of
-/// its fields by name: `.openNamespaces = {...}`, `.builtinApis = {...}`.
-#define ERNIE_DEFINE_SCHEMA(Class, schemaName, schemaBase, schemaKind, extentRule, text,           \
-                            OWN_ATTRIBUTES, ...)                                                   \
+/// Declares a schema's view class: an abstract base's, a prim type's with `Define`, or an applied
+/// API schema's with `Apply`. Classes adding members of their own spell the body out instead.
+#define ERNIE_SCHEMA(Class, Base, OWN_ATTRIBUTES, text)                                            \
+    ERNIE_SCHEMA_ACCESSORS(Class, Base, OWN_ATTRIBUTES);                                           \
+    class Class : public Class##Accessors<Class, Base> {                                           \
+        ERNIE_SCHEMA_BODY(Class, Base, text)                                                       \
+    }
+#define ERNIE_CONCRETE_SCHEMA(Class, Base, OWN_ATTRIBUTES, text)                                   \
+    ERNIE_SCHEMA_ACCESSORS(Class, Base, OWN_ATTRIBUTES);                                           \
+    class Class : public Class##Accessors<Class, Base> {                                           \
+        ERNIE_SCHEMA_BODY(Class, Base, text)                                                       \
+        ERNIE_SCHEMA_DEFINE(Class)                                                                 \
+    }
+#define ERNIE_API_SCHEMA(Class, OWN_ATTRIBUTES, text)                                              \
+    ERNIE_SCHEMA_ACCESSORS(Class, SchemaView, OWN_ATTRIBUTES);                                     \
+    class Class : public Class##Accessors<Class, ::ernie::SchemaView> {                            \
+        ERNIE_API_SCHEMA_BODY(Class, text)                                                         \
+    }
+
+namespace ernie {
+/// @return The registry entry a view's base gives its schema; none for the root view.
+template <typename Base> const SchemaDef* BaseDefinition() {
+    if constexpr (std::is_same_v<Base, SchemaView>) {
+        return nullptr;
+    } else {
+        return &Base::Definition();
+    }
+}
+}  // namespace ernie
+
+/// Defines `Class::Definition()`, the schema's registry entry, from the view class's name,
+/// documentation and base; the variadic part takes the rest of its fields by name:
+/// `.openNamespaces = {...}`, `.builtinApis = {...}`, `.fallbackOverrides = {...}`.
+#define ERNIE_DEFINE_SCHEMA(Class, schemaKind, extentRule, OWN_ATTRIBUTES, ...)                    \
     const ::ernie::SchemaDef& Class::Definition() {                                                \
         static const ::ernie::SchemaDef definition{                                                \
-            .name = schemaName,                                                                    \
-            .base = schemaBase,                                                                    \
+            .name = Class::kName,                                                                  \
+            .base = ::ernie::BaseDefinition<Class::SchemaBase>(),                                  \
             .kind = ::ernie::SchemaKind::schemaKind,                                               \
-            .doc = text,                                                                           \
+            .doc = Class::kDoc,                                                                    \
             .attributes = {OWN_ATTRIBUTES(ERNIE_ATTRIBUTE_DECLARE)},                               \
             .extent = extentRule,                                                                  \
             __VA_ARGS__};                                                                          \
