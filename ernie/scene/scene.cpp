@@ -254,6 +254,11 @@ std::optional<Box> Scene::Extent(PrimId prim) const {
     return extent;
 }
 
+std::vector<PrimId> Scene::Holders(const Path& target) const {
+    const std::optional<PathId> id = store_.Paths().Find(target);
+    return id ? holders_.Find(store_, *id) : std::vector<PrimId>{};
+}
+
 Box Scene::WorldBounds(const Path& path) const {
     const PrimId prim = Require(path);
     const PathId id = store_.PrimPath(prim);

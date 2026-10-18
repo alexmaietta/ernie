@@ -5,6 +5,7 @@
 
 #include "ernie/geometry/bounds.h"
 #include "ernie/scene/extent_cache.h"
+#include "ernie/scene/holder_index.h"
 #include "ernie/scene/schema.h"
 #include "ernie/scene/storage.h"
 #include "ernie/scene/value.h"
@@ -92,11 +93,16 @@ class Scene {
     std::optional<Box> Extent(PrimId prim) const;
     /// @brief Brings derived data up to date with the edits since the last update, once per step
     /// before renderers pull changes: resolves inherited attributes for the subtrees whose
-    /// authored values or prims changed, then recomputes the changed rows' cached extents.
+    /// authored values or prims changed, re-indexes changed relationships, then recomputes the
+    /// changed rows' cached extents.
     void Update() {
         Resolve();
+        holders_.Update(store_);
         extents_.Update(store_);
     }
+    /// @return The prims whose relationships target `target` as of the last `Update`, resolved
+    /// material bindings included: what an edit to `target` reaches.
+    std::vector<PrimId> Holders(const Path& target) const;
     /// @return The world box of the prim and its visible descendants of the default purpose.
     /// Prims with extents bound their own subtrees, as UsdGeomBBoxCache prunes at Boundables.
     Box WorldBounds(const Path& path) const;
@@ -179,6 +185,7 @@ class Scene {
     Token defaultPurpose_ = 0;
     std::vector<BucketSchema> buckets_;
     ExtentCache extents_;
+    HolderIndex holders_;
 };
 
 }  // namespace ernie
