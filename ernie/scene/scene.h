@@ -71,6 +71,8 @@ class Scene {
     void Set(const Path& path, std::string_view attribute, const Value& value);
     /// @return The authored value, or none.
     std::optional<Value> Get(PrimId prim, std::string_view attribute) const;
+    /// @brief `Get` by the attribute's token, for readers that look it up once.
+    std::optional<Value> Get(PrimId prim, AttributeId attribute) const;
     std::optional<Value> Get(const Path& path, std::string_view attribute) const;
     /// @return An inherited attribute's value as of the last `Update`: the prim's own or its
     /// nearest authoring ancestor's (where "inherited" isn't authoring), else the fallback; none
@@ -165,6 +167,7 @@ class Scene {
     std::vector<ApiName> AllApis(const SchemaDef* schema, std::span<const Token> applied) const;
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
+    const Column* AuthoredColumn(PrimId prim, AttributeId attribute) const;
     /// @return The attribute's value when the prim authors it as a `T`, or null.
     template <typename T> const T* Authored(PrimId prim, std::string_view attribute) const {
         const std::optional<Token> token = store_.Tokens().Find(attribute);

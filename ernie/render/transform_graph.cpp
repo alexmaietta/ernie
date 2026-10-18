@@ -489,11 +489,7 @@ void TransformGraph::ParseOps(std::uint32_t slot) {
         return;
     }
     node.resets = ResetsXformStack(scene_, node.prim);
-    const TokenTable& tokens = scene_.Store().Tokens();
-    for (XformOp& op : XformOpsInOrder(scene_, node.prim)) {
-        const std::optional<Token> attribute = tokens.Find(op.attribute);
-        node.ops.push_back({std::move(op), attribute});
-    }
+    node.ops = XformOpsInOrder(scene_, node.prim);
 }
 
 TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
@@ -518,18 +514,18 @@ TransformGraph::Built TransformGraph::BuildProgram(std::uint32_t slot) const {
             folded = glm::dmat4(1.0);
         }
     };
-    for (const NodeOp& op : node.ops) {
-        const Binding* bound = FindBinding(bucket, op.attribute);
+    for (const XformOp& op : node.ops) {
+        const Binding* bound = FindBinding(bucket, op.token);
         if (bound == nullptr) {
-            folded = folded * XformOpMatrix(scene_, node.prim, op.op);
+            folded = folded * XformOpMatrix(scene_, node.prim, op);
             continue;
         }
         built.onDevice = true;
         fold();
         const DeviceColumn& column = *bound->column;
         const auto floats = static_cast<std::uint32_t>(Floats(column));
-        push({.kind = ProgramKind(op.op.kind),
-              .flags = (op.op.invert ? kInvert : 0u) | floats << kFloatsShift,
+        push({.kind = ProgramKind(op.kind),
+              .flags = (op.invert ? kInvert : 0u) | floats << kFloatsShift,
               .source = bound->address + row * column.RowBytes()});
     }
     fold();

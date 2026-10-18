@@ -106,9 +106,9 @@ glm::dvec3 ToVec3(const Scene& scene, PrimId prim, const OpEntry& op, const Valu
     throw BadOp(scene, prim, op, scalar ? "three numbers or one" : "three numbers");
 }
 
-/// The matrix of one op, inverted if the order says so; identity for an op without a value.
-glm::dmat4 OpMatrix(const Scene& scene, PrimId prim, const OpEntry& op) {
-    const std::optional<Value> value = scene.Get(prim, op.attribute);
+/// The matrix of one op from its value, inverted if the order says so; identity without one.
+glm::dmat4 OpMatrix(const Scene& scene, PrimId prim, const OpEntry& op,
+                    const std::optional<Value>& value) {
     if (!value) {
         return glm::dmat4(1.0);
     }
@@ -220,7 +220,9 @@ void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
 
 glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim) {
     glm::dmat4 local(1.0);
-    ForEachOp(scene, prim, [&](const OpEntry& op) { local = local * OpMatrix(scene, prim, op); });
+    ForEachOp(scene, prim, [&](const OpEntry& op) {
+        local = local * OpMatrix(scene, prim, op, scene.Get(prim, op.attribute));
+    });
     return local;
 }
 
@@ -244,15 +246,18 @@ std::optional<XformOpKind> ParseXformOpKind(std::string_view attribute) {
 }
 
 std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim) {
+    const TokenTable& tokens = scene.Store().Tokens();
     std::vector<XformOp> ops;
     ForEachOp(scene, prim, [&](const OpEntry& op) {
-        ops.push_back({std::string(op.attribute), op.kind, op.invert});
+        ops.push_back({std::string(op.attribute), op.kind, op.invert, tokens.Find(op.attribute)});
     });
     return ops;
 }
 
 glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op) {
-    return OpMatrix(scene, prim, {op.attribute, op.kind, op.invert});
+    // An attribute first authored after the order was read has no token in the op.
+    return OpMatrix(scene, prim, {op.attribute, op.kind, op.invert},
+                    op.token ? scene.Get(prim, *op.token) : scene.Get(prim, op.attribute));
 }
 
 }  // namespace ernie

@@ -93,12 +93,6 @@ class TransformGraph {
         /// The column's address its programs point into; a column that moves rewrites them.
         VkDeviceAddress address = 0;
     };
-    /// An op of a node's order, parsed when the order changes.
-    struct NodeOp {
-        XformOp op;
-        /// Its attribute's token, to find a binding by; none until the attribute is authored.
-        std::optional<Token> attribute;
-    };
     struct NodeState {
         PrimId prim;
         bool live = false;
@@ -109,7 +103,8 @@ class TransformGraph {
         std::uint32_t siblingPosition = kNone;
         std::uint32_t programPosition = kNone;
         std::vector<std::uint32_t> children;
-        std::vector<NodeOp> ops;
+        /// Its order's ops, parsed when the order changes.
+        std::vector<XformOp> ops;
         bool resets = false;
     };
     /// Slots in a device list, kept dense by swap-removal, its changed entries uploaded in runs.

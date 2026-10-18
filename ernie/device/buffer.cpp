@@ -39,8 +39,10 @@ Buffer::Buffer(DeviceContext& context, std::uint64_t size, MemoryUse use, std::s
     }
     VmaAllocationCreateInfo allocation{.usage = VMA_MEMORY_USAGE_AUTO};
     if (use == MemoryUse::Upload) {
-        allocation.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
-                           VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        // Cached host memory: staging is written a few rows at a time, which write-combined or
+        // device-local mappings turn into a bus transaction each.
+        allocation.flags =
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
     } else if (use == MemoryUse::Readback) {
         allocation.flags =
             VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;

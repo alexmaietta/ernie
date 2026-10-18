@@ -41,16 +41,23 @@ void Uploader::Write(const Buffer& destination, std::uint64_t offset,
         return;
     }
     if (staging_.empty() || used_ + bytes.size() > staging_.back()->Size()) {
+        FlushStaging();
         staging_.push_back(std::make_shared<Buffer>(
             context_, std::max<std::uint64_t>(chunk_, bytes.size()), MemoryUse::Upload, "staging"));
         used_ = 0;
     }
     const Buffer& staging = *staging_.back();
     std::memcpy(staging.Mapped().data() + used_, bytes.data(), bytes.size());
-    staging.Flush(used_, bytes.size());
     copies_.push_back({staging_.size() - 1, destination.Handle(), {used_, offset, bytes.size()}});
     used_ += bytes.size();
     pending_ += bytes.size();
+}
+
+void Uploader::FlushStaging() {
+    // Once a staging buffer is full or about to be copied from, not once a write.
+    if (!staging_.empty() && used_ > 0) {
+        staging_.back()->Flush(0, used_);
+    }
 }
 
 void Uploader::WriteRows(const Buffer& destination, std::uint64_t offset, std::uint64_t rowBytes,
@@ -76,6 +83,7 @@ Ticket Uploader::Flush(std::span<const Ticket> waits) {
     }
     ERNIE_ZONE("Upload");
     ERNIE_PLOT("Uploaded bytes", pending_);
+    FlushStaging();
     const Ticket ticket = queue_.Submit(
         [&](VkCommandBuffer commands) {
             BeforeCopies(commands);

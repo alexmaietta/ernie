@@ -74,6 +74,8 @@ struct XformOp {
     std::string attribute;
     XformOpKind kind = XformOpKind::Transform;
     bool invert = false;
+    /// The attribute's token, when interned as the order was read, to read its value by.
+    std::optional<Token> token;
     bool operator==(const XformOp&) const = default;
 };
 /// @return The prim's ops, outermost first, as `ComposeXformOps` multiplies them: those of

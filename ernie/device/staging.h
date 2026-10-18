@@ -54,6 +54,9 @@ class Uploader {
         VkBufferCopy region;
     };
 
+    /// Makes the last staging buffer's writes visible to the device.
+    void FlushStaging();
+
     DeviceContext& context_;
     Queue& queue_;
     std::uint64_t chunk_;

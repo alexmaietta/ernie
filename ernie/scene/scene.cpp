@@ -189,6 +189,10 @@ std::optional<Value> Scene::Get(PrimId prim, std::string_view attribute) const {
     return CellValue(prim, AuthoredColumn(prim, attribute));
 }
 
+std::optional<Value> Scene::Get(PrimId prim, AttributeId attribute) const {
+    return CellValue(prim, AuthoredColumn(prim, attribute));
+}
+
 std::optional<Value> Scene::GetResolved(PrimId prim, std::string_view attribute) const {
     const std::optional<Token> token = store_.Tokens().Find(ResolvedName(attribute));
     return CellValue(prim,
@@ -471,7 +475,11 @@ Box Scene::ExtentsHint(PrimId prim, bool allPurposes) const {
 
 const Column* Scene::AuthoredColumn(PrimId prim, std::string_view attribute) const {
     const std::optional<Token> token = store_.Tokens().Find(attribute);
-    const Column* column = token ? store_.GetBucket(store_.PrimBucket(prim)).Find(*token) : nullptr;
+    return token ? AuthoredColumn(prim, *token) : nullptr;
+}
+
+const Column* Scene::AuthoredColumn(PrimId prim, AttributeId attribute) const {
+    const Column* column = store_.GetBucket(store_.PrimBucket(prim)).Find(attribute);
     return column != nullptr && column->authored.Test(store_.PrimRow(prim)) ? column : nullptr;
 }
 
