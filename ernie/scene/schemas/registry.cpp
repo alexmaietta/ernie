@@ -58,6 +58,9 @@ std::span<const SchemaDef* const> Schemas() {
         &PhotometricDistantLightAPI::Definition(),
         &PhotometricDomeLightAPI::Definition(),
         &PhysicalLightIlluminantAPI::Definition(),
+        &NodeGraph::Definition(),
+        &Material::Definition(),
+        &Shader::Definition(),
         &CollectionAPI::Definition(),
         &MaterialBindingAPI::Definition(),
     };
