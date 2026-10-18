@@ -6,13 +6,19 @@ project(ErnieConsumer LANGUAGES CXX)
 
 find_package(Ernie 0.2 REQUIRED)
 
-# Each installed public header compiles alone (API-008).
-file(
-    GLOB_RECURSE headers
-    RELATIVE "${Ernie_DIR}/../../../include"
-    "${Ernie_DIR}/../../../include/ernie/*.h"
-)
+# Each installed public header compiles alone (API-008), found where the package says its headers
+# are: the include directory holding ernie/export.h.
+get_target_property(include_dirs Ernie::ernie INTERFACE_INCLUDE_DIRECTORIES)
+foreach(directory ${include_dirs})
+    if(EXISTS "${directory}/ernie/export.h")
+        set(include_dir "${directory}")
+    endif()
+endforeach()
+file(GLOB_RECURSE headers RELATIVE "${include_dir}" "${include_dir}/ernie/*.h")
 list(FILTER headers EXCLUDE REGEX "^ernie/third_party/")
+if(NOT headers)
+    message(FATAL_ERROR "No public headers under ${include_dir}")
+endif()
 foreach(header ${headers})
     string(MAKE_C_IDENTIFIER "${header}" name)
     file(WRITE "${CMAKE_BINARY_DIR}/headers/${name}.cpp" "#include <${header}>\n")

@@ -6,10 +6,14 @@ include(GenerateExportHeader)
 # it.
 add_library(ernie SHARED)
 add_library(Ernie::ernie ALIAS ernie)
+# MSVC warns that exported classes' standard library members need "dll-interface" (C4251, C4275);
+# Ernie's C++ ABI already requires consumers to use the same compiler and runtime, so they match.
+set(ernie_export_msvc "#ifdef _MSC_VER\n#pragma warning(disable : 4251 4275)\n#endif")
 generate_export_header(
     ernie
     EXPORT_MACRO_NAME ERNIE_API
     EXPORT_FILE_NAME "${PROJECT_BINARY_DIR}/include/ernie/export.h"
+    CUSTOM_CONTENT_FROM_VARIABLE ernie_export_msvc
 )
 set_target_properties(
     ernie

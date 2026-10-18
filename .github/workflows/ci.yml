@@ -353,7 +353,7 @@ jobs:
           cmake --preset package
           cmake --build --preset package --parallel 4
           cd build/package
-          cmake -DCMAKE_INSTALL_LIBDIR=lib/$(uname -m)-linux-gnu . && cpack -G DEB
+          cmake "-DCMAKE_INSTALL_LIBDIR=lib/$(uname -m)-linux-gnu" . && cpack -G DEB
           cmake -DCMAKE_INSTALL_LIBDIR=lib64 . && cpack -G RPM
           cmake -DCMAKE_INSTALL_LIBDIR=lib . && cpack -G TGZ
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

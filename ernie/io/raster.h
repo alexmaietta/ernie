@@ -143,6 +143,8 @@ class ERNIE_API MosaicRaster : public GridSource {
     /// @throws std::invalid_argument If the tiles do not fill whole rows or differ; else as
     ///         `OpenRaster`.
     MosaicRaster(const std::vector<std::filesystem::path>& tiles, std::uint32_t columns);
+    MosaicRaster(const MosaicRaster&) = delete;
+    MosaicRaster& operator=(const MosaicRaster&) = delete;
 
     std::uint32_t Width() const override {
         return columns_ * tileWidth_;
