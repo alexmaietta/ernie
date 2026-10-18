@@ -8,124 +8,67 @@
 ///   https://openusd.org/release/tut_generating_new_schema.html
 #include "ernie/scene/json_value.h"
 #include "ernie/scene/reference.h"
+#include "ernie/util/text.h"
 
-#include <glm/gtc/matrix_access.hpp>
-
+#include <array>
 #include <string>
 
 namespace ernie {
 namespace {
 
-std::string Number(double number) {
-    return Json(number).dump();
-}
-
-template <typename Vector> std::string Tuple(const Vector& vector) {
-    std::string out = "(";
-    for (glm::length_t i = 0; i < vector.length(); ++i) {
-        out += (i == 0 ? "" : ", ") + Number(static_cast<double>(vector[i]));
+/// @return JSON as USD's text format writes a value: arrays as tuples, or with `list` as lists.
+std::string UsdText(const Json& json, bool list = false) {
+    if (json.is_boolean()) {
+        return json.get<bool>() ? "1" : "0";
     }
-    return out + ")";
+    if (!json.is_array()) {
+        return json.dump();
+    }
+    const std::string items = Join(json, ", ", [](const Json& item) { return UsdText(item); });
+    return list ? "[" + items + "]" : "(" + items + ")";
 }
 
-/// @return A fallback as USD's text format writes it, or empty when it has none there.
-std::string UsdValue(const Value& value, bool asset) {
-    return std::visit(
-        [&](const auto& v) -> std::string {
-            using V = std::decay_t<decltype(v)>;
-            if constexpr (std::is_same_v<V, bool>) {
-                return v ? "1" : "0";
-            } else if constexpr (std::is_same_v<V, int>) {
-                return std::to_string(v);
-            } else if constexpr (std::is_same_v<V, float> || std::is_same_v<V, double>) {
-                return Number(v);
-            } else if constexpr (std::is_same_v<V, glm::dquat>) {
-                return Tuple(glm::dvec4(v.w, v.x, v.y, v.z));
-            } else if constexpr (std::is_same_v<V, glm::dmat4>) {
-                // USD's rows are its row vectors: the columns of Ernie's matrices.
-                std::string out = "(";
-                for (int column = 0; column < 4; ++column) {
-                    out += (column == 0 ? "" : ", ") + Tuple(v[column]);
-                }
-                return out + ")";
-            } else if constexpr (std::is_same_v<V, std::string>) {
-                return asset ? (v.empty() ? "" : "@" + v + "@") : "\"" + v + "\"";
-            } else if constexpr (std::is_same_v<V, std::vector<float>>) {
-                std::string out = "[";
-                for (std::size_t i = 0; i < v.size(); ++i) {
-                    out += (i == 0 ? "" : ", ") + Number(v[i]);
-                }
-                return out + "]";
-            } else if constexpr (std::is_same_v<V, std::vector<std::string>>) {
-                std::string out = "[";
-                for (std::size_t i = 0; i < v.size(); ++i) {
-                    out += (i == 0 ? "\"" : ", \"") + v[i] + "\"";
-                }
-                return out + "]";
-            } else if constexpr (requires { V::length(); }) {
-                return Tuple(v);
-            } else {
-                return "";
+/// @return A fallback in USD's text format, or empty when it has none there (relationships, empty
+/// assets).
+std::string UsdFallback(const AttributeDef& def, const Value& fallback) {
+    const bool none = fallback.Empty() || fallback.Is<Path>() || fallback.Is<std::vector<Path>>();
+    if (none || def.type == ColumnType::Tensor) {
+        return {};
+    }
+    const Json json = ToJson(fallback);
+    if (def.meta.asset) {
+        return json.get<std::string>().empty() ? "" : "@" + json.get<std::string>() + "@";
+    }
+    if (def.type == ColumnType::Matrix) {
+        // USD's rows are its row vectors: the columns of Ernie's matrices.
+        Json columns = Json::array();
+        for (std::size_t column = 0; column < 4; ++column) {
+            columns.push_back(Json::array());
+            for (const Json& row : json) {
+                columns.back().push_back(row[column]);
             }
-        },
-        value.Raw());
-}
-
-std::string UsdType(const AttributeDef& def) {
-    const AttributeMeta& meta = def.meta;
-    switch (def.type) {
-    case ColumnType::Bool:
-        return "bool";
-    case ColumnType::Int:
-        return "int";
-    case ColumnType::Double:
-        return "double";
-    case ColumnType::Vec2:
-        return "double2";
-    case ColumnType::Vec3:
-        return meta.color ? "color3d" : "double3";
-    case ColumnType::Vec4:
-        return "double4";
-    case ColumnType::Quat:
-        return "quatd";
-    case ColumnType::Matrix:
-        return "matrix4d";
-    case ColumnType::TokenValue:
-        return meta.asset ? "asset" : "token";
-    case ColumnType::Relationship:
-    case ColumnType::Relationships:
-        return "rel";
-    case ColumnType::FloatArray:
-        return "float[]";
-    case ColumnType::TokenArray:
-        return "token[]";
-    case ColumnType::Tensor:
-        break;
+        }
+        return UsdText(columns);
     }
-    const std::string element = meta.bytes ? "uchar" : meta.integer ? "int" : "float";
-    return element + (meta.components > 1 ? std::to_string(meta.components) : "") + "[]";
+    return UsdText(json, def.type == ColumnType::FloatArray || def.type == ColumnType::TokenArray);
 }
 
 std::string Quoted(std::string_view text) {
     return "\"\"\"" + std::string(text) + "\"\"\"";
 }
 
+std::string Strings(const auto& texts) {
+    return "[" + Join(texts, ", ", [](std::string_view text) { return Json(text).dump(); }) + "]";
+}
+
 std::string Property(const SchemaDef& schema, const AttributeDef& def) {
-    const std::string type = UsdType(def);
-    std::string out = "    " + type + " " + std::string(def.name);
-    const Value* override = schema.FallbackOverride(def.name);
-    if (const std::string fallback =
-            type == "rel" ? "" : UsdValue(override ? *override : def.fallback, def.meta.asset);
-        !fallback.empty()) {
+    std::string out = "    " + UsdTypeName(def) + " " + std::string(def.name);
+    if (const std::string fallback = UsdFallback(def, schema.Fallback(def)); !fallback.empty()) {
         out += " = " + fallback;
     }
     out += " (\n";
     if (!def.meta.options.empty()) {
-        std::string tokens;
-        for (const std::string_view option : def.meta.options) {
-            tokens += (tokens.empty() ? "\"" : ", \"") + std::string(option) + "\"";
-        }
-        out += "        allowedTokens = [" + tokens + "]\n";
+        out += "        allowedTokens = " + Strings(def.meta.options) + "\n";
     }
     return out + "        doc = " + Quoted(def.meta.doc) + "\n    )\n";
 }
@@ -140,32 +83,13 @@ std::string TypeName(const SchemaDef& schema) {
     return std::string(family != nullptr ? family->usdModule : "Usd") + name;
 }
 
-std::string_view Kind(SchemaKind kind) {
-    switch (kind) {
-    case SchemaKind::Abstract:
-        return "abstractTyped";
-    case SchemaKind::Concrete:
-        return "concreteTyped";
-    case SchemaKind::SingleApply:
-        return "singleApplyAPI";
-    case SchemaKind::MultipleApply:
-        break;
-    }
-    return "multipleApplyAPI";
-}
-
 std::string Class(const SchemaDef& schema) {
-    const bool typed = schema.kind == SchemaKind::Abstract || schema.kind == SchemaKind::Concrete;
     const std::string name(schema.name);
-    std::string out = typed && schema.kind == SchemaKind::Concrete
+    std::string out = schema.kind == SchemaKind::Concrete
                           ? "class " + name + " \"" + name + "\" (\n"
                           : "class \"" + name + "\" (\n";
     if (const std::vector<std::string_view> builtins = schema.AllBuiltinApis(); !builtins.empty()) {
-        std::string apis;
-        for (const std::string_view api : builtins) {
-            apis += (apis.empty() ? "\"" : ", \"") + std::string(api) + "\"";
-        }
-        out += "    prepend apiSchemas = [" + apis + "]\n";
+        out += "    prepend apiSchemas = " + Strings(builtins) + "\n";
     }
     out += "    doc = " + Quoted(schema.doc) + "\n)\n{\n";
     for (const AttributeDef* def : schema.AllAttributes()) {
@@ -175,20 +99,19 @@ std::string Class(const SchemaDef& schema) {
 }
 
 Json PlugInfoType(const SchemaDef& schema) {
+    static constexpr std::array<std::string_view, 4> kKinds{"abstractTyped", "concreteTyped",
+                                                            "singleApplyAPI", "multipleApplyAPI"};
     const bool typed = schema.kind == SchemaKind::Abstract || schema.kind == SchemaKind::Concrete;
+    const std::string base = !typed                   ? "UsdAPISchemaBase"
+                             : schema.base != nullptr ? TypeName(*schema.base)
+                                                      : "UsdTyped";
     Json type{{"alias", {{"UsdSchemaBase", schema.name}}},
               {"autoGenerated", true},
-              {"bases", Json::array({typed ? (schema.base != nullptr ? TypeName(*schema.base)
-                                                                     : std::string("UsdTyped"))
-                                           : std::string("UsdAPISchemaBase")})},
+              {"bases", Json::array({base})},
               {"schemaIdentifier", schema.name},
-              {"schemaKind", Kind(schema.kind)}};
+              {"schemaKind", kKinds[static_cast<std::size_t>(schema.kind)]}};
     if (!schema.appliesTo.empty()) {
-        Json types = Json::array();
-        for (const std::string_view to : schema.appliesTo) {
-            types.push_back(to);
-        }
-        type["apiSchemaCanOnlyApplyTo"] = std::move(types);
+        type["apiSchemaCanOnlyApplyTo"] = schema.appliesTo;
     }
     return type;
 }

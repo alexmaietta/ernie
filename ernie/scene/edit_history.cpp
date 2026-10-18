@@ -3,6 +3,9 @@
 /// @brief Recording edits as steps of before and after states, and applying them either way.
 #include "ernie/scene/edit_history.h"
 
+#include "ernie/util/text.h"
+
+#include <algorithm>
 #include <stdexcept>
 
 namespace ernie {
@@ -15,7 +18,7 @@ void EditHistory::Set(Scene& scene, const Path& path,
         for (auto& [name, value] : edits) {
             Cell before = Capture(scene, prim, name);
             scene.Set(prim, name, std::move(value));
-            step.attributes.push_back({name, {std::move(before), Capture(scene, prim, name)}});
+            step.attributes.push_back({name, std::move(before), Capture(scene, prim, name)});
         }
     } catch (...) {
         // What applied before the rejected edit stays undoable.
@@ -25,20 +28,13 @@ void EditHistory::Set(Scene& scene, const Path& path,
         throw;
     }
     const auto same = [&](const Step& last) {
-        if (last.structural || !last.open || last.path != path ||
-            last.attributes.size() != step.attributes.size()) {
-            return false;
-        }
-        for (std::size_t i = 0; i < last.attributes.size(); ++i) {
-            if (last.attributes[i].first != step.attributes[i].first) {
-                return false;
-            }
-        }
-        return true;
+        return !last.structural && last.open && last.path == path &&
+               std::ranges::equal(last.attributes, step.attributes, {}, &AttributeEdit::name,
+                                  &AttributeEdit::name);
     };
     if (open && open_ && next_ == steps_.size() && !steps_.empty() && same(steps_.back())) {
         for (std::size_t i = 0; i < step.attributes.size(); ++i) {
-            steps_.back().attributes[i].second.second = std::move(step.attributes[i].second.second);
+            steps_.back().attributes[i].after = std::move(step.attributes[i].after);
         }
         return;
     }
@@ -50,9 +46,7 @@ void EditHistory::Clear(Scene& scene, const Path& path, std::string_view attribu
     const std::string name(attribute);
     Cell before = Capture(scene, prim, name);
     scene.Clear(prim, attribute);
-    Step step{.path = path};
-    step.attributes.push_back({name, {std::move(before), Capture(scene, prim, name)}});
-    Push(std::move(step));
+    Push({.path = path, .attributes = {{name, std::move(before), Capture(scene, prim, name)}}});
 }
 
 void EditHistory::Define(Scene& scene, const Path& path, std::string_view type) {
@@ -168,9 +162,7 @@ void EditHistory::Restore(Scene& scene, const std::vector<PrimSnapshot>& prims) 
     for (const PrimSnapshot& snapshot : prims) {
         const PrimId prim = scene.Define(snapshot.path, snapshot.type);
         for (const std::string& api : snapshot.apis) {
-            if (!scene.HasApi(prim, api)) {
-                scene.ApplyApi(prim, api);
-            }
+            scene.ApplyApi(prim, api);
         }
         for (const auto& [name, cell] : snapshot.attributes) {
             Apply(scene, prim, name, cell);
@@ -190,8 +182,8 @@ void EditHistory::Apply(Scene& scene, const Step& step, bool forward) {
         return;
     }
     for (std::size_t i = 0; i < step.attributes.size(); ++i) {
-        const auto& [name, states] = step.attributes[forward ? i : step.attributes.size() - 1 - i];
-        Apply(scene, *prim, name, forward ? states.second : states.first);
+        const AttributeEdit& edit = step.attributes[forward ? i : step.attributes.size() - 1 - i];
+        Apply(scene, *prim, edit.name, forward ? edit.after : edit.before);
     }
 }
 
@@ -227,11 +219,7 @@ std::string EditHistory::Label(const Step& step) {
                                      : "Change ") +
                step.path.String();
     }
-    std::string label = step.path.String();
-    for (const auto& [name, states] : step.attributes) {
-        label += " " + name;
-    }
-    return label;
+    return step.path.String() + " " + Join(step.attributes, " ", &AttributeEdit::name);
 }
 
 }  // namespace ernie

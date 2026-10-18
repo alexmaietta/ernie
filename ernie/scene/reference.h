@@ -34,6 +34,9 @@ const SchemaFamily* FindFamily(std::string_view schema);
 /// @return Whether a schema is Ernie's own rather than one mirroring USD.
 bool IsErnieSchema(std::string_view schema);
 
+/// @return An attribute's USD value type, as `double3`, `token` or `float3[]`.
+std::string UsdTypeName(const AttributeDef& def);
+
 /// @return The JSON Schema (draft 2020-12) of scene files: each prim type and API schema with its
 /// attributes' types, fallbacks, ranges, allowed tokens and descriptions.
 std::string SceneJsonSchema();

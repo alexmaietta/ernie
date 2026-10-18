@@ -9,6 +9,7 @@
 #include "ernie/scene/xform.h"
 #include "ernie/util/algorithm.h"
 #include "ernie/util/file.h"
+#include "ernie/util/text.h"
 
 #include <glm/gtc/matrix_access.hpp>
 
@@ -291,11 +292,7 @@ void LoadPrim(Scene& scene, const Path& path, const Json& json, std::span<const 
         return;
     }
     for (const Json& api : json.value(kApis, Json::array())) {
-        Attempt(problems, path, kApis, [&] {
-            if (!scene.HasApi(prim, api.get<std::string>())) {
-                scene.ApplyApi(prim, api.get<std::string>());
-            }
-        });
+        Attempt(problems, path, kApis, [&] { scene.ApplyApi(prim, api.get<std::string>()); });
     }
     for (const auto& [key, value] : json.items()) {
         if (key == kTypeName || key == kApis) {
@@ -348,7 +345,9 @@ template <typename Vector> Json Components(const Vector& vector) {
     return json;
 }
 
-Json WriteValue(const Value& value) {
+}  // namespace
+
+Json ToJson(const Value& value) {
     return std::visit(
         [](const auto& v) -> Json {
             using V = std::decay_t<decltype(v)>;
@@ -371,11 +370,7 @@ Json WriteValue(const Value& value) {
             } else if constexpr (std::is_same_v<V, std::vector<Path>>) {
                 return Map(v, [](const Path& path) { return path.String(); });
             } else if constexpr (std::is_same_v<V, std::vector<float>>) {
-                Json numbers = Json::array();
-                for (const float number : v) {
-                    numbers.push_back(Shortest(number));
-                }
-                return numbers;
+                return Map(v, Shortest);
             } else if constexpr (requires { V::length(); }) {
                 return Components(v);
             } else {
@@ -385,6 +380,8 @@ Json WriteValue(const Value& value) {
         value.Raw());
 }
 
+namespace {
+
 /// @return A CPU tensor as arrays nested by its shape.
 Json WriteTensor(const Tensor& tensor) {
     if (IsGpu(tensor.Location().kind)) {
@@ -393,18 +390,14 @@ Json WriteTensor(const Tensor& tensor) {
     std::vector<Json> numbers;
     const DType type = tensor.Type();
     if (type == DType::Float16 || type == DType::Float32) {
-        for (const float number : CopyFloats(tensor, "a tensor")) {
-            numbers.push_back(Shortest(number));
-        }
+        numbers = Map(CopyFloats(tensor, "a tensor"), Shortest);
     } else if (type == DType::Float64) {
         const Tensor packed = tensor.Contiguous();
-        for (std::int64_t i = 0; i < packed.Elements(); ++i) {
-            numbers.push_back(Finite(packed.As<double>()[i]));
-        }
+        numbers = Map(std::span(packed.As<double>(), static_cast<std::size_t>(packed.Elements())),
+                      Finite);
     } else {
-        for (const std::int64_t number : CopyInts(tensor, "a tensor")) {
-            numbers.push_back(number);
-        }
+        numbers =
+            Map(CopyInts(tensor, "a tensor"), [](std::int64_t number) { return Json(number); });
     }
     const std::vector<std::int64_t>& shape = tensor.Shape();
     std::size_t next = 0;
@@ -423,7 +416,35 @@ Json WriteSamples(std::span<const TimeSample> samples) {
     Json json = Json::object();
     for (const TimeSample& sample : samples) {
         json[Finite(sample.time).dump()] =
-            sample.tensor.Empty() ? WriteValue(sample.value) : WriteTensor(sample.tensor);
+            sample.tensor.Empty() ? ToJson(sample.value) : WriteTensor(sample.tensor);
+    }
+    return json;
+}
+
+/// @return A prim as scene files write it: type, API schemas, then attributes and their samples
+/// by name.
+Json WritePrim(const Scene& scene, const Path& path) {
+    const PrimId prim = *scene.Find(path);
+    Json json = Json::object();
+    if (const std::string_view type = scene.TypeName(prim); !type.empty()) {
+        json[kTypeName] = type;
+    }
+    if (const std::vector<std::string> apis = scene.AppliedApis(prim); !apis.empty()) {
+        json[kApis] = apis;
+    }
+    std::vector<std::string> names = scene.Attributes(path);
+    std::ranges::sort(names);
+    for (const std::string& name : names) {
+        try {
+            const Tensor* tensor = scene.Read(prim, name);
+            json[name] = tensor != nullptr ? WriteTensor(*tensor) : ToJson(*scene.Get(prim, name));
+            if (const std::span<const TimeSample> samples = scene.Samples(prim, name);
+                !samples.empty()) {
+                json[name + std::string(kTimeSamples)] = WriteSamples(samples);
+            }
+        } catch (const std::exception& error) {
+            throw std::invalid_argument(SceneProblem{path.String(), name, error.what()}.Message());
+        }
     }
     return json;
 }
@@ -449,18 +470,15 @@ void Print(const Json& json, std::size_t indent, std::string& out) {
         }
         out += std::string(indent, ' ') + "]";
     } else if (json.is_array()) {
-        out += "[";
-        for (std::size_t i = 0; i < json.size(); ++i) {
-            out += (i == 0 ? "" : ", ") + json[i].dump();
-        }
-        out += "]";
+        out += "[" + Join(json, ", ", [](const Json& item) { return item.dump(); }) + "]";
     } else {
         out += json.dump();
     }
 }
 
 /// @return The scene file's prims.
-const Json& ParsePrims(std::string_view text, Json& root) {
+Json ParsePrims(std::string_view text) {
+    Json root;
     try {
         root = Json::parse(text);
     } catch (const Json::parse_error& error) {
@@ -469,14 +487,10 @@ const Json& ParsePrims(std::string_view text, Json& root) {
     if (!root.is_object() || !root.contains(kPrims) || !root[kPrims].is_object()) {
         throw std::invalid_argument("A scene file is an object with \"prims\"");
     }
-    return root[kPrims];
+    return std::move(root[kPrims]);
 }
 
 }  // namespace
-
-Json ToJson(const Value& value) {
-    return WriteValue(value);
-}
 
 std::string PrintJson(const Json& json) {
     std::string out;
@@ -484,25 +498,22 @@ std::string PrintJson(const Json& json) {
     return out + "\n";
 }
 
-void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arrays) {
-    Json root;
-    for (const auto& [path, prim] : ParsePrims(text, root).items()) {
-        LoadPrim(scene, Path(path), prim, arrays, nullptr);
-    }
+Json SceneFile(Json prims) {
+    Json root = Json::object();
+    root["$schema"] = std::string(kSceneSchemaUrl);
+    root[kPrims] = std::move(prims);
+    return root;
 }
 
-std::vector<SceneProblem> LoadSceneChecked(Scene& scene, std::string_view text,
-                                           std::span<const Tensor> arrays) {
-    std::vector<SceneProblem> problems;
-    Json root;
-    try {
-        for (const auto& [path, prim] : ParsePrims(text, root).items()) {
-            LoadPrim(scene, Path(path), prim, arrays, &problems);
-        }
-    } catch (const std::invalid_argument& error) {
-        problems.push_back({"", "", error.what()});
+void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arrays,
+               std::vector<SceneProblem>* problems) {
+    Json prims;
+    if (!Attempt(problems, Path(), "", [&] { prims = ParsePrims(text); })) {
+        return;
     }
-    return problems;
+    for (const auto& [path, prim] : prims.items()) {
+        LoadPrim(scene, Path(path), prim, arrays, problems);
+    }
 }
 
 std::string SceneProblem::Message() const {
@@ -522,36 +533,9 @@ void LoadSceneFile(Scene& scene, const std::filesystem::path& path) {
 std::string SaveScene(const Scene& scene) {
     Json prims = Json::object();
     for (const Path& path : scene.Prims()) {
-        const PrimId prim = *scene.Find(path);
-        Json json = Json::object();
-        if (const std::string_view type = scene.TypeName(prim); !type.empty()) {
-            json[kTypeName] = type;
-        }
-        if (const std::vector<std::string> apis = scene.AppliedApis(prim); !apis.empty()) {
-            json[kApis] = apis;
-        }
-        std::vector<std::string> names = scene.Attributes(path);
-        std::ranges::sort(names);
-        for (const std::string& name : names) {
-            try {
-                const Tensor* tensor = scene.Read(prim, name);
-                json[name] =
-                    tensor != nullptr ? WriteTensor(*tensor) : WriteValue(*scene.Get(prim, name));
-                if (const std::span<const TimeSample> samples = scene.Samples(prim, name);
-                    !samples.empty()) {
-                    json[name + std::string(kTimeSamples)] = WriteSamples(samples);
-                }
-            } catch (const std::exception& error) {
-                throw std::invalid_argument(
-                    SceneProblem{path.String(), name, error.what()}.Message());
-            }
-        }
-        prims[path.String()] = std::move(json);
+        prims[path.String()] = WritePrim(scene, path);
     }
-    Json root = Json::object();
-    root["$schema"] = std::string(kSceneSchemaUrl);
-    root[kPrims] = std::move(prims);
-    return PrintJson(root);
+    return PrintJson(SceneFile(std::move(prims)));
 }
 
 void SaveSceneFile(const Scene& scene, const std::filesystem::path& path) {

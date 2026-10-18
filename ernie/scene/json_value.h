@@ -31,4 +31,7 @@ Json ToJson(const Value& value);
 /// @return JSON with 2-space indents, arrays of scalars kept on one line, and a final newline.
 std::string PrintJson(const Json& json);
 
+/// @return A scene file of prims, naming its JSON Schema.
+Json SceneFile(Json prims);
+
 }  // namespace ernie

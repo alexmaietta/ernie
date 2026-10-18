@@ -7,6 +7,7 @@
 #include "ernie/util/text.h"
 
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <stdexcept>
 
@@ -15,15 +16,6 @@ namespace {
 
 constexpr std::string_view kInstancePattern = "[A-Za-z_][A-Za-z0-9_]*";
 constexpr std::string_view kExampleInstance = "example";
-
-std::string Replace(std::string_view text, std::string_view from, std::string_view to) {
-    std::string out(text);
-    for (std::size_t at = out.find(from); at != std::string::npos; at = out.find(from, at)) {
-        out.replace(at, from.size(), to);
-        at += to.size();
-    }
-    return out;
-}
 
 /// @return Text as a regular expression matching it literally.
 std::string Literal(std::string_view text) {
@@ -37,13 +29,7 @@ std::string Literal(std::string_view text) {
     return out;
 }
 
-/// @return A type's fallback for an attribute: its own override, or the declaration's.
-const Value& Fallback(const SchemaDef& schema, const AttributeDef& def) {
-    const Value* override = schema.FallbackOverride(def.name);
-    return override != nullptr ? *override : def.fallback;
-}
-
-std::optional<Json> JsonFallback(const Value& value) {
+std::optional<Json> JsonValue(const Value& value) {
     if (value.Empty()) {
         return std::nullopt;
     }
@@ -52,6 +38,11 @@ std::optional<Json> JsonFallback(const Value& value) {
     } catch (const std::invalid_argument&) {
         return std::nullopt;
     }
+}
+
+/// @return A type's fallback for an attribute as scene files write it; none if it has none.
+std::optional<Json> JsonFallback(const SchemaDef& schema, const AttributeDef& def) {
+    return JsonValue(schema.Fallback(def));
 }
 
 bool IsInstanced(std::string_view name) {
@@ -156,7 +147,7 @@ Json SchemaDefinition(const SchemaDef& schema) {
     for (const AttributeDef* def : schema.AllAttributes()) {
         Json attribute = ValueSchema(*def);
         attribute["description"] = def->meta.doc;
-        if (const std::optional<Json> fallback = JsonFallback(Fallback(schema, *def))) {
+        if (const std::optional<Json> fallback = JsonFallback(schema, *def)) {
             attribute["default"] = *fallback;
         }
         if (IsInstanced(def->name)) {
@@ -216,10 +207,7 @@ Json Condition(const SchemaDef& schema) {
 }
 
 Json PrimSchema() {
-    std::string instanced;
-    for (const std::string& name : Names(SchemaKind::MultipleApply)) {
-        instanced += (instanced.empty() ? "" : "|") + Literal(name);
-    }
+    const std::string instanced = Join(Names(SchemaKind::MultipleApply), "|", Literal);
     const Json api{
         {"anyOf", Json::array({{{"enum", Names(SchemaKind::SingleApply)}},
                                {{"pattern", "^(" + instanced +
@@ -261,65 +249,36 @@ std::string Link(std::string_view schema, const SchemaFamily& from) {
     return "[" + std::string(schema) + "](" + page + "#" + Anchor(schema) + ")";
 }
 
+/// @return The type a reference page shows: USD's, with relationship lists and array shapes
+/// spelt out.
 std::string TypeText(const AttributeDef& def) {
     const AttributeMeta& meta = def.meta;
-    switch (def.type) {
-    case ColumnType::Bool:
-        return "bool";
-    case ColumnType::Int:
-        return "int";
-    case ColumnType::Double:
-        return "double";
-    case ColumnType::Vec2:
-        return "double2";
-    case ColumnType::Vec3:
-        return meta.color ? "color3d" : "double3";
-    case ColumnType::Vec4:
-        return "double4";
-    case ColumnType::Quat:
-        return "quatd";
-    case ColumnType::Matrix:
-        return "matrix4d";
-    case ColumnType::TokenValue:
-        return meta.asset ? "asset" : "token";
-    case ColumnType::Relationship:
-        return "rel";
-    case ColumnType::Relationships:
+    if (def.type == ColumnType::Relationships) {
         return "rel[]";
-    case ColumnType::FloatArray:
-        return "float[]";
-    case ColumnType::TokenArray:
-        return "token[]";
-    case ColumnType::Tensor:
-        break;
+    }
+    if (def.type != ColumnType::Tensor || (meta.components == 0 && meta.ranks.empty())) {
+        return UsdTypeName(def);
     }
     const std::string element = meta.bytes ? "uchar" : meta.integer ? "int" : "float";
     if (meta.components != 0) {
         return element + "[n, " + std::to_string(meta.components) + "]";
     }
-    std::string ranks;
-    for (const std::int64_t rank : meta.ranks) {
-        ranks += (ranks.empty() ? "" : " or ") + std::to_string(rank);
-    }
-    return ranks.empty() ? element + "[]" : element + " tensor, rank " + ranks;
+    return element + " tensor, rank " +
+           Join(meta.ranks, " or ", [](std::int64_t rank) { return std::to_string(rank); });
 }
 
 std::string ValuesText(const AttributeMeta& meta) {
-    std::string text;
+    std::vector<std::string> values;
     for (const std::string_view option : meta.options) {
-        text += (text.empty() ? "`" : ", `") + std::string(option) + "`";
+        values.push_back("`" + std::string(option) + "`");
     }
-    const auto bound = [&](const std::optional<Bound>& limit, const char* inclusive,
-                           const char* exclusive) {
-        if (limit) {
-            text += (text.empty() ? "" : ", ") +
-                    std::string(limit->exclusive ? exclusive : inclusive) + " " +
-                    ToText(limit->value);
-        }
-    };
-    bound(meta.lower, "≥", ">");
-    bound(meta.upper, "≤", "<");
-    return text;
+    if (meta.lower) {
+        values.push_back((meta.lower->exclusive ? "> " : "≥ ") + ToText(meta.lower->value));
+    }
+    if (meta.upper) {
+        values.push_back((meta.upper->exclusive ? "< " : "≤ ") + ToText(meta.upper->value));
+    }
+    return Join(values, ", ");
 }
 
 std::string Cell(std::string_view text) {
@@ -363,19 +322,20 @@ std::string SchemaSection(const SchemaDef& schema, const SchemaFamily& family) {
         for (const AttributeDef& def : schema.attributes) {
             const bool ernie = IsErnieSchema(schema.name) || def.name.starts_with("ernie:");
             out += "| `" + std::string(def.name) + "` | " + TypeText(def) + " | " +
-                   Code(JsonFallback(Fallback(schema, def))) + " | " + ValuesText(def.meta) +
-                   " | " + std::string(ernie ? "Ernie" : family.usdModule) + " | " +
-                   Cell(def.meta.doc) + " |\n";
+                   Code(JsonFallback(schema, def)) + " | " + ValuesText(def.meta) + " | " +
+                   std::string(ernie ? "Ernie" : family.usdModule) + " | " + Cell(def.meta.doc) +
+                   " |\n";
         }
         out += "\n";
     }
     if (!schema.fallbackOverrides.empty()) {
-        out += "Fallbacks it changes:";
-        for (const auto& [name, value] : schema.fallbackOverrides) {
-            out += " `" + std::string(name) + "` " + Code(JsonFallback(value)) + ";";
-        }
-        out.back() = '.';
-        out += "\n\n";
+        out +=
+            "Fallbacks it changes: " +
+            Join(schema.fallbackOverrides, "; ",
+                 [](const auto& entry) {
+                     return "`" + std::string(entry.first) + "` " + Code(JsonValue(entry.second));
+                 }) +
+            ".\n\n";
     }
     if (const std::string example = ExampleScene(schema); !example.empty()) {
         out += "```json\n" + example + "```\n\n";
@@ -509,31 +469,45 @@ std::string ExampleScene(const SchemaDef& schema) {
         return {};
     }
     const bool api = schema.kind != SchemaKind::Concrete;
+    const ApiName name{&schema, schema.kind == SchemaKind::MultipleApply ? kExampleInstance : ""};
     Json prim = Json::object();
     prim[kTypeName] =
         api ? (schema.appliesTo.empty() ? "Xform" : schema.appliesTo.front()) : schema.name;
     if (api) {
-        prim[kApis] =
-            Json::array({schema.kind == SchemaKind::SingleApply
-                             ? std::string(schema.name)
-                             : std::string(schema.name) + ":" + std::string(kExampleInstance)});
+        prim[kApis] = Json::array({name.ToString()});
     }
     for (const AttributeDef& def : schema.attributes) {
-        const std::optional<Json> fallback = JsonFallback(Fallback(schema, def));
+        const std::optional<Json> fallback = JsonFallback(schema, def);
         // Arrays, targets and empty tokens have nothing to show.
         const bool shown = fallback && def.type != ColumnType::Tensor &&
                            def.type != ColumnType::Relationship &&
                            def.type != ColumnType::Relationships && *fallback != Json("");
         if (shown) {
-            prim[Replace(def.name, kInstanceName, kExampleInstance)] = *fallback;
+            prim[name.Attribute(def.name)] = *fallback;
         }
     }
     Json prims = Json::object();
     prims["/World/" + std::string(schema.name)] = std::move(prim);
-    Json root = Json::object();
-    root["$schema"] = std::string(kSceneSchemaUrl);
-    root[kPrims] = std::move(prims);
-    return PrintJson(root);
+    return PrintJson(SceneFile(std::move(prims)));
+}
+
+std::string UsdTypeName(const AttributeDef& def) {
+    static constexpr std::array<std::string_view, 14> kTypes{
+        "bool",     "int",   "double", "double2", "double3", "double4", "quatd",
+        "matrix4d", "token", "rel",    "rel",     "float[]", "token[]", ""};
+    const AttributeMeta& meta = def.meta;
+    switch (def.type) {
+    case ColumnType::Vec3:
+        return meta.color ? "color3d" : "double3";
+    case ColumnType::TokenValue:
+        return meta.asset ? "asset" : "token";
+    case ColumnType::Tensor: {
+        const std::string element = meta.bytes ? "uchar" : meta.integer ? "int" : "float";
+        return element + (meta.components > 1 ? std::to_string(meta.components) : "") + "[]";
+    }
+    default:
+        return std::string(kTypes[static_cast<std::size_t>(def.type)]);
+    }
 }
 
 }  // namespace ernie

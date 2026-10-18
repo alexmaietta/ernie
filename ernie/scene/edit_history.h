@@ -93,10 +93,14 @@ class EditHistory {
         std::vector<std::string> apis;
         std::map<std::string, Cell> attributes;
     };
+    struct AttributeEdit {
+        std::string name;
+        Cell before;
+        Cell after;
+    };
     struct Step {
         Path path;
-        /// Attribute steps: each attribute's state before and after.
-        std::vector<std::pair<std::string, std::pair<Cell, Cell>>> attributes;
+        std::vector<AttributeEdit> attributes;
         /// Structure steps: the subtree at `path` before and after, parents first; empty for none.
         std::vector<PrimSnapshot> before;
         std::vector<PrimSnapshot> after;

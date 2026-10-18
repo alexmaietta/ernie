@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -66,6 +67,33 @@ constexpr bool IsIdentifier(std::string_view text) {
     }
     return std::all_of(text.begin(), text.end(),
                        [&](char c) { return letter(c) || (c >= '0' && c <= '9'); });
+}
+
+/// @return The texts of `items`, each made by `text`, with `separator` between them.
+template <typename Range, typename Text>
+std::string Join(const Range& items, std::string_view separator, const Text& text) {
+    std::string out;
+    bool first = true;
+    for (const auto& item : items) {
+        out += first ? std::string_view() : separator;
+        out += std::invoke(text, item);
+        first = false;
+    }
+    return out;
+}
+/// @return `items`, texts already, with `separator` between them.
+template <typename Range> std::string Join(const Range& items, std::string_view separator) {
+    return Join(items, separator, [](const auto& item) -> std::string_view { return item; });
+}
+
+/// @return `text` with every `from` replaced by `to`.
+inline std::string Replace(std::string_view text, std::string_view from, std::string_view to) {
+    std::string out(text);
+    for (std::size_t at = out.find(from); at != std::string::npos; at = out.find(from, at)) {
+        out.replace(at, from.size(), to);
+        at += to.size();
+    }
+    return out;
 }
 
 /// @return The fewest insertions, deletions and substitutions turning `a` into `b` (Levenshtein).

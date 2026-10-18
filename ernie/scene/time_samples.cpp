@@ -46,12 +46,13 @@ Value Interpolate(const Value& a, const Value& b, double alpha) {
                 return static_cast<T>(x + (y - x) * alpha);
             } else if constexpr (std::is_same_v<T, glm::dquat>) {
                 return glm::slerp(x, y, alpha);
-            } else if constexpr (std::is_same_v<T, glm::dmat4> || std::is_same_v<T, glm::dvec2> ||
-                                 std::is_same_v<T, glm::dvec3> || std::is_same_v<T, glm::dvec4>) {
-                return x + (y - x) * alpha;
-            } else if constexpr (std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3> ||
-                                 std::is_same_v<T, glm::vec4>) {
-                return x + (y - x) * static_cast<float>(alpha);
+            } else if constexpr (requires { T::length(); }) {
+                // Vectors and matrices of floats or doubles; integer vectors hold.
+                if constexpr (std::is_floating_point_v<typename T::value_type>) {
+                    return x + (y - x) * static_cast<typename T::value_type>(alpha);
+                } else {
+                    return a;
+                }
             } else if constexpr (std::is_same_v<T, std::vector<float>>) {
                 return x.size() == y.size() ? Value(Mix(x.data(), y.data(), x.size(), alpha)) : a;
             } else {

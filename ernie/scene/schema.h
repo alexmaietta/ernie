@@ -219,6 +219,12 @@ struct SchemaDef {
     /// @return The fallback the type or its nearest base gives an attribute in place of its
     /// declaration's, or null.
     const Value* FallbackOverride(std::string_view attribute) const;
+    /// @return The type's fallback for an attribute: its own or a base's override, else the
+    /// declaration's.
+    const Value& Fallback(const AttributeDef& def) const {
+        const Value* override = FallbackOverride(def.name);
+        return override != nullptr ? *override : def.fallback;
+    }
     /// @return The rule, the nearest base's when inherited.
     ExtentRule Extent() const;
 

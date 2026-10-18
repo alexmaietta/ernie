@@ -58,11 +58,11 @@ std::optional<Value> Scene::GetAt(PrimId prim, std::string_view attribute, doubl
 }
 
 bool Scene::ClearSamples(PrimId prim, std::string_view attribute) {
-    const auto animated = animated_.find(prim.slot);
-    const std::optional<Token> token = store_.Tokens().Find(attribute);
-    if (animated == animated_.end() || !token || animated->second.samples.erase(*token) == 0) {
+    if (Samples(prim, attribute).empty()) {
         return false;
     }
+    const auto animated = animated_.find(prim.slot);
+    animated->second.samples.erase(*store_.Tokens().Find(attribute));
     if (animated->second.samples.empty()) {
         animated_.erase(animated);
     }

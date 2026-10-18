@@ -85,7 +85,8 @@ void CheckTargets(const Scene& scene, const Path& path, std::vector<SceneProblem
 
 std::vector<SceneProblem> ValidateScene(std::string_view json) {
     Scene scene;
-    std::vector<SceneProblem> problems = LoadSceneChecked(scene, json);
+    std::vector<SceneProblem> problems;
+    LoadScene(scene, json, {}, &problems);
     for (SceneProblem& problem : problems) {
         Suggest(scene, problem);
     }

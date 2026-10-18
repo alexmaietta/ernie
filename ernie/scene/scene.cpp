@@ -380,6 +380,9 @@ const std::vector<Token>& Scene::Apis(PrimId prim) const {
 
 void Scene::ApplyApi(PrimId prim, std::string_view api) {
     const ApiName parsed = ApiName::Parse(api);
+    if (HasApi(prim, api)) {
+        return;
+    }
     const std::vector<std::string_view>& allowed = parsed.schema->appliesTo;
     const SchemaDef* type = Schema(prim);
     if (!allowed.empty() && std::ranges::none_of(allowed, [&](std::string_view name) {

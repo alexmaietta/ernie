@@ -22,15 +22,16 @@ std::string RangeText(const AttributeMeta& meta) {
     if (lower && upper && !lower->exclusive && !upper->exclusive) {
         text = "from " + ToText(lower->value) + " to " + ToText(upper->value);
     } else {
+        std::vector<std::string> limits;
         if (lower) {
-            text = lower->exclusive ? "above " + ToText(lower->value)
-                                    : ToText(lower->value) + " or more";
+            limits.push_back(lower->exclusive ? "above " + ToText(lower->value)
+                                              : ToText(lower->value) + " or more");
         }
         if (upper) {
-            text += (text.empty() ? "" : " and ") + (upper->exclusive
-                                                         ? "below " + ToText(upper->value)
-                                                         : ToText(upper->value) + " or less");
+            limits.push_back(upper->exclusive ? "below " + ToText(upper->value)
+                                              : ToText(upper->value) + " or less");
         }
+        text = Join(limits, " and ");
     }
     if (meta.finite) {
         text = text.empty() ? "finite" : "finite and " + text;
@@ -59,11 +60,7 @@ std::string Problem(const AttributeDef& def, const Value& value) {
     const std::vector<std::string_view>& options = def.meta.options;
     if (const auto* token = value.Get<std::string>();
         token && !options.empty() && std::ranges::find(options, *token) == options.end()) {
-        std::string list;
-        for (const std::string_view option : options) {
-            list += (list.empty() ? "" : ", ") + std::string(option);
-        }
-        return "must be one of " + list + ", not " + *token;
+        return "must be one of " + Join(options, ", ") + ", not " + *token;
     }
     return {};
 }
@@ -86,11 +83,9 @@ std::string ArrayProblem(const AttributeDef& def, const Tensor& array) {
         if (std::ranges::find(ranks, static_cast<std::int64_t>(array.Rank())) != ranks.end()) {
             return {};
         }
-        std::string list;
-        for (const std::int64_t rank : ranks) {
-            list += (list.empty() ? "" : " or ") + std::to_string(rank);
-        }
-        return "must have " + list + " dimensions";
+        return "must have " +
+               Join(ranks, " or ", [](std::int64_t rank) { return std::to_string(rank); }) +
+               " dimensions";
     }
     const std::int64_t components = def.meta.components;
     const bool rows =
@@ -215,11 +210,7 @@ ApiName ApiName::Parse(std::string_view api) {
 }
 
 std::string ApiName::Attribute(std::string_view declared) const {
-    std::string name(declared);
-    if (const std::size_t at = name.find(kInstanceName); at != std::string::npos) {
-        name.replace(at, kInstanceName.size(), instance);
-    }
-    return name;
+    return Replace(declared, kInstanceName, instance);
 }
 
 std::string ApiName::ToString() const {

@@ -52,7 +52,8 @@ class Scene {
     std::vector<Path> Prims(std::string_view type = {}) const;
 
     /// @brief Applies an API schema, `"MaterialBindingAPI"`, or an instance of a multiple-apply
-    /// one, `"CollectionAPI:lights"`, adding its attributes at their fallbacks.
+    /// one, `"CollectionAPI:lights"`, adding its attributes at their fallbacks; one the prim has
+    /// already, built in or applied, is left as it is.
     /// @throws std::invalid_argument for an unknown API schema or a missing or extra instance.
     void ApplyApi(PrimId prim, std::string_view api);
     /// @brief Removes an applied API schema with the values of its attributes.
