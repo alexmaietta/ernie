@@ -22,7 +22,11 @@ ernie_add_test_suite(
         util/worker_pool_test.cpp
     LIBRARIES ernie_static ernie_json
 )
-ernie_add_test_suite(geometry SOURCES geometry/bounds_test.cpp LIBRARIES ernie_static)
+ernie_add_test_suite(
+    geometry
+    SOURCES geometry/bounds_test.cpp geometry/triangle_mesh_test.cpp
+    LIBRARIES ernie_static
+)
 ernie_add_test_suite(
     physics
     SOURCES
