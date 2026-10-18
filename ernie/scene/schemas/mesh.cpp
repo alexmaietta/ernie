@@ -40,14 +40,6 @@ std::optional<Box> BoundPoints(const Tensor& points, const Tensor& widths) {
     return box;
 }
 
-/// @return The authored `extent`, read while the points aren't on the host.
-Box AuthoredExtent(const std::vector<float>& extent) {
-    if (extent.size() != 6) {
-        return {};
-    }
-    return {{extent[0], extent[1], extent[2]}, {extent[3], extent[4], extent[5]}};
-}
-
 /// Meshes from their points; point clouds grown by their widths.
 template <bool kWidths>
 void PointBasedExtent(const ExtentRows& rows, RowRange range, std::span<Box> out) {

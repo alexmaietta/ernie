@@ -91,7 +91,11 @@ class Scene {
         extents_.Update(store_);
     }
     /// @return The world box of the prim and its visible descendants of the default purpose.
+    /// Prims with extents bound their own subtrees, as UsdGeomBBoxCache prunes at Boundables.
     Box WorldBounds(const Path& path) const;
+    /// @return The box of a prim's subtree in its parent's space, whatever its visibility: what a
+    /// point instancer places at each instance.
+    Box BoundsInParent(PrimId prim) const;
 
     PrimStore& Store() {
         return store_;
@@ -126,8 +130,9 @@ class Scene {
     ColumnType TypeForUndeclared(PrimId prim, std::string_view attribute, const Value& value) const;
     /// @return Whether the prim and its subtree are invisible or of a purpose bounds leave out.
     bool LeavesOutOfBounds(PrimId prim) const;
-    /// Adds the visible default-purpose extents of a subtree under `parent`'s world transform.
-    void AddTo(Box& bounds, PathId path, const glm::dmat4& parent) const;
+    /// Adds a subtree's extents under `parent`'s transform; with `visibleOnly`, only its visible
+    /// default-purpose prims'.
+    void AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const;
 
     PrimStore store_;
     Token invisible_ = 0;

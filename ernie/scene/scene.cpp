@@ -254,23 +254,31 @@ Box Scene::WorldBounds(const Path& path) const {
     const glm::dmat4 above =
         parent == kRootPath ? glm::dmat4(1.0) : WorldTransform(*store_.Find(parent));
     Box bounds;
-    AddTo(bounds, id, above);
+    AddTo(bounds, id, above, true);
     return bounds;
 }
 
-void Scene::AddTo(Box& bounds, PathId path, const glm::dmat4& parent) const {
+Box Scene::BoundsInParent(PrimId prim) const {
+    Box bounds;
+    AddTo(bounds, store_.PrimPath(prim), glm::dmat4(1.0), false);
+    return bounds;
+}
+
+void Scene::AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const {
     const PrimId prim = *store_.Find(path);
-    if (LeavesOutOfBounds(prim)) {
+    if (visibleOnly && LeavesOutOfBounds(prim)) {
         return;
     }
     const glm::dmat4 local = LocalTransform(prim);
     const glm::dmat4 world = ResetsXformStack(*this, prim) ? local : parent * local;
+    // A prim with an extent bounds what it is made of, so its children aren't added again.
     if (const std::optional<Box> extent = Extent(prim)) {
         bounds.Extend(extent->Transformed(world));
+        return;
     }
     store_.Paths().ForEachChild(path, [&](PathId child) {
         if (store_.Find(child)) {
-            AddTo(bounds, child, world);
+            AddTo(bounds, child, world, visibleOnly);
         }
     });
 }

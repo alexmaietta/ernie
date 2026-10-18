@@ -17,6 +17,7 @@ inline constexpr std::string_view kCapsule = "Capsule";
 inline constexpr std::string_view kPlane = "Plane";
 inline constexpr std::string_view kMesh = "Mesh";
 inline constexpr std::string_view kPoints = "Points";
+inline constexpr std::string_view kPointInstancer = "PointInstancer";
 inline constexpr std::string_view kVolume = "Volume";
 inline constexpr std::string_view kOpenVdbAsset = "OpenVDBAsset";
 inline constexpr std::string_view kNanoVdbField = "NanoVDBField";

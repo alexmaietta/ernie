@@ -84,6 +84,15 @@
 
 namespace ernie {
 
+/// @return A Boundable's authored `extent` (min x, y, z, max x, y, z), which extent functions
+/// read while the data they bound isn't on the host; empty when unset.
+inline Box AuthoredExtent(const std::vector<float>& extent) {
+    if (extent.size() != 6) {
+        return {};
+    }
+    return {{extent[0], extent[1], extent[2]}, {extent[3], extent[4], extent[5]}};
+}
+
 enum class Axis { X, Y, Z };
 
 template <> struct ChoiceTokens<Axis> {
