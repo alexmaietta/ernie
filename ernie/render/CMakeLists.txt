@@ -2,13 +2,13 @@
 add_library(
     ernie_render
     OBJECT
-    camera_pass.cpp
     device_scene.cpp
     geometry.cpp
     instances.cpp
     prim_rows.cpp
     renderer.cpp
     rt/bottom_levels.cpp
+    rt/camera_pass.cpp
     rt/ray_tracer.cpp
     rt/top_levels.cpp
     scene_columns.cpp

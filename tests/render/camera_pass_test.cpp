@@ -3,8 +3,8 @@
 /// @brief Tests of the camera pass under validation: a sphere ahead of a pinhole camera, seen in
 /// each output where it should be, near the origin and a million kilometres from it.
 #include "ernie/device/bindless.h"
-#include "ernie/render/camera_pass.h"
 #include "ernie/render/device_scene.h"
+#include "ernie/render/rt/camera_pass.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/device/common.h"

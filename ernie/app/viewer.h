@@ -7,8 +7,8 @@
 #include "ernie/app/imgui_backend.h"
 #include "ernie/app/ui.h"
 #include "ernie/device/bindless.h"
-#include "ernie/render/camera_pass.h"
 #include "ernie/render/device_scene.h"
+#include "ernie/render/rt/camera_pass.h"
 
 #include <glm/vec2.hpp>
 

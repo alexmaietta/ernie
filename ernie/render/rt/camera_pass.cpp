@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file camera_pass.cpp
 /// @brief Tracing pinhole cameras as a frame-graph pass.
-#include "ernie/render/camera_pass.h"
+#include "ernie/render/rt/camera_pass.h"
 
 #include "ernie/device/vulkan.h"
 #include "ernie/render/rt/ray_tracer.h"

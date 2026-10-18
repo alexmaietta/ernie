@@ -8,8 +8,8 @@
 
 #include "ernie/device/bindless.h"
 #include "ernie/device/context.h"
-#include "ernie/render/camera_pass.h"
 #include "ernie/render/device_scene.h"
+#include "ernie/render/rt/camera_pass.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/tensor.h"
 
