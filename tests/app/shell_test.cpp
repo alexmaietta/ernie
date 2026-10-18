@@ -2,13 +2,14 @@
 /// @file shell_test.cpp
 /// @brief Tests of the viewer's UI drawn without a window: the layout, menus, shortcuts, the
 /// Stage panel's search and the camera's controls.
-#include "ernie/app/panels.h"
+#include "ernie/app/imgui.h"
+#include "ernie/scene/scene.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/xform.h"
 
-#include "tests/app/ui_frame.h"
-
 #include <gtest/gtest.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include <cmath>
 
@@ -16,7 +17,34 @@ namespace ernie {
 namespace {
 
 using app::Shell;
-using test::UiFrames;
+
+/// An ImGui context that draws the shell's frames at 1280 x 720 without a window or a device, and
+/// takes simulated input.
+class UiFrames {
+  public:
+    UiFrames() : session_(app::Theme()) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = {1280.0f, 720.0f};
+        // Textures ImGui asks for are left unmade, as no renderer draws these frames.
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    }
+
+    void Draw(Shell& shell) const {
+        ImGui::GetIO().DeltaTime = 1.0f / 60.0f;
+        ImGui::NewFrame();
+        shell.Draw();
+        ImGui::Render();
+    }
+
+    /// @return Whether the window titled `title` was drawn last frame.
+    static bool Drawn(const char* title) {
+        const ImGuiWindow* window = ImGui::FindWindowByName(title);
+        return window != nullptr && window->Active;
+    }
+
+  private:
+    app::ImGuiSession session_;
+};
 
 /// A sphere of radius 1 at (10, 0, 0) under /World, and a lamp beside it.
 void Build(Scene& scene) {

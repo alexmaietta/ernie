@@ -2,16 +2,11 @@
 /// @file viewer_test.cpp
 /// @brief Tests of the viewer on a device: frames drawn offscreen, and in a window when there is a
 /// display.
-#include "ernie/app/offscreen_presenter.h"
 #include "ernie/app/viewer.h"
 #include "ernie/device/buffer.h"
 #include "ernie/scene/scene.h"
 
 #include "tests/device/common.h"
-
-#if ERNIE_VIEWER_WINDOW
-#include "ernie/app/window.h"
-#endif
 
 #include <gtest/gtest.h>
 

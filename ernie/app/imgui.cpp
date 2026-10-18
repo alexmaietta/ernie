@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file imgui_renderer.cpp
-/// @brief Setting up ImGui's Vulkan backend and recording its draws.
-#include "ernie/app/imgui_renderer.h"
+/// @file imgui.cpp
+/// @brief Creating the ImGui context, setting up its Vulkan backend and recording its draws.
+#include "ernie/app/imgui.h"
 
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 
-#include <algorithm>
-
 namespace ernie::app {
 namespace {
 
-void TransitionImage(VkCommandBuffer commands, VkImage image, VkImageLayout from, VkImageLayout to,
-                     VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
-                     VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+void Transition(VkCommandBuffer commands, VkImage image, VkImageLayout from, VkImageLayout to,
+                VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+                VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
     const VkImageMemoryBarrier2 barrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = srcStage,
@@ -34,6 +32,22 @@ void TransitionImage(VkCommandBuffer commands, VkImage image, VkImageLayout from
 
 }  // namespace
 
+ImGuiSession::ImGuiSession(const Theme& theme) {
+    IMGUI_CHECKVERSION();
+    context_ = ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    // Layouts are the viewer's to save; nothing is written behind its back.
+    io.IniFilename = nullptr;
+    io.LogFilename = nullptr;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_NavEnableKeyboard;
+    io.Fonts->AddFontDefaultVector();
+    ApplyTheme(theme);
+}
+
+ImGuiSession::~ImGuiSession() {
+    ImGui::DestroyContext(context_);
+}
+
 ImGuiRenderer::ImGuiRenderer(DeviceContext& context, VkFormat format, std::uint32_t imageCount)
     : context_(context) {
     ImGui_ImplVulkan_InitInfo info{};
@@ -44,8 +58,8 @@ ImGuiRenderer::ImGuiRenderer(DeviceContext& context, VkFormat format, std::uint3
     info.QueueFamily = context.Main().Family();
     info.Queue = context.Main().Handle();
     info.DescriptorPoolSize = 64;
-    info.MinImageCount = std::max(imageCount, 2u);
-    info.ImageCount = std::max(imageCount, 2u);
+    info.MinImageCount = imageCount;
+    info.ImageCount = imageCount;
     info.UseDynamicRendering = true;
     info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     info.PipelineInfoMain.PipelineRenderingCreateInfo = {
@@ -81,10 +95,10 @@ void ImGuiRenderer::UpdateTextures(ImDrawData& data) {
 void ImGuiRenderer::Record(VkCommandBuffer commands, ImDrawData& data, const FrameTarget& target,
                            const glm::vec4& clear) {
     // Whatever the image held is replaced; earlier work on it, a previous frame's, finishes first.
-    TransitionImage(commands, target.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT);
+    Transition(commands, target.image, VK_IMAGE_LAYOUT_UNDEFINED,
+               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+               VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+               VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT);
     const VkRenderingAttachmentInfo attachment{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = target.view,
@@ -100,10 +114,10 @@ void ImGuiRenderer::Record(VkCommandBuffer commands, ImDrawData& data, const Fra
     vkCmdBeginRendering(commands, &rendering);
     ImGui_ImplVulkan_RenderDrawData(&data, commands);
     vkCmdEndRendering(commands);
-    TransitionImage(commands, target.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                    target.finalLayout, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    kAnyAccess);
+    Transition(commands, target.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, target.finalLayout,
+               VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+               VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+               kAnyAccess);
 }
 
 }  // namespace ernie::app

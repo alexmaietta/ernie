@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file orbit_camera_test.cpp
 /// @brief Tests of the viewer's orbit camera.
-#include "ernie/app/orbit_camera.h"
+#include "ernie/app/ui.h"
 
 #include <gtest/gtest.h>
 

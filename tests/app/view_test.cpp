@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file view_test.cpp
 /// @brief Tests of the viewer's command line.
-#include "ernie/app/view.h"
+#include "ernie/app/viewer.h"
 
 #include <gtest/gtest.h>
 

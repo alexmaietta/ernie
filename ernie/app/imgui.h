@@ -1,16 +1,32 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file imgui_renderer.h
-/// @brief Drawing ImGui's draw data with Vulkan.
+/// @file imgui.h
+/// @brief Dear ImGui's plumbing: its context as the viewer sets it up, and its Vulkan backend.
 #pragma once
 
-#include "ernie/app/presenter.h"
+#include "ernie/app/ui.h"
 #include "ernie/device/context.h"
 
 #include <glm/vec4.hpp>
 
 struct ImDrawData;
+struct ImGuiContext;
 
 namespace ernie::app {
+
+struct Theme;
+
+/// @brief Makes and destroys an ImGui context with docking and keyboard navigation, the theme
+/// applied and no settings file, current while it lives. One at a time.
+class ImGuiSession {
+  public:
+    explicit ImGuiSession(const Theme& theme);
+    ~ImGuiSession();
+    ImGuiSession(const ImGuiSession&) = delete;
+    ImGuiSession& operator=(const ImGuiSession&) = delete;
+
+  private:
+    ImGuiContext* context_;
+};
 
 /// @brief ImGui's Vulkan backend on a device context's main queue, drawing into images of one
 /// format with dynamic rendering. Needs a current ImGui context for its whole life.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file main.cpp
 /// @brief The ernie program: the viewer, and the schema and scene tools.
-#include "ernie/app/view.h"
+#include "ernie/app/viewer.h"
 #include "ernie/device/device.h"
 #include "ernie/scene/reference.h"
 #include "ernie/util/file.h"

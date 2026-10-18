@@ -3,37 +3,13 @@ include("${PROJECT_SOURCE_DIR}/cmake/third_party/glfw.cmake")
 include("${PROJECT_SOURCE_DIR}/cmake/third_party/dear_imgui.cmake")
 
 # The viewer: its window, panels and frame loop, a library so tests drive it without a window.
-add_library(
-    ernie_viewer
-    STATIC
-    device_panel.cpp
-    dock_layout.cpp
-    help_windows.cpp
-    hud.cpp
-    imgui_session.cpp
-    imgui_renderer.cpp
-    log_panel.cpp
-    menu.cpp
-    menu_bar.cpp
-    message_log.cpp
-    navigation.cpp
-    offscreen_presenter.cpp
-    orbit_camera.cpp
-    profiler_panel.cpp
-    shell.cpp
-    stage_panel.cpp
-    theme.cpp
-    view.cpp
-    viewer.cpp
-    widgets.cpp
-)
+add_library(ernie_viewer STATIC imgui.cpp ui.cpp viewer.cpp)
 target_link_libraries(
     ernie_viewer
     PUBLIC ernie_static ernie_imgui ernie_volk ernie_vma
     PRIVATE ernie_build_options
 )
 if(TARGET ernie_glfw)
-    target_sources(ernie_viewer PRIVATE swapchain.cpp window.cpp window_presenter.cpp)
     target_link_libraries(ernie_viewer PRIVATE ernie_imgui_glfw)
     target_compile_definitions(ernie_viewer PUBLIC ERNIE_VIEWER_WINDOW=1)
 endif()

@@ -1,31 +1,25 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file viewer.h
 /// @brief The interactive viewer: a window, or an offscreen image, showing the shell's panels
-/// around the viewport.
+/// around the viewport, and the command line that opens it.
 #pragma once
 
-#include "ernie/app/shell.h"
-#include "ernie/device/queue.h"
+#include "ernie/app/imgui.h"
+#include "ernie/app/ui.h"
 
 #include <glm/vec2.hpp>
 
 #include <chrono>
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <memory>
+#include <optional>
+#include <span>
 #include <string>
-
-namespace ernie {
-class DeviceContext;
-class Scene;
-}  // namespace ernie
+#include <string_view>
 
 namespace ernie::app {
-
-class ImGuiRenderer;
-class ImGuiSession;
-class OffscreenPresenter;
-class Presenter;
 
 struct ViewerOptions {
     std::string title = "Ernie";
@@ -59,9 +53,6 @@ class Viewer {
 
     /// @brief Draws frames until the window closes, the user quits or the frame count is reached.
     void Run();
-    /// @brief Draws and presents one frame.
-    /// @return Whether to keep going.
-    bool Step();
 
     std::uint64_t Frames() const {
         return frames_;
@@ -73,12 +64,17 @@ class Viewer {
         return *context_;
     }
     /// @return The offscreen presenter, or null when presenting to a window.
-    const OffscreenPresenter* Offscreen() const;
+    const OffscreenPresenter* Offscreen() const {
+        return dynamic_cast<const OffscreenPresenter*>(presenter_.get());
+    }
 
   private:
+    /// @return Whether to keep going.
+    bool Step();
+
     ViewerOptions options_;
     // Made in this order, destroyed in reverse.
-    std::unique_ptr<ImGuiSession> imgui_;
+    ImGuiSession imgui_;
     std::unique_ptr<DeviceContext> context_;
     std::unique_ptr<Presenter> presenter_;
     std::unique_ptr<ImGuiRenderer> renderer_;
@@ -88,5 +84,23 @@ class Viewer {
     std::uint64_t frames_ = 0;
     std::chrono::steady_clock::time_point last_ = std::chrono::steady_clock::now();
 };
+
+/// @brief What the viewer's command line, `ernie [view] [SCENE.json] [options]`, asks for.
+struct ViewCommand {
+    /// The scene file to open; none for an empty scene.
+    std::optional<std::filesystem::path> scene;
+    ViewerOptions viewer;
+};
+
+/// @return The options the viewer's command line usage lists.
+std::string_view ViewUsage();
+
+/// @brief Reads the viewer's arguments: an optional scene file and options.
+/// @throws std::invalid_argument for an unknown option, a missing value or a second scene.
+ViewCommand ParseViewCommand(std::span<const std::string_view> arguments);
+
+/// @brief Opens the viewer on the command's scene and runs it until closed.
+/// @return The process's exit status.
+int RunView(const ViewCommand& command);
 
 }  // namespace ernie::app

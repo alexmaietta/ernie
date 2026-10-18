@@ -1,0 +1,540 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/// @file ui.h
+/// @brief The viewer's UI, in sections: the panels and what they share; the theme and widgets;
+/// the orbit camera; the shell, which draws the menu bar, the docked panels around the viewport
+/// and the heads-up display; and the presenters frames go to. The shell draws ImGui windows only,
+/// so it runs without a device or a window.
+#pragma once
+
+#include "ernie/device/image.h"
+#include "ernie/device/queue.h"
+#include "ernie/geometry/bounds.h"
+#include "ernie/scene/path.h"
+
+#include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+#include <imgui.h>
+
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <initializer_list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+struct GLFWwindow;
+
+namespace ernie {
+class DeviceContext;
+class Scene;
+}  // namespace ernie
+
+namespace ernie::app {
+
+// Panels
+
+struct Theme;
+
+/// @brief Where a panel docks in the default layout.
+enum class Dock : std::uint8_t {
+    Left,
+    /// The right column's upper part; all of it when nothing docks below.
+    Right,
+    /// The right column's lower part.
+    RightLower,
+    Bottom,
+    /// Not docked: a free window.
+    Floating,
+};
+
+/// @brief A dockable window. Panels take what they show and edit in their constructors, and draw
+/// with Dear ImGui in `Draw`, between the window's `Begin` and `End`.
+class Panel {
+  public:
+    /// @param title Its title, also its id in saved layouts.
+    Panel(std::string title, Dock dock, bool visible = true)
+        : title_(std::move(title)), dock_(dock), visible_(visible) {}
+    virtual ~Panel() = default;
+    Panel(const Panel&) = delete;
+    Panel& operator=(const Panel&) = delete;
+
+    const std::string& Title() const {
+        return title_;
+    }
+    /// @return Where it docks in the default layout; a saved layout overrides it.
+    Dock DefaultDock() const {
+        return dock_;
+    }
+    bool Visible() const {
+        return visible_;
+    }
+    void SetVisible(bool visible) {
+        visible_ = visible;
+    }
+
+    virtual void Draw() = 0;
+    /// @brief Called on frames it is not drawn: closed, or a tab behind another.
+    virtual void Undrawn() {}
+
+  private:
+    std::string title_;
+    Dock dock_;
+    bool visible_;
+};
+
+/// @brief Selected prims in the order they were picked.
+class Selection {
+  public:
+    const std::vector<Path>& Paths() const {
+        return paths_;
+    }
+    bool Empty() const {
+        return paths_.empty();
+    }
+    bool Contains(const Path& path) const {
+        return std::ranges::find(paths_, path) != paths_.end();
+    }
+    /// @brief Selects `path` alone.
+    void Set(const Path& path) {
+        paths_ = {path};
+    }
+    /// @brief Adds `path`, or removes it when selected.
+    void Toggle(const Path& path) {
+        if (const auto found = std::ranges::find(paths_, path); found != paths_.end()) {
+            paths_.erase(found);
+        } else {
+            paths_.push_back(path);
+        }
+    }
+    void Clear() {
+        paths_.clear();
+    }
+
+  private:
+    std::vector<Path> paths_;
+};
+
+enum class Severity : std::uint8_t { Info, Warning, Error };
+
+struct Message {
+    /// Seconds since the log was made.
+    double time = 0.0;
+    Severity severity = Severity::Info;
+    std::string text;
+};
+
+/// @brief The viewer's newest messages, oldest first, up to a limit, as the Log panel lists them.
+class MessageLog {
+  public:
+    explicit MessageLog(std::size_t limit = 10'000) : limit_(limit) {}
+
+    void Add(Severity severity, std::string text);
+    void Info(std::string text) {
+        Add(Severity::Info, std::move(text));
+    }
+    void Error(std::string text) {
+        Add(Severity::Error, std::move(text));
+    }
+    void Clear() {
+        messages_.clear();
+    }
+    const std::deque<Message>& Messages() const {
+        return messages_;
+    }
+
+  private:
+    std::size_t limit_;
+    std::chrono::steady_clock::time_point start_ = std::chrono::steady_clock::now();
+    std::deque<Message> messages_;
+};
+
+/// @return The Log panel over `log`, filtered by severity and text.
+std::unique_ptr<Panel> MakeLogPanel(MessageLog& log, const Theme& theme);
+
+/// @return The Stage panel: the scene's prims as a tree, picking the selection.
+std::unique_ptr<Panel> MakeStagePanel(const Scene& scene, Selection& selection);
+
+/// @return The prims whose path contains `filter`, ignoring case, and their ancestors: what the
+/// Stage panel lists for it. Empty for an empty filter, which lists everything.
+std::unordered_set<Path> StageMatches(const Scene& scene, std::string_view filter);
+
+/// @return The Devices panel: the device in use, or none, and every Vulkan device installed.
+std::unique_ptr<Panel> MakeDevicePanel(const DeviceContext* device);
+
+/// @return The Profiler panel over Ernie's zone profiler, saving exports to the working directory
+/// and saying so in `log`.
+/// @param alwaysRecord Whether zones record while the panel is hidden too.
+std::unique_ptr<Panel> MakeProfilerPanel(MessageLog& log, bool alwaysRecord);
+
+/// @brief Draws the Keyboard and Mouse window while `open`; its close button clears it.
+void DrawControlsWindow(bool& open);
+
+/// @brief Draws the About Ernie window while `open`; its close button clears it.
+/// @param device The name of the device in use; empty for none.
+void DrawAboutWindow(bool& open, std::string_view device);
+
+// Theme and widgets
+
+/// @brief Colours and metrics of the viewer's UI: a classic scientific desktop look, after PANGU
+/// v7's GUI, with grey-green windows, white sunken fields, one-pixel edges, square corners and a
+/// navy accent. Colours are sRGB-encoded RGBA.
+struct Theme {
+    /// Tab bar, menu bar, behind the docks.
+    glm::vec4 background{0.788f, 0.800f, 0.773f, 1.0f};
+    /// Panel bodies.
+    glm::vec4 panel{0.831f, 0.843f, 0.816f, 1.0f};
+    /// Section bars, table headers.
+    glm::vec4 header{0.776f, 0.788f, 0.761f, 1.0f};
+    /// Input fields, combos.
+    glm::vec4 field{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::vec4 fieldHovered{0.957f, 0.965f, 0.945f, 1.0f};
+    glm::vec4 button{0.863f, 0.875f, 0.847f, 1.0f};
+    /// A pressed or chosen button.
+    glm::vec4 buttonLit{0.698f, 0.761f, 0.835f, 1.0f};
+    /// Lines between areas.
+    glm::vec4 separator{0.667f, 0.678f, 0.651f, 1.0f};
+    /// Frames', tabs' and popups' edges.
+    glm::vec4 border{0.553f, 0.565f, 0.537f, 1.0f};
+    glm::vec4 text{0.0f, 0.0f, 0.0f, 1.0f};
+    /// Labels, types and disabled text.
+    glm::vec4 textMuted{0.333f, 0.345f, 0.325f, 1.0f};
+    /// Selected and hovered rows.
+    glm::vec4 selection{0.627f, 0.741f, 0.863f, 1.0f};
+    /// Checked menu items, links, active tools.
+    glm::vec4 accent{0.122f, 0.290f, 0.541f, 1.0f};
+    glm::vec4 warning{0.910f, 0.698f, 0.235f, 1.0f};
+    glm::vec4 error{0.886f, 0.341f, 0.318f, 1.0f};
+    /// Menus and popups.
+    glm::vec4 popup{0.831f, 0.843f, 0.816f, 1.0f};
+    glm::vec4 checkBox{1.0f, 1.0f, 1.0f, 1.0f};
+    glm::vec4 checkMark{0.0f, 0.0f, 0.0f, 1.0f};
+    /// The viewport's colour where nothing is rendered.
+    glm::vec4 viewport{0.18f, 0.19f, 0.20f, 1.0f};
+    /// The heads-up display's text, over the viewport.
+    glm::vec4 hud{0.902f, 0.910f, 0.894f, 1.0f};
+    /// Text size, in pixels at a content scale of 1.
+    float fontSize = 14.0f;
+    /// Corner radius of frames, tabs and popups, in pixels.
+    float rounding = 0.0f;
+    /// Fields' and buttons' edge width, in pixels at a content scale of 1.
+    float frameBorder = 1.0f;
+    /// Padding inside frames, in pixels.
+    glm::vec2 framePadding{6.0f, 3.0f};
+    /// Spacing between items, in pixels.
+    glm::vec2 itemSpacing{6.0f, 4.0f};
+};
+
+/// @brief Resets the current ImGui style and writes a theme into it.
+/// @param contentScale Scales sizes and fonts, for high-density displays.
+void ApplyTheme(const Theme& theme, float contentScale = 1.0f);
+
+inline ImVec4 ToImVec4(const glm::vec4& colour) {
+    return {colour.r, colour.g, colour.b, colour.a};
+}
+
+/// @brief Draws a label and a value on one line, the value muted and wrapped to the window.
+void LabelValue(std::string_view label, std::string_view value);
+
+/// @brief Fills the next cells of the current table row with `texts`.
+void TableTexts(std::initializer_list<std::string_view> texts);
+
+/// @return Bytes as a short size with a binary unit, such as "1.5 GiB".
+std::string FormatBytes(std::uint64_t bytes);
+
+// Orbit camera
+
+/// @brief The viewer's camera: an eye orbiting a target point in a z-up world, in double
+/// precision as the scene's transforms are, so it orbits as smoothly far from the origin as at it.
+/// Yaw turns about +z (0 looks along +y, positive turns clockwise seen from above); pitch is the
+/// eye's elevation above the target's horizontal plane.
+struct OrbitCamera {
+    glm::dvec3 target{0.0};
+    /// Radians.
+    double yaw = 0.0;
+    /// Radians, within [kMinPitch, kMaxPitch].
+    double pitch = 0.6;
+    /// Metres from the eye to the target, within [kMinDistance, kMaxDistance].
+    double distance = 10.0;
+    /// Radians.
+    double verticalFov = 0.785398;
+
+    /// Short of straight down and up, where the view's up vector degenerates.
+    static constexpr double kMinPitch = -1.55;
+    static constexpr double kMaxPitch = 1.55;
+    /// A millimetre to about 100,000 light-years.
+    static constexpr double kMinDistance = 1e-3;
+    static constexpr double kMaxDistance = 1e21;
+
+    glm::dvec3 Eye() const;
+    /// @return The camera-to-world transform of the eye looking at the target, +z up.
+    glm::dmat4 Transform() const;
+
+    /// @brief Turns by yaw and pitch radians, clamping pitch.
+    void Orbit(double deltaYaw, double deltaPitch);
+    /// @brief Moves the target parallel to the ground by a drag of (`dx`, `dy`) pixels in a view
+    /// `height` pixels tall, so the ground at the target follows the cursor.
+    void Pan(double dx, double dy, double height);
+    /// @brief Moves the target across the view: sideways as `Pan`, and up and down along +z.
+    void PanVertical(double dx, double dy, double height);
+    /// @brief Moves closer by `steps` scroll steps; negative moves away.
+    void Zoom(double steps);
+    /// @brief Aims at the box's centre from the current direction, at a distance where its
+    /// bounding sphere fits the vertical field of view with a small margin. An empty box leaves
+    /// the camera as it is.
+    void Frame(const Box& box);
+};
+
+// Shell
+
+/// @brief The default layout's dock sizes, as fractions of the space the docks placed before them
+/// leave (left, then the right column, then the bottom).
+struct DockSizes {
+    float left = 0.20f;
+    float right = 0.26f;
+    /// `Dock::RightLower`'s share of the right column's height.
+    float rightLower = 0.45f;
+    float bottom = 0.25f;
+};
+
+struct ShellOptions {
+    Theme theme;
+    DockSizes docks;
+    /// Record profiler zones every frame, not only while the Profiler panel shows.
+    bool profile = false;
+};
+
+/// @brief The panels and controls over a scene. Panels read the scene; its owner keeps it updated
+/// (`Scene::Update`) between frames.
+///
+/// Panels dock around the dock space's central node, which the viewport shows through. The default
+/// layout is built on the first frame and after Window > Reset Layout; panels shown later dock
+/// where they ask. Over the viewport, a left drag orbits the camera, a right drag pans along the
+/// ground, a middle drag pans across the view and the wheel zooms; a drag that starts over the
+/// viewport keeps control until its button is released.
+class Shell {
+  public:
+    /// @param device The device in use, for the Devices panel; null for none.
+    Shell(const Scene& scene, const DeviceContext* device, const ShellOptions& options = {});
+
+    /// @brief Draws this frame's UI, between `ImGui::NewFrame` and `ImGui::Render`.
+    void Draw();
+    /// @return Whether the viewer should keep running: false once the user quits.
+    bool Open() const {
+        return open_;
+    }
+    /// @brief Aims the camera at the selection, or at the whole scene when nothing is selected.
+    void Frame();
+
+    /// @return The viewport's position and size on the screen: the dock space's central node.
+    std::pair<ImVec2, ImVec2> Viewport() const;
+    /// @return The panel titled `title`, or null.
+    Panel* FindPanel(std::string_view title) const;
+    MessageLog& Log() {
+        return log_;
+    }
+    Selection& Selected() {
+        return selection_;
+    }
+    OrbitCamera& Camera() {
+        return camera_;
+    }
+    const Theme& GetTheme() const {
+        return theme_;
+    }
+
+  private:
+    /// @brief What the menus ask for this frame, and the windows they show.
+    struct MenuChoices {
+        bool quit = false;
+        bool resetLayout = false;
+        bool frame = false;
+        bool clearSelection = false;
+        bool controlsShown = false;
+        bool aboutShown = false;
+        bool demoShown = false;
+    };
+
+    void DrawMenuBar();
+    void DrawDockSpace();
+    void BuildLayout();
+    void DrawPanels();
+    void Navigate();
+    void DrawHud();
+    void Apply();
+
+    const Scene& scene_;
+    const DeviceContext* device_;
+    Theme theme_;
+    DockSizes sizes_;
+    MessageLog log_;
+    Selection selection_;
+    OrbitCamera camera_;
+    MenuChoices menu_;
+    std::vector<std::unique_ptr<Panel>> panels_;
+    /// The default layout's nodes; empty until it is built.
+    std::map<Dock, ImGuiID> docks_;
+    bool layoutBuilt_ = false;
+    /// Whether a mouse drag that started over the viewport moves the camera.
+    bool dragging_ = false;
+    /// The heads-up display's lines, refreshed a few times a second so they stay readable.
+    std::string hud_;
+    double hudRefreshed_ = -1.0;
+    bool open_ = true;
+};
+
+// Presenters
+
+/// @brief An image to draw one frame into, and the layout to leave it in.
+struct FrameTarget {
+    VkImage image = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    glm::uvec2 extent{0};
+    VkImageLayout finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+};
+
+/// @brief Supplies the images frames are drawn into and the UI's platform input, then shows
+/// them.
+class Presenter {
+  public:
+    virtual ~Presenter() = default;
+
+    virtual VkFormat Format() const = 0;
+    /// @return How many images it cycles through, at least 2.
+    virtual std::uint32_t ImageCount() const = 0;
+    /// @brief Takes the window system's events.
+    virtual void PollEvents() = 0;
+    /// @return Whether the user asked to close it.
+    virtual bool CloseRequested() const = 0;
+    /// @brief Starts the UI frame's platform part: display size, time step and input.
+    virtual void BeginUiFrame(double delta) = 0;
+    /// @return The next image, or none when there is nothing to draw into, as while minimised.
+    virtual std::optional<FrameTarget> Acquire() = 0;
+    /// @brief Shows the image last acquired once `drawn` is done.
+    virtual void Present(Ticket drawn) = 0;
+};
+
+/// @brief Draws every frame into one image of a fixed size, for tests and headless runs; the UI
+/// gets no input.
+class OffscreenPresenter final : public Presenter {
+  public:
+    OffscreenPresenter(DeviceContext& context, glm::uvec2 extent);
+
+    VkFormat Format() const override {
+        return ToVkFormat(image_.Description().format);
+    }
+    std::uint32_t ImageCount() const override {
+        return 2;
+    }
+    void PollEvents() override {}
+    bool CloseRequested() const override {
+        return false;
+    }
+    void BeginUiFrame(double delta) override;
+    std::optional<FrameTarget> Acquire() override {
+        // The previous frame's drawing is ordered before this one's on the same queue.
+        return FrameTarget{image_.Handle(), image_.View(), glm::uvec2(image_.Description().extent),
+                           VK_IMAGE_LAYOUT_GENERAL};
+    }
+    void Present(Ticket drawn) override {
+        drawn_ = drawn;
+    }
+
+    /// @return The image frames are drawn into, in the general layout.
+    const DeviceImage& Image() const {
+        return image_;
+    }
+    /// @return The ticket of the last frame drawn.
+    Ticket Drawn() const {
+        return drawn_;
+    }
+
+  private:
+    DeviceImage image_;
+    Ticket drawn_;
+};
+
+#if ERNIE_VIEWER_WINDOW
+/// @brief A resizable desktop window through GLFW, with no graphics API of its own. GLFW is
+/// initialised by the first window and terminated with the last.
+class Window {
+  public:
+    /// @throws std::runtime_error when there is no display or the window cannot be made.
+    Window(const std::string& title, glm::uvec2 size);
+    ~Window();
+    Window(const Window&) = delete;
+    Window& operator=(const Window&) = delete;
+
+    /// @return Whether a window could open: GLFW initialises, finding a display, and Vulkan can
+    /// present to it.
+    static bool Available();
+    /// @return The instance extensions presenting to a window needs.
+    static std::vector<std::string> InstanceExtensions();
+
+    /// @return The drawable size in pixels; zero while minimised.
+    glm::uvec2 FramebufferSize() const;
+    /// @return The display's scale over 96 dpi, at least 1.
+    float ContentScale() const;
+    GLFWwindow* Handle() const {
+        return window_;
+    }
+
+  private:
+    GLFWwindow* window_ = nullptr;
+};
+
+/// @brief Presents to a swapchain of the window's surface, made again whenever the window's size
+/// changes, and feeds the window's input to ImGui, whose context must outlive it. The host waits
+/// for each acquired image and each drawn frame, so presenting needs no semaphores beside the
+/// main queue's timeline.
+class WindowPresenter final : public Presenter {
+  public:
+    /// @param window Made before the device context, which needs its instance extensions.
+    /// @throws DeviceError when the device cannot present to the window.
+    WindowPresenter(DeviceContext& context, std::unique_ptr<Window> window, bool vsync);
+    ~WindowPresenter() override;
+
+    VkFormat Format() const override {
+        return format_.format;
+    }
+    std::uint32_t ImageCount() const override {
+        return static_cast<std::uint32_t>(images_.size());
+    }
+    void PollEvents() override;
+    bool CloseRequested() const override;
+    void BeginUiFrame(double delta) override;
+    std::optional<FrameTarget> Acquire() override;
+    void Present(Ticket drawn) override;
+
+  private:
+    /// @brief Makes the swapchain, again when there is one, at `extent`.
+    void CreateSwapchain(glm::uvec2 extent);
+    void DestroyViews();
+
+    DeviceContext& context_;
+    std::unique_ptr<Window> window_;
+    VkSurfaceKHR surface_;
+    bool vsync_;
+    VkSurfaceFormatKHR format_{};
+    VkExtent2D extent_{};
+    VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+    std::vector<VkImage> images_;
+    std::vector<VkImageView> views_;
+    VkFence acquiredFence_ = VK_NULL_HANDLE;
+    /// The image acquired and not yet presented.
+    std::optional<std::uint32_t> acquired_;
+    /// Whether the swapchain no longer matches the surface.
+    bool stale_ = false;
+};
+#endif
+
+}  // namespace ernie::app
