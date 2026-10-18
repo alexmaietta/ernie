@@ -22,7 +22,8 @@ namespace ernie {
 
 /// Triangles, or the unit shapes procedural primitives stand for: a unit sphere and cube, a unit
 /// cylinder and cone about +z with z in [-1, 1] (the cone's apex at +1), a capsule of radius 1
-/// about a segment of half-length `Geometry::halfLength`, and a unit square in z = 0 facing +z.
+/// about a segment of half-length `Geometry::halfLength`, and a unit square in z = 0 facing +z
+/// (planes, and ground planes 200 km across).
 enum class GeometryKind : std::uint8_t { Triangles, Sphere, Cube, Cylinder, Cone, Capsule, Plane };
 
 using GeometryId = std::uint32_t;

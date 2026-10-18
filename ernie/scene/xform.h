@@ -36,6 +36,14 @@ struct XformOps {
     std::optional<glm::dvec3> scale;
 };
 
+/// @return A camera's transform at `eye` looking at `target`, `up` upward in the view: cameras
+/// look down their -z with +y up, as USD's do.
+glm::dmat4 LookAtTransform(const glm::dvec3& eye, const glm::dvec3& target,
+                           const glm::dvec3& up = glm::dvec3(0.0, 0.0, 1.0));
+/// @return A distant light's transform shining from `towardLight`, the direction to its source:
+/// distant lights shine down their -z, so their +z is turned to it.
+glm::dmat4 DistantLightTransform(const glm::dvec3& towardLight);
+
 /// @brief Authors a prim's ops and their order, keeping a reset stack.
 /// @throws std::invalid_argument if there is no prim at `path`, or `xform` has both rotate and
 /// orient.

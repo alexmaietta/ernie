@@ -218,6 +218,19 @@ void SetXform(Scene& scene, const Path& path, const XformOps& xform) {
     scene.Set(prim, tokens::kXformOpOrder, std::move(order));
 }
 
+glm::dmat4 LookAtTransform(const glm::dvec3& eye, const glm::dvec3& target, const glm::dvec3& up) {
+    return glm::inverse(glm::lookAtRH(eye, target, up));
+}
+
+glm::dmat4 DistantLightTransform(const glm::dvec3& towardLight) {
+    const glm::dvec3 z = glm::normalize(towardLight);
+    // Any axis not along z completes the frame; the light is the same turned about it.
+    const glm::dvec3 helper = std::abs(z.z) < 0.9 ? glm::dvec3(0, 0, 1) : glm::dvec3(1, 0, 0);
+    const glm::dvec3 x = glm::normalize(glm::cross(helper, z));
+    const glm::dvec3 y = glm::cross(z, x);
+    return glm::dmat4(glm::dvec4(x, 0), glm::dvec4(y, 0), glm::dvec4(z, 0), glm::dvec4(0, 0, 0, 1));
+}
+
 glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim) {
     glm::dmat4 local(1.0);
     ForEachOp(scene, prim, [&](const OpEntry& op) {

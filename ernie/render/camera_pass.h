@@ -50,6 +50,8 @@ struct CameraOutputs {
     std::optional<graph::Buffer> instances;
     /// `kBands` floats a pixel: the albedo hit, per spectral band; zero where nothing is hit.
     std::optional<graph::Buffer> albedos;
+    /// Four bytes a pixel: the colour as RGBA8, as `colour` holds it.
+    std::optional<graph::Buffer> ldr;
 };
 
 /// @brief A view and what to write of it.

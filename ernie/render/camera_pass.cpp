@@ -29,9 +29,9 @@ struct ViewRecord {
     glm::uvec2 size;
     glm::vec3 background;
     std::uint32_t colour;
-    VkDeviceAddress distances, normals, instances, albedos;
+    VkDeviceAddress distances, normals, instances, albedos, ldr;
 };
-static_assert(sizeof(ViewRecord) == 112);
+static_assert(sizeof(ViewRecord) == 120);
 
 struct CameraParameters {
     TracerParameters tracer;
@@ -109,7 +109,8 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
                     output.colour = pass.Write(*output.colour, graph::Use::StorageWrite);
                 }
                 for (std::optional<graph::Buffer>* buffer :
-                     {&output.distances, &output.normals, &output.instances, &output.albedos}) {
+                     {&output.distances, &output.normals, &output.instances, &output.albedos,
+                      &output.ldr}) {
                     if (*buffer) {
                         *buffer = pass.WriteAddress(**buffer, graph::Use::StorageWrite);
                     }
@@ -128,6 +129,7 @@ void CameraPass::Add(graph::Graph& graph, std::span<CameraView> views) const {
                 records[i].normals = address(outputs[i].normals);
                 records[i].instances = address(outputs[i].instances);
                 records[i].albedos = address(outputs[i].albedos);
+                records[i].ldr = address(outputs[i].ldr);
             }
             // The records hold the outputs' addresses, known only now, so the pass writes them
             // itself before it reads them.

@@ -8,6 +8,7 @@
 #include "ernie/scene/convert.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/mesh.h"
+#include "ernie/scene/schema/planet.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -18,9 +19,12 @@
 namespace ernie {
 namespace {
 
+/// Metres from a ground plane's centre to its edges: far past any horizon a camera near it sees.
+constexpr double kGroundHalfWidth = 1e5;
+
 std::optional<GeometryKind> KindHeld(const Scene& scene, PrimId prim) {
     const SchemaDef* schema = scene.Schema(prim);
-    const std::array<std::pair<const SchemaDef*, GeometryKind>, 7> kinds{{
+    const std::array<std::pair<const SchemaDef*, GeometryKind>, 8> kinds{{
         {&Mesh::Definition(), GeometryKind::Triangles},
         {&Sphere::Definition(), GeometryKind::Sphere},
         {&Cube::Definition(), GeometryKind::Cube},
@@ -28,6 +32,7 @@ std::optional<GeometryKind> KindHeld(const Scene& scene, PrimId prim) {
         {&Cone::Definition(), GeometryKind::Cone},
         {&Capsule::Definition(), GeometryKind::Capsule},
         {&Plane::Definition(), GeometryKind::Plane},
+        {&GroundPlane::Definition(), GeometryKind::Plane},
     }};
     for (const auto& [definition, kind] : kinds) {
         if (IsA(schema, *definition)) {
@@ -95,6 +100,9 @@ glm::dmat4 ShapeTransform(const Scene& scene, PrimId prim, GeometryKind kind) {
     case GeometryKind::Capsule:
         return AxisTurn(scene, prim) * scaled(glm::dvec3(Number(scene, prim, Capsule::kRadius)));
     case GeometryKind::Plane: {
+        if (IsA(scene.Schema(prim), GroundPlane::Definition())) {
+            return scaled({kGroundHalfWidth, kGroundHalfWidth, 1.0});
+        }
         // Width along x, or z for an X normal; length along y, or z for a Y normal: under the
         // cyclic turn, the unit square's x carries the length unless the normal is z.
         const double width = 0.5 * Number(scene, prim, Plane::kWidth);

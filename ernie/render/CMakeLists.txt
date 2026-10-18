@@ -7,6 +7,7 @@ add_library(
     geometry.cpp
     instances.cpp
     prim_rows.cpp
+    renderer.cpp
     rt/bottom_levels.cpp
     rt/ray_tracer.cpp
     rt/top_levels.cpp

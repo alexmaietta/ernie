@@ -24,11 +24,13 @@ struct View {
     /// The colour image's bindless index, or `kNoImage`.
     uint colour;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
-    /// z, the instance row, and `kBands` albedo bands; each 0 for no output.
+    /// z, the instance row, `kBands` albedo bands, and the colour image's RGBA8 bytes; each 0 for
+    /// no output.
     float* distances;
     float* normals;
     uint* instances;
     float* albedos;
+    uint* ldr;
 };
 
 struct Parameters {
@@ -73,13 +75,19 @@ void main(uint3 id : SV_DispatchThreadID) {
     }
 
     uint at = pixel.y * view.size.x + pixel.x;
-    if (view.colour != kNoImage) {
+    if (view.colour != kNoImage || view.ldr != nullptr) {
         float3 shown = view.background;
         if (hit.found) {
-            // The image is UNORM: encode for display roughly as sRGB would.
+            // Stored as UNORM: encoded for display roughly as sRGB would.
             shown = pow(saturate(ToLinearSrgb(Shade(albedo, normal, ray.Direction))), 1 / 2.2);
         }
-        images[NonUniformResourceIndex(view.colour)][pixel] = float4(shown, 1);
+        if (view.colour != kNoImage) {
+            images[NonUniformResourceIndex(view.colour)][pixel] = float4(shown, 1);
+        }
+        if (view.ldr != nullptr) {
+            uint3 bytes = uint3(round(saturate(shown) * 255));
+            view.ldr[at] = bytes.r | bytes.g << 8 | bytes.b << 16 | 0xff000000u;
+        }
     }
     if (view.distances != nullptr) {
         view.distances[at] = hit.found ? hit.t : 1.0 / 0.0;
