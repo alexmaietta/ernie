@@ -173,9 +173,8 @@ NanoVdbGrid ParseGrid(std::span<const std::uint8_t> bytes) {
     return grid;
 }
 
-// The grids of a raw buffer: each GridData header gives its grid's
-// size.
-std::vector<NanoVdbGrid> RawGrids(std::span<const std::uint8_t> bytes) {
+// The grids of a raw buffer, or only their headers: each GridData header gives its grid's size.
+std::vector<NanoVdbGrid> RawGrids(std::span<const std::uint8_t> bytes, bool headsOnly = false) {
     std::vector<NanoVdbGrid> grids;
     std::size_t offset = 0;
     while (offset + PNANOVDB_GRID_SIZE <= bytes.size()) {
@@ -189,7 +188,9 @@ std::vector<NanoVdbGrid> RawGrids(std::span<const std::uint8_t> bytes) {
         if (size < PNANOVDB_GRID_SIZE || offset + size > bytes.size()) {
             throw std::runtime_error("NanoVDB grid size runs past its data");
         }
-        grids.push_back(ParseGrid(bytes.subspan(offset, size)));
+        const std::span<const std::uint8_t> grid = bytes.subspan(offset, size);
+        grids.push_back(headsOnly ? NanoVdbGridHead(grid.first(std::min(size, kNanoVdbHeadBytes)))
+                                  : ParseGrid(grid));
         offset += size;
     }
     if (grids.empty()) {
@@ -234,6 +235,10 @@ std::vector<NanoVdbGrid> ParseNanoVdbGrids(std::span<const std::uint8_t> bytes) 
     return RawGrids(bytes);
 }
 
+std::vector<NanoVdbGrid> ParseNanoVdbHeads(std::span<const std::uint8_t> bytes) {
+    return RawGrids(bytes, true);
+}
+
 NanoVdbGrid NanoVdbGridHead(std::span<const std::uint8_t> head) {
     const auto magic = ReadLittleEndian<std::uint64_t>(head, 0);
     if (magic != kMagicNumber && magic != kMagicGrid) {
@@ -247,8 +252,9 @@ NanoVdbGrid NanoVdbGridHead(std::span<const std::uint8_t> head) {
     return grid;
 }
 
-std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
-    // Grids are copied out of the mapping into buffers aligned for PNanoVDB.
+static std::vector<NanoVdbGrid> ReadGrids(const std::filesystem::path& path, bool headsOnly) {
+    // Grids are copied out of the mapping into buffers aligned for PNanoVDB; heads touch only the
+    // pages holding them.
     const MappedFile file(path);
     const std::span<const std::uint8_t> data(
         reinterpret_cast<const std::uint8_t*>(file.Bytes().data()), file.Bytes().size());
@@ -256,7 +262,7 @@ std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
     try {
         const auto magic = ReadLittleEndian<std::uint64_t>(data, 0);
         if (magic == kMagicGrid) {
-            return RawGrids(data);
+            return RawGrids(data, headsOnly);
         }
         if (magic != kMagicNumber && magic != kMagicFile) {
             throw std::runtime_error("not a NanoVDB file");
@@ -267,7 +273,7 @@ std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
         if (MajorVersion(ReadLittleEndian<std::uint32_t>(data, 8)) != kMajorVersion &&
             MajorVersion(ReadLittleEndian<std::uint32_t>(data, PNANOVDB_GRID_OFF_VERSION)) ==
                 kMajorVersion) {
-            return RawGrids(data);
+            return RawGrids(data, headsOnly);
         }
         std::vector<NanoVdbGrid> grids;
         std::size_t offset = 0;
@@ -296,7 +302,7 @@ std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
                 if (offset + size > data.size()) {
                     throw std::runtime_error("grid runs past the file's end");
                 }
-                std::vector<NanoVdbGrid> one = RawGrids(data.subspan(offset, size));
+                std::vector<NanoVdbGrid> one = RawGrids(data.subspan(offset, size), headsOnly);
                 grids.insert(grids.end(), std::make_move_iterator(one.begin()),
                              std::make_move_iterator(one.end()));
                 offset += size;
@@ -313,6 +319,14 @@ std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
     } catch (const std::runtime_error& error) {
         throw std::runtime_error("NanoVDB: " + std::string(error.what()) + where);
     }
+}
+
+std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path) {
+    return ReadGrids(path, false);
+}
+
+std::vector<NanoVdbGrid> ReadNanoVdbHeads(const std::filesystem::path& path) {
+    return ReadGrids(path, true);
 }
 
 const NanoVdbGrid* FindNanoVdbGrid(std::span<const NanoVdbGrid> grids, std::string_view name,

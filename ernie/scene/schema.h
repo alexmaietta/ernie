@@ -80,8 +80,12 @@ struct AttributeMeta {
     bool asset = false;
     /// A tensor of integers rather than floats.
     bool integer = false;
+    /// A tensor of raw bytes, in elements of any type.
+    bool bytes = false;
     /// A tensor's vector size: (n, components) or flat; 0 for a flat array.
     std::uint8_t components = 0;
+    /// A tensor's fixed rank, as a dense grid's 3; 0 for flat or vector arrays.
+    std::uint8_t rank = 0;
     Dirty dirty = Dirty::Params;
     /// Resolved from the nearest authoring ancestor.
     bool inherited = false;
@@ -106,10 +110,14 @@ enum class SchemaKind : std::uint8_t {
     MultipleApply,
 };
 
-/// @brief A bucket's prims as an extent function reads them: columns by attribute name.
+class Scene;
+
+/// @brief A bucket's prims as an extent function reads them: columns by attribute name, and the
+/// scene for rules that read other prims.
 struct ExtentRows {
     const PrimStore& store;
     BucketId bucket = 0;
+    const Scene* scene = nullptr;
 
     /// @return The column of a declared attribute.
     template <typename T> std::span<const T> Column(std::string_view attribute) const {
@@ -141,7 +149,13 @@ struct ExtentRule {
     };
     Kind kind = Kind::Inherit;
     ExtentFunction compute = nullptr;
+    /// Reads other prims (a volume its fields), so it is computed afresh rather than cached.
+    bool readsOtherPrims = false;
 };
+/// An extent from other prims' (a volume's from its fields).
+constexpr ExtentRule ComputedFromOtherPrims(ExtentFunction compute) {
+    return {ExtentRule::Kind::Computed, compute, true};
+}
 constexpr ExtentRule ComputedExtent(ExtentFunction compute) {
     return {ExtentRule::Kind::Computed, compute};
 }

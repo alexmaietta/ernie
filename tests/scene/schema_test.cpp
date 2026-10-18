@@ -6,6 +6,8 @@
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 
+#include "tests/common.h"
+
 #include <gtest/gtest.h>
 
 #include <string>
@@ -14,10 +16,7 @@ namespace ernie {
 namespace {
 
 void ExpectBox(const Box& box, const glm::dvec3& min, const glm::dvec3& max) {
-    for (int i = 0; i < 3; ++i) {
-        EXPECT_NEAR(box.min[i], min[i], 1e-12) << "min " << i;
-        EXPECT_NEAR(box.max[i], max[i], 1e-12) << "max " << i;
-    }
+    EXPECT_TRUE(test::BoxNear(box, min, max));
 }
 
 TEST(Schema, RegistryListsTypesWithBasesAndAttributes) {

@@ -73,11 +73,19 @@ std::string ArrayProblem(const AttributeDef& def, const Tensor& array) {
     if (def.type != ColumnType::Tensor) {
         return "takes one value, not an array; set it";
     }
+    if (def.meta.bytes) {
+        return {};
+    }
     const DType type = array.Type();
     const bool integer = type == DType::Int32 || type == DType::Int64 || type == DType::UInt32;
     const bool floating = type == DType::Float32 || type == DType::Float64;
     if (def.meta.integer ? !integer : !floating) {
         return def.meta.integer ? "must hold integers" : "must hold float32 or float64 numbers";
+    }
+    if (def.meta.rank != 0) {
+        return array.Rank() == def.meta.rank
+                   ? std::string()
+                   : "must have " + std::to_string(def.meta.rank) + " dimensions";
     }
     const std::int64_t components = def.meta.components;
     const bool rows =

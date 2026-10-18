@@ -5,6 +5,7 @@
 #include "ernie/scene/schemas/geom.h"
 #include "ernie/scene/schemas/mesh.h"
 #include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schemas/vol.h"
 
 namespace ernie {
 
@@ -25,6 +26,12 @@ std::span<const SchemaDef* const> Schemas() {
         &PointBased::Definition(),
         &Mesh::Definition(),
         &Points::Definition(),
+        &Volume::Definition(),
+        &FieldBase::Definition(),
+        &FieldAsset::Definition(),
+        &OpenVDBAsset::Definition(),
+        &NanoVDBField::Definition(),
+        &DenseField::Definition(),
         &CollectionAPI::Definition(),
         &MaterialBindingAPI::Definition(),
     };

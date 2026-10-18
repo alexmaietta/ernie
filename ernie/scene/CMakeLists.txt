@@ -14,5 +14,6 @@ add_library(
     schemas/mesh.cpp
     schemas/registry.cpp
     schemas/shade.cpp
+    schemas/vol.cpp
 )
 target_link_libraries(ernie_scene PUBLIC ernie_physics ernie_io PRIVATE ernie_build_options)

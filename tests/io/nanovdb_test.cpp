@@ -84,6 +84,15 @@ TEST(NanoVdb, RawBufferMatchesTheFile) {
     EXPECT_EQ(read[0].buffer, file.buffer);
 }
 
+TEST(NanoVdb, HeadsOfAFileMatchItsGridsWithoutTheirVoxels) {
+    const NanoVdbGrid full = ReadNanoVdb(Cube())[0];
+    const std::vector<NanoVdbGrid> heads = ReadNanoVdbHeads(Cube());
+    ASSERT_EQ(heads.size(), 1u);
+    EXPECT_TRUE(heads[0].buffer.empty());
+    EXPECT_EQ(heads[0].name, full.name);
+    EXPECT_EQ(heads[0].GridBounds(), full.GridBounds());
+}
+
 TEST(NanoVdb, AGridsHeadHoldsItsHeader) {
     const NanoVdbGrid file = ReadNanoVdb(Cube())[0];
     const std::span<const std::uint8_t> bytes(file.buffer);

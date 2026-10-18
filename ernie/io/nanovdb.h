@@ -95,12 +95,20 @@ struct NanoVdbGrid {
 ///         `nanovdb_convert` without `-z`/`-b`).
 std::vector<NanoVdbGrid> ReadNanoVdb(const std::filesystem::path& path);
 
+/// @brief Reads the headers of a NanoVDB file's grids (names, types, bounds and transforms)
+/// without their voxels, as `NanoVdbGridHead` does for each grid.
+/// @throws std::runtime_error As `ReadNanoVdb`.
+std::vector<NanoVdbGrid> ReadNanoVdbHeads(const std::filesystem::path& path);
+
 /// @brief Splits a raw in-memory NanoVDB buffer into its grids.
 /// @param bytes Grids back to back, as Warp's `Volume.array()`.
 /// @return The grids.
 /// @throws std::runtime_error If it does not start with a version 32
 ///         NanoVDB grid.
 std::vector<NanoVdbGrid> ParseNanoVdbGrids(std::span<const std::uint8_t> bytes);
+/// @brief Reads the headers of a raw buffer's grids, without copying their voxels.
+/// @throws std::runtime_error As `ParseNanoVdbGrids`.
+std::vector<NanoVdbGrid> ParseNanoVdbHeads(std::span<const std::uint8_t> bytes);
 
 /// Bytes at a grid's start holding its header, tree and root, root
 /// statistics included.

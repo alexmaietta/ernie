@@ -243,7 +243,7 @@ std::optional<Box> Scene::Extent(PrimId prim) const {
         return cached;
     }
     Box extent;
-    rule.compute({store_, bucket}, {row, row + 1}, std::span(&extent, 1));
+    rule.compute({store_, bucket, this}, {row, row + 1}, std::span(&extent, 1));
     return extent;
 }
 
@@ -309,7 +309,8 @@ BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis
     buckets_.resize(std::max<std::size_t>(buckets_.size(), bucket + 1));
     buckets_[bucket] = std::move(entry);
     const ExtentRule rule = schema != nullptr ? schema->Extent() : kNoExtent;
-    extents_.Track(bucket, rule.kind == ExtentRule::Kind::Computed ? rule.compute : nullptr);
+    const bool cached = rule.kind == ExtentRule::Kind::Computed && !rule.readsOtherPrims;
+    extents_.Track(bucket, cached ? rule.compute : nullptr);
     return bucket;
 }
 
