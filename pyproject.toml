@@ -77,3 +77,6 @@ environment = { MACOSX_DEPLOYMENT_TARGET = "26.0" }
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
+# Slang's DLLs are in the wheel already, beside the module, where Windows looks for an extension's
+# DLLs; delvewheel would look for them on the PATH instead.
+repair-wheel-command = "delvewheel repair --no-dll \"slang-compiler.dll;slang-glslang.dll\" -w {dest_dir} {wheel}"
