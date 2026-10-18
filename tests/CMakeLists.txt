@@ -60,6 +60,7 @@ ernie_add_test_suite(
         scene/holder_index_test.cpp
         scene/inherit_test.cpp
         scene/instancer_test.cpp
+        scene/json_test.cpp
         scene/lux_test.cpp
         scene/mesh_test.cpp
         scene/path_test.cpp

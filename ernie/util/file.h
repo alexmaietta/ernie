@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace ernie {
 
@@ -17,6 +18,10 @@ namespace ernie {
 /// @return Its bytes.
 /// @throws std::runtime_error If it cannot be read.
 ERNIE_API std::string ReadTextFile(const std::filesystem::path& path);
+
+/// @brief Writes text to a file, replacing it.
+/// @throws std::runtime_error If it cannot be written.
+ERNIE_API void WriteTextFile(const std::filesystem::path& path, std::string_view text);
 
 /// @brief Finds a file by name in any case, as archives named in capitals often unpack in small
 /// letters.

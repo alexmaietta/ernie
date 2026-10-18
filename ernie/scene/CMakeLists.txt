@@ -5,6 +5,7 @@ add_library(
     extent_cache.cpp
     holder_index.cpp
     inherit.cpp
+    json.cpp
     path.cpp
     schema.cpp
     scene.cpp
@@ -24,4 +25,8 @@ add_library(
     schemas/shade.cpp
     schemas/vol.cpp
 )
-target_link_libraries(ernie_scene PUBLIC ernie_physics ernie_io PRIVATE ernie_build_options)
+target_link_libraries(
+    ernie_scene
+    PUBLIC ernie_physics ernie_io
+    PRIVATE ernie_json ernie_build_options
+)

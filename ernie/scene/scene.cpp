@@ -448,6 +448,11 @@ const Column* Scene::AuthoredColumn(PrimId prim, std::string_view attribute) con
     return column != nullptr && column->authored.Test(store_.PrimRow(prim)) ? column : nullptr;
 }
 
+const AttributeDef* Scene::Declaration(PrimId prim, std::string_view attribute) const {
+    const std::optional<Token> token = store_.Tokens().Find(attribute);
+    return token ? Declared(store_.PrimBucket(prim), *token) : nullptr;
+}
+
 const AttributeDef* Scene::Declared(BucketId bucket, AttributeId attribute) const {
     const auto& declared = buckets_[bucket].declared;
     const auto found = declared.find(attribute);

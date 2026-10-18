@@ -82,6 +82,8 @@ class Scene {
     /// @return Whether the attribute was authored.
     bool Clear(PrimId prim, std::string_view attribute);
     bool IsAuthored(PrimId prim, std::string_view attribute) const;
+    /// @return The declaration of the prim's attribute by its type or API schemas, or null.
+    const AttributeDef* Declaration(PrimId prim, std::string_view attribute) const;
     /// @return The authored attributes' names, in column order.
     std::vector<std::string> Attributes(const Path& path) const;
 

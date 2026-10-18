@@ -34,6 +34,13 @@ std::string ReadTextFile(const fs::path& path) {
     return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 
+void WriteTextFile(const fs::path& path, std::string_view text) {
+    std::ofstream file(path, std::ios::binary);
+    if (!file.write(text.data(), static_cast<std::streamsize>(text.size()))) {
+        throw std::runtime_error("Cannot write " + path.string());
+    }
+}
+
 fs::path FindFileAnyCase(const fs::path& directory, const std::string& name) {
     const fs::path exact = directory / name;
     if (fs::exists(exact)) {
