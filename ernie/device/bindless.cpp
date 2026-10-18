@@ -76,13 +76,13 @@ BindlessHeap::~BindlessHeap() {
     vkDestroyDescriptorSetLayout(context_.Device(), layout_, nullptr);
 }
 
-BindlessIndex BindlessHeap::AddTexture(const Image& image) {
+BindlessIndex BindlessHeap::AddTexture(const DeviceImage& image) {
     const BindlessIndex index = Take(0);
     Write(0, index, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
     return index;
 }
 
-BindlessIndex BindlessHeap::AddStorageImage(const Image& image) {
+BindlessIndex BindlessHeap::AddStorageImage(const DeviceImage& image) {
     const BindlessIndex index = Take(1);
     Write(1, index, {.imageView = image.View(), .imageLayout = VK_IMAGE_LAYOUT_GENERAL});
     return index;

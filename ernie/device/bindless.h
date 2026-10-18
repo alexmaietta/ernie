@@ -35,8 +35,8 @@ class BindlessHeap {
     BindlessHeap& operator=(const BindlessHeap&) = delete;
 
     /// @throws DeviceError when the array is full.
-    BindlessIndex AddTexture(const Image& image);
-    BindlessIndex AddStorageImage(const Image& image);
+    BindlessIndex AddTexture(const DeviceImage& image);
+    BindlessIndex AddStorageImage(const DeviceImage& image);
     BindlessIndex AddSampler(const Sampler& sampler);
     /// @brief Frees slots once every queue's work submitted so far is done.
     void RemoveTexture(BindlessIndex index);

@@ -50,7 +50,8 @@ VkFormat ToVkFormat(ImageFormat format) {
     return Info(format).vk;
 }
 
-Image::Image(DeviceContext& context, const ImageDescription& description, std::string_view name)
+DeviceImage::DeviceImage(DeviceContext& context, const ImageDescription& description,
+                         std::string_view name)
     : context_(context), description_(description) {
     const bool volume = description.extent.z > 1;
     const VkImageCreateInfo info{
@@ -96,7 +97,7 @@ Image::Image(DeviceContext& context, const ImageDescription& description, std::s
     });
 }
 
-Image::~Image() {
+DeviceImage::~DeviceImage() {
     vkDestroyImageView(context_.Device(), view_, nullptr);
     vmaDestroyImage(context_.Allocator(), image_, allocation_);
 }

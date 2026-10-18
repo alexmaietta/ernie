@@ -50,13 +50,13 @@ struct ImageDescription {
 /// @brief An image, its memory and a view of it all. Images stay in the general layout, which
 /// every use accepts; the frame graph will choose layouts per pass. Destroying one the GPU may
 /// still use is an error: retire it instead.
-class Image {
+class DeviceImage {
   public:
     /// @throws DeviceError when the memory cannot be allocated or the format is unsupported.
-    Image(DeviceContext& context, const ImageDescription& description, std::string_view name);
-    ~Image();
-    Image(const Image&) = delete;
-    Image& operator=(const Image&) = delete;
+    DeviceImage(DeviceContext& context, const ImageDescription& description, std::string_view name);
+    ~DeviceImage();
+    DeviceImage(const DeviceImage&) = delete;
+    DeviceImage& operator=(const DeviceImage&) = delete;
 
     const ImageDescription& Description() const {
         return description_;

@@ -80,11 +80,11 @@ TEST(BindlessHeap, KernelsPaintAndSampleImagesByIndex) {
 
     const std::uint32_t width = 16;
     const std::uint32_t height = 8;
-    const Image image(*context,
-                      {.format = ImageFormat::Rgba32Float,
-                       .extent = {width, height, 1},
-                       .usage = ImageUsage::Sampled | ImageUsage::Storage},
-                      "canvas");
+    const DeviceImage image(*context,
+                            {.format = ImageFormat::Rgba32Float,
+                             .extent = {width, height, 1},
+                             .usage = ImageUsage::Sampled | ImageUsage::Storage},
+                            "canvas");
     const Sampler nearest(*context, {.filter = Filter::Nearest, .address = Address::Clamp},
                           "nearest");
     const BindlessIndex storage = heap.AddStorageImage(image);
@@ -120,7 +120,8 @@ TEST(BindlessHeap, KernelsPaintAndSampleImagesByIndex) {
 TEST(BindlessHeap, SlotsAreReusedOnceTheGpuIsDone) {
     ERNIE_CONTEXT(context);
     BindlessHeap heap(*context);
-    const Image image(*context, {.format = ImageFormat::R32Float, .extent = {4, 4, 1}}, "small");
+    const DeviceImage image(*context, {.format = ImageFormat::R32Float, .extent = {4, 4, 1}},
+                            "small");
     const BindlessIndex first = heap.AddTexture(image);
     EXPECT_NE(heap.AddTexture(image), first);
     heap.RemoveTexture(first);
