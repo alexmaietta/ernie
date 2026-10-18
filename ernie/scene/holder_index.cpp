@@ -60,14 +60,20 @@ void HolderIndex::Update(const PrimStore& store) {
 
 void HolderIndex::Index(PrimId prim, AttributeId attribute, std::vector<PathId> targets) {
     const Cell cell = Key(prim, attribute);
-    std::vector<PathId>& indexed = targets_[cell];
-    for (const PathId old : indexed) {
-        holders_[old].erase(cell);
+    const auto found = targets_.find(cell);
+    if (found != targets_.end()) {
+        for (const PathId old : found->second) {
+            holders_[old].erase(cell);
+        }
     }
     for (const PathId target : targets) {
         holders_[target][cell] = prim.generation;
     }
-    indexed = std::move(targets);
+    if (!targets.empty()) {
+        targets_[cell] = std::move(targets);
+    } else if (found != targets_.end()) {
+        targets_.erase(found);
+    }
 }
 
 std::vector<PrimId> HolderIndex::Find(const PrimStore& store, PathId target) const {
