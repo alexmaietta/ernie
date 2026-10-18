@@ -7,9 +7,12 @@ add_library(
     inherit.cpp
     json.cpp
     path.cpp
+    reference.cpp
     schema.cpp
     scene.cpp
     storage.cpp
+    usd_plugin.cpp
+    validate.cpp
     view.cpp
     xform.cpp
     schemas/camera.cpp

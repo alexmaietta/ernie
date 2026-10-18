@@ -1,0 +1,17 @@
+{
+  "prims": {
+    "/World": {"typeName": "Xform"},
+    "/World/Ball": {"typeName": "Sphere", "radiuss": 1, "radius": -1},
+    "/World/Lamp": {"typeName": "SphereLight", "inputs:intensty": 2, "inputs:color": "red"},
+    "/World/Teapot": {"typeName": "Teapot"},
+    "/World/Rock": {"typeName": "Cube", "apiSchemas": ["MeshLightAPI", "ShinyAPI"]},
+    "/World/Box": {"typeName": "Cube", "xform": {"spin": 90}},
+    "/World/Mesh": {"typeName": "Mesh", "points": [[0, 0], [1, 1]]},
+    "/World/Bound": {
+      "typeName": "Sphere",
+      "apiSchemas": ["MaterialBindingAPI"],
+      "material:binding": "/Looks/Missing"
+    },
+    "/World/Junk": 3
+  }
+}

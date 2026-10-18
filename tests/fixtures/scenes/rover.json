@@ -1,0 +1,64 @@
+{
+  "$schema": "https://alexmaietta.github.io/ernie/schema/ernie-scene.schema.json",
+  "prims": {
+    "/World": {"typeName": "Xform", "ernie:world": 0},
+    "/World/Ground": {"typeName": "GroundPlane"},
+    "/World/Sun": {
+      "typeName": "DistantLight",
+      "inputs:angle": 0.53,
+      "inputs:intensity": 120000,
+      "xform": {"rotate": [-35, 0, 20], "rotationOrder": "ZYX"}
+    },
+    "/World/Rover": {
+      "typeName": "Xform",
+      "apiSchemas": ["MaterialBindingAPI", "GeomModelAPI"],
+      "material:binding": "/Looks/Paint",
+      "extentsHint": [-1.5, -1, 0, 1.5, 1, 1.8],
+      "xform": {"translate": [2, -1, 0], "orient": [0.9238795, 0, 0, 0.3826834], "scale": 1}
+    },
+    "/World/Rover/Body": {
+      "typeName": "Mesh",
+      "points": [[-1, -0.5, 0.3], [1, -0.5, 0.3], [1, 0.5, 0.3], [-1, 0.5, 0.3]],
+      "faceVertexCounts": [4],
+      "faceVertexIndices": [0, 1, 2, 3],
+      "subdivisionScheme": "none",
+      "primvars:displayColor": [0.8, 0.1, 0.1]
+    },
+    "/World/Rover/Wheel": {"typeName": "Cylinder", "radius": 0.25, "height": 0.2, "axis": "Y"},
+    "/World/Rover/Cable": {
+      "typeName": "BasisCurves",
+      "type": "linear",
+      "curveVertexCounts": [3],
+      "points": [[0, 0, 0.3], [0.2, 0, 0.6], [0.4, 0, 0.7]],
+      "widths": [0.01]
+    },
+    "/World/Rover/Mast": {
+      "typeName": "Camera",
+      "apiSchemas": ["ErnieSensorAPI"],
+      "focalLength": 0.035,
+      "clippingRange": [0.05, 5000],
+      "xformOp:transform": [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 1.5], [0, 0, 0, 1]],
+      "xformOpOrder": ["xformOp:transform"]
+    },
+    "/World/Rocks": {
+      "typeName": "PointInstancer",
+      "prototypes": ["/World/Rocks/Protos/Pebble"],
+      "protoIndices": [0, 0],
+      "positions": [[4, 0, 0], [5, 1, 0]]
+    },
+    "/World/Rocks/Protos/Pebble": {"typeName": "Sphere", "radius": 0.1, "visibility": "invisible"},
+    "/Looks/Paint": {"typeName": "Material"},
+    "/Looks/Paint/Surface": {"typeName": "Shader", "info:id": "UsdPreviewSurface"},
+    "/Lighting": {
+      "typeName": "Scope",
+      "apiSchemas": ["CollectionAPI:sunlit"],
+      "collection:sunlit:includes": ["/World/Rover"],
+      "ernie:note": "custom data on a grouping"
+    },
+    "/Render/Settings": {
+      "typeName": "RenderSettings",
+      "camera": "/World/Rover/Mast",
+      "resolution": [640, 480]
+    }
+  }
+}

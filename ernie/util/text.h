@@ -68,6 +68,25 @@ constexpr bool IsIdentifier(std::string_view text) {
                        [&](char c) { return letter(c) || (c >= '0' && c <= '9'); });
 }
 
+/// @return The fewest insertions, deletions and substitutions turning `a` into `b` (Levenshtein).
+inline std::size_t EditDistance(std::string_view a, std::string_view b) {
+    std::vector<std::size_t> row(b.size() + 1);
+    for (std::size_t j = 0; j < row.size(); ++j) {
+        row[j] = j;
+    }
+    for (std::size_t i = 1; i <= a.size(); ++i) {
+        std::size_t diagonal = row[0];
+        row[0] = i;
+        for (std::size_t j = 1; j <= b.size(); ++j) {
+            const std::size_t above = row[j];
+            row[j] =
+                std::min({above + 1, row[j - 1] + 1, diagonal + std::size_t{a[i - 1] != b[j - 1]}});
+            diagonal = above;
+        }
+    }
+    return row.back();
+}
+
 /// @brief Reads numbers separated by blanks, line breaks or commas, in turn.
 class NumberReader {
   public:

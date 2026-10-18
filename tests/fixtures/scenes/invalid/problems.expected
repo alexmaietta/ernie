@@ -1,0 +1,11 @@
+'/World/Ball' radiuss: has no attribute 'radiuss'; did you mean 'radius'?
+'/World/Ball' radius: 'radius' must be finite and 0 or more, not -1
+'/World/Lamp' inputs:intensty: has no attribute 'inputs:intensty'; did you mean 'inputs:intensity'?
+'/World/Lamp' inputs:color: takes 3 numbers
+'/World/Teapot': Cannot define '/World/Teapot' as 'Teapot', which is no prim type
+'/World/Rock' apiSchemas: MeshLightAPI applies only to Mesh prims, not '/World/Rock' (Cube)
+'/World/Rock' apiSchemas: 'ShinyAPI' is no API schema
+'/World/Box' xform: has no op 'spin'
+'/World/Mesh' points: 'points' must be (n, 3) or flat
+'/World/Junk': a prim is an object
+'/World/Bound' material:binding: targets /Looks/Missing, which is no prim

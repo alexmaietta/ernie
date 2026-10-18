@@ -3,6 +3,7 @@
 /// @brief Reading scene files into the typed API and writing them back.
 #include "ernie/scene/json.h"
 
+#include "ernie/scene/json_value.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
@@ -10,7 +11,6 @@
 #include "ernie/util/file.h"
 
 #include <glm/gtc/matrix_access.hpp>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,18 +21,6 @@
 
 namespace ernie {
 namespace {
-
-using Json = nlohmann::ordered_json;
-
-constexpr std::string_view kPrims = "prims";
-constexpr std::string_view kType = "type";
-constexpr std::string_view kApis = "apiSchemas";
-constexpr std::string_view kXform = "xform";
-constexpr std::string_view kArray = "$array";
-
-[[noreturn]] void Fail(const std::string& where, const std::string& why) {
-    throw std::invalid_argument(where + ": " + why);
-}
 
 // Reading.
 
@@ -233,36 +221,71 @@ void LoadAttribute(Scene& scene, PrimId prim, const std::string& name, const Jso
     }
 }
 
-void LoadPrim(Scene& scene, const Path& path, const Json& json, std::span<const Tensor> arrays) {
-    if (!json.is_object()) {
-        Fail("'" + path.String() + "'", "a prim is an object");
+/// @return The scene's message without the prim it opens with ("'/Ball' (Sphere) has ..."), which
+/// the problem names already.
+std::string WithoutPrim(std::string what, const Path& path) {
+    const std::string prim = "'" + path.String() + "'";
+    if (what.starts_with(prim)) {
+        what.erase(0, prim.size());
+        if (what.starts_with(" (")) {
+            what.erase(0, what.find(')') + 1);
+        }
+        what.erase(0, what.find_first_not_of(": "));
     }
-    PrimId prim;
+    return what;
+}
+
+/// Runs `load`, a problem it throws recorded in `problems` when given, else thrown on.
+/// @return Whether it loaded.
+template <typename Load>
+bool Attempt(std::vector<SceneProblem>* problems, const Path& path, std::string_view key,
+             const Load& load) {
     try {
-        prim = json.contains(kType) || !scene.Has(path)
-                   ? scene.Define(path, json.value(kType, std::string()))
+        load();
+        return true;
+    } catch (const std::exception& error) {
+        const SceneProblem problem{path.String(), std::string(key),
+                                   WithoutPrim(error.what(), path)};
+        if (problems == nullptr) {
+            throw std::invalid_argument(problem.Message());
+        }
+        problems->push_back(problem);
+        return false;
+    }
+}
+
+void LoadPrim(Scene& scene, const Path& path, const Json& json, std::span<const Tensor> arrays,
+              std::vector<SceneProblem>* problems) {
+    PrimId prim;
+    const bool defined = Attempt(problems, path, "", [&] {
+        if (!json.is_object()) {
+            throw std::invalid_argument("a prim is an object");
+        }
+        prim = json.contains(kTypeName) || !scene.Has(path)
+                   ? scene.Define(path, json.value(kTypeName, std::string()))
                    : scene.Require(path);
-        for (const Json& api : json.value(kApis, Json::array())) {
+    });
+    if (!defined) {
+        return;
+    }
+    for (const Json& api : json.value(kApis, Json::array())) {
+        Attempt(problems, path, kApis, [&] {
             if (!scene.HasApi(prim, api.get<std::string>())) {
                 scene.ApplyApi(prim, api.get<std::string>());
             }
-        }
-    } catch (const std::exception& error) {
-        Fail("'" + path.String() + "'", error.what());
+        });
     }
     for (const auto& [key, value] : json.items()) {
-        if (key == kType || key == kApis) {
+        if (key == kTypeName || key == kApis) {
             continue;
         }
-        try {
+        Attempt(problems, path, key, [&] {
             if (key == kXform) {
                 SetXform(scene, path, ReadXform(value));
             } else {
                 LoadAttribute(scene, prim, key, value, arrays);
             }
-        } catch (const std::exception& error) {
-            Fail("'" + path.String() + "' " + key, error.what());
-        }
+        });
     }
 }
 
@@ -402,10 +425,8 @@ void Print(const Json& json, std::size_t indent, std::string& out) {
     }
 }
 
-}  // namespace
-
-void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arrays) {
-    Json root;
+/// @return The scene file's prims.
+const Json& ParsePrims(std::string_view text, Json& root) {
     try {
         root = Json::parse(text);
     } catch (const Json::parse_error& error) {
@@ -414,9 +435,46 @@ void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arra
     if (!root.is_object() || !root.contains(kPrims) || !root[kPrims].is_object()) {
         throw std::invalid_argument("A scene file is an object with \"prims\"");
     }
-    for (const auto& [path, prim] : root[kPrims].items()) {
-        LoadPrim(scene, Path(path), prim, arrays);
+    return root[kPrims];
+}
+
+}  // namespace
+
+Json ToJson(const Value& value) {
+    return WriteValue(value);
+}
+
+std::string PrintJson(const Json& json) {
+    std::string out;
+    Print(json, 0, out);
+    return out + "\n";
+}
+
+void LoadScene(Scene& scene, std::string_view text, std::span<const Tensor> arrays) {
+    Json root;
+    for (const auto& [path, prim] : ParsePrims(text, root).items()) {
+        LoadPrim(scene, Path(path), prim, arrays, nullptr);
     }
+}
+
+std::vector<SceneProblem> LoadSceneChecked(Scene& scene, std::string_view text,
+                                           std::span<const Tensor> arrays) {
+    std::vector<SceneProblem> problems;
+    Json root;
+    try {
+        for (const auto& [path, prim] : ParsePrims(text, root).items()) {
+            LoadPrim(scene, Path(path), prim, arrays, &problems);
+        }
+    } catch (const std::invalid_argument& error) {
+        problems.push_back({"", "", error.what()});
+    }
+    return problems;
+}
+
+std::string SceneProblem::Message() const {
+    std::string message = path.empty() ? "" : "'" + path + "'";
+    message += key.empty() ? "" : (message.empty() ? "" : " ") + key;
+    return message.empty() ? what : message + ": " + what;
 }
 
 void LoadSceneFile(Scene& scene, const std::filesystem::path& path) {
@@ -433,7 +491,7 @@ std::string SaveScene(const Scene& scene) {
         const PrimId prim = *scene.Find(path);
         Json json = Json::object();
         if (const std::string_view type = scene.TypeName(prim); !type.empty()) {
-            json[kType] = type;
+            json[kTypeName] = type;
         }
         if (const std::vector<std::string> apis = scene.AppliedApis(prim); !apis.empty()) {
             json[kApis] = apis;
@@ -446,17 +504,16 @@ std::string SaveScene(const Scene& scene) {
                 json[name] =
                     tensor != nullptr ? WriteTensor(*tensor) : WriteValue(*scene.Get(prim, name));
             } catch (const std::exception& error) {
-                Fail("'" + path.String() + "' " + name, error.what());
+                throw std::invalid_argument(
+                    SceneProblem{path.String(), name, error.what()}.Message());
             }
         }
         prims[path.String()] = std::move(json);
     }
-    std::string out;
     Json root = Json::object();
     root["$schema"] = std::string(kSceneSchemaUrl);
     root[kPrims] = std::move(prims);
-    Print(root, 0, out);
-    return out + "\n";
+    return PrintJson(root);
 }
 
 void SaveSceneFile(const Scene& scene, const std::filesystem::path& path) {

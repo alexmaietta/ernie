@@ -65,6 +65,7 @@ ernie_add_test_suite(
         scene/mesh_test.cpp
         scene/path_test.cpp
         scene/planet_test.cpp
+        scene/reference_test.cpp
         scene/render_test.cpp
         scene/scene_test.cpp
         scene/schema_test.cpp
@@ -93,9 +94,12 @@ if(TARGET _ernie)
         set_tests_properties(
             ernie.python.${name}
             PROPERTIES
-                ENVIRONMENT "PYTHONPATH=${PROJECT_BINARY_DIR}/python"
+                ENVIRONMENT
+                    "PYTHONPATH=${PROJECT_BINARY_DIR}/python;ERNIE_EXE=$<TARGET_FILE:ernie_app>;ERNIE_TEST_FIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
                 LABELS python
                 TIMEOUT ${ERNIE_TEST_TIMEOUT_python}
+                # pytest's code when every test skipped, as for a missing optional module.
+                SKIP_RETURN_CODE 5
         )
     endforeach()
 endif()
