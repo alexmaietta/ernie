@@ -85,7 +85,7 @@ Json Number(const AttributeMeta& meta, bool integer) {
     return number;
 }
 
-Json ArrayOf(Json items, std::optional<std::size_t> count = std::nullopt) {
+Json Array(Json items, std::optional<std::size_t> count = std::nullopt) {
     Json array{{"type", "array"}, {"items", std::move(items)}};
     if (count) {
         array["minItems"] = *count;
@@ -108,15 +108,15 @@ Json ValueSchema(const AttributeDef& def) {
     case ColumnType::Double:
         return Number(meta, false);
     case ColumnType::Vec2:
-        return ArrayOf(Number(meta, false), 2);
+        return Array(Number(meta, false), 2);
     case ColumnType::Vec3:
-        return ArrayOf(Number(meta, false), 3);
+        return Array(Number(meta, false), 3);
     case ColumnType::Vec4:
-        return ArrayOf(Number(meta, false), 4);
+        return Array(Number(meta, false), 4);
     case ColumnType::Quat:
-        return ArrayOf(Number({}, false), 4);
+        return Array(Number({}, false), 4);
     case ColumnType::Matrix:
-        return ArrayOf(ArrayOf(Number({}, false), 4), 4);
+        return Array(Array(Number({}, false), 4), 4);
     case ColumnType::TokenValue: {
         Json token = String();
         if (!meta.options.empty()) {
@@ -127,11 +127,11 @@ Json ValueSchema(const AttributeDef& def) {
     case ColumnType::Relationship:
         return String();
     case ColumnType::Relationships:
-        return {{"anyOf", Json::array({String(), ArrayOf(String())})}};
+        return {{"anyOf", Json::array({String(), Array(String())})}};
     case ColumnType::FloatArray:
-        return ArrayOf(Number(meta, false));
+        return Array(Number(meta, false));
     case ColumnType::TokenArray:
-        return ArrayOf(String());
+        return Array(String());
     case ColumnType::Tensor:
         break;
     }
@@ -178,14 +178,14 @@ Json SchemaDefinition(const SchemaDef& schema) {
 }
 
 Json XformOpsSchema() {
-    const Json vector = ArrayOf(Number({}, false), 3);
+    const Json vector = Array(Number({}, false), 3);
     return {{"type", "object"},
             {"description", "The prim's transform ops, as SetXform authors them."},
             {"properties",
              {{"translate", vector},
               {"rotate", vector},
               {"rotationOrder", {{"enum", {"XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"}}}},
-              {"orient", ArrayOf(Number({}, false), 4)},
+              {"orient", Array(Number({}, false), 4)},
               {"scale", {{"anyOf", Json::array({Number({}, false), vector})}}}}},
             {"additionalProperties", false}};
 }
@@ -225,7 +225,7 @@ Json PrimSchema() {
             {"description", "A prim: its type, applied API schemas, transform and attributes."},
             {"properties",
              {{kTypeName, {{"enum", Names(SchemaKind::Concrete)}}},
-              {kApis, ArrayOf(api)},
+              {kApis, Array(api)},
               {kXform, Ref("XformOps")}}},
             {"patternProperties",
              {{Literal(kTimeSamples) + "$",

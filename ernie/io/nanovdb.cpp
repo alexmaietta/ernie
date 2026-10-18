@@ -376,7 +376,7 @@ std::vector<std::uint8_t> BuildDense(std::span<const float> values, const glm::i
     };
     // The leaves (8^3) holding active values, then the lower (128^3)
     // and upper (4096^3) nodes above them, each keyed by its origin.
-    const auto originOf = [](const glm::ivec3& ijk, int size) {
+    const auto nodeOrigin = [](const glm::ivec3& ijk, int size) {
         return ijk & glm::ivec3(~(size - 1));
     };
     const auto less = [](const glm::ivec3& a, const glm::ivec3& b) {
@@ -410,11 +410,11 @@ std::vector<std::uint8_t> BuildDense(std::span<const float> values, const glm::i
     std::map<glm::ivec3, std::size_t, decltype(less)> upperIndex(less);
     std::vector<glm::ivec3> uppers;
     for (const glm::ivec3& leaf : leaves) {
-        const glm::ivec3 lower = originOf(leaf, 128);
+        const glm::ivec3 lower = nodeOrigin(leaf, 128);
         if (lowerIndex.emplace(lower, lowers.size()).second) {
             lowers.push_back(lower);
         }
-        const glm::ivec3 upper = originOf(leaf, 4096);
+        const glm::ivec3 upper = nodeOrigin(leaf, 4096);
         if (upperIndex.emplace(upper, uppers.size()).second) {
             uppers.push_back(upper);
         }
@@ -493,7 +493,7 @@ std::vector<std::uint8_t> BuildDense(std::span<const float> values, const glm::i
             buf, pnanovdb_address_offset(leaf.address, constant(&Constants::leaf_off_max)),
             stats.max);
         // Its lower node's child.
-        const std::size_t l = lowerIndex.at(originOf(origin8, 128));
+        const std::size_t l = lowerIndex.at(nodeOrigin(origin8, 128));
         const pnanovdb_lower_handle_t lower{
             address(firstLower + l * constant(&Constants::lower_size))};
         const pnanovdb_coord_t at8 = coord(origin8);
@@ -516,7 +516,7 @@ std::vector<std::uint8_t> BuildDense(std::span<const float> values, const glm::i
         pnanovdb_write_float(
             buf, pnanovdb_address_offset(lower.address, constant(&Constants::lower_off_max)),
             stats.max);
-        const std::size_t u = upperIndex.at(originOf(lowers[l], 4096));
+        const std::size_t u = upperIndex.at(nodeOrigin(lowers[l], 4096));
         const pnanovdb_upper_handle_t upper{
             address(firstUpper + u * constant(&Constants::upper_size))};
         const pnanovdb_coord_t at128 = coord(lowers[l]);

@@ -538,7 +538,7 @@ void EncodeBlocks(TextureFormat format, std::span<const std::uint8_t> rgba, std:
     ERNIE_ZONE("Encode blocks on the CPU");
     const std::uint32_t blockBytes = FormatInfo(format).blockBytes;
     const std::uint32_t across = (width + 3) / 4;
-    ParallelFor((height + 3) / 4, [&](std::size_t blockRow) {
+    ParallelLoop((height + 3) / 4, [&](std::size_t blockRow) {
         const auto row = static_cast<std::uint32_t>(blockRow);
         std::array<std::uint8_t, 64> pixels{};
         for (std::uint32_t column = 0; column < across; ++column) {
@@ -615,7 +615,7 @@ std::vector<std::uint8_t> HalveRgba8(std::span<const std::uint8_t> rgba, std::ui
     const std::uint32_t w = MipSide(width, 1);
     const std::uint32_t h = MipSide(height, 1);
     std::vector<std::uint8_t> half(std::size_t{w} * h * 4);
-    ParallelFor(h, [&](std::size_t line) {
+    ParallelLoop(h, [&](std::size_t line) {
         const auto y = static_cast<std::uint32_t>(line);
         for (std::uint32_t x = 0; x < w; ++x) {
             for (std::uint32_t c = 0; c < 4; ++c) {

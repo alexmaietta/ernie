@@ -16,7 +16,7 @@ namespace ernie {
 /// rest of the machine responsive while tables and textures are built.
 /// @param count The number of iterations.
 /// @param body  Called once per iteration, from any thread, possibly concurrently.
-template <typename Body> void ParallelFor(std::size_t count, const Body& body) {
+template <typename Body> void ParallelLoop(std::size_t count, const Body& body) {
     std::atomic<std::size_t> next{0};
     const auto work = [&] {
         for (std::size_t i; (i = next.fetch_add(1)) < count;) {

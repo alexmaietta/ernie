@@ -277,7 +277,7 @@ DiurnalTable DiurnalTemperatureTable(const RegolithProperties& regolith, int lat
     const std::size_t inertiaCount = table.inertias.size();
     const std::size_t albedoCount = table.albedos.size();
     const std::size_t rows = static_cast<std::size_t>(latitudes) * inertiaCount * albedoCount;
-    ParallelFor(rows, [&](std::size_t r) {
+    ParallelLoop(rows, [&](std::size_t r) {
         const auto albedo = static_cast<int>(r % albedoCount);
         const auto inertia = static_cast<int>(r / albedoCount % inertiaCount);
         const auto row = static_cast<int>(r / (albedoCount * inertiaCount));

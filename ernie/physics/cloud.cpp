@@ -294,7 +294,7 @@ glm::dvec3 TexelCentre(std::size_t i, std::size_t j, std::size_t k, std::size_t 
 /// The shape: Perlin-Worley noise, remapped by a Worley fractal sum.
 std::vector<float> MakeShapeNoise(std::size_t n) {
     std::vector<float> shape(n * n * n, 0.0f);
-    ParallelFor(n, [&](std::size_t k) {
+    ParallelLoop(n, [&](std::size_t k) {
         for (std::size_t j = 0; j < n; ++j) {
             for (std::size_t i = 0; i < n; ++i) {
                 const glm::dvec3 p = TexelCentre(i, j, k, n);
@@ -315,7 +315,7 @@ std::vector<float> MakeShapeNoise(std::size_t n) {
 /// The detail: a Worley fractal sum.
 std::vector<float> MakeDetailNoise(std::size_t n) {
     std::vector<float> detail(n * n * n, 0.0f);
-    ParallelFor(n, [&](std::size_t k) {
+    ParallelLoop(n, [&](std::size_t k) {
         for (std::size_t j = 0; j < n; ++j) {
             for (std::size_t i = 0; i < n; ++i) {
                 detail[(k * n + j) * n + i] =
@@ -329,7 +329,7 @@ std::vector<float> MakeDetailNoise(std::size_t n) {
 /// The local weather: the low and mid layers' Worley cells, the high layer's streaky Perlin.
 std::vector<float> MakeWeatherMap(std::size_t n) {
     std::vector<float> weather(n * n * 4, 0.0f);
-    ParallelFor(n, [&](std::size_t j) {
+    ParallelLoop(n, [&](std::size_t j) {
         for (std::size_t i = 0; i < n; ++i) {
             const glm::dvec3 p = TexelCentre(i, j, 0, n) * glm::dvec3(1.0, 1.0, 0.0);
             const double mid = SmoothStep(1.0, 1.4, WeatherWorley(p + glm::dvec3(0.5), 8.0));
@@ -350,7 +350,7 @@ std::vector<float> MakeWeatherMap(std::size_t n) {
 /// The turbulence: the direction of Perlin noise's curl, mapped to [0, 1].
 std::vector<float> MakeTurbulenceMap(std::size_t n) {
     std::vector<float> turbulence(n * n * 3, 0.0f);
-    ParallelFor(n, [&](std::size_t j) {
+    ParallelLoop(n, [&](std::size_t j) {
         constexpr double kDelta = 0.1;
         for (std::size_t i = 0; i < n; ++i) {
             const glm::dvec3 p = TexelCentre(i, j, 0, n) * glm::dvec3(1.0, 1.0, 0.0);
@@ -488,7 +488,7 @@ CloudTransportTable SimulateCloudTransport(const DropletPhaseTable& phase,
     table.values.assign(kCloudOrderSets * shape.Cells() * 4, 0.0f);
     table.single.assign(shape.Cells(), 0.0f);
     // Each light and thickness's slab on its own; the thickest first, as they take longest.
-    ParallelFor(shape.lightCosines * shape.thicknesses, [&](std::size_t job) {
+    ParallelLoop(shape.lightCosines * shape.thicknesses, [&](std::size_t job) {
         const std::size_t light = job % shape.lightCosines;
         const std::size_t thickness = shape.thicknesses - 1 - job / shape.lightCosines;
         const std::uint64_t seed = HashCombine(options.seed, job);
