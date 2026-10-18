@@ -18,8 +18,9 @@
 namespace ernie {
 
 /// @brief A row a drawn prim, in device columns: `Nodes` its transform graph slot, `Geometries` its
-/// geometry and `Shapes` the 3x4 row-major transform from that geometry to the prim. Rows are kept
-/// dense by swap-removal, so a row is no stable id; a prim's row is found with `Row`.
+/// geometry, `Shapes` the 3x4 row-major transform from that geometry to the prim, and `Colours` its
+/// linear RGB albedo. Rows are kept dense by swap-removal, so a row is no stable id; a prim's row
+/// is found with `Row`.
 class InstanceTable {
   public:
     using Shape = std::array<float, 12>;
@@ -48,6 +49,9 @@ class InstanceTable {
     const DeviceColumn& Shapes() const {
         return *shapes_;
     }
+    const DeviceColumn& Colours() const {
+        return *colours_;
+    }
 
   private:
     void Set(std::uint32_t row, const PrimGeometry& placed);
@@ -60,12 +64,14 @@ class InstanceTable {
     std::vector<std::uint32_t> hostNodes_;
     std::vector<std::uint32_t> hostGeometries_;
     std::vector<Shape> hostShapes_;
+    std::vector<glm::vec3> hostColours_;
     /// Each prim's row by its id's slot.
     std::vector<std::uint32_t> rows_;
     std::vector<std::uint32_t> dirty_;
     std::unique_ptr<DeviceColumn> nodes_;
     std::unique_ptr<DeviceColumn> geometries_;
     std::unique_ptr<DeviceColumn> shapes_;
+    std::unique_ptr<DeviceColumn> colours_;
 };
 
 }  // namespace ernie

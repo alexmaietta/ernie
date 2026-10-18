@@ -47,6 +47,20 @@ double Number(const Scene& scene, PrimId prim, std::string_view attribute) {
     return *number;
 }
 
+/// @return The prim's display colour, authored in double or float precision.
+glm::vec3 DisplayColour(const Scene& scene, PrimId prim) {
+    const std::optional<Value> value = scene.GetOrFallback(prim, Gprim::kDisplayColor);
+    if (value) {
+        if (const auto* colour = value->Get<glm::dvec3>()) {
+            return glm::vec3(*colour);
+        }
+        if (const auto* colour = value->Get<glm::vec3>()) {
+            return *colour;
+        }
+    }
+    return glm::vec3(0.5f);
+}
+
 /// @return The turn taking a unit shape's +z to the prim's axis, cyclically, keeping handedness.
 glm::dmat4 AxisTurn(const Scene& scene, PrimId prim) {
     const std::optional<Value> axis = scene.GetOrFallback(prim, Cylinder::kAxis);
@@ -102,9 +116,17 @@ struct Touched {
     bool shape = false;
     bool points = false;
     bool topology = false;
+    bool colour = false;
+
+    bool Any() const {
+        return shape || points || topology || colour;
+    }
 };
 
 Touched Classify(std::string_view attribute) {
+    if (attribute == Gprim::kDisplayColor) {
+        return {.colour = true};
+    }
     if (attribute == Mesh::kPoints) {
         return {.points = true};
     }
@@ -226,7 +248,7 @@ void GeometryPool::UploadMesh(PrimId prim, GeometryId id, bool topology, Changes
     }
 }
 
-void GeometryPool::Place(PrimId prim, bool topology, Changes& changes) {
+void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& changes) {
     const std::optional<GeometryKind> kind = KindHeld(scene_, prim);
     if (!kind) {
         return;
@@ -239,7 +261,9 @@ void GeometryPool::Place(PrimId prim, bool topology, Changes& changes) {
     PrimGeometry next{.prim = prim};
     if (*kind == GeometryKind::Triangles) {
         next.geometry = known ? placed->geometry : Allocate({.kind = GeometryKind::Triangles});
-        UploadMesh(prim, next.geometry, topology || !known, changes);
+        if (!known || points || topology) {
+            UploadMesh(prim, next.geometry, topology || !known, changes);
+        }
     } else if (*kind == GeometryKind::Capsule) {
         const double radius = Number(scene_, prim, Capsule::kRadius);
         const auto halfLength =
@@ -262,7 +286,9 @@ void GeometryPool::Place(PrimId prim, bool topology, Changes& changes) {
         }
     }
     next.shape = ShapeTransform(scene_, prim, *kind);
-    if (!known || placed->geometry != next.geometry || placed->shape != next.shape) {
+    next.colour = DisplayColour(scene_, prim);
+    if (!known || placed->geometry != next.geometry || placed->shape != next.shape ||
+        placed->colour != next.colour) {
         changes.placed.push_back(next);
     }
     placed = next;
@@ -287,7 +313,7 @@ GeometryPool::Changes GeometryPool::Update() {
         }
     }
     for (const PrimId prim : followed.added) {
-        Place(prim, true, changes);
+        Place(prim, true, true, changes);
     }
     // Prims just added were placed from all their values: none of them is an edit.
     std::vector<bool> fresh(prims_.size(), false);
@@ -296,10 +322,10 @@ GeometryPool::Changes GeometryPool::Update() {
             fresh[prim.slot] = true;
         }
     }
-    // Values the host authored: shapes, points and topology.
+    // Values the host authored: shapes, points, topology and colours.
     for (const ChangeSet::Values& values : changeSet.values) {
         const Touched touched = Classify(store.Tokens().Text(values.attribute));
-        if (!touched.shape && !touched.points && !touched.topology) {
+        if (!touched.Any()) {
             continue;
         }
         const Bucket& bucket = store.GetBucket(values.bucket);
@@ -307,7 +333,7 @@ GeometryPool::Changes GeometryPool::Update() {
             for (std::uint32_t row = range.begin; row < std::min(range.end, bucket.Rows()); ++row) {
                 const PrimId prim = bucket.prims[row];
                 if (Find(prim) && !fresh[prim.slot]) {
-                    Place(prim, touched.topology, changes);
+                    Place(prim, touched.points, touched.topology, changes);
                 }
             }
         }

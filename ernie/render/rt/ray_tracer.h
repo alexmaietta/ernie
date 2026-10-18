@@ -39,6 +39,9 @@ struct TraceScene {
     graph::Acceleration top;
     graph::Buffer records;
     std::uint32_t instances = 0;
+    /// Each instance row's albedo, three linear RGB floats, and their device address.
+    graph::Buffer colours;
+    std::uint64_t colourAddress = 0;
     /// The render origin the structures are relative to: rays start from points less it.
     glm::dvec3 origin{0.0};
 
@@ -46,6 +49,7 @@ struct TraceScene {
     void Read(graph::PassBuilder& pass) const {
         pass.Read(top);
         pass.ReadAddress(records);
+        pass.ReadAddress(colours);
     }
 };
 

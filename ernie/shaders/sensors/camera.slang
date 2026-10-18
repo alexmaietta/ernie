@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file camera.slang
-/// @brief A pinhole camera traced one ray a pixel: a headlit colour into a bindless image, and
-/// each pixel's distance, world normal and instance into buffers kernels, CUDA or PyTorch read.
+/// @brief Pinhole cameras traced one ray a pixel, every view in one dispatch: a headlit colour
+/// into a bindless image, and each pixel's distance, world normal, instance and albedo into
+/// buffers kernels, CUDA or PyTorch read.
 import bindless;
 import ray_tracer;
+import spectrum;
 
 /// No output: an image index or address left out.
 static const uint kNoImage = 0xffffffff;
 /// What a pixel that sees nothing gets in `instances`.
 static const uint kNoInstance = 0xffffffff;
 
-/// As camera_pass.cpp's `CameraParameters`.
-struct Parameters {
-    TracerParameters tracer;
+/// A view, as camera_pass.cpp's `ViewRecord`.
+struct View {
     /// Camera to world, relative to the render origin; the camera looks down -z, +y up.
     float4 rows[3];
-    /// The view's half extents at unit distance: tan(fov / 2) times the aspect, and tan(fov / 2).
+    /// The half extents at unit distance: tan(fov / 2) times the aspect, and tan(fov / 2).
     float2 halfExtent;
     uint2 size;
     /// What the colour image shows where nothing is hit, as stored.
@@ -23,57 +24,77 @@ struct Parameters {
     /// The colour image's bindless index, or `kNoImage`.
     uint colour;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
-    /// z, and the instance row; each 0 for no output.
+    /// z, the instance row, and `kBands` albedo bands; each 0 for no output.
     float* distances;
     float* normals;
     uint* instances;
+    float* albedos;
+};
+
+struct Parameters {
+    TracerParameters tracer;
+    View* views;
+    /// Each instance row's albedo, three linear RGB floats.
+    float* colours;
+    uint count;
 };
 [[vk::push_constant]] ConstantBuffer<Parameters> parameters;
 
-/// A plain look: grey surfaces lit from the eye.
-float3 Shade(float3 normal, float3 direction) {
+/// @return The light a pixel sees: the surface's albedo lit from the eye.
+Spectrum Shade(Spectrum albedo, float3 normal, float3 direction) {
     float lit = abs(dot(normal, direction));
-    return float3(0.8) * (0.15 + 0.85 * lit);
+    return albedo.Scaled(0.15 + 0.85 * lit);
 }
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 id : SV_DispatchThreadID) {
-    uint2 pixel = id.xy;
-    if (any(pixel >= parameters.size)) {
+    if (id.z >= parameters.count) {
         return;
     }
-    float2 ndc = (float2(pixel) + 0.5) / float2(parameters.size) * 2 - 1;
-    float3 view = normalize(float3(ndc.x * parameters.halfExtent.x,
-                                   -ndc.y * parameters.halfExtent.y, -1));
-    float3x4 toWorld = float3x4(parameters.rows[0], parameters.rows[1], parameters.rows[2]);
-    RayDesc ray = { mul(toWorld, float4(0, 0, 0, 1)), 0, mul(toWorld, float4(view, 0)), 1e30 };
+    View view = parameters.views[id.z];
+    uint2 pixel = id.xy;
+    if (any(pixel >= view.size)) {
+        return;
+    }
+    float2 ndc = (float2(pixel) + 0.5) / float2(view.size) * 2 - 1;
+    float3 direction = normalize(float3(ndc.x * view.halfExtent.x, -ndc.y * view.halfExtent.y, -1));
+    float3x4 toWorld = float3x4(view.rows[0], view.rows[1], view.rows[2]);
+    RayDesc ray = { mul(toWorld, float4(0, 0, 0, 1)), 0, mul(toWorld, float4(direction, 0)), 1e30 };
 
     RayTracer tracer = RayTracer(parameters.tracer);
     Hit hit = tracer.TraceClosest(ray, 0xff);
     float3 normal = float3(0);
+    Spectrum albedo = Spectrum(0);
     if (hit.found) {
         normal = tracer.WorldNormal(hit);
+        float* colour = parameters.colours + 3 * hit.instance;
+        albedo = Uplift(float3(colour[0], colour[1], colour[2]));
     }
 
-    uint at = pixel.y * parameters.size.x + pixel.x;
-    if (parameters.colour != kNoImage) {
-        // The image is UNORM: encode for display roughly as sRGB would.
-        float3 colour = parameters.background;
+    uint at = pixel.y * view.size.x + pixel.x;
+    if (view.colour != kNoImage) {
+        float3 shown = view.background;
         if (hit.found) {
-            colour = pow(Shade(normal, ray.Direction), 1 / 2.2);
+            // The image is UNORM: encode for display roughly as sRGB would.
+            shown = pow(saturate(ToLinearSrgb(Shade(albedo, normal, ray.Direction))), 1 / 2.2);
         }
-        images[NonUniformResourceIndex(parameters.colour)][pixel] = float4(colour, 1);
+        images[NonUniformResourceIndex(view.colour)][pixel] = float4(shown, 1);
     }
-    if (parameters.distances != nullptr) {
-        parameters.distances[at] = hit.found ? hit.t : 1.0 / 0.0;
+    if (view.distances != nullptr) {
+        view.distances[at] = hit.found ? hit.t : 1.0 / 0.0;
     }
-    if (parameters.normals != nullptr) {
-        parameters.normals[3 * at] = normal.x;
-        parameters.normals[3 * at + 1] = normal.y;
-        parameters.normals[3 * at + 2] = normal.z;
+    if (view.normals != nullptr) {
+        view.normals[3 * at] = normal.x;
+        view.normals[3 * at + 1] = normal.y;
+        view.normals[3 * at + 2] = normal.z;
     }
-    if (parameters.instances != nullptr) {
-        parameters.instances[at] = hit.found ? hit.instance : kNoInstance;
+    if (view.instances != nullptr) {
+        view.instances[at] = hit.found ? hit.instance : kNoInstance;
+    }
+    if (view.albedos != nullptr) {
+        for (int band = 0; band < kBands; ++band) {
+            view.albedos[kBands * at + band] = albedo.values[band];
+        }
     }
 }

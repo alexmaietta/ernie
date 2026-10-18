@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file camera_pass.h
-/// @brief A pinhole camera traced through the scene: a shaded colour image to look at, and each
-/// pixel's distance, normal and instance in buffers kernels, CUDA or PyTorch read in place.
+/// @brief Pinhole cameras traced through the scene, every view in one dispatch: a shaded colour
+/// image to look at, and each pixel's distance, normal, instance and albedo in buffers kernels,
+/// CUDA or PyTorch read in place.
 ///
 ///     CameraOutputs outputs{.colour = graph.Import(image, "colour"), .colourIndex = index};
 ///     camera.Add(graph, {.cameraToWorld = orbit.Transform(), .size = {640, 480}}, outputs);
@@ -18,6 +19,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace ernie {
 
@@ -32,8 +34,8 @@ struct PinholeView {
     glm::uvec2 size{1};
 };
 
-/// @brief What a camera pass writes; each left out is not written. Each written one is replaced by
-/// its version after the pass.
+/// @brief What a camera pass writes for a view; each left out is not written. Each written one is
+/// replaced by its version after the pass.
 struct CameraOutputs {
     /// A storage image of the view's size, and its slot in the pass's heap.
     std::optional<graph::Image> colour;
@@ -46,18 +48,29 @@ struct CameraOutputs {
     std::optional<graph::Buffer> normals;
     /// A uint32 a pixel: the instance row hit, or `kNoInstance`.
     std::optional<graph::Buffer> instances;
+    /// `kBands` floats a pixel: the albedo hit, per spectral band; zero where nothing is hit.
+    std::optional<graph::Buffer> albedos;
 };
 
-/// @brief Traces a pinhole camera through the scene the graph's `TraceScene` describes, one ray a
-/// pixel, shading what it hits with a headlight.
+/// @brief A view and what to write of it.
+struct CameraView {
+    PinholeView view;
+    CameraOutputs outputs;
+};
+
+/// @brief Traces pinhole cameras through the scene the graph's `TraceScene` describes, one ray a
+/// pixel, shading what each hits by its albedo and a headlight.
 class CameraPass {
   public:
     static constexpr std::uint32_t kNoInstance = 0xffffffff;
+    /// The spectral bands albedos carry: RGB mode's three, linear sRGB.
+    static constexpr std::uint32_t kBands = 3;
 
     CameraPass(DeviceContext& context, const ShaderCompiler& compiler, const BindlessHeap& heap);
 
-    /// @brief Adds the pass, after the ray tracer's builds.
+    /// @brief Adds the pass tracing every view in one dispatch, after the ray tracer's builds.
     /// @throws std::invalid_argument when the graph has no `TraceScene`.
+    void Add(graph::Graph& graph, std::span<CameraView> views) const;
     void Add(graph::Graph& graph, const PinholeView& view, CameraOutputs& outputs) const;
 
   private:

@@ -10,4 +10,5 @@ ernie_add_shaders(
     scene/shapes.slang
     scene/transform.slang
     sensors/camera.slang
+    spectral/spectrum.slang
 )

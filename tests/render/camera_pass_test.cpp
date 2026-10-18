@@ -33,6 +33,7 @@ struct Outputs {
     std::vector<float> distances;
     std::vector<glm::vec3> normals;
     std::vector<std::uint32_t> instances;
+    std::vector<glm::vec3> albedos;
 };
 
 class CameraPassTest : public ::testing::Test {
@@ -57,6 +58,7 @@ class CameraPassTest : public ::testing::Test {
         distances_ = column("distances", DType::Float32, 1);
         normals_ = column("normals", DType::Float32, 3);
         instances_ = column("instances", DType::Int32, 1);
+        albedos_ = column("albedos", DType::Float32, CameraPass::kBands);
         colour_ = std::make_unique<DeviceImage>(
             *context_,
             ImageDescription{.format = ImageFormat::Rgba8Unorm,
@@ -92,6 +94,7 @@ class CameraPassTest : public ::testing::Test {
                     .distances = graph.Import(*distances_, "distances"),
                     .normals = graph.Import(*normals_, "normals"),
                     .instances = graph.Import(*instances_, "instances"),
+                    .albedos = graph.Import(*albedos_, "albedos"),
                 };
                 camera_->Add(graph, view, outputs);
             },
@@ -100,6 +103,7 @@ class CameraPassTest : public ::testing::Test {
         outputs.distances = Read<float>(*distances_, kPixels, done);
         outputs.normals = Read<glm::vec3>(*normals_, kPixels, done);
         outputs.instances = Read<std::uint32_t>(*instances_, kPixels, done);
+        outputs.albedos = Read<glm::vec3>(*albedos_, kPixels, done);
         return outputs;
     }
 
@@ -119,16 +123,19 @@ class CameraPassTest : public ::testing::Test {
         return sphere;
     }
 
-    /// @brief Expects the middle pixel to see the sphere's near side 4 m off along +y, and the
-    /// corners to see nothing.
-    void ExpectTheSphereAhead(const Outputs& outputs, PrimId sphere) {
+    /// @brief Expects the middle pixel to see the sphere's near side 4 m off along +y, of albedo
+    /// `colour`, and the corners to see nothing.
+    void ExpectTheSphereAhead(const Outputs& outputs, PrimId sphere,
+                              glm::vec3 colour = glm::vec3(0.5f)) {
         EXPECT_NEAR(outputs.distances[kMiddle], 4.0f, 1e-4f);
         EXPECT_NEAR(glm::length(outputs.normals[kMiddle] - glm::vec3(0, -1, 0)), 0.0f, 1e-4f);
         EXPECT_EQ(outputs.instances[kMiddle], *device_->Instances().Row(sphere));
+        EXPECT_EQ(outputs.albedos[kMiddle], colour);
         for (const std::size_t corner : {std::size_t{0}, std::size_t{kSize.x} - 1, kPixels - 1}) {
             EXPECT_EQ(outputs.distances[corner], std::numeric_limits<float>::infinity()) << corner;
             EXPECT_EQ(outputs.normals[corner], glm::vec3(0)) << corner;
             EXPECT_EQ(outputs.instances[corner], CameraPass::kNoInstance) << corner;
+            EXPECT_EQ(outputs.albedos[corner], glm::vec3(0)) << corner;
         }
     }
 
@@ -139,6 +146,7 @@ class CameraPassTest : public ::testing::Test {
     std::unique_ptr<DeviceColumn> distances_;
     std::unique_ptr<DeviceColumn> normals_;
     std::unique_ptr<DeviceColumn> instances_;
+    std::unique_ptr<DeviceColumn> albedos_;
     std::unique_ptr<DeviceImage> colour_;
     BindlessIndex colourIndex_;
     Scene scene_;
@@ -168,6 +176,45 @@ TEST_F(CameraPassTest, KeepsSeeingWhatItFliesTo) {
     Frame({0, 0, 0}, {0, 1, 0});
     EXPECT_FALSE(device_->Follow({500, 0, 0})) << "within the rebase distance";
     ExpectTheSphereAhead(Frame(far, far + glm::dvec3(0, 1, 0)), sphere);
+}
+
+TEST_F(CameraPassTest, AlbedoFollowsTheDisplayColourWithoutRebuilding) {
+    const PrimId sphere = Sphere({0, 5, 0});
+    scene_.Set(sphere, "primvars:displayColor", glm::dvec3(0.25, 0.5, 0.75));
+    ExpectTheSphereAhead(Frame({0, 0, 0}, {0, 1, 0}), sphere, {0.25f, 0.5f, 0.75f});
+    scene_.Set(sphere, "primvars:displayColor", glm::dvec3(1, 0, 0));
+    ExpectTheSphereAhead(Frame({0, 0, 0}, {0, 1, 0}), sphere, {1, 0, 0});
+    const BottomLevels::Statistics& totals = device_->Tracer()->Bottoms().Totals();
+    EXPECT_EQ(totals.built, 1u) << "the unit sphere, once";
+    EXPECT_EQ(totals.refitted, 0u);
+}
+
+TEST_F(CameraPassTest, TracesViewsOfDifferentSizesInOneDispatch) {
+    const PrimId sphere = Sphere({0, 5, 0});
+    const glm::uvec2 small{17, 9};
+    const DeviceColumn behind(*arenas_, "behind", DType::Float32, {}, small.x * small.y);
+    device_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene_, ShaderCompiler());
+    const auto looking = [](const glm::dvec3& target) {
+        return glm::inverse(glm::lookAtRH(glm::dvec3(0), target, glm::dvec3(0, 0, 1)));
+    };
+    const Ticket done = device_->Execute([&](graph::Graph& graph) {
+        std::array views{
+            CameraView{
+                .view = {.cameraToWorld = looking({0, 1, 0}), .verticalFov = 0.5, .size = kSize},
+                .outputs = {.distances = graph.Import(*distances_, "distances"),
+                            .instances = graph.Import(*instances_, "instances")}},
+            CameraView{.view = {.cameraToWorld = looking({0, -1, 0}), .size = small},
+                       .outputs = {.distances = graph.Import(behind, "behind")}},
+        };
+        camera_->Add(graph, views);
+    });
+    const std::vector<float> ahead = Read<float>(*distances_, kPixels, done);
+    EXPECT_NEAR(ahead[kMiddle], 4.0f, 1e-4f);
+    EXPECT_EQ(Read<std::uint32_t>(*instances_, kPixels, done)[kMiddle],
+              *device_->Instances().Row(sphere));
+    for (const float distance : Read<float>(behind, std::size_t{small.x} * small.y, done)) {
+        ASSERT_EQ(distance, std::numeric_limits<float>::infinity()) << "nothing behind";
+    }
 }
 
 }  // namespace

@@ -60,6 +60,8 @@ struct PrimGeometry {
     PrimId prim;
     GeometryId geometry = 0;
     glm::dmat4 shape{1.0};
+    /// Its albedo in linear RGB, from `primvars:displayColor`, until materials bind one.
+    glm::vec3 colour{0.5f};
 };
 
 /// @brief The scene's gprims as device geometry. Implicit shapes share one unit geometry a kind
@@ -71,7 +73,7 @@ class GeometryPool {
   public:
     /// @brief What an update changed, for the bottom levels and instances that follow it.
     struct Changes {
-        /// Prims added, or whose geometry or shape changed.
+        /// Prims added, or whose geometry, shape or colour changed.
         std::vector<PrimGeometry> placed;
         std::vector<PrimId> removed;
         /// Geometries new or of new topology, whose bottom levels are built anew.
@@ -109,8 +111,9 @@ class GeometryPool {
     }
 
   private:
-    /// Places a prim: its geometry, built or shared, and its shape transform.
-    void Place(PrimId prim, bool topology, Changes& changes);
+    /// Places a prim: its geometry, built or shared, its shape transform and its colour. A mesh's
+    /// points are uploaded when it is new or `points`, its triangles when `topology`.
+    void Place(PrimId prim, bool points, bool topology, Changes& changes);
     /// @return The unit shape geometry of a kind, made the first time it is asked for.
     GeometryId UnitShape(GeometryKind kind);
     /// @return A new or recycled geometry id.

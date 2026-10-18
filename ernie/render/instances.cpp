@@ -33,6 +33,7 @@ InstanceTable::InstanceTable(DeviceContext& context, Arenas& arenas)
     nodes_ = column("instance nodes", DType::UInt32, {});
     geometries_ = column("instance geometries", DType::UInt32, {});
     shapes_ = column("instance shapes", DType::Float32, {3, 4});
+    colours_ = column("instance colours", DType::Float32, {3});
 }
 
 std::optional<std::uint32_t> InstanceTable::Row(PrimId prim) const {
@@ -48,6 +49,7 @@ void InstanceTable::Set(std::uint32_t row, const PrimGeometry& placed) {
     hostNodes_[row] = placed.prim.slot;
     hostGeometries_[row] = placed.geometry;
     hostShapes_[row] = RowMajor(placed.shape);
+    hostColours_[row] = placed.colour;
     rows_[placed.prim.slot] = row;
     dirty_.push_back(row);
 }
@@ -64,6 +66,7 @@ void InstanceTable::Remove(PrimId prim) {
         hostNodes_[*row] = hostNodes_[last];
         hostGeometries_[*row] = hostGeometries_[last];
         hostShapes_[*row] = hostShapes_[last];
+        hostColours_[*row] = hostColours_[last];
         rows_[prims_[*row].slot] = *row;
         dirty_.push_back(*row);
     }
@@ -72,6 +75,7 @@ void InstanceTable::Remove(PrimId prim) {
     hostNodes_.pop_back();
     hostGeometries_.pop_back();
     hostShapes_.pop_back();
+    hostColours_.pop_back();
 }
 
 void InstanceTable::Apply(const GeometryPool::Changes& changes) {
@@ -92,13 +96,14 @@ void InstanceTable::Apply(const GeometryPool::Changes& changes) {
         hostNodes_.emplace_back();
         hostGeometries_.emplace_back();
         hostShapes_.emplace_back();
+        hostColours_.emplace_back();
         Set(static_cast<std::uint32_t>(prims_.size() - 1), placed);
     }
 }
 
 void InstanceTable::AddUploads(graph::Graph& graph) {
     const std::size_t rows = prims_.size();
-    for (DeviceColumn* column : {nodes_.get(), geometries_.get(), shapes_.get()}) {
+    for (DeviceColumn* column : {nodes_.get(), geometries_.get(), shapes_.get(), colours_.get()}) {
         column->Resize(rows, context_.Main());
     }
     std::ranges::sort(dirty_);
@@ -114,10 +119,11 @@ void InstanceTable::AddUploads(graph::Graph& graph) {
     upload(*nodes_, hostNodes_);
     upload(*geometries_, hostGeometries_);
     upload(*shapes_, hostShapes_);
+    upload(*colours_, hostColours_);
     dirty_.clear();
-    std::array columns{graph.Import(*nodes_, nodes_->Name()),
-                       graph.Import(*geometries_, geometries_->Name()),
-                       graph.Import(*shapes_, shapes_->Name())};
+    std::array columns{
+        graph.Import(*nodes_, nodes_->Name()), graph.Import(*geometries_, geometries_->Name()),
+        graph.Import(*shapes_, shapes_->Name()), graph.Import(*colours_, colours_->Name())};
     graph.Add(
         "Upload instances", graph::Kind::Copy,
         [&](graph::PassBuilder& pass) {

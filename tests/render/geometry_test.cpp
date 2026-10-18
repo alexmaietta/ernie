@@ -156,6 +156,13 @@ TEST_F(Geometries, EditsCostWhatTheyChange) {
     EXPECT_EQ(changes.placed[0].shape[0][0], 5.0);
     EXPECT_TRUE(changes.rebuilt.empty() && changes.refitted.empty());
 
+    // A mesh recoloured: a new colour, no geometry work.
+    scene_.Set(mesh_, "primvars:displayColor", glm::dvec3(1, 0, 0));
+    changes = Update();
+    ASSERT_EQ(changes.placed.size(), 1u);
+    EXPECT_EQ(changes.placed[0].colour, glm::vec3(1, 0, 0));
+    EXPECT_TRUE(changes.rebuilt.empty() && changes.refitted.empty());
+
     // A capsule taken out frees its own geometry; the shared sphere stays.
     scene_.Remove("/Pill");
     changes = Update();

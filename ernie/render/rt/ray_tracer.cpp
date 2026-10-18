@@ -29,11 +29,14 @@ void RayTracer::AddBuild(graph::Graph& graph, const GeometryPool::Changes& chang
     bottoms_.AddBuilds(graph);
     const graph::Acceleration top = tops_.AddBuild(graph, transforms, instances, bottoms_);
     const DeviceColumn& records = geometry_.Records();
+    const DeviceColumn& colours = instances.Colours();
     graph.Board().Put(TraceScene{
         .parameters = {.scene = tops_.Structure()->Address(), .records = records.Address()},
         .top = top,
         .records = graph.Import(records, records.Name()),
         .instances = instances.Count(),
+        .colours = graph.Import(colours, colours.Name()),
+        .colourAddress = colours.Address(),
         .origin = transforms.Origin()});
 }
 
