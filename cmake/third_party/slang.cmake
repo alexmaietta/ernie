@@ -6,9 +6,6 @@ set(ERNIE_DEP_VERSION_slang
 )
 mark_as_advanced(ERNIE_DEP_VERSION_slang)
 
-# Prebuilt Slang: the compiler Ernie links to turn Slang modules into SPIR-V (and WGSL) at run
-# time, so user models compile into Ernie's kernels. The Linux builds target old glibc versions,
-# so they run wherever manylinux_2_34 wheels do.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
     set(slang_platform linux-x86_64-glibc-2.27)
     set(slang_sha256 ae348a33d906ed29d14c2294f2260746cb2c3eb4aa2c7fc4bfd887a3a298737d)
