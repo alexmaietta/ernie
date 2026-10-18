@@ -3,6 +3,7 @@ add_library(
     ernie_scene
     OBJECT
     animation.cpp
+    edit_history.cpp
     extent_cache.cpp
     holder_index.cpp
     inherit.cpp

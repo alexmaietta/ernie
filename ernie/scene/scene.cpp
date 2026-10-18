@@ -214,6 +214,7 @@ std::optional<Value> Scene::Get(const Path& path, std::string_view attribute) co
 }
 
 bool Scene::Clear(PrimId prim, std::string_view attribute) {
+    ClearSamples(prim, attribute);
     const Column* column = AuthoredColumn(prim, attribute);
     if (column != nullptr) {
         store_.Clear(prim, column->attribute);

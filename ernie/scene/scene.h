@@ -105,6 +105,7 @@ class Scene {
     double Time() const {
         return time_;
     }
+    /// @brief Unauthors an attribute and drops its samples.
     /// @return Whether the attribute was authored.
     bool Clear(PrimId prim, std::string_view attribute);
     bool IsAuthored(PrimId prim, std::string_view attribute) const;
