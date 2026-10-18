@@ -5,6 +5,9 @@ from ernie import _ernie
 from ernie._ernie import (
     DeviceColumn,
     DeviceContext,
+    Prim,
+    Scene,
+    SceneArray,
     VulkanDeviceInfo,
     VulkanDeviceType,
     __version__,
@@ -32,6 +35,9 @@ def cuda_allocator():
 __all__ = [
     "DeviceColumn",
     "DeviceContext",
+    "Prim",
+    "Scene",
+    "SceneArray",
     "VulkanDeviceInfo",
     "VulkanDeviceType",
     "__version__",

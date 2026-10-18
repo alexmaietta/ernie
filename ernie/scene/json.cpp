@@ -183,6 +183,8 @@ RotationOrder ReadRotationOrder(const Json& json) {
     throw std::invalid_argument("rotationOrder is one of XYZ, XZY, YXZ, YZX, ZXY or ZYX");
 }
 
+}  // namespace
+
 XformOps ReadXform(const Json& json) {
     XformOps xform;
     for (const auto& [key, value] : json.items()) {
@@ -203,9 +205,8 @@ XformOps ReadXform(const Json& json) {
     return xform;
 }
 
-/// Authors an attribute's value, or with `time` its sample there.
 void LoadAttribute(Scene& scene, PrimId prim, const std::string& name, const Json& json,
-                   std::span<const Tensor> arrays, std::optional<double> time = std::nullopt) {
+                   std::span<const Tensor> arrays, std::optional<double> time) {
     const auto write = [&](Tensor array) {
         time ? scene.WriteAt(prim, name, *time, std::move(array))
              : scene.Write(prim, name, std::move(array));
@@ -228,6 +229,8 @@ void LoadAttribute(Scene& scene, PrimId prim, const std::string& name, const Jso
         time ? scene.SetAt(prim, name, *time, value) : scene.Set(prim, name, value);
     }
 }
+
+namespace {
 
 /// Authors an attribute's samples: `"radius.timeSamples": {"0": 1, "24": 2}`, as USD writes them.
 void LoadSamples(Scene& scene, PrimId prim, const std::string& name, const Json& json,
