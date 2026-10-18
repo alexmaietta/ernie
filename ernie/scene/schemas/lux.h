@@ -29,10 +29,6 @@
       "Tints it by its colour temperature too.", .group = "Light")                                 \
     X(double, ColorTemperature, "inputs:colorTemperature", 6500.0, "Kelvin, a black body's.",      \
       .group = "Light", .lower = Above(0.0), .finite = true)                                       \
-    X(std::vector<float>, Spectrum, "ernie:spectrum", std::vector<float>{},                        \
-      "(nm, value) pairs of a physical spectrum: W m^-2 nm^-1 for a distant light, W sr^-1 nm^-1 " \
-      "for a sphere, W m^-2 sr^-1 nm^-1 for a rect, disk or dome.",                                \
-      .group = "Spectrum")                                                                         \
     X(double, PolarizationDegree, "ernie:polarization:degree", 0.0,                                \
       "The fraction of its light linearly polarized.", .label = "Polarized",                       \
       .group = "Polarization", .lower = AtLeast(0.0), .upper = AtMost(1.0))                        \
@@ -58,15 +54,16 @@
 
 #define ERNIE_BOUNDABLE_LIGHT_BASE_ATTRIBUTES(X)                                                   \
     X(double, Power, "ernie:power", 0.0,                                                           \
-      "Radiant flux in watts over 360 to 830 nm, in place of the intensity when set.",             \
+      "Radiant flux in watts, scaling the illuminant's spectral shape; authored, it sets the "     \
+      "brightness unless photometric values are authored.",                                        \
       .group = "Light", .lower = AtLeast(0.0), .finite = true)
 
 #define ERNIE_DISTANT_LIGHT_ATTRIBUTES(X)                                                          \
     X(double, Angle, "inputs:angle", 0.53, "Angular diameter in degrees; the Sun's is 0.53.",      \
       .group = "Light", .lower = AtLeast(0.0), .upper = AtMost(360.0))                             \
     X(double, Irradiance, "ernie:irradiance", 1361.0,                                              \
-      "W m^-2 at normal incidence, the Sun's at 1 au; authored, or with a spectrum, the light is " \
-      "physical.",                                                                                 \
+      "W m^-2 at normal incidence (the Sun's at 1 au), scaling the illuminant's spectral shape; "  \
+      "authored, it sets the brightness unless photometric values are authored.",                 \
       .group = "Light", .lower = AtLeast(0.0), .finite = true)
 
 #define ERNIE_DISK_LIGHT_ATTRIBUTES(X)                                                             \
@@ -125,8 +122,9 @@
     X(bool, ShapingIesNormalize, "inputs:shaping:ies:normalize", false,                            \
       "Keeps the profile from changing the light's power.", .group = "Shaping")
 
-// Omniverse's photometric and illuminant schemas (omni.usd.schema.physical_lighting). Authoring any
-// photometric value puts the light in photometric units, which alone then set its brightness.
+// Omniverse's photometric and illuminant schemas (omni.usd.schema.physical_lighting). A light's
+// spectral shape comes from its illuminant alone; its brightness from authored photometric values,
+// else authored ernie:irradiance or ernie:power, else USD's intensity and exposure.
 #define ERNIE_PHOTOMETRIC_SWITCH " Authored, it alone sets the light's brightness."
 
 #define ERNIE_PHOTOMETRIC_AREA_LIGHT_API_ATTRIBUTES(X)                                             \

@@ -82,10 +82,12 @@ TEST(Lights, ErnieAttributesSitBesideUsdLuxs) {
     Scene scene;
     SphereLight strobe = SphereLight::Define(scene, "/Strobe");
     strobe.SetPulseRate(30.0).SetPulseTrigger(PulseTrigger::Exposure).SetPower(100.0);
-    strobe.SetSpectrum({400.0f, 1.0f, 700.0f, 0.5f});
+    PhysicalLightIlluminantAPI::Apply(scene, "/Strobe")
+        .SetPhysicalIlluminant("custom")
+        .SetPhysicalCustomIlluminant({400.0f, 1.0f, 700.0f, 0.5f});
     EXPECT_EQ(scene.Get(strobe.Id(), "ernie:pulse:trigger"), Value("exposure"));
-    EXPECT_EQ(scene.Get(strobe.Id(), "ernie:power"), Value(100.0));
-    EXPECT_EQ(strobe.GetSpectrum().size(), 4u);
+    EXPECT_EQ(scene.Get(strobe.Id(), "ernie:power"), Value(100.0)) << "the scale of that shape";
+    EXPECT_FALSE(scene.Get(strobe.Id(), "ernie:spectrum")) << "shape comes from the illuminant";
     EXPECT_EQ(DistantLight::Define(scene, "/Sun").GetIrradiance(), 1361.0);
     EXPECT_THROW(strobe.SetPolarizationDegree(2.0), std::invalid_argument);
 }
