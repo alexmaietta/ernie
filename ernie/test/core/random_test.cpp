@@ -120,5 +120,21 @@ TEST(Random, SampleBitsAreStable) {
     EXPECT_EQ(SampleBits({1, 2, 3, 4}, 5), 2812305927u);
 }
 
+TEST(Random, SplitMix64MatchesTheReferenceAndDrawsUniforms) {
+    SplitMix64 reference(0);
+    EXPECT_EQ(reference.NextBits(), 0xe220a8397b1dcdafull);  // Vigna's splitmix64.c from seed 0.
+    SplitMix64 random(42);
+    double sum = 0.0;
+    constexpr int kDraws = 100000;
+    for (int i = 0; i < kDraws; ++i) {
+        const double u = random.NextUniform();
+        ASSERT_GE(u, 0.0);
+        ASSERT_LT(u, 1.0);
+        sum += u;
+    }
+    // The mean of 10^5 uniforms is 0.5 within about 5 standard errors (0.0009 each).
+    EXPECT_NEAR(sum / kDraws, 0.5, 0.005);
+}
+
 }  // namespace
 }  // namespace ernie

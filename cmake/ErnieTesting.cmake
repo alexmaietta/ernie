@@ -9,6 +9,12 @@ set(ERNIE_TEST_TIMEOUT_unit 10)
 set(ERNIE_TEST_TIMEOUT_gpu 60)
 set(ERNIE_TEST_TIMEOUT_accuracy 120)
 set(ERNIE_TEST_TIMEOUT_python 120)
+# Unoptimised, instrumented coverage builds run several times slower.
+if(ERNIE_COVERAGE)
+    foreach(label unit gpu accuracy python)
+        math(EXPR ERNIE_TEST_TIMEOUT_${label} "${ERNIE_TEST_TIMEOUT_${label}} * 10")
+    endforeach()
+endif()
 
 # Adds the gtest executable ernie_tests_<name> and registers its tests as ernie.<name>.<test>.
 function(ernie_add_test_suite name)

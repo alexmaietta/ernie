@@ -5,9 +5,12 @@ ernie_add_test_suite(
     core
     SOURCES
         core/disk_cache_test.cpp
+        core/linear_algebra_test.cpp
         core/log_test.cpp
         core/mapped_file_test.cpp
+        core/math_test.cpp
         core/noise_test.cpp
+        core/parallel_test.cpp
         core/profile_report_test.cpp
         core/profiler_test.cpp
         core/random_test.cpp
@@ -15,6 +18,25 @@ ernie_add_test_suite(
         core/version_test.cpp
         core/worker_pool_test.cpp
     LIBRARIES ernie_core ernie_json
+)
+ernie_add_test_suite(
+    physics
+    SOURCES
+        physics/astronomy_test.cpp
+        physics/atmosphere_test.cpp
+        physics/reflectance_library_test.cpp
+        physics/regolith_test.cpp
+        physics/scattering_test.cpp
+        physics/solar_test.cpp
+        physics/spectrum_test.cpp
+    LIBRARIES ernie_physics
+)
+# Monte Carlo and Mie checks against analytic results, slower than unit tests.
+ernie_add_test_suite(
+    physics_accuracy
+    LABEL accuracy
+    SOURCES physics/cloud_test.cpp
+    LIBRARIES ernie_physics
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)
 

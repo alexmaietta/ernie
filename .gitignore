@@ -1,9 +1,11 @@
-# Local design documents
-docs/requirements/
+# Local design documents and tools, not yet part of the repository
+/requirements/
+/tools/
 
 # Build output and fetched dependencies
 build/
 dist/
+site/
 .deps/
 *.egg-info/
 __pycache__/

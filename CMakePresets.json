@@ -33,6 +33,19 @@
       }
     },
     {
+      "name": "coverage",
+      "displayName": "Coverage",
+      "description": "Instrumented for code coverage, as CI measures it, in build/coverage",
+      "inherits": "dev",
+      "binaryDir": "${sourceDir}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ERNIE_COVERAGE": "ON",
+        "ERNIE_WARNINGS_AS_ERRORS": "ON",
+        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+      }
+    },
+    {
       "name": "package",
       "displayName": "Packages",
       "description": "Release build of the ernie program for DEB, RPM and TGZ packages, in build/package",
@@ -58,6 +71,10 @@
       "configurePreset": "ci"
     },
     {
+      "name": "coverage",
+      "configurePreset": "coverage"
+    },
+    {
       "name": "package",
       "configurePreset": "package"
     }
@@ -73,6 +90,13 @@
     {
       "name": "ci",
       "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
       "output": {
         "outputOnFailure": true
       }

@@ -3,4 +3,5 @@ build
 dist
 .deps
 .venv
-docs/requirements
+requirements
+site

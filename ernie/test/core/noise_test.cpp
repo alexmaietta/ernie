@@ -48,5 +48,38 @@ TEST(Noise, FbmAddsOctavesWithinTheSameRange) {
     }
 }
 
+// One period on in any axis gives the same noise, so textures built from it repeat seamlessly.
+TEST(Noise, WorleyAndPerlinTileAcrossTheirPeriod) {
+    for (const double cells : {4.0, 8.0, 32.0}) {
+        for (const double t : {0.013, 0.37, 0.81}) {
+            const glm::dvec3 p(t, 0.21, 0.6);
+            const double here = TileableWorley(p, cells);
+            EXPECT_NEAR(TileableWorley(p + glm::dvec3(1.0, 0.0, 0.0), cells), here, 1e-9);
+            EXPECT_NEAR(TileableWorley(p + glm::dvec3(0.0, 1.0, 0.0), cells), here, 1e-9);
+            EXPECT_NEAR(TileableWorley(p + glm::dvec3(0.0, 0.0, 1.0), cells), here, 1e-9);
+            EXPECT_GE(here, 0.0);
+            EXPECT_LE(here, 1.0);
+        }
+    }
+    const glm::dvec3 frequency(6.0, 12.0, 1.0);
+    for (const double t : {0.013, 0.37, 0.81}) {
+        const glm::dvec3 p(t, 0.4, 0.0);
+        const double here = TileablePerlin(p, frequency, 4);
+        EXPECT_NEAR(TileablePerlin(p + glm::dvec3(1.0, 0.0, 0.0), frequency, 4), here, 1e-5);
+        EXPECT_NEAR(TileablePerlin(p + glm::dvec3(0.0, 1.0, 0.0), frequency, 4), here, 1e-5);
+    }
+}
+
+TEST(Noise, ValueNoiseAndWorleyFbmStayInRange) {
+    for (int i = 0; i < 1000; ++i) {
+        const glm::dvec3 p(0.173 * i, 0.311 * i - 40.0, 0.057 * i);
+        EXPECT_GE(ValueNoise(p), 0.0);
+        EXPECT_LE(ValueNoise(p), 1.0);
+        const double fbm = WorleyFbm(glm::fract(p), 2.0);
+        EXPECT_GE(fbm, 0.0);
+        EXPECT_LE(fbm, 1.0);
+    }
+}
+
 }  // namespace
 }  // namespace ernie

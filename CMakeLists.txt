@@ -23,6 +23,7 @@ option(ERNIE_BUILD_APP "Build the ernie program" ON)
 option(ERNIE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(ERNIE_ASSERTS "Keep assertions in optimised builds" OFF)
 option(ERNIE_TRACY "Send profiling zones to the Tracy profiler too" OFF)
+option(ERNIE_COVERAGE "Instrument Ernie for code coverage (GCC or Clang)" OFF)
 
 get_property(ernie_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(PROJECT_IS_TOP_LEVEL AND NOT ernie_multi_config AND NOT CMAKE_BUILD_TYPE)
@@ -76,6 +77,12 @@ if(ERNIE_ASSERTS)
         ernie_build_options
         INTERFACE $<IF:$<CXX_COMPILER_ID:MSVC>,/UNDEBUG,-UNDEBUG>
     )
+endif()
+if(ERNIE_COVERAGE)
+    # Unoptimised, so every line maps to its own counters; atomic, as ParallelFor's threads share
+    # them.
+    target_compile_options(ernie_build_options INTERFACE --coverage -fprofile-update=atomic -O0 -g)
+    target_link_options(ernie_build_options INTERFACE --coverage)
 endif()
 
 add_subdirectory(ernie)

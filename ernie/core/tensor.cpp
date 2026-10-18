@@ -290,7 +290,10 @@ std::vector<float> CopyFloats(const Tensor& tensor, std::string_view what) {
         return {packed.As<float>(), packed.As<float>() + count};
     }
     if (packed.Type() == DType::Float64) {
-        return {packed.As<double>(), packed.As<double>() + count};
+        std::vector<float> values(count);
+        std::transform(packed.As<double>(), packed.As<double>() + count, values.begin(),
+                       [](double value) { return static_cast<float>(value); });
+        return values;
     }
     throw std::invalid_argument(std::string(what) + " must be float32 or float64");
 }

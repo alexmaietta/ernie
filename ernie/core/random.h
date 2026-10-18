@@ -93,4 +93,34 @@ inline constexpr float SampleUniform(const SampleKey& key, std::uint32_t dimensi
     return static_cast<float>(SampleBits(key, dimension) >> 8u) * (1.0f / 16777216.0f);
 }
 
+/// A sequential generator for host-side Monte Carlo work such as baking tables: SplitMix64, with
+/// full double precision. Use `SampleBits` instead for anything the GPU must reproduce.
+///
+/// Reference: G. L. Steele, D. Lea and C. H. Flood, "Fast Splittable Pseudorandom Number
+/// Generators", OOPSLA 2014.
+class SplitMix64 {
+  public:
+    /// @brief Starts a stream.
+    /// @param seed The seed; different seeds give unrelated streams.
+    explicit constexpr SplitMix64(std::uint64_t seed) : state_(seed) {}
+
+    /// @brief Draws the next 64 random bits.
+    /// @return The bits.
+    constexpr std::uint64_t NextBits() {
+        std::uint64_t z = (state_ += 0x9e3779b97f4a7c15ull);
+        z = (z ^ (z >> 30u)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27u)) * 0x94d049bb133111ebull;
+        return z ^ (z >> 31u);
+    }
+
+    /// @brief Draws a uniform number.
+    /// @return A double in [0, 1) with 53 random bits.
+    constexpr double NextUniform() {
+        return static_cast<double>(NextBits() >> 11u) * 0x1.0p-53;
+    }
+
+  private:
+    std::uint64_t state_;
+};
+
 }  // namespace ernie

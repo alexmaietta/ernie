@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file noise.h
-/// @brief Seeded 3D gradient noise for procedural fields.
+/// @brief Procedural noise: seeded gradient noise, and value, Worley and Perlin noise that tile.
 #pragma once
 
 #include <glm/glm.hpp>
@@ -49,5 +49,39 @@ class GradientNoise {
   private:
     std::array<std::uint8_t, 512> permutation_{};
 };
+
+/// @brief Smoothed value noise on the integer lattice, from a sine hash.
+/// @param p The point.
+/// @return The noise at `p`, in [0, 1].
+double ValueNoise(const glm::dvec3& p);
+
+/// @brief Hillaire's tileable Worley noise, repeating over [0, 1] on every axis.
+/// @param p     The point.
+/// @param cells Cells across each axis.
+/// @return The squared distance to the nearest cell point, clamped to 1.
+///
+/// References:
+/// - S. Worley, "A Cellular Texture Basis Function", SIGGRAPH 1996.
+/// - S. Hillaire, TileableVolumeNoise, 2017, MIT. https://github.com/sebh/TileableVolumeNoise
+double TileableWorley(const glm::dvec3& p, double cells);
+
+/// @brief A fractal sum of inverted tileable Worley noise over four octaves (Hillaire's weights).
+/// @param p     The point.
+/// @param cells The first octave's cells across each axis, doubling each octave.
+/// @return The sum, in [0, 1].
+double WorleyFbm(const glm::dvec3& p, double cells);
+
+/// @brief A fractal sum of periodic Perlin noise; each octave doubles the frequency and halves
+/// the weight.
+/// @param p         The point.
+/// @param frequency The first octave's frequency on each axis, which is also its period.
+/// @param octaves   The number of octaves.
+/// @return The sum over the weights' sum, in about [-1, 1], unclamped.
+double TileablePerlin(const glm::dvec3& p, const glm::dvec3& frequency, int octaves);
+
+/// @brief Three decorrelated tileable Perlin sums, a vector field for curl noise.
+/// @param p The point.
+/// @return Three-octave sums at frequency 12, each at an offset of the point.
+glm::dvec3 TileablePerlin3(const glm::dvec3& p);
 
 }  // namespace ernie

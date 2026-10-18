@@ -16,6 +16,8 @@ repos:
     hooks:
       - id: clang-format
         types_or: [c++, c]
+        # Data tables written by tools/, kept exactly as generated.
+        exclude: _table\.h$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.1

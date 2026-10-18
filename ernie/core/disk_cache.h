@@ -4,11 +4,14 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace ernie {
 
@@ -38,5 +41,19 @@ class CacheKey {
 
     std::array<std::uint64_t, 2> hashes_{0xcbf29ce484222325ull, 0x84222325cbf29ce4ull};
 };
+
+/// @brief Reads a cache file of floats.
+/// @param path  The file.
+/// @param count How many floats it must hold.
+/// @return The floats, or nothing if the file is missing or holds a different amount.
+std::optional<std::vector<float>> ReadCachedFloats(const std::filesystem::path& path,
+                                                   std::size_t count);
+
+/// @brief Writes a cache file of floats so that no reader ever sees part of it: written beside it,
+/// then renamed over it. Failures leave no file behind and are otherwise ignored, since a cache
+/// can always be rebuilt.
+/// @param path   The file; its folder is created if needed.
+/// @param values The floats.
+void WriteCachedFloats(const std::filesystem::path& path, std::span<const float> values);
 
 }  // namespace ernie

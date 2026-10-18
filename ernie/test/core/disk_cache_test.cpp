@@ -49,5 +49,17 @@ TEST(DiskCache, TheVariableNamesOrDisablesTheFolder) {
     EXPECT_FALSE(CacheDirectory("ERNIE_TEST_CACHE", "test").has_value());
 }
 
+TEST(DiskCache, CachedFloatsRoundTripAndRejectTheWrongSize) {
+    const std::filesystem::path path =
+        std::filesystem::path(testing::TempDir()) / "ernie_cache" / "floats.bin";
+    std::filesystem::remove(path);
+    EXPECT_FALSE(ReadCachedFloats(path, 3).has_value());
+    const std::vector<float> values{1.5f, -2.0f, 3.25f};
+    WriteCachedFloats(path, values);
+    EXPECT_EQ(ReadCachedFloats(path, 3), values);
+    EXPECT_FALSE(ReadCachedFloats(path, 2).has_value());
+    EXPECT_FALSE(ReadCachedFloats(path, 4).has_value());
+}
+
 }  // namespace
 }  // namespace ernie

@@ -1,0 +1,21 @@
+site_name: Ernie
+site_description: Efficient Renderer for Natural and Interplanetary Environments
+site_url: https://alexmaietta.github.io/ernie/
+repo_url: https://github.com/alexmaietta/ernie
+repo_name: alexmaietta/ernie
+edit_uri: blob/main/docs/
+docs_dir: docs
+site_dir: site
+strict: true
+exclude_docs: |
+  README.md
+  requirements.txt
+
+theme:
+  name: readthedocs
+  navigation_depth: 3
+  collapse_navigation: true
+  sticky_navigation: true
+
+nav:
+  - Home: index.md
