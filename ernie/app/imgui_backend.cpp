@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file imgui.cpp
+/// @file imgui_backend.cpp
 /// @brief Creating the ImGui context, setting up its Vulkan backend and recording its draws.
-#include "ernie/app/imgui.h"
+#include "ernie/app/imgui_backend.h"
 
 #include "ernie/util/profiler.h"
 
@@ -84,6 +84,15 @@ ImGuiRenderer::~ImGuiRenderer() {
 
 void ImGuiRenderer::NewFrame() {
     ImGui_ImplVulkan_NewFrame();
+}
+
+ImTextureID ImGuiRenderer::AddTexture(VkImageView view, VkSampler sampler) {
+    return reinterpret_cast<ImTextureID>(
+        ImGui_ImplVulkan_AddTexture(sampler, view, VK_IMAGE_LAYOUT_GENERAL));
+}
+
+void ImGuiRenderer::RemoveTexture(ImTextureID texture) {
+    ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(texture));
 }
 
 void ImGuiRenderer::UpdateTextures(ImDrawData& data) {

@@ -4,8 +4,9 @@
 /// around the viewport, and the command line that opens it.
 #pragma once
 
-#include "ernie/app/imgui.h"
+#include "ernie/app/imgui_backend.h"
 #include "ernie/app/ui.h"
+#include "ernie/frame/frame.h"
 
 #include <glm/vec2.hpp>
 
@@ -71,6 +72,11 @@ class Viewer {
   private:
     /// @return Whether to keep going.
     bool Step();
+    /// @brief Sizes the viewport's image to the dock space's central node and draws it there,
+    /// behind the panels.
+    void ShowViewport();
+    /// @brief Adds the frame's own passes: rendering the viewport, then the UI over the target.
+    void AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target);
 
     ViewerOptions options_;
     // Made in this order, destroyed in reverse.
@@ -79,6 +85,12 @@ class Viewer {
     std::unique_ptr<Presenter> presenter_;
     std::unique_ptr<ImGuiRenderer> renderer_;
     std::unique_ptr<Shell> shell_;
+    std::unique_ptr<Arenas> arenas_;
+    std::unique_ptr<Frame> frame_;
+    /// The image the viewport is rendered into, and the UI's texture of it.
+    std::unique_ptr<Sampler> sampler_;
+    std::unique_ptr<DeviceImage> viewport_;
+    ImTextureID viewportTexture_ = 0;
     /// The frames the device may still be drawing, oldest first.
     std::deque<Ticket> inFlight_;
     std::uint64_t frames_ = 0;

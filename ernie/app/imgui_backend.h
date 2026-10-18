@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file imgui.h
+/// @file imgui_backend.h
 /// @brief Dear ImGui's plumbing: its context as the viewer sets it up, and its Vulkan backend.
 #pragma once
 
@@ -46,6 +46,10 @@ class ImGuiRenderer {
     /// its final layout.
     void Record(VkCommandBuffer commands, ImDrawData& data, const FrameTarget& target,
                 const glm::vec4& clear);
+    /// @return A texture the UI draws an image with in place, sampled in the general layout.
+    ImTextureID AddTexture(VkImageView view, VkSampler sampler);
+    /// @brief Forgets a texture `AddTexture` made, once no frame in flight draws with it.
+    void RemoveTexture(ImTextureID texture);
 
   private:
     DeviceContext& context_;

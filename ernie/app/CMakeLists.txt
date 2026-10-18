@@ -3,7 +3,7 @@ include("${PROJECT_SOURCE_DIR}/cmake/third_party/glfw.cmake")
 include("${PROJECT_SOURCE_DIR}/cmake/third_party/dear_imgui.cmake")
 
 # The viewer: its window, panels and frame loop, a library so tests drive it without a window.
-add_library(ernie_viewer STATIC imgui.cpp ui.cpp viewer.cpp)
+add_library(ernie_viewer STATIC imgui_backend.cpp ui.cpp viewer.cpp)
 target_link_libraries(
     ernie_viewer
     PUBLIC ernie_static ernie_imgui ernie_volk ernie_vma

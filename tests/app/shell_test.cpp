@@ -2,7 +2,7 @@
 /// @file shell_test.cpp
 /// @brief Tests of the viewer's UI drawn without a window: the layout, menus, shortcuts, the
 /// Stage panel's search and the camera's controls.
-#include "ernie/app/imgui.h"
+#include "ernie/app/imgui_backend.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/xform.h"

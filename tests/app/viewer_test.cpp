@@ -58,7 +58,7 @@ std::array<std::uint8_t, 4> ReadTexel(Viewer& viewer, glm::uvec2 pixel) {
     return rgba;
 }
 
-TEST(Viewer, ClearsTheViewportOffscreen) {
+TEST(Viewer, ShowsTheFramesViewportImageOffscreen) {
     const Scene scene;
     ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 3, .validation = true};
     const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
@@ -71,6 +71,7 @@ TEST(Viewer, ClearsTheViewportOffscreen) {
     // The viewport's bottom right, clear of the heads-up display at its top left.
     const glm::uvec2 corner(static_cast<std::uint32_t>(origin.x + size.x) - 4,
                             static_cast<std::uint32_t>(origin.y + size.y) - 4);
+    // The UI clears to black under it, so the colour comes from the frame's viewport image.
     const std::array<std::uint8_t, 4> texel = ReadTexel(*viewer, corner);
     const glm::vec4 clear = viewer->GetShell().GetTheme().viewport;
     for (std::size_t c = 0; c < 4; ++c) {

@@ -84,10 +84,22 @@ Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
         std::make_unique<ImGuiRenderer>(*context_, presenter_->Format(), presenter_->ImageCount());
     shell_ = std::make_unique<Shell>(scene, context_.get(), options.shell);
     shell_->Frame();
+    {
+        ERNIE_ZONE("Set up the frame");
+        arenas_ = std::make_unique<Arenas>(*context_, MemoryUse::Device, "scene columns",
+                                           std::uint64_t{16} << 20);
+        frame_ = std::make_unique<Frame>(*context_, *arenas_, scene, ShaderCompiler());
+        sampler_ = std::make_unique<Sampler>(
+            *context_, SamplerDescription{.filter = Filter::Nearest, .address = Address::Clamp},
+            "viewport");
+    }
     profiler::SetThreadName("Main");
 }
 
-Viewer::~Viewer() = default;
+Viewer::~Viewer() {
+    // Frames in flight sample the viewport and read the frame's columns.
+    Quietly([this] { context_->Main().Last().Wait(); });
+}
 
 void Viewer::Run() {
     while (Step()) {
@@ -115,6 +127,7 @@ bool Viewer::Step() {
         ImGui::NewFrame();
     }
     shell_->Draw();
+    ShowViewport();
     {
         ERNIE_ZONE("Build the UI's draw data");
         ImGui::Render();
@@ -139,13 +152,9 @@ bool Viewer::Step() {
         renderer_->UpdateTextures(data);
         Ticket drawn;
         {
-            ERNIE_ZONE("Submit the UI");
-            drawn = context_->Main().Submit(
-                [&](VkCommandBuffer commands) {
-                    ERNIE_ZONE("Record the UI");
-                    renderer_->Record(commands, data, *target, shell_->GetTheme().viewport);
-                },
-                {}, target->semaphores);
+            ERNIE_ZONE("Run the frame");
+            drawn = frame_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
+                                    {}, target->semaphores);
         }
         inFlight_.push_back(drawn);
         ERNIE_ZONE("Present");
@@ -154,6 +163,57 @@ bool Viewer::Step() {
     context_->Collect();
     ++frames_;
     return shell_->Open() && (options_.frames == 0 || frames_ < options_.frames);
+}
+
+void Viewer::ShowViewport() {
+    const auto [position, size] = shell_->Viewport();
+    const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
+    const glm::uvec2 pixels(std::max(1.0f, size.x * scale.x), std::max(1.0f, size.y * scale.y));
+    if (!viewport_ || glm::uvec2(viewport_->Description().extent) != pixels) {
+        ERNIE_ZONE("Resize the viewport");
+        // Frames in flight may still sample the old image.
+        context_->Main().Last().Wait();
+        if (viewport_) {
+            renderer_->RemoveTexture(viewportTexture_);
+        }
+        viewport_ = std::make_unique<DeviceImage>(
+            *context_,
+            ImageDescription{.format = ImageFormat::Rgba8Unorm,
+                             .extent = {pixels, 1},
+                             .usage = ImageUsage::Sampled | ImageUsage::Storage},
+            "Viewport");
+        viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
+    }
+    ImGui::GetBackgroundDrawList()->AddImage(viewportTexture_, position,
+                                             {position.x + size.x, position.y + size.y});
+}
+
+void Viewer::AddPasses(graph::Graph& graph, ImDrawData& data, const FrameTarget& target) {
+    graph::Image viewport = graph.Import(*viewport_, "viewport");
+    // Until a renderer draws it, the viewport is the theme's colour.
+    graph.Add(
+        "Viewport", graph::Kind::Copy,
+        [&](graph::PassBuilder& pass) { viewport = pass.Write(viewport, graph::Use::CopyDst); },
+        [this, viewport](graph::PassContext& pass) {
+            const glm::vec4 colour = shell_->GetTheme().viewport;
+            const VkClearColorValue clear{.float32 = {colour.r, colour.g, colour.b, colour.a}};
+            const VkImageSubresourceRange all{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1};
+            vkCmdClearColorImage(pass.commands, pass.Get(viewport).Handle(), pass.Layout(viewport),
+                                 &clear, 1, &all);
+        });
+    graph.Add(
+        "UI", graph::Kind::Raster,
+        [&](graph::PassBuilder& pass) {
+            pass.Read(viewport, graph::Use::Sampled);
+            // It draws into the presenter's image, outside the graph.
+            pass.NeverCull();
+        },
+        [&](graph::PassContext& pass) {
+            ERNIE_ZONE("Record the UI");
+            // Panels and the viewport's image cover every pixel.
+            renderer_->Record(pass.commands, data, target, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        });
 }
 
 std::string_view ViewUsage() {
