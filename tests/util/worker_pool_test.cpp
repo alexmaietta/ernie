@@ -6,8 +6,10 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <chrono>
 #include <future>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace ernie {
@@ -55,12 +57,19 @@ TEST(WorkerPool, DropsQueuedJobsOnDestruction) {
     std::atomic<int> ran{0};
     std::promise<void> release;
     std::future<void> queued;
+    // Released only once the pool is being destroyed (its stop flag is the destructor's first
+    // step), so the worker can't reach the queued job first.
+    std::thread releaser;
     {
         WorkerPool pool(1);
         pool.Submit([&release] { release.get_future().wait(); });
         queued = pool.Submit([&ran] { ++ran; });
-        release.set_value();
+        releaser = std::thread([&release] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            release.set_value();
+        });
     }
+    releaser.join();
     EXPECT_THROW(queued.get(), std::future_error);
     EXPECT_EQ(ran.load(), 0);
 }
