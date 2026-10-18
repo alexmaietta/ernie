@@ -58,9 +58,9 @@ class FrameGraph : public ::testing::Test {
         if (!context_) {
             GTEST_SKIP() << "No Vulkan device";
         }
-        affine_ = std::make_unique<ComputeKernel>(*context_,
-                                                  compiler_.Spirv(std::span(&kAffine, 1), "main"),
-                                                  "affine", sizeof(AffineParameters));
+        affine_ = std::make_unique<ComputeKernel>(
+            *context_, compiler_.Spirv(std::span(&kAffine, 1), "main"), "affine",
+            std::uint32_t{sizeof(AffineParameters)});
         arenas_ = std::make_unique<Arenas>(*context_, MemoryUse::Device, "columns", 1 << 20);
         pool_ = std::make_unique<TransientPool>(*context_, 1 << 20);
     }
