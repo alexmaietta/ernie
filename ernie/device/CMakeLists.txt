@@ -2,6 +2,7 @@
 add_library(
     ernie_device
     OBJECT
+    acceleration.cpp
     arena.cpp
     bindless.cpp
     buffer.cpp

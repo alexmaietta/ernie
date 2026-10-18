@@ -83,6 +83,7 @@ ernie_add_test_suite(
     device
     LABEL gpu
     SOURCES
+        device/acceleration_test.cpp
         device/arena_test.cpp
         device/bindless_test.cpp
         device/column_test.cpp

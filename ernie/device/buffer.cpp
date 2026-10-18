@@ -9,10 +9,18 @@
 namespace ernie {
 namespace {
 
-VkBufferCreateInfo BufferInfo(std::uint64_t size, VkBufferUsageFlags usage) {
+/// Every buffer's usage: on devices with ray queries, any may hold or feed an acceleration
+/// structure, so geometry in columns builds one in place.
+VkBufferCreateInfo BufferInfo(const DeviceContext& context, std::uint64_t size,
+                              VkBufferUsageFlags usage) {
+    const VkBufferUsageFlags acceleration =
+        context.Capabilities().rayQuery
+            ? VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+                  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
+            : 0;
     return {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = size,
-            .usage = usage | kBufferUsage,
+            .usage = usage | kBufferUsage | acceleration,
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
 }
 
@@ -29,7 +37,7 @@ Buffer::Buffer(DeviceContext& context, std::uint64_t size, MemoryUse use, std::s
                VkBufferUsageFlags usage)
     : allocator_(context.Allocator()), device_(context.Device()), shared_(use == MemoryUse::Shared),
       size_(size) {
-    const VkBufferCreateInfo info = BufferInfo(size, usage);
+    const VkBufferCreateInfo info = BufferInfo(context, size, usage);
     VmaAllocationInfo allocated{};
     if (shared_) {
         RequireExternal(context);
@@ -60,11 +68,11 @@ Buffer::Buffer(DeviceContext& context, ExternalHandle handle, std::uint64_t size
     RequireExternal(context);
     VmaAllocationInfo allocated{};
     if (from == SharedFrom::Vulkan) {
-        CreateImportedBuffer(allocator_, BufferInfo(size, 0), handle, buffer_, allocation_,
+        CreateImportedBuffer(allocator_, BufferInfo(context, size, 0), handle, buffer_, allocation_,
                              allocated);
     } else {
-        CreateImportedBuffer(device_, context.Physical(), BufferInfo(size, 0), handle, buffer_,
-                             memory_);
+        CreateImportedBuffer(device_, context.Physical(), BufferInfo(context, size, 0), handle,
+                             buffer_, memory_);
         allocated.size = size;
     }
     Finish(context, allocated, name);
