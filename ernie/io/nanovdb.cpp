@@ -188,8 +188,10 @@ std::vector<NanoVdbGrid> RawGrids(std::span<const std::uint8_t> bytes, bool head
         if (size < PNANOVDB_GRID_SIZE || offset + size > bytes.size()) {
             throw std::runtime_error("NanoVDB grid size runs past its data");
         }
-        const std::span<const std::uint8_t> grid = bytes.subspan(offset, size);
-        grids.push_back(headsOnly ? NanoVdbGridHead(grid.first(std::min(size, kNanoVdbHeadBytes)))
+        const std::span<const std::uint8_t> grid =
+            bytes.subspan(offset, static_cast<std::size_t>(size));
+        grids.push_back(headsOnly ? NanoVdbGridHead(grid.first(std::min(
+                                        static_cast<std::size_t>(size), kNanoVdbHeadBytes)))
                                   : ParseGrid(grid));
         offset += size;
     }
