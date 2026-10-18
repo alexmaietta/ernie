@@ -23,8 +23,10 @@ namespace ernie {
 #ifdef _WIN32
 
 MappedFile::MappedFile(const std::filesystem::path& path) {
-    file_ = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                        FILE_ATTRIBUTE_NORMAL, nullptr);
+    // Others may delete or replace the file while it is mapped, as on POSIX systems: caches evict
+    // and rewrite entries that live textures still map, which keep their views until closed.
+    file_ = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
+                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file_ == INVALID_HANDLE_VALUE) {
         file_ = nullptr;
         throw std::runtime_error("Cannot open " + path.string());

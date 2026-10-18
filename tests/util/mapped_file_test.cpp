@@ -32,6 +32,15 @@ TEST(MappedFile, MapsAnEmptyFile) {
     EXPECT_TRUE(file.Bytes().empty());
 }
 
+TEST(MappedFile, AMappedFileCanBeDeletedAndItsViewStays) {
+    // As caches evict entries that live textures still map, on every platform.
+    const std::filesystem::path path = WriteFile("ernie_mapped_deleted.bin", "spectral");
+    const MappedFile file(path);
+    EXPECT_TRUE(std::filesystem::remove(path));
+    EXPECT_FALSE(std::filesystem::exists(path));
+    EXPECT_EQ(static_cast<char>(file.Bytes()[7]), 'l');
+}
+
 TEST(MappedFile, ThrowsForAMissingFile) {
     EXPECT_THROW(MappedFile(std::filesystem::path(testing::TempDir()) / "ernie_missing.bin"),
                  std::runtime_error);
