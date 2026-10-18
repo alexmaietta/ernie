@@ -18,6 +18,7 @@ add_library(
     schemas/mesh.cpp
     schemas/planet.cpp
     schemas/registry.cpp
+    schemas/render.cpp
     schemas/shade.cpp
     schemas/vol.cpp
 )

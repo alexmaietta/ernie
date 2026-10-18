@@ -114,12 +114,8 @@
 
 #define ERNIE_SENSOR_API_ATTRIBUTES(X)                                                             \
     X(glm::dvec2, SpectralRange, "ernie:spectral:range", glm::dvec2(380.0, 780.0),                 \
-      "Wavelengths in nm the sensor sees.", .group = "Sensor", .lower = Above(0.0))                \
-    X(int, SpectralBands, "ernie:spectral:bands", 16, "Bands across the range.",                   \
-      .group = "Sensor", .lower = AtLeast(1.0))                                                    \
-    X(std::string, SpectralMode, "ernie:spectral:mode", "spectral",                                \
-      "spectral: bands over the range; rgb: three bands of linear sRGB, faster.",                  \
-      .group = "Sensor", .options = {"spectral", "rgb"})                                           \
+      "Wavelengths in nm the sensor responds to; its products sample them in bands.",              \
+      .group = "Sensor", .lower = Above(0.0))                                                      \
     X(std::string, SensorType, "ernie:sensor:type", "rgb", "A colour or a mono sensor.",           \
       .group = "Sensor", .options = {"rgb", "mono"})                                               \
     X(bool, SensorNoise, "ernie:sensor:noise", true, "Whether it adds the noise below.",           \
@@ -176,7 +172,8 @@ class ErniePolarizerAPI : public ErniePolarizerAPIAccessors<ErniePolarizerAPI, S
     ERNIE_API_SCHEMA_BODY(ErniePolarizerAPI)
 };
 
-/// A camera's sensor: its spectral bands, noise, ADC and quantum efficiency.
+/// A camera's sensor: its spectral range, noise, ADC and quantum efficiency; its products set how
+/// finely the range is sampled.
 class ErnieSensorAPI : public ErnieSensorAPIAccessors<ErnieSensorAPI, SchemaView> {
     ERNIE_API_SCHEMA_BODY(ErnieSensorAPI)
 };

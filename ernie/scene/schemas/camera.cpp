@@ -14,7 +14,7 @@ ERNIE_DEFINE_SCHEMA(ErniePolarizerAPI, "ErniePolarizerAPI", nullptr, SingleApply
                     "A polarizer in front of a camera's lens, or a polarization sensor's mosaic.",
                     ERNIE_POLARIZER_API_ATTRIBUTES)
 ERNIE_DEFINE_SCHEMA(ErnieSensorAPI, "ErnieSensorAPI", nullptr, SingleApply, kInheritExtent,
-                    "A camera's sensor: its spectral bands, noise, ADC and quantum efficiency.",
+                    "A camera's sensor: its spectral range, noise, ADC and quantum efficiency.",
                     ERNIE_SENSOR_API_ATTRIBUTES)
 
 }  // namespace ernie

@@ -62,6 +62,7 @@ ernie_add_test_suite(
         scene/mesh_test.cpp
         scene/path_test.cpp
         scene/planet_test.cpp
+        scene/render_test.cpp
         scene/scene_test.cpp
         scene/schema_test.cpp
         scene/shade_test.cpp

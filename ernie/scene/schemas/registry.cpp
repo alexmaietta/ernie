@@ -9,6 +9,7 @@
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/schemas/mesh.h"
 #include "ernie/scene/schemas/planet.h"
+#include "ernie/scene/schemas/render.h"
 #include "ernie/scene/schemas/shade.h"
 #include "ernie/scene/schemas/vol.h"
 
@@ -63,6 +64,11 @@ std::span<const SchemaDef* const> Schemas() {
         &PhotometricDistantLightAPI::Definition(),
         &PhotometricDomeLightAPI::Definition(),
         &PhysicalLightIlluminantAPI::Definition(),
+        &RenderSettingsBase::Definition(),
+        &RenderSettings::Definition(),
+        &RenderProduct::Definition(),
+        &RenderVar::Definition(),
+        &RenderPass::Definition(),
         &NodeGraph::Definition(),
         &Material::Definition(),
         &Shader::Definition(),
