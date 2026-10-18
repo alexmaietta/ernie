@@ -5,6 +5,7 @@
 
 #include "ernie/scene/json.h"
 #include "ernie/scene/scene.h"
+#include "ernie/util/disk_cache.h"
 #include "ernie/util/profiler.h"
 
 #include <imgui.h>
@@ -42,6 +43,13 @@ std::unique_ptr<Presenter> MakePresenter(const ViewerOptions& options, MakeConte
 #endif
 }
 
+/// @return Where the viewer keeps compiled pipelines between runs; empty when caching is off.
+std::filesystem::path PipelineCachePath() {
+    const std::optional<std::filesystem::path> folder =
+        CacheDirectory("ERNIE_PIPELINE_CACHE", "pipelines");
+    return folder ? *folder / "viewer.bin" : std::filesystem::path();
+}
+
 template <typename Number> Number ParseNumber(std::string_view text, std::string_view option) {
     Number value{};
     const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
@@ -77,7 +85,8 @@ Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
         context_ = std::make_unique<DeviceContext>(
             DeviceContextOptions{.validation = options.validation,
                                  .device = options.device,
-                                 .instanceExtensions = std::move(extensions)});
+                                 .instanceExtensions = std::move(extensions),
+                                 .pipelineCache = PipelineCachePath()});
         return *context_;
     });
     renderer_ =

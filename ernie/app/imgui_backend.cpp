@@ -71,6 +71,7 @@ ImGuiRenderer::ImGuiRenderer(DeviceContext& context, VkFormat format, std::uint3
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &format};
+    info.PipelineCache = context.PipelineCache();
     info.CheckVkResultFn = [](VkResult result) { CheckVk(result, "ImGui's Vulkan backend"); };
     if (!ImGui_ImplVulkan_Init(&info)) {
         throw DeviceError(DeviceErrorKind::Failed, "Could not set up ImGui's Vulkan backend");
