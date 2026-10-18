@@ -120,8 +120,9 @@ void WriteExr(const std::filesystem::path& path, const Tensor& image) {
     if (type == DType::UInt16 || type == DType::UInt8) {
         floats.resize(count);
         for (std::size_t i = 0; i < count; ++i) {
-            floats[i] = type == DType::UInt16 ? contiguous.As<std::uint16_t>()[i]
-                                              : contiguous.As<std::uint8_t>()[i];
+            floats[i] =
+                static_cast<float>(type == DType::UInt16 ? contiguous.As<std::uint16_t>()[i]
+                                                         : contiguous.As<std::uint8_t>()[i]);
         }
     }
     char* base = floats.empty() ? static_cast<char*>(const_cast<void*>(contiguous.Data()))

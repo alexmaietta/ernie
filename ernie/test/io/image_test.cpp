@@ -234,7 +234,7 @@ TEST_F(ImageFiles, LoadsExrInLossyAndLosslessCompressions) {
                               1.0f);
         }
     }
-    for (const auto [compression, tolerance] :
+    for (const auto& [compression, tolerance] :
          {std::pair(Imf::PIZ_COMPRESSION, 0.0f), std::pair(Imf::DWAA_COMPRESSION, 0.02f),
           std::pair(Imf::DWAB_COMPRESSION, 0.02f)}) {
         const auto path = dir_ / ("gradient" + std::to_string(compression) + ".exr");
@@ -297,7 +297,7 @@ TEST_F(ImageFiles, ReadsExrFixturesOfOtherWriters) {
     const Image zip = LoadImageFile(exr / "rgb_float_zip.exr", ImageEncoding::Linear);
     ASSERT_EQ(zip.width, 16u);
     ASSERT_EQ(zip.height, 16u);
-    for (const auto [x, y] : {std::pair(0u, 0u), std::pair(7u, 3u), std::pair(15u, 15u)}) {
+    for (const auto& [x, y] : {std::pair(0u, 0u), std::pair(7u, 3u), std::pair(15u, 15u)}) {
         EXPECT_EQ(zip.At(x, y),
                   glm::vec4(float(x) / 16.0f, float(y) / 16.0f, 100.0f + float(x), 1.0f))
             << "no alpha reads as 1: " << x << ", " << y;
