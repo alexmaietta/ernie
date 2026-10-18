@@ -140,10 +140,12 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Submit the UI");
-            drawn = context_->Main().Submit([&](VkCommandBuffer commands) {
-                ERNIE_ZONE("Record the UI");
-                renderer_->Record(commands, data, *target, shell_->GetTheme().viewport);
-            });
+            drawn = context_->Main().Submit(
+                [&](VkCommandBuffer commands) {
+                    ERNIE_ZONE("Record the UI");
+                    renderer_->Record(commands, data, *target, shell_->GetTheme().viewport);
+                },
+                {}, target->semaphores);
         }
         inFlight_.push_back(drawn);
         ERNIE_ZONE("Present");

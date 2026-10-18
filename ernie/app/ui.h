@@ -400,6 +400,9 @@ struct FrameTarget {
     VkImageView view = VK_NULL_HANDLE;
     glm::uvec2 extent{0};
     VkImageLayout finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+    /// For the frame's submission: waiting until the image is free to draw into, and signalling
+    /// it drawn for presenting; none offscreen.
+    BinarySemaphores semaphores;
 };
 
 /// @brief Supplies the images frames are drawn into and the UI's platform input, then shows
@@ -419,7 +422,8 @@ class Presenter {
     virtual void BeginUiFrame(double delta) = 0;
     /// @return The next image, or none when there is nothing to draw into, as while minimised.
     virtual std::optional<FrameTarget> Acquire() = 0;
-    /// @brief Shows the image last acquired once `drawn` is done.
+    /// @brief Shows the image last acquired once `drawn` is done, or once its target's semaphore
+    /// is signalled.
     virtual void Present(Ticket drawn) = 0;
 };
 
@@ -516,9 +520,11 @@ class WindowPresenter final : public Presenter {
     void Present(Ticket drawn) override;
 
   private:
-    /// @brief Makes the swapchain, again when there is one, at `extent`.
+    /// @brief Makes the swapchain, again when there is one, at `extent`, with its views and
+    /// semaphores.
     void CreateSwapchain(glm::uvec2 extent);
-    void DestroyViews();
+    /// @brief Destroys the images' views and semaphores, once the queue has finished with them.
+    void DestroyFrames();
 
     DeviceContext& context_;
     std::unique_ptr<Window> window_;
@@ -529,7 +535,12 @@ class WindowPresenter final : public Presenter {
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
     std::vector<VkImage> images_;
     std::vector<VkImageView> views_;
-    VkFence acquiredFence_ = VK_NULL_HANDLE;
+    /// Signalled by acquiring, one more than the images, used in turn: a frame reuses one only
+    /// after the frames in flight before it are done.
+    std::vector<VkSemaphore> acquiredSemaphores_;
+    std::size_t nextAcquired_ = 0;
+    /// Signalled when an image is drawn, one an image, for presenting it to wait on.
+    std::vector<VkSemaphore> drawnSemaphores_;
     /// The image acquired and not yet presented.
     std::optional<std::uint32_t> acquired_;
     /// Whether the swapchain no longer matches the surface.

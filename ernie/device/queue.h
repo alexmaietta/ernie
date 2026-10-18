@@ -74,6 +74,13 @@ class Timeline {
     VkSemaphore semaphore_ = VK_NULL_HANDLE;
 };
 
+/// @brief Binary semaphores a submission waits on and signals besides its tickets, as swapchain
+/// images need.
+struct BinarySemaphores {
+    VkSemaphore wait = VK_NULL_HANDLE;
+    VkSemaphore signal = VK_NULL_HANDLE;
+};
+
 /// @brief A queue of one family. Submissions take a recording function and return a ticket on the
 /// queue's timeline; command buffers are recycled once their tickets complete. Any thread may
 /// submit, one recording at a time, and test or wait on tickets.
@@ -89,7 +96,7 @@ class Queue {
     /// @return The submission's ticket.
     /// @throws DeviceError if a wait is another device's, or submission fails.
     Ticket Submit(const std::function<void(VkCommandBuffer)>& record,
-                  std::span<const Ticket> waits = {});
+                  std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
     /// @return The ticket of the latest submission: waiting on it waits for all of them.
     Ticket Last() const;
     /// @brief Presents swapchain images, between submissions from any thread.

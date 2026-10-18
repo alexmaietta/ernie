@@ -1390,12 +1390,9 @@ WindowPresenter::WindowPresenter(DeviceContext& context, std::unique_ptr<Window>
                           "The device's main queue cannot present to the window");
     }
     format_ = ChooseFormat(context.Physical(), surface_);
-    const VkFenceCreateInfo fence{.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    CheckVk(vkCreateFence(context.Device(), &fence, nullptr, &acquiredFence_), "vkCreateFence");
     const OnFailure destroyHandles([&] {
-        DestroyViews();
+        DestroyFrames();
         vkDestroySwapchainKHR(context_.Device(), swapchain_, nullptr);
-        vkDestroyFence(context_.Device(), acquiredFence_, nullptr);
     });
     CreateSwapchain(window_->FramebufferSize());
     ImGui_ImplGlfw_InitForVulkan(window_->Handle(), true);
@@ -1403,10 +1400,8 @@ WindowPresenter::WindowPresenter(DeviceContext& context, std::unique_ptr<Window>
 
 WindowPresenter::~WindowPresenter() {
     ImGui_ImplGlfw_Shutdown();
-    Quietly([this] { context_.Main().Last().Wait(); });
-    DestroyViews();
+    DestroyFrames();
     vkDestroySwapchainKHR(context_.Device(), swapchain_, nullptr);
-    vkDestroyFence(context_.Device(), acquiredFence_, nullptr);
     vkDestroySurfaceKHR(context_.Instance(), surface_, nullptr);
 }
 
@@ -1461,13 +1456,34 @@ void WindowPresenter::CreateSwapchain(glm::uvec2 extent) {
         CheckVk(vkCreateImageView(context_.Device(), &view, nullptr, &views_.emplace_back()),
                 "vkCreateImageView");
     }
+    const VkSemaphoreCreateInfo semaphore{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    const auto create = [&](std::vector<VkSemaphore>& semaphores, std::size_t wanted) {
+        while (semaphores.size() < wanted) {
+            CheckVk(vkCreateSemaphore(context_.Device(), &semaphore, nullptr,
+                                      &semaphores.emplace_back()),
+                    "vkCreateSemaphore");
+        }
+    };
+    create(acquiredSemaphores_, images_.size() + 1);
+    create(drawnSemaphores_, images_.size());
+    nextAcquired_ = 0;
 }
 
-void WindowPresenter::DestroyViews() {
+void WindowPresenter::DestroyFrames() {
+    // The queue's idle once its presents have waited on their semaphores too.
+    Quietly([this] { context_.Main().Borrow([](VkQueue queue) { vkQueueWaitIdle(queue); }); });
     for (const VkImageView view : views_) {
         vkDestroyImageView(context_.Device(), view, nullptr);
     }
+    for (const VkSemaphore semaphore : acquiredSemaphores_) {
+        vkDestroySemaphore(context_.Device(), semaphore, nullptr);
+    }
+    for (const VkSemaphore semaphore : drawnSemaphores_) {
+        vkDestroySemaphore(context_.Device(), semaphore, nullptr);
+    }
     views_.clear();
+    acquiredSemaphores_.clear();
+    drawnSemaphores_.clear();
 }
 
 void WindowPresenter::PollEvents() {
@@ -1491,16 +1507,18 @@ std::optional<FrameTarget> WindowPresenter::Acquire() {
     const glm::uvec2 extent(extent_.width, extent_.height);
     if (stale_ || size != extent) {
         ERNIE_ZONE("Resize the swapchain");
-        context_.Main().Last().Wait();
-        DestroyViews();
+        DestroyFrames();
         CreateSwapchain(size);
         stale_ = false;
     }
+    // Blocks only while every image is queued for the display, as vsync paces frames; the
+    // device waits for the image itself.
     ERNIE_ZONE("Wait for a swapchain image");
+    const VkSemaphore acquired = acquiredSemaphores_[nextAcquired_];
     std::uint32_t index = 0;
     const VkResult result = vkAcquireNextImageKHR(context_.Device(), swapchain_,
                                                   std::numeric_limits<std::uint64_t>::max(),
-                                                  VK_NULL_HANDLE, acquiredFence_, &index);
+                                                  acquired, VK_NULL_HANDLE, &index);
     if (!Matches(result)) {
         if (result != VK_ERROR_OUT_OF_DATE_KHR) {
             CheckVk(result, "vkAcquireNextImageKHR");
@@ -1508,24 +1526,23 @@ std::optional<FrameTarget> WindowPresenter::Acquire() {
         stale_ = true;
         return std::nullopt;
     }
-    CheckVk(vkWaitForFences(context_.Device(), 1, &acquiredFence_, VK_TRUE,
-                            std::numeric_limits<std::uint64_t>::max()),
-            "vkWaitForFences");
-    CheckVk(vkResetFences(context_.Device(), 1, &acquiredFence_), "vkResetFences");
+    nextAcquired_ = (nextAcquired_ + 1) % acquiredSemaphores_.size();
     acquired_ = index;
-    return FrameTarget{images_[index], views_[index], glm::uvec2(extent_.width, extent_.height),
-                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
+    return FrameTarget{images_[index],
+                       views_[index],
+                       glm::uvec2(extent_.width, extent_.height),
+                       VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                       {acquired, drawnSemaphores_[index]}};
 }
 
-void WindowPresenter::Present(Ticket drawn) {
+void WindowPresenter::Present(Ticket /*drawn*/) {
     if (!acquired_) {
         return;
     }
-    {
-        ERNIE_ZONE("Wait for the frame to draw");
-        drawn.Wait();
-    }
+    // The device waits for the frame's drawing; the host goes on to the next.
     const VkPresentInfoKHR info{.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                                .waitSemaphoreCount = 1,
+                                .pWaitSemaphores = &drawnSemaphores_[*acquired_],
                                 .swapchainCount = 1,
                                 .pSwapchains = &swapchain_,
                                 .pImageIndices = &*acquired_};

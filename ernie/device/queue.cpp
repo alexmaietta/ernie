@@ -6,6 +6,7 @@
 #include "ernie/util/algorithm.h"
 #include "ernie/util/on_failure.h"
 
+#include <array>
 #include <limits>
 
 namespace ernie {
@@ -97,7 +98,7 @@ Queue::~Queue() {
 }
 
 Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
-                     std::span<const Ticket> waits) {
+                     std::span<const Ticket> waits, BinarySemaphores binary) {
     // One recording at a time: the command pool is not thread-safe.
     const std::lock_guard recording(recording_);
     std::vector<VkSemaphoreSubmitInfo> waitInfos;
@@ -116,6 +117,11 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
         waitInfos.push_back({.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
                              .semaphore = wait.timeline->Handle(),
                              .value = wait.value,
+                             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT});
+    }
+    if (binary.wait != VK_NULL_HANDLE) {
+        waitInfos.push_back({.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                             .semaphore = binary.wait,
                              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT});
     }
 
@@ -155,18 +161,22 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     const std::uint64_t value = submitted_ + 1;
     const VkCommandBufferSubmitInfo commandInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, .commandBuffer = commands};
-    const VkSemaphoreSubmitInfo signal{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                                       .semaphore = timeline_.Handle(),
-                                       .value = value,
-                                       .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT};
-    const VkSubmitInfo2 submit{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-                               .waitSemaphoreInfoCount =
-                                   static_cast<std::uint32_t>(waitInfos.size()),
-                               .pWaitSemaphoreInfos = waitInfos.data(),
-                               .commandBufferInfoCount = 1,
-                               .pCommandBufferInfos = &commandInfo,
-                               .signalSemaphoreInfoCount = 1,
-                               .pSignalSemaphoreInfos = &signal};
+    const std::array signals{
+        VkSemaphoreSubmitInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                              .semaphore = timeline_.Handle(),
+                              .value = value,
+                              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT},
+        VkSemaphoreSubmitInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                              .semaphore = binary.signal,
+                              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT}};
+    const VkSubmitInfo2 submit{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = static_cast<std::uint32_t>(waitInfos.size()),
+        .pWaitSemaphoreInfos = waitInfos.data(),
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &commandInfo,
+        .signalSemaphoreInfoCount = binary.signal != VK_NULL_HANDLE ? 2u : 1u,
+        .pSignalSemaphoreInfos = signals.data()};
     const VkResult submitted = vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE);
     if (submitted < VK_SUCCESS) {
         free_.push_back(commands);
