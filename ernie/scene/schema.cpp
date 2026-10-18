@@ -82,10 +82,15 @@ std::string ArrayProblem(const AttributeDef& def, const Tensor& array) {
     if (def.meta.integer ? !integer : !floating) {
         return def.meta.integer ? "must hold integers" : "must hold float32 or float64 numbers";
     }
-    if (def.meta.rank != 0) {
-        return array.Rank() == def.meta.rank
-                   ? std::string()
-                   : "must have " + std::to_string(def.meta.rank) + " dimensions";
+    if (const std::vector<std::int64_t>& ranks = def.meta.ranks; !ranks.empty()) {
+        if (std::ranges::find(ranks, static_cast<std::int64_t>(array.Rank())) != ranks.end()) {
+            return {};
+        }
+        std::string list;
+        for (const std::int64_t rank : ranks) {
+            list += (list.empty() ? "" : " or ") + std::to_string(rank);
+        }
+        return "must have " + list + " dimensions";
     }
     const std::int64_t components = def.meta.components;
     const bool rows =

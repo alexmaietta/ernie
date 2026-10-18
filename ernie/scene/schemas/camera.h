@@ -88,7 +88,7 @@
     X(Tensor, LensRays, "ernie:lens:rays", Tensor(),                                               \
       "float32 (rows, columns, 3) unit directions every rays step pixels, in place of the "        \
       "projection and distortion.",                                                                \
-      .group = "Lens", .rank = 3)                                                                  \
+      .group = "Lens", .ranks = {3})                                                               \
     X(int, LensRaysStep, "ernie:lens:raysStep", 8, "Pixels between the lens's rays.",              \
       .group = "Lens", .lower = AtLeast(1.0))
 

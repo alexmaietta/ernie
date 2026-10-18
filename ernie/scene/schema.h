@@ -84,8 +84,8 @@ struct AttributeMeta {
     bool bytes = false;
     /// A tensor's vector size: (n, components) or flat; 0 for a flat array.
     std::uint8_t components = 0;
-    /// A tensor's fixed rank, as a dense grid's 3; 0 for flat or vector arrays.
-    std::uint8_t rank = 0;
+    /// The ranks a tensor may have, as a dense grid's 3; none for flat or vector arrays.
+    std::vector<std::int64_t> ranks{};
     Dirty dirty = Dirty::Params;
     /// Resolved from the nearest authoring ancestor.
     bool inherited = false;

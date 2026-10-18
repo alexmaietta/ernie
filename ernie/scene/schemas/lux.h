@@ -96,7 +96,7 @@
     X(Tensor, Texture, "ernie:texture", Tensor(),                                                  \
       "float32 (rows, columns, 3 or 4) linear RGB in memory, latitude-longitude about +z, in "     \
       "place of the file.",                                                                        \
-      .group = "Light", .rank = 3)                                                                 \
+      .group = "Light", .ranks = {3})                                                              \
     X(std::vector<Path>, Portals, "portals", std::vector<Path>{},                                  \
       "Portal lights its light enters through.", .group = "Light")                                 \
     X(double, GuideRadius, "guideRadius", 1.0e5, "Metres to the sphere drawn as its guide.",       \

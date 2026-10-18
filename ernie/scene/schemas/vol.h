@@ -40,7 +40,7 @@
 #define ERNIE_DENSE_FIELD_ATTRIBUTES(X)                                                            \
     X(Tensor, Values, "ernie:values", Tensor(),                                                    \
       "float32 (x, y, z) values, z fastest, on the host or a device; 0 is empty.",                 \
-      .group = "Field", .rank = 3, .dirty = Dirty::Points)                                         \
+      .group = "Field", .ranks = {3}, .dirty = Dirty::Points)                                      \
     X(double, VoxelSize, "ernie:voxelSize", 1.0,                                                   \
       "Metres between values: value (i, j, k) lies at the voxel size times (i, j, k).",            \
       .group = "Field", .lower = Above(0.0), .finite = true, .dirty = Dirty::Points)

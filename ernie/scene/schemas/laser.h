@@ -68,7 +68,7 @@
       .asset = true)                                                                               \
     X(Tensor, PatternImageArray, "ernie:laser:pattern:imageArray", Tensor(),                       \
       "float32 (rows, columns) pattern image in place of the file, on the host or a device.",      \
-      .group = "Pattern", .rank = 2)                                                               \
+      .group = "Pattern", .ranks = {2})                                                            \
     X(glm::dvec2, PatternFieldOfView, "ernie:laser:pattern:fieldOfView", glm::dvec2(40.0, 30.0),   \
       "Full angles an image, dots or a scan span along x and y, degrees.", .group = "Pattern",     \
       .lower = AtLeast(0.0), .upper = Below(170.0))                                                \

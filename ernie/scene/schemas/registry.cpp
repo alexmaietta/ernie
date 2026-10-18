@@ -8,6 +8,7 @@
 #include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/schemas/mesh.h"
+#include "ernie/scene/schemas/planet.h"
 #include "ernie/scene/schemas/shade.h"
 #include "ernie/scene/schemas/vol.h"
 
@@ -52,6 +53,10 @@ std::span<const SchemaDef* const> Schemas() {
         &DomeLight::Definition(),
         &PortalLight::Definition(),
         &LaserLight::Definition(),
+        &Terrain::Definition(),
+        &Atmosphere::Definition(),
+        &StarField::Definition(),
+        &GroundPlane::Definition(),
         &ShapingAPI::Definition(),
         &ShadowAPI::Definition(),
         &PhotometricAreaLightAPI::Definition(),

@@ -16,6 +16,7 @@ add_library(
     schemas/laser.cpp
     schemas/lux.cpp
     schemas/mesh.cpp
+    schemas/planet.cpp
     schemas/registry.cpp
     schemas/shade.cpp
     schemas/vol.cpp
