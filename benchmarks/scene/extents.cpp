@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file extents.cpp
-/// @brief Cached extents at 100,000 prims: the first update, and one edit's.
+/// @brief Scene updates at 100,000 prims: the first, one edit's, and one inherited edit's.
 #include "benchmarks/bench.h"
 #include "ernie/scene/schemas/geom.h"
 
@@ -21,19 +21,34 @@ std::unique_ptr<Scene> MakeSpheres() {
     return scene;
 }
 
-const bool kFirstUpdate = Register("scene.extents.first_update_100k", [] {
+const bool kFirstUpdate = Register("scene.update.first_100k", [] {
     std::unique_ptr<Scene> scene;
-    return Timing{Fastest([&] { scene = MakeSpheres(); }, [&] { scene->UpdateExtents(); }), 10.0};
+    return Timing{Fastest([&] { scene = MakeSpheres(); }, [&] { scene->Update(); }), 10.0};
 });
 
-const bool kOneEdit = Register("scene.extents.update_after_one_edit_of_100k", [] {
+const bool kOneEdit = Register("scene.update.after_one_edit_of_100k", [] {
     std::unique_ptr<Scene> scene = MakeSpheres();
-    scene->UpdateExtents();
+    scene->Update();
     const PrimId ball = *scene->Find("/World/Ball_54321");
     double radius = 1.0;
     const double ms = Fastest([&] { scene->Set(ball, Sphere::kRadius, radius += 1.0); },
-                              [&] { scene->UpdateExtents(); });
+                              [&] { scene->Update(); });
     return Timing{ms, 1.0};
+});
+
+const bool kInheritedEdit = Register("scene.update.after_hiding_the_parent_of_100k", [] {
+    std::unique_ptr<Scene> scene = MakeSpheres();
+    scene->Define("/World", "Xform");
+    scene->Update();
+    const PrimId world = *scene->Find("/World");
+    bool hidden = false;
+    const double ms = Fastest(
+        [&] {
+            hidden = !hidden;
+            scene->Set(world, Imageable::kVisibility, hidden ? "invisible" : "inherited");
+        },
+        [&] { scene->Update(); });
+    return Timing{ms, 10.0};
 });
 
 }  // namespace

@@ -19,6 +19,8 @@ inline constexpr std::string_view kOrient = "xformOp:orient";
 inline constexpr std::string_view kScale = "xformOp:scale";
 inline constexpr std::string_view kResetXformStack = "!resetXformStack!";
 inline constexpr std::string_view kInvertPrefix = "!invert!";
+/// The namespace of inherited attributes' resolved values, which only the scene writes.
+inline constexpr std::string_view kResolvedPrefix = "ernie:resolved:";
 
 inline constexpr std::string_view kInherited = "inherited";
 inline constexpr std::string_view kInvisible = "invisible";

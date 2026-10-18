@@ -68,6 +68,10 @@ class Scene {
     /// @return The authored value, or none.
     std::optional<Value> Get(PrimId prim, std::string_view attribute) const;
     std::optional<Value> Get(const Path& path, std::string_view attribute) const;
+    /// @return An inherited attribute's value as of the last `Update`: the prim's own or its
+    /// nearest authoring ancestor's (where "inherited" isn't authoring), else the fallback; none
+    /// for a prim that isn't Imageable.
+    std::optional<Value> GetResolved(PrimId prim, std::string_view attribute) const;
     /// @brief Authors an array attribute with a tensor on the host or a device, shared, not copied.
     /// @throws std::invalid_argument for a non-array attribute, or a tensor of the wrong type or
     /// shape.
@@ -84,10 +88,13 @@ class Scene {
     glm::dmat4 LocalTransform(PrimId prim) const;
     glm::dmat4 WorldTransform(PrimId prim) const;
     /// @return The prim's extent in its own space; none when it isn't computed from attributes.
-    /// Cached since `UpdateExtents` when its bucket hasn't changed, computed otherwise.
+    /// Cached since `Update` when its bucket hasn't changed, computed otherwise.
     std::optional<Box> Extent(PrimId prim) const;
-    /// @brief Recomputes the cached extents of the rows that changed since the last update.
-    void UpdateExtents() {
+    /// @brief Brings derived data up to date with the edits since the last update, once per step
+    /// before renderers pull changes: resolves inherited attributes for the subtrees whose
+    /// authored values or prims changed, then recomputes the changed rows' cached extents.
+    void Update() {
+        Resolve();
         extents_.Update(store_);
     }
     /// @return The world box of the prim and its visible descendants of the default purpose.
@@ -127,7 +134,30 @@ class Scene {
     /// @return The attribute's column when the prim authors it, or null.
     const Column* AuthoredColumn(PrimId prim, std::string_view attribute) const;
     /// @return The attribute's value when the prim authors it as a `T`, or null.
-    template <typename T> const T* Authored(PrimId prim, std::string_view attribute) const;
+    template <typename T> const T* Authored(PrimId prim, std::string_view attribute) const {
+        const Column* column = AuthoredColumn(prim, attribute);
+        if (column == nullptr || column->values->Type() != kColumnType<T>) {
+            return nullptr;
+        }
+        return &store_.Read<T>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
+    }
+    std::optional<Value> CellValue(PrimId prim, const Column* column) const;
+
+    /// Resolves every inherited attribute for the subtrees changed since the last resolve.
+    void Resolve();
+    /// @return The paths of the prims whose subtrees resolve `attribute` again: those added, reset
+    /// or with it changed.
+    BitSet ResolveRoots(const ChangeSet& changes, AttributeId attribute) const;
+    /// @return What `attribute` resolves to from the prim's own value: null when it doesn't
+    /// author it, or authors "inherited".
+    template <typename T> const T* Inheritable(PrimId prim, AttributeId attribute) const;
+    /// @return The value `path` inherits from its ancestors.
+    template <typename T> T Above(PathId path, AttributeId attribute, const T& fallback) const;
+    /// Resolves `attribute` over the subtree at `root`, descending past a prim only while its
+    /// resolved value changes or it is one of `roots`, which it clears as it reaches them.
+    template <typename T>
+    void ResolveSubtree(PathId root, AttributeId attribute, AttributeId resolved, const T& fallback,
+                        BitSet& roots);
     const AttributeDef* Declared(BucketId bucket, AttributeId attribute) const;
     /// @return Whether the prim's type or an applied API schema leaves the attribute's namespace
     /// open; any attribute for a prim without a type.
@@ -142,6 +172,9 @@ class Scene {
     void AddTo(Box& bounds, PathId path, const glm::dmat4& parent, bool visibleOnly) const;
 
     PrimStore store_;
+    /// The store version inherited attributes were last resolved at.
+    std::uint64_t resolved_ = 0;
+    Token inherited_ = 0;
     Token invisible_ = 0;
     Token defaultPurpose_ = 0;
     std::vector<BucketSchema> buckets_;

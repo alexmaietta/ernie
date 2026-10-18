@@ -57,6 +57,7 @@ ernie_add_test_suite(
     SOURCES
         scene/api_test.cpp
         scene/extent_cache_test.cpp
+        scene/inherit_test.cpp
         scene/instancer_test.cpp
         scene/lux_test.cpp
         scene/mesh_test.cpp

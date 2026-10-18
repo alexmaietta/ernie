@@ -38,7 +38,8 @@ std::string Describe(const Scene& scene, PrimId prim) {
 }  // namespace
 
 Scene::Scene()
-    : invisible_(store_.Tokens().Intern(tokens::kInvisible)),
+    : inherited_(store_.Tokens().Intern(tokens::kInherited)),
+      invisible_(store_.Tokens().Intern(tokens::kInvisible)),
       defaultPurpose_(store_.Tokens().Intern(tokens::kDefault)) {
     FindOrAddBucket(nullptr, {});
 }
@@ -169,20 +170,21 @@ void Scene::Write(PrimId prim, std::string_view attribute, Tensor array) {
     store_.Set(prim, token, std::move(array));
 }
 
-template <typename T> const T* Scene::Authored(PrimId prim, std::string_view attribute) const {
-    const Column* column = AuthoredColumn(prim, attribute);
-    if (column == nullptr || column->values->Type() != kColumnType<T>) {
-        return nullptr;
-    }
-    return &store_.Read<T>(store_.PrimBucket(prim), column->attribute)[store_.PrimRow(prim)];
-}
-
 const Tensor* Scene::Read(PrimId prim, std::string_view attribute) const {
     return Authored<Tensor>(prim, attribute);
 }
 
 std::optional<Value> Scene::Get(PrimId prim, std::string_view attribute) const {
-    const Column* column = AuthoredColumn(prim, attribute);
+    return CellValue(prim, AuthoredColumn(prim, attribute));
+}
+
+std::optional<Value> Scene::GetResolved(PrimId prim, std::string_view attribute) const {
+    const std::optional<Token> token = store_.Tokens().Find(ResolvedName(attribute));
+    return CellValue(prim,
+                     token ? store_.GetBucket(store_.PrimBucket(prim)).Find(*token) : nullptr);
+}
+
+std::optional<Value> Scene::CellValue(PrimId prim, const Column* column) const {
     if (column == nullptr) {
         return std::nullopt;
     }
@@ -333,6 +335,11 @@ BucketId Scene::FindOrAddBucket(const SchemaDef* schema, std::vector<Token> apis
     for (const ApiName& api : allApis) {
         add(*api.schema, api);
     }
+    if (schema != nullptr && schema->IsA(Imageable::Definition())) {
+        for (const AttributeDef* def : InheritedAttributes()) {
+            layout.push_back(MakeLayout(paths, *def, ResolvedName(def->name), def->fallback));
+        }
+    }
     const BucketId bucket = store_.AddBucket(key, layout);
     buckets_.resize(std::max<std::size_t>(buckets_.size(), bucket + 1));
     buckets_[bucket] = std::move(entry);
@@ -447,12 +454,18 @@ Dirty Scene::Classify(const ChangeSet::Values& change) const {
         return def->meta.dirty;
     }
     const std::string_view name = store_.Tokens().Text(change.attribute);
+    if (name.starts_with(tokens::kResolvedPrefix)) {
+        return FindInherited(name.substr(tokens::kResolvedPrefix.size()))->meta.dirty;
+    }
     return name.starts_with(tokens::kXformOpPrefix)    ? Dirty::Transform
            : name.starts_with(tokens::kPrimvarsPrefix) ? Dirty::Primvars
                                                        : Dirty::Params;
 }
 
 bool Scene::TakesUndeclared(PrimId prim, std::string_view attribute) const {
+    if (attribute.starts_with(tokens::kResolvedPrefix)) {
+        return false;
+    }
     const SchemaDef* schema = Schema(prim);
     return schema == nullptr || schema->IsOpen(attribute) ||
            std::ranges::any_of(AllApis(schema, Apis(prim)),

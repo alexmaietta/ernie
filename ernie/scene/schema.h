@@ -5,12 +5,14 @@
 
 #include "ernie/geometry/bounds.h"
 #include "ernie/scene/storage.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/scene/value.h"
 
 #include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -87,7 +89,8 @@ struct AttributeMeta {
     /// The ranks a tensor may have, as a dense grid's 3; none for flat or vector arrays.
     std::vector<std::int64_t> ranks{};
     Dirty dirty = Dirty::Params;
-    /// Resolved from the nearest authoring ancestor.
+    /// Resolved from the nearest ancestor authoring it (other than as "inherited") into its
+    /// `ResolvedName` column.
     bool inherited = false;
 };
 
@@ -234,6 +237,15 @@ struct SchemaDef {
 std::span<const SchemaDef* const> Schemas();
 /// @return The schema named `name`, or null.
 const SchemaDef* FindSchema(std::string_view name);
+/// @return Every attribute declared inherited, once each.
+std::span<const AttributeDef* const> InheritedAttributes();
+/// @return The inherited attribute named `name`, or null.
+const AttributeDef* FindInherited(std::string_view name);
+/// @return The column holding an inherited attribute's resolved values:
+/// `ernie:resolved:visibility`.
+inline std::string ResolvedName(std::string_view attribute) {
+    return std::string(tokens::kResolvedPrefix) + std::string(attribute);
+}
 
 /// What a multiple-apply schema's attribute names hold in place of the instance's name.
 inline constexpr std::string_view kInstanceName = "__INSTANCE_NAME__";

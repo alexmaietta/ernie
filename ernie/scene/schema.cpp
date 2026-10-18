@@ -175,6 +175,28 @@ const SchemaDef* FindSchema(std::string_view name) {
     return found != schemas.end() ? *found : nullptr;
 }
 
+std::span<const AttributeDef* const> InheritedAttributes() {
+    static const std::vector<const AttributeDef*> kInherited = [] {
+        std::vector<const AttributeDef*> inherited;
+        for (const SchemaDef* schema : Schemas()) {
+            for (const AttributeDef& def : schema->attributes) {
+                if (def.meta.inherited) {
+                    inherited.push_back(&def);
+                }
+            }
+        }
+        return inherited;
+    }();
+    return kInherited;
+}
+
+const AttributeDef* FindInherited(std::string_view name) {
+    const std::span<const AttributeDef* const> inherited = InheritedAttributes();
+    const auto found =
+        std::ranges::find_if(inherited, [&](const AttributeDef* def) { return def->name == name; });
+    return found != inherited.end() ? *found : nullptr;
+}
+
 ApiName ApiName::Parse(std::string_view api) {
     const std::size_t colon = api.find(':');
     const std::string_view name = api.substr(0, colon);

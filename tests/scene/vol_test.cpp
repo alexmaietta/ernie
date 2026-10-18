@@ -58,7 +58,7 @@ TEST(Volume, FieldsElsewhereComeThroughTheTransformsBetween) {
         BoxNear(*scene.Extent(smoke.Id()), {1.575, -0.425, -0.425}, {2.425, 0.425, 0.425}, kFloat));
 
     SetXform(scene, "/Library/density", {.translate = glm::dvec3(0.0)});
-    scene.UpdateExtents();
+    scene.Update();
     EXPECT_TRUE(BoxNear(*scene.Extent(smoke.Id()), glm::dvec3(-0.425), glm::dvec3(0.425), kFloat))
         << "a volume follows its fields' edits";
 }

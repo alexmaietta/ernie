@@ -361,6 +361,25 @@ class PrimStore {
         }
         return &Values<T>(*column)[slot.row];
     }
+    /// @brief Writes a value derived from others into a column the bucket has, leaving it
+    /// unauthored and touching the row only when the value changes.
+    /// @return Whether it changed; false too when the bucket has no such column.
+    template <typename T> bool Derive(PrimId prim, AttributeId attribute, const T& value) {
+        const SlotData& slot = Slot(prim);
+        Bucket& bucket = *buckets_[slot.bucket];
+        const auto found = bucket.columnIndex.find(attribute);
+        if (found == bucket.columnIndex.end()) {
+            return false;
+        }
+        Column& column = bucket.columns[found->second];
+        T& cell = Values<T>(column)[slot.row];
+        if (cell == value) {
+            return false;
+        }
+        cell = value;
+        Touch(slot.bucket, column, slot.row, slot.row + 1, Next());
+        return true;
+    }
     /// @brief Unauthors an attribute, putting its fallback back.
     void Clear(PrimId prim, AttributeId attribute);
 

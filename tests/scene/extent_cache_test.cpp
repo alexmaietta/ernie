@@ -42,13 +42,13 @@ TEST(ExtentCache, CachedExtentsFollowEditsBeforeAndAfterAnUpdate) {
     for (int i = 0; i < 100; ++i) {
         balls.Add(1.0 + i);
     }
-    balls.scene.UpdateExtents();
+    balls.scene.Update();
     balls.ExpectExtents();
 
     Sphere(balls.scene, balls.scene.PrimPath(balls.prims[7])).SetRadius(42.0);
     balls.radii[7] = 42.0;
     balls.ExpectExtents();  // computed afresh: the bucket changed since the update
-    balls.scene.UpdateExtents();
+    balls.scene.Update();
     balls.ExpectExtents();
 }
 
@@ -72,7 +72,7 @@ TEST(ExtentCache, RandomEditsRemovalsAndAdditionsKeepEveryExtentRight) {
                 balls.radii[i] = radius;
             }
         }
-        balls.scene.UpdateExtents();
+        balls.scene.Update();
         balls.ExpectExtents();
     }
 }

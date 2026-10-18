@@ -16,7 +16,7 @@
 #define ERNIE_MATERIAL_BINDING_API_ATTRIBUTES(X)                                                   \
     X(Path, MaterialBinding, "material:binding", Path(),                                           \
       "The Material the prim and its descendants are drawn with.", .label = "Material",            \
-      .group = "Material", .dirty = Dirty::Material)
+      .group = "Material", .dirty = Dirty::Material, .inherited = true)
 
 #define ERNIE_SHADER_ATTRIBUTES(X)                                                                 \
     X(std::string, Id, "info:id", "",                                                              \

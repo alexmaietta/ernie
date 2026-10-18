@@ -20,15 +20,15 @@
     X(std::string, Visibility, "visibility", "inherited",                                          \
       "\"invisible\" hides the prim and its descendants.",                                         \
       .group = "Prim", .options = {tokens::kInherited, tokens::kInvisible},                        \
-      .dirty = Dirty::Visibility)                                                                  \
+      .dirty = Dirty::Visibility, .inherited = true)                                               \
     X(std::string, Purpose, "purpose", "default",                                                  \
-      "Which renders include it: default, render, proxy or guide; inherited when default.",        \
+      "Which renders include it and its descendants: default, render, proxy or guide.",            \
       .group = "Prim",                                                                             \
       .options = {tokens::kDefault, tokens::kRender, tokens::kProxy, tokens::kGuide},              \
-      .dirty = Dirty::Visibility)                                                                  \
+      .dirty = Dirty::Visibility, .inherited = true)                                               \
     X(int, World, "ernie:world", -1,                                                               \
       "The batch world the prim and its descendants are in; -1 for every world.",                  \
-      .group = "Prim", .lower = AtLeast(-1.0), .inherited = true)
+      .group = "Prim", .lower = AtLeast(-1.0), .dirty = Dirty::Visibility, .inherited = true)
 
 #define ERNIE_XFORMABLE_ATTRIBUTES(X)                                                              \
     X(std::vector<std::string>, XformOpOrder, "xformOpOrder", std::vector<std::string>{},         \

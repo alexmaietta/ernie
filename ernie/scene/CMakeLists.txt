@@ -3,6 +3,7 @@ add_library(
     ernie_scene
     OBJECT
     extent_cache.cpp
+    inherit.cpp
     path.cpp
     schema.cpp
     scene.cpp
