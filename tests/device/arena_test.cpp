@@ -38,7 +38,7 @@ TEST(Arenas, FreedRangesComeBackOnlyOnceTheGpuIsDone) {
     });
     arenas.Free(range);
     EXPECT_EQ(arenas.Used(), std::uint64_t{1} << 16) << "still in use until its work is done";
-    context->Main().Wait(work);
+    work.Wait();
     context->Collect();
     EXPECT_EQ(arenas.Used(), 0u);
     EXPECT_EQ(arenas.Allocate(1 << 16).arena, range.arena) << "the arena is reused";

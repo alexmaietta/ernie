@@ -120,7 +120,7 @@ Readback::~Readback() {
 }
 
 std::span<const std::byte> Readback::Bytes() {
-    ticket_.queue->Wait(ticket_);
+    ticket_.Wait();
     host_->Invalidate(0, host_->Size());
     return host_->Mapped();
 }

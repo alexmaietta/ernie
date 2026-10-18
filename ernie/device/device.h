@@ -25,8 +25,10 @@ enum class VulkanDeviceType : std::uint8_t {
 struct DeviceCapabilities {
     /// Ray queries over hardware acceleration structures; the software BVH otherwise.
     bool rayQuery = false;
-    /// Memory and timeline semaphores exported to CUDA and HIP.
+    /// Memory shared with CUDA, HIP and other contexts.
     bool externalMemory = false;
+    /// Timeline semaphores shared the same way, so work is ordered without the host.
+    bool externalTimeline = false;
     bool shaderInt64 = false;
     bool shaderFloat16 = false;
     /// The driver's memory budget per heap.

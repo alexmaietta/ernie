@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file queue.cpp
-/// @brief Submitting to a queue with synchronization2 and a timeline semaphore.
+/// @brief Timeline semaphores, and submitting to a queue with synchronization2.
 #include "ernie/device/queue.h"
 
 #include "ernie/util/algorithm.h"
@@ -8,16 +8,83 @@
 #include <limits>
 
 namespace ernie {
+namespace {
 
-Queue::Queue(VkDevice device, std::uint32_t family, std::string name)
-    : device_(device), family_(family), name_(std::move(name)) {
-    vkGetDeviceQueue(device_, family_, 0, &queue_);
+VkSemaphore CreateTimeline(VkDevice device, const std::string& name, bool exportable) {
+    const VkExportSemaphoreCreateInfo exported{
+        .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
+        .handleTypes = static_cast<VkExternalSemaphoreHandleTypeFlags>(kExternalSemaphoreType)};
     const VkSemaphoreTypeCreateInfo timeline{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+                                             .pNext = exportable ? &exported : nullptr,
                                              .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE};
-    const VkSemaphoreCreateInfo semaphore{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-                                          .pNext = &timeline};
-    CheckVk(vkCreateSemaphore(device_, &semaphore, nullptr, &timeline_),
-            "Creating " + name_ + "'s timeline");
+    const VkSemaphoreCreateInfo info{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                                     .pNext = &timeline};
+    VkSemaphore semaphore = VK_NULL_HANDLE;
+    CheckVk(vkCreateSemaphore(device, &info, nullptr, &semaphore), "Creating " + name);
+    return semaphore;
+}
+
+}  // namespace
+
+bool Ticket::Done() const {
+    return timeline == nullptr || timeline->Reached() >= value;
+}
+
+void Ticket::Wait() const {
+    if (timeline == nullptr) {
+        return;
+    }
+    const VkSemaphore semaphore = timeline->Handle();
+    const VkSemaphoreWaitInfo wait{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+                                   .semaphoreCount = 1,
+                                   .pSemaphores = &semaphore,
+                                   .pValues = &value};
+    CheckVk(vkWaitSemaphores(timeline->Device(), &wait, std::numeric_limits<std::uint64_t>::max()),
+            "Waiting on " + timeline->Name());
+}
+
+Timeline::Timeline(VkDevice device, std::string name, bool exportable)
+    : device_(device), name_(std::move(name)), exportable_(exportable),
+      semaphore_(CreateTimeline(device_, name_, exportable)) {}
+
+Timeline::Timeline(VkDevice device, std::string name, ExternalHandle handle)
+    : device_(device), name_(std::move(name)), exportable_(false),
+      semaphore_(CreateTimeline(device_, name_, false)) {
+    try {
+        ImportSemaphore(device_, semaphore_, handle, name_);
+    } catch (...) {
+        vkDestroySemaphore(device_, semaphore_, nullptr);
+        throw;
+    }
+}
+
+Timeline::~Timeline() {
+    vkDestroySemaphore(device_, semaphore_, nullptr);
+}
+
+std::uint64_t Timeline::Reached() const {
+    std::uint64_t reached = 0;
+    CheckVk(vkGetSemaphoreCounterValue(device_, semaphore_, &reached), "Reading " + name_);
+    return reached;
+}
+
+void Timeline::Signal(std::uint64_t value) const {
+    const VkSemaphoreSignalInfo signal{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO, .semaphore = semaphore_, .value = value};
+    CheckVk(vkSignalSemaphore(device_, &signal), "Signalling " + name_);
+}
+
+ExternalHandle Timeline::Export() const {
+    if (!exportable_) {
+        throw DeviceError(DeviceErrorKind::Unsupported, name_ + " was not created exportable");
+    }
+    return ExportSemaphore(device_, semaphore_, name_);
+}
+
+Queue::Queue(VkDevice device, std::uint32_t family, std::string name, bool exportable)
+    : device_(device), family_(family), name_(std::move(name)),
+      timeline_(device, name_ + "'s timeline", exportable) {
+    vkGetDeviceQueue(device_, family_, 0, &queue_);
     const VkCommandPoolCreateInfo pool{.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                                        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                                        .queueFamilyIndex = family_};
@@ -26,24 +93,23 @@ Queue::Queue(VkDevice device, std::uint32_t family, std::string name)
 }
 
 Queue::~Queue() {
-    Wait(Last());
+    Last().Wait();
     vkDestroyCommandPool(device_, pool_, nullptr);
-    vkDestroySemaphore(device_, timeline_, nullptr);
 }
 
 Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                      std::span<const Ticket> waits) {
     std::vector<VkSemaphoreSubmitInfo> waitInfos;
     for (const Ticket& wait : waits) {
-        if (wait.queue == nullptr || wait.queue->Done(wait)) {
+        if (wait.Done()) {
             continue;
         }
-        if (wait.queue->device_ != device_) {
+        if (wait.timeline->Device() != device_) {
             throw DeviceError(DeviceErrorKind::Failed,
-                              name_ + " cannot wait on another device's work");
+                              name_ + " cannot wait on another device's " + wait.timeline->Name());
         }
         waitInfos.push_back({.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                             .semaphore = wait.queue->timeline_,
+                             .semaphore = wait.timeline->Handle(),
                              .value = wait.value,
                              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT});
     }
@@ -84,7 +150,7 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     const VkCommandBufferSubmitInfo commandInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, .commandBuffer = commands};
     const VkSemaphoreSubmitInfo signal{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-                                       .semaphore = timeline_,
+                                       .semaphore = timeline_.Handle(),
                                        .value = value,
                                        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT};
     const VkSubmitInfo2 submit{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
@@ -98,41 +164,16 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     CheckVk(vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE), "Submitting to " + name_);
     submitted_ = value;
     inFlight_.emplace_back(commands, value);
-    return {this, value};
-}
-
-bool Queue::Done(const Ticket& ticket) const {
-    if (ticket.queue == nullptr) {
-        return true;
-    }
-    std::uint64_t reached = 0;
-    CheckVk(vkGetSemaphoreCounterValue(ticket.queue->device_, ticket.queue->timeline_, &reached),
-            "Reading " + ticket.queue->name_ + "'s timeline");
-    return reached >= ticket.value;
-}
-
-void Queue::Wait(const Ticket& ticket) const {
-    if (ticket.queue == nullptr) {
-        return;
-    }
-    const VkSemaphoreWaitInfo wait{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
-                                   .semaphoreCount = 1,
-                                   .pSemaphores = &ticket.queue->timeline_,
-                                   .pValues = &ticket.value};
-    CheckVk(
-        vkWaitSemaphores(ticket.queue->device_, &wait, std::numeric_limits<std::uint64_t>::max()),
-        "Waiting on " + ticket.queue->name_);
+    return timeline_.At(value);
 }
 
 Ticket Queue::Last() const {
     const std::lock_guard lock(mutex_);
-    return submitted_ == 0 ? Ticket() : Ticket{this, submitted_};
+    return submitted_ == 0 ? Ticket() : timeline_.At(submitted_);
 }
 
 void Queue::Recycle() {
-    std::uint64_t reached = 0;
-    CheckVk(vkGetSemaphoreCounterValue(device_, timeline_, &reached),
-            "Reading " + name_ + "'s timeline");
+    const std::uint64_t reached = timeline_.Reached();
     std::erase_if(inFlight_, [&](const auto& entry) {
         if (entry.second > reached) {
             return false;

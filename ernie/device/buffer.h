@@ -20,6 +20,10 @@ enum class MemoryUse : std::uint8_t {
     Upload,
     /// Written by the GPU, read by the host: mapped and cached.
     Readback,
+    /// Read and written by the GPU and by another API or context, such as CUDA: device-local, in
+    /// dedicated memory that `Buffer::Export` shares. The device needs
+    /// `DeviceCapabilities::externalMemory`.
+    Shared,
 };
 
 /// @brief A buffer and its memory. Every buffer takes device-address and transfer usage, so
@@ -31,6 +35,11 @@ class Buffer {
     /// @throws DeviceError when the memory cannot be allocated.
     Buffer(DeviceContext& context, std::uint64_t size, MemoryUse use, std::string_view name,
            VkBufferUsageFlags usage = 0);
+    /// @brief Imports a shared buffer of `size` bytes that another context exported, taking
+    /// `handle` where the platform does. It is a `MemoryUse::Shared` buffer on this context.
+    /// @throws DeviceError when the device cannot import it.
+    Buffer(DeviceContext& context, ExternalHandle handle, std::uint64_t size,
+           std::string_view name);
     ~Buffer();
     Buffer(Buffer&& other) noexcept;
     Buffer& operator=(Buffer&& other) noexcept;
@@ -56,9 +65,17 @@ class Buffer {
     /// @brief Makes device writes to a mapped range visible to the host, where memory is not
     /// coherent.
     void Invalidate(std::uint64_t offset, std::uint64_t size) const;
+    /// @return A handle to the buffer's memory, which another API or context imports with its
+    /// size. Each call returns a new handle.
+    /// @throws DeviceError unless the buffer is `MemoryUse::Shared`.
+    ExternalHandle Export() const;
 
   private:
+    void Finish(DeviceContext& context, const VmaAllocationInfo& allocated, std::string_view name);
+
     VmaAllocator allocator_ = VK_NULL_HANDLE;
+    VkDevice device_ = VK_NULL_HANDLE;
+    bool shared_ = false;
     VkBuffer buffer_ = VK_NULL_HANDLE;
     VmaAllocation allocation_ = VK_NULL_HANDLE;
     std::uint64_t size_ = 0;

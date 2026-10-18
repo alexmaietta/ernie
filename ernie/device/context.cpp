@@ -131,7 +131,8 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
             chosen[i] = existing->get();
             continue;
         }
-        queues_.push_back(std::make_unique<Queue>(device_, wanted[i], names[i]));
+        queues_.push_back(std::make_unique<Queue>(device_, wanted[i], names[i],
+                                                  physical_.info.capabilities.externalTimeline));
         chosen[i] = queues_.back().get();
         Name(VK_OBJECT_TYPE_QUEUE, reinterpret_cast<std::uint64_t>(chosen[i]->Handle()), names[i]);
     }
@@ -168,9 +169,8 @@ void DeviceContext::Collect() {
     {
         const std::lock_guard lock(retiredMutex_);
         const auto finished = std::ranges::partition(retired_, [](const Retired& retired) {
-            return !std::ranges::all_of(retired.tickets, [](const Ticket& ticket) {
-                return ticket.queue == nullptr || ticket.queue->Done(ticket);
-            });
+            return !std::ranges::all_of(retired.tickets,
+                                        [](const Ticket& ticket) { return ticket.Done(); });
         });
         done.assign(std::make_move_iterator(finished.begin()),
                     std::make_move_iterator(finished.end()));
@@ -184,7 +184,7 @@ void DeviceContext::Collect() {
 
 void DeviceContext::WaitIdle() {
     for (const auto& queue : queues_) {
-        queue->Wait(queue->Last());
+        queue->Last().Wait();
     }
     Collect();
 }

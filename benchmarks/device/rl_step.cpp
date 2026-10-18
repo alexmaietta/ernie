@@ -24,7 +24,7 @@ const bool kRlStep = Register("device.rl_step.poses_16k", [] {
     std::uint32_t step = 0;
     const auto run = [&] {
         const Ticket ticket = rl.Step(++step);
-        ticket.queue->Wait(ticket);
+        ticket.Wait();
     };
     run();
     const HostTransfers before = context->Transfers();

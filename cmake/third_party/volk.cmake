@@ -14,3 +14,7 @@ target_include_directories(ernie_volk SYSTEM PUBLIC "${volk_SOURCE_DIR}")
 target_compile_definitions(ernie_volk PUBLIC VK_NO_PROTOTYPES)
 target_link_libraries(ernie_volk PUBLIC ernie_vulkan_headers ${CMAKE_DL_LIBS})
 set_target_properties(ernie_volk PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Loads the Win32 sharing functions, which only external.cpp declares.
+if(WIN32)
+    target_compile_definitions(ernie_volk PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+endif()

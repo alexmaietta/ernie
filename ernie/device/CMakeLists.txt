@@ -7,6 +7,7 @@ add_library(
     buffer.cpp
     column.cpp
     context.cpp
+    external.cpp
     image.cpp
     instance.cpp
     kernel.cpp

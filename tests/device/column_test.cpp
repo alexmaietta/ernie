@@ -62,7 +62,7 @@ TEST(DeviceColumn, AnRlStepMovesNoBulkBytesThroughTheHost) {
     for (std::uint32_t step = 1; step <= 10; ++step) {
         stepped = rl.Step(step);
     }
-    stepped.queue->Wait(stepped);
+    stepped.Wait();
     EXPECT_EQ(context->Transfers(), before) << "the steps stay on the device";
 
     const std::vector<float> transforms = Read(*context, rl.Transforms(), worlds, {});

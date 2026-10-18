@@ -4,6 +4,7 @@
 /// and listing them.
 #include "ernie/device/vulkan.h"
 
+#include "ernie/device/external.h"
 #include "ernie/device/instance.h"
 #include "ernie/util/algorithm.h"
 
@@ -12,15 +13,6 @@
 
 namespace ernie {
 namespace {
-
-#if defined(_WIN32)
-// Named here: their macros are in vulkan_win32.h, which needs <windows.h>.
-constexpr const char* kExternalMemory = "VK_KHR_external_memory_win32";
-constexpr const char* kExternalSemaphore = "VK_KHR_external_semaphore_win32";
-#else
-constexpr const char* kExternalMemory = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
-constexpr const char* kExternalSemaphore = VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME;
-#endif
 
 /// @brief An optional extension and the capability it is part of.
 struct Extension {
@@ -33,8 +25,8 @@ const std::array kExtensions{
     Extension{VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, &DeviceCapabilities::rayQuery},
     Extension{VK_KHR_RAY_QUERY_EXTENSION_NAME, &DeviceCapabilities::rayQuery},
     Extension{VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, &DeviceCapabilities::rayQuery},
-    Extension{kExternalMemory, &DeviceCapabilities::externalMemory},
-    Extension{kExternalSemaphore, &DeviceCapabilities::externalMemory},
+    Extension{kExternalMemoryExtension, &DeviceCapabilities::externalMemory},
+    Extension{kExternalSemaphoreExtension, &DeviceCapabilities::externalTimeline},
     Extension{VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, &DeviceCapabilities::memoryBudget},
     Extension{VK_EXT_DEVICE_FAULT_EXTENSION_NAME, &DeviceCapabilities::deviceFault},
 };
@@ -194,14 +186,19 @@ PhysicalDevice Probe(VkPhysicalDevice handle) {
     }
     // A capability needs every one of its extensions and, for ray queries, the feature bits.
     DeviceCapabilities& capabilities = device.info.capabilities;
-    capabilities = {
-        .rayQuery = true, .externalMemory = true, .memoryBudget = true, .deviceFault = true};
+    capabilities = {.rayQuery = true,
+                    .externalMemory = true,
+                    .externalTimeline = true,
+                    .memoryBudget = true,
+                    .deviceFault = true};
     for (const Extension& extension : kExtensions) {
         capabilities.*extension.capability &= has(extension.name);
     }
     capabilities.rayQuery &= features.accelerationStructure.accelerationStructure == VK_TRUE &&
                              features.rayQuery.rayQuery == VK_TRUE;
     capabilities.deviceFault &= features.fault.deviceFault == VK_TRUE;
+    capabilities.externalMemory = capabilities.externalMemory && SharesMemory(handle);
+    capabilities.externalTimeline = capabilities.externalTimeline && SharesTimelines(handle);
     capabilities.shaderInt64 = features.core.features.shaderInt64 == VK_TRUE;
     capabilities.shaderFloat16 = features.v12.shaderFloat16 == VK_TRUE;
     capabilities.sparseResidency = features.core.features.sparseResidencyImage2D == VK_TRUE;

@@ -36,13 +36,13 @@ TEST(DeviceContext, ChoosesASupportedDeviceWithItsQueues) {
 TEST(DeviceContext, TicketsOrderSubmissionsAndRecycleCommandBuffers) {
     ERNIE_CONTEXT(context);
     Queue& queue = context->Main();
-    EXPECT_TRUE(queue.Done({})) << "a default ticket is done";
+    EXPECT_TRUE(Ticket().Done()) << "a default ticket is done";
     Ticket last;
     for (int i = 0; i < 8; ++i) {
         last = queue.Submit([](VkCommandBuffer) {}, std::span(&last, 1));
     }
-    queue.Wait(last);
-    EXPECT_TRUE(queue.Done(last));
+    last.Wait();
+    EXPECT_TRUE(last.Done());
     EXPECT_EQ(queue.Last(), last);
     ExpectClean(*context);
 }
@@ -90,7 +90,7 @@ TEST(DeviceContext, RetiredObjectsLiveUntilTheirWorkIsDone) {
     });
     context->Retire(std::move(buffer));
     EXPECT_FALSE(watch.expired()) << "held while its work may run";
-    context->Main().Wait(work);
+    work.Wait();
     context->Collect();
     EXPECT_TRUE(watch.expired());
     ExpectClean(*context);
@@ -123,7 +123,7 @@ TEST(DeviceContext, TwoContextsKeepTheirWorkApart) {
                      DeviceError)
             << "a ticket names its device";
     }
-    first->Main().Wait(firsts);
+    firsts.Wait();
     ExpectClean(*first);
     ExpectClean(*second);
 }
