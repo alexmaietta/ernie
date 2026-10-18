@@ -79,6 +79,10 @@ DeviceContext::DeviceContext(const DeviceContextOptions& options)
     : instance_({.validation = options.validation, .extensions = options.instanceExtensions}),
       physical_(Choose(instance_, options.device)) {
     ERNIE_ZONE("Create device");
+    // Swapchains need the surfaces only a window system's instance extensions bring.
+    physical_.info.capabilities.present &=
+        std::ranges::find(options.instanceExtensions, VK_KHR_SURFACE_EXTENSION_NAME) !=
+        options.instanceExtensions.end();
     VkPhysicalDeviceMaintenance4Properties maintenance4{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES};
     VkPhysicalDeviceProperties2 properties{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,

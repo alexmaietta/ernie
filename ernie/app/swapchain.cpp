@@ -69,11 +69,9 @@ Swapchain::Swapchain(DeviceContext& context, VkSurfaceKHR surface, glm::uvec2 ex
     : context_(context), surface_(surface), vsync_(vsync) {
     const OnFailure destroySurface(
         [&] { vkDestroySurfaceKHR(context_.Instance(), surface_, nullptr); });
-    // The device context enables only the extensions Ernie's capabilities name.
-    if (vkGetDeviceProcAddr(context.Device(), "vkCreateSwapchainKHR") == nullptr) {
+    if (!context.Capabilities().present) {
         throw DeviceError(DeviceErrorKind::Unsupported,
-                          "The device context does not enable VK_KHR_swapchain, which presenting "
-                          "to a window needs; --offscreen draws without one");
+                          "The device cannot present to a window; --offscreen draws without one");
     }
     VkBool32 presents = VK_FALSE;
     CheckVk(vkGetPhysicalDeviceSurfaceSupportKHR(context.Physical(), context.Main().Family(),

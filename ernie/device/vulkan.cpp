@@ -32,6 +32,7 @@ const std::array kExtensions{
     Extension{VK_EXT_DEVICE_FAULT_EXTENSION_NAME, &DeviceCapabilities::deviceFault},
     Extension{VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
               &DeviceCapabilities::calibratedTimestamps},
+    Extension{VK_KHR_SWAPCHAIN_EXTENSION_NAME, &DeviceCapabilities::present},
 };
 
 /// @brief A feature bit Ernie requires: its name, for the error naming it, and where it lives.
@@ -210,7 +211,8 @@ PhysicalDevice Probe(VkPhysicalDevice handle) {
                     .externalTimeline = true,
                     .memoryBudget = true,
                     .deviceFault = true,
-                    .calibratedTimestamps = true};
+                    .calibratedTimestamps = true,
+                    .present = true};
     for (const Extension& extension : kExtensions) {
         capabilities.*extension.capability &= has(extension.name);
     }

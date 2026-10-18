@@ -37,6 +37,8 @@ struct DeviceCapabilities {
     bool deviceFault = false;
     /// The device's and host's clocks read together, so GPU zones line up with CPU zones.
     bool calibratedTimestamps = false;
+    /// Swapchains, so a window can show what the device draws.
+    bool present = false;
     bool sparseResidency = false;
 };
 

@@ -29,6 +29,8 @@ std::vector<const char*> CapabilityNames(const DeviceCapabilities& capabilities)
         {capabilities.shaderFloat16, "16-bit floats"},
         {capabilities.memoryBudget, "memory budget"},
         {capabilities.deviceFault, "fault reports"},
+        {capabilities.calibratedTimestamps, "GPU zones"},
+        {capabilities.present, "presenting"},
         {capabilities.sparseResidency, "sparse residency"},
     };
     std::vector<const char*> names;
