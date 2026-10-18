@@ -48,6 +48,35 @@ TEST(PrimStore, DefinesFindsAndRemovesPrims) {
     EXPECT_FALSE(s.store.Alive(a));
 }
 
+TEST(PrimStore, MovingToAnotherBucketKeepsTheIdAndSharedAuthoredValues) {
+    Spheres s;
+    const AttributeId height = s.store.Tokens().Intern("height");
+    const BucketId cylinders =
+        s.store.AddBucket({s.store.Tokens().Intern("Cylinder"), {}},
+                          std::vector<ColumnLayout>{ColumnLayout::Of<double>(s.radius, 1.0),
+                                                    ColumnLayout::Of<double>(height, 2.0)});
+    const PrimId a = s.Define("/A");
+    const PrimId b = s.Define("/B");
+    s.store.Set(a, s.radius, 3.0);
+    s.store.Set(a, s.color, glm::dvec3(1.0));
+    const std::uint64_t cursor = s.store.Version();
+
+    s.store.Move(a, cylinders);
+    EXPECT_TRUE(s.store.Alive(a));
+    EXPECT_EQ(s.store.BucketOf(a), cylinders);
+    EXPECT_EQ(*s.store.Get<double>(a, s.radius), 3.0) << "both buckets have radius";
+    EXPECT_EQ(s.store.Get<double>(a, height), nullptr) << "unauthored in its new bucket";
+    EXPECT_EQ(s.store.RowOf(b), 0u) << "the old bucket's last row filled the gap";
+
+    const ChangeSet changes = s.store.ChangesSince(cursor);
+    ASSERT_EQ(changes.rows.size(), 3u) << "removed and moved in one bucket, added in the other";
+    EXPECT_EQ(changes.rows[0].bucket, s.bucket);
+    EXPECT_EQ(changes.rows[0].change.kind, StructuralChange::Kind::Removed);
+    EXPECT_EQ(changes.rows[1].change.kind, StructuralChange::Kind::Moved);
+    EXPECT_EQ(changes.rows[2].bucket, cylinders);
+    EXPECT_EQ(changes.rows[2].change.kind, StructuralChange::Kind::Added);
+}
+
 TEST(PrimStore, UnauthoredRowsHoldTheFallbackForWholeColumnReads) {
     Spheres s;
     const PrimId a = s.Define("/A");

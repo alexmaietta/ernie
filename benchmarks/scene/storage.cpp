@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file scene_storage.cpp
+/// @file storage.cpp
 /// @brief The prim store at 100,000 prims: create, first sync, one edit, edit all, add and remove.
-#include "benchmarks/bench.h"
 #include "ernie/scene/storage.h"
+#include "benchmarks/bench.h"
 
 #include <memory>
 #include <string>

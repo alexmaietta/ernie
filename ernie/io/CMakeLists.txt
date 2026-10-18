@@ -10,7 +10,7 @@ add_library(
 )
 target_link_libraries(
     ernie_io
-    PUBLIC ernie_util
+    PUBLIC ernie_geometry
     PRIVATE
         ernie_build_options
         ernie_basisu

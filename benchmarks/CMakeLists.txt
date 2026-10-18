@@ -1,3 +1,3 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_executable(ernie_benchmarks main.cpp scene_storage.cpp)
+add_executable(ernie_benchmarks main.cpp scene/storage.cpp)
 target_link_libraries(ernie_benchmarks PRIVATE ernie_static ernie_build_options)

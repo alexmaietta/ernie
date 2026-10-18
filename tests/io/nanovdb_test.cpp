@@ -62,11 +62,9 @@ TEST(NanoVdb, ReadsWarpsFile) {
     EXPECT_EQ(grid.maxValue, 0.0);
 
     // Grown by a voxel each side, what trilinear sampling reaches.
-    glm::dvec3 min;
-    glm::dvec3 max;
-    grid.GridBounds(min, max);
-    EXPECT_NEAR(min.x, -0.85, kFloat);
-    EXPECT_NEAR(max.y, 0.85, kFloat);
+    const Box bounds = grid.GridBounds();
+    EXPECT_NEAR(bounds.min.x, -0.85, kFloat);
+    EXPECT_NEAR(bounds.max.y, 0.85, kFloat);
 }
 
 TEST(NanoVdb, RawBufferMatchesTheFile) {

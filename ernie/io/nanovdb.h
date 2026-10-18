@@ -3,6 +3,8 @@
 /// @brief NanoVDB grids: reading .nvdb/.vdb files and building grids.
 #pragma once
 
+#include "ernie/geometry/bounds.h"
+
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -79,11 +81,9 @@ struct NanoVdbGrid {
     bool Scalar() const;
     /// @return Whether volumes sample a 3-vector per voxel.
     bool Vector() const;
-    /// @brief Active bounds in the grid frame, grown by a voxel on
-    /// each side for trilinear sampling.
-    /// @param min Receives the lower corner.
-    /// @param max Receives the upper corner.
-    void GridBounds(glm::dvec3& min, glm::dvec3& max) const;
+    /// @return Active bounds in the grid frame, grown by a voxel on each side for trilinear
+    /// sampling; the grid's origin when it has no active voxels.
+    Box GridBounds() const;
 };
 
 /// @brief Reads every grid of a NanoVDB file, in file order.

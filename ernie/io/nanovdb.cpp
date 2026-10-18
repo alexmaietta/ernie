@@ -222,22 +222,12 @@ bool NanoVdbGrid::Vector() const {
     return type == NanoVdbType::Vec3f;
 }
 
-void NanoVdbGrid::GridBounds(glm::dvec3& min, glm::dvec3& max) const {
-    min = glm::dvec3(std::numeric_limits<double>::infinity());
-    max = -min;
+Box NanoVdbGrid::GridBounds() const {
     if (Empty()) {
-        min = max = glm::dvec3(indexToGrid[3]);
-        return;
+        const glm::dvec3 origin(indexToGrid[3]);
+        return {origin, origin};
     }
-    const glm::dvec3 lo = glm::dvec3(indexMin) - 1.0;
-    const glm::dvec3 hi = glm::dvec3(indexMax) + 1.0;
-    for (int corner = 0; corner < 8; ++corner) {
-        const glm::dvec3 index{(corner & 1) != 0 ? hi.x : lo.x, (corner & 2) != 0 ? hi.y : lo.y,
-                               (corner & 4) != 0 ? hi.z : lo.z};
-        const glm::dvec3 point = glm::dvec3(indexToGrid * glm::dvec4(index, 1.0));
-        min = glm::min(min, point);
-        max = glm::max(max, point);
-    }
+    return Box{glm::dvec3(indexMin) - 1.0, glm::dvec3(indexMax) + 1.0}.Transformed(indexToGrid);
 }
 
 std::vector<NanoVdbGrid> ParseNanoVdbGrids(std::span<const std::uint8_t> bytes) {

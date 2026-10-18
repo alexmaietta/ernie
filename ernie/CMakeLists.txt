@@ -22,6 +22,7 @@ set_target_properties(
 
 # One object library per layer; a layer links only the layers below it.
 add_subdirectory(util)
+add_subdirectory(geometry)
 add_subdirectory(physics)
 add_subdirectory(io)
 add_subdirectory(scene)
@@ -31,6 +32,7 @@ add_subdirectory(render)
 
 set(ernie_layers
     ernie_util
+    ernie_geometry
     ernie_physics
     ernie_io
     ernie_scene

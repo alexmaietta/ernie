@@ -108,6 +108,8 @@ class ColumnValues {
     virtual void SwapRemove(std::size_t row) = 0;
     /// Puts the fallback back in `row`.
     virtual void Reset(std::size_t row) = 0;
+    /// Copies `source`'s value at `from` into `row`; `source` holds the same type.
+    virtual void CopyRow(std::size_t row, const ColumnValues& source, std::size_t from) = 0;
 };
 
 template <typename T> class TypedColumn final : public ColumnValues {
@@ -131,6 +133,9 @@ template <typename T> class TypedColumn final : public ColumnValues {
     }
     void Reset(std::size_t row) override {
         values_[row] = fallback_;
+    }
+    void CopyRow(std::size_t row, const ColumnValues& source, std::size_t from) override {
+        values_[row] = static_cast<const TypedColumn&>(source).values_[from];
     }
 
     std::vector<T>& Values() {
@@ -290,6 +295,9 @@ class PrimStore {
     std::vector<PrimId> DefineMany(std::span<const PathId> paths, BucketId bucket);
     /// @brief Removes a prim; the bucket's last row moves into its place.
     void Remove(PrimId prim);
+    /// @brief Moves a prim to another bucket, keeping its id and the authored values of the
+    /// attributes both buckets have.
+    void Move(PrimId prim, BucketId bucket);
 
     bool Alive(PrimId prim) const;
     std::optional<PrimId> Find(PathId path) const;
@@ -362,6 +370,10 @@ class PrimStore {
     }
     const SlotData& Slot(PrimId prim) const;
     PrimId AddSlot(PathId path, BucketId bucket, std::uint32_t row);
+    /// Appends `count` rows at their fallbacks to a bucket, logged as one change.
+    std::uint32_t AddRows(BucketId bucket, std::uint32_t count);
+    /// Drops a prim's row from its bucket, the last row moving into its place.
+    void DropRow(const SlotData& slot);
     void Log(Bucket& bucket, StructuralChange change);
     /// Marks rows [begin, end) authored and changed at `version`.
     void Stamp(BucketId bucket, Column& column, std::uint32_t begin, std::uint32_t end,

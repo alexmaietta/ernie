@@ -113,26 +113,66 @@ std::vector<PrimId> PrimStore::DefineMany(std::span<const PathId> paths, BucketI
             throw std::invalid_argument("Prim " + paths_.ToPath(path).String() + " already exists");
         }
     }
+    const auto count = static_cast<std::uint32_t>(paths.size());
+    const std::uint32_t first = AddRows(bucket, count);
+    Bucket& b = *buckets_[bucket];
+    std::vector<PrimId> prims;
+    prims.reserve(count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        prims.push_back(AddSlot(paths[i], bucket, first + i));
+        b.prims[first + i] = prims.back();
+    }
+    return prims;
+}
+
+std::uint32_t PrimStore::AddRows(BucketId bucket, std::uint32_t count) {
     Bucket& b = *buckets_[bucket];
     const std::uint32_t first = b.Rows();
-    const auto count = static_cast<std::uint32_t>(paths.size());
     for (Column& column : b.columns) {
         column.values->Grow(count);
         column.Resize(first + count);
     }
-    std::vector<PrimId> prims;
-    prims.reserve(count);
-    b.prims.reserve(first + count);
-    for (std::uint32_t i = 0; i < count; ++i) {
-        prims.push_back(AddSlot(paths[i], bucket, first + i));
-        b.prims.push_back(prims.back());
-    }
+    b.prims.resize(first + count);
     Log(b, {Next(), StructuralChange::Kind::Added, first, count, 0});
-    return prims;
+    return first;
 }
 
 void PrimStore::Remove(PrimId prim) {
     SlotData& slot = const_cast<SlotData&>(Slot(prim));
+    DropRow(slot);
+    pathSlots_[slot.path] = kNoSlot;
+    slot.alive = false;
+    ++slot.generation;
+    free_.push_back(prim.slot);
+}
+
+void PrimStore::Move(PrimId prim, BucketId bucket) {
+    SlotData& slot = const_cast<SlotData&>(Slot(prim));
+    if (slot.bucket == bucket) {
+        return;
+    }
+    const std::uint32_t row = AddRows(bucket, 1);
+    Bucket& to = *buckets_[bucket];
+    const Bucket& from = *buckets_[slot.bucket];
+    to.prims[row] = prim;
+    const std::uint64_t version = Next();
+    for (const Column& source : from.columns) {
+        const auto found = to.columnIndex.find(source.attribute);
+        if (found == to.columnIndex.end() || !source.authored.Test(slot.row)) {
+            continue;
+        }
+        Column& column = to.columns[found->second];
+        if (column.values->Type() == source.values->Type()) {
+            column.values->CopyRow(row, *source.values, slot.row);
+            Stamp(bucket, column, row, row + 1, version);
+        }
+    }
+    DropRow(slot);
+    slot.bucket = bucket;
+    slot.row = row;
+}
+
+void PrimStore::DropRow(const SlotData& slot) {
     Bucket& b = *buckets_[slot.bucket];
     const std::uint32_t row = slot.row;
     const std::uint32_t last = b.Rows() - 1;
@@ -149,10 +189,6 @@ void PrimStore::Remove(PrimId prim) {
         column.authored.Set(row, column.authored.Test(last));
         column.Resize(last);
     }
-    pathSlots_[slot.path] = kNoSlot;
-    slot.alive = false;
-    ++slot.generation;
-    free_.push_back(prim.slot);
 }
 
 void PrimStore::Clear(PrimId prim, AttributeId attribute) {
