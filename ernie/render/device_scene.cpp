@@ -3,6 +3,9 @@
 /// @brief Building and running each frame's graph over the device scene.
 #include "ernie/render/device_scene.h"
 
+#include <glm/common.hpp>
+#include <glm/geometric.hpp>
+
 namespace ernie {
 
 DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
@@ -13,6 +16,15 @@ DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& sc
     if (context.Capabilities().rayQuery) {
         tracer_ = std::make_unique<RayTracer>(context, arenas, compiler, geometry_);
     }
+}
+
+bool DeviceScene::Follow(const glm::dvec3& viewpoint) {
+    if (glm::length(viewpoint - transforms_.Origin()) <= kRebaseDistance) {
+        return false;
+    }
+    ERNIE_ZONE("Rebase the render origin");
+    transforms_.SetOrigin(glm::round(viewpoint / kRebaseDistance) * kRebaseDistance);
+    return true;
 }
 
 Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,

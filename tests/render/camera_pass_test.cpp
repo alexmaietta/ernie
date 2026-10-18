@@ -76,8 +76,9 @@ class CameraPassTest : public ::testing::Test {
     Outputs Frame(const glm::dvec3& eye, const glm::dvec3& target) {
         if (!device_) {
             device_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene_, ShaderCompiler());
-            device_->Transforms().SetOrigin(origin_);
         }
+        // As the viewer does, keeping the origin near the eye.
+        device_->Follow(eye);
         const PinholeView view{.cameraToWorld =
                                    glm::inverse(glm::lookAtRH(eye, target, glm::dvec3(0, 0, 1))),
                                .verticalFov = 0.5,
@@ -141,20 +142,31 @@ class CameraPassTest : public ::testing::Test {
     std::unique_ptr<DeviceImage> colour_;
     BindlessIndex colourIndex_;
     Scene scene_;
-    glm::dvec3 origin_{0.0};
     std::unique_ptr<DeviceScene> device_;
 };
 
 TEST_F(CameraPassTest, SeesASphereAheadInEveryOutput) {
     const PrimId sphere = Sphere({0, 5, 0});
     ExpectTheSphereAhead(Frame({0, 0, 0}, {0, 1, 0}), sphere);
+    EXPECT_EQ(device_->Transforms().Origin(), glm::dvec3(0)) << "the eye is at the origin";
 }
 
-TEST_F(CameraPassTest, SeesTheSameAMillionKilometresOutAboutTheOrigin) {
-    // Floats spaced 128 m apart there: only the origin keeps a 1 m sphere whole.
+TEST_F(CameraPassTest, SeesTheSameAMillionKilometresOutOnceTheOriginFollows) {
+    // Floats spaced 128 m apart there: only an origin near the eye keeps a 1 m sphere whole.
     const glm::dvec3 far(1e9, -2e9, 3e8);
-    origin_ = far;
     const PrimId sphere = Sphere(far + glm::dvec3(0, 5, 0));
+    ExpectTheSphereAhead(Frame(far, far + glm::dvec3(0, 1, 0)), sphere);
+    const glm::dvec3 origin = device_->Transforms().Origin();
+    EXPECT_LE(glm::length(origin - far), DeviceScene::kRebaseDistance);
+    EXPECT_EQ(glm::mod(origin, glm::dvec3(DeviceScene::kRebaseDistance)), glm::dvec3(0))
+        << "on the rebase grid";
+}
+
+TEST_F(CameraPassTest, KeepsSeeingWhatItFliesTo) {
+    const glm::dvec3 far(4e7, 0, 0);
+    const PrimId sphere = Sphere(far + glm::dvec3(0, 5, 0));
+    Frame({0, 0, 0}, {0, 1, 0});
+    EXPECT_FALSE(device_->Follow({500, 0, 0})) << "within the rebase distance";
     ExpectTheSphereAhead(Frame(far, far + glm::dvec3(0, 1, 0)), sphere);
 }
 

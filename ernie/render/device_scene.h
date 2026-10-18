@@ -54,6 +54,14 @@ class DeviceScene {
     RayTracer* Tracer() {
         return tracer_.get();
     }
+    /// @brief Keeps the render origin near a viewpoint: once it is more than `kRebaseDistance`
+    /// away, the origin moves to the viewpoint snapped to a `kRebaseDistance` grid, so a viewpoint
+    /// hovering at the threshold does not rebase back and forth.
+    /// @return Whether the origin moved.
+    bool Follow(const glm::dvec3& viewpoint);
+    /// Metres: far enough that rebases are rare, near enough that floats there resolve 0.1 mm.
+    static constexpr double kRebaseDistance = 1024.0;
+
     /// @return Where the frames' transients come from.
     graph::TransientPool& Pool() {
         return pool_;

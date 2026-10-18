@@ -167,6 +167,7 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Run the frame");
+            deviceScene_->Follow(shell_->Camera().Eye());
             drawn =
                 deviceScene_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
                                       {}, target->semaphores);
