@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_library(ernie_render OBJECT scene_columns.cpp transform_graph.cpp)
+add_library(ernie_render OBJECT prim_rows.cpp scene_columns.cpp transform_graph.cpp)
 target_link_libraries(
     ernie_render
     PUBLIC ernie_scene ernie_graph

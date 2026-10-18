@@ -10,6 +10,7 @@
 #include "ernie/device/shader_compiler.h"
 #include "ernie/device/staging.h"
 #include "ernie/graph/graph.h"
+#include "ernie/render/prim_rows.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/xform.h"
 
@@ -209,8 +210,7 @@ class TransformGraph {
     std::uint64_t cursor_ = 0;
     glm::dvec3 origin_{0.0};
     std::vector<Binding> bindings_;
-    /// Each bucket's prims by row as the graph last saw them, to replay row logs on.
-    std::vector<std::vector<PrimId>> rows_;
+    PrimRows rows_;
     std::vector<NodeState> nodes_;
     std::vector<SlotList> levels_;
     SlotList programmed_;
