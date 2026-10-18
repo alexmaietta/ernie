@@ -68,9 +68,16 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     CheckVk(vkResetCommandBuffer(commands, 0), "Resetting " + name_ + "'s command buffer");
     const VkCommandBufferBeginInfo begin{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                                          .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
-    CheckVk(vkBeginCommandBuffer(commands, &begin), "Recording on " + name_);
-    record(commands);
-    CheckVk(vkEndCommandBuffer(commands), "Recording on " + name_);
+    try {
+        CheckVk(vkBeginCommandBuffer(commands, &begin), "Recording on " + name_);
+        record(commands);
+        CheckVk(vkEndCommandBuffer(commands), "Recording on " + name_);
+    } catch (...) {
+        // Nothing was submitted: the command buffer goes back, to be reset on its next use.
+        lock.lock();
+        free_.push_back(commands);
+        throw;
+    }
 
     lock.lock();
     const std::uint64_t value = submitted_ + 1;
