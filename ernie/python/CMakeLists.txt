@@ -4,7 +4,16 @@ include("${PROJECT_SOURCE_DIR}/cmake/third_party/nanobind.cmake")
 # The package is assembled in the build tree, so tests import it with PYTHONPATH=<build>/python.
 set(ernie_package_dir "${PROJECT_BINARY_DIR}/python/ernie")
 
-nanobind_add_module(_ernie STABLE_ABI NB_STATIC module.cpp device.cpp dlpack.cpp scene.cpp)
+nanobind_add_module(
+    _ernie
+    STABLE_ABI
+    NB_STATIC
+    module.cpp
+    device.cpp
+    dlpack.cpp
+    render.cpp
+    scene.cpp
+)
 target_link_libraries(
     _ernie
     PRIVATE ernie_static ernie_volk ernie_vma ernie_json ernie_build_options

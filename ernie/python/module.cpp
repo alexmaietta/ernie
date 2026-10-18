@@ -3,6 +3,7 @@
 /// @brief The _ernie Python extension module.
 #include "ernie/device/device.h"
 #include "ernie/python/device.h"
+#include "ernie/python/render.h"
 #include "ernie/python/scene.h"
 #include "ernie/util/version.h"
 
@@ -35,6 +36,7 @@ NB_MODULE(_ernie, module) {
 
     ernie::python::BindDevice(module);
     ernie::python::BindScene(module);
+    ernie::python::BindRender(module);
 
     module.def("vulkan_devices", &ernie::ListVulkanDevices,
                "Lists the Vulkan devices of the installed drivers.");

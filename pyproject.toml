@@ -11,7 +11,7 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 authors = [{ name = "Alex Maietta" }]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["numpy>=1.24"]
 
 [project.urls]
 Homepage = "https://github.com/alexmaietta/ernie"
@@ -19,7 +19,7 @@ Repository = "https://github.com/alexmaietta/ernie"
 Issues = "https://github.com/alexmaietta/ernie/issues"
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "pillow"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"

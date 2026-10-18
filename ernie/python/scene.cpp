@@ -9,9 +9,12 @@
 #include "ernie/scene/json.h"
 #include "ernie/scene/json_value.h"
 #include "ernie/scene/scene.h"
+#include "ernie/scene/schema.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/algorithm.h"
 
+#include <nanobind/stl/array.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
@@ -34,9 +37,10 @@ namespace nb = nanobind;
 namespace ernie::python {
 namespace {
 
-/// A prim of a scene, as long as it is not removed.
+/// A prim of a scene, as long as it is not removed; the scene outlives it.
 struct Prim {
     PrimId id;
+    Scene* scene = nullptr;
 };
 
 /// A prim, or the path of one.
@@ -170,6 +174,28 @@ XformOps ReadXformArguments(const nb::object& translate, const nb::object& rotat
     return ReadXform(xform);
 }
 
+/// Authors an attribute from a Python value: an array is shared in place, anything else read as
+/// scene files read it.
+void SetValue(Scene& scene, PrimId prim, const std::string& attribute, const nb::handle& value) {
+    if (IsArray(value)) {
+        Tensor array = TakeTensor(nb::borrow(value), nb::none());
+        Attempt(scene, prim, attribute, [&] { scene.Write(prim, attribute, std::move(array)); });
+        return;
+    }
+    const Json json = ToJson(value);
+    Attempt(scene, prim, attribute, [&] { LoadAttribute(scene, prim, attribute, json); });
+}
+
+using Vector3 = std::array<double, 3>;
+
+glm::dvec3 Vec(const Vector3& v) {
+    return {v[0], v[1], v[2]};
+}
+
+/// The `define` keywords that author transform ops rather than attributes.
+constexpr std::array<std::string_view, 5> kXformKeywords{"translate", "rotate", "rotation_order",
+                                                         "orient", "scale"};
+
 }  // namespace
 
 void BindScene(nb::module_& module) {
@@ -179,10 +205,22 @@ void BindScene(nb::module_& module) {
              [](const Prim& self) {
                  return (static_cast<std::uint64_t>(self.id.generation) << 32) | self.id.slot;
              })
-        .def("__repr__", [](const Prim& self) {
-            return "Prim(" + std::to_string(self.id.slot) + ", " +
-                   std::to_string(self.id.generation) + ")";
-        });
+        .def("__repr__",
+             [](const Prim& self) {
+                 return "Prim(" + std::to_string(self.id.slot) + ", " +
+                        std::to_string(self.id.generation) + ")";
+             })
+        .def(
+            "set",
+            [](const Prim& self, const std::string& attribute, const nb::object& value) {
+                if (!self.scene->Store().Alive(self.id)) {
+                    throw nb::value_error("The prim has been removed");
+                }
+                SetValue(*self.scene, self.id, attribute, value);
+                return self;
+            },
+            nb::arg("attribute"), nb::arg("value"),
+            "Authors an attribute as `Scene.set` does, returning the prim to set more.");
 
     nb::class_<SceneArray>(module, "SceneArray",
                            "An array attribute's values, shared in place through DLPack.")
@@ -207,21 +245,47 @@ void BindScene(nb::module_& module) {
         .def(nb::init<>())
         .def(
             "define",
-            [](Scene& self, const std::string& path, const std::string& type) {
-                return Prim{self.Define(Path(path), type)};
+            [](Scene& self, const std::string& path, const std::string& type,
+               const nb::kwargs& attributes) {
+                const PrimId prim = self.Define(Path(path), type);
+                const auto keyword = [&](std::string_view name) -> nb::object {
+                    const std::string key(name);
+                    return attributes.contains(key.c_str()) ? nb::object(attributes[key.c_str()])
+                                                            : nb::none();
+                };
+                bool xform = false;
+                for (const auto& [key, value] : attributes) {
+                    const std::string name = nb::cast<std::string>(key);
+                    if (std::ranges::find(kXformKeywords, name) != kXformKeywords.end()) {
+                        xform = true;
+                    } else {
+                        SetValue(self, prim, name, value);
+                    }
+                }
+                if (xform) {
+                    const nb::object order = keyword("rotation_order");
+                    SetXform(self, Path(path),
+                             ReadXformArguments(keyword("translate"), keyword("rotate"),
+                                                order.is_none() ? std::string("XYZ")
+                                                                : nb::cast<std::string>(order),
+                                                keyword("orient"), keyword("scale")));
+                }
+                return Prim{prim, &self};
             },
-            nb::arg("path"), nb::arg("type") = "",
-            "Defines a prim of a concrete type, or none, with its missing ancestors.")
+            nb::arg("path"), nb::arg("type") = "", nb::arg("attributes"), nb::keep_alive<0, 1>(),
+            "Defines a prim of a concrete type, or none, with its missing ancestors. Keywords "
+            "author its transform ops (translate, rotate, rotation_order, orient, scale, as "
+            "`set_xform`) and attributes by name (radius=2.0), as `set` does.")
         .def(
             "remove", [](Scene& self, const std::string& path) { return self.Remove(Path(path)); },
             nb::arg("path"), "Removes a prim and its descendants; whether there was one.")
         .def(
             "find",
-            [](const Scene& self, const std::string& path) -> std::optional<Prim> {
+            [](Scene& self, const std::string& path) -> std::optional<Prim> {
                 const std::optional<PrimId> prim = self.Find(Path(path));
-                return prim ? std::optional<Prim>(Prim{*prim}) : std::nullopt;
+                return prim ? std::optional<Prim>(Prim{*prim, &self}) : std::nullopt;
             },
-            nb::arg("path"), "The prim at a path, or None.")
+            nb::arg("path"), nb::keep_alive<0, 1>(), "The prim at a path, or None.")
         .def("__contains__",
              [](const Scene& self, const std::string& path) { return self.Has(Path(path)); })
         .def(
@@ -265,15 +329,7 @@ void BindScene(nb::module_& module) {
             "set",
             [](Scene& self, const Target& target, const std::string& attribute,
                const nb::object& value) {
-                const PrimId prim = Resolve(self, target);
-                if (IsArray(value)) {
-                    Tensor array = TakeTensor(value, nb::none());
-                    Attempt(self, prim, attribute,
-                            [&] { self.Write(prim, attribute, std::move(array)); });
-                    return;
-                }
-                const Json json = ToJson(value);
-                Attempt(self, prim, attribute, [&] { LoadAttribute(self, prim, attribute, json); });
+                SetValue(self, Resolve(self, target), attribute, value);
             },
             nb::arg("prim"), nb::arg("attribute"), nb::arg("value"),
             "Authors an attribute: a number, string, sequence for a vector, quaternion "
@@ -370,6 +426,39 @@ void BindScene(nb::module_& module) {
             "save",
             [](const Scene& self, const std::filesystem::path& path) { SaveSceneFile(self, path); },
             nb::arg("path"), "Writes the scene to a scene file.");
+
+    // Each prim type by its name, for `scene.define(path, ernie.Sphere)`.
+    nb::list types;
+    for (const SchemaDef* schema : Schemas()) {
+        if (schema->kind == SchemaKind::Concrete) {
+            const std::string name(schema->name);
+            module.attr(name.c_str()) = name;
+            types.append(name);
+        }
+    }
+    module.attr("PRIM_TYPES") = nb::tuple(types);
+
+    nb::module_ names = module.def_submodule("tokens", "Names the scene's code shares.");
+    names.attr("TRANSFORM") = std::string(tokens::kTransform);
+    names.attr("TRANSLATE") = std::string(tokens::kTranslate);
+    names.attr("ORIENT") = std::string(tokens::kOrient);
+    names.attr("SCALE") = std::string(tokens::kScale);
+    names.attr("XFORM_OP_ORDER") = std::string(tokens::kXformOpOrder);
+
+    module.def(
+        "look_at_transform",
+        [](const Vector3& eye, const Vector3& target, const Vector3& up) {
+            return TransformRows(LookAtTransform(Vec(eye), Vec(target), Vec(up)));
+        },
+        nb::arg("eye"), nb::arg("target"), nb::arg("up") = Vector3{0.0, 0.0, 1.0},
+        "A camera's transform at `eye` looking at `target`, as 4 rows: cameras look down -z.");
+    module.def(
+        "distant_light_transform",
+        [](const Vector3& towardLight) {
+            return TransformRows(DistantLightTransform(Vec(towardLight)));
+        },
+        nb::arg("toward_light"),
+        "A distant light's transform shining from the direction to its source, as 4 rows.");
 }
 
 }  // namespace ernie::python

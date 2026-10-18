@@ -3,16 +3,24 @@
 
 from ernie import _ernie
 from ernie._ernie import (
+    PRIM_TYPES,
     DeviceColumn,
     DeviceContext,
     Prim,
+    Renderer,
     Scene,
     SceneArray,
     VulkanDeviceInfo,
     VulkanDeviceType,
     __version__,
+    distant_light_transform,
+    look_at_transform,
+    tokens,
     vulkan_devices,
 )
+
+# Each prim type by its name, for scene.define("/World/Rock", ernie.Sphere).
+globals().update({name: name for name in PRIM_TYPES})
 
 
 def cuda_allocator():
@@ -33,14 +41,20 @@ def cuda_allocator():
 
 
 __all__ = [
+    "PRIM_TYPES",
     "DeviceColumn",
     "DeviceContext",
     "Prim",
+    "Renderer",
     "Scene",
     "SceneArray",
     "VulkanDeviceInfo",
     "VulkanDeviceType",
     "__version__",
     "cuda_allocator",
+    "distant_light_transform",
+    "look_at_transform",
+    "tokens",
     "vulkan_devices",
+    *PRIM_TYPES,
 ]
