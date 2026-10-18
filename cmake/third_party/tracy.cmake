@@ -12,12 +12,10 @@ endif()
 set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
 set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     tracy
     URL https://github.com/wolfpld/tracy/archive/refs/tags/${ERNIE_DEP_VERSION_tracy}.tar.gz
 )
-FetchContent_MakeAvailable(tracy)
 set_target_properties(
     TracyClient
     PROPERTIES POSITION_INDEPENDENT_CODE ON COMPILE_WARNING_AS_ERROR OFF

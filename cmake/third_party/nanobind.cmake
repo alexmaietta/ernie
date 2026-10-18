@@ -22,13 +22,11 @@ execute_process(
 )
 find_package(nanobind CONFIG QUIET)
 if(NOT nanobind_FOUND)
-    include(FetchContent)
-    FetchContent_Declare(
+    ernie_fetch(
         nanobind
         GIT_REPOSITORY https://github.com/wjakob/nanobind.git
         GIT_TAG ${ERNIE_DEP_VERSION_nanobind}
         GIT_SHALLOW TRUE
         GIT_SUBMODULES ext/robin_map
     )
-    FetchContent_MakeAvailable(nanobind)
 endif()

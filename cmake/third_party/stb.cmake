@@ -7,13 +7,11 @@ set(ERNIE_DEP_VERSION_stb
 )
 mark_as_advanced(ERNIE_DEP_VERSION_stb)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     stb
     URL https://github.com/nothings/stb/archive/${ERNIE_DEP_VERSION_stb}.tar.gz
     SOURCE_SUBDIR no-build
 )
-FetchContent_MakeAvailable(stb)
 
 # stb is header-only: its implementations of stb_image (PNG, JPEG) and stb_image_write are compiled
 # once, from a source written into the build tree.

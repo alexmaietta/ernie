@@ -6,12 +6,7 @@ set(GLM_BUILD_LIBRARY OFF)
 set(GLM_BUILD_TESTS OFF)
 set(GLM_BUILD_INSTALL OFF)
 
-include(FetchContent)
-FetchContent_Declare(
-    glm
-    URL https://github.com/g-truc/glm/archive/refs/tags/${ERNIE_DEP_VERSION_glm}.tar.gz
-)
-FetchContent_MakeAvailable(glm)
+ernie_fetch(glm URL https://github.com/g-truc/glm/archive/refs/tags/${ERNIE_DEP_VERSION_glm}.tar.gz)
 
 add_library(ernie_glm INTERFACE)
 target_include_directories(ernie_glm SYSTEM INTERFACE "${glm_SOURCE_DIR}")

@@ -4,6 +4,8 @@
 /// and planetary DEMs.
 #include "ernie/io/raster.h"
 
+#include "ernie/io/image.h"
+
 #include "ernie/util/bytes.h"
 #include "ernie/util/file.h"
 #include "ernie/util/profile.h"
@@ -698,7 +700,7 @@ std::unique_ptr<GridSource> OpenRaster(const fs::path& path) {
     if (extension == ".mosaic") {
         return OpenMosaic(path);
     }
-    if (extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
+    if (IsPngOrJpeg(path)) {
         return std::make_unique<DecodedRaster>(path);
     }
     throw std::runtime_error(

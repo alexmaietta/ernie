@@ -1,0 +1,3 @@
+Basis Universal's transcoder, vendored from [BinomialLLC/basis_universal](https://github.com/BinomialLLC/basis_universal) tag `v2_50` (Apache-2.0, see `LICENSE`, `NOTICE` and `LICENSES/`). Only `transcoder/` and zstd's two headers are kept: the full release archive is 188 MB, mostly test data and the encoder. The headers declare the zstd calls the transcoder makes (`ZSTD_decompress`, `ZSTD_isError`, `ZSTD_getFrameContentSize`), which link against OpenEXR's zstd (`ernie_zstd`).
+
+To update, replace `transcoder/` and `zstd/zstd.h`, `zstd/zstd_errors.h` from the new tag's archive, and change the tag here.

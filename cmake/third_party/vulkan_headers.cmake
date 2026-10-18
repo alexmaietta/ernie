@@ -6,14 +6,12 @@ set(ERNIE_DEP_VERSION_vulkan_headers
 )
 mark_as_advanced(ERNIE_DEP_VERSION_vulkan_headers)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     vulkan_headers
     URL
         https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/${ERNIE_DEP_VERSION_vulkan_headers}.tar.gz
     SOURCE_SUBDIR no-build
 )
-FetchContent_MakeAvailable(vulkan_headers)
 
 add_library(ernie_vulkan_headers INTERFACE)
 target_include_directories(

@@ -53,7 +53,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 known-first-party = ["ernie"]
 
 [tool.pytest.ini_options]
-testpaths = ["ernie/test/python"]
+testpaths = ["tests/python"]
 
 [tool.cibuildwheel]
 # One stable-ABI wheel per platform serves every CPython from 3.12.

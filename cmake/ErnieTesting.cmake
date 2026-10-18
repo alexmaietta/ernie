@@ -27,7 +27,7 @@ function(ernie_add_test_suite name)
     target_link_libraries(${target} PRIVATE ${ARG_LIBRARIES} GTest::gtest_main ernie_build_options)
     target_compile_definitions(
         ${target}
-        PRIVATE ERNIE_TEST_FIXTURES="${PROJECT_SOURCE_DIR}/ernie/test/fixtures"
+        PRIVATE ERNIE_TEST_FIXTURES="${PROJECT_SOURCE_DIR}/tests/fixtures"
     )
     gtest_discover_tests(
         ${target}

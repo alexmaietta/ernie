@@ -2,13 +2,11 @@
 set(ERNIE_DEP_VERSION_volk vulkan-sdk-1.4.363.0 CACHE STRING "Tag of volk to fetch")
 mark_as_advanced(ERNIE_DEP_VERSION_volk)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     volk
     URL https://github.com/zeux/volk/archive/refs/tags/${ERNIE_DEP_VERSION_volk}.tar.gz
     SOURCE_SUBDIR no-build
 )
-FetchContent_MakeAvailable(volk)
 
 # Loads the Vulkan loader at run time, so nothing links against libvulkan.
 add_library(ernie_volk STATIC "${volk_SOURCE_DIR}/volk.c")

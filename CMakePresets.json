@@ -28,8 +28,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "ERNIE_ASSERTS": "ON",
-        "ERNIE_WARNINGS_AS_ERRORS": "ON",
-        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+        "ERNIE_WARNINGS_AS_ERRORS": "ON"
       }
     },
     {
@@ -41,8 +40,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "ERNIE_COVERAGE": "ON",
-        "ERNIE_WARNINGS_AS_ERRORS": "ON",
-        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+        "ERNIE_WARNINGS_AS_ERRORS": "ON"
       }
     },
     {
@@ -56,8 +54,7 @@
         "CMAKE_INSTALL_PREFIX": "/usr",
         "ERNIE_BUILD_APP": "ON",
         "ERNIE_BUILD_TESTS": "OFF",
-        "ERNIE_BUILD_PYTHON": "OFF",
-        "FETCHCONTENT_BASE_DIR": "${sourceDir}/.deps"
+        "ERNIE_BUILD_PYTHON": "OFF"
       }
     }
   ],
@@ -68,11 +65,13 @@
     },
     {
       "name": "ci",
-      "configurePreset": "ci"
+      "configurePreset": "ci",
+      "nativeToolOptions": ["-k", "0"]
     },
     {
       "name": "coverage",
-      "configurePreset": "coverage"
+      "configurePreset": "coverage",
+      "nativeToolOptions": ["-k", "0"]
     },
     {
       "name": "package",

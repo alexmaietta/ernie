@@ -43,7 +43,12 @@ ernie_add_test_suite(
 )
 ernie_add_test_suite(
     io
-    SOURCES io/ies_test.cpp io/image_test.cpp io/raster_test.cpp
+    SOURCES
+        io/ies_test.cpp
+        io/image_test.cpp
+        io/nanovdb_test.cpp
+        io/raster_test.cpp
+        io/texture_test.cpp
     LIBRARIES ernie_io ernie_stb ernie_openexr
 )
 ernie_add_test_suite(device LABEL gpu SOURCES device/vulkan_devices_test.cpp LIBRARIES ernie_device)

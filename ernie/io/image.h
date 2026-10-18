@@ -88,6 +88,11 @@ struct Image {
 ///         or is not .png, .jpg, .jpeg or .exr.
 Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding);
 
+/// @brief Tests for a .png, .jpg or .jpeg extension, in any case.
+/// @param path The file.
+/// @return Whether it is a PNG or JPEG, read by stb.
+bool IsPngOrJpeg(const std::filesystem::path& path);
+
 /// @brief Writes a CPU tensor as a ZIP-compressed OpenEXR file.
 /// Channels are float32, or uint32 for uint32 data such as ids;
 /// narrower integers become exact floats. One channel is Y, two RG,

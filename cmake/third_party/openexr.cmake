@@ -21,22 +21,20 @@ set(IMATH_INSTALL_PKG_CONFIG OFF)
 set(IMATH_INSTALL OFF)
 set(BUILD_SHARED_LIBS OFF)
 
-# Imath is declared first, so OpenEXR's own declaration of it (a git clone) is skipped.
-include(FetchContent)
-FetchContent_Declare(
+# Their own tests stay out of Ernie's ctest. Imath is made available first, so OpenEXR finds it
+# populated and skips its own git clone of it.
+set(ernie_saved_build_testing ${BUILD_TESTING})
+set(BUILD_TESTING OFF)
+ernie_fetch(
     Imath
     URL
         https://github.com/AcademySoftwareFoundation/Imath/archive/refs/tags/${ERNIE_DEP_VERSION_imath}.tar.gz
 )
-FetchContent_Declare(
+ernie_fetch(
     openexr
     URL
         https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/${ERNIE_DEP_VERSION_openexr}.tar.gz
 )
-# Its own tests stay out of Ernie's ctest.
-set(ernie_saved_build_testing ${BUILD_TESTING})
-set(BUILD_TESTING OFF)
-FetchContent_MakeAvailable(openexr)
 set(BUILD_TESTING ${ernie_saved_build_testing})
 
 # Its headers and Imath's are system headers to Ernie, kept out of its warnings.

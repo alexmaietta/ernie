@@ -2,13 +2,11 @@
 set(ERNIE_DEP_VERSION_dlpack v1.3 CACHE STRING "Tag of DLPack to fetch")
 mark_as_advanced(ERNIE_DEP_VERSION_dlpack)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     dlpack
     URL https://github.com/dmlc/dlpack/archive/refs/tags/${ERNIE_DEP_VERSION_dlpack}.tar.gz
     SOURCE_SUBDIR no-build
 )
-FetchContent_MakeAvailable(dlpack)
 
 # The tensor exchange header, nothing to build.
 add_library(ernie_dlpack INTERFACE)

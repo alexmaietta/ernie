@@ -160,10 +160,15 @@ Image LoadImageFile(const std::filesystem::path& path, ImageEncoding encoding) {
     if (extension == ".exr") {
         return LoadExr(path);
     }
-    if (extension == ".png" || extension == ".jpg" || extension == ".jpeg") {
+    if (IsPngOrJpeg(path)) {
         return LoadStb(path, encoding);
     }
     throw std::runtime_error("Unsupported image format: " + path.string());
+}
+
+bool IsPngOrJpeg(const std::filesystem::path& path) {
+    const std::string extension = ToLower(path.extension().string());
+    return extension == ".png" || extension == ".jpg" || extension == ".jpeg";
 }
 
 float SrgbToLinear(float value) {

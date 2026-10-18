@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <numbers>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -52,8 +53,8 @@ TEST(Ies, ReadsTypeBAboutTheWidth) {
         const auto [theta, phi] = Angles(glm::normalize(e));
         return profile.Sample(theta, phi);
     };
-    const double s = std::sin(M_PI / 6.0);
-    const double c = std::cos(M_PI / 6.0);
+    const double s = std::sin(glm::radians(30.0));
+    const double c = std::cos(glm::radians(30.0));
     EXPECT_NEAR(at({0.0, 0.0, -1.0}), 100.0, 1e-9) << "the beam's axis";
     EXPECT_NEAR(at({s, 0.0, -c}), 130.0, 1e-9) << "V 30: turned about y towards x";
     EXPECT_NEAR(at({-s, 0.0, -c}), 130.0, 1e-9) << "V -30, mirrored";
@@ -72,8 +73,8 @@ TEST(Ies, ReadsTypeAAboutTheLength) {
         const auto [theta, phi] = Angles(glm::normalize(e));
         return profile.Sample(theta, phi);
     };
-    const double s = std::sin(M_PI / 6.0);
-    const double c = std::cos(M_PI / 6.0);
+    const double s = std::sin(glm::radians(30.0));
+    const double c = std::cos(glm::radians(30.0));
     EXPECT_NEAR(at({0.0, s, -c}), 130.0, 1e-9) << "V 30: turned about x towards y";
     EXPECT_NEAR(at({s, 0.0, -c}), 110.0, 1e-9) << "H 30: out of the plane towards x";
     EXPECT_NEAR(at({-s, 0.0, -c}), 110.0, 1e-9) << "H -30, mirrored";
@@ -130,12 +131,12 @@ TEST(Ies, ReadsARotationallySymmetricProfile) {
     ASSERT_EQ(profile.vertical.size(), 4u);
     ASSERT_EQ(profile.horizontal.size(), 1u);
     EXPECT_DOUBLE_EQ(profile.Sample(0.0, 0.0), 100.0) << "times the multiplier";
-    EXPECT_NEAR(profile.Sample(30.0, 123.0), 100.0 * std::cos(M_PI / 6.0), 1e-4);
+    EXPECT_NEAR(profile.Sample(30.0, 123.0), 100.0 * std::cos(glm::radians(30.0)), 1e-4);
     EXPECT_NEAR(profile.Sample(45.0, 0.0), 0.5 * (86.60254 + 50.0), 1e-4) << "linear between";
     EXPECT_EQ(profile.Sample(120.0, 0.0), 0.0) << "nothing above the horizon";
     // A cos lobe of 100 cd gives pi 100 lumens; the 30 degree steps
     // lose a little of it.
-    EXPECT_NEAR(profile.Flux(), M_PI * 100.0, 0.03 * M_PI * 100.0);
+    EXPECT_NEAR(profile.Flux(), std::numbers::pi * 100.0, 0.03 * std::numbers::pi * 100.0);
 }
 
 TEST(Ies, MirrorsTheHorizontalPlanesBySymmetry) {

@@ -6,10 +6,8 @@ set(BUILD_GMOCK OFF)
 set(INSTALL_GTEST OFF)
 set(gtest_force_shared_crt ON)
 
-include(FetchContent)
-FetchContent_Declare(
+ernie_fetch(
     googletest
     URL
         https://github.com/google/googletest/archive/refs/tags/${ERNIE_DEP_VERSION_googletest}.tar.gz
 )
-FetchContent_MakeAvailable(googletest)
