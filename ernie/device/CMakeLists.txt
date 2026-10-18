@@ -3,8 +3,10 @@ add_library(
     ernie_device
     OBJECT
     arena.cpp
+    bindless.cpp
     buffer.cpp
     context.cpp
+    image.cpp
     instance.cpp
     kernel.cpp
     queue.cpp

@@ -9,15 +9,19 @@ namespace ernie {
 
 ComputeKernel::ComputeKernel(DeviceContext& context, std::span<const std::uint32_t> spirv,
                              std::string_view name, std::uint32_t parameterBytes,
-                             std::string_view entryPoint)
-    : device_(context.Device()), name_(name), parameterBytes_(parameterBytes) {
+                             const BindlessHeap* heap, std::string_view entryPoint)
+    : device_(context.Device()), name_(name), parameterBytes_(parameterBytes),
+      heap_(heap != nullptr ? heap->Set() : VK_NULL_HANDLE) {
     if (parameterBytes > context.Limits().maxPushConstantsSize) {
         throw DeviceError(DeviceErrorKind::Unsupported,
                           name_ + " passes more bytes per dispatch than the device allows");
     }
     const VkPushConstantRange range{.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
                                     .size = parameterBytes};
+    const VkDescriptorSetLayout heapLayout = heap != nullptr ? heap->Layout() : VK_NULL_HANDLE;
     const VkPipelineLayoutCreateInfo layout{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                                            .setLayoutCount = heap != nullptr ? 1u : 0u,
+                                            .pSetLayouts = &heapLayout,
                                             .pushConstantRangeCount = parameterBytes > 0 ? 1u : 0u,
                                             .pPushConstantRanges = &range};
     CheckVk(vkCreatePipelineLayout(device_, &layout, nullptr, &layout_),
@@ -57,6 +61,10 @@ void ComputeKernel::Dispatch(VkCommandBuffer commands, glm::uvec3 groups,
                                     std::to_string(parameters.size()));
     }
     vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
+    if (heap_ != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_COMPUTE, layout_, 0, 1, &heap_, 0,
+                                nullptr);
+    }
     if (parameterBytes_ > 0) {
         vkCmdPushConstants(commands, layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, parameterBytes_,
                            parameters.data());

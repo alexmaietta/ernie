@@ -3,6 +3,7 @@
 /// @brief A compute kernel: its pipeline, and the per-dispatch bytes it reads.
 #pragma once
 
+#include "ernie/device/bindless.h"
 #include "ernie/device/context.h"
 
 #include <glm/vec3.hpp>
@@ -22,10 +23,12 @@ class ComputeKernel {
   public:
     /// @param parameterBytes The bytes each dispatch passes, at most the device's push-constant
     /// limit (128 at least).
+    /// @param heap The bindless heap it reads images through, bound as set 0; none for kernels
+    /// that touch no images.
     /// @throws DeviceError if the pipeline cannot be created or the bytes exceed the limit.
     ComputeKernel(DeviceContext& context, std::span<const std::uint32_t> spirv,
                   std::string_view name, std::uint32_t parameterBytes = 0,
-                  std::string_view entryPoint = "main");
+                  const BindlessHeap* heap = nullptr, std::string_view entryPoint = "main");
     ~ComputeKernel();
     ComputeKernel(const ComputeKernel&) = delete;
     ComputeKernel& operator=(const ComputeKernel&) = delete;
@@ -46,6 +49,7 @@ class ComputeKernel {
     VkDevice device_;
     std::string name_;
     std::uint32_t parameterBytes_;
+    VkDescriptorSet heap_ = VK_NULL_HANDLE;
     VkPipelineLayout layout_ = VK_NULL_HANDLE;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
