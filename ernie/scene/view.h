@@ -185,6 +185,12 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
 /// For schemas that declare no attributes of their own.
 #define ERNIE_NO_ATTRIBUTES(X)
 
+/// The options of an attribute in `group` that is finite and 0 or more: a length, a power.
+#define ERNIE_NONNEGATIVE(group_) .group = group_, .lower = ::ernie::AtLeast(0.0), .finite = true
+/// The options of an attribute in `group` from 0 to 1: a fraction, a reflectance.
+#define ERNIE_FRACTION(group_)                                                                     \
+    .group = group_, .lower = ::ernie::AtLeast(0.0), .upper = ::ernie::AtMost(1.0)
+
 #define ERNIE_ATTRIBUTE_ACCESSORS(Type, Name, usdName, fallback, ...)                              \
     static constexpr std::string_view k##Name = usdName;                                           \
     typename ::ernie::AttributeTraits<Type>::Result Get##Name() const {                            \

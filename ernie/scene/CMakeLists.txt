@@ -21,7 +21,6 @@ add_library(
     schemas/camera.cpp
     schemas/geom.cpp
     schemas/instancer.cpp
-    schemas/laser.cpp
     schemas/lux.cpp
     schemas/mesh.cpp
     schemas/planet.cpp

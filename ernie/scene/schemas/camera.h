@@ -12,8 +12,7 @@
 // Lens lengths are metres, whatever a USD stage's scale: USD's tenths of a scene unit are
 // converted on import and export.
 #define ERNIE_LENS_LENGTH(X, Name, usdName, fallback, text)                                        \
-    X(double, Name, usdName, fallback, text ", metres.", .group = "Lens", .lower = AtLeast(0.0),   \
-      .finite = true)
+    X(double, Name, usdName, fallback, text ", metres.", ERNIE_NONNEGATIVE("Lens"))
 
 #define ERNIE_CAMERA_ATTRIBUTES(X)                                                                 \
     X(std::string, Projection, "projection", "perspective", "How it projects the scene.",          \
@@ -79,7 +78,7 @@
     X(bool, LensVignetting, "ernie:lens:vignetting", false, "Natural falloff off axis.",           \
       .group = "Lens")                                                                             \
     X(double, LensTransmission, "ernie:lens:transmission", 1.0, "The fraction of light passed.",   \
-      .group = "Lens", .lower = AtLeast(0.0), .upper = AtMost(1.0))                                \
+      ERNIE_FRACTION("Lens"))                                                                      \
     X(std::vector<float>, LensChromaticScale, "ernie:lens:chromatic:scale", std::vector<float>{},  \
       "(nm, scale) pairs: lateral colour, the image's scale per wavelength.", .group = "Lens")     \
     X(std::vector<float>, LensChromaticFocus, "ernie:lens:chromatic:focus", std::vector<float>{},  \
@@ -104,8 +103,7 @@
       "Light passed along the axis over light passed across it.", .group = "Polarizer",            \
       .lower = AtLeast(1.0))                                                                       \
     X(double, PolarizerTransmission, "ernie:polarizer:transmission", 0.85,                         \
-      "The fraction of light polarized along the axis passed.", .group = "Polarizer",              \
-      .lower = AtLeast(0.0), .upper = AtMost(1.0))
+      "The fraction of light polarized along the axis passed.", ERNIE_FRACTION("Polarizer"))
 
 #define ERNIE_SENSOR_QE(X, Name, usdName, channel)                                                 \
     X(std::vector<float>, Name, usdName, std::vector<float>{},                                     \

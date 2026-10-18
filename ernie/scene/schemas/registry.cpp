@@ -5,7 +5,6 @@
 #include "ernie/scene/schemas/collection.h"
 #include "ernie/scene/schemas/geom.h"
 #include "ernie/scene/schemas/instancer.h"
-#include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/schemas/mesh.h"
 #include "ernie/scene/schemas/planet.h"

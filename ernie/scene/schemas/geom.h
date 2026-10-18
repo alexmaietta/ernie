@@ -45,7 +45,7 @@
       "Linear RGB of the whole prim.", .label = "Display colour", .group = "Geometry",              \
       .lower = AtLeast(0.0), .finite = true, .color = true, .dirty = Dirty::Primvars)              \
     X(double, DisplayOpacity, "primvars:displayOpacity", 1.0, "Opacity of the whole prim.",        \
-      .group = "Geometry", .lower = AtLeast(0.0), .upper = AtMost(1.0), .dirty = Dirty::Primvars)  \
+      ERNIE_FRACTION("Geometry"), .dirty = Dirty::Primvars)                                        \
     X(bool, DoubleSided, "doubleSided", false, "Whether its back faces are seen too.",             \
       .group = "Geometry")                                                                         \
     X(std::string, Orientation, "orientation", "rightHanded",                                      \
@@ -93,7 +93,7 @@
       "The family of subsets it is one of, as materialBind for per-face materials.",               \
       .group = "Subset", .dirty = Dirty::Topology)
 
-#define ERNIE_SHAPE_LENGTH .group = "Shape", .lower = AtLeast(0.0), .finite = true
+#define ERNIE_SHAPE_LENGTH ERNIE_NONNEGATIVE("Shape")
 
 #define ERNIE_AXIS_ATTRIBUTE(X)                                                                    \
     X(Choice<Axis>, Axis, "axis", Axis::Z, "The axis of its height, or a plane's normal.",         \

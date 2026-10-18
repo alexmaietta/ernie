@@ -34,7 +34,7 @@
     X(double, CellSize, "ernie:terrain:cellSize", 1.0, "Metres between a plane's heights.",        \
       .group = "Terrain", .lower = Above(0.0), .finite = true)                                     \
     X(double, Exaggeration, "ernie:terrain:exaggeration", 1.0, "Scales the heights as drawn.",     \
-      .group = "Terrain", .lower = AtLeast(0.0), .finite = true)                                   \
+      ERNIE_NONNEGATIVE("Terrain"))                                                                \
     X(double, FinestCell, "ernie:terrain:finestCell", 1.0,                                         \
       "Metres: a body's LOD refines below its heights, bilinearly, to quads this size; 0 stops at " \
       "the heights'.",                                                                             \
@@ -51,8 +51,7 @@
       .lower = AtLeast(0.0), .upper = AtMost(90.0))
 
 #define ERNIE_ATMOSPHERE_COLUMN(X, Name, usdName, fallback, text)                                  \
-    X(double, Name, usdName, fallback, text, .group = "Atmosphere", .lower = AtLeast(0.0),         \
-      .finite = true)
+    X(double, Name, usdName, fallback, text, ERNIE_NONNEGATIVE("Atmosphere"))
 
 #define ERNIE_ATMOSPHERE_ATTRIBUTES(X)                                                             \
     X(Path, Body, "ernie:atmosphere:body", Path(), "The Sphere it surrounds.",                     \
@@ -63,8 +62,7 @@
     ERNIE_ATMOSPHERE_COLUMN(X, Top, "ernie:atmosphere:top", 100000.0,                              \
                             "Metres above the surface it reaches; Earth's 100 km.")                \
     X(double, GroundAlbedo, "ernie:atmosphere:groundAlbedo", 0.3,                                  \
-      "The ground's reflectance for light scattered in the air.", .group = "Atmosphere",           \
-      .lower = AtLeast(0.0), .upper = AtMost(1.0))                                                 \
+      "The ground's reflectance for light scattered in the air.", ERNIE_FRACTION("Atmosphere"))   \
     ERNIE_ATMOSPHERE_COLUMN(X, HazeOpticalDepth, "ernie:atmosphere:hazeOpticalDepth", 0.1,         \
                             "Earth: the haze's vertical optical depth at 550 nm.")                 \
     ERNIE_ATMOSPHERE_COLUMN(X, OzoneColumn, "ernie:atmosphere:ozoneColumn", 300.0,                 \
@@ -78,12 +76,10 @@
                             "Metres below which clouds block light grazing the limb, darkening "   \
                             "its shadow as in a lunar eclipse; 0 clear.")                          \
     X(double, CloudCover, "ernie:atmosphere:cloudCover", 0.5,                                      \
-      "The fraction of the limb the clouds cover.", .group = "Atmosphere", .lower = AtLeast(0.0),  \
-      .upper = AtMost(1.0))                                                                        \
+      "The fraction of the limb the clouds cover.", ERNIE_FRACTION("Atmosphere"))                 \
     X(double, PolarizationDegree, "ernie:polarization:degree", 0.75,                               \
       "The sky's greatest degree of linear polarization, 90 degrees from the sun.",                \
-      .label = "Sky polarization", .group = "Atmosphere", .lower = AtLeast(0.0),                   \
-      .upper = AtMost(1.0))
+      .label = "Sky polarization", ERNIE_FRACTION("Atmosphere"))
 
 #define ERNIE_STAR_FIELD_ATTRIBUTES(X)                                                             \
     X(double, MagnitudeLimit, "ernie:stars:magnitudeLimit", 99.0,                                  \

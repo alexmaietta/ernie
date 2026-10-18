@@ -3,7 +3,6 @@
 /// @brief Tests of lights' and cameras' schemas and extents.
 #include "ernie/scene/schemas/camera.h"
 #include "ernie/scene/schemas/collection.h"
-#include "ernie/scene/schemas/laser.h"
 #include "ernie/scene/schemas/lux.h"
 #include "ernie/scene/schemas/mesh.h"
 #include "ernie/scene/schemas/vol.h"
