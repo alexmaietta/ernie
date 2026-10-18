@@ -94,10 +94,10 @@ Viewer::Viewer(const Scene& scene, const ViewerOptions& options)
     shell_ = std::make_unique<Shell>(scene, context_.get(), options.shell);
     shell_->Frame();
     {
-        ERNIE_ZONE("Set up the frame");
+        ERNIE_ZONE("Set up the device scene");
         arenas_ = std::make_unique<Arenas>(*context_, MemoryUse::Device, "scene columns",
                                            std::uint64_t{16} << 20);
-        frame_ = std::make_unique<Frame>(*context_, *arenas_, scene, ShaderCompiler());
+        deviceScene_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene, ShaderCompiler());
         sampler_ = std::make_unique<Sampler>(
             *context_, SamplerDescription{.filter = Filter::Nearest, .address = Address::Clamp},
             "viewport");
@@ -162,8 +162,9 @@ bool Viewer::Step() {
         Ticket drawn;
         {
             ERNIE_ZONE("Run the frame");
-            drawn = frame_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
-                                    {}, target->semaphores);
+            drawn =
+                deviceScene_->Execute([&](graph::Graph& graph) { AddPasses(graph, data, *target); },
+                                      {}, target->semaphores);
         }
         inFlight_.push_back(drawn);
         ERNIE_ZONE("Present");

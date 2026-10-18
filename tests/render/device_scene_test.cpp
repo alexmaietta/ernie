@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file frame_test.cpp
-/// @brief Tests of a frame: the scene's columns, its transforms and the frame's own passes run as
-/// one graph in one submission, under synchronization validation, as the device and the host
-/// change the scene between frames.
-#include "ernie/frame/frame.h"
+/// @file device_scene_test.cpp
+/// @brief Tests of the device scene: the scene's columns, its transforms and a frame's own passes
+/// run as one graph in one submission, under synchronization validation, as the device and the
+/// host change the scene between frames.
+#include "ernie/render/device_scene.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/device/columns.h"
@@ -48,7 +48,7 @@ void ExpectTranslation(const std::vector<float>& worlds, std::uint32_t node, glm
     }
 }
 
-TEST(Frame, RunsTheScenesPassesBeforeItsOwnInOneGraph) {
+TEST(DeviceScene, RunsTheScenesPassesBeforeAFramesOwnInOneGraph) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;
     Bodies bodies;
@@ -91,12 +91,12 @@ TEST(Frame, RunsTheScenesPassesBeforeItsOwnInOneGraph) {
     ExpectClean(*context);
 }
 
-TEST(Frame, FollowsTheDeviceAndTheHostFrameByFrame) {
+TEST(DeviceScene, FollowsTheDeviceAndTheHostFrameByFrame) {
     ERNIE_CONTEXT(context);
     const ShaderCompiler compiler;
     Bodies bodies;
     Arenas arenas(*context, MemoryUse::Device, "frame", 1 << 20);
-    Frame frame(*context, arenas, bodies.scene, compiler);
+    DeviceScene frame(*context, arenas, bodies.scene, compiler);
     const DeviceColumn& translate = frame.Columns().Bind(bodies.bucket, "xformOp:translate");
     frame.Transforms().Bind(bodies.bucket, "xformOp:translate", translate);
     frame.Execute({}).Wait();

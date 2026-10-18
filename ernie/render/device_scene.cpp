@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file frame.cpp
-/// @brief Building and running a frame's graph.
-#include "ernie/frame/frame.h"
+/// @file device_scene.cpp
+/// @brief Building and running each frame's graph over the device scene.
+#include "ernie/render/device_scene.h"
 
 namespace ernie {
 
-Frame::Frame(DeviceContext& context, Arenas& arenas, const Scene& scene,
-             const ShaderCompiler& compiler)
+DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
+                         const ShaderCompiler& compiler)
     : context_(context), pool_(context), columns_(context, arenas, scene),
       transforms_(context, arenas, scene, compiler) {}
 
-Ticket Frame::Execute(const std::function<void(graph::Graph&)>& passes,
-                      std::span<const Ticket> waits, BinarySemaphores binary) {
+Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,
+                            std::span<const Ticket> waits, BinarySemaphores binary) {
     ERNIE_ZONE("Run a frame");
     graph::Graph graph(context_, pool_);
     columns_.AddSync(graph);

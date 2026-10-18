@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
-/// @file frame.h
-/// @brief A frame: one graph that brings a scene's device state up to date, then runs the passes
-/// that read it, in one submission.
+/// @file device_scene.h
+/// @brief The device scene: the managers that keep a scene's device state, and the graph each
+/// frame runs to bring it up to date and then run the passes that read it, in one submission.
 ///
-///     Frame frame(context, scene, compiler);
-///     frame.Transforms().Bind(bucket, "xformOp:translate",
-///                             frame.Columns().Bind(bucket, "xformOp:translate"));
-///     const Ticket done = frame.Execute([&](graph::Graph& graph) {
-///         const graph::Buffer worlds = graph.Import(frame.Transforms().Worlds(), "worlds");
+///     DeviceScene device(context, arenas, scene, compiler);
+///     device.Transforms().Bind(bucket, "xformOp:translate",
+///                              device.Columns().Bind(bucket, "xformOp:translate"));
+///     const Ticket done = device.Execute([&](graph::Graph& graph) {
+///         const graph::Buffer worlds = graph.Import(device.Transforms().Worlds(), "worlds");
 ///         graph.Add("Shade", ...);
 ///     });
 #pragma once
@@ -24,13 +24,13 @@ namespace ernie {
 
 /// @brief A scene on a device and the graph each frame runs: the columns bound on the device
 /// follow the scene, world transforms compose from them, and then the frame's own passes run.
-class Frame {
+class DeviceScene {
   public:
     /// @param arenas Where the device columns live; `MemoryUse::Shared` to share them with CUDA.
-    Frame(DeviceContext& context, Arenas& arenas, const Scene& scene,
-          const ShaderCompiler& compiler);
-    Frame(const Frame&) = delete;
-    Frame& operator=(const Frame&) = delete;
+    DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
+                const ShaderCompiler& compiler);
+    DeviceScene(const DeviceScene&) = delete;
+    DeviceScene& operator=(const DeviceScene&) = delete;
 
     SceneColumns& Columns() {
         return columns_;

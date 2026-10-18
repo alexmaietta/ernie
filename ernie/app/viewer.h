@@ -6,7 +6,7 @@
 
 #include "ernie/app/imgui_backend.h"
 #include "ernie/app/ui.h"
-#include "ernie/frame/frame.h"
+#include "ernie/render/device_scene.h"
 
 #include <glm/vec2.hpp>
 
@@ -86,7 +86,7 @@ class Viewer {
     std::unique_ptr<ImGuiRenderer> renderer_;
     std::unique_ptr<Shell> shell_;
     std::unique_ptr<Arenas> arenas_;
-    std::unique_ptr<Frame> frame_;
+    std::unique_ptr<DeviceScene> deviceScene_;
     /// The image the viewport is rendered into, and the UI's texture of it.
     std::unique_ptr<Sampler> sampler_;
     std::unique_ptr<DeviceImage> viewport_;
