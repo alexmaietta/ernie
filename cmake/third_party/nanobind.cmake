@@ -8,7 +8,7 @@ mark_as_advanced(ERNIE_DEP_VERSION_nanobind)
 
 find_package(
     Python
-    3.12
+    3.10
     REQUIRED
     COMPONENTS Interpreter Development.Module ${SKBUILD_SABI_COMPONENT}
 )

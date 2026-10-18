@@ -10,7 +10,7 @@ readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 authors = [{ name = "Alex Maietta" }]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = []
 
 [project.urls]
@@ -26,6 +26,7 @@ minimum-version = "build-system.requires"
 cmake.version = ">=3.21"
 cmake.build-type = "Release"
 build-dir = "build/wheel/{wheel_tag}"
+# Stable-ABI (abi3) wheels from 3.12, where nanobind supports it; ordinary per-version wheels below.
 wheel.py-api = "cp312"
 wheel.packages = []
 install.components = ["python"]
@@ -43,7 +44,7 @@ ERNIE_BUILD_APP = "OFF"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 extend-exclude = ["build", "dist", ".deps", ".venv"]
 
 [tool.ruff.lint]
@@ -56,8 +57,9 @@ known-first-party = ["ernie"]
 testpaths = ["tests/python"]
 
 [tool.cibuildwheel]
-# One stable-ABI wheel per platform serves every CPython from 3.12.
-build = "cp312-*"
+# Per-version wheels for 3.10 and 3.11; one stable-ABI wheel serves every CPython from 3.12. CI
+# builds each in its own job (CIBW_BUILD).
+build = "cp310-* cp311-* cp312-*"
 skip = "*-musllinux_*"
 manylinux-x86_64-image = "manylinux_2_34"
 manylinux-aarch64-image = "manylinux_2_34"

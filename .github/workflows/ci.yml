@@ -220,9 +220,13 @@ jobs:
 
   # The project site on GitHub Pages, from main: the docs, with the coverage report and its badge
   # under coverage/.
+  # The site follows main whenever its docs build, so a failing test elsewhere never takes it down;
+  # the coverage report is included when the coverage job passed.
   pages:
-    needs: [lint, test, docs, coverage]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [docs, coverage]
+    if: >
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.docs.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -237,6 +241,7 @@ jobs:
           name: docs
           path: site
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.coverage.result == 'success'
         with:
           name: coverage
           path: site/coverage
@@ -247,18 +252,23 @@ jobs:
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   wheel:
-    name: wheel (${{ matrix.platform }})
+    name: wheel (${{ matrix.platform }}, ${{ matrix.python }})
     needs: version
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
+        # cp312 is the stable-ABI wheel for every CPython from 3.12.
+        python: [cp310, cp311, cp312]
+        platform: [linux-x86_64, linux-aarch64, windows-amd64, macos-arm64]
         include:
           - { platform: linux-x86_64, runner: ubuntu-24.04 }
           - { platform: linux-aarch64, runner: ubuntu-24.04-arm }
           - { platform: windows-amd64, runner: windows-2025 }
           - { platform: macos-arm64, runner: macos-15 }
+    env:
+      CIBW_BUILD: ${{ matrix.python }}-*
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Version
@@ -273,7 +283,7 @@ jobs:
           output-dir: wheelhouse
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: wheel-${{ matrix.platform }}
+          name: wheel-${{ matrix.platform }}-${{ matrix.python }}
           path: wheelhouse/*.whl
 
   # The sdist, then a wheel built from it and imported, as pip does for platforms without wheels.
