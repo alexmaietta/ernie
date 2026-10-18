@@ -4,7 +4,11 @@
 /// traced into a column, and the column read back.
 #include "ernie/render/renderer.h"
 
+#include "ernie/device/bindless.h"
+#include "ernie/device/context.h"
 #include "ernie/device/staging.h"
+#include "ernie/render/device_scene.h"
+#include "ernie/render/rt/camera_pass.h"
 #include "ernie/scene/schema/camera.h"
 #include "ernie/scene/schema/render.h"
 #include "ernie/util/profiler.h"
@@ -34,23 +38,39 @@ PinholeView View(const Scene& scene, const Path& path, glm::uvec2 size) {
 
 }  // namespace
 
-Renderer::Renderer(const RendererOptions& options)
-    : context_(std::make_unique<DeviceContext>(
-          DeviceContextOptions{.validation = options.validation, .device = options.device})) {
-    if (!context_->Capabilities().rayQuery) {
+/// What a renderer keeps on its device.
+struct Renderer::Device {
+    std::unique_ptr<DeviceContext> context;
+    std::unique_ptr<Arenas> arenas;
+    std::unique_ptr<BindlessHeap> heap;
+    std::unique_ptr<CameraPass> camera;
+    const Scene* scene = nullptr;
+    std::unique_ptr<DeviceScene> deviceScene;
+    std::unique_ptr<DeviceColumn> ldr;
+};
+
+Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<Device>()) {
+    Device& device = *device_;
+    device.context = std::make_unique<DeviceContext>(
+        DeviceContextOptions{.validation = options.validation, .device = options.device});
+    if (!device.context->Capabilities().rayQuery) {
         throw DeviceError(DeviceErrorKind::Unsupported,
-                          context_->Info().name + " cannot ray trace");
+                          device.context->Info().name + " cannot ray trace");
     }
-    arenas_ =
-        std::make_unique<Arenas>(*context_, MemoryUse::Device, "renderer", std::uint64_t{16} << 20);
-    heap_ = std::make_unique<BindlessHeap>(*context_);
-    camera_ = std::make_unique<CameraPass>(*context_, ShaderCompiler(), *heap_);
-    ldr_ = std::make_unique<DeviceColumn>(*arenas_, "ldr colour", DType::UInt8,
-                                          std::vector<std::int64_t>{4}, 0);
+    device.arenas = std::make_unique<Arenas>(*device.context, MemoryUse::Device, "renderer",
+                                             std::uint64_t{16} << 20);
+    device.heap = std::make_unique<BindlessHeap>(*device.context);
+    device.camera = std::make_unique<CameraPass>(*device.context, ShaderCompiler(), *device.heap);
+    device.ldr = std::make_unique<DeviceColumn>(*device.arenas, "ldr colour", DType::UInt8,
+                                                std::vector<std::int64_t>{4}, 0);
 }
 
 Renderer::~Renderer() {
-    context_->WaitIdle();
+    device_->context->WaitIdle();
+}
+
+DeviceContext& Renderer::Context() {
+    return *device_->context;
 }
 
 Tensor Renderer::Render(const Scene& scene) {
@@ -68,20 +88,22 @@ Tensor Renderer::Render(const Scene& scene) {
     const glm::uvec2 size(std::max(1.0, resolution.x), std::max(1.0, resolution.y));
     const PinholeView view = View(scene, camera, size);
 
-    if (&scene != scene_) {
-        context_->WaitIdle();
-        device_ = std::make_unique<DeviceScene>(*context_, *arenas_, scene, ShaderCompiler());
-        scene_ = &scene;
+    Device& device = *device_;
+    if (&scene != device.scene) {
+        device.context->WaitIdle();
+        device.deviceScene =
+            std::make_unique<DeviceScene>(*device.context, *device.arenas, scene, ShaderCompiler());
+        device.scene = &scene;
     }
     const std::size_t pixels = std::size_t{size.x} * size.y;
-    ldr_->Resize(pixels, context_->Main());
-    device_->Follow(glm::dvec3(view.cameraToWorld[3]));
-    const Ticket done = device_->Execute([&](graph::Graph& graph) {
-        CameraOutputs outputs{.ldr = graph.Import(*ldr_, ldr_->Name())};
-        camera_->Add(graph, view, outputs);
+    device.ldr->Resize(pixels, device.context->Main());
+    device.deviceScene->Follow(glm::dvec3(view.cameraToWorld[3]));
+    const Ticket done = device.deviceScene->Execute([&](graph::Graph& graph) {
+        CameraOutputs outputs{.ldr = graph.Import(*device.ldr, device.ldr->Name())};
+        device.camera->Add(graph, view, outputs);
     });
-    Readback readback(*context_, context_->Main(), ldr_->Storage(), ldr_->Range().offset,
-                      pixels * 4, std::span(&done, 1));
+    Readback readback(*device.context, device.context->Main(), device.ldr->Storage(),
+                      device.ldr->Range().offset, pixels * 4, std::span(&done, 1));
     return Tensor::Copy(
         std::span<const std::uint8_t>(
             reinterpret_cast<const std::uint8_t*>(readback.Bytes().data()), pixels * 4),

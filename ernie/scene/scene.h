@@ -3,6 +3,7 @@
 /// @brief The scene: typed prims at paths, stored in columns by type.
 #pragma once
 
+#include "ernie/export.h"
 #include "ernie/geometry/bounds.h"
 #include "ernie/scene/extent_cache.h"
 #include "ernie/scene/holder_index.h"
@@ -24,9 +25,11 @@ namespace ernie {
 
 /// @brief Prims named by paths, each of a registered type, its attributes validated against the
 /// type's schema and stored in the columns of the type's bucket.
-class Scene {
+class ERNIE_API Scene {
   public:
     Scene();
+    Scene(const Scene&) = delete;
+    Scene& operator=(const Scene&) = delete;
 
     /// @brief Defines a prim of a concrete type, or `""` for none; missing ancestors are defined
     /// without a type. Redefining with another type keeps the authored values both types declare.

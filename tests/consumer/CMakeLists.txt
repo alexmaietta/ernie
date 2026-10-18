@@ -26,5 +26,10 @@ target_link_libraries(headers PRIVATE Ernie::ernie)
 add_executable(consumer main.cpp)
 target_link_libraries(consumer PRIVATE Ernie::ernie)
 
+add_executable(first_render first_render.cpp)
+target_link_libraries(first_render PRIVATE Ernie::ernie)
+
 enable_testing()
 add_test(NAME consumer COMMAND consumer)
+add_test(NAME first_render COMMAND first_render)
+set_tests_properties(first_render PROPERTIES SKIP_RETURN_CODE 77)

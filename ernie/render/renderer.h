@@ -6,10 +6,7 @@
 ///     Tensor image = renderer.Render(scene);  // height x width x 4 bytes of LdrColor
 #pragma once
 
-#include "ernie/device/bindless.h"
-#include "ernie/device/context.h"
-#include "ernie/render/device_scene.h"
-#include "ernie/render/rt/camera_pass.h"
+#include "ernie/export.h"
 #include "ernie/scene/scene.h"
 #include "ernie/util/tensor.h"
 
@@ -17,6 +14,8 @@
 #include <string>
 
 namespace ernie {
+
+class DeviceContext;
 
 struct RendererOptions {
     /// The device: its UUID in hex, or part of its name; empty for the best scoring one.
@@ -27,9 +26,9 @@ struct RendererOptions {
 
 /// @brief A device and what it keeps of the scene it last rendered, so rendering the same scene
 /// again costs only what changed in it.
-class Renderer {
+class ERNIE_API Renderer {
   public:
-    /// @throws DeviceError without a device that can ray trace.
+    /// @throws std::runtime_error without a device that can ray trace.
     explicit Renderer(const RendererOptions& options = {});
     ~Renderer();
     Renderer(const Renderer&) = delete;
@@ -41,18 +40,12 @@ class Renderer {
     /// @throws std::invalid_argument when the scene has no render settings or they name no camera.
     Tensor Render(const Scene& scene);
 
-    DeviceContext& Context() {
-        return *context_;
-    }
+    /// @return Its device, for Ernie's own tests and tools.
+    DeviceContext& Context();
 
   private:
-    std::unique_ptr<DeviceContext> context_;
-    std::unique_ptr<Arenas> arenas_;
-    std::unique_ptr<BindlessHeap> heap_;
-    std::unique_ptr<CameraPass> camera_;
-    const Scene* scene_ = nullptr;
-    std::unique_ptr<DeviceScene> device_;
-    std::unique_ptr<DeviceColumn> ldr_;
+    struct Device;
+    std::unique_ptr<Device> device_;
 };
 
 }  // namespace ernie

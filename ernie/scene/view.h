@@ -3,6 +3,7 @@
 /// @brief Typed views of prims, with accessors generated from their schemas' declarations.
 #pragma once
 
+#include "ernie/export.h"
 #include "ernie/scene/convert.h"
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema.h"
@@ -100,7 +101,7 @@ AttributeDef DeclareAttribute(std::string_view name, const Fallback& fallback, A
 }
 
 /// @brief A prim seen through its schema: what generated accessors read and write.
-class SchemaView {
+class ERNIE_API SchemaView {
   public:
     PrimId Id() const {
         return prim_;
@@ -230,7 +231,7 @@ template <typename Self, typename Base> class SchemaViewAccessors : public Base 
     using SchemaBase = Base;                                                                       \
     static constexpr std::string_view kName = #Class;                                              \
     static constexpr std::string_view kDoc = text;                                                 \
-    static const ::ernie::SchemaDef& Definition();
+    ERNIE_API static const ::ernie::SchemaDef& Definition();
 
 /// The constructors of a typed schema view class.
 #define ERNIE_SCHEMA_BODY(Class, Base, text)                                                       \

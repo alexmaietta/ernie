@@ -42,7 +42,10 @@ else()
 endif()
 
 set(ernie_public_headers
+    util/algorithm.h
+    util/bytes.h
     util/glm.h
+    util/hash_index.h
     util/log.h
     util/file.h
     util/profiler.h
@@ -52,6 +55,31 @@ set(ernie_public_headers
     io/image.h
     io/raster.h
     io/texture.h
+    geometry/bounds.h
+    physics/astronomy.h
+    scene/convert.h
+    scene/extent_cache.h
+    scene/holder_index.h
+    scene/path.h
+    scene/scene.h
+    scene/schema.h
+    scene/storage.h
+    scene/time_samples.h
+    scene/tokens.h
+    scene/value.h
+    scene/view.h
+    scene/xform.h
+    scene/schema/camera.h
+    scene/schema/collection.h
+    scene/schema/geom.h
+    scene/schema/instancer.h
+    scene/schema/lux.h
+    scene/schema/mesh.h
+    scene/schema/planet.h
+    scene/schema/render.h
+    scene/schema/shade.h
+    scene/schema/vol.h
+    render/renderer.h
 )
 foreach(header ${ernie_public_headers})
     get_filename_component(directory "${header}" DIRECTORY)

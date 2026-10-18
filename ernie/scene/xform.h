@@ -3,6 +3,7 @@
 /// @brief UsdGeomXformable's transform ops: composing them, and authoring them from parts.
 #pragma once
 
+#include "ernie/export.h"
 #include "ernie/scene/scene.h"
 
 #include <glm/glm.hpp>
@@ -20,11 +21,11 @@ namespace ernie {
 enum class RotationOrder : std::uint8_t { XYZ, XZY, YXZ, YZX, ZXY, ZYX };
 
 /// @return The op name of an order, as `xformOp:rotateXYZ`.
-std::string_view RotateOp(RotationOrder order);
+ERNIE_API std::string_view RotateOp(RotationOrder order);
 /// @return The rotation of Euler angles in degrees, the order's first axis turning first.
-glm::dmat3 EulerRotation(const glm::dvec3& degrees, RotationOrder order);
+ERNIE_API glm::dmat3 EulerRotation(const glm::dvec3& degrees, RotationOrder order);
 /// @return Angles in degrees that `EulerRotation` turns back into `rotation`.
-glm::dvec3 EulerAngles(const glm::dmat3& rotation, RotationOrder order);
+ERNIE_API glm::dvec3 EulerAngles(const glm::dmat3& rotation, RotationOrder order);
 
 /// @brief A transform as translate, rotate or orient, and scale ops; unset parts are left out.
 struct XformOps {
@@ -38,23 +39,23 @@ struct XformOps {
 
 /// @return A camera's transform at `eye` looking at `target`, `up` upward in the view: cameras
 /// look down their -z with +y up, as USD's do.
-glm::dmat4 LookAtTransform(const glm::dvec3& eye, const glm::dvec3& target,
-                           const glm::dvec3& up = glm::dvec3(0.0, 0.0, 1.0));
+ERNIE_API glm::dmat4 LookAtTransform(const glm::dvec3& eye, const glm::dvec3& target,
+                                     const glm::dvec3& up = glm::dvec3(0.0, 0.0, 1.0));
 /// @return A distant light's transform shining from `towardLight`, the direction to its source:
 /// distant lights shine down their -z, so their +z is turned to it.
-glm::dmat4 DistantLightTransform(const glm::dvec3& towardLight);
+ERNIE_API glm::dmat4 DistantLightTransform(const glm::dvec3& towardLight);
 
 /// @brief Authors a prim's ops and their order, keeping a reset stack.
 /// @throws std::invalid_argument if there is no prim at `path`, or `xform` has both rotate and
 /// orient.
-void SetXform(Scene& scene, const Path& path, const XformOps& xform);
+ERNIE_API void SetXform(Scene& scene, const Path& path, const XformOps& xform);
 
 /// @return The prim's local transform from its ops in `xformOpOrder`; without an order,
 /// `xformOp:transform` alone.
 /// @throws std::invalid_argument for an op Ernie does not know or a value of the wrong kind.
-glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim);
+ERNIE_API glm::dmat4 ComposeXformOps(const Scene& scene, PrimId prim);
 /// @return Whether the prim's transform ignores its ancestors' (`!resetXformStack!`).
-bool ResetsXformStack(const Scene& scene, PrimId prim);
+ERNIE_API bool ResetsXformStack(const Scene& scene, PrimId prim);
 
 /// The transform ops Ernie knows; the Euler rotations in `RotationOrder`'s order.
 enum class XformOpKind : std::uint8_t {
@@ -75,7 +76,7 @@ enum class XformOpKind : std::uint8_t {
 
 /// @return The kind of an op attribute, as `xformOp:rotateXYZ:arm` is a `RotateXYZ`; none for an
 /// attribute that is no op Ernie knows.
-std::optional<XformOpKind> ParseXformOpKind(std::string_view attribute);
+ERNIE_API std::optional<XformOpKind> ParseXformOpKind(std::string_view attribute);
 
 /// @brief One op of a prim's transform: its attribute, kind and whether the order inverts it.
 struct XformOp {
@@ -89,9 +90,9 @@ struct XformOp {
 /// @return The prim's ops, outermost first, as `ComposeXformOps` multiplies them: those of
 /// `xformOpOrder` without its reset token, or without an order `xformOp:transform` alone.
 /// @throws std::invalid_argument for an entry that is no xformOp, or an op Ernie does not know.
-std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim);
+ERNIE_API std::vector<XformOp> XformOpsInOrder(const Scene& scene, PrimId prim);
 /// @return One op's matrix, inverted if the order says so; identity when it has no value.
 /// @throws std::invalid_argument for a value of the wrong kind.
-glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op);
+ERNIE_API glm::dmat4 XformOpMatrix(const Scene& scene, PrimId prim, const XformOp& op);
 
 }  // namespace ernie

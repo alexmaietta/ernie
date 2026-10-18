@@ -3,6 +3,7 @@
 /// @brief The schema registry: prim types, API schemas and their attributes, declared once.
 #pragma once
 
+#include "ernie/export.h"
 #include "ernie/geometry/bounds.h"
 #include "ernie/scene/storage.h"
 #include "ernie/scene/tokens.h"
@@ -277,7 +278,7 @@ inline std::string ResolvedName(std::string_view attribute) {
 inline constexpr std::string_view kInstanceName = "__INSTANCE_NAME__";
 
 /// @brief An applied API schema: `"MaterialBindingAPI"`, or `"CollectionAPI:lights"`.
-struct ApiName {
+struct ERNIE_API ApiName {
     const SchemaDef* schema = nullptr;
     std::string_view instance;
 

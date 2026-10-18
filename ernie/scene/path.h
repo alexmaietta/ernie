@@ -3,6 +3,7 @@
 /// @brief Prim paths, interned names, and the scene's table of paths as (parent, name) nodes.
 #pragma once
 
+#include "ernie/export.h"
 #include "ernie/util/hash_index.h"
 
 #include <compare>
@@ -18,7 +19,7 @@
 namespace ernie {
 
 /// @brief An absolute prim path such as `/World/Rover/Wheel_FL`, as text.
-class Path {
+class ERNIE_API Path {
   public:
     Path() = default;
     /// @param text An absolute path of valid names.
