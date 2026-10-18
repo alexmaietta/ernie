@@ -34,8 +34,8 @@ TEST(ExternalMemory, AnotherContextReadsAColumnAfterTheQueueThatWroteIt) {
     const DeviceColumn column(arenas, "temperatures", DType::UInt32, {}, 1000);
     ASSERT_GT(column.Range().offset, 0u) << "the column sits inside its arena";
     const Ticket written = writer->Main().Submit([&](VkCommandBuffer commands) {
-        vkCmdFillBuffer(commands, column.Storage().Handle(), column.Range().offset,
-                        column.Range().size, 0x2a);
+        vkCmdFillBuffer(commands, column.Storage().Handle(), column.Range().offset, column.Bytes(),
+                        0x2a);
     });
 
     // The arena is imported once; the column is reached at its offset, as CUDA would.
@@ -50,10 +50,10 @@ TEST(ExternalMemory, AnotherContextReadsAColumnAfterTheQueueThatWroteIt) {
     } else {
         written.Wait();
     }
-    Readback readback(*reader, reader->Main(), imported, column.Range().offset, column.Range().size,
+    Readback readback(*reader, reader->Main(), imported, column.Range().offset, column.Bytes(),
                       std::span(&ready, 1));
     std::vector<std::uint32_t> values(1000);
-    std::memcpy(values.data(), readback.Bytes().data(), column.Range().size);
+    std::memcpy(values.data(), readback.Bytes().data(), column.Bytes());
     EXPECT_EQ(values, std::vector<std::uint32_t>(1000, 0x2a));
     reader->WaitIdle();
     ExpectClean(*writer);

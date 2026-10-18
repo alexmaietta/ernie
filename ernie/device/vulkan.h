@@ -21,6 +21,11 @@ namespace ernie {
 /// @throws DeviceError naming `what` unless `result` succeeded.
 void CheckVk(VkResult result, std::string_view what);
 
+/// @brief Records a global memory barrier: `src` work and writes before `dst` work and accesses.
+/// The frame graph places barriers between passes; this is for work recorded by hand.
+void Barrier(VkCommandBuffer commands, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+             VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
+
 /// @brief The feature structs Ernie reads and enables, chained.
 struct FeatureChain {
     VkPhysicalDeviceFeatures2 core{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};

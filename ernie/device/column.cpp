@@ -8,29 +8,13 @@
 #include <numeric>
 
 namespace ernie {
-namespace {
-
-void Barrier(VkCommandBuffer commands, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
-             VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
-    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-                                   .srcStageMask = srcStage,
-                                   .srcAccessMask = srcAccess,
-                                   .dstStageMask = dstStage,
-                                   .dstAccessMask = dstAccess};
-    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-                                      .memoryBarrierCount = 1,
-                                      .pMemoryBarriers = &barrier};
-    vkCmdPipelineBarrier2(commands, &dependency);
-}
-
-}  // namespace
 
 DeviceColumn::DeviceColumn(Arenas& arenas, std::string_view name, DType type,
                            std::vector<std::int64_t> element, std::uint64_t rows)
     : arenas_(arenas), name_(name), type_(type), element_(std::move(element)),
       rowBytes_(ByteSize(type) * std::accumulate(element_.begin(), element_.end(), std::uint64_t{1},
                                                  std::multiplies<>())),
-      rows_(rows), range_(Allocate(rows)) {}
+      rows_(rows), capacity_(rows), range_(Allocate(rows)) {}
 
 DeviceColumn::~DeviceColumn() {
     arenas_.Free(range_);
@@ -42,10 +26,14 @@ BufferRange DeviceColumn::Allocate(std::uint64_t rows) {
 }
 
 Ticket DeviceColumn::Resize(std::uint64_t rows, Queue& queue, std::span<const Ticket> waits) {
-    const BufferRange old = range_;
-    range_ = Allocate(rows);
     const std::uint64_t kept = rowBytes_ * std::min(rows, rows_);
     rows_ = rows;
+    if (rows <= capacity_) {
+        return {};
+    }
+    const BufferRange old = range_;
+    capacity_ = std::max(rows, 2 * capacity_);
+    range_ = Allocate(capacity_);
     Ticket ticket;
     if (kept > 0) {
         ticket = queue.Submit(

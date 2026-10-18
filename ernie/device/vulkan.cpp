@@ -95,6 +95,19 @@ void CheckVk(VkResult result, std::string_view what) {
                                 std::to_string(static_cast<int>(result)) + ")");
 }
 
+void Barrier(VkCommandBuffer commands, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+             VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+    const VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                                   .srcStageMask = srcStage,
+                                   .srcAccessMask = srcAccess,
+                                   .dstStageMask = dstStage,
+                                   .dstAccessMask = dstAccess};
+    const VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                                      .memoryBarrierCount = 1,
+                                      .pMemoryBarriers = &barrier};
+    vkCmdPipelineBarrier2(commands, &dependency);
+}
+
 FeatureChain& FeatureChain::operator=(const FeatureChain& other) {
     core = other.core;
     v11 = other.v11;

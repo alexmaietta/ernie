@@ -89,6 +89,12 @@ ernie_add_test_suite(
         device/vulkan_devices_test.cpp
     LIBRARIES ernie_static ernie_volk ernie_vma
 )
+ernie_add_test_suite(
+    render
+    LABEL gpu
+    SOURCES render/scene_columns_test.cpp
+    LIBRARIES ernie_static ernie_volk ernie_vma
+)
 
 if(TARGET _ernie)
     # The interpreter tests run with; CI passes the one on its PATH.

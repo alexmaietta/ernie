@@ -208,9 +208,9 @@ struct Column {
 
     nb::bytes Read() {
         Readback readback(*owner.context, owner.context->Main(), column.Storage(),
-                          column.Range().offset, column.Range().size, std::span(&written, 1));
+                          column.Range().offset, column.Bytes(), std::span(&written, 1));
         const std::span<const std::byte> bytes = readback.Bytes();
-        return nb::bytes(reinterpret_cast<const char*>(bytes.data()), column.Range().size);
+        return nb::bytes(reinterpret_cast<const char*>(bytes.data()), column.Bytes());
     }
 };
 

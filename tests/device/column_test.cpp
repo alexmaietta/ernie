@@ -39,15 +39,20 @@ TEST(DeviceColumn, RowsKeepTheirShapeAndValuesAcrossResizes) {
     uploader.Write(column.Storage(), column.Range().offset, std::span<const float>(points));
     const Ticket written = uploader.Flush();
 
-    const Ticket grown = column.Resize(5000, context->Main(), std::span(&written, 1));
-    EXPECT_EQ(column.Rows(), 5000u);
+    const Ticket grown = column.Resize(101, context->Main(), std::span(&written, 1));
+    EXPECT_EQ(column.Rows(), 101u);
+    EXPECT_EQ(column.Capacity(), 200u) << "the capacity doubles";
     EXPECT_EQ(Read(*context, column, 100, std::span(&grown, 1)), points);
-    const Ticket shrunk = column.Resize(10, context->Main());
-    EXPECT_EQ(Read(*context, column, 10, std::span(&shrunk, 1)),
+    const VkDeviceAddress address = column.Address();
+    EXPECT_EQ(column.Resize(200, context->Main()), Ticket()) << "nothing to copy within capacity";
+    EXPECT_EQ(column.Address(), address);
+    const Ticket large = column.Resize(5000, context->Main());
+    EXPECT_EQ(column.Capacity(), 5000u);
+    EXPECT_EQ(Read(*context, column, 100, std::span(&large, 1)), points);
+    column.Resize(10, context->Main());
+    EXPECT_EQ(column.Bytes(), 120u);
+    EXPECT_EQ(Read(*context, column, 10, {}),
               std::vector<float>(points.begin(), points.begin() + 30));
-    column.Resize(0, context->Main());
-    context->WaitIdle();
-    EXPECT_LE(arenas.Used(), 1u) << "only the empty column's byte is left";
     ExpectClean(*context);
 }
 

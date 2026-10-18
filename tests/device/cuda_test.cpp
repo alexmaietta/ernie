@@ -28,9 +28,9 @@ using test::ExpectClean;
 
 std::vector<float> Read(DeviceContext& context, const DeviceColumn& column, const Ticket& after) {
     Readback readback(context, context.Main(), column.Storage(), column.Range().offset,
-                      column.Range().size, std::span(&after, 1));
-    std::vector<float> values(column.Range().size / sizeof(float));
-    std::memcpy(values.data(), readback.Bytes().data(), column.Range().size);
+                      column.Bytes(), std::span(&after, 1));
+    std::vector<float> values(column.Bytes() / sizeof(float));
+    std::memcpy(values.data(), readback.Bytes().data(), column.Bytes());
     return values;
 }
 
@@ -71,17 +71,17 @@ TEST(CudaInterop, CudaReadsWhatErnieWroteOnceItsTicketIsReached) {
     const DeviceColumn values(arenas, "values", DType::UInt32, {}, 4096);
     const Tensor view = cuda->View(values);
     const Ticket written = context->Main().Submit([&](VkCommandBuffer commands) {
-        vkCmdFillBuffer(commands, values.Storage().Handle(), values.Range().offset,
-                        values.Range().size, 7);
+        vkCmdFillBuffer(commands, values.Storage().Handle(), values.Range().offset, values.Bytes(),
+                        7);
     });
     cuda->Wait(nullptr, written);
     const CudaDriver& driver = cuda->Driver();
     const CudaInterop::Current current(*cuda);
     driver.Check(driver.streamSynchronize(nullptr), "Synchronizing");
     std::vector<std::uint32_t> seen(4096);
-    driver.Check(driver.memcpyDtoH(seen.data(), reinterpret_cast<CUdeviceptr>(view.Data()),
-                                   values.Range().size),
-                 "Reading in CUDA");
+    driver.Check(
+        driver.memcpyDtoH(seen.data(), reinterpret_cast<CUdeviceptr>(view.Data()), values.Bytes()),
+        "Reading in CUDA");
     EXPECT_EQ(seen, std::vector<std::uint32_t>(4096, 7));
     EXPECT_TRUE(written.Done());
     ExpectClean(*context);
@@ -92,7 +92,7 @@ TEST(CudaInterop, AssigningItsOwnViewCopiesNothingAndAnyOtherTensorCopiesOnce) {
     ERNIE_CUDA(cuda, context);
     Arenas arenas(*context, MemoryUse::Shared, "shared", 1 << 16);
     const DeviceColumn poses(arenas, "poses", DType::Float32, {8}, 100);
-    const std::uint64_t bytes = poses.Range().size;
+    const std::uint64_t bytes = poses.Bytes();
     const CudaDriver& driver = cuda->Driver();
     const CudaInterop::Current current(*cuda);
 

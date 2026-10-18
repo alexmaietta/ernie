@@ -1,3 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_library(ernie_render INTERFACE)
-target_link_libraries(ernie_render INTERFACE ernie_scene ernie_graph)
+add_library(ernie_render OBJECT scene_columns.cpp)
+target_link_libraries(
+    ernie_render
+    PUBLIC ernie_scene ernie_graph
+    PRIVATE ernie_volk ernie_vma ernie_build_options
+)
