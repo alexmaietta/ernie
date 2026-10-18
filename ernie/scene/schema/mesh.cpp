@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file mesh.cpp
 /// @brief Point-based geometry's registry entries and extents, as UsdGeom computes them.
-#include "ernie/scene/schemas/mesh.h"
+#include "ernie/scene/schema/mesh.h"
 
 #include <algorithm>
 #include <optional>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file extent_cache_test.cpp
 /// @brief Tests that cached extents follow edits, removals and additions.
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/util/random.h"
 
 #include <gtest/gtest.h>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file camera.cpp
 /// @brief The camera's registry entry and Ernie's camera API schemas'.
-#include "ernie/scene/schemas/camera.h"
+#include "ernie/scene/schema/camera.h"
 
 namespace ernie {
 

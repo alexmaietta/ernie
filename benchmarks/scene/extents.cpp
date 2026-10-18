@@ -2,7 +2,7 @@
 /// @file extents.cpp
 /// @brief Scene updates at 100,000 prims: the first, one edit's, and one inherited edit's.
 #include "benchmarks/bench.h"
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 #include <memory>
 #include <string>

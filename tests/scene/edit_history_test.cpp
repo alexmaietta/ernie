@@ -3,9 +3,9 @@
 /// @brief Tests of undo and redo: attribute edits, drags, groups and subtrees.
 #include "ernie/scene/edit_history.h"
 #include "ernie/scene/json.h"
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/mesh.h"
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/mesh.h"
+#include "ernie/scene/schema/shade.h"
 
 #include <gtest/gtest.h>
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file planet_test.cpp
 /// @brief Tests of terrains, atmospheres, star fields and ground planes, and their extents.
-#include "ernie/scene/schemas/planet.h"
+#include "ernie/scene/schema/planet.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/common.h"

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "ernie/physics/astronomy.h"
-#include "ernie/scene/schemas/lux.h"
+#include "ernie/scene/schema/lux.h"
 
 // clang-format off
 #define ERNIE_TERRAIN_ATTRIBUTES(X)                                                                \

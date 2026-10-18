@@ -2,9 +2,9 @@
 /// @file scene_test.cpp
 /// @brief Tests of prims, attributes, typed views and applied API schemas over the columnar store.
 #include "ernie/scene/scene.h"
-#include "ernie/scene/schemas/collection.h"
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/collection.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/shade.h"
 #include "ernie/scene/tokens.h"
 
 #include <gtest/gtest.h>

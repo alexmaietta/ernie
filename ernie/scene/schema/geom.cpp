@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file geom.cpp
 /// @brief UsdGeom's registry entries and the implicit shapes' extents, as UsdGeom computes them.
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 namespace ernie {
 namespace {

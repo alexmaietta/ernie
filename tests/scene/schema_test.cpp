@@ -2,7 +2,7 @@
 /// @file schema_test.cpp
 /// @brief Tests of the schema registry, extents and world bounds.
 #include "ernie/scene/schema.h"
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 

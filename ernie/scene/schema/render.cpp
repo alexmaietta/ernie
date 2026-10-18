@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file render.cpp
 /// @brief UsdRender's registry entries.
-#include "ernie/scene/schemas/render.h"
+#include "ernie/scene/schema/render.h"
 
 namespace ernie {
 

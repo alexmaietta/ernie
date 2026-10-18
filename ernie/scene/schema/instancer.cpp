@@ -2,7 +2,7 @@
 /// @file instancer.cpp
 /// @brief The point instancer's registry entry and extent: its prototypes' bounds at each
 /// instance, as UsdGeomPointInstancer computes it.
-#include "ernie/scene/schemas/instancer.h"
+#include "ernie/scene/schema/instancer.h"
 
 #include "ernie/util/algorithm.h"
 

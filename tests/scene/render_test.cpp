@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file render_test.cpp
 /// @brief Tests of render settings, products, vars and passes.
-#include "ernie/scene/schemas/collection.h"
-#include "ernie/scene/schemas/render.h"
+#include "ernie/scene/schema/collection.h"
+#include "ernie/scene/schema/render.h"
 
 #include <gtest/gtest.h>
 

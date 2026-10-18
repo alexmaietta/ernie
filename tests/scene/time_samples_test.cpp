@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file time_samples_test.cpp
 /// @brief Tests of time samples: bracketing, interpolation, and the clock that evaluates them.
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/mesh.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/mesh.h"
 #include "ernie/scene/time_samples.h"
 
 #include <gtest/gtest.h>

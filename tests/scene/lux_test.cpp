@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file lux_test.cpp
 /// @brief Tests of lights' and cameras' schemas and extents.
-#include "ernie/scene/schemas/camera.h"
-#include "ernie/scene/schemas/collection.h"
-#include "ernie/scene/schemas/lux.h"
-#include "ernie/scene/schemas/mesh.h"
-#include "ernie/scene/schemas/vol.h"
+#include "ernie/scene/schema/camera.h"
+#include "ernie/scene/schema/collection.h"
+#include "ernie/scene/schema/lux.h"
+#include "ernie/scene/schema/mesh.h"
+#include "ernie/scene/schema/vol.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/common.h"

@@ -2,7 +2,7 @@
 /// @file lux.cpp
 /// @brief UsdLux's registry entries and the shaped lights' extents, as UsdLux computes them, and
 /// the laser's: its emitter.
-#include "ernie/scene/schemas/lux.h"
+#include "ernie/scene/schema/lux.h"
 
 #include <algorithm>
 

@@ -6,7 +6,7 @@
 /// - Pixar, UsdGeomCamera, https://openusd.org/release/api/class_usd_geom_camera.html
 #pragma once
 
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 // clang-format off
 // Lens lengths are metres, whatever a USD stage's scale: USD's tenths of a scene unit are

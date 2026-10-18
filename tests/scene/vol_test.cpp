@@ -2,7 +2,7 @@
 /// @file vol_test.cpp
 /// @brief Tests of volumes' and fields' extents, so any volume can be framed.
 #include "ernie/io/nanovdb.h"
-#include "ernie/scene/schemas/vol.h"
+#include "ernie/scene/schema/vol.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/common.h"

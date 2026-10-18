@@ -6,7 +6,7 @@
 /// - Pixar, UsdVol, https://openusd.org/release/api/usd_vol_page_front.html
 #pragma once
 
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 // clang-format off
 #define ERNIE_FIELD_SELECTION_ATTRIBUTES(X, where)                                                 \

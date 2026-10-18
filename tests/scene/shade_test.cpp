@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file shade_test.cpp
 /// @brief Tests of UsdShade materials, shaders and their connections.
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/shade.h"
 
 #include <gtest/gtest.h>
 

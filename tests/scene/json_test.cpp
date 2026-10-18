@@ -4,10 +4,10 @@
 /// golden files, and validation's reports on broken ones.
 #include "ernie/scene/json.h"
 #include "ernie/scene/reference.h"
-#include "ernie/scene/schemas/camera.h"
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/mesh.h"
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/camera.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/mesh.h"
+#include "ernie/scene/schema/shade.h"
 #include "ernie/util/file.h"
 
 #include "tests/common.h"

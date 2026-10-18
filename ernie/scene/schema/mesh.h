@@ -7,7 +7,7 @@
 ///   https://openusd.org/release/api/usd_geom_page_front.html
 #pragma once
 
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 // clang-format off
 #define ERNIE_POINT_BASED_ATTRIBUTES(X)                                                            \

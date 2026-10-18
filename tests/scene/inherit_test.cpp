@@ -2,9 +2,9 @@
 /// @file inherit_test.cpp
 /// @brief Tests of what edits reach beyond their prim: inherited attributes resolving from the
 /// nearest authoring ancestor, and relationship targets reaching their holders.
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/instancer.h"
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/instancer.h"
+#include "ernie/scene/schema/shade.h"
 #include "ernie/util/algorithm.h"
 
 #include "tests/common.h"

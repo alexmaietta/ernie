@@ -7,7 +7,7 @@
 /// - Pixar, UsdLux, https://openusd.org/release/api/usd_lux_page_front.html
 #pragma once
 
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 // clang-format off
 #define ERNIE_LIGHT_LENGTH ERNIE_NONNEGATIVE("Light")

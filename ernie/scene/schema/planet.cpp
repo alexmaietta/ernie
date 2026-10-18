@@ -2,7 +2,7 @@
 /// @file planet.cpp
 /// @brief The planetary prims' registry entries and extents: terrains from their heights and
 /// bodies, atmospheres from their bodies and tops.
-#include "ernie/scene/schemas/planet.h"
+#include "ernie/scene/schema/planet.h"
 
 #include <algorithm>
 #include <optional>

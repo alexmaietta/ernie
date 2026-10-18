@@ -7,7 +7,7 @@
 ///   https://openusd.org/release/api/class_usd_geom_point_instancer.html
 #pragma once
 
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 #include <array>
 #include <string_view>

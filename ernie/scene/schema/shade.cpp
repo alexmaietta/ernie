@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file shade.cpp
 /// @brief UsdShade's registry entries and connections.
-#include "ernie/scene/schemas/shade.h"
+#include "ernie/scene/schema/shade.h"
 
 #include <stdexcept>
 

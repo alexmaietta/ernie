@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file mesh_test.cpp
 /// @brief Tests of point-based schemas, array attributes and their extents.
-#include "ernie/scene/schemas/mesh.h"
+#include "ernie/scene/schema/mesh.h"
 
 #include "tests/common.h"
 

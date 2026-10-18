@@ -2,7 +2,7 @@
 /// @file vol.cpp
 /// @brief Volumes' and fields' registry entries and extents: fields from their grids' headers,
 /// volumes from their fields.
-#include "ernie/scene/schemas/vol.h"
+#include "ernie/scene/schema/vol.h"
 
 #include "ernie/io/nanovdb.h"
 

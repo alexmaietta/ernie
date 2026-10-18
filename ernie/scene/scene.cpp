@@ -4,7 +4,7 @@
 #include "ernie/scene/scene.h"
 
 #include "ernie/scene/convert.h"
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/scene/tokens.h"
 #include "ernie/scene/xform.h"
 #include "ernie/util/algorithm.h"

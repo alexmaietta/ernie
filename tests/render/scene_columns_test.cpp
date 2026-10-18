@@ -3,7 +3,7 @@
 /// @brief Tests of scene columns on the device: they follow their buckets' swap-removes and
 /// additions without losing what the device wrote, and take what the host authors.
 #include "ernie/render/scene_columns.h"
-#include "ernie/scene/schemas/geom.h"
+#include "ernie/scene/schema/geom.h"
 
 #include "tests/device/columns.h"
 #include "tests/device/common.h"

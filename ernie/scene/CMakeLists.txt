@@ -18,16 +18,16 @@ add_library(
     validate.cpp
     view.cpp
     xform.cpp
-    schemas/camera.cpp
-    schemas/geom.cpp
-    schemas/instancer.cpp
-    schemas/lux.cpp
-    schemas/mesh.cpp
-    schemas/planet.cpp
-    schemas/registry.cpp
-    schemas/render.cpp
-    schemas/shade.cpp
-    schemas/vol.cpp
+    schema/camera.cpp
+    schema/geom.cpp
+    schema/instancer.cpp
+    schema/lux.cpp
+    schema/mesh.cpp
+    schema/planet.cpp
+    schema/registry.cpp
+    schema/render.cpp
+    schema/shade.cpp
+    schema/vol.cpp
 )
 target_link_libraries(
     ernie_scene

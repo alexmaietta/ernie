@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file instancer_test.cpp
 /// @brief Tests of point instancers' extents: prototypes' bounds at each instance.
-#include "ernie/scene/schemas/instancer.h"
+#include "ernie/scene/schema/instancer.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/common.h"

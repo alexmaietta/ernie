@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file registry.cpp
 /// @brief Every registered schema, by family, bases before the types deriving from them.
-#include "ernie/scene/schemas/camera.h"
-#include "ernie/scene/schemas/collection.h"
-#include "ernie/scene/schemas/geom.h"
-#include "ernie/scene/schemas/instancer.h"
-#include "ernie/scene/schemas/lux.h"
-#include "ernie/scene/schemas/mesh.h"
-#include "ernie/scene/schemas/planet.h"
-#include "ernie/scene/schemas/render.h"
-#include "ernie/scene/schemas/shade.h"
-#include "ernie/scene/schemas/vol.h"
+#include "ernie/scene/schema/camera.h"
+#include "ernie/scene/schema/collection.h"
+#include "ernie/scene/schema/geom.h"
+#include "ernie/scene/schema/instancer.h"
+#include "ernie/scene/schema/lux.h"
+#include "ernie/scene/schema/mesh.h"
+#include "ernie/scene/schema/planet.h"
+#include "ernie/scene/schema/render.h"
+#include "ernie/scene/schema/shade.h"
+#include "ernie/scene/schema/vol.h"
 
 namespace ernie {
 
