@@ -72,8 +72,9 @@ class GeometryPool {
   public:
     /// @brief What an update changed, for the bottom levels and instances that follow it.
     struct Changes {
-        /// Prims added, or whose geometry, shape or colour changed.
+        /// Prims drawn anew, or whose geometry, shape or colour changed.
         std::vector<PrimGeometry> placed;
+        /// Prims removed, or meshes left with no triangles.
         std::vector<PrimId> removed;
         /// Geometries new or of new topology, whose bottom levels are built anew.
         std::vector<GeometryId> rebuilt;

@@ -24,6 +24,8 @@ struct Expected {
     glm::vec3 direction;
     float t;
     glm::vec3 normal{0.0f};
+    float tMin = 0.0f;
+    std::uint32_t mask = 0xff;
 };
 
 class RayTracerScene : public test::RayTracingTest {
@@ -32,7 +34,10 @@ class RayTracerScene : public test::RayTracingTest {
     void ExpectHits(const std::vector<Expected>& expected, float tolerance = 1e-4f) {
         std::vector<test::Ray> rays;
         for (const Expected& ray : expected) {
-            rays.push_back({glm::vec4(ray.origin, 1), glm::vec4(ray.direction, 0)});
+            rays.push_back({.origin = glm::vec4(ray.origin, 1),
+                            .direction = glm::vec4(ray.direction, 0),
+                            .tMin = ray.tMin,
+                            .mask = ray.mask});
         }
         const std::vector<glm::vec4> hits = Trace(rays);
         for (std::size_t i = 0; i < expected.size(); ++i) {
@@ -138,6 +143,50 @@ TEST_F(RayTracerScene, APlanetsSphereStaysRound) {
                             glm::vec3(x, 0, surface + kRadius)});
     }
     ExpectHits(expected, 0.5f);
+}
+
+TEST_F(RayTracerScene, CountsHitsFromTMinAmongTheInstancesInTheMask) {
+    test::DefineSquare(scene_, "/Floor", 100, -20);
+    const PrimId sphere = scene_.Define("/Sphere", "Sphere");
+    scene_.Set(sphere, "radius", 2.0);
+    ExpectHits({
+        {"the sphere's top", {0, 0, 10}, kDown, 8, kUp},
+        {"past its top, its bottom from inside", {0, 0, 10}, kDown, 12, -kUp, 9.0f},
+        {"past the sphere, the floor", {0, 0, 10}, kDown, 30, kUp, 13.0f},
+        {"instances are all in mask bit 0", {0, 0, 10}, kDown, 8, kUp, 0.0f, 0x01},
+        {"an empty mask sees nothing", {0, 0, 10}, kDown, kMiss, {}, 0.0f, 0x00},
+    });
+}
+
+TEST_F(RayTracerScene, HandlesRaysAlongAFaceAndFromInside) {
+    scene_.Define("/Cube", "Cube");
+    SetXform(scene_, "/Cube", {.translate = glm::dvec3(10, 0, 0)});
+    scene_.Define("/Cylinder", "Cylinder");
+    SetXform(scene_, "/Cylinder", {.translate = glm::dvec3(20, 0, 0)});
+    const PrimId plane = scene_.Define("/Plane", "Plane");
+    scene_.Set(plane, "width", 4.0);
+    scene_.Set(plane, "length", 2.0);
+    SetXform(scene_, "/Plane", {.translate = glm::dvec3(50, 0, 0)});
+    ExpectHits({
+        {"the cube left through the face ahead", {10, 0, 0}, kNorth, 1, kNorth},
+        // Its caps are parallel to the ray, which meets only the side.
+        {"the cylinder's side, level with its caps", {20, -10, 0.5f}, kNorth, 9, -kNorth},
+        {"along the plane, in it", {50, -10, 0}, kNorth, kMiss},
+        {"along the plane, above it", {50, -10, 0.5f}, kNorth, kMiss},
+    });
+}
+
+TEST_F(RayTracerScene, AMeshWithNoTrianglesIsLeftOut) {
+    const PrimId empty = scene_.Define("/Empty", "Mesh");
+    test::WriteMesh(scene_, empty, {}, {}, {});
+    scene_.Define("/Sphere", "Sphere");
+    ExpectHits({{"the sphere, beside the empty mesh", {0, 0, 10}, kDown, 9, kUp}});
+    EXPECT_EQ(Device().Instances().Count(), 1u) << "the empty mesh has no instance";
+    EXPECT_FALSE(Device().Instances().Row(empty));
+    // Given triangles, it is drawn.
+    test::WriteMesh(scene_, empty, {4, -1, 0, 6, -1, 0, 6, 1, 0, 4, 1, 0}, {4}, {0, 1, 2, 3});
+    ExpectHits({{"the mesh, once it has triangles", {5, 0, 10}, kDown, 10, kUp}});
+    EXPECT_TRUE(Device().Instances().Row(empty));
 }
 
 }  // namespace

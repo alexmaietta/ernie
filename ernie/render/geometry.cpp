@@ -267,6 +267,12 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
     }
     std::optional<PrimGeometry>& placed = prims_[prim.slot];
     const bool known = placed && placed->prim == prim;
+    // A mesh with no triangles draws nothing: it has no instance until it has some.
+    const auto draws = [&](GeometryId geometry) {
+        return geometries_[geometry].kind != GeometryKind::Triangles ||
+               geometries_[geometry].triangleCount > 0;
+    };
+    const bool drew = known && draws(placed->geometry);
     PrimGeometry next{.prim = prim};
     if (*kind == GeometryKind::Triangles) {
         next.geometry = known ? placed->geometry : Allocate({.kind = GeometryKind::Triangles});
@@ -296,8 +302,12 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
     }
     next.shape = ShapeTransform(scene_, prim, *kind);
     next.colour = DisplayColour(scene_, prim);
-    if (!known || placed->geometry != next.geometry || placed->shape != next.shape ||
-        placed->colour != next.colour) {
+    if (!draws(next.geometry)) {
+        if (drew) {
+            changes.removed.push_back(prim);
+        }
+    } else if (!drew || placed->geometry != next.geometry || placed->shape != next.shape ||
+               placed->colour != next.colour) {
         changes.placed.push_back(next);
     }
     placed = next;

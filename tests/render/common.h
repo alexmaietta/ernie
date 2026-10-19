@@ -40,10 +40,14 @@ inline PrimId DefineSquare(Scene& scene, const Path& path, float half, float z) 
     return square;
 }
 
-/// A ray as `kTrace` reads it: origin and direction, each padded to four floats.
+/// A ray as `kTrace` reads it: origin and direction, each padded to four floats, where along it
+/// hits count from, and the instances it sees.
 struct Ray {
     glm::vec4 origin;
     glm::vec4 direction;
+    float tMin = 0.0f;
+    std::uint32_t mask = 0xff;
+    std::uint32_t pad[2]{};
 };
 
 /// What `kTrace` writes for a ray that hits nothing, and for one `TraceAny` and `TraceClosest`
@@ -55,7 +59,7 @@ inline constexpr float kDisagree = -2.0f;
 inline const ShaderModule kTrace{"trace", R"(
 import ray_tracer;
 import buffer_ref;
-struct Ray { float4 origin; float4 direction; };
+struct Ray { float4 origin; float4 direction; float tMin; uint mask; uint2 pad; };
 struct Parameters { TracerParameters tracer; BufferRef<Ray> rays; BufferRef<float4> hits; uint count; };
 
 [shader("compute")]
@@ -65,11 +69,11 @@ void main(uint3 id : SV_DispatchThreadID, uniform Parameters parameters) {
         return;
     }
     Ray r = parameters.rays[id.x];
-    RayDesc ray = { r.origin.xyz, 0, r.direction.xyz, 1e30 };
+    RayDesc ray = { r.origin.xyz, r.tMin, r.direction.xyz, 1e30 };
     RayTracer tracer = RayTracer(parameters.tracer);
-    Hit hit = tracer.TraceClosest(ray, 0xff);
+    Hit hit = tracer.TraceClosest(ray, r.mask);
     float4 result = float4(-1, 0, 0, 0);
-    if (hit.found != tracer.TraceAny(ray, 0xff)) {
+    if (hit.found != tracer.TraceAny(ray, r.mask)) {
         result.x = -2;
     } else if (hit.found) {
         result = float4(hit.t, tracer.WorldNormal(hit));
@@ -141,7 +145,7 @@ inline std::vector<glm::vec4> RayTracingTest::Trace(std::span<const Ray> rays) {
         trace_ = std::make_unique<ComputeKernel>(*context_, compiler_.Spirv(modules, "main"),
                                                  "trace", std::uint32_t{sizeof(TraceParameters)});
         rays_ = std::make_unique<DeviceColumn>(*arenas_, "rays", DType::Float32,
-                                               std::vector<std::int64_t>{8}, 0);
+                                               std::vector<std::int64_t>{sizeof(Ray) / 4}, 0);
         hits_ = std::make_unique<DeviceColumn>(*arenas_, "hits", DType::Float32,
                                                std::vector<std::int64_t>{4}, 0);
     }
