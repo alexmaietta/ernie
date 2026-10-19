@@ -52,20 +52,12 @@ void InstanceTable::Remove(PrimId prim) {
     // The last row moves into the gap.
     const auto last = static_cast<std::uint32_t>(prims_.size() - 1);
     if (*row != last) {
-        prims_[*row] = prims_[last];
-        hostNodes_[*row] = hostNodes_[last];
-        hostGeometries_[*row] = hostGeometries_[last];
-        hostShapes_[*row] = hostShapes_[last];
-        hostColours_[*row] = hostColours_[last];
+        ForEachHostColumn([&](auto& column) { column[*row] = column[last]; });
         rows_[prims_[*row].slot] = *row;
         dirty_.push_back(*row);
     }
     rows_[prim.slot] = kNoRow;
-    prims_.pop_back();
-    hostNodes_.pop_back();
-    hostGeometries_.pop_back();
-    hostShapes_.pop_back();
-    hostColours_.pop_back();
+    ForEachHostColumn([](auto& column) { column.pop_back(); });
 }
 
 void InstanceTable::Apply(const GeometryPool::Changes& changes) {
@@ -75,18 +67,14 @@ void InstanceTable::Apply(const GeometryPool::Changes& changes) {
     }
     for (const PrimGeometry& placed : changes.placed) {
         if (placed.prim.slot >= rows_.size()) {
-            rows_.resize(std::max<std::size_t>(placed.prim.slot + 1, 2 * rows_.size()), kNoRow);
+            rows_.resize(placed.prim.slot + 1, kNoRow);
         }
         const std::optional<std::uint32_t> row = Row(placed.prim);
         if (row) {
             Set(*row, placed);
             continue;
         }
-        prims_.emplace_back();
-        hostNodes_.emplace_back();
-        hostGeometries_.emplace_back();
-        hostShapes_.emplace_back();
-        hostColours_.emplace_back();
+        ForEachHostColumn([](auto& column) { column.emplace_back(); });
         Set(static_cast<std::uint32_t>(prims_.size() - 1), placed);
     }
 }

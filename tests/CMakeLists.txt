@@ -79,6 +79,8 @@ ernie_add_test_suite(
         scene/xform_test.cpp
     LIBRARIES ernie_static
 )
+# The suites that drive the device record Vulkan themselves.
+set(gpu_test_libraries ernie_static ernie_volk ernie_vma)
 ernie_add_test_suite(
     device
     LABEL gpu
@@ -93,13 +95,13 @@ ernie_add_test_suite(
         device/kernel_test.cpp
         device/profile_test.cpp
         device/vulkan_devices_test.cpp
-    LIBRARIES ernie_static ernie_volk ernie_vma
+    LIBRARIES ${gpu_test_libraries}
 )
 ernie_add_test_suite(
     graph
     LABEL gpu
     SOURCES graph/dependencies_test.cpp graph/graph_test.cpp
-    LIBRARIES ernie_static ernie_volk ernie_vma
+    LIBRARIES ${gpu_test_libraries}
 )
 ernie_add_test_suite(
     render
@@ -114,7 +116,7 @@ ernie_add_test_suite(
         render/scene_columns_test.cpp
         render/shaders_test.cpp
         render/transform_graph_test.cpp
-    LIBRARIES ernie_static ernie_volk ernie_vma
+    LIBRARIES ${gpu_test_libraries}
 )
 
 if(TARGET ernie_viewer)

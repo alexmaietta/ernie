@@ -263,7 +263,7 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
         return;
     }
     if (prim.slot >= prims_.size()) {
-        prims_.resize(std::max<std::size_t>(prim.slot + 1, 2 * prims_.size()));
+        prims_.resize(prim.slot + 1);
     }
     std::optional<PrimGeometry>& placed = prims_[prim.slot];
     const bool known = placed && placed->prim == prim;

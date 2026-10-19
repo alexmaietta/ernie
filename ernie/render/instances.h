@@ -57,6 +57,14 @@ class InstanceTable {
   private:
     void Set(std::uint32_t row, const PrimGeometry& placed);
     void Remove(PrimId prim);
+    /// Calls `f` with each host array kept a row an instance, so they grow and shrink together.
+    template <typename F> void ForEachHostColumn(F&& f) {
+        f(prims_);
+        f(hostNodes_);
+        f(hostGeometries_);
+        f(hostShapes_);
+        f(hostColours_);
+    }
 
     DeviceContext& context_;
     Uploader uploader_;

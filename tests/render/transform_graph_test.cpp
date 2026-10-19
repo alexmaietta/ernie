@@ -330,5 +330,57 @@ TEST(TransformGraph, AnyOpOrderComposesOnTheDevice) {
     ExpectClean(*context);
 }
 
+/// An op a device column feeds, and the value the host authors for it.
+struct BoundOp {
+    std::string attribute;
+    Value value;
+};
+
+TEST(TransformGraph, EveryBoundOpMatchesTheHostsMatrix) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    const glm::dvec3 angles(10, 20, 30);
+    const glm::dmat4 matrix = glm::translate(glm::dmat4(1.0), glm::dvec3(1, -2, 3)) *
+                              glm::dmat4(glm::mat3_cast(kQuarterTurn)) *
+                              glm::scale(glm::dmat4(1.0), glm::dvec3(2, 3, 4));
+    std::vector<BoundOp> ops{
+        {"xformOp:translate", glm::dvec3(1, -2, 3)},
+        {"xformOp:scale", glm::dvec3(2, 3, 4)},
+        {"xformOp:scale", 2.0},
+        {"xformOp:rotateX", 30.0},
+        {"xformOp:rotateY", 40.0},
+        {"xformOp:rotateZ", 50.0},
+        {"xformOp:orient", glm::dquat(glm::angleAxis(0.5, glm::normalize(glm::dvec3(1, 2, 3))))},
+        {"xformOp:transform", matrix},
+    };
+    for (const char* order : {"XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"}) {
+        ops.push_back({std::string("xformOp:rotate") + order, angles});
+    }
+    for (const BoundOp& op : ops) {
+        for (const bool invert : {false, true}) {
+            Scene scene;
+            scene.Define("/Rig", "Xform");
+            SetXform(scene, "/Rig", {.translate = glm::dvec3(0, 0, 2)});
+            const PrimId joint = scene.Define("/Rig/Joint", "Xform");
+            scene.Set(joint, op.attribute, op.value);
+            scene.Set(joint, "xformOpOrder",
+                      std::vector<std::string>{(invert ? "!invert!" : "") + op.attribute});
+            const BucketId bucket = scene.Store().PrimBucket(joint);
+            Arenas arenas(*context, MemoryUse::Device, "transforms", 1 << 16);
+            SceneColumns columns(*context, arenas, scene);
+            const DeviceColumn& bound = columns.Bind(bucket, op.attribute);
+            TransformGraph graph(*context, arenas, scene, compiler);
+            graph.Bind(bucket, op.attribute, bound);
+            const std::vector<float> worlds =
+                ReadFloats(*context, graph.Worlds(), graph.Update(std::array{columns.Sync()}));
+            const glm::dmat4 expected =
+                glm::translate(glm::dmat4(1.0), glm::dvec3(0, 0, 2)) * scene.LocalTransform(joint);
+            SCOPED_TRACE(op.attribute + (invert ? ", inverted" : ""));
+            ExpectWorld(worlds, *graph.Node(joint), expected);
+        }
+    }
+    ExpectClean(*context);
+}
+
 }  // namespace
 }  // namespace ernie
