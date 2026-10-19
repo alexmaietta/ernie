@@ -26,13 +26,14 @@ namespace {
 
 /// @return A renderer, or none without a device that ray traces; no Vulkan at all fails where CI
 /// requires it.
-std::unique_ptr<Renderer> MakeRenderer(RenderCapacities capacities = {}) {
+std::unique_ptr<Renderer> MakeRenderer(RenderCapacities capacities = {},
+                                       std::uint32_t outputSets = 1) {
     const std::unique_ptr<DeviceContext> probe = test::MakeContext();
     if (!probe || !probe->Capabilities().rayQuery) {
         return nullptr;
     }
     return std::make_unique<Renderer>(
-        RendererOptions{.validation = true, .capacities = capacities});
+        RendererOptions{.validation = true, .capacities = capacities, .outputSets = outputSets});
 }
 
 /// @return The RGBA bytes at a pixel of an image `width` pixels across.
@@ -236,6 +237,50 @@ TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {
     SetXform(scene, "/World/Camera", {.translate = glm::dvec3(0.0, -1.0, 0.0)});
     renderer->Step(scene);
     EXPECT_FALSE(renderer->Replayed());
+    test::ExpectClean(context);
+}
+
+TEST(Renderer, StepsTakeTurnsAmongOutputSetsAndReplayEach) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer({}, 2);
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    Scene scene;
+    DefineSphereAhead(scene);
+    DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0});
+    DefineProduct(scene, "/Render/Product", "/World/Camera", {9, 9},
+                  {std::string(render_vars::kDistanceToCamera)});
+    RenderSettings::Define(scene, "/Render/Settings").SetProducts({Path("/Render/Product")});
+    const DeviceColumn& translates =
+        renderer->BindColumn(scene, "/World/Ball", "xformOp:translate");
+
+    // Each step's depth stays in its set while the next step renders into the other.
+    DeviceContext& context = renderer->Context();
+    Uploader uploader(context, context.Main());
+    const DeviceColumn* columns[2] = {};
+    std::optional<RenderVarOutput> last;
+    float lastDistance = 0.0f;
+    for (int step = 0; step < 8; ++step) {
+        const float distance = 1.0f + 0.5f * static_cast<float>(step);
+        const std::array<float, 3> ball{0.0f, distance + 1.0f, 0.0f};
+        uploader.Write(translates.Storage(), translates.Range().offset,
+                       std::span<const float>(ball));
+        renderer->WaitFor(uploader.Flush());
+        const RenderVarOutput depth =
+            *renderer->Step(scene).front().Find(render_vars::kDistanceToCamera);
+        const DeviceColumn*& expected = columns[step % 2];
+        expected = expected != nullptr ? expected : depth.column;
+        EXPECT_EQ(depth.column, expected) << "step " << step << " renders into set " << step % 2;
+        EXPECT_NEAR(renderer->Read(depth).As<float>()[40], distance, 1e-4f) << "step " << step;
+        if (last) {
+            EXPECT_NEAR(renderer->Read(*last).As<float>()[40], lastDistance, 1e-4f)
+                << "step " << step - 1 << "'s set, untouched by step " << step;
+        }
+        last = depth;
+        lastDistance = distance;
+    }
+    EXPECT_NE(columns[0], columns[1]);
+    EXPECT_TRUE(renderer->Replayed()) << "a frame kept for each set";
     test::ExpectClean(context);
 }
 

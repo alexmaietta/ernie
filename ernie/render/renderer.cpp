@@ -46,11 +46,11 @@ const VarFormat& FindFormat(std::string_view name) {
     return *std::ranges::find(VarFormats(), name, &VarFormat::name);
 }
 
-/// A batch and the views and columns it renders.
+/// A batch and the views it renders, and for each output set, its outputs and their columns.
 struct Batch {
-    RenderBatch outputs;
+    std::vector<RenderBatch> outputs;
     std::vector<CameraView> views;
-    std::vector<std::unique_ptr<DeviceColumn>> columns;
+    std::vector<std::vector<std::unique_ptr<DeviceColumn>>> columns;
 };
 
 /// @return The products grouped into batches of one size and vars, in order of first appearance.
@@ -89,8 +89,12 @@ struct Renderer::Device {
     /// The scene `deviceScene` follows, by `Scene::Id`: an address can be a new scene's.
     std::uint64_t sceneId = 0;
     std::unique_ptr<DeviceScene> deviceScene;
+    std::uint32_t outputSets = 1;
     std::vector<Batch> batches;
-    std::vector<RenderBatch> rendered;
+    /// Each output set's batches.
+    std::vector<std::vector<RenderBatch>> rendered;
+    /// The steps taken, whose count picks the next step's output set.
+    std::uint64_t steps = 0;
     /// The scene's version the batches were planned at.
     std::uint64_t plannedVersion = 0;
     /// Changed whenever the passes would record something else: a new plan or binding.
@@ -102,8 +106,8 @@ struct Renderer::Device {
     DeviceScene& Follow(const Scene& scene);
     /// Makes the batches for `specs`, keeping last step's columns where their vars match.
     void Plan(const Scene& scene, const std::vector<ProductSpec>& specs);
-    /// Sizes a batch's columns for its views, making them when there are none.
-    void Allocate(Batch& batch, const std::vector<std::string>& vars);
+    /// Sizes a batch's columns in each output set for its views, making them when there are none.
+    void Allocate(Batch& batch, const ProductSpec& spec);
 };
 
 void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& specs) {
@@ -115,9 +119,7 @@ void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& 
     std::vector<Batch> planned(groups.size());
     for (std::size_t i = 0; i < groups.size(); ++i) {
         Batch& batch = planned[i];
-        batch.outputs.size = groups[i].front()->size;
         for (const ProductSpec* spec : groups[i]) {
-            batch.outputs.products.push_back(spec->product);
             batch.views.push_back({.cameraToWorld = scene.WorldTransform(spec->camera),
                                    .size = spec->size,
                                    .lens = spec->lens,
@@ -128,40 +130,56 @@ void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& 
         if (i < batches.size()) {
             batch.columns = std::move(batches[i].columns);
         }
-        Allocate(batch, groups[i].front()->vars);
+        Allocate(batch, *groups[i].front());
+        for (RenderBatch& outputs : batch.outputs) {
+            for (const ProductSpec* spec : groups[i]) {
+                outputs.products.push_back(spec->product);
+            }
+        }
     }
     batches = std::move(planned);
-    rendered.clear();
-    for (const Batch& batch : batches) {
-        rendered.push_back(batch.outputs);
+    rendered.assign(outputSets, {});
+    for (std::uint32_t set = 0; set < outputSets; ++set) {
+        for (const Batch& batch : batches) {
+            rendered[set].push_back(batch.outputs[set]);
+        }
     }
 }
 
-void Renderer::Device::Allocate(Batch& batch, const std::vector<std::string>& vars) {
-    const glm::uvec2 size = batch.outputs.size;
+void Renderer::Device::Allocate(Batch& batch, const ProductSpec& spec) {
+    const glm::uvec2 size = spec.size;
     const std::uint64_t pixels = batch.views.size() * std::uint64_t{size.x} * size.y;
     const auto views = static_cast<std::int64_t>(batch.views.size());
-    batch.columns.resize(vars.size());
-    for (std::size_t i = 0; i < vars.size(); ++i) {
-        const VarFormat& format = FindFormat(vars[i]);
-        std::unique_ptr<DeviceColumn>& column = batch.columns[i];
-        if (!column || column->Name() != format.name) {
-            column = std::make_unique<DeviceColumn>(*arenas, format.name, format.type,
-                                                    format.channels, 0);
+    batch.columns.resize(outputSets);
+    batch.outputs.assign(outputSets, RenderBatch{.size = size});
+    for (std::uint32_t set = 0; set < outputSets; ++set) {
+        std::vector<std::unique_ptr<DeviceColumn>>& columns = batch.columns[set];
+        columns.resize(spec.vars.size());
+        for (std::size_t i = 0; i < spec.vars.size(); ++i) {
+            const VarFormat& format = FindFormat(spec.vars[i]);
+            std::unique_ptr<DeviceColumn>& column = columns[i];
+            if (!column || column->Name() != format.name) {
+                column = std::make_unique<DeviceColumn>(*arenas, format.name, format.type,
+                                                        format.channels, 0);
+            }
+            column->Resize(pixels, context->Main());
+            std::vector<std::int64_t> shape{views, size.y, size.x};
+            shape.insert(shape.end(), format.channels.begin(), format.channels.end());
+            batch.outputs[set].vars.push_back({.name = std::string(format.name),
+                                               .type = format.type,
+                                               .shape = std::move(shape),
+                                               .column = column.get()});
         }
-        column->Resize(pixels, context->Main());
-        std::vector<std::int64_t> shape{views, size.y, size.x};
-        shape.insert(shape.end(), format.channels.begin(), format.channels.end());
-        batch.outputs.vars.push_back({.name = std::string(format.name),
-                                      .type = format.type,
-                                      .shape = std::move(shape),
-                                      .column = column.get()});
     }
 }
 
 Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<Device>()) {
     Device& device = *device_;
     device.capacities = options.capacities;
+    if (options.outputSets == 0) {
+        throw std::invalid_argument("A renderer needs at least one output set");
+    }
+    device.outputSets = options.outputSets;
     device.context = std::make_unique<DeviceContext>(
         DeviceContextOptions{.validation = options.validation, .device = options.device});
     if (!device.context->Capabilities().rayQuery) {
@@ -214,21 +232,24 @@ std::span<const RenderBatch> Renderer::Step(Scene& scene) {
         ++device.recorded;
     }
     deviceScene.Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
-    // Replayed while the plan and bindings stand: the camera records only their data.
+    const auto set = static_cast<std::uint32_t>(device.steps++ % device.outputSets);
+    // Replayed while the plan and bindings stand, a frame kept for each output set: the camera
+    // records only their data.
     deviceScene.Step(
         [&](graph::Graph& graph) {
             for (const Batch& batch : device.batches) {
                 CameraOutputs outputs;
-                for (std::size_t i = 0; i < batch.columns.size(); ++i) {
-                    outputs.*FindFormat(batch.outputs.vars[i].name).output =
-                        graph.Import(*batch.columns[i]);
+                const std::vector<std::unique_ptr<DeviceColumn>>& columns = batch.columns[set];
+                for (std::size_t i = 0; i < columns.size(); ++i) {
+                    outputs.*FindFormat(batch.outputs[set].vars[i].name).output =
+                        graph.Import(*columns[i]);
                 }
                 device.camera->Add(graph, batch.views, outputs);
             }
         },
-        device.recorded, device.waits);
+        device.recorded * device.outputSets + set, device.waits);
     device.waits.clear();
-    return device.rendered;
+    return device.rendered[set];
 }
 
 const DeviceColumn& Renderer::BindColumn(Scene& scene, const Path& prim,

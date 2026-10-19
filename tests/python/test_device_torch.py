@@ -116,6 +116,44 @@ def test_pytorch_poses_move_what_a_step_renders(context):
     assert batch["DistanceToCamera"].read()[0, 16, 16] == pytest.approx(2.0, abs=1e-4)
 
 
+def test_pytorch_reads_one_step_while_the_next_renders(context):
+    scene = ernie.Scene()
+    scene.define("/World/Ball", ernie.Sphere, translate=(0, 5, 0))
+    scene.define("/World/Camera", ernie.Camera).set(
+        ernie.tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (0, 1, 0))
+    )
+    scene.define("/Render/Product/Depth", ernie.RenderVar, sourceName="DistanceToCamera")
+    scene.define(
+        "/Render/Product",
+        ernie.RenderProduct,
+        camera="/World/Camera",
+        resolution=(33, 33),
+        orderedVars=["/Render/Product/Depth"],
+    )
+    scene.define("/Render/Settings", ernie.RenderSettings, products=["/Render/Product"])
+    try:
+        renderer = ernie.Renderer(device=context.uuid, output_sets=2)
+    except RuntimeError as error:
+        pytest.skip(str(error))
+    translates = renderer.bind_column(scene, "/World/Ball", "xformOp:translate")
+    poses = torch.from_dlpack(translates)
+    stream = torch.cuda.current_stream(context.cuda_ordinal).cuda_stream
+
+    # A learner's loop: each step waits for the stream's work so far, and the last step's depth
+    # is read in place after the next step is queued, holding its own values.
+    last = None
+    for step in range(6):
+        distance = 1.0 + 0.5 * step
+        poses[0] = torch.tensor([0.0, distance + 1.0, 0.0])
+        translates.ready(stream)
+        (batch,) = renderer.step(scene, stream=stream)
+        depth = torch.from_dlpack(batch["DistanceToCamera"])
+        if last is not None:
+            assert last[1][0, 16, 16].item() == pytest.approx(last[0], abs=1e-4)
+        last = (distance, depth)
+    assert last[1][0, 16, 16].item() == pytest.approx(last[0], abs=1e-4)
+
+
 def test_pytorch_reads_a_render_in_place(context):
     scene = ernie.Scene()
     scene.define("/World/Ball", ernie.Sphere, translate=(0, 5, 0))

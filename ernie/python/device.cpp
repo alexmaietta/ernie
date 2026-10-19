@@ -54,16 +54,6 @@ std::string_view TypeName(DType type) {
     return "";
 }
 
-/// A DLPack stream argument as a CUDA stream: None and 1 are the legacy default stream, 2 the
-/// per-thread one, anything else a `cudaStream_t`.
-CUstream ToStream(const nb::object& stream) {
-    if (stream.is_none()) {
-        return nullptr;
-    }
-    const auto value = nb::cast<std::intptr_t>(stream);
-    return reinterpret_cast<CUstream>(value == 1 ? 0 : value);
-}
-
 /// A device, with the shared arenas Python's columns live in and its CUDA interop.
 struct Context {
     std::unique_ptr<DeviceContext> context;
@@ -95,6 +85,14 @@ struct Context {
 
 }  // namespace
 
+CUstream ToStream(const nb::object& stream) {
+    if (stream.is_none()) {
+        return nullptr;
+    }
+    const auto value = nb::cast<std::intptr_t>(stream);
+    return reinterpret_cast<CUstream>(value == 1 ? 0 : value);
+}
+
 CudaInterop& Interop::Cuda() const {
     if (cuda == nullptr) {
         throw nb::buffer_error(("No CUDA device pairs with " + context->Info().name).c_str());
@@ -107,7 +105,7 @@ Column::Column(Interop interop, std::unique_ptr<DeviceColumn> device, std::optio
 
 Column::Column(Interop interop, const DeviceColumn& device, std::vector<std::int64_t> view,
                Ticket ready)
-    : owner(interop), column(&device), shape(std::move(view)), written(ready) {}
+    : owner(interop), column(&device), shape(std::move(view)), written(ready), rendered(ready) {}
 
 std::vector<std::int64_t> Column::Shape() const {
     return shape.empty() ? column->Shape() : shape;
@@ -117,8 +115,12 @@ nb::object Column::Dlpack(const nb::object& stream, const nb::object& maxVersion
     CudaInterop& cuda = owner.Cuda();
     // -1 asks for no synchronization.
     if (stream.is_none() || nb::cast<std::intptr_t>(stream) != -1) {
-        for (const Queue* queue : owner.context->Queues()) {
-            cuda.Wait(ToStream(stream), queue->Last());
+        if (rendered) {
+            cuda.Wait(ToStream(stream), *rendered);
+        } else {
+            for (const Queue* queue : owner.context->Queues()) {
+                cuda.Wait(ToStream(stream), queue->Last());
+            }
         }
     }
     const bool versioned =

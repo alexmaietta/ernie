@@ -17,6 +17,10 @@
 
 namespace ernie::python {
 
+/// @return A DLPack stream argument as a CUDA stream: None and 1 are the legacy default stream, 2
+/// the per-thread one, anything else a `cudaStream_t`.
+CUstream ToStream(const nanobind::object& stream);
+
 /// @brief A device and the CUDA device paired with it, if any.
 struct Interop {
     DeviceContext* context = nullptr;
@@ -38,6 +42,9 @@ struct Column {
     /// The shape it shows; empty for the column's own.
     std::vector<std::int64_t> shape;
     Ticket written;
+    /// The step that rendered a renderer's output: what readers wait for in place of the queues'
+    /// last work, so a later step rendering into another output set need not finish first.
+    std::optional<Ticket> rendered;
     /// What keeps a column another object owns alive.
     nanobind::object keeper;
 

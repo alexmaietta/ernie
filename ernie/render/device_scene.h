@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <span>
+#include <vector>
 
 namespace ernie {
 
@@ -75,11 +76,12 @@ class DeviceScene {
     /// @throws graph::GraphError when the passes cannot run.
     Ticket Execute(const std::function<void(graph::Graph&)>& passes,
                    std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
-    /// @brief `Execute`, or the last frame's commands submitted again while nothing they record
-    /// has changed: the scene (its version), the render origin, the bottom levels (none waiting)
-    /// and `key`, which the caller changes whenever `passes` would record something else. A frame
-    /// is kept to replay when it runs no one-shot pass, so a step whose data all comes from device
-    /// columns costs the host one submission.
+    /// @brief `Execute`, or the commands of an earlier frame with the same `key` submitted again
+    /// while nothing they record has changed: the scene (its version), the render origin and the
+    /// bottom levels (none waiting). The caller changes `key` whenever `passes` would record
+    /// something else, and may alternate keys, as steps alternating output sets do: a frame is
+    /// kept for each of the last few keys when it runs no one-shot pass, so a step whose data all
+    /// comes from device columns costs the host one submission.
     /// @return The frame's ticket.
     Ticket Step(const std::function<void(graph::Graph&)>& passes, std::uint64_t key,
                 std::span<const Ticket> waits = {});
@@ -96,6 +98,12 @@ class DeviceScene {
         std::uint64_t passes = 0;
         bool operator==(const CaptureKey&) const = default;
     };
+    struct Captured {
+        CaptureKey key;
+        std::unique_ptr<graph::CapturedGraph> graph;
+    };
+    /// The most captured frames kept, by key: as many as output sets steps alternate between.
+    static constexpr std::size_t kKeptFrames = 4;
 
     /// Adds a frame's passes: the columns' sync, the transforms, the geometry, the ray tracer's
     /// builds, then `passes`'.
@@ -111,8 +119,7 @@ class DeviceScene {
     GeometryPool geometry_;
     InstanceTable instances_;
     std::unique_ptr<RayTracer> tracer_;
-    std::unique_ptr<graph::CapturedGraph> captured_;
-    CaptureKey capturedKey_;
+    std::vector<Captured> captured_;
     bool replayed_ = false;
 };
 

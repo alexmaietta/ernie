@@ -6,6 +6,8 @@
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 
+#include <algorithm>
+
 namespace ernie {
 
 DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
@@ -30,7 +32,7 @@ bool DeviceScene::Follow(const glm::dvec3& viewpoint) {
 Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,
                             std::span<const Ticket> waits, BinarySemaphores binary) {
     ERNIE_ZONE("Run a frame");
-    captured_.reset();
+    captured_.clear();
     graph::Graph graph(context_, pool_);
     AddFrame(graph, passes);
     return graph.Execute(context_.Main(), waits, binary);
@@ -39,21 +41,30 @@ Ticket DeviceScene::Execute(const std::function<void(graph::Graph&)>& passes,
 Ticket DeviceScene::Step(const std::function<void(graph::Graph&)>& passes, std::uint64_t key,
                          std::span<const Ticket> waits) {
     const CaptureKey now{scene_.Store().Version(), transforms_.Origin(), key};
-    replayed_ = captured_ && now == capturedKey_ && Settled();
+    // Frames of another version or origin record what no longer stands.
+    std::erase_if(captured_, [&](const Captured& frame) {
+        return frame.key.version != now.version || frame.key.origin != now.origin;
+    });
+    const auto found = std::ranges::find(captured_, now, &Captured::key);
+    replayed_ = found != captured_.end() && Settled();
     if (replayed_) {
         ERNIE_ZONE("Replay a frame");
-        return captured_->Submit(waits);
+        return found->graph->Submit(waits);
     }
     ERNIE_ZONE("Run a frame");
-    captured_.reset();
+    if (found != captured_.end()) {
+        captured_.erase(found);
+    }
     graph::Graph graph(context_, pool_);
     AddFrame(graph, passes);
     if (!Settled() || !graph.Capturable()) {
         return graph.Execute(context_.Main(), waits);
     }
-    captured_ = graph.Capture(context_.Main());
-    capturedKey_ = now;
-    return captured_->Submit(waits);
+    if (captured_.size() == kKeptFrames) {
+        captured_.erase(captured_.begin());
+    }
+    captured_.push_back({now, graph.Capture(context_.Main())});
+    return captured_.back().graph->Submit(waits);
 }
 
 bool DeviceScene::Settled() const {

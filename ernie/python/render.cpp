@@ -51,7 +51,8 @@ struct PythonRenderer {
     }
 };
 
-/// A batch of a step: its products and each var's columns, valid until the next step.
+/// A batch of a step: its products and each var's columns, valid until a later step renders into
+/// its output set again.
 struct PythonBatch {
     std::vector<std::string> products;
     std::tuple<std::uint32_t, std::uint32_t> size;
@@ -67,8 +68,15 @@ struct PythonBatch {
     }
 };
 
-std::vector<PythonBatch> Step(PythonRenderer& self, const nb::object& owner, Scene& scene) {
+std::vector<PythonBatch> Step(PythonRenderer& self, const nb::object& owner, Scene& scene,
+                              const nb::object& stream) {
     self.WaitForBound();
+    if (!stream.is_none()) {
+        if (!self.cuda) {
+            throw nb::buffer_error("No CUDA device pairs with the renderer's");
+        }
+        self.renderer.WaitFor(self.cuda->Signal(ToStream(stream)));
+    }
     const std::span<const RenderBatch> batches = self.renderer.Step(scene);
     const Interop interop = self.Pair();
     const Ticket ready = self.renderer.Context().Main().Last();
@@ -94,7 +102,7 @@ void BindRender(nb::module_& module) {
     nb::class_<PythonBatch>(module, "RenderBatch",
                             "Products of one size and vars rendered in one dispatch: each var a "
                             "DeviceColumn of shape (views, height, width, channels...), a view a "
-                            "product, valid until the renderer's next step.")
+                            "product, valid until a later step renders into its output set again.")
         .def_ro("products", &PythonBatch::products)
         .def_ro("size", &PythonBatch::size, "(width, height) in pixels.")
         .def("__getitem__", &PythonBatch::Get, nb::arg("name"))
@@ -117,18 +125,24 @@ void BindRender(nb::module_& module) {
         .def(
             "__init__",
             [](PythonRenderer* self, const std::string& device, bool validation,
-               std::uint32_t worlds, std::uint32_t instancesPerWorld, std::uint32_t views) {
-                new (self) PythonRenderer(RendererOptions{
-                    .device = device,
-                    .validation = validation,
-                    .capacities = {
-                        .worlds = worlds, .instancesPerWorld = instancesPerWorld, .views = views}});
+               std::uint32_t worlds, std::uint32_t instancesPerWorld, std::uint32_t views,
+               std::uint32_t outputSets) {
+                new (self) PythonRenderer(
+                    RendererOptions{.device = device,
+                                    .validation = validation,
+                                    .capacities = {.worlds = worlds,
+                                                   .instancesPerWorld = instancesPerWorld,
+                                                   .views = views},
+                                    .outputSets = outputSets});
             },
             nb::kw_only(), nb::arg("device") = "", nb::arg("validation") = false,
             nb::arg("worlds") = 0, nb::arg("instances_per_world") = 0, nb::arg("views") = 0,
+            nb::arg("output_sets") = 1,
             "Opens a device that ray traces: by UUID or part of its name, or the best one. "
             "worlds, instances_per_world and views declare the most the scene holds, laid out "
-            "once; a scene beyond them raises. 0 is as many as there are.")
+            "once; a scene beyond them raises. 0 is as many as there are. Steps take turns among "
+            "output_sets sets of outputs: with 2, one step's outputs are read while the next "
+            "renders.")
         .def(
             "render",
             [](PythonRenderer& self, Scene& scene) { return ToNumpy(self.renderer.Render(scene)); },
@@ -137,13 +151,16 @@ void BindRender(nb::module_& module) {
             "array.")
         .def(
             "step",
-            [](nb::object self, Scene& scene) {
-                return Step(nb::cast<PythonRenderer&>(self), self, scene);
+            [](nb::object self, Scene& scene, const nb::object& stream) {
+                return Step(nb::cast<PythonRenderer&>(self), self, scene, stream);
             },
-            nb::arg("scene"),
+            nb::arg("scene"), nb::kw_only(), nb::arg("stream").none() = nb::none(),
             "Renders every product of the scene's first RenderSettings, products alike in size "
             "and vars in one dispatch, and returns the RenderBatches without waiting: their vars "
-            "are device columns that torch.from_dlpack views in place, or read() copies.")
+            "are device columns that torch.from_dlpack views in place, or read() copies, valid "
+            "until a later step renders into their output set again. stream, a CUDA stream "
+            "(torch.cuda.current_stream().cuda_stream), makes the step wait for the work queued "
+            "on it so far, such as reading the outputs it overwrites.")
         .def(
             "bind_column",
             [](nb::object self, Scene& scene, const std::string& prim,

@@ -46,6 +46,9 @@ struct RendererOptions {
     /// The Khronos validation layer with synchronization validation, when installed.
     bool validation = false;
     RenderCapacities capacities;
+    /// The sets of outputs steps take turns rendering into: with 2, a learner reads one step's
+    /// outputs while the next step renders into the other set.
+    std::uint32_t outputSets = 1;
 };
 
 /// @brief One var of a batch: every view's pixels, stacked on the device.
@@ -84,8 +87,9 @@ class ERNIE_API Renderer {
     /// Minimal sees them: albedo lit from the eye. It updates the scene first. Products alike in
     /// size and vars render in one dispatch, and the step in one submission; it returns once that
     /// is submitted. Cameras take their poses from the device's transforms, so poses CUDA writes
-    /// move them.
-    /// @return The batches, valid until the next step.
+    /// move them. Steps take turns among the output sets.
+    /// @return The batches, valid until a later step renders into their set again: the next step
+    /// with one set, the one after with two.
     /// @throws std::invalid_argument as `ReadProducts`; std::length_error for a scene beyond the
     /// declared capacities.
     std::span<const RenderBatch> Step(Scene& scene);
