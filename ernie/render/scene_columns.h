@@ -46,7 +46,9 @@ class SceneColumns {
     SceneColumns(const SceneColumns&) = delete;
     SceneColumns& operator=(const SceneColumns&) = delete;
 
-    /// @brief Puts a bucket's column of `attribute` on the device, from the scene's values.
+    /// @brief Puts a bucket's column of `attribute` on the device, from the scene's values, which
+    /// are submitted at once: work on the main queue after the call, or CUDA work waiting on it,
+    /// sees them.
     /// @throws std::invalid_argument when the bucket has no such column, or its type has no
     /// device element.
     const DeviceColumn& Bind(BucketId bucket, std::string_view attribute);

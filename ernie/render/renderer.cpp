@@ -79,9 +79,9 @@ const RenderVarOutput* RenderBatch::Find(std::string_view name) const {
 struct Renderer::Device {
     ShaderCompiler compiler;
     std::unique_ptr<DeviceContext> context;
+    /// Where the device scene and outputs live: shared with CUDA where the device can export
+    /// memory, so bound columns and outputs map in place.
     std::unique_ptr<Arenas> arenas;
-    /// Where outputs live: shared with CUDA where the device can export memory.
-    std::unique_ptr<Arenas> outputs;
     std::unique_ptr<BindlessHeap> heap;
     std::unique_ptr<CameraPass> camera;
     /// The scene `deviceScene` follows, by `Scene::Id`: an address can be a new scene's.
@@ -89,7 +89,11 @@ struct Renderer::Device {
     std::unique_ptr<DeviceScene> deviceScene;
     std::vector<Batch> batches;
     std::vector<RenderBatch> rendered;
+    /// What the next step waits for.
+    std::vector<Ticket> waits;
 
+    /// @return The device scene following `scene`, made anew for a scene it does not follow.
+    DeviceScene& Follow(const Scene& scene);
     /// Makes the batches for `specs`, keeping last step's columns where their vars match.
     void Plan(const Scene& scene, const std::vector<ProductSpec>& specs);
     /// Sizes a batch's columns for its views, making them when there are none.
@@ -131,7 +135,7 @@ void Renderer::Device::Allocate(Batch& batch, const std::vector<std::string>& va
         const VarFormat& format = FindFormat(vars[i]);
         std::unique_ptr<DeviceColumn>& column = batch.columns[i];
         if (!column || column->Name() != format.name) {
-            column = std::make_unique<DeviceColumn>(*outputs, format.name, format.type,
+            column = std::make_unique<DeviceColumn>(*arenas, format.name, format.type,
                                                     format.channels, 0);
         }
         column->Resize(pixels, context->Main());
@@ -152,12 +156,10 @@ Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<De
         throw DeviceError(DeviceErrorKind::Unsupported,
                           device.context->Info().name + " cannot ray trace");
     }
-    device.arenas = std::make_unique<Arenas>(*device.context, MemoryUse::Device, "renderer",
-                                             std::uint64_t{16} << 20);
-    device.outputs = std::make_unique<Arenas>(
+    device.arenas = std::make_unique<Arenas>(
         *device.context,
         device.context->Capabilities().externalMemory ? MemoryUse::Shared : MemoryUse::Device,
-        "render outputs", std::uint64_t{16} << 20);
+        "renderer", std::uint64_t{16} << 20);
     device.heap = std::make_unique<BindlessHeap>(*device.context);
     device.camera = std::make_unique<CameraPass>(*device.context, device.compiler, *device.heap);
 }
@@ -170,32 +172,54 @@ DeviceContext& Renderer::Context() {
     return *device_->context;
 }
 
+DeviceScene& Renderer::Device::Follow(const Scene& scene) {
+    if (scene.Id() != sceneId) {
+        context->WaitIdle();
+        deviceScene = std::make_unique<DeviceScene>(*context, *arenas, scene, compiler);
+        sceneId = scene.Id();
+        batches.clear();
+        rendered.clear();
+    }
+    return *deviceScene;
+}
+
 std::span<const RenderBatch> Renderer::Step(Scene& scene) {
     ERNIE_ZONE("Render step");
     scene.Update();
     const std::vector<ProductSpec> specs = ReadProducts(scene);
     Device& device = *device_;
-    if (scene.Id() != device.sceneId) {
-        device.context->WaitIdle();
-        device.deviceScene =
-            std::make_unique<DeviceScene>(*device.context, *device.arenas, scene, device.compiler);
-        device.sceneId = scene.Id();
-    }
+    DeviceScene& deviceScene = device.Follow(scene);
     device.Plan(scene, specs);
     const auto highest = std::ranges::max(specs, {}, &ProductSpec::world).world;
-    device.deviceScene->Instances().ReserveWorlds(highest + 1);
-    device.deviceScene->Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
-    device.deviceScene->Execute([&](graph::Graph& graph) {
-        for (const Batch& batch : device.batches) {
-            CameraOutputs outputs;
-            for (std::size_t i = 0; i < batch.columns.size(); ++i) {
-                outputs.*FindFormat(batch.outputs.vars[i].name).output =
-                    graph.Import(*batch.columns[i]);
+    deviceScene.Instances().ReserveWorlds(highest + 1);
+    deviceScene.Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
+    deviceScene.Execute(
+        [&](graph::Graph& graph) {
+            for (const Batch& batch : device.batches) {
+                CameraOutputs outputs;
+                for (std::size_t i = 0; i < batch.columns.size(); ++i) {
+                    outputs.*FindFormat(batch.outputs.vars[i].name).output =
+                        graph.Import(*batch.columns[i]);
+                }
+                device.camera->Add(graph, batch.views, outputs);
             }
-            device.camera->Add(graph, batch.views, outputs);
-        }
-    });
+        },
+        device.waits);
+    device.waits.clear();
     return device.rendered;
+}
+
+const DeviceColumn& Renderer::BindTransformOp(Scene& scene, const Path& prim,
+                                              std::string_view attribute) {
+    DeviceScene& deviceScene = device_->Follow(scene);
+    const BucketId bucket = scene.Store().PrimBucket(scene.Require(prim));
+    const DeviceColumn& column = deviceScene.Columns().Bind(bucket, attribute);
+    deviceScene.Transforms().Bind(bucket, attribute, column);
+    return column;
+}
+
+void Renderer::WaitFor(const Ticket& ticket) {
+    device_->waits.push_back(ticket);
 }
 
 Tensor Renderer::Read(const RenderVarOutput& var) {

@@ -2,6 +2,8 @@
 /// @file renderer_test.cpp
 /// @brief The README's first render, as written there: a rock on the ground under the sun, seen
 /// by a camera the render settings name.
+#include "ernie/device/column.h"
+#include "ernie/device/staging.h"
 #include "ernie/render/products.h"
 #include "ernie/render/renderer.h"
 #include "ernie/scene/schema/camera.h"
@@ -193,6 +195,33 @@ TEST(Renderer, EachViewSeesItsWorldAndTheSharedPrims) {
     EXPECT_NEAR(moved[1], 10.0f, 1e-4f) << "the shared wall";
     EXPECT_NEAR(moved[2], 1.0f, 1e-4f) << "nearer than world 1's ball, now in world 2";
     test::ExpectClean(renderer->Context());
+}
+
+TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    Scene scene;
+    DefineSphereAhead(scene);
+    DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0});
+    DefineProduct(scene, "/Render/Product", "/World/Camera", {9, 9},
+                  {std::string(render_vars::kDistanceToCamera)});
+    RenderSettings::Define(scene, "/Render/Settings").SetProducts({Path("/Render/Product")});
+    const DeviceColumn& translates =
+        renderer->BindTransformOp(scene, "/World/Ball", "xformOp:translate");
+    ASSERT_EQ(translates.Shape(), (std::vector<std::int64_t>{1, 3}));
+
+    // As CUDA would, a write on the device the host never sees: the ball 2 m nearer.
+    DeviceContext& context = renderer->Context();
+    Uploader uploader(context, context.Main());
+    const std::array<float, 3> nearer{0.0f, 3.0f, 0.0f};
+    uploader.Write(translates.Storage(), translates.Range().offset, std::span<const float>(nearer));
+    renderer->WaitFor(uploader.Flush());
+    const RenderBatch& batch = renderer->Step(scene).front();
+    const Tensor depth = renderer->Read(*batch.Find(render_vars::kDistanceToCamera));
+    EXPECT_NEAR(depth.As<float>()[40], 2.0f, 1e-4f);
+    test::ExpectClean(context);
 }
 
 TEST(Products, ConformTheFilmToTheImage) {

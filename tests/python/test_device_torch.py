@@ -83,6 +83,39 @@ def test_exportable_tensors_are_wrapped_in_place(context, mode, allocator_config
     assert result.returncode == 0, result.stderr
 
 
+def test_pytorch_poses_move_what_a_step_renders(context):
+    scene = ernie.Scene()
+    for name in ("A", "B"):
+        scene.define(f"/World/{name}", ernie.Sphere, translate=(0, 5, 0))
+    scene.define("/World/Camera", ernie.Camera).set(
+        ernie.tokens.TRANSFORM, ernie.look_at_transform((0, 0, 0), (0, 1, 0))
+    )
+    scene.define("/Render/Product/Depth", ernie.RenderVar, sourceName="DistanceToCamera")
+    scene.define(
+        "/Render/Product",
+        ernie.RenderProduct,
+        camera="/World/Camera",
+        resolution=(33, 33),
+        orderedVars=["/Render/Product/Depth"],
+    )
+    scene.define("/Render/Settings", ernie.RenderSettings, products=["/Render/Product"])
+    try:
+        renderer = ernie.Renderer(device=context.uuid)
+    except RuntimeError as error:
+        pytest.skip(str(error))
+    translates = renderer.bind_transform_op(scene, "/World/A", "xformOp:translate")
+    rows = scene.bucket_paths("/World/A")
+    assert sorted(rows) == ["/World/A", "/World/B"] and translates.shape == [2, 3]
+
+    # PyTorch moves A 2 m nearer and B out of view, and the step renders A without the host.
+    poses = torch.from_dlpack(translates)
+    poses[rows.index("/World/A")] = torch.tensor([0.0, 3.0, 0.0])
+    poses[rows.index("/World/B")] = torch.tensor([50.0, 5.0, 0.0])
+    translates.ready(torch.cuda.current_stream(context.cuda_ordinal).cuda_stream)
+    (batch,) = renderer.step(scene)
+    assert batch["DistanceToCamera"].read()[0, 16, 16] == pytest.approx(2.0, abs=1e-4)
+
+
 def test_pytorch_reads_a_render_in_place(context):
     scene = ernie.Scene()
     scene.define("/World/Ball", ernie.Sphere, translate=(0, 5, 0))

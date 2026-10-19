@@ -27,6 +27,7 @@ namespace ernie {
 
 class DeviceColumn;
 class DeviceContext;
+struct Ticket;
 
 struct RendererOptions {
     /// The device: its UUID in hex, or part of its name; empty for the best scoring one.
@@ -78,6 +79,18 @@ class ERNIE_API Renderer {
 
     /// @return A var's pixels copied to the host once the last step has rendered them.
     Tensor Read(const RenderVarOutput& var);
+
+    /// @brief Hands a transform op to the device for every prim in `prim`'s bucket (the prims of
+    /// its type and applied schemas), as the device scene's columns bind it: from then on the
+    /// column is what steps read, so CUDA, PyTorch or Warp write poses in place and nothing goes
+    /// through the host. Values the host authors later still overwrite their rows. The op must
+    /// be in the prims' `xformOpOrder`.
+    /// @return The column, a row a prim in the bucket's row order, in memory CUDA can map.
+    /// @throws std::invalid_argument as `SceneColumns::Bind` and `TransformGraph::Bind`.
+    const DeviceColumn& BindTransformOp(Scene& scene, const Path& prim, std::string_view attribute);
+    /// @brief Makes the next step wait on the device for `ticket`, such as CUDA's writes to a
+    /// bound column.
+    void WaitFor(const Ticket& ticket);
 
     /// @brief Steps and reads the first product's LdrColor.
     /// @return LdrColor, height x width x 4 bytes (RGBA8, display encoded) on the host.

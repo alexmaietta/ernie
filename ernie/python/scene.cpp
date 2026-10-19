@@ -328,6 +328,20 @@ void BindScene(nb::module_& module) {
             },
             nb::arg("type") = "", "The paths of every prim of a type or one deriving from it.")
         .def(
+            "bucket_paths",
+            [](const Scene& self, const Target& prim) {
+                const PrimStore& store = self.Store();
+                const Bucket& bucket = store.GetBucket(store.PrimBucket(Resolve(self, prim)));
+                std::vector<std::string> paths;
+                for (const PrimId row : bucket.prims) {
+                    paths.push_back(self.PrimPath(row).String());
+                }
+                return paths;
+            },
+            nb::arg("prim"),
+            "The paths of the prims stored with this one (its type and applied schemas), by row: "
+            "the rows of a column bound for them. Adding or removing such prims reorders them.")
+        .def(
             "apply_api",
             [](Scene& self, const Target& prim, const std::string& api) {
                 self.ApplyApi(Resolve(self, prim), api);

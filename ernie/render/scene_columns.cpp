@@ -121,6 +121,8 @@ const DeviceColumn& SceneColumns::Bind(BucketId bucket, std::string_view attribu
         bucket, host.attribute, scene_.Store().Version(), std::move(column), std::move(shadow)});
     uploader_.Write(binding.column->Storage(), binding.column->Range().offset,
                     std::span<const std::byte>(binding.shadow));
+    // Submitted now, so writes the device makes once it is bound land after the scene's values.
+    uploader_.Flush();
     return *binding.column;
 }
 

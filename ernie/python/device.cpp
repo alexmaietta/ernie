@@ -213,7 +213,8 @@ void BindDevice(nb::module_& module) {
             "A column over a CUDA tensor's own memory, in place, when it is exportable.");
 
     nb::class_<Column>(module, "DeviceColumn",
-                       "Rows on the device that CUDA, PyTorch and Warp read and write in place.")
+                       "Rows on the device that CUDA, PyTorch and Warp read and write in place.",
+                       nb::is_weak_referenceable())
         .def_prop_ro("name", [](const Column& self) { return self.column->Name(); })
         .def_prop_ro("shape", &Column::Shape)
         .def_prop_ro("dtype", [](const Column& self) { return TypeName(self.column->Type()); })

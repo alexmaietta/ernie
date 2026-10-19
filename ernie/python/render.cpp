@@ -24,13 +24,31 @@ namespace nb = nanobind;
 namespace ernie::python {
 namespace {
 
-/// A renderer and the CUDA device paired with its device. Members go in reverse: CUDA first.
+/// A renderer, the CUDA device paired with its device, and the columns bound to it, whose writes
+/// each step waits for. Members go in reverse: CUDA first.
 struct PythonRenderer {
     Renderer renderer;
     std::unique_ptr<CudaInterop> cuda;
+    std::vector<nb::weakref> bound;
 
     explicit PythonRenderer(const RendererOptions& options)
         : renderer(options), cuda(CudaInterop::Create(renderer.Context())) {}
+
+    Interop Pair() {
+        return {&renderer.Context(), cuda.get()};
+    }
+
+    /// Makes the next step wait for the bound columns' writes, forgetting columns gone.
+    void WaitForBound() {
+        std::erase_if(bound, [&](const nb::weakref& reference) {
+            const nb::object column = reference();
+            if (column.is_none()) {
+                return true;
+            }
+            renderer.WaitFor(nb::cast<const Column&>(column).written);
+            return false;
+        });
+    }
 };
 
 /// A batch of a step: its products and each var's columns, valid until the next step.
@@ -50,8 +68,9 @@ struct PythonBatch {
 };
 
 std::vector<PythonBatch> Step(PythonRenderer& self, const nb::object& owner, Scene& scene) {
+    self.WaitForBound();
     const std::span<const RenderBatch> batches = self.renderer.Step(scene);
-    const Interop interop{&self.renderer.Context(), self.cuda.get()};
+    const Interop interop = self.Pair();
     const Ticket ready = self.renderer.Context().Main().Last();
     std::vector<PythonBatch> result;
     for (const RenderBatch& batch : batches) {
@@ -117,7 +136,25 @@ void BindRender(nb::module_& module) {
             nb::arg("scene"),
             "Renders every product of the scene's first RenderSettings, products alike in size "
             "and vars in one dispatch, and returns the RenderBatches without waiting: their vars "
-            "are device columns that torch.from_dlpack views in place, or read() copies.");
+            "are device columns that torch.from_dlpack views in place, or read() copies.")
+        .def(
+            "bind_transform_op",
+            [](nb::object self, Scene& scene, const std::string& prim,
+               const std::string& attribute) {
+                auto& renderer = nb::cast<PythonRenderer&>(self);
+                const DeviceColumn& bound =
+                    renderer.renderer.BindTransformOp(scene, Path(prim), attribute);
+                auto* column = new Column(renderer.Pair(), bound, {}, Ticket{});
+                column->keeper = self;
+                nb::object handle = nb::cast(column, nb::rv_policy::take_ownership);
+                renderer.bound.emplace_back(handle);
+                return handle;
+            },
+            nb::arg("scene"), nb::arg("prim"), nb::arg("attribute"),
+            "Hands a transform op (such as xformOp:translate) of every prim in the prim's bucket "
+            "to the device: returns its DeviceColumn, a row a prim in the bucket's order, which "
+            "PyTorch or Warp write in place; call ready(stream) after writing, and the next step "
+            "renders the new poses with no copy through the host.");
 }
 
 }  // namespace ernie::python
