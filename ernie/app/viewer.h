@@ -78,8 +78,10 @@ class Viewer {
     /// @brief Sizes the viewport's image to the dock space's central node and draws it there,
     /// behind the panels.
     void ShowViewport();
-    /// @brief Makes the viewport's image `pixels` in size, in the UI and the heap.
+    /// @brief Makes the viewport's image `pixels` in size, in the UI and the heap, with its prims.
     void ResizeViewport(glm::uvec2 pixels);
+    /// @brief Selects the prim the frame `drawn` shows under a click.
+    void Pick(const Shell::Pick& pick, const Ticket& drawn);
     /// @brief Adds the pass filling the viewport: traced, or the theme's colour without ray
     /// queries.
     /// @return The viewport, filled.
@@ -105,6 +107,8 @@ class Viewer {
     std::unique_ptr<DeviceImage> viewport_;
     ImTextureID viewportTexture_ = 0;
     BindlessIndex viewportImage_;
+    /// Each viewport pixel's prim slot, which picking reads; null without ray queries.
+    std::unique_ptr<DeviceColumn> prims_;
     /// The frames the device may still be drawing, oldest first.
     std::deque<Ticket> inFlight_;
     std::uint64_t frames_ = 0;

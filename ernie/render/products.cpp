@@ -80,6 +80,7 @@ ProductSpec ReadProduct(const Scene& scene, const RenderSettingsBase& settings,
             .lens =
                 ReadLens(scene, *prim, size, pick(own.HasPixelAspectRatio()).GetPixelAspectRatio(),
                          pick(own.HasAspectRatioConformPolicy()).GetAspectRatioConformPolicy()),
+            .clipping = glm::vec2(Camera(scene, camera).GetClippingRange()),
             .vars = ReadVars(scene, vars)};
 }
 

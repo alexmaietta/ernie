@@ -43,7 +43,9 @@ View ToView(const CameraView& view, const glm::dvec3& origin, std::uint32_t firs
             .colour = shaders::kNoImage,
             .node = view.node,
             .first = first,
-            .world = view.world};
+            .world = view.world,
+            .near = view.clipping.x,
+            .far = view.clipping.y};
 }
 
 }  // namespace

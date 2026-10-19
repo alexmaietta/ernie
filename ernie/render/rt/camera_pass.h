@@ -47,6 +47,8 @@ struct CameraView {
     std::uint32_t node = shaders::kNone;
     /// The batch world it sees: its prims and every world's shared ones.
     std::uint32_t world = 0;
+    /// Metres along the view axis to the near and far clipping planes.
+    glm::vec2 clipping{0.0f, 1e30f};
 };
 
 /// @brief What a camera pass writes; each left out is not written. The views' pixels are stacked

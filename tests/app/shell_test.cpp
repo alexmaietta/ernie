@@ -205,6 +205,43 @@ TEST(Shell, DuplicatesAndDeletesTheSelection) {
     EXPECT_TRUE(scene.Has("/World/Rover1/Wheel"));
 }
 
+TEST(Shell, PicksOnAStillClickAndSelectsWhatItFinds) {
+    const UiFrames frames;
+    Scene scene;
+    Build(scene);
+    Shell shell(scene, nullptr);
+    // The docks settle over the first frames.
+    for (int frame = 0; frame < 3; ++frame) {
+        frames.Draw(shell);
+    }
+    const auto [origin, size] = shell.Viewport();
+    ImGuiIO& io = ImGui::GetIO();
+    const auto click = [&](float dx) {
+        io.AddMousePosEvent(origin.x + 0.25f * size.x, origin.y + 0.5f * size.y);
+        frames.Draw(shell);
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+        frames.Draw(shell);
+        io.AddMousePosEvent(origin.x + 0.25f * size.x + dx, origin.y + 0.5f * size.y);
+        frames.Draw(shell);
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+        frames.Draw(shell);
+        return shell.TakePick();
+    };
+    const std::optional<Shell::Pick> pick = click(0.0f);
+    ASSERT_TRUE(pick);
+    EXPECT_NEAR(pick->at.x, 0.25f, 0.01f);
+    EXPECT_NEAR(pick->at.y, 0.5f, 0.01f);
+    EXPECT_FALSE(shell.TakePick()) << "taken once";
+    EXPECT_FALSE(click(60.0f)) << "a drag orbits instead";
+
+    shell.Picked(Path("/World/Lamp"), false);
+    shell.Picked(Path("/World/Rover"), true);
+    EXPECT_EQ(shell.Selected().Paths(),
+              (std::vector<Path>{Path("/World/Lamp"), Path("/World/Rover")}));
+    shell.Picked(std::nullopt, false);
+    EXPECT_TRUE(shell.Selected().Empty()) << "a click on nothing clears";
+}
+
 TEST(Shell, OpensAndSavesSceneFiles) {
     Scene scene;
     Build(scene);

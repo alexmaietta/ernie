@@ -164,5 +164,39 @@ TEST_F(Geometries, EditsCostWhatTheyChange) {
     EXPECT_TRUE(Has(changes.freed, capsule));
 }
 
+TEST_F(Geometries, MeshesGivenTheSameArraysShareOneGeometry) {
+    // Two copies drawing the quad's own arrays, as copies authored from one set of tensors do.
+    const std::array copies{scene_.Define("/CopyA", "Mesh"), scene_.Define("/CopyB", "Mesh")};
+    for (const PrimId copy : copies) {
+        for (const char* attribute : {"points", "faceVertexCounts", "faceVertexIndices"}) {
+            scene_.Write(copy, attribute, *scene_.Read(mesh_, attribute));
+        }
+    }
+    GeometryPool::Changes changes = Update();
+    const GeometryId quad = geometry_->Find(mesh_)->geometry;
+    EXPECT_EQ(geometry_->Find(copies[0])->geometry, quad);
+    EXPECT_EQ(geometry_->Find(copies[1])->geometry, quad);
+    EXPECT_EQ(std::ranges::count_if(changes.rebuilt,
+                                    [&](GeometryId id) {
+                                        return geometry_->Get(id).kind == GeometryKind::Triangles;
+                                    }),
+              1)
+        << "one bottom level for all three";
+
+    // A copy given points of its own leaves the shared geometry, which the others keep.
+    WriteQuad(scene_, copies[0], 2.0f);
+    changes = Update();
+    const GeometryId own = geometry_->Find(copies[0])->geometry;
+    EXPECT_NE(own, quad);
+    EXPECT_TRUE(Has(changes.rebuilt, own));
+    EXPECT_EQ(geometry_->Find(copies[1])->geometry, quad);
+
+    // The shared geometry is freed only with its last prim.
+    scene_.Remove("/Quad");
+    EXPECT_FALSE(Has(Update().freed, quad));
+    scene_.Remove("/CopyB");
+    EXPECT_TRUE(Has(Update().freed, quad));
+}
+
 }  // namespace
 }  // namespace ernie

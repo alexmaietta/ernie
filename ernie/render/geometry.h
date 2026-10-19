@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 namespace ernie {
@@ -67,6 +68,8 @@ struct PrimGeometry {
 
 /// @brief The scene's gprims as device geometry. Implicit shapes share one unit geometry a kind
 /// (capsules one each, as their caps stay round), so a thousand spheres need one bottom level.
+/// Meshes given the same point and face arrays share a geometry too, as a thousand copies of a
+/// robot authored from one set of tensors do; a mesh given arrays of its own leaves it.
 /// Updates follow the scene's changes and cost what changed: new points of the same count are
 /// rewritten in place for a refit, new topology is a rebuild, and shape attributes change only
 /// the prim's shape transform.
@@ -113,9 +116,31 @@ class GeometryPool {
     }
 
   private:
+    /// The arrays a mesh draws, by their storage: meshes given the same tensors, shared rather
+    /// than copied as `Scene::Write` keeps them, draw the same geometry.
+    struct MeshArrays {
+        const void* points = nullptr;
+        const void* counts = nullptr;
+        const void* indices = nullptr;
+        std::int64_t vertices = 0;
+        bool operator==(const MeshArrays&) const = default;
+    };
+    struct MeshArraysHash {
+        std::size_t operator()(const MeshArrays& arrays) const;
+    };
+
     /// Places a prim: its geometry, built or shared, its shape transform and its colour. A mesh's
     /// points are uploaded when it is new or `points`, its triangles when `topology`.
     void Place(PrimId prim, bool points, bool topology, Changes& changes);
+    /// @return The geometry of a mesh: the one its arrays already draw, or one made for them.
+    /// @param known The geometry it drew before, if any.
+    GeometryId PlaceMesh(PrimId prim, std::optional<GeometryId> known, bool points, bool topology,
+                         Changes& changes);
+    MeshArrays ReadMeshArrays(PrimId prim) const;
+    /// @return A geometry drawing `arrays`, shared with the meshes already drawing them.
+    GeometryId AcquireMesh(PrimId prim, const MeshArrays& arrays, Changes& changes);
+    /// Drops a prim's use of a mesh geometry, freeing it with its last.
+    void ReleaseMesh(GeometryId geometry, Changes& changes);
     /// @return The unit shape geometry of a kind, made the first time it is asked for.
     GeometryId UnitShape(GeometryKind kind);
     /// @return A new or recycled geometry id.
@@ -138,6 +163,10 @@ class GeometryPool {
     /// What each prim draws, by its id's slot.
     std::vector<std::optional<PrimGeometry>> prims_;
     std::vector<std::optional<GeometryId>> unitShapes_;
+    /// Mesh geometries by the arrays they draw, and each one's arrays and prims drawing it.
+    std::unordered_map<MeshArrays, GeometryId, MeshArraysHash> meshes_;
+    std::vector<MeshArrays> meshArrays_;
+    std::vector<std::uint32_t> meshUsers_;
     /// The records' host copies, and the geometries whose records changed.
     std::vector<GeometryRecord> hostRecords_;
     std::vector<std::uint32_t> dirtyRecords_;

@@ -41,6 +41,10 @@ struct View {
     uint first;
     /// The batch world it sees: its prims and every world's shared ones.
     uint world;
+    /// Metres along the view axis to the near and far clipping planes, UsdGeomCamera's
+    /// `clippingRange`: nothing nearer or farther is seen.
+    float near;
+    float far;
     /// Per pixel, row by row: the hit distance (infinity for none), the world normal's x, y and
     /// z, the instance row, the prim's slot, `kBands` albedo bands, and the colour image's RGBA8
     /// bytes; each null for no output.
@@ -81,8 +85,10 @@ Spectrum Shade(Spectrum albedo, float3 normal, no_diff float3 direction) {
 /// @return A view's ray through the middle of a pixel, from the camera's pose `toWorld`.
 RayDesc PixelRay(View view, float3x4 toWorld, uint2 pixel) {
     LensRay ray = Unproject(view.lens, float2(pixel) + 0.5);
-    return { mul(toWorld, float4(ray.origin, 1)), 0,
-             normalize(mul(toWorld, float4(ray.direction, 0))), 1e30 };
+    // The clipping planes are across the view axis: a ray off axis reaches them farther along.
+    float along = max(-ray.direction.z, 1e-6);
+    return { mul(toWorld, float4(ray.origin, 1)), view.near / along,
+             normalize(mul(toWorld, float4(ray.direction, 0))), view.far / along };
 }
 
 /// @return A view's camera to world: its node's world, or its own rows.

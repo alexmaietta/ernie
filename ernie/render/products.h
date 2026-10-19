@@ -23,6 +23,8 @@ struct ProductSpec {
     std::uint32_t world = 0;
     glm::uvec2 size{1};
     Lens lens;
+    /// Its camera's `clippingRange`: metres to the near and far planes.
+    glm::vec2 clipping{0.0f, 1e30f};
     /// Its vars' source names, in order.
     std::vector<std::string> vars;
 };

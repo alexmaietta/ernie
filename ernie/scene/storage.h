@@ -309,6 +309,8 @@ class PrimStore {
     void Move(PrimId prim, BucketId bucket);
 
     bool Alive(PrimId prim) const;
+    /// @return The live prim in a slot, as a render's PrimId output names it; none for a free one.
+    std::optional<PrimId> PrimAtSlot(std::uint32_t slot) const;
     std::optional<PrimId> Find(PathId path) const;
     PathId PrimPath(PrimId prim) const {
         return Slot(prim).path;

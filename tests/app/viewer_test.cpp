@@ -107,6 +107,37 @@ TEST(Viewer, TracesTheSceneIntoTheViewport) {
     test::ExpectClean(viewer->Context());
 }
 
+TEST(Viewer, ClickingTheViewportSelectsWhatItShows) {
+    Scene scene;
+    const PrimId ball = scene.Define("/Ball", "Sphere");
+    scene.Set(ball, "radius", 2.0);
+    ViewerOptions options{.size = {320, 240}, .offscreen = true, .frames = 2, .validation = true};
+    const std::unique_ptr<Viewer> viewer = MakeViewer(scene, options);
+    if (!viewer) {
+        GTEST_SKIP() << "No Vulkan device";
+    }
+    if (!viewer->Context().Capabilities().rayQuery) {
+        GTEST_SKIP() << viewer->Context().Info().name << " has no ray queries";
+    }
+    viewer->Run();
+    const auto [origin, size] = viewer->GetShell().Viewport();
+    ImGuiIO& io = ImGui::GetIO();
+    // Each run past the frame count draws one more frame.
+    const auto clickAt = [&](float x, float y) {
+        io.AddMousePosEvent(origin.x + x * size.x, origin.y + y * size.y);
+        viewer->Run();
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+        viewer->Run();
+        io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+        viewer->Run();
+    };
+    clickAt(0.5f, 0.5f);
+    EXPECT_EQ(viewer->GetShell().Selected().Paths(), std::vector<Path>{Path("/Ball")});
+    clickAt(0.9f, 0.15f);
+    EXPECT_TRUE(viewer->GetShell().Selected().Empty()) << "the background clears it";
+    test::ExpectClean(viewer->Context());
+}
+
 #if ERNIE_VIEWER_WINDOW
 TEST(Viewer, OpensOnTheLogTab) {
     Scene scene;

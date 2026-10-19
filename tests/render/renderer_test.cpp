@@ -91,7 +91,11 @@ void DefineSphereAhead(Scene& scene) {
 /// @brief Defines a camera at `eye` looking along +y, its film `aperture` metres across and down.
 void DefineCamera(Scene& scene, const Path& path, const glm::dvec3& eye,
                   glm::dvec2 aperture = {0.02, 0.02}) {
-    Camera::Define(scene, path).SetHorizontalAperture(aperture.x).SetVerticalAperture(aperture.y);
+    // Seeing from a centimetre out, nearer than USD's 1 m default.
+    Camera::Define(scene, path)
+        .SetHorizontalAperture(aperture.x)
+        .SetVerticalAperture(aperture.y)
+        .SetClippingRange({0.01, 1e6});
     scene.Set(path, tokens::kTransform,
               LookAtTransform(eye, eye + glm::dvec3(0.0, 1.0, 0.0), {0.0, 0.0, 1.0}));
 }

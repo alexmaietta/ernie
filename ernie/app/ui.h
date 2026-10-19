@@ -170,9 +170,10 @@ std::unique_ptr<Panel> MakeStagePanel(const Scene& scene, Selection& selection);
 /// Stage panel lists for it. Empty for an empty filter, which lists everything.
 std::unordered_set<Path> StageMatches(const Scene& scene, std::string_view filter);
 
-/// @return The Properties panel: the first selected prim's type, APIs, bounds and authored
-/// attributes, read-only.
-std::unique_ptr<Panel> MakePropertiesPanel(const Scene& scene, const Selection& selection);
+/// @return The Properties panel: the first selected prim's schemas and their attributes, edited
+/// through `history` as one undo step an edit, a drag one step; failures go to `log`.
+std::unique_ptr<Panel> MakePropertiesPanel(Scene& scene, const Selection& selection,
+                                           EditHistory& history, MessageLog& log);
 
 /// @return The Info panel: the scene's prims by type and bounds, and the frame time, the device's
 /// memory budget and the bytes it has moved.
@@ -385,6 +386,19 @@ class Shell {
     /// @throws std::runtime_error as `SaveSceneFile`.
     void SaveScene(const std::filesystem::path& path);
 
+    /// @brief A click over the viewport asking what is under it.
+    struct Pick {
+        /// Where, as fractions of the viewport's width and height from its top-left corner.
+        glm::vec2 at{0.0f};
+        /// Ctrl held: the prim joins or leaves the selection instead of replacing it.
+        bool toggle = false;
+    };
+    /// @return This frame's pick, once; none when nothing was clicked.
+    std::optional<Pick> TakePick();
+    /// @brief Selects what a pick found: the prim, or nothing, which clears the selection unless
+    /// toggling.
+    void Picked(const std::optional<Path>& path, bool toggle);
+
   private:
     /// @brief What the menus and shortcuts ask for this frame.
     struct MenuChoices {
@@ -403,7 +417,6 @@ class Shell {
     struct Windows {
         bool controls = false;
         bool about = false;
-        bool demo = false;
         /// Asking for a scene file to open or to save to.
         bool open = false;
         bool save = false;
@@ -445,6 +458,7 @@ class Shell {
     bool selectLog_ = false;
     /// Whether a mouse drag that started over the viewport moves the camera.
     bool dragging_ = false;
+    std::optional<Pick> pick_;
     /// The heads-up display's lines, refreshed a few times a second so they stay readable.
     std::string hud_;
     double hudRefreshed_ = -1.0;

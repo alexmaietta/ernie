@@ -12,6 +12,7 @@
 #include "ernie/scene/scene.h"
 #include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/render.h"
+#include "ernie/scene/tokens.h"
 #include "ernie/util/file.h"
 #include "ernie/util/on_failure.h"
 #include "ernie/util/profiler.h"
@@ -297,14 +298,102 @@ std::string AttributeText(const Scene& scene, PrimId prim, const std::string& at
 
 /// @brief After Omniverse Kit's Property window, read-only: the first selected prim's path, type,
 /// API schemas and bounds, then its authored attributes.
+/// @return The edited value when the editor of a declared attribute changed it this frame.
+/// Numbers drag, or slide within the declaration's range; colours pick; tokens with options
+/// choose; texts and relationships commit on Enter; arrays and matrices show only.
+std::optional<Value> EditValue(const AttributeDef& def, const Value& value) {
+    const auto drag = [&](ImGuiDataType type, void* data, int components) {
+        const bool ranged = def.meta.min < def.meta.max;
+        return ranged ? ImGui::SliderScalarN("##v", type, data, components, &def.meta.min,
+                                             &def.meta.max)
+                      : ImGui::DragScalarN("##v", type, data, components, 0.01f);
+    };
+    switch (def.type) {
+    case ColumnType::Bool: {
+        bool on = value.Get<bool>() != nullptr && *value.Get<bool>();
+        return ImGui::Checkbox("##v", &on) ? std::optional<Value>(on) : std::nullopt;
+    }
+    case ColumnType::Int: {
+        double number = value.Get<int>() != nullptr ? *value.Get<int>() : 0.0;
+        return drag(ImGuiDataType_Double, &number, 1)
+                   ? std::optional<Value>(static_cast<int>(std::lround(number)))
+                   : std::nullopt;
+    }
+    case ColumnType::Double: {
+        double number = value.Get<double>() != nullptr ? *value.Get<double>() : 0.0;
+        return drag(ImGuiDataType_Double, &number, 1) ? std::optional<Value>(number) : std::nullopt;
+    }
+    case ColumnType::Vec2:
+    case ColumnType::Vec3:
+    case ColumnType::Vec4: {
+        glm::dvec4 v(0.0);
+        const int n = def.type == ColumnType::Vec2 ? 2 : def.type == ColumnType::Vec3 ? 3 : 4;
+        if (const auto* v2 = value.Get<glm::dvec2>()) {
+            v = glm::dvec4(*v2, 0.0, 0.0);
+        } else if (const auto* v3 = value.Get<glm::dvec3>()) {
+            v = glm::dvec4(*v3, 0.0);
+        } else if (const auto* v4 = value.Get<glm::dvec4>()) {
+            v = *v4;
+        }
+        bool changed = false;
+        if (def.meta.color && n >= 3) {
+            glm::vec4 colour(v);
+            changed =
+                n == 3
+                    ? ImGui::ColorEdit3("##v", glm::value_ptr(colour), ImGuiColorEditFlags_Float)
+                    : ImGui::ColorEdit4("##v", glm::value_ptr(colour), ImGuiColorEditFlags_Float);
+            v = glm::dvec4(colour);
+        } else {
+            changed = drag(ImGuiDataType_Double, glm::value_ptr(v), n);
+        }
+        if (!changed) {
+            return std::nullopt;
+        }
+        return n == 2 ? Value(glm::dvec2(v)) : n == 3 ? Value(glm::dvec3(v)) : Value(v);
+    }
+    case ColumnType::TokenValue: {
+        const std::string current =
+            value.Get<std::string>() != nullptr ? *value.Get<std::string>() : std::string();
+        if (!def.meta.options.empty()) {
+            std::optional<Value> chosen;
+            if (ImGui::BeginCombo("##v", current.c_str())) {
+                for (const std::string_view option : def.meta.options) {
+                    if (ImGui::Selectable(std::string(option).c_str(), option == current)) {
+                        chosen = std::string(option);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            return chosen;
+        }
+        std::string text = current;
+        return ImGui::InputText("##v", &text, ImGuiInputTextFlags_EnterReturnsTrue)
+                   ? std::optional<Value>(text)
+                   : std::nullopt;
+    }
+    case ColumnType::Relationship: {
+        std::string text = value.Get<Path>() != nullptr ? value.Get<Path>()->String() : "";
+        return ImGui::InputTextWithHint("##v", "No target", &text,
+                                        ImGuiInputTextFlags_EnterReturnsTrue)
+                   ? std::optional<Value>(text.empty() ? Path() : Path(text))
+                   : std::nullopt;
+    }
+    default:
+        return std::nullopt;
+    }
+}
+
+/// After Ernie 1's Properties panel: the first selected prim's schemas, a section each, their
+/// attributes grouped and edited through the undo history, authored ones in the accent colour.
 class PropertiesPanel final : public Panel {
   public:
-    PropertiesPanel(const Scene& scene, const Selection& selection)
-        : Panel("Properties", Dock::RightLower), scene_(scene), selection_(selection) {}
+    PropertiesPanel(Scene& scene, const Selection& selection, EditHistory& history, MessageLog& log)
+        : Panel("Properties", Dock::RightLower), scene_(scene), selection_(selection),
+          history_(history), log_(log) {}
 
     void Draw() override {
         if (selection_.Empty() || !scene_.Has(selection_.Paths().front())) {
-            ImGui::TextDisabled("Select a prim in the Stage.");
+            ImGui::TextDisabled("Select a prim in the Stage or the viewport.");
             return;
         }
         const Path& path = selection_.Paths().front();
@@ -313,37 +402,141 @@ class PropertiesPanel final : public Panel {
         ImGui::InputTextWithHint("##search", "Search", search_.data(), search_.size());
         LabelValue("Path", path.String());
         LabelValue("Type", TypeLabel(scene_.TypeName(prim)));
-        if (const std::vector<std::string> apis = scene_.AppliedApis(prim); !apis.empty()) {
-            LabelValue("API schemas", Join(apis, ", "));
-        }
         LabelValue("World bounds", BoxText(scene_.WorldBounds(path)));
         if (const std::size_t selected = selection_.Paths().size(); selected > 1) {
             ImGui::TextDisabled("The first of %zu selected.", selected);
         }
-        constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
-                                           ImGuiTableFlags_Resizable |
-                                           ImGuiTableFlags_BordersInnerV;
-        if (!ImGui::BeginTable("##attributes", 2, kFlags)) {
-            return;
-        }
-        ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("Attribute");
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableHeadersRow();
-        const std::string wanted = ToLower(search_.data());
-        for (const std::string& attribute : scene_.Attributes(path)) {
-            if (ToLower(attribute).find(wanted) == std::string::npos) {
-                continue;
+        if (const SchemaDef* schema = scene_.Schema(prim)) {
+            DrawSchema(path, prim, schema->name, schema->AllAttributes(), {});
+            for (const std::string_view api : schema->AllBuiltinApis()) {
+                DrawApi(path, prim, api);
             }
-            ImGui::TableNextRow();
-            TableTexts({attribute, AttributeText(scene_, prim, attribute)});
         }
-        ImGui::EndTable();
+        for (const std::string& api : scene_.AppliedApis(prim)) {
+            DrawApi(path, prim, api);
+        }
+        DrawUndeclared(path, prim);
     }
 
   private:
-    const Scene& scene_;
+    void DrawApi(const Path& path, PrimId prim, std::string_view api) {
+        const ApiName name = ApiName::Parse(api);
+        DrawSchema(path, prim, api, name.schema->AllAttributes(), name);
+    }
+
+    /// Draws a schema's attributes in its section, a table a group.
+    void DrawSchema(const Path& path, PrimId prim, std::string_view title,
+                    const std::vector<const AttributeDef*>& attributes, const ApiName& api) {
+        const std::string wanted = ToLower(search_.data());
+        std::map<std::string_view, std::vector<std::pair<const AttributeDef*, std::string>>> groups;
+        for (const AttributeDef* def : attributes) {
+            std::string name =
+                api.schema != nullptr ? api.Attribute(def->name) : std::string(def->name);
+            if (ToLower(name).find(wanted) != std::string::npos) {
+                groups[def->meta.group.empty() ? "Attributes" : def->meta.group].emplace_back(
+                    def, std::move(name));
+            }
+        }
+        if (groups.empty() ||
+            !ImGui::CollapsingHeader(std::string(title).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            return;
+        }
+        for (const auto& [group, defs] : groups) {
+            ImGui::SeparatorText(std::string(group).c_str());
+            if (!ImGui::BeginTable(("##" + std::string(title) + std::string(group)).c_str(), 2,
+                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV)) {
+                continue;
+            }
+            ImGui::TableSetupColumn("Attribute", ImGuiTableColumnFlags_WidthFixed,
+                                    11.0f * ImGui::GetFontSize());
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            for (const auto& [def, name] : defs) {
+                DrawAttribute(path, prim, *def, name);
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    void DrawAttribute(const Path& path, PrimId prim, const AttributeDef& def,
+                       const std::string& name) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        const bool authored = scene_.IsAuthored(prim, name);
+        const std::string_view label = def.meta.label.empty() ? def.name : def.meta.label;
+        if (authored) {
+            ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_TextLink), "%.*s",
+                               static_cast<int>(label.size()), label.data());
+        } else {
+            ImGui::Text("%.*s", static_cast<int>(label.size()), label.data());
+        }
+        if (ImGui::BeginItemTooltip()) {
+            ImGui::Text("%s", name.c_str());
+            ImGui::TextDisabled("%.*s", static_cast<int>(def.meta.doc.size()), def.meta.doc.data());
+            ImGui::EndTooltip();
+        }
+        ImGui::PushID(name.c_str());
+        if (ImGui::BeginPopupContextItem("##reset")) {
+            if (ImGui::MenuItem("Reset to Fallback", nullptr, false, authored)) {
+                Attempt([&] { history_.Clear(scene_, path, name); });
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::TableNextColumn();
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        const std::optional<Value> value = scene_.GetOrFallback(prim, name);
+        const std::optional<Value> edited = value ? EditValue(def, *value) : std::nullopt;
+        if (edited) {
+            // A drag's frames merge into one step, closed once the editor lets go.
+            Attempt([&] { history_.Set(scene_, path, name, *edited, ImGui::IsItemActive()); });
+        } else if (!value || !EditableType(def.type)) {
+            ImGui::TextDisabled("%s", AttributeText(scene_, prim, name).c_str());
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            history_.Close();
+        }
+        ImGui::PopID();
+    }
+
+    /// Lists authored attributes no schema declares, as transform ops are, read-only.
+    void DrawUndeclared(const Path& path, PrimId prim) {
+        std::vector<std::string> undeclared;
+        for (const std::string& name : scene_.Attributes(path)) {
+            if (scene_.Declaration(prim, name) == nullptr &&
+                !name.starts_with(tokens::kResolvedPrefix)) {
+                undeclared.push_back(name);
+            }
+        }
+        if (undeclared.empty() ||
+            !ImGui::CollapsingHeader("Other", ImGuiTreeNodeFlags_DefaultOpen)) {
+            return;
+        }
+        if (ImGui::BeginTable("##other", 2,
+                              ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV)) {
+            for (const std::string& name : undeclared) {
+                ImGui::TableNextRow();
+                TableTexts({name, AttributeText(scene_, prim, name)});
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    static bool EditableType(ColumnType type) {
+        return type <= ColumnType::Vec4 || type == ColumnType::TokenValue ||
+               type == ColumnType::Relationship;
+    }
+
+    template <typename Edit> void Attempt(Edit&& edit) {
+        try {
+            edit();
+        } catch (const std::exception& error) {
+            log_.Error(error.what());
+        }
+    }
+
+    Scene& scene_;
     const Selection& selection_;
+    EditHistory& history_;
+    MessageLog& log_;
     std::array<char, 128> search_{};
 };
 
@@ -875,8 +1068,9 @@ std::unique_ptr<Panel> MakeStagePanel(const Scene& scene, Selection& selection) 
     return std::make_unique<StagePanel>(scene, selection);
 }
 
-std::unique_ptr<Panel> MakePropertiesPanel(const Scene& scene, const Selection& selection) {
-    return std::make_unique<PropertiesPanel>(scene, selection);
+std::unique_ptr<Panel> MakePropertiesPanel(Scene& scene, const Selection& selection,
+                                           EditHistory& history, MessageLog& log) {
+    return std::make_unique<PropertiesPanel>(scene, selection, history, log);
 }
 
 std::unique_ptr<Panel> MakeInfoPanel(const Scene& scene, const DeviceContext* device) {
@@ -1230,7 +1424,7 @@ Shell::Shell(Scene& scene, const DeviceContext* device, const ShellOptions& opti
     : scene_(scene), device_(device), theme_(options.theme), sizes_(options.docks) {
     // Stage above Properties on the right; Log, Info, Devices and Profiler tabbed at the bottom.
     panels_.push_back(MakeStagePanel(scene, selection_));
-    panels_.push_back(MakePropertiesPanel(scene, selection_));
+    panels_.push_back(MakePropertiesPanel(scene, selection_, history_, log_));
     panels_.push_back(MakeLogPanel(log_, theme_));
     panels_.push_back(MakeInfoPanel(scene, device));
     panels_.push_back(MakeDevicePanel(device));
@@ -1269,9 +1463,6 @@ void Shell::Draw() {
         ERNIE_ZONE("Draw the windows");
         DrawControlsWindow(windows_.controls);
         DrawAboutWindow(windows_.about, device_ != nullptr ? device_->Info().name : "");
-        if (windows_.demo) {
-            ImGui::ShowDemoWindow(&windows_.demo);
-        }
         DrawFileWindow();
     }
     TakeShortcuts();
@@ -1382,6 +1573,12 @@ void Shell::Navigate() {
                          io.MousePos.y >= origin.y && io.MousePos.x < origin.x + size.x &&
                          io.MousePos.y < origin.y + size.y;
     const auto any = [](auto&& test) { return std::ranges::any_of(kMouseButtons, test); };
+    // A left click that does not move picks what is under it.
+    if (dragging_ && ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+        !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
+        const glm::vec2 at(io.MousePos.x - origin.x, io.MousePos.y - origin.y);
+        pick_ = Pick{.at = at / glm::vec2(size.x, size.y), .toggle = io.KeyCtrl};
+    }
     if (!any([](ImGuiMouseButton button) { return ImGui::IsMouseDown(button); })) {
         dragging_ = false;
     } else if (hovered &&
@@ -1473,7 +1670,6 @@ void Shell::DrawMenuBar() {
         }
         ImGui::Separator();
         choices_.resetLayout |= MenuAction("Reset Layout");
-        MenuCheck("ImGui Demo", windows_.demo);
     });
     Menu("Help", [&] { DrawHelpMenu(); });
     ImGui::EndMainMenuBar();
@@ -1692,6 +1888,20 @@ void Shell::OpenScene(const std::filesystem::path& path) {
     selection_.Clear();
     log_.Info("Opened " + path.string());
     Frame();
+}
+
+std::optional<Shell::Pick> Shell::TakePick() {
+    return std::exchange(pick_, std::nullopt);
+}
+
+void Shell::Picked(const std::optional<Path>& path, bool toggle) {
+    if (path && toggle) {
+        selection_.Toggle(*path);
+    } else if (path) {
+        selection_.Set(*path);
+    } else if (!toggle) {
+        selection_.Clear();
+    }
 }
 
 void Shell::SaveScene(const std::filesystem::path& path) {

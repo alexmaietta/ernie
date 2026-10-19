@@ -203,6 +203,76 @@ void GeometryPool::Free(GeometryId id, Changes& changes) {
     changes.freed.push_back(id);
 }
 
+std::size_t GeometryPool::MeshArraysHash::operator()(const MeshArrays& arrays) const {
+    std::size_t hash = std::hash<const void*>()(arrays.points);
+    for (const std::size_t part :
+         {std::hash<const void*>()(arrays.counts), std::hash<const void*>()(arrays.indices),
+          std::hash<std::int64_t>()(arrays.vertices)}) {
+        hash ^= part + 0x9e3779b97f4a7c15ull + (hash << 6) + (hash >> 2);
+    }
+    return hash;
+}
+
+GeometryPool::MeshArrays GeometryPool::ReadMeshArrays(PrimId prim) const {
+    const auto data = [&](std::string_view attribute) -> const void* {
+        const Tensor* tensor = scene_.Read(prim, attribute);
+        return tensor != nullptr ? tensor->Data() : nullptr;
+    };
+    const Tensor* points = scene_.Read(prim, Mesh::kPoints);
+    return {.points = data(Mesh::kPoints),
+            .counts = data(Mesh::kFaceVertexCounts),
+            .indices = data(Mesh::kFaceVertexIndices),
+            .vertices = points != nullptr ? points->Elements() : 0};
+}
+
+GeometryId GeometryPool::PlaceMesh(PrimId prim, std::optional<GeometryId> known, bool points,
+                                   bool topology, Changes& changes) {
+    const MeshArrays arrays = ReadMeshArrays(prim);
+    if (known && meshArrays_[*known] == arrays) {
+        // Its arrays edited in place: every mesh sharing them sees the edit.
+        if (points || topology) {
+            UploadMesh(prim, *known, topology, changes);
+        }
+        return *known;
+    }
+    if (known && meshUsers_[*known] == 1 && !meshes_.contains(arrays)) {
+        // Its own geometry follows its new arrays, refitted when only the points moved.
+        const MeshArrays& before = meshArrays_[*known];
+        const bool faces = before.counts != arrays.counts || before.indices != arrays.indices;
+        meshes_.erase(before);
+        meshArrays_[*known] = arrays;
+        meshes_.emplace(arrays, *known);
+        UploadMesh(prim, *known, topology || faces, changes);
+        return *known;
+    }
+    if (known) {
+        ReleaseMesh(*known, changes);
+    }
+    return AcquireMesh(prim, arrays, changes);
+}
+
+GeometryId GeometryPool::AcquireMesh(PrimId prim, const MeshArrays& arrays, Changes& changes) {
+    if (const auto found = meshes_.find(arrays); found != meshes_.end()) {
+        ++meshUsers_[found->second];
+        return found->second;
+    }
+    const GeometryId id = Allocate({.kind = GeometryKind::Triangles});
+    meshArrays_.resize(geometries_.size());
+    meshUsers_.resize(geometries_.size());
+    meshArrays_[id] = arrays;
+    meshUsers_[id] = 1;
+    meshes_.emplace(arrays, id);
+    UploadMesh(prim, id, true, changes);
+    return id;
+}
+
+void GeometryPool::ReleaseMesh(GeometryId geometry, Changes& changes) {
+    if (--meshUsers_[geometry] == 0) {
+        meshes_.erase(meshArrays_[geometry]);
+        Free(geometry, changes);
+    }
+}
+
 void GeometryPool::UploadBox(const Geometry& geometry, const glm::vec3& low,
                              const glm::vec3& high) {
     const std::array<float, 6> box{low.x, low.y, low.z, high.x, high.y, high.z};
@@ -280,10 +350,8 @@ void GeometryPool::Place(PrimId prim, bool points, bool topology, Changes& chang
     const bool drew = known && draws(placed->geometry);
     PrimGeometry next{.prim = prim};
     if (*kind == GeometryKind::Triangles) {
-        next.geometry = known ? placed->geometry : Allocate({.kind = GeometryKind::Triangles});
-        if (!known || points || topology) {
-            UploadMesh(prim, next.geometry, topology || !known, changes);
-        }
+        next.geometry = PlaceMesh(prim, known ? std::optional(placed->geometry) : std::nullopt,
+                                  points, topology, changes);
     } else if (*kind == GeometryKind::Capsule) {
         const double radius = RequireNumber(scene_, prim, Capsule::kRadius);
         const auto halfLength =
@@ -329,8 +397,9 @@ GeometryPool::Changes GeometryPool::Update() {
     for (const PrimId prim : followed.removed) {
         if (const std::optional<PrimGeometry> placed = Find(prim)) {
             const Geometry& geometry = geometries_[placed->geometry];
-            if (geometry.kind == GeometryKind::Triangles ||
-                geometry.kind == GeometryKind::Capsule) {
+            if (geometry.kind == GeometryKind::Triangles) {
+                ReleaseMesh(placed->geometry, changes);
+            } else if (geometry.kind == GeometryKind::Capsule) {
                 Free(placed->geometry, changes);
             }
             prims_[prim.slot].reset();

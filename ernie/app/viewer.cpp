@@ -178,6 +178,10 @@ bool Viewer::Step() {
                                       {}, target->semaphores);
         }
         inFlight_.push_back(drawn);
+        if (const std::optional<Shell::Pick> pick = shell_->TakePick()) {
+            ERNIE_ZONE("Pick");
+            Pick(*pick, drawn);
+        }
         ERNIE_ZONE("Present");
         presenter_->Present(drawn);
     }
@@ -216,7 +220,25 @@ void Viewer::ResizeViewport(glm::uvec2 pixels) {
     viewportTexture_ = renderer_->AddTexture(viewport_->View(), sampler_->Handle());
     if (heap_) {
         viewportImage_ = heap_->AddStorageImage(*viewport_);
+        prims_ = std::make_unique<DeviceColumn>(*arenas_, "viewport prims", DType::UInt32,
+                                                std::vector<std::int64_t>{},
+                                                std::uint64_t{pixels.x} * pixels.y);
     }
+}
+
+void Viewer::Pick(const Shell::Pick& pick, const Ticket& drawn) {
+    if (!prims_) {
+        return;
+    }
+    const glm::uvec2 size(viewport_->Description().extent);
+    const glm::uvec2 pixel = glm::min(glm::uvec2(pick.at * glm::vec2(size)), size - 1u);
+    const std::uint64_t at = std::uint64_t{pixel.y} * size.x + pixel.x;
+    Readback readback(*context_, context_->Main(), prims_->Storage(),
+                      prims_->Range().offset + at * sizeof(std::uint32_t), sizeof(std::uint32_t),
+                      std::span(&drawn, 1));
+    const std::uint32_t slot = readback.Values<std::uint32_t>().front();
+    const std::optional<PrimId> prim = scene_.Store().PrimAtSlot(slot);
+    shell_->Picked(prim ? std::optional(scene_.PrimPath(*prim)) : std::nullopt, pick.toggle);
 }
 
 graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
@@ -225,7 +247,8 @@ graph::Image Viewer::AddViewportPass(graph::Graph& graph) {
         const OrbitCamera& orbit = shell_->Camera();
         CameraOutputs outputs{.colour = viewport,
                               .colourIndex = viewportImage_,
-                              .background = glm::vec3(shell_->GetTheme().viewport)};
+                              .background = glm::vec3(shell_->GetTheme().viewport),
+                              .prims = graph.Import(*prims_)};
         const glm::uvec2 size(viewport_->Description().extent);
         camera_->Add(graph,
                      {.cameraToWorld = orbit.Transform(),

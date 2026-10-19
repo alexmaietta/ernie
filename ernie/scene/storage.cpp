@@ -77,6 +77,13 @@ bool PrimStore::Alive(PrimId prim) const {
            slots_[prim.slot].generation == prim.generation;
 }
 
+std::optional<PrimId> PrimStore::PrimAtSlot(std::uint32_t slot) const {
+    if (slot >= slots_.size() || !slots_[slot].alive) {
+        return std::nullopt;
+    }
+    return PrimId{slot, slots_[slot].generation};
+}
+
 std::optional<PrimId> PrimStore::Find(PathId path) const {
     if (path >= pathSlots_.size() || pathSlots_[path] == kNoSlot) {
         return std::nullopt;
