@@ -18,6 +18,7 @@ namespace {
 
 using shaders::WriteParameters;
 static_assert(sizeof(shaders::Instance) == sizeof(AccelerationInstance));
+static_assert(shaders::kNoRow == InstanceTable::kNoRow);
 
 std::vector<std::uint32_t> Compile(const ShaderCompiler& compiler) {
     std::vector<ShaderModule> modules(TransformGraph::WorldModules().begin(),
@@ -46,7 +47,7 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
                                         const BottomLevels& bottoms) {
     ERNIE_ZONE("Prepare the top levels");
     const std::span<const InstanceTable::WorldRecords> worlds = instances.Worlds();
-    EnsureCapacity(worlds);
+    EnsureCapacity(worlds, instances.Capacities().instancesPerWorld);
     if (uploader_.Staged()) {
         std::array buffers{graph.Import(*tops_)};
         graph::AddUploadPass(graph, "Upload top levels", uploader_, buffers);
@@ -60,7 +61,8 @@ graph::Acceleration TopLevels::AddBuild(graph::Graph& graph, const TransformGrap
     return AddBuildPass(graph, bottoms, worlds, records);
 }
 
-void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds) {
+void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds,
+                               std::uint32_t declared) {
     // Frames in flight keep the old ones: destroying them retires them.
     structures_.resize(worlds.size());
     hostTops_.resize(worlds.size());
@@ -69,9 +71,12 @@ void TopLevels::EnsureCapacity(std::span<const InstanceTable::WorldRecords> worl
         std::unique_ptr<AccelerationStructure>& top = structures_[world];
         const std::uint32_t count = worlds[world].count;
         const std::uint32_t capacity = top ? top->Sizes().primitives[0] : 0;
-        if (!top || count > capacity || (capacity > 4 && count < capacity / 4)) {
+        const bool resize = declared > 0
+                                ? capacity != declared
+                                : count > capacity || (capacity > 4 && count < capacity / 4);
+        if (!top || resize) {
             top = std::make_unique<AccelerationStructure>(
-                pool_, Sizes(context_, RoundUpCapacity(count), kRebuilt),
+                pool_, Sizes(context_, declared > 0 ? declared : RoundUpCapacity(count), kRebuilt),
                 "world " + std::to_string(world));
         }
         const shaders::TopLevel next{

@@ -9,10 +9,10 @@
 namespace ernie {
 
 DeviceScene::DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
-                         const ShaderCompiler& compiler)
+                         const ShaderCompiler& compiler, WorldCapacities capacities)
     : context_(context), scene_(scene), pool_(context), columns_(context, arenas, scene),
       transforms_(context, arenas, scene, compiler), geometry_(context, arenas, scene),
-      instances_(context, arenas) {
+      instances_(context, arenas, scene, compiler, capacities) {
     if (context.Capabilities().rayQuery) {
         tracer_ = std::make_unique<RayTracer>(context, arenas, compiler, geometry_);
     }

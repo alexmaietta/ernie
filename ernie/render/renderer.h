@@ -29,11 +29,23 @@ class DeviceColumn;
 class DeviceContext;
 struct Ticket;
 
+/// @brief The most a renderer's scene holds, declared up front as batched simulation does: memory
+/// is laid out once, never again as counts move, and a scene beyond it is an error, never cut
+/// short. 0 for as many as there are.
+struct RenderCapacities {
+    std::uint32_t worlds = 0;
+    /// Each world's instances, its own and the shared ones.
+    std::uint32_t instancesPerWorld = 0;
+    /// The products a step renders, a view each.
+    std::uint32_t views = 0;
+};
+
 struct RendererOptions {
     /// The device: its UUID in hex, or part of its name; empty for the best scoring one.
     std::string device;
     /// The Khronos validation layer with synchronization validation, when installed.
     bool validation = false;
+    RenderCapacities capacities;
 };
 
 /// @brief One var of a batch: every view's pixels, stacked on the device.
@@ -74,20 +86,23 @@ class ERNIE_API Renderer {
     /// is submitted. Cameras take their poses from the device's transforms, so poses CUDA writes
     /// move them.
     /// @return The batches, valid until the next step.
-    /// @throws std::invalid_argument as `ReadProducts`.
+    /// @throws std::invalid_argument as `ReadProducts`; std::length_error for a scene beyond the
+    /// declared capacities.
     std::span<const RenderBatch> Step(Scene& scene);
 
     /// @return A var's pixels copied to the host once the last step has rendered them.
     Tensor Read(const RenderVarOutput& var);
 
-    /// @brief Hands a transform op to the device for every prim in `prim`'s bucket (the prims of
-    /// its type and applied schemas), as the device scene's columns bind it: from then on the
-    /// column is what steps read, so CUDA, PyTorch or Warp write poses in place and nothing goes
-    /// through the host. Values the host authors later still overwrite their rows. The op must
-    /// be in the prims' `xformOpOrder`.
+    /// @brief Hands an attribute to the device for every prim in `prim`'s bucket (the prims of its
+    /// type and applied schemas), as the device scene's columns bind it: from then on the column
+    /// is what steps read, so CUDA, PyTorch or Warp write it in place each step, as poses or
+    /// domain randomisation do, and nothing goes through the host. Values the host authors later
+    /// still overwrite their rows. Binds a transform op in the prims' `xformOpOrder`, or
+    /// `primvars:displayColor`.
     /// @return The column, a row a prim in the bucket's row order, in memory CUDA can map.
-    /// @throws std::invalid_argument as `SceneColumns::Bind` and `TransformGraph::Bind`.
-    const DeviceColumn& BindTransformOp(Scene& scene, const Path& prim, std::string_view attribute);
+    /// @throws std::invalid_argument for another attribute, or as `SceneColumns::Bind` and
+    /// `TransformGraph::Bind`.
+    const DeviceColumn& BindColumn(Scene& scene, const Path& prim, std::string_view attribute);
     /// @brief Makes the next step wait on the device for `ticket`, such as CUDA's writes to a
     /// bound column.
     void WaitFor(const Ticket& ticket);

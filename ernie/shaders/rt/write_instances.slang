@@ -13,6 +13,9 @@ import buffer_ref;
 import transform;
 #endif
 
+/// What `sources` holds for a record no instance fills.
+static const uint kNoRow = 0xffffffff;
+
 /// A top level's instance, as Vulkan's VkAccelerationStructureInstanceKHR lays it out.
 struct Instance {
     /// The instance's transform: the geometry's frame to the scene's.
@@ -54,6 +57,13 @@ void main(uint3 id : SV_DispatchThreadID, uniform WriteParameters parameters) {
         return;
     }
     uint row = parameters.sources[record];
+    if (row == kNoRow) {
+        // Past its world's instances: switched off, as the capacity's spare records are.
+        Instance spare = {};
+        spare.bottom = parameters.placeholder;
+        parameters.instances[record] = spare;
+        return;
+    }
     uint geometry = parameters.geometries[row];
     Affine m = Mul(LoadWorld(parameters.worlds, parameters.nodes[row]),
                    Load(parameters.shapes, row));

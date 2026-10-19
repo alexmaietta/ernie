@@ -33,8 +33,9 @@ namespace ernie {
 class DeviceScene {
   public:
     /// @param arenas Where the device columns live; `MemoryUse::Shared` to share them with CUDA.
+    /// @param capacities The worlds and instances a world declared up front, if any.
     DeviceScene(DeviceContext& context, Arenas& arenas, const Scene& scene,
-                const ShaderCompiler& compiler);
+                const ShaderCompiler& compiler, WorldCapacities capacities = {});
     DeviceScene(const DeviceScene&) = delete;
     DeviceScene& operator=(const DeviceScene&) = delete;
 

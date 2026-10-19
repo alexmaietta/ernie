@@ -116,12 +116,19 @@ void BindRender(nb::module_& module) {
                                "rendering the same scene again costs only what changed.")
         .def(
             "__init__",
-            [](PythonRenderer* self, const std::string& device, bool validation) {
-                new (self)
-                    PythonRenderer(RendererOptions{.device = device, .validation = validation});
+            [](PythonRenderer* self, const std::string& device, bool validation,
+               std::uint32_t worlds, std::uint32_t instancesPerWorld, std::uint32_t views) {
+                new (self) PythonRenderer(RendererOptions{
+                    .device = device,
+                    .validation = validation,
+                    .capacities = {
+                        .worlds = worlds, .instancesPerWorld = instancesPerWorld, .views = views}});
             },
             nb::kw_only(), nb::arg("device") = "", nb::arg("validation") = false,
-            "Opens a device that ray traces: by UUID or part of its name, or the best one.")
+            nb::arg("worlds") = 0, nb::arg("instances_per_world") = 0, nb::arg("views") = 0,
+            "Opens a device that ray traces: by UUID or part of its name, or the best one. "
+            "worlds, instances_per_world and views declare the most the scene holds, laid out "
+            "once; a scene beyond them raises. 0 is as many as there are.")
         .def(
             "render",
             [](PythonRenderer& self, Scene& scene) { return ToNumpy(self.renderer.Render(scene)); },
@@ -138,12 +145,12 @@ void BindRender(nb::module_& module) {
             "and vars in one dispatch, and returns the RenderBatches without waiting: their vars "
             "are device columns that torch.from_dlpack views in place, or read() copies.")
         .def(
-            "bind_transform_op",
+            "bind_column",
             [](nb::object self, Scene& scene, const std::string& prim,
                const std::string& attribute) {
                 auto& renderer = nb::cast<PythonRenderer&>(self);
                 const DeviceColumn& bound =
-                    renderer.renderer.BindTransformOp(scene, Path(prim), attribute);
+                    renderer.renderer.BindColumn(scene, Path(prim), attribute);
                 auto* column = new Column(renderer.Pair(), bound, {}, Ticket{});
                 column->keeper = self;
                 nb::object handle = nb::cast(column, nb::rv_policy::take_ownership);
@@ -151,10 +158,10 @@ void BindRender(nb::module_& module) {
                 return handle;
             },
             nb::arg("scene"), nb::arg("prim"), nb::arg("attribute"),
-            "Hands a transform op (such as xformOp:translate) of every prim in the prim's bucket "
-            "to the device: returns its DeviceColumn, a row a prim in the bucket's order, which "
-            "PyTorch or Warp write in place; call ready(stream) after writing, and the next step "
-            "renders the new poses with no copy through the host.");
+            "Hands a transform op (such as xformOp:translate) or primvars:displayColor of every "
+            "prim in the prim's bucket to the device: returns its DeviceColumn, a row a prim in "
+            "the bucket's order, which PyTorch or Warp write in place; call ready(stream) after "
+            "writing, and the next step renders the new values with no copy through the host.");
 }
 
 }  // namespace ernie::python

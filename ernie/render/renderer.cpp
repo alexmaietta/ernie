@@ -10,6 +10,7 @@
 #include "ernie/render/device_scene.h"
 #include "ernie/render/products.h"
 #include "ernie/render/rt/camera_pass.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/scene/schema/render.h"
 #include "ernie/util/profiler.h"
 
@@ -78,6 +79,7 @@ const RenderVarOutput* RenderBatch::Find(std::string_view name) const {
 /// What a renderer keeps on its device.
 struct Renderer::Device {
     ShaderCompiler compiler;
+    RenderCapacities capacities;
     std::unique_ptr<DeviceContext> context;
     /// Where the device scene and outputs live: shared with CUDA where the device can export
     /// memory, so bound columns and outputs map in place.
@@ -105,6 +107,10 @@ struct Renderer::Device {
 };
 
 void Renderer::Device::Plan(const Scene& scene, const std::vector<ProductSpec>& specs) {
+    if (capacities.views > 0 && specs.size() > capacities.views) {
+        throw std::length_error(std::to_string(specs.size()) + " products are more than the " +
+                                std::to_string(capacities.views) + " views declared");
+    }
     const std::vector<std::vector<const ProductSpec*>> groups = GroupProducts(specs);
     std::vector<Batch> planned(groups.size());
     for (std::size_t i = 0; i < groups.size(); ++i) {
@@ -154,6 +160,7 @@ void Renderer::Device::Allocate(Batch& batch, const std::vector<std::string>& va
 
 Renderer::Renderer(const RendererOptions& options) : device_(std::make_unique<Device>()) {
     Device& device = *device_;
+    device.capacities = options.capacities;
     device.context = std::make_unique<DeviceContext>(
         DeviceContextOptions{.validation = options.validation, .device = options.device});
     if (!device.context->Capabilities().rayQuery) {
@@ -179,7 +186,10 @@ DeviceContext& Renderer::Context() {
 DeviceScene& Renderer::Device::Follow(const Scene& scene) {
     if (scene.Id() != sceneId) {
         context->WaitIdle();
-        deviceScene = std::make_unique<DeviceScene>(*context, *arenas, scene, compiler);
+        deviceScene = std::make_unique<DeviceScene>(
+            *context, *arenas, scene, compiler,
+            WorldCapacities{.worlds = capacities.worlds,
+                            .instancesPerWorld = capacities.instancesPerWorld});
         sceneId = scene.Id();
         batches.clear();
         rendered.clear();
@@ -220,12 +230,21 @@ std::span<const RenderBatch> Renderer::Step(Scene& scene) {
     return device.rendered;
 }
 
-const DeviceColumn& Renderer::BindTransformOp(Scene& scene, const Path& prim,
-                                              std::string_view attribute) {
+const DeviceColumn& Renderer::BindColumn(Scene& scene, const Path& prim,
+                                         std::string_view attribute) {
+    const bool colour = attribute == Gprim::kDisplayColor;
+    if (!colour && !attribute.starts_with("xformOp:")) {
+        throw std::invalid_argument(std::string(attribute) +
+                                    " is no transform op or display colour to bind");
+    }
     DeviceScene& deviceScene = device_->Follow(scene);
     const BucketId bucket = scene.Store().PrimBucket(scene.Require(prim));
     const DeviceColumn& column = deviceScene.Columns().Bind(bucket, attribute);
-    deviceScene.Transforms().Bind(bucket, attribute, column);
+    if (colour) {
+        deviceScene.Instances().BindColours(bucket, column);
+    } else {
+        deviceScene.Transforms().Bind(bucket, attribute, column);
+    }
     ++device_->recorded;
     return column;
 }

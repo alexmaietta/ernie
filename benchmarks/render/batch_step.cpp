@@ -25,11 +25,10 @@ namespace ernie::bench {
 namespace {
 
 constexpr int kShapesPerWorld = 8;
-constexpr glm::uvec2 kSize{64, 64};
 
 /// @brief A scene of `worlds` worlds side by side, each with shapes scattered in front of its
-/// camera, and the products rendering every camera's colour and depth.
-void BuildWorlds(Scene& scene, int worlds) {
+/// camera, and the products rendering every camera's colour and depth at `size` pixels.
+void BuildWorlds(Scene& scene, int worlds, glm::uvec2 size) {
     GroundPlane::Define(scene, "/Ground");
     const std::vector<Path> vars{Path("/Render/Vars/Colour"), Path("/Render/Vars/Depth")};
     RenderVar::Define(scene, vars[0]).SetSourceName(std::string(render_vars::kLdrColor));
@@ -58,13 +57,13 @@ void BuildWorlds(Scene& scene, int worlds) {
         products.emplace_back("/Render/View" + std::to_string(world));
         RenderProduct::Define(scene, products.back())
             .SetCamera(camera)
-            .SetResolution(glm::dvec2(kSize))
+            .SetResolution(glm::dvec2(size))
             .SetOrderedVars(vars);
     }
     RenderSettings::Define(scene, "/Render/Settings").SetProducts(products);
 }
 
-Timing StepWorlds(int worlds, double targetMs) {
+Timing StepWorlds(int worlds, glm::uvec2 size, double targetMs) {
     std::unique_ptr<Renderer> renderer;
     try {
         renderer = std::make_unique<Renderer>();
@@ -73,7 +72,7 @@ Timing StepWorlds(int worlds, double targetMs) {
         return {0.0, targetMs};
     }
     Scene scene;
-    BuildWorlds(scene, worlds);
+    BuildWorlds(scene, worlds, size);
     // The first step builds every bottom level; later ones rebuild only the top levels.
     renderer->Step(scene);
     renderer->Context().WaitIdle();
@@ -84,8 +83,10 @@ Timing StepWorlds(int worlds, double targetMs) {
                                   renderer->Step(scene);
                                   renderer->Context().WaitIdle();
                               });
-    std::printf("  %d views of %u x %u: %.0f views a second, %.2f ms submitting, on %s\n", worlds,
-                kSize.x, kSize.y, 1000.0 * worlds / ms, host,
+    const double pixels = static_cast<double>(worlds) * size.x * size.y;
+    std::printf("  %d views of %u x %u: %.0f views, %.2f gigapixels a second, %.2f ms submitting, "
+                "on %s\n",
+                worlds, size.x, size.y, 1000.0 * worlds / ms, pixels / ms / 1e6, host,
                 renderer->Context().Info().name.c_str());
     if (std::getenv("ERNIE_BENCH_PROFILE") != nullptr) {
         profiler::SetEnabled(true);
@@ -105,10 +106,17 @@ Timing StepWorlds(int worlds, double targetMs) {
     return {ms, targetMs};
 }
 
-const bool kBatch1k =
-    Register("render.batch_step.1024_worlds_64x64", [] { return StepWorlds(1024, 5.0); });
-const bool kBatch4k =
-    Register("render.batch_step.4096_worlds_64x64", [] { return StepWorlds(4096, 20.0); });
+/// Registers a step of `worlds` views of `side` x `side` pixels.
+bool RegisterBatch(int worlds, std::uint32_t side, double targetMs) {
+    return Register("render.batch_step." + std::to_string(worlds) + "_worlds_" +
+                        std::to_string(side) + "x" + std::to_string(side),
+                    [=] { return StepWorlds(worlds, glm::uvec2(side), targetMs); });
+}
+
+// Madrona's benchmark resolutions, then beyond, at 1024 worlds; and many worlds at 64 x 64.
+const bool kBatches = RegisterBatch(1024, 64, 5.0) && RegisterBatch(1024, 128, 15.0) &&
+                      RegisterBatch(1024, 256, 50.0) && RegisterBatch(1024, 512, 200.0) &&
+                      RegisterBatch(4096, 64, 20.0);
 
 }  // namespace
 }  // namespace ernie::bench

@@ -103,7 +103,7 @@ def test_pytorch_poses_move_what_a_step_renders(context):
         renderer = ernie.Renderer(device=context.uuid)
     except RuntimeError as error:
         pytest.skip(str(error))
-    translates = renderer.bind_transform_op(scene, "/World/A", "xformOp:translate")
+    translates = renderer.bind_column(scene, "/World/A", "xformOp:translate")
     rows = scene.bucket_paths("/World/A")
     assert sorted(rows) == ["/World/A", "/World/B"] and translates.shape == [2, 3]
 

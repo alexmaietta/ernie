@@ -8,6 +8,7 @@ ernie_add_shaders(
     rt/ray_tracer.slang
     rt/write_instances.slang
     scene/geometry.slang
+    scene/instance_colours.slang
     scene/shapes.slang
     scene/transform.slang
     sensors/camera.slang

@@ -26,12 +26,13 @@ namespace {
 
 /// @return A renderer, or none without a device that ray traces; no Vulkan at all fails where CI
 /// requires it.
-std::unique_ptr<Renderer> MakeRenderer() {
+std::unique_ptr<Renderer> MakeRenderer(RenderCapacities capacities = {}) {
     const std::unique_ptr<DeviceContext> probe = test::MakeContext();
     if (!probe || !probe->Capabilities().rayQuery) {
         return nullptr;
     }
-    return std::make_unique<Renderer>(RendererOptions{.validation = true});
+    return std::make_unique<Renderer>(
+        RendererOptions{.validation = true, .capacities = capacities});
 }
 
 /// @return The RGBA bytes at a pixel of an image `width` pixels across.
@@ -209,7 +210,7 @@ TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {
                   {std::string(render_vars::kDistanceToCamera)});
     RenderSettings::Define(scene, "/Render/Settings").SetProducts({Path("/Render/Product")});
     const DeviceColumn& translates =
-        renderer->BindTransformOp(scene, "/World/Ball", "xformOp:translate");
+        renderer->BindColumn(scene, "/World/Ball", "xformOp:translate");
     ASSERT_EQ(translates.Shape(), (std::vector<std::int64_t>{1, 3}));
 
     // As CUDA would, writes on the device the host never sees, a step each: once the bottom
@@ -232,6 +233,96 @@ TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {
     renderer->Step(scene);
     EXPECT_FALSE(renderer->Replayed());
     test::ExpectClean(context);
+}
+
+TEST(Renderer, StepsRecolourPrimsFromABoundColourColumn) {
+    const std::unique_ptr<Renderer> renderer = MakeRenderer();
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    // Two small balls 5 m ahead, left and right of the middle: pixels 8 and 24 of row 16.
+    Scene scene;
+    for (const auto& [name, x] : {std::pair{"/World/Left", -0.5}, std::pair{"/World/Right", 0.5}}) {
+        Sphere::Define(scene, name).SetRadius(0.3);
+        SetXform(scene, name, {.translate = glm::dvec3(x, 5.0, 0.0)});
+    }
+    DefineCamera(scene, "/World/Camera", {0.0, 0.0, 0.0});
+    DefineProduct(scene, "/Render/Product", "/World/Camera", {33, 33},
+                  {std::string(render_vars::kAlbedo)});
+    RenderSettings::Define(scene, "/Render/Settings").SetProducts({Path("/Render/Product")});
+    const DeviceColumn& colours = renderer->BindColumn(scene, "/World/Left", Gprim::kDisplayColor);
+    ASSERT_EQ(colours.Shape(), (std::vector<std::int64_t>{2, 3}));
+    // The column's rows are the bucket's.
+    const PrimId leftPrim = *scene.Find("/World/Left");
+    const PrimStore& store = scene.Store();
+    const std::size_t left =
+        store.GetBucket(store.PrimBucket(leftPrim)).prims[0] == leftPrim ? 0 : 1;
+
+    DeviceContext& context = renderer->Context();
+    Uploader uploader(context, context.Main());
+    for (int step = 0; step < 4; ++step) {
+        const float shade = 0.2f * static_cast<float>(step);
+        std::array<float, 6> values{};
+        values[3 * left] = shade;
+        values[3 * (1 - left) + 1] = 1.0f - shade;
+        uploader.Write(colours.Storage(), colours.Range().offset, std::span<const float>(values));
+        renderer->WaitFor(uploader.Flush());
+        const RenderBatch& batch = renderer->Step(scene).front();
+        const Tensor albedo = renderer->Read(*batch.Find(render_vars::kAlbedo));
+        const float* bands = albedo.As<float>();
+        const std::size_t row = 16 * 33;
+        EXPECT_NEAR(bands[3 * (row + 8)], shade, 1e-6f) << "step " << step;
+        EXPECT_NEAR(bands[3 * (row + 24) + 1], 1.0f - shade, 1e-6f) << "step " << step;
+    }
+    EXPECT_TRUE(renderer->Replayed());
+    test::ExpectClean(context);
+}
+
+TEST(Renderer, HoldsTheDeclaredCapacitiesAndReportsWhatIsBeyondThem) {
+    const std::unique_ptr<Renderer> renderer =
+        MakeRenderer({.worlds = 4, .instancesPerWorld = 3, .views = 2});
+    if (!renderer) {
+        GTEST_SKIP() << "No Vulkan device that ray traces";
+    }
+    // Two worlds of the four, each a ball, and a camera each.
+    Scene scene;
+    std::vector<Path> products;
+    for (int world = 0; world < 2; ++world) {
+        const std::string root = "/World" + std::to_string(world);
+        Xform::Define(scene, root).SetWorld(world);
+        Sphere::Define(scene, root + "/Ball");
+        SetXform(scene, root + "/Ball", {.translate = glm::dvec3(0.0, 5.0 - world, 0.0)});
+        DefineCamera(scene, root + "/Camera", {0.0, 0.0, 0.0});
+        products.emplace_back("/Render/View" + std::to_string(world));
+        DefineProduct(scene, products.back(), root + "/Camera", {9, 9},
+                      {std::string(render_vars::kDistanceToCamera)});
+    }
+    RenderSettings::Define(scene, "/Render/Settings").SetProducts(products);
+    const auto depth = [&] {
+        const RenderBatch& batch = renderer->Step(scene).front();
+        return renderer->Read(*batch.Find(render_vars::kDistanceToCamera));
+    };
+    const Tensor seen = depth();
+    EXPECT_NEAR(seen.As<float>()[40], 4.0f, 1e-4f);
+    EXPECT_NEAR(seen.As<float>()[81 + 40], 3.0f, 1e-4f) << "world 1, laid out a stride on";
+
+    // Growing within a world's capacity moves nothing; past it, the step says so.
+    Sphere::Define(scene, "/World1/Pebble");
+    SetXform(scene, "/World1/Pebble", {.translate = glm::dvec3(0.0, 2.0, 0.0)});
+    EXPECT_NEAR(depth().As<float>()[81 + 40], 1.0f, 1e-4f);
+    Sphere::Define(scene, "/World1/Stone");
+    Sphere::Define(scene, "/World1/Rock");
+    EXPECT_THROW(depth(), std::length_error) << "four instances in world 1";
+    scene.Remove("/World1/Rock");
+    Xform::Define(scene, "/World5").SetWorld(5);
+    Sphere::Define(scene, "/World5/Ball");
+    EXPECT_THROW(depth(), std::length_error) << "a sixth world";
+    scene.Remove("/World5");
+    DefineProduct(scene, "/Render/Third", "/World0/Camera", {9, 9},
+                  {std::string(render_vars::kDistanceToCamera)});
+    products.emplace_back("/Render/Third");
+    RenderSettings(scene, "/Render/Settings").SetProducts(products);
+    EXPECT_THROW(depth(), std::length_error) << "a third view";
 }
 
 TEST(Products, ConformTheFilmToTheImage) {

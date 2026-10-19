@@ -49,8 +49,10 @@ class TopLevels {
     }
 
   private:
-    /// Remakes the top levels whose worlds outgrow them or use under a quarter of them.
-    void EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds);
+    /// Remakes the top levels whose worlds outgrow them or use under a quarter of them; with a
+    /// `declared` capacity a world, makes each once at that size.
+    void EnsureCapacity(std::span<const InstanceTable::WorldRecords> worlds,
+                        std::uint32_t declared);
     /// Adds the pass writing each record from its instance's world and shape transforms.
     void AddWritePass(graph::Graph& graph, const TransformGraph& transforms,
                       const InstanceTable& instances, const BottomLevels& bottoms,
