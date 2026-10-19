@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /// @file instances.cpp
-/// @brief Keeping instance rows dense as prims come and go, and uploading the rows that changed.
+/// @brief Keeping instance rows dense as prims come and go, uploading the rows that changed, and
+/// sorting them by world on the device.
 #include "ernie/render/instances.h"
 
 #include "ernie/shaders/device/buffer_ref.h"
 #include "ernie/shaders/scene/instance_colours.h"
+#include "ernie/shaders/scene/world_layout.h"
 #include "ernie/util/math.h"
 #include "ernie/util/profiler.h"
 
@@ -16,10 +18,19 @@ namespace ernie {
 namespace {
 
 static_assert(shaders::kNoInstanceRow == InstanceTable::kNoRow);
+static_assert(shaders::kNoSource == InstanceTable::kNoRow);
+
+/// The most workgroups a layout kernel dispatches; each thread loops over the rest.
+constexpr std::uint32_t kLayoutGroups = 1024;
 
 std::vector<std::uint32_t> CompileColourer(const ShaderCompiler& compiler) {
     const std::array modules{shaders::kBufferRef, shaders::kInstanceColours};
     return compiler.Spirv(modules, "main");
+}
+
+std::vector<std::uint32_t> CompileLayout(const ShaderCompiler& compiler, std::string_view entry) {
+    const std::array modules{shaders::kBufferRef, shaders::kWorldLayout};
+    return compiler.Spirv(modules, entry);
 }
 
 }  // namespace
@@ -29,6 +40,12 @@ InstanceTable::InstanceTable(DeviceContext& context, Arenas& arenas, const Scene
     : context_(context), arenas_(arenas), scene_(scene), capacities_(capacities),
       colourer_(context, CompileColourer(compiler), "instance colours",
                 std::uint32_t{sizeof(shaders::ColourParameters)}),
+      clearer_(context, CompileLayout(compiler, "Clear"), "clear records",
+               std::uint32_t{sizeof(shaders::LayoutParameters)}),
+      scatterer_(context, CompileLayout(compiler, "Scatter"), "sort records by world",
+                 std::uint32_t{sizeof(shaders::LayoutParameters)}),
+      sharer_(context, CompileLayout(compiler, "FillShared"), "share records",
+              std::uint32_t{sizeof(shaders::LayoutParameters)}),
       uploader_(context, context.Main()) {
     const auto column = [&](std::string_view name, DType type, std::vector<std::int64_t> element) {
         return std::make_unique<DeviceColumn>(arenas, name, type, std::move(element), 0);
@@ -38,6 +55,9 @@ InstanceTable::InstanceTable(DeviceContext& context, Arenas& arenas, const Scene
     shapes_ = column("instance shapes", DType::Float32, {3, 4});
     colours_ = column("instance colours", DType::Float32, {3});
     sources_ = column("top-level sources", DType::UInt32, {});
+    rowWorlds_ = column("instance worlds", DType::Int32, {});
+    cursors_ = column("world cursors", DType::UInt32, {});
+    sharedRows_ = column("shared rows", DType::UInt32, {});
 }
 
 std::optional<std::uint32_t> InstanceTable::Row(PrimId prim) const {
@@ -79,12 +99,10 @@ void InstanceTable::Remove(PrimId prim) {
 
 void InstanceTable::LayOutWorlds() {
     std::int32_t highest = 0;
-    std::vector<std::uint32_t> shared;
-    for (std::uint32_t row = 0; row < hostWorlds_.size(); ++row) {
-        highest = std::max(highest, hostWorlds_[row]);
-        if (hostWorlds_[row] < 0) {
-            shared.push_back(row);
-        }
+    std::uint32_t shared = 0;
+    for (const std::int32_t world : hostWorlds_) {
+        highest = std::max(highest, world);
+        shared += world < 0 ? 1u : 0u;
     }
     const std::size_t needed =
         std::max<std::size_t>(static_cast<std::size_t>(highest) + 1, reserved_);
@@ -93,30 +111,73 @@ void InstanceTable::LayOutWorlds() {
                                 std::to_string(capacities_.worlds) + " declared");
     }
     const std::size_t count = capacities_.worlds > 0 ? capacities_.worlds : needed;
-    std::vector<std::vector<std::uint32_t>> own(count);
-    for (std::uint32_t row = 0; row < hostWorlds_.size(); ++row) {
-        if (hostWorlds_[row] >= 0) {
-            own[static_cast<std::size_t>(hostWorlds_[row])].push_back(row);
+    std::vector<std::uint32_t> records(count, shared);
+    for (const std::int32_t world : hostWorlds_) {
+        if (world >= 0) {
+            ++records[static_cast<std::size_t>(world)];
         }
     }
-    const std::uint32_t stride = capacities_.instancesPerWorld;
-    worlds_.assign(count, {});
-    hostSources_.clear();
+    const auto largest = std::ranges::max_element(records);
+    const std::uint32_t declared = capacities_.instancesPerWorld;
+    if (declared > 0 && *largest > declared) {
+        throw std::length_error("World " + std::to_string(largest - records.begin()) + " has " +
+                                std::to_string(*largest) + " instances, beyond the " +
+                                std::to_string(declared) + " declared a world");
+    }
+    stride_ = declared > 0 ? declared : *largest;
+    sharedCount_ = shared;
+    worlds_.resize(count);
     for (std::size_t world = 0; world < count; ++world) {
-        const auto records = static_cast<std::uint32_t>(shared.size() + own[world].size());
-        if (stride > 0 && records > stride) {
-            throw std::length_error("World " + std::to_string(world) + " has " +
-                                    std::to_string(records) + " instances, beyond the " +
-                                    std::to_string(stride) + " declared a world");
-        }
-        worlds_[world] = {.first = static_cast<std::uint32_t>(hostSources_.size()),
-                          .count = records};
-        hostSources_.insert(hostSources_.end(), shared.begin(), shared.end());
-        hostSources_.insert(hostSources_.end(), own[world].begin(), own[world].end());
-        if (stride > 0) {
-            hostSources_.resize(worlds_[world].first + stride, kNoRow);
-        }
+        worlds_[world] = {.first = static_cast<std::uint32_t>(world) * stride_,
+                          .count = records[world]};
     }
+}
+
+void InstanceTable::AddLayoutPasses(graph::Graph& graph, graph::Buffer rowWorlds,
+                                    graph::Buffer& sources) const {
+    graph::Buffer cursors = graph.Import(*cursors_);
+    graph::Buffer shared = graph.Import(*sharedRows_);
+    const shaders::LayoutParameters layout{.worlds = ToBufferRef<int>(*rowWorlds_),
+                                           .cursors = ToBufferRef<shaders::uint>(*cursors_),
+                                           .sharedRows = ToBufferRef<shaders::uint>(*sharedRows_),
+                                           .sources = ToBufferRef<shaders::uint>(*sources_),
+                                           .rows = Count(),
+                                           .worldCount = static_cast<std::uint32_t>(worlds_.size()),
+                                           .stride = stride_,
+                                           .sharedCount = sharedCount_};
+    const auto add = [&](const char* name, const ComputeKernel& kernel, std::uint32_t items,
+                         const auto& declare) {
+        if (items == 0) {
+            return;
+        }
+        const std::uint32_t groups = std::min(DivideRoundUp(items, 64u), kLayoutGroups);
+        shaders::LayoutParameters parameters = layout;
+        parameters.threads = groups * 64;
+        graph.Add(
+            name, graph::Kind::Compute,
+            [&](graph::PassBuilder& pass) {
+                pass.OneShot();
+                declare(pass);
+            },
+            [&kernel, parameters, groups](graph::PassContext& pass) {
+                kernel.Dispatch(pass.commands, {groups, 1, 1}, parameters);
+            });
+    };
+    add("Clear records", clearer_, std::max(Records(), layout.worldCount + 1),
+        [&](graph::PassBuilder& pass) {
+            sources = pass.WriteAddress(sources);
+            cursors = pass.WriteAddress(cursors);
+        });
+    add("Sort records by world", scatterer_, Count(), [&](graph::PassBuilder& pass) {
+        pass.ReadAddress(rowWorlds);
+        sources = pass.WriteAddress(sources);
+        cursors = pass.WriteAddress(cursors);
+        shared = pass.WriteAddress(shared);
+    });
+    add("Share records", sharer_, layout.worldCount * sharedCount_, [&](graph::PassBuilder& pass) {
+        pass.ReadAddress(shared);
+        sources = pass.WriteAddress(sources);
+    });
 }
 
 void InstanceTable::Apply(const GeometryPool::Changes& changes) {
@@ -143,19 +204,22 @@ void InstanceTable::AddUploads(graph::Graph& graph) {
     // Rows that came, went or moved move the bound colours' targets too.
     retarget_ = retarget_ || relayout_;
     const std::size_t rows = prims_.size();
-    for (DeviceColumn* column : {nodes_.get(), geometries_.get(), shapes_.get(), colours_.get()}) {
+    for (DeviceColumn* column :
+         {nodes_.get(), geometries_.get(), shapes_.get(), colours_.get(), rowWorlds_.get()}) {
         column->Resize(rows, context_.Main());
     }
     StageRows(uploader_, *nodes_, hostNodes_, dirty_);
     StageRows(uploader_, *geometries_, hostGeometries_, dirty_);
     StageRows(uploader_, *shapes_, hostShapes_, dirty_);
     StageRows(uploader_, *colours_, hostColours_, dirty_);
+    StageRows(uploader_, *rowWorlds_, hostWorlds_, dirty_);
     dirty_.clear();
-    if (relayout_) {
+    const bool relayout = relayout_;
+    if (relayout) {
         LayOutWorlds();
-        sources_->Resize(hostSources_.size(), context_.Main());
-        uploader_.Write(sources_->Storage(), sources_->Range().offset,
-                        std::span<const std::uint32_t>(hostSources_));
+        sources_->Resize(Records(), context_.Main());
+        cursors_->Resize(worlds_.size() + 1, context_.Main());
+        sharedRows_->Resize(std::max(sharedCount_, 1u), context_.Main());
         relayout_ = false;
     }
     if (retarget_) {
@@ -163,11 +227,15 @@ void InstanceTable::AddUploads(graph::Graph& graph) {
     }
     std::vector<graph::Buffer> columns{graph.Import(*nodes_), graph.Import(*geometries_),
                                        graph.Import(*shapes_), graph.Import(*colours_),
-                                       graph.Import(*sources_)};
+                                       graph.Import(*rowWorlds_)};
     for (const ColourBinding& binding : colourBindings_) {
         columns.push_back(graph.Import(*binding.targets));
     }
     graph::AddUploadPass(graph, "Upload instances", uploader_, columns);
+    if (relayout) {
+        graph::Buffer sources = graph.Import(*sources_);
+        AddLayoutPasses(graph, columns[4], sources);
+    }
     AddColourPasses(graph);
 }
 

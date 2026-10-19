@@ -4,6 +4,7 @@
 /// run as one graph in one submission, under synchronization validation, as the device and the
 /// host change the scene between frames.
 #include "ernie/render/device_scene.h"
+#include "ernie/scene/schema/geom.h"
 #include "ernie/scene/xform.h"
 
 #include "tests/device/columns.h"
@@ -11,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -121,6 +123,80 @@ TEST(DeviceScene, FollowsTheDeviceAndTheHostFrameByFrame) {
                       {10.0 * (kBodies - 1), 0, 1});
     EXPECT_FALSE(frame.Transforms().Node(bodies.body[4]));
     ExpectClean(*context);
+}
+
+/// Expects each world's records to hold the shared rows, then its own, then none, in any order
+/// within the shared rows and within its own.
+void ExpectSources(DeviceContext& context, DeviceScene& frame, const Scene& scene,
+                   const std::vector<std::vector<std::string>>& own,
+                   const std::vector<std::string>& shared, const Ticket& done) {
+    const InstanceTable& instances = frame.Instances();
+    const std::vector<std::uint32_t> sources =
+        test::ReadRows<std::uint32_t>(context, instances.Sources(), done);
+    ASSERT_EQ(sources.size(), instances.Records());
+    const auto rows = [&](const std::vector<std::string>& paths) {
+        std::vector<std::uint32_t> found;
+        for (const std::string& path : paths) {
+            found.push_back(*instances.Row(*scene.Find(path)));
+        }
+        std::ranges::sort(found);
+        return found;
+    };
+    const auto sorted = [&](std::size_t from, std::size_t to) {
+        std::vector<std::uint32_t> part(sources.begin() + static_cast<std::ptrdiff_t>(from),
+                                        sources.begin() + static_cast<std::ptrdiff_t>(to));
+        std::ranges::sort(part);
+        return part;
+    };
+    ASSERT_EQ(instances.Worlds().size(), own.size());
+    const std::size_t stride = instances.Records() / own.size();
+    for (std::size_t world = 0; world < own.size(); ++world) {
+        const InstanceTable::WorldRecords records = instances.Worlds()[world];
+        EXPECT_EQ(records.first, world * stride);
+        EXPECT_EQ(records.count, shared.size() + own[world].size()) << "world " << world;
+        EXPECT_EQ(sorted(records.first, records.first + shared.size()), rows(shared));
+        EXPECT_EQ(sorted(records.first + shared.size(), records.first + records.count),
+                  rows(own[world]))
+            << "world " << world;
+        for (std::size_t spare = records.first + records.count; spare < (world + 1) * stride;
+             ++spare) {
+            EXPECT_EQ(sources[spare], InstanceTable::kNoRow) << "record " << spare;
+        }
+    }
+}
+
+TEST(DeviceScene, SortsInstancesByWorldOnTheDevice) {
+    ERNIE_CONTEXT(context);
+    const ShaderCompiler compiler;
+    for (const WorldCapacities capacities : {WorldCapacities{}, WorldCapacities{4, 6}}) {
+        SCOPED_TRACE(capacities.worlds);
+        // Two walls in every world; world 0 has a ball, world 1 none and world 2 three.
+        Scene scene;
+        Cube::Define(scene, "/Wall0");
+        Cube::Define(scene, "/Wall1");
+        for (int world = 0; world < 3; ++world) {
+            Xform::Define(scene, "/World" + std::to_string(world)).SetWorld(world);
+        }
+        Sphere::Define(scene, "/World0/Ball");
+        for (int ball = 0; ball < 3; ++ball) {
+            Sphere::Define(scene, "/World2/Ball" + std::to_string(ball));
+        }
+        Arenas arenas(*context, MemoryUse::Device, "frame", 1 << 20);
+        DeviceScene frame(*context, arenas, scene, compiler, capacities);
+        const std::vector<std::string> walls{"/Wall0", "/Wall1"};
+        const auto expect = [&](std::vector<std::vector<std::string>> own) {
+            own.resize(std::max<std::size_t>(own.size(), capacities.worlds));
+            scene.Update();
+            ExpectSources(*context, frame, scene, own, walls, frame.Execute({}));
+        };
+        expect({{"/World0/Ball"}, {}, {"/World2/Ball0", "/World2/Ball1", "/World2/Ball2"}});
+
+        // A ball moves to world 1, and world 0's goes, moving the last row into its own.
+        scene.Set("/World2/Ball1", Imageable::kWorld, 1);
+        scene.Remove("/World0/Ball");
+        expect({{}, {"/World2/Ball1"}, {"/World2/Ball0", "/World2/Ball2"}});
+        ExpectClean(*context);
+    }
 }
 
 }  // namespace

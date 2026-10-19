@@ -29,7 +29,8 @@ namespace ernie {
 ///
 /// Each row is in a batch world, or in every world. The top levels' records, a world after
 /// another, are laid out by `Sources`: each world's records are the shared rows, then its own.
-/// The layout changes only as rows come, go or change world.
+/// The layout changes only as rows come, go or change world, and is sorted on the device from
+/// each row's world.
 /// @brief How many worlds and instances a world the device scene holds at most, declared up front
 /// so nothing is laid out again or reallocated as counts move; 0 for as many as there are.
 struct WorldCapacities {
@@ -95,17 +96,18 @@ class InstanceTable {
     std::span<const WorldRecords> Worlds() const {
         return worlds_;
     }
-    /// @return Each top-level record's instance row, a uint32 a record, world after world;
-    /// `kNoRow` for a record no instance fills.
+    /// @return Each top-level record's instance row, a uint32 a record, world after world, each
+    /// world's own rows in no fixed order; `kNoRow` for a record no instance fills.
     const DeviceColumn& Sources() const {
         return *sources_;
     }
     const WorldCapacities& Capacities() const {
         return capacities_;
     }
-    /// @return The records of every world.
+    /// @return The records of every world: as many a world as the declared capacity, or as the
+    /// largest world's.
     std::uint32_t Records() const {
-        return static_cast<std::uint32_t>(hostSources_.size());
+        return static_cast<std::uint32_t>(worlds_.size()) * stride_;
     }
 
   private:
@@ -117,8 +119,11 @@ class InstanceTable {
         std::unique_ptr<DeviceColumn> targets;
     };
 
-    /// Lays the records out again, world by world.
+    /// Counts each world's records, and checks them against the capacities.
     void LayOutWorlds();
+    /// Adds the passes sorting the rows into the records by world.
+    void AddLayoutPasses(graph::Graph& graph, graph::Buffer rowWorlds,
+                         graph::Buffer& sources) const;
     /// Maps each bound bucket's rows to instance rows again, after rows moved.
     void TargetColours();
     void AddColourPasses(graph::Graph& graph) const;
@@ -139,6 +144,9 @@ class InstanceTable {
     const Scene& scene_;
     WorldCapacities capacities_;
     ComputeKernel colourer_;
+    ComputeKernel clearer_;
+    ComputeKernel scatterer_;
+    ComputeKernel sharer_;
     Uploader uploader_;
     std::vector<ColourBinding> colourBindings_;
     /// Whether rows moved since the colour bindings were mapped.
@@ -157,8 +165,14 @@ class InstanceTable {
     bool relayout_ = true;
     std::uint32_t reserved_ = 1;
     std::vector<WorldRecords> worlds_{1};
-    std::vector<std::uint32_t> hostSources_;
+    /// Records from one world's first to the next's.
+    std::uint32_t stride_ = 0;
+    std::uint32_t sharedCount_ = 0;
     std::unique_ptr<DeviceColumn> sources_;
+    std::unique_ptr<DeviceColumn> rowWorlds_;
+    /// The layout kernels' scratch.
+    std::unique_ptr<DeviceColumn> cursors_;
+    std::unique_ptr<DeviceColumn> sharedRows_;
     std::unique_ptr<DeviceColumn> nodes_;
     std::unique_ptr<DeviceColumn> geometries_;
     std::unique_ptr<DeviceColumn> shapes_;

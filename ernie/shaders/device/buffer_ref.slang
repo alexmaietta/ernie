@@ -35,6 +35,15 @@ struct BufferRef<T> {
     }
 }
 
+extension BufferRef<uint> {
+    /// @return The element's value before `value` was added to it, atomically.
+    uint AtomicAdd(uint index, uint value) {
+        uint original;
+        arenas[arena].InterlockedAdd(offset + index * 4, value, original);
+        return original;
+    }
+}
+
 #else
 
 struct BufferRef<T> {
@@ -52,6 +61,15 @@ struct BufferRef<T> {
         [nonmutating] set {
             ((T*)handle)[index] = newValue;
         }
+    }
+}
+
+extension BufferRef<uint> {
+    /// @return The element's value before `value` was added to it, atomically.
+    uint AtomicAdd(uint index, uint value) {
+        uint original;
+        InterlockedAdd(((uint*)handle)[index], value, original);
+        return original;
     }
 }
 
