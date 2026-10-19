@@ -57,6 +57,10 @@ class BottomLevels {
     void SetScratchBudget(std::uint64_t bytes) {
         scratchBudget_ = bytes;
     }
+    /// @return Whether nothing is waiting for a later frame: no builds, refits or compactions.
+    bool Idle() const {
+        return pending_.empty() && compactions_.empty();
+    }
     /// @return Builds and refits not run yet, as over the budget.
     std::size_t Pending() const {
         return pending_.size();

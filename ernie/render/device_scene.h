@@ -74,15 +74,45 @@ class DeviceScene {
     /// @throws graph::GraphError when the passes cannot run.
     Ticket Execute(const std::function<void(graph::Graph&)>& passes,
                    std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
+    /// @brief `Execute`, or the last frame's commands submitted again while nothing they record
+    /// has changed: the scene (its version), the render origin, the bottom levels (none waiting)
+    /// and `key`, which the caller changes whenever `passes` would record something else. A frame
+    /// is kept to replay when it runs no one-shot pass, so a step whose data all comes from device
+    /// columns costs the host one submission.
+    /// @return The frame's ticket.
+    Ticket Step(const std::function<void(graph::Graph&)>& passes, std::uint64_t key,
+                std::span<const Ticket> waits = {});
+    /// @return Whether the last `Step` replayed a captured frame.
+    bool Replayed() const {
+        return replayed_;
+    }
 
   private:
+    /// What a captured frame recorded from.
+    struct CaptureKey {
+        std::uint64_t version = 0;
+        glm::dvec3 origin{0.0};
+        std::uint64_t passes = 0;
+        bool operator==(const CaptureKey&) const = default;
+    };
+
+    /// Adds a frame's passes: the columns' sync, the transforms, the geometry, the ray tracer's
+    /// builds, then `passes`'.
+    void AddFrame(graph::Graph& graph, const std::function<void(graph::Graph&)>& passes);
+    /// @return Whether no work waits for a later frame.
+    bool Settled() const;
+
     DeviceContext& context_;
+    const Scene& scene_;
     graph::TransientPool pool_;
     SceneColumns columns_;
     TransformGraph transforms_;
     GeometryPool geometry_;
     InstanceTable instances_;
     std::unique_ptr<RayTracer> tracer_;
+    std::unique_ptr<graph::CapturedGraph> captured_;
+    CaptureKey capturedKey_;
+    bool replayed_ = false;
 };
 
 }  // namespace ernie

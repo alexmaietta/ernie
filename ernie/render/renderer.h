@@ -91,6 +91,9 @@ class ERNIE_API Renderer {
     /// @brief Makes the next step wait on the device for `ticket`, such as CUDA's writes to a
     /// bound column.
     void WaitFor(const Ticket& ticket);
+    /// @return Whether the last step submitted the commands recorded for an earlier one again,
+    /// as steps do while nothing changes on the host: its cost then is one submission.
+    bool Replayed() const;
 
     /// @brief Steps and reads the first product's LdrColor.
     /// @return LdrColor, height x width x 4 bytes (RGBA8, display encoded) on the host.

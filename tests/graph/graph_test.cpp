@@ -118,6 +118,56 @@ TEST_F(FrameGraph, ChainsPassesThroughTransientsAndCullsWhatNothingNeeds) {
     EXPECT_NE(graph.Dot().find("label=\"Unused\", style=dashed"), std::string::npos);
 }
 
+TEST_F(FrameGraph, ReplaysACaptureOverWhatItsImportsHoldNow) {
+    const DeviceColumn input(*arenas_, "input", DType::UInt32, {}, kCount);
+    const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);
+    Graph graph(*context_, *pool_);
+    Buffer doubled = graph.Create(kCount * 4, "doubled");
+    Buffer result = graph.Import(values, "values");
+    AddAffine(graph, "Double", graph.Import(input, "input"), doubled, 2, 0);
+    AddAffine(graph, "Add one", doubled, result, 1, 1);
+    ASSERT_TRUE(graph.Capturable());
+    const std::unique_ptr<CapturedGraph> captured = graph.Capture(context_->Main());
+
+    Uploader uploader(*context_, context_->Main());
+    for (std::uint32_t round = 1; round <= 3; ++round) {
+        // The capture's transient stays its own: nothing else leases it meanwhile.
+        Graph other(*context_, *pool_);
+        Buffer scratch = other.Create(kCount * 4, "scratch");
+        Buffer seen = other.Import(input, "input");
+        AddAffine(other, "Elsewhere", {}, scratch, 7, 7);
+        AddAffine(other, "Keep", scratch, seen, 0, 0);
+        other.Execute(context_->Main());
+
+        std::vector<std::uint32_t> host(kCount);
+        for (std::uint32_t i = 0; i < kCount; ++i) {
+            host[i] = round * i;
+        }
+        uploader.Write(input.Storage(), input.Range().offset, std::span<const std::uint32_t>(host));
+        const Ticket uploaded = uploader.Flush();
+        const std::vector<std::uint32_t> read =
+            Read(*context_, values, captured->Submit(std::span(&uploaded, 1)));
+        for (std::uint32_t i = 0; i < kCount; ++i) {
+            ASSERT_EQ(read[i], 2 * round * i + 1) << "round " << round << ", " << i;
+        }
+    }
+}
+
+TEST_F(FrameGraph, CapturesNoGraphWithOneShotPasses) {
+    const DeviceColumn values(*arenas_, "values", DType::UInt32, {}, kCount);
+    Graph graph(*context_, *pool_);
+    Buffer output = graph.Import(values, "values");
+    graph.Add(
+        "Upload", Kind::Copy,
+        [&](PassBuilder& pass) {
+            pass.OneShot();
+            output = pass.Write(output, Use::CopyDst);
+        },
+        [](PassContext&) {});
+    EXPECT_FALSE(graph.Capturable());
+    EXPECT_THROW(graph.Capture(context_->Main()), std::logic_error);
+}
+
 TEST_F(FrameGraph, ClearsAndCopiesImagesInTheirLayouts) {
     const DeviceColumn texels(*arenas_, "texels", DType::Float32, {4}, 64);
     Graph graph(*context_, *pool_);

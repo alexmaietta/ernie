@@ -100,6 +100,7 @@ struct BufferSlice {
 };
 
 class Graph;
+class CapturedGraph;
 
 /// @brief Declares one pass's accesses during setup.
 class PassBuilder {
@@ -128,6 +129,9 @@ class PassBuilder {
     Acceleration Read(Acceleration structure, Use use = Use::Trace);
     /// @brief Keeps the pass though nothing reads what it writes, as for one the host reads.
     void NeverCull();
+    /// @brief Marks the pass as recording this frame's data, as an upload's or a build of new
+    /// geometry does: a graph with one is not captured to replay (`Graph::Capturable`).
+    void OneShot();
 
   private:
     friend class Graph;
@@ -242,6 +246,14 @@ class Graph {
     /// @return The ticket of the graph's work, which CUDA can wait on too.
     /// @throws GraphError as `Compile`; std::logic_error if executed already.
     Ticket Execute(Queue& queue, std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
+    /// @return Whether the graph can be captured: it has no one-shot pass. Compiles it.
+    bool Capturable();
+    /// @brief Records every kept pass once, for submitting again and again while what the passes
+    /// record stays as it was: the same resources, laid out as now. The capture keeps the
+    /// transients and the objects passes keep. Passes are not timed on the GPU.
+    /// @return The capture, not yet submitted.
+    /// @throws std::logic_error unless `Capturable`, or if executed or captured already.
+    std::unique_ptr<CapturedGraph> Capture(Queue& queue);
 
     /// @brief Adds a full barrier before every pass; on by default with
     /// ERNIE_GRAPH_FULL_BARRIERS=1.
@@ -296,6 +308,7 @@ class Graph {
         /// The innermost scope it was added in.
         std::uint32_t scope = kNoScope;
         bool neverCull = false;
+        bool oneShot = false;
     };
     struct ScopeNode {
         std::string name;
@@ -330,6 +343,36 @@ class Graph {
     bool leased_ = false;
     bool fullBarriers_ = false;
     bool flushEachPass_ = false;
+    /// Whether passes record GPU timing zones, which a capture cannot replay.
+    bool timed_ = true;
+};
+
+/// @brief A graph's commands recorded once and submitted per frame, while the transients they use
+/// stay leased to it. Releasing it gives them back once its last submission is done.
+class CapturedGraph {
+  public:
+    ~CapturedGraph();
+    CapturedGraph(const CapturedGraph&) = delete;
+    CapturedGraph& operator=(const CapturedGraph&) = delete;
+
+    /// @brief Submits the commands after `waits`; the first submission also waits for transient
+    /// images new to the pool.
+    /// @return The submission's ticket.
+    Ticket Submit(std::span<const Ticket> waits = {});
+
+  private:
+    friend class Graph;
+    CapturedGraph(DeviceContext& context, TransientPool& pool, Queue& queue)
+        : context_(context), pool_(pool), queue_(queue) {}
+
+    DeviceContext& context_;
+    TransientPool& pool_;
+    Queue& queue_;
+    std::unique_ptr<Recording> recording_;
+    std::vector<Ticket> firstWaits_;
+    std::vector<const DeviceImage*> images_;
+    std::vector<BufferRange> ranges_;
+    std::vector<std::shared_ptr<const void>> kept_;
 };
 
 /// @brief Adds a copy pass recording what `uploader` staged into `targets`, which later passes then

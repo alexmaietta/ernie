@@ -291,6 +291,7 @@ void SceneColumns::AddSync(graph::Graph& graph) {
     graph.Add(
         "Sync scene columns", graph::Kind::Copy,
         [&](graph::PassBuilder& pass) {
+            pass.OneShot();
             for (graph::Buffer& column : columns) {
                 pass.Read(column, graph::Use::CopySrc);
                 column = pass.Write(column, graph::Use::CopyDst);

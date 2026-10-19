@@ -97,10 +97,54 @@ Queue::~Queue() {
     vkDestroyCommandPool(device_, pool_, nullptr);
 }
 
+Recording::~Recording() {
+    queue_.GiveBack(commands_, last_);
+}
+
 Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                      std::span<const Ticket> waits, BinarySemaphores binary) {
     // One recording at a time: the command pool is not thread-safe.
     const std::lock_guard recording(recording_);
+    const std::vector<VkSemaphoreSubmitInfo> waitInfos = WaitInfos(waits, binary);
+    const VkCommandBuffer commands =
+        RecordBuffer(record, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    const std::lock_guard lock(mutex_);
+    try {
+        const Ticket ticket = SubmitBuffer(commands, waitInfos, binary);
+        inFlight_.emplace_back(commands, ticket.value);
+        return ticket;
+    } catch (...) {
+        free_.push_back(commands);
+        throw;
+    }
+}
+
+std::unique_ptr<Recording> Queue::Record(const std::function<void(VkCommandBuffer)>& record) {
+    const std::lock_guard recording(recording_);
+    // Simultaneous use, so a replay may be submitted before the last has finished.
+    return std::unique_ptr<Recording>(
+        new Recording(*this, RecordBuffer(record, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT)));
+}
+
+Ticket Queue::Submit(Recording& recorded, std::span<const Ticket> waits, BinarySemaphores binary) {
+    if (&recorded.queue_ != this) {
+        throw DeviceError(DeviceErrorKind::Failed,
+                          name_ + " cannot submit another queue's recording");
+    }
+    const std::vector<VkSemaphoreSubmitInfo> waitInfos = WaitInfos(waits, binary);
+    const std::lock_guard lock(mutex_);
+    const Ticket ticket = SubmitBuffer(recorded.commands_, waitInfos, binary);
+    recorded.last_ = ticket.value;
+    return ticket;
+}
+
+void Queue::GiveBack(VkCommandBuffer commands, std::uint64_t last) {
+    const std::lock_guard lock(mutex_);
+    inFlight_.emplace_back(commands, last);
+}
+
+std::vector<VkSemaphoreSubmitInfo> Queue::WaitInfos(std::span<const Ticket> waits,
+                                                    BinarySemaphores binary) const {
     std::vector<VkSemaphoreSubmitInfo> waitInfos;
     for (const Ticket& wait : waits) {
         if (wait.timeline == nullptr) {
@@ -124,7 +168,11 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
                              .semaphore = binary.wait,
                              .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT});
     }
+    return waitInfos;
+}
 
+VkCommandBuffer Queue::RecordBuffer(const std::function<void(VkCommandBuffer)>& record,
+                                    VkCommandBufferUsageFlags usage) {
     std::unique_lock lock(mutex_);
     Recycle();
     VkCommandBuffer commands = VK_NULL_HANDLE;
@@ -145,7 +193,7 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
     CheckVk(vkResetCommandBuffer(commands, 0),
             [&] { return "Resetting " + name_ + "'s command buffer"; });
     const VkCommandBufferBeginInfo begin{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-                                         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+                                         .flags = usage};
     try {
         CheckVk(vkBeginCommandBuffer(commands, &begin), [&] { return "Recording on " + name_; });
         record(commands);
@@ -156,8 +204,12 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
         free_.push_back(commands);
         throw;
     }
+    return commands;
+}
 
-    lock.lock();
+Ticket Queue::SubmitBuffer(VkCommandBuffer commands,
+                           const std::vector<VkSemaphoreSubmitInfo>& waitInfos,
+                           BinarySemaphores binary) {
     const std::uint64_t value = submitted_ + 1;
     const VkCommandBufferSubmitInfo commandInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, .commandBuffer = commands};
@@ -177,13 +229,9 @@ Ticket Queue::Submit(const std::function<void(VkCommandBuffer)>& record,
         .pCommandBufferInfos = &commandInfo,
         .signalSemaphoreInfoCount = binary.signal != VK_NULL_HANDLE ? 2u : 1u,
         .pSignalSemaphoreInfos = signals.data()};
-    const VkResult submitted = vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE);
-    if (submitted < VK_SUCCESS) {
-        free_.push_back(commands);
-    }
-    CheckVk(submitted, [&] { return "Submitting to " + name_; });
+    CheckVk(vkQueueSubmit2(queue_, 1, &submit, VK_NULL_HANDLE),
+            [&] { return "Submitting to " + name_; });
     submitted_ = value;
-    inFlight_.emplace_back(commands, value);
     return timeline_.At(value);
 }
 

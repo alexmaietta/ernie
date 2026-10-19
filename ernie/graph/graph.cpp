@@ -160,6 +160,10 @@ void PassBuilder::NeverCull() {
     graph_.passes_[pass_].neverCull = true;
 }
 
+void PassBuilder::OneShot() {
+    graph_.passes_[pass_].oneShot = true;
+}
+
 void PassContext::Check(std::uint32_t id) const {
     const Graph::Pass& pass = graph_.passes_[pass_];
     if (std::ranges::none_of(
@@ -470,13 +474,21 @@ void Graph::RecordPass(VkCommandBuffer commands, std::uint32_t order, std::uint3
         scope = scopes_[scope].parent;
     }
     if (scope != kNoScope && scopes_[scope].depth == depth) {
-        ERNIE_GPU_ZONE(context_, commands, scopes_[scope].name.c_str());
+        std::optional<GpuZone> zone;
+        if (timed_) {
+            zone.emplace(context_, commands, scopes_[scope].name.c_str());
+        }
         RecordPass(commands, order, depth + 1);
         return;
     }
     ERNIE_ZONE("Record a pass");
     ERNIE_ZONE_TEXT(pass.name);
-    ERNIE_GPU_ZONE(context_, commands, pass.name.c_str());
+    // Ernie's own reports name each pass by a zone of its own.
+    const profiler::ScopedZone named(profiler::Enabled() ? profiler::Intern(pass.name) : "");
+    std::optional<GpuZone> zone;
+    if (timed_) {
+        zone.emplace(context_, commands, pass.name.c_str());
+    }
     Record(commands, dependencies_.passes[order]);
     if (fullBarriers_) {
         ernie::Barrier(commands, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
@@ -529,6 +541,67 @@ Ticket Graph::Execute(Queue& queue, std::span<const Ticket> waits, BinarySemapho
     return ticket;
 }
 
+bool Graph::Capturable() {
+    Compile();
+    return std::ranges::none_of(live_, [&](std::uint32_t p) { return passes_[p].oneShot; });
+}
+
+std::unique_ptr<CapturedGraph> Graph::Capture(Queue& queue) {
+    if (executed_) {
+        throw std::logic_error("A frame graph executes or is captured once");
+    }
+    if (!Capturable()) {
+        throw std::logic_error("A frame graph with one-shot passes cannot be captured");
+    }
+    executed_ = true;
+    timed_ = false;
+    auto captured = std::unique_ptr<CapturedGraph>(new CapturedGraph(context_, pool_, queue));
+    captured->recording_ = queue.Record([&](VkCommandBuffer commands) {
+        for (std::uint32_t order = 0; order < live_.size(); ++order) {
+            RecordPass(commands, order);
+        }
+        Record(commands, dependencies_.after);
+    });
+    // The transients stay leased to the capture, which gives them back.
+    for (Resource& resource : resources_) {
+        if (resource.imported) {
+            continue;
+        }
+        if (resource.deviceImage != nullptr) {
+            captured->firstWaits_.push_back(resource.deviceImage->Ready());
+            captured->images_.push_back(std::exchange(resource.deviceImage, nullptr));
+        }
+        if (resource.slice.buffer != nullptr) {
+            captured->ranges_.push_back(resource.range);
+            resource.slice = {};
+        }
+    }
+    leased_ = false;
+    captured->kept_ = std::move(kept_);
+    kept_.clear();
+    return captured;
+}
+
+CapturedGraph::~CapturedGraph() {
+    // The pool takes leases back once every queue's work so far, the last submission's, is done.
+    for (const DeviceImage* image : images_) {
+        pool_.Release(*image);
+    }
+    for (const BufferRange& range : ranges_) {
+        pool_.Release(range);
+    }
+    for (std::shared_ptr<const void>& object : kept_) {
+        context_.Retire(std::move(object));
+    }
+}
+
+Ticket CapturedGraph::Submit(std::span<const Ticket> waits) {
+    std::vector<Ticket> after(waits.begin(), waits.end());
+    after.insert(after.end(), firstWaits_.begin(), firstWaits_.end());
+    firstWaits_.clear();
+    return queue_.Submit(*recording_, after);
+}
+
 std::vector<std::string> Graph::ExecutedPasses() const {
     std::vector<std::string> names;
     for (const std::uint32_t p : live_) {
@@ -578,6 +651,7 @@ void AddUploadPass(Graph& graph, std::string_view name, Uploader& uploader,
     graph.Add(
         name, Kind::Copy,
         [&](PassBuilder& pass) {
+            pass.OneShot();
             for (Buffer& target : targets) {
                 if (target.Valid()) {
                     target = pass.Write(target, Use::CopyDst);

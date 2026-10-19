@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <span>
 #include <string>
@@ -81,6 +82,26 @@ struct BinarySemaphores {
     VkSemaphore signal = VK_NULL_HANDLE;
 };
 
+class Queue;
+
+/// @brief Commands recorded once and submitted again and again, as a captured frame is replayed.
+/// Its command buffer goes back to its queue once its last submission is done.
+class Recording {
+  public:
+    ~Recording();
+    Recording(const Recording&) = delete;
+    Recording& operator=(const Recording&) = delete;
+
+  private:
+    friend class Queue;
+    Recording(Queue& queue, VkCommandBuffer commands) : queue_(queue), commands_(commands) {}
+
+    Queue& queue_;
+    VkCommandBuffer commands_;
+    /// The timeline value of its latest submission; 0 before its first.
+    std::uint64_t last_ = 0;
+};
+
 /// @brief A queue of one family. Submissions take a recording function and return a ticket on the
 /// queue's timeline; command buffers are recycled once their tickets complete. Any thread may
 /// submit, one recording at a time, and test or wait on tickets.
@@ -97,6 +118,13 @@ class Queue {
     /// @throws DeviceError if a wait is another device's, or submission fails.
     Ticket Submit(const std::function<void(VkCommandBuffer)>& record,
                   std::span<const Ticket> waits = {}, BinarySemaphores binary = {});
+    /// @brief Records commands to submit any number of times. Submissions may overlap: what one
+    /// must see of the last, it waits for.
+    std::unique_ptr<Recording> Record(const std::function<void(VkCommandBuffer)>& record);
+    /// @brief Submits a recording once `waits` are done.
+    /// @throws DeviceError for another queue's recording, as `Submit`.
+    Ticket Submit(Recording& recorded, std::span<const Ticket> waits = {},
+                  BinarySemaphores binary = {});
     /// @return The ticket of the latest submission: waiting on it waits for all of them.
     Ticket Last() const;
     /// @brief Presents swapchain images, between submissions from any thread.
@@ -124,8 +152,21 @@ class Queue {
     }
 
   private:
+    friend class Recording;
+
     /// Moves finished command buffers to the free list.
     void Recycle();
+    std::vector<VkSemaphoreSubmitInfo> WaitInfos(std::span<const Ticket> waits,
+                                                 BinarySemaphores binary) const;
+    /// @return A free command buffer with `record`'s commands.
+    VkCommandBuffer RecordBuffer(const std::function<void(VkCommandBuffer)>& record,
+                                 VkCommandBufferUsageFlags usage);
+    /// Submits a recorded buffer, with `mutex_` held.
+    Ticket SubmitBuffer(VkCommandBuffer commands,
+                        const std::vector<VkSemaphoreSubmitInfo>& waitInfos,
+                        BinarySemaphores binary);
+    /// Takes a recording's buffer back, to recycle once `last` is reached.
+    void GiveBack(VkCommandBuffer commands, std::uint64_t last);
 
     VkDevice device_;
     std::uint32_t family_;

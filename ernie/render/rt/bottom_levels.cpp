@@ -235,6 +235,7 @@ void BottomLevels::AddBuildPass(graph::Graph& graph, FrameBuilds frame, Moves mo
     graph.Add(
         "Build bottom levels", graph::Kind::Build,
         [&](graph::PassBuilder& pass) {
+            pass.OneShot();
             for (const graph::Buffer& input : inputs) {
                 pass.Read(input, graph::Use::BuildInput);
             }

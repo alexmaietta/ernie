@@ -89,6 +89,10 @@ struct Renderer::Device {
     std::unique_ptr<DeviceScene> deviceScene;
     std::vector<Batch> batches;
     std::vector<RenderBatch> rendered;
+    /// The scene's version the batches were planned at.
+    std::uint64_t plannedVersion = 0;
+    /// Changed whenever the passes would record something else: a new plan or binding.
+    std::uint64_t recorded = 0;
     /// What the next step waits for.
     std::vector<Ticket> waits;
 
@@ -186,14 +190,21 @@ DeviceScene& Renderer::Device::Follow(const Scene& scene) {
 std::span<const RenderBatch> Renderer::Step(Scene& scene) {
     ERNIE_ZONE("Render step");
     scene.Update();
-    const std::vector<ProductSpec> specs = ReadProducts(scene);
     Device& device = *device_;
     DeviceScene& deviceScene = device.Follow(scene);
-    device.Plan(scene, specs);
-    const auto highest = std::ranges::max(specs, {}, &ProductSpec::world).world;
-    deviceScene.Instances().ReserveWorlds(highest + 1);
+    // Products are read again only after host edits: a step whose poses all come from device
+    // columns costs the host nothing a view.
+    if (device.batches.empty() || scene.Store().Version() != device.plannedVersion) {
+        const std::vector<ProductSpec> specs = ReadProducts(scene);
+        device.Plan(scene, specs);
+        const auto highest = std::ranges::max(specs, {}, &ProductSpec::world).world;
+        deviceScene.Instances().ReserveWorlds(highest + 1);
+        device.plannedVersion = scene.Store().Version();
+        ++device.recorded;
+    }
     deviceScene.Follow(glm::dvec3(device.batches.front().views.front().cameraToWorld[3]));
-    deviceScene.Execute(
+    // Replayed while the plan and bindings stand: the camera records only their data.
+    deviceScene.Step(
         [&](graph::Graph& graph) {
             for (const Batch& batch : device.batches) {
                 CameraOutputs outputs;
@@ -204,7 +215,7 @@ std::span<const RenderBatch> Renderer::Step(Scene& scene) {
                 device.camera->Add(graph, batch.views, outputs);
             }
         },
-        device.waits);
+        device.recorded, device.waits);
     device.waits.clear();
     return device.rendered;
 }
@@ -215,11 +226,16 @@ const DeviceColumn& Renderer::BindTransformOp(Scene& scene, const Path& prim,
     const BucketId bucket = scene.Store().PrimBucket(scene.Require(prim));
     const DeviceColumn& column = deviceScene.Columns().Bind(bucket, attribute);
     deviceScene.Transforms().Bind(bucket, attribute, column);
+    ++device_->recorded;
     return column;
 }
 
 void Renderer::WaitFor(const Ticket& ticket) {
     device_->waits.push_back(ticket);
+}
+
+bool Renderer::Replayed() const {
+    return device_->deviceScene && device_->deviceScene->Replayed();
 }
 
 Tensor Renderer::Read(const RenderVarOutput& var) {

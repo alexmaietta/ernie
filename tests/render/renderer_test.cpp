@@ -212,15 +212,25 @@ TEST(Renderer, StepsRenderPosesWrittenOnTheDevice) {
         renderer->BindTransformOp(scene, "/World/Ball", "xformOp:translate");
     ASSERT_EQ(translates.Shape(), (std::vector<std::int64_t>{1, 3}));
 
-    // As CUDA would, a write on the device the host never sees: the ball 2 m nearer.
+    // As CUDA would, writes on the device the host never sees, a step each: once the bottom
+    // levels settle, steps replay their recorded commands and still see each new pose.
     DeviceContext& context = renderer->Context();
     Uploader uploader(context, context.Main());
-    const std::array<float, 3> nearer{0.0f, 3.0f, 0.0f};
-    uploader.Write(translates.Storage(), translates.Range().offset, std::span<const float>(nearer));
-    renderer->WaitFor(uploader.Flush());
-    const RenderBatch& batch = renderer->Step(scene).front();
-    const Tensor depth = renderer->Read(*batch.Find(render_vars::kDistanceToCamera));
-    EXPECT_NEAR(depth.As<float>()[40], 2.0f, 1e-4f);
+    for (int step = 0; step < 6; ++step) {
+        const float distance = 1.0f + 0.5f * static_cast<float>(step);
+        const std::array<float, 3> ball{0.0f, distance + 1.0f, 0.0f};
+        uploader.Write(translates.Storage(), translates.Range().offset,
+                       std::span<const float>(ball));
+        renderer->WaitFor(uploader.Flush());
+        const RenderBatch& batch = renderer->Step(scene).front();
+        const Tensor depth = renderer->Read(*batch.Find(render_vars::kDistanceToCamera));
+        EXPECT_NEAR(depth.As<float>()[40], distance, 1e-4f) << "step " << step;
+    }
+    EXPECT_TRUE(renderer->Replayed()) << "nothing changed on the host";
+    // A host edit records anew.
+    SetXform(scene, "/World/Camera", {.translate = glm::dvec3(0.0, -1.0, 0.0)});
+    renderer->Step(scene);
+    EXPECT_FALSE(renderer->Replayed());
     test::ExpectClean(context);
 }
 
