@@ -7,6 +7,7 @@ ernie_add_shaders(
     math/double_float.slang
     rt/ray_tracer.slang
     rt/write_instances.slang
+    sampling/random.slang
     scene/geometry.slang
     scene/instance_colours.slang
     scene/shapes.slang

@@ -16,6 +16,55 @@ namespace {
 static_assert(HashStream("") == 2166136261u, "FNV-1a offset basis");
 static_assert(HashStream("a") == 0xe40c292cu, "FNV-1a of a");
 static_assert(SampleBits({1, 2, 3, 4}, 5) == SampleBits({1, 2, 3, 4}, 5), "usable at compile time");
+static_assert(ReverseBits(1u) == 0x80000000u && ReverseBits(0x0000ffffu) == 0xffff0000u);
+// Sobol's second point is a half in every dimension; its third, a quarter or three in the second.
+static_assert(SobolBits(1, 0) == 0x80000000u && SobolBits(1, 1) == 0x80000000u);
+static_assert(SobolBits(2, 0) == 0x40000000u && SobolBits(2, 1) == 0xc0000000u);
+
+/// @brief Expects a pixel's first `count` samples of dimensions `x` and `y` to fill every cell of
+/// each grid of `count` cells, `2^i` by `count / 2^i`, exactly once.
+void ExpectStratified(const SampleKey& pixel, std::uint32_t x, std::uint32_t y,
+                      std::uint32_t count) {
+    for (std::uint32_t columns = 1; columns <= count; columns *= 2) {
+        const std::uint32_t rows = count / columns;
+        std::set<std::uint32_t> cells;
+        for (std::uint32_t sample = 0; sample < count; ++sample) {
+            SampleKey key = pixel;
+            key.sample = sample;
+            const auto column =
+                static_cast<std::uint32_t>(SampleSobol(key, x) * static_cast<float>(columns));
+            const auto row =
+                static_cast<std::uint32_t>(SampleSobol(key, y) * static_cast<float>(rows));
+            cells.insert(row * columns + column);
+        }
+        EXPECT_EQ(cells.size(), count)
+            << columns << " x " << rows << " cells, dimensions " << x << " and " << y;
+    }
+}
+
+TEST(Random, SobolSamplesStratifyEachPair) {
+    for (const SampleKey pixel : {SampleKey{1, 0, 0, 0}, SampleKey{77, 3, 12345, 0}}) {
+        for (const std::uint32_t count : {16u, 64u, 256u}) {
+            ExpectStratified(pixel, 0, 1, count);
+            ExpectStratified(pixel, 2, 3, count);
+            ExpectStratified(pixel, 4, 5, count);
+        }
+    }
+}
+
+TEST(Random, SobolSamplesDifferAcrossPixelsFramesAndSets) {
+    const SampleKey key{9, 1, 100, 5};
+    const float value = SampleSobol(key, 0);
+    EXPECT_NE(SampleSobol({9, 1, 101, 5}, 0), value) << "the next pixel";
+    EXPECT_NE(SampleSobol({10, 1, 100, 5}, 0), value) << "another frame";
+    EXPECT_NE(SampleSobol({9, 2, 100, 5}, 0), value) << "another view";
+    EXPECT_NE(SampleSobol(key, 2), value) << "the next pair's first dimension";
+    for (std::uint32_t dimension = 0; dimension < 12; ++dimension) {
+        const float sampled = SampleSobol(key, dimension);
+        EXPECT_GE(sampled, 0.0f);
+        EXPECT_LT(sampled, 1.0f);
+    }
+}
 
 TEST(Random, Pcg3dMixesEveryInputWord) {
     const glm::uvec3 base = Pcg3d(glm::uvec3(0u));

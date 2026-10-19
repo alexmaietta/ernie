@@ -8,14 +8,20 @@
 #include "ernie/render/rt/ray_tracer.h"
 #include "ernie/render/transform_graph.h"
 #include "ernie/shaders/device/bindless.h"
+#include "ernie/shaders/device/buffer_ref.h"
 #include "ernie/shaders/rt/write_instances.h"
+#include "ernie/shaders/sampling/random.h"
 #include "ernie/shaders/sensors/camera.h"
 #include "ernie/shaders/spectral/spectrum.h"
+
+#include "ernie/util/random.h"
 
 #include "tests/render/common.h"
 
 #include <gtest/gtest.h>
 
+#include <array>
+#include <bit>
 #include <cstddef>
 #include <vector>
 
@@ -83,6 +89,60 @@ TEST(Shaders, SharedStructsLayOutAsInCpp) {
     Readback readback(*context, context->Main(), arenas.Storage(range), range.offset, range.size,
                       std::span(&written, 1));
     EXPECT_EQ(readback.Values<std::uint32_t>(), kExpected);
+    test::ExpectClean(*context);
+}
+
+/// Writes each key's hashed bits and Sobol samples, as `ExpectedSamples` lists them.
+const ShaderModule kSamples{"samples", R"(
+import random;
+import buffer_ref;
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void main(uint3 id : SV_DispatchThreadID, uniform BufferRef<uint> out, uniform uint count) {
+    if (id.x >= count) {
+        return;
+    }
+    SampleKey key = { 0x9e3779b9u * (id.x / 64u), id.x % 3u, id.x * 7919u, id.x % 64u };
+    for (uint dimension = 0; dimension < 8; ++dimension) {
+        out[(id.x * 8 + dimension) * 2] = SampleBits(key, dimension);
+        out[(id.x * 8 + dimension) * 2 + 1] = asuint(SampleSobol(key, dimension));
+    }
+}
+)"};
+
+/// @return What `kSamples` writes for `count` keys, from the host's functions.
+std::vector<std::uint32_t> ExpectedSamples(std::uint32_t count) {
+    std::vector<std::uint32_t> values;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const SampleKey key{0x9e3779b9u * (i / 64u), i % 3u, i * 7919u, i % 64u};
+        for (std::uint32_t dimension = 0; dimension < 8; ++dimension) {
+            values.push_back(SampleBits(key, dimension));
+            values.push_back(std::bit_cast<std::uint32_t>(SampleSobol(key, dimension)));
+        }
+    }
+    return values;
+}
+
+TEST(Shaders, RandomNumbersMatchTheHostsBitForBit) {
+    ERNIE_CONTEXT(context);
+    const std::array modules{shaders::kBufferRef, shaders::kRandom, kSamples};
+    struct Parameters {
+        shaders::BufferRef<std::uint32_t> out;
+        std::uint32_t count;
+    };
+    const ComputeKernel samples(*context, ShaderCompiler().Spirv(modules, "main"), "samples",
+                                std::uint32_t{sizeof(Parameters)});
+    constexpr std::uint32_t kCount = 256;
+    const std::vector<std::uint32_t> expected = ExpectedSamples(kCount);
+    Arenas arenas(*context, MemoryUse::Device, "samples", 1 << 16);
+    const BufferRange range = arenas.Allocate(expected.size() * sizeof(std::uint32_t));
+    const Ticket written = context->Main().Submit([&](VkCommandBuffer commands) {
+        samples.Dispatch(commands, {kCount / 64, 1, 1},
+                         Parameters{{arenas.Address(range)}, kCount});
+    });
+    Readback readback(*context, context->Main(), arenas.Storage(range), range.offset, range.size,
+                      std::span(&written, 1));
+    EXPECT_EQ(readback.Values<std::uint32_t>(), expected);
     test::ExpectClean(*context);
 }
 
