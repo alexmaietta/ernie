@@ -60,6 +60,9 @@ class Viewer {
 
     /// @brief Draws frames until the window closes, the user quits or the frame count is reached.
     void Run();
+    /// @brief Draws `count` more frames, whatever the frame count, or fewer once the window
+    /// closes or the user quits.
+    void RunFrames(std::uint64_t count);
 
     std::uint64_t Frames() const {
         return frames_;

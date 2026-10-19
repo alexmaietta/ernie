@@ -123,6 +123,13 @@ void Viewer::Run() {
     }
 }
 
+void Viewer::RunFrames(std::uint64_t count) {
+    for (std::uint64_t frame = 0; frame < count && !presenter_->CloseRequested() && shell_->Open();
+         ++frame) {
+        Step();
+    }
+}
+
 Tensor Viewer::ReadImage(const DeviceImage& image, const Ticket& drawn) {
     const glm::uvec2 size(image.Description().extent);
     const std::uint64_t bytes = std::uint64_t{4} * size.x * size.y;

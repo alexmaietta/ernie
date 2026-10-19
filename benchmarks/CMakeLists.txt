@@ -2,6 +2,7 @@
 add_executable(
     ernie_benchmarks
     main.cpp
+    app/viewer_frame.cpp
     device/pose_step.cpp
     render/batch_step.cpp
     render/hide_seek.cpp
@@ -11,5 +12,5 @@ add_executable(
 )
 target_link_libraries(
     ernie_benchmarks
-    PRIVATE ernie_static ernie_volk ernie_vma ernie_build_options
+    PRIVATE ernie_viewer ernie_static ernie_volk ernie_vma ernie_build_options
 )
